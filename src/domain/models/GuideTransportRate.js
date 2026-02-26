@@ -131,12 +131,10 @@ class GuideTransportRate extends Parse.Object {
 
       if (!currentRate) {
         // Create default rate of 400 MXN
-        const defaultUser = await new Parse.Query(Parse.User)
-          .equalTo('username', 'system')
-          .first({ useMasterKey: true }) || null;
+        const defaultUser = (await new Parse.Query(Parse.User).equalTo('username', 'system').first({ useMasterKey: true })) || null;
 
         const defaultRate = await GuideTransportRate.createRate(
-          400.00,
+          400.0,
           new Date(),
           defaultUser,
           'Tarifa por defecto creada automáticamente'

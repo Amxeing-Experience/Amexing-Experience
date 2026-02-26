@@ -95,7 +95,7 @@ class VehicleRatePricesController {
               id: p.id,
               rateId,
               rateName: rate ? rate.get('name') : 'undefined',
-              rateColor: rate ? (rate.get('color') || '#6c757d') : '#6c757d',
+              rateColor: rate ? rate.get('color') || '#6c757d' : '#6c757d',
               vehicleTypeId,
               vehicleTypeName: vehicleType ? vehicleType.get('name') : 'undefined',
               vehicleTypeCode: vehicleType ? vehicleType.get('code') : 'undefined',

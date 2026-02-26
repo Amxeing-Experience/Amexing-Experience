@@ -187,9 +187,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                 <div class="form-text">Número de pasajeros</div>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="luggageCapacity" class="form-label">Capacidad de Maletas</label>
+                                <label for="luggageCapacity" class="form-label">Capacidad de Carry-on</label>
                                 <input type="number" class="form-control" id="luggageCapacity" name="luggageCapacity" min="0" max="20" placeholder="Ej: 2">
-                                <div class="form-text">Número de maletas grandes</div>
+                                <div class="form-text">Número de carry-on grandes</div>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="color" class="form-label">Color <span class="text-danger">*</span></label>
@@ -445,7 +445,7 @@ table.dataTable thead .sorting_desc_disabled {
                         const luggageCapacity = row.luggageCapacity || 0;
                         return `<div class="text-center">
                             <span class="badge bg-secondary">${data} pax</span>
-                            <br><small class="text-muted">${luggageCapacity} maletas</small>
+                            <br><small class="text-muted">${luggageCapacity} carry-on</small>
                         </div>`;
                     }
                 });

@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "description": "Vehicle images list response",
+  "required": ["success", "data"],
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "Operation success status",
+      "example": true
+    },
+    "data": {
+      "type": "array",
+      "description": "Array of vehicle images",
+      "items": {
+        "$ref": "./VehicleImage.json"
+      }
+    },
+    "count": {
+      "type": "integer",
+      "description": "Total number of images",
+      "example": 5
+    }
+  }
+}

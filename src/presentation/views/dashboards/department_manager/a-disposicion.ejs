@@ -1,0 +1,980 @@
+<%
+/**
+ * Department Manager A Disposición Calculator Page
+ * Hourly vehicle rental pricing calculator with volume discounts
+ *
+ * Layout Structure:
+ * - Page header with breadcrumb
+ * - Calculator card with vehicle selection, inputs, and real-time pricing
+ * - Discount information and pricing breakdown
+ *
+ * Created by Denisse Maldonado.
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'department_manager';
+%>
+
+<!-- CSRF Token Meta Tag -->
+<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+<meta name="csrf-token" content="<%= csrfToken %>">
+<% } %>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h2 class="mb-1 fw-bold">Servicio a Disposición</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/department_manager" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-calculator me-1"></i>A Disposición
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Calculator Section -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); border: none;">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-calculator me-2"></i>Calculadora de Servicios por Horas
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Information Banner -->
+                <div class="alert alert-info border-0 mb-4" role="alert">
+                    <i class="ti ti-info-circle me-2"></i>
+                    <strong>Servicio a Disposición:</strong> Calcula el costo de renta de vehículos por horas con descuentos automáticos por volumen.
+                </div>
+
+                <!-- Global Settings Row -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">
+                            <i class="ti ti-currency-dollar me-1"></i>Moneda
+                        </label>
+                        <select class="form-select" id="disposicion-currency">
+                            <option value="MXN" selected>MXN - Peso Mexicano</option>
+                            <option value="USD">USD - Dólar Estadounidense</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">
+                            <i class="ti ti-credit-card me-1"></i>Método de Pago
+                        </label>
+                        <select class="form-select" id="disposicion-payment">
+                            <option value="efectivo" selected>Efectivo</option>
+                            <option value="transferencia">Transferencia</option>
+                            <option value="tarjeta">Tarjeta de Débito/Crédito</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- First Row: All Steps + Mini Carousel -->
+                <div class="row">
+                    <!-- Rate Selection (Paso 1) -->
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <label class="form-label fw-bold" style="font-size: 1rem;">
+                            <i class="ti ti-star me-1"></i>Paso 1: Tarifa
+                        </label>
+                        <div id="rate-buttons-group" class="btn-group-vertical w-100" role="group" aria-label="Tarifas disponibles">
+                            <!-- Rate buttons will be dynamically added here -->
+                        </div>
+                        <input type="hidden" id="disposicion-rate" value="">
+                    </div>
+                    
+                    <!-- Vehicle Selection (Paso 2) -->
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <!-- Message when no rate is selected -->
+                        <div id="vehicle-placeholder-message">
+                            <label class="form-label fw-bold text-muted" style="font-size: 1rem;">
+                                <i class="ti ti-car me-1"></i>Paso 2: Vehículo
+                            </label>
+                            <div class="alert alert-info border-0 small" style="background-color: #f8f9fa; padding: 0.5rem;">
+                                <i class="ti ti-info-circle me-1"></i>
+                                <span class="text-muted">Selecciona tarifa primero</span>
+                            </div>
+                        </div>
+                        
+                        <div id="vehicle-selection-container" style="display: none;">
+                            <label class="form-label fw-bold" style="font-size: 1rem;">
+                                <i class="ti ti-car me-1"></i>Paso 2: Vehículo
+                            </label>
+                            <div id="vehicle-buttons-group" style="max-height: 250px; overflow-y: auto;">
+                                <!-- Vehicle buttons will be dynamically added here -->
+                            </div>
+                            <input type="hidden" id="disposicion-vehicle-type" value="">
+                        </div>
+                    </div>
+                    
+                    <!-- Mini Vehicle Carousel (Thumbnails) - Now comes third -->
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <label class="form-label fw-bold" style="font-size: 1rem;">
+                            <i class="ti ti-photo me-1"></i>Fotos
+                        </label>
+                        <div id="vehicle-carousel-section" style="display: none;">
+                            <div id="vehicleCarousel" class="carousel slide" data-bs-ride="false">
+                                <div class="carousel-inner" id="carousel-images" style="height: 150px; overflow: hidden;">
+                                    <!-- Mini vehicle images will be loaded here -->
+                                </div>
+                                <button class="carousel-control-prev" type="button" data-bs-target="#vehicleCarousel" data-bs-slide="prev" 
+                                        style="width: 25px; height: 150px; background: rgba(0,0,0,0.1);">
+                                    <span class="carousel-control-prev-icon" aria-hidden="true" style="width: 1rem; height: 1rem;"></span>
+                                </button>
+                                <button class="carousel-control-next" type="button" data-bs-target="#vehicleCarousel" data-bs-slide="next"
+                                        style="width: 25px; height: 150px; background: rgba(0,0,0,0.1);">
+                                    <span class="carousel-control-next-icon" aria-hidden="true" style="width: 1rem; height: 1rem;"></span>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Placeholder when no vehicle selected -->
+                        <div id="photos-placeholder" class="alert alert-info border-0 small" style="background-color: #f8f9fa; padding: 0.5rem;">
+                            <i class="ti ti-info-circle me-1"></i>
+                            <span class="text-muted">Selecciona un vehículo</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Input Controls (Paso 3) - Now comes fourth -->
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <!-- Message when no vehicle is selected -->
+                        <div id="input-placeholder-message">
+                            <label class="form-label fw-bold text-muted" style="font-size: 1rem;">
+                                <i class="ti ti-calculator me-1"></i>Paso 3: Datos
+                            </label>
+                            <div class="alert alert-info border-0 small" style="background-color: #f8f9fa; padding: 0.5rem;">
+                                <i class="ti ti-info-circle me-1"></i>
+                                <span class="text-muted">Completa pasos anteriores</span>
+                            </div>
+                        </div>
+                        
+                        <div id="input-fields-container" style="display: none;">
+                            <label class="form-label fw-bold" style="font-size: 1rem;">
+                                <i class="ti ti-calculator me-1"></i>Paso 3: Datos
+                            </label>
+                            
+                            <!-- Number of Vehicles -->
+                            <div class="mb-2">
+                                <label class="form-label small">
+                                    <i class="ti ti-car me-1"></i>Vehículos
+                                </label>
+                                <input type="number" class="form-control" id="disposicion-vehicle-count" 
+                                       min="1" max="10" value="1">
+                            </div>
+                            
+                            <!-- Hours Required -->
+                            <div class="mb-2">
+                                <label class="form-label small">
+                                    <i class="ti ti-clock me-1"></i>Horas
+                                </label>
+                                <input type="number" class="form-control" id="disposicion-hours" 
+                                       min="1" max="24" value="4" step="0.5">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Results Section (Discount Information + Price Display) -->
+                <div class="row mt-4" id="price-display-section">
+                    <!-- Descuentos por Volumen (6 columns) -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card border-0" style="background-color: #f8f9fa; border-radius: 15px;">
+                            <div class="card-body p-4">
+                                <h5 class="card-title mb-3 fw-bold text-primary">
+                                    <i class="ti ti-percentage me-2"></i>Descuentos por Volumen
+                                </h5>
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <div class="fw-bold text-success">8+ horas</div>
+                                            <div class="text-muted small">-2.5%</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <div class="fw-bold text-success">10+ horas</div>
+                                            <div class="text-muted small">-5%</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <div class="fw-bold text-success">12+ horas</div>
+                                            <div class="text-muted small">-7.5%</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <div class="fw-bold text-success">16+ horas</div>
+                                            <div class="text-muted small">-10%</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Cotización Final (6 columns) -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card border-0" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f8f9fa 100%); border-radius: 15px;">
+                            <div class="card-body p-4">
+                                <h5 class="card-title mb-3 fw-bold text-primary">
+                                    <i class="ti ti-currency-dollar me-2"></i>Cotización Final
+                                </h5>
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="text-muted">Costo base:</span>
+                                    <span id="disposicion-base-cost" class="fw-bold text-dark fs-5">$0 MXN</span>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-3" id="disposicion-discount-row" style="display: none;">
+                                    <span class="text-success">
+                                        <i class="ti ti-discount me-1"></i>Descuento:
+                                    </span>
+                                    <span id="disposicion-discount" class="text-success fw-bold fs-5">-0%</span>
+                                </div>
+                                
+                                <hr class="my-3" style="border-top: 2px solid #dee2e6;">
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold text-primary" style="font-size: 1rem;">Total:</span>
+                                    <span id="disposicion-total-cost" class="fw-bold text-primary" style="font-size: 1rem;">$0 MXN</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Centralized Pricing Utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
+
+<!-- JavaScript for Calculator -->
+<script>
+(function() {
+    'use strict';
+    
+    let vehicleTypes = [];
+    let disposablePrices = {};
+    let availableRates = [];
+    let defaultHourlyRate = 500; // Fallback hourly rate
+    let vehicleImages = {}; // Store images grouped by vehicleType + rate
+    let currentExchangeRate = 0;
+    let currentTransferRate = 0;
+    let currentAgencyRate = 0;
+    
+    // Load rates and initialize calculator
+    async function loadRatesAndInitialize() {
+        try {
+            // Load all available rates first
+            const ratesResponse = await fetch('/api/rates/active', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (ratesResponse.ok) {
+                const ratesData = await ratesResponse.json();
+                // Filter out "Económico" rate
+                availableRates = (ratesData.data || []).filter(rate => 
+                    rate.label !== 'Económico' && !rate.label.toLowerCase().includes('economico')
+                );
+                populateRateButtons();
+            }
+            
+            // Load disposable prices grouped by vehicle type
+            const pricesResponse = await fetch('/api/disposable-prices/by-vehicle-type', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (pricesResponse.ok) {
+                const pricesResult = await pricesResponse.json();
+                disposablePrices = pricesResult.data || {};
+                
+                // Extract vehicle types from disposable prices data
+                vehicleTypes = Object.values(disposablePrices).map(data => {
+                    const vehicleType = data.vehicleType;
+                    const currentPrice = data.prices.find(p => p.isCurrentlyEffective) || data.prices[0];
+                    
+                    return {
+                        id: vehicleType.id,
+                        value: vehicleType.code || vehicleType.name,
+                        label: vehicleType.name,
+                        capacity: vehicleType.capacity || 4,
+                        hourlyPrice: currentPrice ? currentPrice.hourlyPrice : defaultHourlyRate,
+                        currency: currentPrice ? currentPrice.currency : 'MXN'
+                    };
+                });
+                
+                populateVehicleTypeSelect();
+                
+                // Load vehicle images for all combinations
+                await loadAllVehicleImages();
+            } else {
+                console.warn('Failed to load disposable prices, using fallback data');
+                loadFallbackData();
+            }
+        } catch (error) {
+            console.error('Error loading vehicle types and prices:', error);
+            loadFallbackData();
+        }
+    }
+    
+    // Load all vehicle images for available combinations
+    async function loadAllVehicleImages() {
+        try {
+            console.log('🖼️ Loading vehicle images for all combinations...');
+            
+            // Get all vehicles that have images based on vehicleType and rate combinations
+            const imagesResponse = await fetch('/api/vehicles/images/by-disposable-combinations', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (imagesResponse.ok) {
+                const imagesData = await imagesResponse.json();
+                vehicleImages = imagesData.data || {};
+                console.log('✅ Loaded vehicle images:', Object.keys(vehicleImages).length, 'combinations');
+            } else {
+                console.warn('⚠️ Failed to load vehicle images, will use placeholders');
+                vehicleImages = {};
+            }
+        } catch (error) {
+            console.error('❌ Error loading vehicle images:', error);
+            vehicleImages = {};
+        }
+    }
+    
+    // Fallback data if API fails
+    function loadFallbackData() {
+        vehicleTypes = [
+            { id: 'fallback-sedan', value: 'SEDAN', label: 'Sedan', capacity: 4, hourlyPrice: 450, currency: 'MXN' },
+            { id: 'fallback-van', value: 'VAN', label: 'Van', capacity: 8, hourlyPrice: 650, currency: 'MXN' },
+            { id: 'fallback-suburban', value: 'SUBURBAN', label: 'SUV', capacity: 6, hourlyPrice: 850, currency: 'MXN' },
+            { id: 'fallback-sprinter', value: 'SPRINTER', label: 'Sprinter', capacity: 15, hourlyPrice: 1200, currency: 'MXN' },
+            { id: 'fallback-model3', value: 'MODEL 3', label: 'Tesla Model 3', capacity: 4, hourlyPrice: 750, currency: 'MXN' },
+            { id: 'fallback-modely', value: 'MODEL Y', label: 'Tesla Model Y', capacity: 5, hourlyPrice: 950, currency: 'MXN' }
+        ];
+        populateVehicleTypeSelect();
+    }
+    
+    // Populate rate buttons (shows all rates initially)
+    function populateRateButtons() {
+        const buttonsContainer = $('#rate-buttons-group');
+        buttonsContainer.empty();
+        
+        if (availableRates.length === 0) {
+            buttonsContainer.append(`
+                <div class="alert alert-warning mb-0">
+                    <i class="ti ti-exclamation-triangle me-2"></i>
+                    No hay tarifas disponibles
+                </div>
+            `);
+            return;
+        }
+        
+        // Create buttons for all available rates (none selected by default)
+        availableRates.forEach((rate, index) => {
+            const button = $(`
+                <button type="button" 
+                        class="btn btn-outline-primary mb-2 rate-button shadow-sm" 
+                        data-rate-id="${rate.value}"
+                        data-percentage="${rate.percentage || 0}"
+                        style="border-radius: 12px; padding: 15px 20px; transition: all 0.2s ease;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="fw-bold fs-6">${rate.label}</span>
+                            ${rate.percentage ? `<div class="small text-muted mt-1">Tarifa: ${rate.percentage}%</div>` : ''}
+                        </div>
+                        <i class="ti ti-calculator fs-5 opacity-75"></i>
+                    </div>
+                </button>
+            `);
+            
+            // Add hover effects
+            button.hover(
+                function() { $(this).css('transform', 'translateY(-2px)'); },
+                function() { $(this).css('transform', 'translateY(0)'); }
+            );
+            
+            buttonsContainer.append(button);
+        });
+        
+        // Don't auto-select any rate - let user choose
+        
+        // Add click handlers for rate buttons
+        $('.rate-button').on('click', async function() {
+            // Remove active state from all buttons
+            $('.rate-button').each(function() {
+                $(this).removeClass('btn-primary').addClass('btn-outline-primary');
+                // Update text colors for inactive state
+                $(this).find('.small').removeClass('text-light').addClass('text-muted');
+            });
+            
+            // Add active state to clicked button
+            $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+            $(this).find('.small').removeClass('text-muted').addClass('text-light');
+            
+            // Update hidden input value
+            const rateId = $(this).data('rate-id');
+            $('#disposicion-rate').val(rateId);
+            
+            // Show vehicle selection and load vehicles for this rate
+            await loadVehiclesForRate(rateId);
+            
+            // Recalculate price
+            updateDisposicionPrice();
+        });
+    }
+    
+    // Load vehicles available for selected rate
+    async function loadVehiclesForRate(rateId) {
+        try {
+            const vehiclesResponse = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (vehiclesResponse.ok) {
+                const vehiclesData = await vehiclesResponse.json();
+                const availableVehicles = vehiclesData.data || [];
+                
+                // Hide placeholder message and show vehicle selection container
+                $('#vehicle-placeholder-message').hide();
+                $('#vehicle-selection-container').show();
+                
+                // Clear and populate vehicle buttons
+                const buttonsContainer = $('#vehicle-buttons-group');
+                buttonsContainer.empty();
+                
+                if (availableVehicles.length === 0) {
+                    buttonsContainer.append(`
+                        <div class="alert alert-warning mb-0">
+                            <i class="ti ti-exclamation-triangle me-2"></i>
+                            No hay vehículos disponibles para esta tarifa
+                        </div>
+                    `);
+                    return;
+                }
+                
+                availableVehicles.forEach((vehicle, index) => {
+                    const button = $(`
+                        <button type="button" 
+                                class="btn btn-outline-success mb-2 vehicle-button shadow-sm" 
+                                data-vehicle-id="${vehicle.value}"
+                                data-capacity="${vehicle.capacity}"
+                                data-trunk-capacity="${vehicle.trunkCapacity || 2}"
+                                style="border-radius: 12px; padding: 15px 20px; transition: all 0.2s ease;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="text-start">
+                                    <div class="fw-bold fs-6">${vehicle.label}</div>
+                                    <div class="small text-muted mt-1">
+                                        <i class="ti ti-users me-1"></i>${vehicle.capacity} personas
+                                        <span class="mx-2">•</span>
+                                        <i class="ti ti-luggage me-1"></i>${vehicle.trunkCapacity || 2} carry-on
+                                    </div>
+                                </div>
+                                <i class="ti ti-car fs-5 opacity-75"></i>
+                            </div>
+                        </button>
+                    `);
+                    
+                    // Add hover effects
+                    button.hover(
+                        function() { $(this).css('transform', 'translateY(-2px)'); },
+                        function() { $(this).css('transform', 'translateY(0)'); }
+                    );
+                    
+                    buttonsContainer.append(button);
+                });
+                
+                // Don't auto-select any vehicle - wait for user selection
+                $('#disposicion-vehicle-type').val('');
+                
+                // Add click handlers for vehicle buttons
+                $('.vehicle-button').on('click', function() {
+                    // Remove active state from all vehicle buttons
+                    $('.vehicle-button').each(function() {
+                        $(this).removeClass('btn-success').addClass('btn-outline-success');
+                        $(this).find('.small').removeClass('text-white text-light').addClass('text-muted');
+                    });
+                    
+                    // Add active state to clicked button
+                    $(this).removeClass('btn-outline-success').addClass('btn-success');
+                    $(this).find('.small').removeClass('text-muted').addClass('text-white');
+                    
+                    // Update hidden input value
+                    const selectedVehicleId = $(this).data('vehicle-id');
+                    const selectedVehicleName = $(this).find('.fw-bold').text();
+                    $('#disposicion-vehicle-type').val(selectedVehicleId);
+                    
+                    // Show Paso 3 input fields when vehicle is selected
+                    $('#input-placeholder-message').hide();
+                    $('#input-fields-container').show();
+                    $('#price-display-section').show();
+                    
+                    // Load and show vehicle carousel
+                    loadVehicleCarousel(selectedVehicleId, selectedVehicleName);
+                    
+                    // Recalculate price
+                    updateDisposicionPrice();
+                });
+            }
+        } catch (error) {
+            console.error('Error loading vehicles for rate:', error);
+        }
+    }
+    
+    // Load vehicle carousel images from pre-loaded data
+    function loadVehicleCarousel(vehicleTypeId, vehicleName) {
+        try {
+            // Show the carousel section and hide placeholder
+            $('#vehicle-carousel-section').show();
+            $('#photos-placeholder').hide();
+            
+            const carouselContainer = $('#carousel-images');
+            carouselContainer.empty();
+            
+            // Get current rate selection
+            const selectedRate = $('#disposicion-rate').val();
+            
+            // Create key for vehicleType + rate combination
+            const combinationKey = `${vehicleTypeId}_${selectedRate}`;
+            
+            // Get images for this combination from pre-loaded data
+            const images = vehicleImages[combinationKey] || [];
+            
+            console.log(`🖼️ Loading carousel for ${vehicleName} (${combinationKey}):`, images.length, 'images');
+            
+            if (images.length > 0) {
+                // Show one image per slide for better visibility
+                images.forEach((image, index) => {
+                    const isActive = index === 0;
+                    
+                    const slideHtml = `
+                        <div class="carousel-item ${isActive ? 'active' : ''}">
+                            <div class="d-flex justify-content-center align-items-center" style="height: 150px;">
+                                <img src="${image.url}" 
+                                     class="img-thumbnail" 
+                                     alt="Vehículo"
+                                     style="height: 150px; width: 150px; object-fit: cover; cursor: pointer;"
+                                     onclick="showFullImage('${image.url}')">
+                            </div>
+                        </div>
+                    `;
+                    
+                    carouselContainer.append(slideHtml);
+                });
+            } else {
+                // No images found, show placeholder
+                carouselContainer.append(`
+                    <div class="carousel-item active">
+                        <div class="d-flex align-items-center justify-content-center" 
+                             style="height: 150px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 5px;">
+                            <div class="text-center">
+                                <i class="ti ti-car text-muted fs-3"></i>
+                                <small class="text-muted d-block">Sin imagen</small>
+                            </div>
+                        </div>
+                    </div>
+                `);
+            }
+            
+        } catch (error) {
+            console.error('Error loading vehicle carousel:', error);
+            // Show placeholder on error
+            const carouselContainer = $('#carousel-images');
+            carouselContainer.html(`
+                <div class="carousel-item active">
+                    <div class="d-flex align-items-center justify-content-center" 
+                         style="height: 150px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 5px;">
+                        <div class="text-center">
+                            <i class="ti ti-car text-muted fs-3"></i>
+                            <small class="text-muted d-block">Sin imagen</small>
+                        </div>
+                    </div>
+                </div>
+            `);
+        }
+    }
+    
+    // Show full-size image in modal
+    function showFullImage(imageUrl) {
+        // Create and show modal with full image
+        const modal = `
+            <div class="modal fade" id="imageModal" tabindex="-1">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-body p-0">
+                            <img src="${imageUrl}" class="w-100" alt="Vehículo">
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove existing modal if any
+        $('#imageModal').remove();
+        $('body').append(modal);
+        $('#imageModal').modal('show');
+    }
+    
+    // Populate vehicle type select (legacy function)
+    function populateVehicleTypeSelect() {
+        const select = $('#disposicion-vehicle-type');
+        select.find('option:not(:first)').remove();
+        
+        vehicleTypes.forEach(vehicleType => {
+            const id = vehicleType.id || vehicleType.value;
+            const name = vehicleType.label || vehicleType.name;
+            const capacity = vehicleType.capacity || 4;
+            const hourlyPrice = vehicleType.hourlyPrice || defaultHourlyRate;
+            const currency = vehicleType.currency || 'MXN';
+            
+            select.append(`
+                <option value="${id}" 
+                        data-capacity="${capacity}"
+                        data-currency="${currency}">
+                    ${name} (${capacity} pasajeros)
+                </option>
+            `);
+        });
+    }
+    
+    // Load current exchange rate from API
+    async function loadCurrentExchangeRate() {
+        try {
+            const response = await fetch('/api/exchange-rate/current', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.data) {
+                    currentExchangeRate = data.data.value || 17.5;
+                    console.log('✅ Current exchange rate loaded:', currentExchangeRate);
+                } else {
+                    currentExchangeRate = 17.5; // Fallback
+                }
+            } else {
+                currentExchangeRate = 17.5; // Fallback
+            }
+        } catch (error) {
+            console.error('❌ Error loading exchange rate:', error);
+            currentExchangeRate = 17.5; // Fallback
+        }
+        return currentExchangeRate;
+    }
+    
+    // Load current transfer rate from API  
+    async function loadCurrentTransferRate() {
+        try {
+            const response = await fetch('/api/transfer-rate/current', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.data) {
+                    currentTransferRate = data.data.value || 3.0;
+                    console.log('✅ Current transfer rate loaded:', currentTransferRate + '%');
+                } else {
+                    currentTransferRate = 3.0; // Fallback percentage
+                }
+            } else {
+                currentTransferRate = 3.0; // Fallback percentage
+            }
+        } catch (error) {
+            console.error('❌ Error loading transfer rate:', error);
+            currentTransferRate = 3.0; // Fallback percentage
+        }
+        return currentTransferRate;
+    }
+    
+    // Load current agency rate from API  
+    async function loadCurrentAgencyRate() {
+        try {
+            const response = await fetch('/api/agency-rate/current', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.data) {
+                    currentAgencyRate = data.data.value || 5.0;
+                    console.log('✅ Current agency rate loaded:', currentAgencyRate + '%');
+                } else {
+                    currentAgencyRate = 5.0; // Fallback percentage
+                }
+            } else {
+                currentAgencyRate = 5.0; // Fallback percentage
+            }
+        } catch (error) {
+            console.error('❌ Error loading agency rate:', error);
+            currentAgencyRate = 5.0; // Fallback percentage
+        }
+        return currentAgencyRate;
+    }
+    
+    // USD rounding rules now handled by centralized PricingUtils.applyUSDRoundingRules()
+    
+    // Calculate discount percentage based on hours
+    function calculateDiscount(hours) {
+        if (hours >= 16) return 10;
+        if (hours >= 12) return 7.5;
+        if (hours >= 10) return 5;
+        if (hours >= 8) return 2.5;
+        return 0;
+    }
+    
+    // Update price calculation
+    async function updateDisposicionPrice() {
+        const vehicleCount = parseInt($('#disposicion-vehicle-count').val()) || 0;
+        const hours = parseFloat($('#disposicion-hours').val()) || 0;
+        const selectedVehicle = $('#disposicion-vehicle-type').val();
+        const selectedRate = $('#disposicion-rate').val();
+        const selectedCurrency = $('#disposicion-currency').val() || 'MXN';
+        const selectedPayment = $('#disposicion-payment').val() || 'efectivo';
+        
+        let currentHourlyRate = defaultHourlyRate;
+        
+        // Check if we have valid inputs
+        if (vehicleCount === 0 || hours === 0 || !selectedVehicle || !selectedRate) {
+            // Reset display when inputs are invalid
+            $('#disposicion-base-cost').text(`$0 ${selectedCurrency}`);
+            $('#disposicion-discount-row').hide();
+            $('#disposicion-total-cost').text(`$0 ${selectedCurrency}`);
+            return;
+        }
+        
+        // Fetch the specific price from DisposablePrices based on vehicle type and rate
+        try {
+            const apiUrl = `/api/disposable-prices/price?vehicleTypeId=${selectedVehicle}&rateId=${selectedRate}`;
+            console.log('🌐 Fetching price from:', apiUrl);
+            
+            const priceResponse = await fetch(apiUrl, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            console.log('📡 API response status:', priceResponse.status);
+            
+            if (priceResponse.ok) {
+                const priceData = await priceResponse.json();
+                console.log('💰 API response data:', priceData);
+                
+                if (priceData.success && priceData.data && !priceData.data.isDefault) {
+                    // Use the actual price from DisposablePrices
+                    currentHourlyRate = priceData.data.hourlyPrice;
+                    console.log('✅ Using actual price:', currentHourlyRate);
+                } else {
+                    // No specific price found, use default
+                    console.warn('⚠️ No specific price found for this combination, using default:', defaultHourlyRate);
+                    currentHourlyRate = defaultHourlyRate;
+                }
+            } else {
+                console.error('❌ Failed to fetch price:', priceResponse.status);
+                currentHourlyRate = defaultHourlyRate;
+            }
+        } catch (error) {
+            console.error('❌ Error fetching specific price:', error);
+            currentHourlyRate = defaultHourlyRate;
+        }
+        
+        // Load exchange rate if USD is selected and not already loaded
+        if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
+            await loadCurrentExchangeRate();
+        }
+        
+        // Load transfer rate if transferencia payment is selected and not already loaded
+        if (selectedPayment === 'transferencia' && currentTransferRate <= 0) {
+            await loadCurrentTransferRate();
+        }
+        
+        // Load agency rate if tarjeta payment is selected and not already loaded  
+        if (selectedPayment === 'tarjeta' && currentAgencyRate <= 0) {
+            await loadCurrentAgencyRate();
+        }
+        
+        // Calculate base price in MXN first
+        let adjustedHourlyRate = currentHourlyRate;
+        
+        // Apply payment method modifier
+        if (selectedPayment === 'transferencia') {
+            // Use transfer rate as percentage (e.g., 3.0 = +3%)
+            adjustedHourlyRate = adjustedHourlyRate * (1 + currentTransferRate / 100);
+        } else if (selectedPayment === 'tarjeta') {
+            // Use agency rate as percentage (typically higher than transfer rate)
+            adjustedHourlyRate = adjustedHourlyRate * (1 + currentAgencyRate / 100);
+        }
+        
+        // Convert to USD if needed
+        if (selectedCurrency === 'USD') {
+            adjustedHourlyRate = adjustedHourlyRate / currentExchangeRate;
+        }
+        
+        // Calculate base cost: hourly rate × hours × number of vehicles
+        let baseCost = adjustedHourlyRate * hours * vehicleCount;
+        
+        // Apply USD rounding rules to base cost for consistency
+        if (selectedCurrency === 'USD') {
+            baseCost = PricingUtils.applyUSDRoundingRules(baseCost);
+        }
+        
+        // Calculate discount based on hours (volume discount)
+        const discountPercent = calculateDiscount(hours);
+        const discountAmount = baseCost * (discountPercent / 100);
+        let totalCost = baseCost - discountAmount;
+        
+        // Apply USD rounding rules to final total if discount was applied
+        if (selectedCurrency === 'USD' && discountPercent > 0) {
+            totalCost = PricingUtils.applyUSDRoundingRules(totalCost);
+        }
+        
+        // Format currency based on selection
+        function formatPrice(amount, currency) {
+            if (currency === 'USD') {
+                return `$${amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} USD`;
+            } else {
+                return `$${amount.toLocaleString('es-MX', {minimumFractionDigits: 0, maximumFractionDigits: 0})} MXN`;
+            }
+        }
+        
+        // Update UI with formatted numbers
+        $('#disposicion-base-cost').text(formatPrice(baseCost, selectedCurrency));
+        
+        if (discountPercent > 0) {
+            $('#disposicion-discount-row').show();
+            $('#disposicion-discount').text(`-${discountPercent}% (${formatPrice(discountAmount, selectedCurrency)})`);
+        } else {
+            $('#disposicion-discount-row').hide();
+        }
+        
+        $('#disposicion-total-cost').text(formatPrice(totalCost, selectedCurrency));
+        
+        // Log calculation for debugging
+        console.log('🧮 Price calculation details:', {
+            selectedVehicle: selectedVehicle,
+            selectedRate: selectedRate,
+            hourlyRate: currentHourlyRate,
+            hours: hours,
+            vehicleCount: vehicleCount,
+            baseCost: baseCost,
+            discountPercent: discountPercent,
+            discountAmount: discountAmount,
+            totalCost: totalCost,
+            apiCallMade: selectedVehicle && selectedRate ? 'Yes' : 'No'
+        });
+    }
+    
+    // Event handlers
+    function initializeEventHandlers() {
+        // Handle input changes
+        $('#disposicion-vehicle-count, #disposicion-hours').on('input change', function() {
+            updateDisposicionPrice();
+        });
+        
+        // Add currency and payment method change listeners
+        $('#disposicion-currency').on('change', function() {
+            updateDisposicionPrice();
+        });
+        
+        $('#disposicion-payment').on('change', function() {
+            updateDisposicionPrice();
+        });
+    }
+    
+    // Initialize calculator
+    function initializeCalculator() {
+        if (typeof jQuery === 'undefined') {
+            setTimeout(initializeCalculator, 100);
+            return;
+        }
+        
+        loadRatesAndInitialize();
+        initializeEventHandlers();
+        updateDisposicionPrice();
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeCalculator);
+    } else {
+        initializeCalculator();
+    }
+})();
+</script>
+
+<!-- Page Styles -->
+<style>
+/* Calculator specific styles */
+#disposicion-vehicle-photo {
+    transition: all 0.3s ease;
+}
+
+.form-control-lg, .form-select-lg {
+    font-size: 1.1rem;
+    padding: 0.75rem 1rem;
+}
+
+/* Price display animations */
+#disposicion-total-cost {
+    transition: all 0.3s ease;
+}
+
+#disposicion-discount-row {
+    transition: all 0.3s ease;
+}
+
+/* Breadcrumb styles */
+.breadcrumb-item a {
+    color: #5a6a85;
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    color: #f59e0b;
+}
+
+/* Discount cards hover effect */
+.row .col-md-3:hover .bg-white {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+}
+</style>

@@ -2352,12 +2352,13 @@ const isClient = dtUserRole === 'client';
                 tours: selectedTours
             };
 
-            // DEBUG: Log the data being sent
-
-            // Only include duration if it has a value
+            // Always include duration (even if empty/null for proper handling)
             const durationValue = $('#duration').val();
-            if (durationValue) {
+            
+            if (durationValue && durationValue.toString().trim() !== '') {
                 experienceData.duration = parseFloat(durationValue);
+            } else {
+                experienceData.duration = null;
             }
 
             // Only include min_people if it has a value
@@ -2426,6 +2427,20 @@ const isClient = dtUserRole === 'client';
 
             const url = isEdit ? `${apiEndpoint}/${experienceId}` : apiEndpoint;
             const method = isEdit ? 'PUT' : 'POST';
+            
+            // DEBUG: Log form submission data
+            console.log('🔍 FORM SUBMISSION DEBUG:', {
+                isEdit: isEdit,
+                experienceId: experienceId,
+                url: url,
+                method: method,
+                formData: experienceData,
+                durationFromForm: $('#duration').val(),
+                nameFromForm: $('#name').val(),
+                descriptionFromForm: $('#description').val(),
+                costFromForm: $('#cost').val()
+            });
+            
             $('#saveExperienceBtn').prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
 
             $.ajax({
@@ -2433,6 +2448,12 @@ const isClient = dtUserRole === 'client';
                 contentType: 'application/json',
                 data: JSON.stringify(experienceData),
                 success: function(response) {
+                    // DEBUG: Log API response
+                    console.log('📡 API RESPONSE DEBUG:', {
+                        success: response.success,
+                        data: response.data,
+                        fullResponse: response
+                    });
                     if (response.success) {
                         $('#experienceModal').modal('hide');
                         

@@ -27,6 +27,7 @@
 const Parse = require('parse/node');
 const BaseModel = require('./BaseModel');
 const logger = require('../../infrastructure/logger');
+const FileStorageService = require('../../application/services/FileStorageService');
 
 /**
  * ExperienceImage class for managing experience gallery images.
@@ -149,13 +150,49 @@ class ExperienceImage extends BaseModel {
 
   /**
    * Get image URL (presigned S3 URL or legacy local path).
-   * Priority: imageFile (Parse.File) > url (legacy local path).
-   * @returns {string} Image URL path or presigned URL.
+   * Priority: s3Key (direct S3) > imageFile (Parse.File) > url (legacy local path).
+   * @returns {Promise<string>} Image URL path or presigned URL.
    * @example
-   * const url = experienceImage.getUrl(); // Presigned S3 URL or legacy path
+   * const url = await experienceImage.getUrl(); // Presigned S3 URL or legacy path
    */
-  getUrl() {
-    // Priority: imageFile (Parse.File with presigned URL) > url (legacy local)
+  async getUrl() {
+    // Priority: s3Key (direct S3) > imageFile (Parse.File) > url (legacy local)
+    const s3Key = this.get('s3Key');
+    if (s3Key) {
+      try {
+        // Initialize FileStorageService for presigned URL generation
+        const fileStorageService = new FileStorageService({
+          baseFolder: 'experiences',
+          isPublic: false,
+          deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+          presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+        });
+
+        // Fix environment mismatch in S3 keys (staging vs dev)
+        const currentPrefix = process.env.S3_PREFIX || 'dev/';
+        let correctedS3Key = s3Key;
+        if (!s3Key.startsWith(currentPrefix)) {
+          // Extract filename from the key and prepend correct environment prefix
+          const filename = s3Key.split('/').pop();
+          const pathParts = s3Key.split('/');
+          // Keep the resource type (e.g., 'experiences') and filename
+          if (pathParts.length >= 2) {
+            const resourceType = pathParts[pathParts.length - 2];
+            correctedS3Key = `${currentPrefix}${resourceType}/${filename}`;
+          }
+        }
+
+        return await fileStorageService.getPresignedUrl(correctedS3Key);
+      } catch (error) {
+        logger.warn('Failed to generate presigned URL for S3 key', {
+          s3Key,
+          error: error.message,
+          imageId: this.id,
+        });
+        // Fall through to legacy methods
+      }
+    }
+
     const imageFile = this.get('imageFile');
     if (imageFile) {
       return imageFile.url(); // S3 presigned URL from Parse.File
@@ -313,6 +350,56 @@ class ExperienceImage extends BaseModel {
     this.set('uploadedAt', date);
   }
 
+  /**
+   * Get optimization metadata.
+   * @returns {object|null} Optimization metadata object or null.
+   * @example
+   * const metadata = experienceImage.getOptimizationMetadata();
+   */
+  getOptimizationMetadata() {
+    return this.get('optimizationMetadata') || null;
+  }
+
+  /**
+   * Set optimization metadata.
+   * @param {object} metadata - Optimization metadata.
+   * @example
+   * experienceImage.setOptimizationMetadata({ optimized: true, formats: {...} });
+   */
+  setOptimizationMetadata(metadata) {
+    this.set('optimizationMetadata', metadata);
+  }
+
+  /**
+   * Get optimized variants.
+   * @returns {object|null} Optimized variants object or null.
+   * @example
+   * const variants = experienceImage.getOptimizedVariants();
+   */
+  getOptimizedVariants() {
+    return this.get('optimizedVariants') || null;
+  }
+
+  /**
+   * Set optimized variants.
+   * @param {object} variants - Optimized variants.
+   * @example
+   * experienceImage.setOptimizedVariants({ avif: {...}, webp: {...} });
+   */
+  setOptimizedVariants(variants) {
+    this.set('optimizedVariants', variants);
+  }
+
+  /**
+   * Get is primary status (alias for isPrimary for compatibility).
+   * @returns {boolean} True if primary image.
+   * @example
+   * if (experienceImage.getIsPrimary()) { console.log('This is the main image'); }
+   */
+  getIsPrimary() {
+    return this.get('isPrimary') || false;
+  }
+
   // =================
   // STATIC METHODS
   // =================
@@ -326,8 +413,7 @@ class ExperienceImage extends BaseModel {
    */
   static async findByExperience(experienceId) {
     try {
-      const LocalExperienceImage = Parse.Object.extend('ExperienceImage');
-      const query = new Parse.Query(LocalExperienceImage);
+      const query = new Parse.Query('ExperienceImage');
 
       const experience = await new Parse.Query('Experience').get(experienceId, {
         useMasterKey: true,
@@ -336,7 +422,47 @@ class ExperienceImage extends BaseModel {
       query.equalTo('exists', true);
       query.ascending('displayOrder');
 
-      return await query.find({ useMasterKey: true });
+      const results = await query.find({ useMasterKey: true });
+
+      // Convert Parse objects to ExperienceImage instances
+      const images = results.map((obj) => {
+        const img = new ExperienceImage();
+        // Copy all attributes from Parse object to ExperienceImage instance
+        Object.keys(obj.attributes).forEach((key) => {
+          img.set(key, obj.get(key));
+        });
+        img.id = obj.id;
+        img._objCount = obj._objCount; // eslint-disable-line no-underscore-dangle
+        img.className = obj.className;
+        // Store timestamps as private properties to avoid Parse setter issue
+        img._createdAt = obj.createdAt; // eslint-disable-line no-underscore-dangle
+        img._updatedAt = obj.updatedAt; // eslint-disable-line no-underscore-dangle
+        // Override getters to return the stored timestamps
+        Object.defineProperty(img, 'createdAt', {
+          get() { return this._createdAt; }, // eslint-disable-line no-underscore-dangle
+          configurable: true,
+        });
+        Object.defineProperty(img, 'updatedAt', {
+          get() { return this._updatedAt; }, // eslint-disable-line no-underscore-dangle
+          configurable: true,
+        });
+        return img;
+      });
+
+      // Sort to ensure primary image comes first, then by display order
+      return images.sort((a, b) => {
+        const aIsPrimary = a.get('isPrimary') || false;
+        const bIsPrimary = b.get('isPrimary') || false;
+
+        // Primary images come first
+        if (aIsPrimary && !bIsPrimary) return -1;
+        if (!aIsPrimary && bIsPrimary) return 1;
+
+        // If both are primary or both are not primary, sort by displayOrder
+        const aOrder = a.get('displayOrder') || 0;
+        const bOrder = b.get('displayOrder') || 0;
+        return aOrder - bOrder;
+      });
     } catch (error) {
       logger.error('Error finding images by experience', {
         experienceId,
@@ -443,8 +569,7 @@ class ExperienceImage extends BaseModel {
    */
   static async findPrimaryImages(experienceId) {
     try {
-      const LocalExperienceImage = Parse.Object.extend('ExperienceImage');
-      const query = new Parse.Query(LocalExperienceImage);
+      const query = new Parse.Query('ExperienceImage');
 
       const experience = await new Parse.Query('Experience').get(experienceId, {
         useMasterKey: true,
@@ -454,7 +579,32 @@ class ExperienceImage extends BaseModel {
       query.equalTo('isPrimary', true);
       query.ascending('createdAt');
 
-      return await query.find({ useMasterKey: true });
+      const results = await query.find({ useMasterKey: true });
+
+      // Convert Parse objects to ExperienceImage instances
+      return results.map((obj) => {
+        const img = new ExperienceImage();
+        // Copy all attributes from Parse object to ExperienceImage instance
+        Object.keys(obj.attributes).forEach((key) => {
+          img.set(key, obj.get(key));
+        });
+        img.id = obj.id;
+        img._objCount = obj._objCount; // eslint-disable-line no-underscore-dangle
+        img.className = obj.className;
+        // Store timestamps as private properties to avoid Parse setter issue
+        img._createdAt = obj.createdAt; // eslint-disable-line no-underscore-dangle
+        img._updatedAt = obj.updatedAt; // eslint-disable-line no-underscore-dangle
+        // Override getters to return the stored timestamps
+        Object.defineProperty(img, 'createdAt', {
+          get() { return this._createdAt; }, // eslint-disable-line no-underscore-dangle
+          configurable: true,
+        });
+        Object.defineProperty(img, 'updatedAt', {
+          get() { return this._updatedAt; }, // eslint-disable-line no-underscore-dangle
+          configurable: true,
+        });
+        return img;
+      });
     } catch (error) {
       logger.error('Error finding primary images', {
         experienceId,
@@ -475,8 +625,16 @@ class ExperienceImage extends BaseModel {
     try {
       const images = await this.findByExperience(experienceId);
 
-      // Sort by creation time
-      images.sort((a, b) => a.get('createdAt').getTime() - b.get('createdAt').getTime());
+      // Sort by creation time (with null checks)
+      images.sort((a, b) => {
+        // Handle both direct property and private property
+        const aTime = a.createdAt || a._createdAt || a.get('createdAt') || new Date(0); // eslint-disable-line no-underscore-dangle
+        const bTime = b.createdAt || b._createdAt || b.get('createdAt') || new Date(0); // eslint-disable-line no-underscore-dangle
+        // Ensure we have Date objects
+        const aDate = aTime instanceof Date ? aTime : new Date(aTime);
+        const bDate = bTime instanceof Date ? bTime : new Date(bTime);
+        return aDate.getTime() - bDate.getTime();
+      });
 
       // Update display order based on sorted position
       const updatePromises = images.map((img, index) => {

@@ -106,21 +106,30 @@ class FileStorageService {
    */
   async uploadFile(fileBuffer, fileName, mimeType, options = {}) {
     try {
-      const { entityId, metadata = {} } = options;
+      const { entityId, metadata = {}, customS3Key } = options;
 
       logger.info('FileStorageService.uploadFile - Direct S3 upload with AWS SDK', {
         fileName,
         mimeType,
         bufferLength: fileBuffer?.length,
         timestamp: new Date().toISOString(),
+        customS3Key,
       });
 
-      // Generate unique filename with path structure
-      const uniqueFileName = this._generateFileName(fileName, entityId);
-
-      // Add environment prefix (dev/ or prod/)
-      const s3Prefix = process.env.S3_PREFIX || '';
-      const s3Key = `${s3Prefix}${uniqueFileName}`;
+      // Use customS3Key if provided, otherwise generate unique filename
+      let s3Key;
+      let uniqueFileName;
+      if (customS3Key) {
+        s3Key = customS3Key;
+        // Extract filename from customS3Key for logging
+        uniqueFileName = customS3Key.split('/').pop();
+      } else {
+        // Generate unique filename with path structure
+        uniqueFileName = this._generateFileName(fileName, entityId);
+        // Add environment prefix (dev/ or prod/)
+        const s3Prefix = process.env.S3_PREFIX || '';
+        s3Key = `${s3Prefix}${uniqueFileName}`;
+      }
 
       // Initialize AWS S3 client using credential chain (IAM role, env vars, etc.)
       const AWS = require('aws-sdk');

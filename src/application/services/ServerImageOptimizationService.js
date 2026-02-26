@@ -47,69 +47,148 @@ class ServerImageOptimizationService extends FileStorageService {
    */
   async uploadOptimizedImage(fileBuffer, fileName, mimeType, options = {}) {
     try {
-      const optimizationResults = {};
-
-      // Generate base S3 key
+      // Generate base S3 key for original
       const baseKey = this.generateS3Key(fileName, options);
-      const baseName = baseKey.split('.')[0]; // Remove extension
+      const extension = this.getFileExtension(fileName);
+      const basePath = baseKey.substring(0, baseKey.lastIndexOf('.'));
 
-      // Process each format
-      for (const format of this.supportedFormats) {
-        optimizationResults[format] = {};
+      // Upload original file first
+      await this.uploadFile(fileBuffer, baseKey, mimeType, options);
 
-        // Process each size variant
-        for (const [sizeName, sizeConfig] of Object.entries(this.sizeVariants)) {
-          try {
-            const optimizedBuffer = await this.processImageFormat(
-              fileBuffer,
-              format,
-              sizeConfig
-            );
+      const optimizedVariants = {};
 
-            // Generate S3 key for this variant
-            const variantKey = `${baseName}-${sizeName}.${format}`;
+      // Create AVIF variant
+      try {
+        const avifBuffer = await sharp(fileBuffer)
+          .avif({ quality: 85, effort: 4 })
+          .toBuffer();
 
-            // Upload to S3
-            const uploadResult = await this.uploadFile(
-              optimizedBuffer,
-              variantKey,
-              `image/${format}`,
-              { customS3Key: variantKey }
-            );
+        const avifKey = `${basePath}.avif`;
+        await this.uploadFile(avifBuffer, avifKey, 'image/avif', {
+          customS3Key: avifKey,
+        });
 
-            optimizationResults[format][sizeName] = {
-              s3Key: uploadResult.s3Key,
-              url: await this.getPresignedUrl(uploadResult.s3Key),
-              fileSize: optimizedBuffer.length,
-            };
-          } catch (error) {
-            console.error(`Error processing ${format} ${sizeName}:`, error);
-            optimizationResults[format][sizeName] = { error: error.message };
-          }
-        }
+        optimizedVariants.avif = {
+          s3Key: avifKey,
+          format: 'avif',
+        };
+
+        logger.info('Created AVIF variant', {
+          originalKey: baseKey,
+          avifKey,
+          size: avifBuffer.length,
+        });
+      } catch (error) {
+        logger.warn('Failed to create AVIF variant', {
+          error: error.message,
+          originalKey: baseKey,
+        });
       }
 
-      // Also upload original
-      const originalKey = `${baseName}-original.${this.getFileExtension(fileName)}`;
-      const originalUpload = await this.uploadFile(fileBuffer, originalKey, mimeType, {
-        customS3Key: originalKey,
-      });
+      // Create WebP variant
+      try {
+        const webpBuffer = await sharp(fileBuffer)
+          .webp({ quality: 90, effort: 4 })
+          .toBuffer();
 
-      optimizationResults.original = {
-        s3Key: originalUpload.s3Key,
-        url: await this.getPresignedUrl(originalUpload.s3Key),
-        fileSize: fileBuffer.length,
+        const webpKey = `${basePath}.webp`;
+        await this.uploadFile(webpBuffer, webpKey, 'image/webp', {
+          customS3Key: webpKey,
+        });
+
+        optimizedVariants.webp = {
+          s3Key: webpKey,
+          format: 'webp',
+        };
+
+        logger.info('Created WebP variant', {
+          originalKey: baseKey,
+          webpKey,
+          size: webpBuffer.length,
+        });
+      } catch (error) {
+        logger.warn('Failed to create WebP variant', {
+          error: error.message,
+          originalKey: baseKey,
+        });
+      }
+
+      // Create optimized JPEG if original isn't JPEG
+      if (extension !== 'jpg' && extension !== 'jpeg') {
+        try {
+          const jpegBuffer = await sharp(fileBuffer)
+            .jpeg({ quality: 92, progressive: true, mozjpeg: true })
+            .toBuffer();
+
+          const jpegKey = `${basePath}.jpg`;
+          await this.uploadFile(jpegBuffer, jpegKey, 'image/jpeg', {
+            customS3Key: jpegKey,
+          });
+
+          optimizedVariants.jpeg = {
+            s3Key: jpegKey,
+            format: 'jpeg',
+          };
+
+          logger.info('Created JPEG variant', {
+            originalKey: baseKey,
+            jpegKey,
+            size: jpegBuffer.length,
+          });
+        } catch (error) {
+          logger.warn('Failed to create JPEG variant', {
+            error: error.message,
+            originalKey: baseKey,
+          });
+        }
+      } else {
+        // Original is already JPEG
+        optimizedVariants.jpeg = {
+          s3Key: baseKey,
+          format: 'jpeg',
+        };
+      }
+
+      // Build optimization metadata structure compatible with existing code
+      const optimizationMetadata = {
+        formats: {},
+        original: {
+          s3Key: baseKey,
+          format: extension,
+        },
       };
+
+      // Add format metadata
+      if (optimizedVariants.avif) {
+        optimizationMetadata.formats.avif = {
+          url: null, // Will be generated by presigned URL
+          s3Key: optimizedVariants.avif.s3Key,
+        };
+      }
+      if (optimizedVariants.webp) {
+        optimizationMetadata.formats.webp = {
+          url: null,
+          s3Key: optimizedVariants.webp.s3Key,
+        };
+      }
+      if (optimizedVariants.jpeg) {
+        optimizationMetadata.formats.jpeg = {
+          url: null,
+          s3Key: optimizedVariants.jpeg.s3Key,
+        };
+      }
+
+      logger.info('Image optimization complete', {
+        originalKey: baseKey,
+        formats: Object.keys(optimizedVariants),
+        entityPath: options.entityPath,
+      });
 
       return {
         success: true,
-        originalS3Key: originalUpload.s3Key,
-        optimizedVariants: optimizationResults,
-        metadata: {
-          formats: this.supportedFormats,
-          sizes: Object.keys(this.sizeVariants),
-          processedAt: new Date().toISOString(),
-        },
+        originalS3Key: baseKey,
+        optimizedVariants,
+        metadata: optimizationMetadata,
       };
     } catch (error) {
       logger.error('Server-side image optimization failed:', error);
@@ -121,16 +200,14 @@ class ServerImageOptimizationService extends FileStorageService {
       return {
         success: true,
         originalS3Key: fallbackUpload.s3Key,
-        optimizedVariants: {
-          original: {
-            s3Key: fallbackUpload.s3Key,
-            url: await this.getPresignedUrl(fallbackUpload.s3Key),
-            fileSize: fileBuffer.length,
-          },
-        },
+        optimizedVariants: {},
         metadata: {
           fallback: true,
           error: error.message,
+          original: {
+            s3Key: fallbackUpload.s3Key,
+            format: this.getFileExtension(fileName),
+          },
         },
       };
     }
@@ -154,19 +231,13 @@ class ServerImageOptimizationService extends FileStorageService {
     // Apply format-specific optimization
     switch (format) {
       case 'avif':
-        return sharpInstance
-          .avif(this.qualitySettings.avif)
-          .toBuffer();
+        return sharpInstance.avif(this.qualitySettings.avif).toBuffer();
 
       case 'webp':
-        return sharpInstance
-          .webp(this.qualitySettings.webp)
-          .toBuffer();
+        return sharpInstance.webp(this.qualitySettings.webp).toBuffer();
 
       case 'jpeg':
-        return sharpInstance
-          .jpeg(this.qualitySettings.jpeg)
-          .toBuffer();
+        return sharpInstance.jpeg(this.qualitySettings.jpeg).toBuffer();
 
       default:
         throw new Error(`Unsupported format: ${format}`);
@@ -180,16 +251,31 @@ class ServerImageOptimizationService extends FileStorageService {
    * @param size
    * @example
    */
-  async getOptimizedImageUrl(originalS3Key, acceptHeader = '', size = 'original') {
+  async getOptimizedImageUrl(originalS3Key, acceptHeader = '') {
     try {
-      // Parse the base name from original key
-      const baseName = originalS3Key.split('-original.')[0];
+      // Remove extension to get base path
+      const lastDot = originalS3Key.lastIndexOf('.');
+      const basePath = originalS3Key.substring(0, lastDot);
 
       // Detect preferred format from Accept header
       const preferredFormat = this.detectPreferredFormat(acceptHeader);
 
-      // Try to get optimized version
-      const optimizedKey = `${baseName}-${size}.${preferredFormat}`;
+      // Build the optimized key based on format
+      let optimizedKey;
+      if (preferredFormat === 'avif') {
+        optimizedKey = `${basePath}.avif`;
+      } else if (preferredFormat === 'webp') {
+        optimizedKey = `${basePath}.webp`;
+      } else {
+        // For JPEG preference, check if we have an optimized JPEG
+        const extension = this.getFileExtension(originalS3Key);
+        if (extension !== 'jpg' && extension !== 'jpeg') {
+          optimizedKey = `${basePath}.jpg`;
+        } else {
+          // Original is already JPEG
+          optimizedKey = originalS3Key;
+        }
+      }
 
       // Check if optimized version exists
       const optimizedExists = await this.checkS3ObjectExists(optimizedKey);
@@ -199,7 +285,7 @@ class ServerImageOptimizationService extends FileStorageService {
         return {
           url,
           format: preferredFormat,
-          size,
+          size: 'original',
           optimized: true,
         };
       }
@@ -209,7 +295,7 @@ class ServerImageOptimizationService extends FileStorageService {
 
       return {
         url: originalUrl,
-        format: 'original',
+        format: this.getFileExtension(originalS3Key),
         size: 'original',
         optimized: false,
       };
@@ -250,10 +336,12 @@ class ServerImageOptimizationService extends FileStorageService {
     try {
       const AWS = require('aws-sdk');
       const s3 = new AWS.S3();
-      await s3.headObject({
-        Bucket: process.env.S3_BUCKET,
-        Key: s3Key,
-      }).promise();
+      await s3
+        .headObject({
+          Bucket: process.env.S3_BUCKET,
+          Key: s3Key,
+        })
+        .promise();
       return true;
     } catch (error) {
       if (error.code === 'NotFound') {
@@ -281,6 +369,15 @@ class ServerImageOptimizationService extends FileStorageService {
   generateS3Key(fileName, options = {}) {
     const prefix = process.env.S3_PREFIX || '';
     const entityPath = options.entityPath || 'images';
+
+    // Check if filename already has timestamp pattern (e.g., 1772057218560-ef1e7dbd.jpg)
+    const timestampPattern = /^\d{13}-[a-f0-9]{8}\./;
+    if (timestampPattern.test(fileName)) {
+      // Use filename as-is since it already has unique timestamp and random hex
+      return `${prefix}${entityPath}/${fileName}`;
+    }
+
+    // Generate new timestamp and random ID for regular filenames
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2, 10);
 

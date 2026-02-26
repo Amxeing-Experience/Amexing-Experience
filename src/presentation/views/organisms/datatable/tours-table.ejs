@@ -979,6 +979,13 @@ table.dataTable tbody tr.hover {
                             
                             console.log(`📊 Filtered ${newToursData.length - vehicleOnlyTours.length} walking tours out of ${newToursData.length} total tours`);
                             
+                            // Sort data alphabetically by destination name
+                            vehicleOnlyTours.sort((a, b) => {
+                                const nameA = (a.destinationPOI?.name || 'Tour').trim();
+                                const nameB = (b.destinationPOI?.name || 'Tour').trim();
+                                return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+                            });
+                            
                             allToursData = vehicleOnlyTours;
                             filteredData = allToursData; // Show filtered vehicle tours by default
                             
@@ -1827,6 +1834,14 @@ table.dataTable tbody tr.hover {
                         
                         // Update the data with price information (walking tours excluded)
                         allToursData = vehicleOnlyTours;
+                        
+                        // Sort data alphabetically by destination name
+                        allToursData.sort((a, b) => {
+                            const nameA = (a.destinationPOI?.name || 'Tour').trim();
+                            const nameB = (b.destinationPOI?.name || 'Tour').trim();
+                            return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+                        });
+                        
                         filteredData = allToursData;
                         
                         // Update table
@@ -2482,9 +2497,20 @@ table.dataTable tbody tr.hover {
             } 
             // Check optimization metadata
             else if (optimizationMetadata && (optimizationMetadata.availableFormats || optimizationMetadata.formats)) {
-                const availableFormats = optimizationMetadata.availableFormats || 
-                                        optimizationMetadata.formats || 
-                                        [];
+                let availableFormats = optimizationMetadata.availableFormats || 
+                                     optimizationMetadata.formats || 
+                                     [];
+                
+                // Handle case where formats is an object instead of array
+                if (typeof availableFormats === 'object' && !Array.isArray(availableFormats)) {
+                    availableFormats = Object.keys(availableFormats);
+                }
+                
+                // Ensure it's an array
+                if (!Array.isArray(availableFormats)) {
+                    availableFormats = [];
+                }
+                
                 // Count non-original formats (AVIF, WebP, JPEG)
                 const optimizedFormats = availableFormats.filter(f => f !== 'original');
                 const formatCount = optimizedFormats.length;
@@ -3162,6 +3188,11 @@ table.dataTable tbody tr.hover {
                                 });
 
                                 updateNoDaysMessage();
+                                // Update the availability status text to show selected days
+                                updateTourAvailabilityStatus();
+                            } else {
+                                // No specific days selected, update status to show "all days"
+                                updateTourAvailabilityStatus();
                             }
 
                             // Load base pricing for editing

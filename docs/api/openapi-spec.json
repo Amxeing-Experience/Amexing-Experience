@@ -1381,7 +1381,7 @@
         ],
         "summary": "Get current user profile",
         "operationId": "getUserProfile",
-        "description": "Retrieve the authenticated user's profile information.",
+        "description": "Retrieve the authenticated user's profile information including role and permissions.\n\n**Mobile App Usage:** Use this endpoint after login to get the user's permissions array and determine what features to enable in the app UI.",
         "security": [
           {
             "bearerAuth": []
@@ -1389,11 +1389,11 @@
         ],
         "responses": {
           "200": {
-            "description": "User profile",
+            "description": "User profile with role and permissions",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/User"
+                  "$ref": "#/components/schemas/UserProfileResponse"
                 }
               }
             }
@@ -1438,6 +1438,252 @@
           },
           "400": {
             "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/profile/image": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Get current user's profile image",
+        "operationId": "getProfileImage",
+        "description": "Get the optimized profile image URL for the authenticated user.\n\n**Mobile App Usage:** Call this endpoint after login to get the user's profile picture URL. The URL is a presigned S3 URL valid for 24 hours.\n\n**Image Optimization:** The API automatically returns the best format based on Accept header (WebP, AVIF, or original).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile image URL or null if no image",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri",
+                          "nullable": true,
+                          "description": "Presigned S3 URL (expires in 24h) or null if no image",
+                          "example": "https://amexing-bucket.s3.amazonaws.com/profiles/user123/avatar.webp?X-Amz-..."
+                        },
+                        "hasProfileImage": {
+                          "type": "boolean",
+                          "description": "Whether user has uploaded a profile image",
+                          "example": true
+                        },
+                        "optimization": {
+                          "type": "object",
+                          "description": "Image optimization metadata",
+                          "properties": {
+                            "format": {
+                              "type": "string",
+                              "description": "Served format",
+                              "example": "webp"
+                            },
+                            "availableFormats": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "example": [
+                                "webp",
+                                "avif",
+                                "jpeg"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "examples": {
+                  "with_image": {
+                    "summary": "User has profile image",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "url": "https://amexing-bucket.s3.amazonaws.com/profiles/user123/avatar.webp?...",
+                        "hasProfileImage": true,
+                        "optimization": {
+                          "format": "webp",
+                          "availableFormats": [
+                            "webp",
+                            "avif",
+                            "jpeg"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "no_image": {
+                    "summary": "User has no profile image",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "url": null,
+                        "hasProfileImage": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Upload profile image",
+        "operationId": "uploadProfileImage",
+        "description": "Upload and optimize a new profile image for the authenticated user.\n\n**Mobile App Usage:** Use multipart/form-data to upload the image. The API automatically optimizes the image into multiple formats (WebP, AVIF) for best performance.\n\n**Supported formats:** JPEG, PNG, GIF, WebP, AVIF\n**Max file size:** 10MB",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "profileImage"
+                ],
+                "properties": {
+                  "profileImage": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file to upload (JPEG, PNG, GIF, WebP, AVIF)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Image uploaded and optimized successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "New profile image URL",
+                          "example": "https://amexing-bucket.s3.amazonaws.com/profiles/user123/avatar.webp?..."
+                        },
+                        "optimization": {
+                          "type": "object",
+                          "properties": {
+                            "originalSize": {
+                              "type": "integer",
+                              "description": "Original file size in bytes",
+                              "example": 2048000
+                            },
+                            "optimizedSize": {
+                              "type": "integer",
+                              "description": "Optimized file size in bytes",
+                              "example": 512000
+                            },
+                            "savedPercentage": {
+                              "type": "number",
+                              "description": "Size reduction percentage",
+                              "example": 75
+                            },
+                            "availableFormats": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "example": [
+                                "webp",
+                                "avif",
+                                "jpeg"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Profile image uploaded successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Delete profile image",
+        "operationId": "deleteProfileImage",
+        "description": "Delete the profile image for the authenticated user.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile image deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Profile image deleted successfully"
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/UnauthorizedError"
@@ -1878,8 +2124,9 @@
         "tags": [
           "Rates"
         ],
-        "summary": "Get active Rates",
+        "summary": "Get active rates for filters",
         "operationId": "getActiveRates",
+        "description": "Get all active rates/segments formatted for dropdown select options.\n\n**Mobile App Usage:** Call this endpoint to populate the segment filter dropdown in vehicle list screens.\n\n**Use Case:** Filter vehicles by segment (Premium, Standard, etc.)",
         "security": [
           {
             "bearerAuth": []
@@ -1887,7 +2134,72 @@
         ],
         "responses": {
           "200": {
-            "description": "Active rates"
+            "description": "Active rates list formatted for select options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "description": "Array of rate options for dropdown",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "description": "Rate ID (use this for filtering)",
+                            "example": "rate001"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Display name for the dropdown",
+                            "example": "Premium"
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Color code for UI badges",
+                            "example": "#6366F1"
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Active Rates retrieved successfully"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "value": "rate001",
+                      "label": "Premium",
+                      "color": "#6366F1"
+                    },
+                    {
+                      "value": "rate002",
+                      "label": "Standard",
+                      "color": "#10B981"
+                    },
+                    {
+                      "value": "rate003",
+                      "label": "Economy",
+                      "color": "#F59E0B"
+                    }
+                  ],
+                  "message": "Active Rates retrieved successfully"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
           }
         }
       }
@@ -2212,8 +2524,9 @@
         "tags": [
           "Vehicle Types"
         ],
-        "summary": "Get active Vehicle Types",
+        "summary": "Get active vehicle types for filters",
         "operationId": "getActiveVehicleTypes",
+        "description": "Get all active vehicle types formatted for dropdown select options.\n\n**Mobile App Usage:** Call this endpoint to populate the vehicle type filter dropdown.\n\n**Use Case:** Filter vehicles by type (Van, SUV, Sedan, etc.)",
         "security": [
           {
             "bearerAuth": []
@@ -2221,7 +2534,96 @@
         ],
         "responses": {
           "200": {
-            "description": "Active vehicle types"
+            "description": "Active vehicle types list formatted for select options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "description": "Array of vehicle type options for dropdown",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "description": "Vehicle Type ID (use this for filtering)",
+                            "example": "type001"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Display name for the dropdown",
+                            "example": "Van"
+                          },
+                          "code": {
+                            "type": "string",
+                            "description": "Short code identifier",
+                            "example": "VAN"
+                          },
+                          "capacity": {
+                            "type": "integer",
+                            "description": "Default passenger capacity",
+                            "example": 14
+                          },
+                          "trunkCapacity": {
+                            "type": "integer",
+                            "description": "Default luggage capacity",
+                            "example": 10
+                          },
+                          "icon": {
+                            "type": "string",
+                            "description": "Icon identifier for UI",
+                            "example": "van"
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Active vehicle types retrieved successfully"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "value": "type001",
+                      "label": "Van",
+                      "code": "VAN",
+                      "capacity": 14,
+                      "trunkCapacity": 10,
+                      "icon": "van"
+                    },
+                    {
+                      "value": "type002",
+                      "label": "SUV",
+                      "code": "SUV",
+                      "capacity": 6,
+                      "trunkCapacity": 4,
+                      "icon": "suv"
+                    },
+                    {
+                      "value": "type003",
+                      "label": "Sedan",
+                      "code": "SEDAN",
+                      "capacity": 4,
+                      "trunkCapacity": 2,
+                      "icon": "car"
+                    }
+                  ],
+                  "message": "Active vehicle types retrieved successfully"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
           }
         }
       }
@@ -2343,16 +2745,141 @@
         "tags": [
           "Vehicles"
         ],
-        "summary": "Get Vehicles",
+        "summary": "Get vehicles list",
         "operationId": "getVehicles",
+        "description": "Get vehicles with optional filtering and pagination. Supports DataTables server-side processing.\n\n**Mobile App Usage:**\n- Use `rateId` to filter by segment (Premium, Standard, etc.)\n- Use `search[value]` for text search across brand, model, and license plate\n- Pagination via `start` and `length` parameters\n\n**Available Filters in Response:**\n- `vehicleTypeId.name` - Vehicle type (Van, SUV, Sedan, etc.)\n- `rateId.name` - Segment/rate name\n- `rateId.color` - Color code for UI badges",
         "security": [
           {
             "bearerAuth": []
           }
         ],
+        "parameters": [
+          {
+            "name": "rateId",
+            "in": "query",
+            "description": "Filter by Rate ID (segment). Get available rates from GET /api/rates/active",
+            "schema": {
+              "type": "string",
+              "example": "rate123"
+            }
+          },
+          {
+            "name": "vehicleTypeId",
+            "in": "query",
+            "description": "Filter by Vehicle Type ID. Get available types from GET /api/vehicle-types/active",
+            "schema": {
+              "type": "string",
+              "example": "vehicleType123"
+            }
+          },
+          {
+            "name": "search[value]",
+            "in": "query",
+            "description": "Text search across brand, model, and license plate",
+            "schema": {
+              "type": "string",
+              "example": "Mercedes"
+            }
+          },
+          {
+            "name": "draw",
+            "in": "query",
+            "description": "DataTables draw counter (echoed back in response)",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "description": "Pagination offset (default: 0)",
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "example": 0
+            }
+          },
+          {
+            "name": "length",
+            "in": "query",
+            "description": "Results per page (default: 25, max: 100)",
+            "schema": {
+              "type": "integer",
+              "default": 25,
+              "maximum": 100,
+              "example": 25
+            }
+          },
+          {
+            "name": "order[0][column]",
+            "in": "query",
+            "description": "Column index for sorting (DataTables format)",
+            "schema": {
+              "type": "integer",
+              "example": 0
+            }
+          },
+          {
+            "name": "order[0][dir]",
+            "in": "query",
+            "description": "Sort direction",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "example": "asc"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Vehicles list"
+            "description": "Paginated vehicles list with embedded type and rate information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleListResponse"
+                },
+                "example": {
+                  "success": true,
+                  "draw": 1,
+                  "recordsTotal": 50,
+                  "recordsFiltered": 12,
+                  "data": [
+                    {
+                      "id": "vehicle001",
+                      "brand": "Mercedes-Benz",
+                      "model": "Sprinter",
+                      "year": 2023,
+                      "licensePlate": "ABC-123",
+                      "capacity": 14,
+                      "luggageCapacity": 10,
+                      "color": "Blanco",
+                      "maintenanceStatus": "operational",
+                      "active": true,
+                      "image": "https://amexing-bucket.s3.amazonaws.com/vehicles/vehicle001/cover.jpg?...",
+                      "vehicleTypeId": {
+                        "id": "type001",
+                        "name": "Van",
+                        "code": "VAN",
+                        "icon": "van",
+                        "trunkCapacity": 10
+                      },
+                      "rateId": {
+                        "id": "rate001",
+                        "name": "Premium",
+                        "color": "#6366F1"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
           }
         }
       },
@@ -2360,16 +2887,109 @@
         "tags": [
           "Vehicles"
         ],
-        "summary": "Create Vehicle",
+        "summary": "Create vehicle",
         "operationId": "createVehicle",
+        "description": "Create a new vehicle. Requires admin or department_manager role.",
         "security": [
           {
             "bearerAuth": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "brand",
+                  "model",
+                  "licensePlate",
+                  "vehicleTypeId"
+                ],
+                "properties": {
+                  "brand": {
+                    "type": "string",
+                    "description": "Vehicle brand/manufacturer",
+                    "example": "Mercedes-Benz"
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "Vehicle model",
+                    "example": "Sprinter"
+                  },
+                  "year": {
+                    "type": "integer",
+                    "description": "Vehicle year",
+                    "example": 2023
+                  },
+                  "licensePlate": {
+                    "type": "string",
+                    "description": "License plate number (unique)",
+                    "example": "ABC-123"
+                  },
+                  "capacity": {
+                    "type": "integer",
+                    "description": "Passenger capacity",
+                    "example": 14
+                  },
+                  "luggageCapacity": {
+                    "type": "integer",
+                    "description": "Luggage capacity",
+                    "example": 10
+                  },
+                  "color": {
+                    "type": "string",
+                    "description": "Vehicle color",
+                    "example": "Blanco"
+                  },
+                  "vehicleTypeId": {
+                    "type": "string",
+                    "description": "Vehicle Type ID (required)",
+                    "example": "vehicleType123"
+                  },
+                  "rateId": {
+                    "type": "string",
+                    "description": "Rate/Segment ID",
+                    "example": "rate123"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
-            "description": "Vehicle created"
+            "description": "Vehicle created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Vehicle"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Vehicle created successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
           }
         }
       }
@@ -2453,6 +3073,75 @@
         "responses": {
           "200": {
             "description": "Vehicle deleted"
+          }
+        }
+      }
+    },
+    "/api/vehicles/{id}/images": {
+      "get": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Get vehicle images",
+        "operationId": "getVehicleImages",
+        "description": "Get all images for a specific vehicle. Returns presigned S3 URLs valid for 24 hours.\n\n**Mobile App Usage:** Call this endpoint to load image galleries for vehicles. Cache the URLs but refresh when expired.\n\n**Note:** The `isPrimary` field indicates the main/cover image. Use `displayOrder` for sorting.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Vehicle ID (Parse ObjectId)",
+            "schema": {
+              "type": "string",
+              "example": "abc123def456"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle images list with presigned S3 URLs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleImagesResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "id": "img001",
+                      "url": "https://amexing-bucket.s3.amazonaws.com/vehicles/abc123/front.jpg?X-Amz-...",
+                      "fileName": "front.jpg",
+                      "fileSize": 1024000,
+                      "isPrimary": true,
+                      "displayOrder": 0,
+                      "uploadedAt": "2024-01-15T10:00:00.000Z"
+                    },
+                    {
+                      "id": "img002",
+                      "url": "https://amexing-bucket.s3.amazonaws.com/vehicles/abc123/interior.jpg?X-Amz-...",
+                      "fileName": "interior.jpg",
+                      "fileSize": 850000,
+                      "isPrimary": false,
+                      "displayOrder": 1,
+                      "uploadedAt": "2024-01-15T10:05:00.000Z"
+                    }
+                  ],
+                  "count": 2
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
           }
         }
       }
@@ -3767,6 +4456,382 @@
           "nodeVersion": {
             "type": "string",
             "example": "20.0.0"
+          }
+        }
+      },
+      "UserProfileResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "email"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique user identifier (Parse ObjectId)",
+            "example": "abc123def456"
+          },
+          "username": {
+            "type": "string",
+            "description": "User's unique username",
+            "example": "john.doe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address",
+            "example": "john.doe@amexing.com"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true,
+            "description": "User's first name",
+            "example": "John"
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true,
+            "description": "User's last name",
+            "example": "Doe"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Whether user's email has been verified",
+            "example": true
+          },
+          "profilePicture": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true,
+            "description": "Profile picture URL (presigned S3 URL, expires in 24h). Null if no image uploaded.",
+            "example": "https://amexing-bucket.s3.amazonaws.com/profiles/user123/avatar.webp?X-Amz-..."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "User creation timestamp",
+            "example": "2024-10-01T10:00:00.000Z"
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last login timestamp",
+            "example": "2025-02-18T10:00:00.000Z"
+          },
+          "role": {
+            "type": "object",
+            "description": "User's role information",
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": [
+                  "superadmin",
+                  "admin",
+                  "client",
+                  "department_manager",
+                  "employee",
+                  "employee_amexing",
+                  "driver",
+                  "guest"
+                ],
+                "description": "Role identifier name",
+                "example": "employee"
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 7,
+                "description": "Role hierarchy level (1=lowest, 7=superadmin)",
+                "example": 3
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Human-readable role name",
+                "example": "Employee"
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "system",
+                  "organization",
+                  "department",
+                  "operations",
+                  "public"
+                ],
+                "description": "Role access scope",
+                "example": "department"
+              }
+            }
+          },
+          "permissions": {
+            "type": "array",
+            "description": "Array of permission strings granted to this user",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "profile.read",
+              "profile.update",
+              "bookings.read",
+              "bookings.create",
+              "services.read",
+              "pricing.read"
+            ]
+          }
+        }
+      },
+      "VehicleTypeInfo": {
+        "type": "object",
+        "description": "Embedded vehicle type information",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Vehicle type ID",
+            "example": "vehicleType123"
+          },
+          "name": {
+            "type": "string",
+            "description": "Vehicle type name",
+            "example": "Van"
+          },
+          "code": {
+            "type": "string",
+            "description": "Vehicle type code",
+            "example": "VAN"
+          },
+          "icon": {
+            "type": "string",
+            "description": "Icon identifier for UI",
+            "example": "van"
+          },
+          "trunkCapacity": {
+            "type": "integer",
+            "description": "Trunk/luggage capacity",
+            "example": 10
+          }
+        }
+      },
+      "RateInfo": {
+        "type": "object",
+        "description": "Embedded rate/segment information",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Rate ID",
+            "example": "rate123"
+          },
+          "name": {
+            "type": "string",
+            "description": "Rate/segment name",
+            "example": "Premium"
+          },
+          "color": {
+            "type": "string",
+            "description": "Color code for UI display",
+            "example": "#6366F1"
+          }
+        }
+      },
+      "Vehicle": {
+        "type": "object",
+        "description": "Vehicle information with embedded type and rate data",
+        "required": [
+          "id",
+          "brand",
+          "model",
+          "licensePlate"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique vehicle identifier (Parse ObjectId)",
+            "example": "abc123def456"
+          },
+          "brand": {
+            "type": "string",
+            "description": "Vehicle brand/manufacturer",
+            "example": "Mercedes-Benz"
+          },
+          "model": {
+            "type": "string",
+            "description": "Vehicle model",
+            "example": "Sprinter"
+          },
+          "year": {
+            "type": "integer",
+            "description": "Vehicle year",
+            "example": 2023
+          },
+          "licensePlate": {
+            "type": "string",
+            "description": "Vehicle license plate number",
+            "example": "ABC-123"
+          },
+          "capacity": {
+            "type": "integer",
+            "description": "Passenger capacity",
+            "example": 14
+          },
+          "luggageCapacity": {
+            "type": "integer",
+            "description": "Luggage capacity (number of bags)",
+            "example": 10
+          },
+          "color": {
+            "type": "string",
+            "description": "Vehicle color",
+            "example": "Blanco"
+          },
+          "maintenanceStatus": {
+            "type": "string",
+            "enum": [
+              "operational",
+              "maintenance",
+              "out_of_service"
+            ],
+            "description": "Current maintenance status",
+            "example": "operational"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether the vehicle is active",
+            "example": true
+          },
+          "image": {
+            "type": "string",
+            "format": "uri",
+            "description": "Primary image URL (presigned S3 URL, expires in 24h)",
+            "example": "https://amexing-bucket.s3.amazonaws.com/vehicles/abc123/image.jpg?..."
+          },
+          "vehicleTypeId": {
+            "$ref": "#/components/schemas/VehicleTypeInfo"
+          },
+          "rateId": {
+            "$ref": "#/components/schemas/RateInfo"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation timestamp",
+            "example": "2024-01-15T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp",
+            "example": "2024-02-01T14:30:00.000Z"
+          }
+        }
+      },
+      "VehicleListResponse": {
+        "type": "object",
+        "description": "Paginated vehicle list response (DataTables compatible)",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Operation success status",
+            "example": true
+          },
+          "draw": {
+            "type": "integer",
+            "description": "DataTables draw counter (echo back for async requests)",
+            "example": 1
+          },
+          "recordsTotal": {
+            "type": "integer",
+            "description": "Total number of vehicles (without filters)",
+            "example": 50
+          },
+          "recordsFiltered": {
+            "type": "integer",
+            "description": "Number of vehicles after filtering",
+            "example": 25
+          },
+          "data": {
+            "type": "array",
+            "description": "Array of vehicle objects",
+            "items": {
+              "$ref": "#/components/schemas/Vehicle"
+            }
+          }
+        }
+      },
+      "VehicleImage": {
+        "type": "object",
+        "description": "Vehicle image with S3 presigned URL",
+        "required": [
+          "id",
+          "url"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Image record ID",
+            "example": "image123"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Presigned S3 URL (expires in 24 hours)",
+            "example": "https://amexing-bucket.s3.amazonaws.com/vehicles/abc123/image.jpg?X-Amz-Algorithm=..."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original file name",
+            "example": "mercedes-sprinter-front.jpg"
+          },
+          "fileSize": {
+            "type": "integer",
+            "description": "File size in bytes",
+            "example": 1024000
+          },
+          "isPrimary": {
+            "type": "boolean",
+            "description": "Whether this is the primary/cover image",
+            "example": true
+          },
+          "displayOrder": {
+            "type": "integer",
+            "description": "Display order (0 = first)",
+            "example": 0
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Upload timestamp",
+            "example": "2024-01-15T10:00:00.000Z"
+          }
+        }
+      },
+      "VehicleImagesResponse": {
+        "type": "object",
+        "description": "Vehicle images list response",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Operation success status",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "description": "Array of vehicle images",
+            "items": {
+              "$ref": "#/components/schemas/VehicleImage"
+            }
+          },
+          "count": {
+            "type": "integer",
+            "description": "Total number of images",
+            "example": 5
           }
         }
       }

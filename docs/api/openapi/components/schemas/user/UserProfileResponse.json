@@ -1,0 +1,96 @@
+{
+  "type": "object",
+  "required": ["id", "username", "email"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique user identifier (Parse ObjectId)",
+      "example": "abc123def456"
+    },
+    "username": {
+      "type": "string",
+      "description": "User's unique username",
+      "example": "john.doe"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "User's email address",
+      "example": "john.doe@amexing.com"
+    },
+    "firstName": {
+      "type": "string",
+      "nullable": true,
+      "description": "User's first name",
+      "example": "John"
+    },
+    "lastName": {
+      "type": "string",
+      "nullable": true,
+      "description": "User's last name",
+      "example": "Doe"
+    },
+    "emailVerified": {
+      "type": "boolean",
+      "description": "Whether user's email has been verified",
+      "example": true
+    },
+    "profilePicture": {
+      "type": "string",
+      "format": "uri",
+      "nullable": true,
+      "description": "Profile picture URL (presigned S3 URL, expires in 24h). Null if no image uploaded.",
+      "example": "https://amexing-bucket.s3.amazonaws.com/profiles/user123/avatar.webp?X-Amz-..."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "User creation timestamp",
+      "example": "2024-10-01T10:00:00.000Z"
+    },
+    "lastLoginAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last login timestamp",
+      "example": "2025-02-18T10:00:00.000Z"
+    },
+    "role": {
+      "type": "object",
+      "description": "User's role information",
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": ["superadmin", "admin", "client", "department_manager", "employee", "employee_amexing", "driver", "guest"],
+          "description": "Role identifier name",
+          "example": "employee"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7,
+          "description": "Role hierarchy level (1=lowest, 7=superadmin)",
+          "example": 3
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable role name",
+          "example": "Employee"
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["system", "organization", "department", "operations", "public"],
+          "description": "Role access scope",
+          "example": "department"
+        }
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "description": "Array of permission strings granted to this user",
+      "items": {
+        "type": "string"
+      },
+      "example": ["profile.read", "profile.update", "bookings.read", "bookings.create", "services.read", "pricing.read"]
+    }
+  }
+}

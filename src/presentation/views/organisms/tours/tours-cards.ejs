@@ -1,0 +1,1160 @@
+<%
+/**
+ * Tours Card Layout Component
+ * Displays tours with vehicles in card format while preserving all pricing functionality
+ * 
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ * @param {boolean} showClientPricing - Whether to show client-specific pricing
+ * @param {string} clientId - Client ID for pricing context
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for tours data
+ * 
+ * Created by Denisse Maldonado
+ */
+
+// Setup component parameters
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+const isDepartmentManager = currentUserRole === 'department_manager';
+const isClient = currentUserRole === 'client';
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
+%>
+
+<!-- Tours Cards Section -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #0891b2 0%, #0ea5e9 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-car me-2"></i>Tours con Vehículos
+                </h5>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Controls -->
+    <div class="card-body border-bottom bg-light">
+        <!-- Desktop Layout (lg and above) -->
+        <div class="d-none d-lg-block">
+            <div class="row g-3">
+                <!-- Search -->
+                <div class="col-lg-3">
+                    <label for="searchTour" class="form-label fw-semibold">
+                        <i class="ti ti-search me-1"></i>Buscar Tour
+                    </label>
+                    <input type="text" class="form-control" id="searchTour" placeholder="Buscar...">
+                </div>
+                
+                <!-- Filter Pills and Dropdowns Container -->
+                <div class="col-lg-9">
+                    <div class="d-flex justify-content-between align-items-end h-100">
+                        <!-- Pills for Guide Type -->
+                        <div>
+                            <label class="form-label fw-semibold mb-2">Tipo de Servicio</label>
+                            <ul class="nav nav-pills" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active filter-pill" data-filter="guide-only" type="button" role="tab">
+                                        Solo Guía
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link filter-pill" data-filter="with-driver" type="button" role="tab">
+                                        Guía + Chofer
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Dropdowns Container -->
+                        <div class="d-flex gap-2">
+                            <!-- Rate Selection Dropdown -->
+                            <div class="d-flex align-items-center gap-1">
+                                <label for="rateFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Segmento:</label>
+                                <select class="form-select" id="rateFilter-<%= dtTableId %>" style="min-width: 150px;">
+                                    <option value="">Seleccionar segmento...</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Currency Dropdown -->
+                            <div class="d-flex align-items-center gap-1">
+                                <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
+                                <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
+                                    <option value="MXN" selected>MXN</option>
+                                    <option value="USD">USD</option>
+                                </select>
+                            </div>
+
+                            <!-- Payment Type Dropdown -->
+                            <div class="d-flex align-items-center gap-1">
+                                <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
+                                <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
+                                    <% if (isDepartmentManager || isClient) { %>
+                                        <option value="efectivo">Efectivo</option>
+                                        <option value="transferencia" selected>Transferencia</option>
+                                    <% } else { %>
+                                        <option value="efectivo" selected>Efectivo</option>
+                                        <option value="transferencia">Transferencia</option>
+                                    <% } %>
+                                    <option value="tarjeta">Tarjeta Débito/Crédito</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tablet and Mobile Layout (md and below) -->
+        <div class="d-lg-none">
+            <!-- First Row: Search and Service Type Pills -->
+            <div class="row g-3 mb-3">
+                <!-- Search -->
+                <div class="col-md-6 col-12">
+                    <label for="searchTourMobile" class="form-label fw-semibold">
+                        <i class="ti ti-search me-1"></i>Buscar Tour
+                    </label>
+                    <input type="text" class="form-control search-input" id="searchTourMobile" placeholder="Buscar...">
+                </div>
+                
+                <!-- Service Type Pills -->
+                <div class="col-md-6 col-12">
+                    <label class="form-label fw-semibold mb-2">Tipo de Servicio</label>
+                    <ul class="nav nav-pills" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active filter-pill" data-filter="guide-only" type="button" role="tab">
+                                Solo Guía
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link filter-pill" data-filter="with-driver" type="button" role="tab">
+                                Guía + Chofer
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Second Row: Filter Dropdowns -->
+            <div class="row g-3">
+                <!-- Rate Selection -->
+                <div class="col-md-4 col-12">
+                    <label for="rateFilterMobile-<%= dtTableId %>" class="form-label fw-semibold">
+                        <i class="ti ti-tag me-1"></i>Segmento
+                    </label>
+                    <select class="form-select rate-filter" id="rateFilterMobile-<%= dtTableId %>">
+                        <option value="">Seleccionar segmento...</option>
+                    </select>
+                </div>
+                
+                <!-- Currency -->
+                <div class="col-md-4 col-6">
+                    <label for="currencyFilterMobile-<%= dtTableId %>" class="form-label fw-semibold">
+                        <i class="ti ti-currency-dollar me-1"></i>Moneda
+                    </label>
+                    <select class="form-select currency-filter" id="currencyFilterMobile-<%= dtTableId %>">
+                        <option value="MXN" selected>MXN</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+
+                <!-- Payment Type -->
+                <div class="col-md-4 col-6">
+                    <label for="paymentTypeFilterMobile-<%= dtTableId %>" class="form-label fw-semibold">
+                        <i class="ti ti-credit-card me-1"></i>Pago
+                    </label>
+                    <select class="form-select payment-filter" id="paymentTypeFilterMobile-<%= dtTableId %>">
+                        <% if (isDepartmentManager || isClient) { %>
+                            <option value="efectivo">Efectivo</option>
+                            <option value="transferencia" selected>Transferencia</option>
+                        <% } else { %>
+                            <option value="efectivo" selected>Efectivo</option>
+                            <option value="transferencia">Transferencia</option>
+                        <% } %>
+                        <option value="tarjeta">Tarjeta Débito/Crédito</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Area -->
+    <div class="card-body">
+        <!-- Loading state -->
+        <div id="toursLoading" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando tours...</span>
+            </div>
+            <p class="mt-2 text-muted">Cargando tours con vehículos...</p>
+        </div>
+
+        <!-- Tours Grid -->
+        <div id="toursGrid" class="d-flex flex-wrap gap-3" style="display: none;">
+            <!-- Tour cards will be dynamically inserted here -->
+        </div>
+
+        <!-- No results message -->
+        <div id="noToursMessage" class="text-center py-5" style="display: none;">
+            <i class="ti ti-mood-sad" style="font-size: 3rem; color: #dee2e6;"></i>
+            <p class="mt-3 text-muted">No se encontraron tours con los filtros seleccionados</p>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Tour Card Styles */
+.tour-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    max-width: 100%;
+    width: 100%;
+}
+
+/* Tour card wrapper for flexbox layout */
+.tour-card-wrapper {
+    flex: 1 1 300px;
+    max-width: calc(33.333% - 1rem);
+    min-width: 300px;
+}
+
+@media (max-width: 992px) {
+    .tour-card-wrapper {
+        max-width: calc(50% - 1rem);
+    }
+}
+
+@media (max-width: 768px) {
+    .tour-card-wrapper {
+        max-width: 100%;
+    }
+}
+
+.tour-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.tour-card-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+}
+
+.tour-card-body {
+    padding: 1rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.tour-card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+
+.tour-card-description {
+    color: #6b7280;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+}
+
+.tour-card-info {
+    border-top: 1px solid #e5e7eb;
+    padding-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.tour-card-details {
+    flex-grow: 1;
+}
+
+.tour-card-button-wrapper {
+    margin-top: auto;
+    padding-top: 1rem;
+}
+
+.tour-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.375rem 0;
+    font-size: 0.875rem;
+}
+
+.tour-info-label {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.tour-info-value {
+    color: #111827;
+    font-weight: 600;
+}
+
+.tour-price {
+    font-size: 1.25rem;
+    color: #059669;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.tour-price br {
+    margin-bottom: 0.25rem;
+}
+
+.tour-duration {
+    color: #7c3aed;
+    font-weight: 600;
+}
+
+.tour-destination {
+    color: #0891b2;
+    font-weight: 600;
+}
+
+.driver-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.driver-badge.with-driver {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.driver-badge.guide-only {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.vehicle-info {
+    background: #f8fafc;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.vehicle-info-text {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin: 0;
+}
+
+/* Custom styling for nav pills with borders */
+.nav-pills .nav-link {
+    border: 1px solid #dee2e6;
+    background: white;
+    color: #6b7280;
+    margin-right: 0.25rem;
+    border-radius: 0.375rem;
+}
+
+.nav-pills .nav-link:hover {
+    background: #f8fafc;
+    color: #374151;
+    border-color: #c4b5fd;
+}
+
+.nav-pills .nav-link.active {
+    background: #0891b2;
+    border-color: #0891b2;
+    color: white;
+}
+
+/* Vehicle pricing options styling */
+.vehicle-pricing {
+    margin-top: 1rem;
+}
+
+.vehicle-option {
+    transition: all 0.2s ease;
+}
+
+.vehicle-option:hover {
+    background: #e9ecef !important;
+    border-color: #0891b2 !important;
+}
+
+.tour-info-pricing {
+    border-top: 1px solid #e5e7eb;
+    padding-top: 0.75rem;
+    margin-top: 1rem;
+}
+
+/* Enhanced styling for vehicle options */
+.vehicle-option .fw-bold {
+    font-size: 1.1rem;
+}
+
+.vehicle-option .small {
+    font-size: 0.75rem;
+    line-height: 1.3;
+}
+</style>
+
+<!-- Load centralized pricing utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tour management functionality
+    let allTours = [];
+    let filteredTours = [];
+    let availableRates = [];
+    let currentExchangeRate = 20; // Default exchange rate MXN to USD
+    let currentTransferRate = 0; // Transfer payment surcharge percentage
+    let currentAgencyRate = 0; // Credit card payment surcharge percentage
+    let currentDriverTourRate = 0; // Driver tour rate surcharge percentage
+    let currentGuideFilter = 'guide-only'; // Filter for guide type - default to guide-only (Solo Guía)
+    let selectedRateId = null; // Currently selected rate
+    
+    // DOM elements
+    const toursLoading = document.getElementById('toursLoading');
+    const toursGrid = document.getElementById('toursGrid');
+    const noToursMessage = document.getElementById('noToursMessage');
+    
+    // Search inputs (desktop and mobile)
+    const searchInputDesktop = document.getElementById('searchTour');
+    const searchInputMobile = document.getElementById('searchTourMobile');
+    
+    // Filter elements (desktop and mobile)
+    const currencyFilterDesktop = document.getElementById('currencyFilter-<%= dtTableId %>');
+    const currencyFilterMobile = document.getElementById('currencyFilterMobile-<%= dtTableId %>');
+    const paymentFilterDesktop = document.getElementById('paymentTypeFilter-<%= dtTableId %>');
+    const paymentFilterMobile = document.getElementById('paymentTypeFilterMobile-<%= dtTableId %>');
+    const rateFilterDesktop = document.getElementById('rateFilter-<%= dtTableId %>');
+    const rateFilterMobile = document.getElementById('rateFilterMobile-<%= dtTableId %>');
+    
+    const filterPills = document.querySelectorAll('.filter-pill');
+    
+    // Load available rates from API
+    async function loadAvailableRates() {
+        try {
+            console.log('🔄 Loading available segmentos from /api/rates/active...');
+            const response = await fetch('/api/rates/active');
+            console.log('📡 Rate API response status:', response.status, response.statusText);
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('📦 Rate API response data:', data);
+                
+                if (data.success && data.data) {
+                    // Filter out "Económico" rate
+                    availableRates = data.data.filter(rate => {
+                        const rateName = (rate.label || rate.name || '').toLowerCase();
+                        return !rateName.includes('económico') && !rateName.includes('economico');
+                    });
+                    console.log('✅ Available segmentos loaded:', availableRates.length, 'segmentos (excluding Económico):', availableRates);
+                    populateRateDropdown();
+                } else {
+                    console.warn('❌ Rate API returned success=false or no data:', data);
+                }
+            } else {
+                console.warn('❌ Rate API request failed:', response.status, response.statusText);
+            }
+        } catch (error) {
+            console.warn('❌ Could not load available rates:', error);
+        }
+    }
+    
+    // Populate rate dropdown with available rates
+    function populateRateDropdown() {
+        // Clear both desktop and mobile dropdowns
+        if (rateFilterDesktop) rateFilterDesktop.innerHTML = '';
+        if (rateFilterMobile) rateFilterMobile.innerHTML = '';
+        
+        console.log('🔍 Populating rates:', availableRates);
+        
+        availableRates.forEach((rate, index) => {
+            const optionDesktop = document.createElement('option');
+            const optionMobile = document.createElement('option');
+            
+            const value = rate.value || rate.id;
+            const text = rate.label || rate.name || `Tarifa ${rate.value || rate.id}`;
+            const color = rate.color || '#000';
+            
+            // Configure desktop option
+            if (rateFilterDesktop) {
+                optionDesktop.value = value;
+                optionDesktop.textContent = text;
+                optionDesktop.style.color = color;
+                if (index === 0) {
+                    optionDesktop.selected = true;
+                    selectedRateId = value;
+                }
+                rateFilterDesktop.appendChild(optionDesktop);
+            }
+            
+            // Configure mobile option
+            if (rateFilterMobile) {
+                optionMobile.value = value;
+                optionMobile.textContent = text;
+                optionMobile.style.color = color;
+                if (index === 0) {
+                    optionMobile.selected = true;
+                    selectedRateId = value;
+                }
+                rateFilterMobile.appendChild(optionMobile);
+            }
+            
+            console.log('➕ Added segmento:', text, 'ID:', value);
+        });
+        
+        console.log('✅ Segmento dropdown populated with', availableRates.length, 'segmentos');
+        console.log('🎯 Auto-selected first segmento:', selectedRateId);
+    }
+    
+    // Load rates functions
+    async function loadExchangeRate() {
+        try {
+            const response = await fetch('/api/exchange-rate/current');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.data && data.data.value !== undefined) {
+                    currentExchangeRate = parseFloat(data.data.value);
+                    console.log('✅ Exchange rate loaded:', currentExchangeRate, 'MXN per USD');
+                }
+            }
+        } catch (error) {
+            console.warn('Could not load exchange rate, using default:', currentExchangeRate);
+        }
+    }
+    
+    async function loadTransferRate() {
+        try {
+            const response = await fetch('/api/transfer-rate/current');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.data && data.data.value !== undefined) {
+                    currentTransferRate = parseFloat(data.data.value);
+                }
+            }
+        } catch (error) {
+            console.warn('Could not load transfer rate, using default:', currentTransferRate);
+        }
+    }
+    
+    async function loadAgencyRate() {
+        try {
+            const response = await fetch('/api/agency-rate/current');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.data && data.data.value !== undefined) {
+                    currentAgencyRate = parseFloat(data.data.value);
+                }
+            }
+        } catch (error) {
+            console.warn('Could not load agency rate, using default:', currentAgencyRate);
+        }
+    }
+    
+    async function loadDriverTourRate() {
+        try {
+            const response = await fetch('/api/driver-tour-rate/current');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.data && data.data.value !== undefined) {
+                    currentDriverTourRate = parseFloat(data.data.value);
+                    console.log('✅ Driver tour rate loaded:', currentDriverTourRate, 'pesos');
+                }
+            }
+        } catch (error) {
+            console.warn('Could not load driver tour rate, using default:', currentDriverTourRate);
+        }
+    }
+    
+    // Convert and format price based on currency and payment type
+    function convertTourPrice(priceInput, currency, paymentType, hasDriver = false) {
+        const price = parseFloat(priceInput || 0);
+        
+        if (price <= 0) {
+            return currency === 'USD' ? '$0.00 USD' : '$0.00';
+        }
+        
+        // First apply driver surcharge if driver is included (fixed amount in pesos)
+        let adjustedPrice = price;
+        if (hasDriver && currentGuideFilter === 'with-driver' && currentDriverTourRate > 0) {
+            adjustedPrice = price + currentDriverTourRate;
+        }
+        
+        // Then apply payment surcharge if not cash
+        if (paymentType === 'transferencia' && currentTransferRate > 0) {
+            adjustedPrice = adjustedPrice * (1 + currentTransferRate / 100);
+        } else if (paymentType === 'tarjeta' && currentAgencyRate > 0) {
+            adjustedPrice = adjustedPrice * (1 + currentAgencyRate / 100);
+        }
+        
+        // Then convert to requested currency
+        if (currency === 'USD') {
+            const usdPrice = adjustedPrice / currentExchangeRate;
+            // Apply USD rounding rules and format without decimals
+            const roundedPrice = PricingUtils ? PricingUtils.applyUSDRoundingRules(usdPrice) : Math.round(usdPrice);
+            return `$${roundedPrice} USD`;
+        } else {
+            return `$${adjustedPrice.toFixed(2)}`;
+        }
+    }
+    
+    // Load tours from API
+    async function loadTours() {
+        try {
+            showLoading();
+            
+            let apiUrl = '<%= apiEndpoint %>';
+            let queryParams = new URLSearchParams();
+            
+            // If a rate is selected, use the tours-with-rate-prices endpoint
+            if (selectedRateId) {
+                apiUrl = '/api/tours/with-rate-prices';
+                queryParams.append('rateId', selectedRateId);
+                <% if (typeof clientId !== 'undefined' && clientId) { %>
+                queryParams.append('clientId', '<%= clientId %>');
+                <% } %>
+            }
+            
+            // Add query parameters if any
+            if (queryParams.toString()) {
+                apiUrl += '?' + queryParams.toString();
+            }
+            
+            console.log('🌐 Fetching tours from:', apiUrl);
+            const response = await fetch(apiUrl);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success && data.data) {
+                // Filter for tours with vehicles (not walking tours)
+                allTours = data.data.filter(tour => !tour.isWalkingTour);
+                
+                // Sort tours alphabetically by destination (Destino)
+                allTours.sort((a, b) => {
+                    const destA = (a.destinationPOI?.name || '').toLowerCase();
+                    const destB = (b.destinationPOI?.name || '').toLowerCase();
+                    return destA.localeCompare(destB, 'es', { numeric: true, sensitivity: 'base' });
+                });
+                
+                console.log(`✅ Loaded ${allTours.length} tours with vehicles (sorted alphabetically by destination)`);
+                console.log('🔍 First tour data structure:', allTours[0]);
+                console.log('🔍 Selected rate ID:', selectedRateId);
+                applyFilters();
+            } else {
+                throw new Error(data.message || 'Failed to load tours');
+            }
+        } catch (error) {
+            console.error('❌ Error loading tours:', error);
+            showError('Error al cargar los tours');
+        }
+    }
+    
+    // Apply filters and search
+    function applyFilters() {
+        // Get search term from active input (desktop or mobile)
+        const searchTerm = (searchInputDesktop?.value || searchInputMobile?.value || '').toLowerCase().trim();
+        
+        // Get currency from active filter (desktop or mobile)
+        const currency = currencyFilterDesktop?.value || currencyFilterMobile?.value || 'MXN';
+        
+        // Get payment type from active filter (desktop or mobile)
+        const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'efectivo';
+        
+        filteredTours = allTours.filter(tour => {
+            // Search filter - use actual API field names
+            const searchMatch = !searchTerm || 
+                (tour.destinationPOI?.name && tour.destinationPOI.name.toLowerCase().includes(searchTerm)) ||
+                (tour.description && tour.description.toLowerCase().includes(searchTerm));
+            
+            // Guide type filter - always show all vehicle tours regardless of pill selection
+            // The pill selection affects pricing and capacity display, not visibility
+            const guideMatch = true;
+            
+            return searchMatch && guideMatch;
+        });
+        
+        // Sort tours alphabetically by destination (Destino)
+        filteredTours.sort((a, b) => {
+            const destA = (a.destinationPOI?.name || '').toLowerCase();
+            const destB = (b.destinationPOI?.name || '').toLowerCase();
+            return destA.localeCompare(destB, 'es', { numeric: true, sensitivity: 'base' });
+        });
+        
+        displayTours();
+    }
+    
+    // Display tours in card layout
+    function displayTours() {
+        hideLoading();
+        
+        if (filteredTours.length === 0) {
+            showNoResults();
+            return;
+        }
+        
+        const currency = currencyFilterDesktop?.value || currencyFilterMobile?.value || 'MXN';
+        const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'efectivo';
+        
+        const cardsHTML = filteredTours.map(tour => {
+            // Map API data to display format
+            const destination = tour.destinationPOI?.name || 'Destino no especificado';
+            
+            // Convert minutes to hours and minutes format
+            let duration = 'Consultar';
+            if (tour.time) {
+                const totalMinutes = parseInt(tour.time);
+                const hours = Math.floor(totalMinutes / 60);
+                const minutes = totalMinutes % 60;
+                
+                if (hours > 0 && minutes > 0) {
+                    duration = `${hours}h ${minutes}min`;
+                } else if (hours > 0) {
+                    duration = `${hours}h`;
+                } else {
+                    duration = `${minutes}min`;
+                }
+            }
+            
+            const description = tour.description || 'Descripción no disponible';
+            
+            // Get availability and booking time
+            const advanceBookingTime = tour.advance_booking_time || tour.advanceBookingTime || tour.advanceBooking;
+            
+            // Debug logging for advance booking time
+            console.log('🕒 Tour advance booking time:', {
+                tourName: tour.destinationPOI?.name,
+                advance_booking_time: tour.advance_booking_time,
+                advanceBookingTime: tour.advanceBookingTime,
+                advanceBooking: tour.advanceBooking,
+                allFields: Object.keys(tour).filter(key => key.toLowerCase().includes('advance') || key.toLowerCase().includes('booking'))
+            });
+            
+            // Format availability days - handle different formats
+            let availabilityText = 'Todos los días';
+            let availableDays = null;
+            
+            // Check for availableDays field (legacy format - direct array)
+            if (tour.availableDays && Array.isArray(tour.availableDays)) {
+                availableDays = tour.availableDays;
+            }
+            // Check for availability field (could be array or object)
+            else if (tour.availability) {
+                // If it's an array of day schedules
+                if (Array.isArray(tour.availability)) {
+                    // Check if it's array of objects with day property
+                    if (tour.availability.length > 0 && typeof tour.availability[0] === 'object' && 'day' in tour.availability[0]) {
+                        availableDays = tour.availability.map(schedule => schedule.day);
+                    } else {
+                        // It's a simple array of day codes
+                        availableDays = tour.availability;
+                    }
+                }
+                // If it's an object with availableDays property
+                else if (typeof tour.availability === 'object' && tour.availability.availableDays) {
+                    availableDays = tour.availability.availableDays;
+                }
+            }
+            
+            // Format the days for display
+            if (availableDays && Array.isArray(availableDays) && availableDays.length > 0) {
+                const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+                // Filter valid day codes (0-6)
+                const validDays = availableDays.filter(day => Number.isInteger(day) && day >= 0 && day <= 6);
+                
+                if (validDays.length === 7) {
+                    availabilityText = 'Todos los días';
+                } else if (validDays.length > 0) {
+                    const days = validDays.sort((a, b) => a - b).map(day => dayNames[day]).filter(Boolean);
+                    availabilityText = days.join(', ');
+                }
+            }
+            
+            // Format advance booking time (value is in minutes)
+            let bookingTimeText = 'Reserva inmediata';
+            if (advanceBookingTime && advanceBookingTime > 0) {
+                const totalMinutes = parseInt(advanceBookingTime);
+                const hours = Math.floor(totalMinutes / 60);
+                const minutes = totalMinutes % 60;
+                
+                // If 24 hours or more, show in days
+                if (hours >= 24) {
+                    const days = Math.floor(hours / 24);
+                    bookingTimeText = days === 1 ? '1 día' : `${days} días`;
+                }
+                // If both hours and minutes
+                else if (hours > 0 && minutes > 0) {
+                    bookingTimeText = `${hours}h ${minutes}min`;
+                }
+                // If only hours
+                else if (hours > 0) {
+                    bookingTimeText = hours === 1 ? '1 hora' : `${hours} hrs`;
+                }
+                // If only minutes
+                else {
+                    bookingTimeText = minutes === 1 ? '1 minuto' : `${minutes} min`;
+                }
+            }
+            
+            // Get pricing information
+            let priceSection = '';
+            let vehicleInfo = '';
+            let typeSection = '';
+            
+            console.log('🔍 Display logic for tour:', tour.destinationPOI?.name, {
+                selectedRateId,
+                hasPriceData: !!tour.priceData,
+                priceDataLength: tour.priceData?.length || 0,
+                priceData: tour.priceData,
+                tourId: tour.id
+            });
+            
+            if (selectedRateId && tour.priceData && tour.priceData.length > 0) {
+                // Show detailed vehicles and pricing when rate is selected
+                const vehicleCards = tour.priceData.map(priceData => {
+                    const vehicleName = priceData.vehicleType?.name || 'Vehículo';
+                    const baseCapacity = priceData.vehicleType?.defaultCapacity || 0;
+                    let finalPrice = priceData.price || 0;
+                    
+                    // Adjust capacity based on guide filter
+                    let adjustedCapacity = baseCapacity;
+                    if (currentGuideFilter === 'with-driver' && baseCapacity > 0) {
+                        adjustedCapacity = baseCapacity - 1; // Driver takes a seat
+                    }
+                    
+                    // Check if there's a client-specific price
+                    const isClientSpecific = priceData.isClientPrice;
+                    
+                    // Apply driver rate if "with-driver" is selected
+                    const formattedPrice = convertTourPrice(finalPrice, currency, paymentType, true);
+                    const clientBadge = isClientSpecific ? 
+                        '<span class="badge bg-primary text-white ms-1" style="font-size: 0.6rem;">Cliente</span>' : '';
+                    
+                    return `
+                        <div class="vehicle-option mb-2 p-2 border rounded" style="background: #f8f9fa;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong style="color: #0891b2;">${vehicleName}</strong>${clientBadge}
+                                    <div class="small text-muted">
+                                        <i class="ti ti-users me-1"></i>${adjustedCapacity} personas
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold text-success" style="font-size: 1.1rem;">${formattedPrice}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                priceSection = `
+                    <div class="vehicle-pricing">
+                        ${vehicleCards}
+                    </div>
+                `;
+                
+                vehicleInfo = ``;
+                
+                // Don't show type section - removed as requested
+                typeSection = '';
+            } else {
+                // No pricing when no rate is selected or no vehicles available
+                priceSection = '';
+                vehicleInfo = '';
+                typeSection = '';
+            }
+            
+            // Build picture element with optimized formats
+            let pictureElement = '';
+            const primaryPhoto = tour.primaryPhoto;
+            
+            // Debug logging
+            console.log('🖼️ Tour photo data:', {
+                tourName: destination,
+                hasPrimaryPhoto: !!primaryPhoto,
+                hasOptimizedVariants: !!(primaryPhoto?.optimizedVariants),
+                optimizationMetadata: primaryPhoto?.optimizationMetadata,
+                variants: primaryPhoto?.optimizedVariants ? Object.keys(primaryPhoto.optimizedVariants) : 'none'
+            });
+            
+            if (primaryPhoto?.optimizedVariants) {
+                const variants = primaryPhoto.optimizedVariants;
+                let sources = [];
+                
+                // Add AVIF source if available
+                if (variants.avif?.url) {
+                    sources.push(`<source type="image/avif" srcset="${variants.avif.url}">`);
+                }
+                
+                // Add WebP source if available
+                if (variants.webp?.url) {
+                    sources.push(`<source type="image/webp" srcset="${variants.webp.url}">`);
+                }
+                
+                // Add optimized JPEG if available, otherwise use original
+                const jpegUrl = variants.jpeg?.url || primaryPhoto.url || '/images/placeholder-tour.jpg';
+                
+                pictureElement = `
+                    <picture>
+                        ${sources.join('\n                        ')}
+                        <img src="${jpegUrl}" alt="Tour ${destination}" class="tour-card-image" 
+                             onerror="this.src='/images/placeholder-tour.jpg'"
+                             loading="lazy">
+                    </picture>
+                `;
+            } else {
+                // Fallback to simple img if no optimization available
+                const imageUrl = primaryPhoto?.url || '/images/placeholder-tour.jpg';
+                pictureElement = `
+                    <img src="${imageUrl}" alt="Tour ${destination}" class="tour-card-image" 
+                         onerror="this.src='/images/placeholder-tour.jpg'"
+                         loading="lazy">
+                `;
+            }
+            
+            return `
+                <div class="tour-card-wrapper">
+                    <div class="tour-card">
+                        ${pictureElement}
+                        <div class="tour-card-body">
+                            <h6 class="tour-card-title">${destination}</h6>
+                            <p class="tour-card-description">${description.substring(0, 120)}${description.length > 120 ? '...' : ''}</p>
+                            
+                            ${vehicleInfo}
+                            
+                            <div class="tour-card-info">
+                                <div class="tour-card-details">
+                                    <div class="tour-info-row">
+                                        <span class="tour-info-label">
+                                            <i class="ti ti-clock me-1"></i>Mínimo de horas
+                                        </span>
+                                        <span class="tour-info-value tour-duration">${duration}</span>
+                                    </div>
+                                    <div class="tour-info-row">
+                                        <span class="tour-info-label">
+                                            <i class="ti ti-calendar-time me-1"></i>Reserva anticipada
+                                        </span>
+                                        <span class="tour-info-value">
+                                            ${bookingTimeText}
+                                        </span>
+                                    </div>
+                                    <div class="tour-info-row">
+                                        <span class="tour-info-label">
+                                            <i class="ti ti-calendar-event me-1"></i>Días disponibles
+                                        </span>
+                                        <span class="tour-info-value" style="font-size: 0.8rem;">
+                                            ${availabilityText}
+                                        </span>
+                                    </div>
+                                    ${typeSection}
+                                    <div class="tour-info-pricing">
+                                        ${priceSection}
+                                    </div>
+                                </div>
+                                <div class="tour-card-button-wrapper">
+                                    <button class="btn btn-outline-primary btn-sm w-100 view-more-btn" 
+                                            data-tour-id="${tour.id || tour.objectId}" 
+                                            data-tour-name="${destination}"
+                                            data-tour-type="vehicle">
+                                        <i class="ti ti-eye me-1"></i>Ver más
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        toursGrid.innerHTML = cardsHTML;
+        showResults();
+    }
+    
+    // UI state management functions
+    function showLoading() {
+        toursLoading.style.display = 'block';
+        toursGrid.style.display = 'none';
+        noToursMessage.style.display = 'none';
+    }
+    
+    function hideLoading() {
+        toursLoading.style.display = 'none';
+    }
+    
+    function showResults() {
+        toursGrid.style.display = 'block';
+        noToursMessage.style.display = 'none';
+    }
+    
+    function showNoResults() {
+        toursGrid.style.display = 'none';
+        noToursMessage.style.display = 'block';
+    }
+    
+    function showError(message) {
+        hideLoading();
+        toursGrid.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-danger" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>${message}
+                </div>
+            </div>
+        `;
+        showResults();
+    }
+    
+    // Helper function to sync dropdown values between desktop and mobile
+    function syncDropdowns(source, target) {
+        if (source && target && source !== target) {
+            target.value = source.value;
+        }
+    }
+    
+    // Event listeners for search inputs
+    if (searchInputDesktop) {
+        searchInputDesktop.addEventListener('input', debounce(() => {
+            if (searchInputMobile) searchInputMobile.value = searchInputDesktop.value;
+            applyFilters();
+        }, 300));
+    }
+    
+    if (searchInputMobile) {
+        searchInputMobile.addEventListener('input', debounce(() => {
+            if (searchInputDesktop) searchInputDesktop.value = searchInputMobile.value;
+            applyFilters();
+        }, 300));
+    }
+    
+    // Event listeners for currency filters
+    if (currencyFilterDesktop) {
+        currencyFilterDesktop.addEventListener('change', () => {
+            syncDropdowns(currencyFilterDesktop, currencyFilterMobile);
+            applyFilters();
+        });
+    }
+    
+    if (currencyFilterMobile) {
+        currencyFilterMobile.addEventListener('change', () => {
+            syncDropdowns(currencyFilterMobile, currencyFilterDesktop);
+            applyFilters();
+        });
+    }
+    
+    // Event listeners for payment filters
+    if (paymentFilterDesktop) {
+        paymentFilterDesktop.addEventListener('change', () => {
+            syncDropdowns(paymentFilterDesktop, paymentFilterMobile);
+            applyFilters();
+        });
+    }
+    
+    if (paymentFilterMobile) {
+        paymentFilterMobile.addEventListener('change', () => {
+            syncDropdowns(paymentFilterMobile, paymentFilterDesktop);
+            applyFilters();
+        });
+    }
+    
+    // Event listeners for rate filters
+    if (rateFilterDesktop) {
+        rateFilterDesktop.addEventListener('change', function() {
+            selectedRateId = this.value || null;
+            syncDropdowns(rateFilterDesktop, rateFilterMobile);
+            console.log('🔄 Segmento changed to:', selectedRateId);
+            console.log('🔍 Selected rate element:', this.selectedOptions[0]?.textContent);
+            loadTours(); // Reload tours with new rate pricing
+        });
+    }
+    
+    if (rateFilterMobile) {
+        rateFilterMobile.addEventListener('change', function() {
+            selectedRateId = this.value || null;
+            syncDropdowns(rateFilterMobile, rateFilterDesktop);
+            console.log('🔄 Segmento changed to:', selectedRateId);
+            console.log('🔍 Selected rate element:', this.selectedOptions[0]?.textContent);
+            loadTours(); // Reload tours with new rate pricing
+        });
+    }
+    
+    // Filter pills event handlers
+    filterPills.forEach(pill => {
+        pill.addEventListener('click', function() {
+            // Update active state
+            filterPills.forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Update filter
+            currentGuideFilter = this.getAttribute('data-filter');
+            console.log('🚗 Guide filter changed to:', currentGuideFilter);
+            
+            // Refresh display to recalculate capacity and pricing
+            displayTours();
+        });
+    });
+    
+    // Debounce function for search
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    // Set up event listener for "Ver más" buttons
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.view-more-btn')) {
+            const button = e.target.closest('.view-more-btn');
+            const tourId = button.dataset.tourId;
+            const tourName = button.dataset.tourName;
+            const tourType = button.dataset.tourType;
+            
+            // For now, show an alert with the tour details
+            // This can be replaced with a modal or navigation to a detail page
+            alert(`Ver detalles de: ${tourName}\nID: ${tourId}\nTipo: ${tourType}`);
+            
+            // TODO: Implement tour detail view
+            // Options:
+            // 1. Open a modal with full tour details
+            // 2. Navigate to a detail page
+            // 3. Expand the card to show more information
+        }
+    });
+    
+    // Authentication is handled via session cookies automatically
+    
+    // Initialize the component
+    async function init() {
+        await Promise.all([
+            loadAvailableRates(),
+            loadExchangeRate(),
+            loadTransferRate(),
+            loadAgencyRate(),
+            loadDriverTourRate()
+        ]);
+        await loadTours();
+    }
+    
+    // Start the application
+    init();
+});
+</script>

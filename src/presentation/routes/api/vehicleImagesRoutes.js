@@ -91,7 +91,11 @@ router.get('/:id/images', authenticateToken, controller.listImages.bind(controll
  * GET /api/vehicles/images/by-disposable-combinations.
  * @access public
  */
-router.get('/images/by-disposable-combinations', authenticateToken, controller.getImagesByDisposableCombinations.bind(controller));
+router.get(
+  '/images/by-disposable-combinations',
+  authenticateToken,
+  controller.getImagesByDisposableCombinations.bind(controller)
+);
 
 /**
  * Delete (soft delete) a vehicle image.

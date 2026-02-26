@@ -11,6 +11,14 @@ const FileStorageService = require('../../services/FileStorageService');
 const ImageOptimizationService = require('../../services/ImageOptimizationService');
 const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
 
+/**
+ * TourImageController - Handles tour image upload and optimization operations.
+ * Provides API endpoints for managing tour images with S3 storage and multi-format optimization.
+ * @class TourImageController
+ * @example
+ * const controller = new TourImageController();
+ * controller.uploadTourImage(req, res);
+ */
 class TourImageController {
   constructor() {
     // Initialize services with dependency injection

@@ -203,26 +203,6 @@ router.post('/auth/logout', jwtMiddleware.authenticateToken, async (req, res) =>
   }
 });
 
-// CSP Report endpoint
-router.post(
-  '/csp-report',
-  express.json({
-    type: ['application/csp-report', 'application/json'],
-    limit: '1mb',
-  }),
-  (req, res) => {
-    try {
-      if (req.body && Object.keys(req.body).length > 0) {
-        logger.warn('CSP Violation Report:', JSON.stringify(req.body, null, 2));
-      }
-      res.status(204).end();
-    } catch (error) {
-      logger.warn('CSP Report parsing error:', error);
-      res.status(204).end();
-    }
-  }
-);
-
 // Enable test endpoint in development and test environments only
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') {
   router.post('/test-csrf', (req, res) => {
@@ -379,6 +359,8 @@ const serviceTypesRoutes = require('./api/serviceTypesRoutes');
 const servicesRoutes = require('./api/servicesRoutes');
 const servicesNewRoutes = require('./api/servicesNewRoutes');
 const ratesRoutes = require('./api/ratesRoutes');
+// Greeter Services Management API routes
+const greeterRoutes = require('./api/greeterRoutes');
 // Experience Management API routes
 const experiencesRoutes = require('./api/experiencesRoutes');
 const experienceImagesRoutes = require('./api/experienceImagesRoutes');
@@ -425,6 +407,7 @@ router.use('/service-types', serviceTypesRoutes);
 router.use('/services', servicesRoutes);
 router.use('/services-new', servicesNewRoutes);
 router.use('/rates', ratesRoutes);
+router.use('/greeter', greeterRoutes);
 router.use('/experiences', experiencesRoutes);
 router.use('/experiences', experienceImagesRoutes); // Experience images endpoints
 router.use('/tours', require('./api/tourImagesRoutes'));

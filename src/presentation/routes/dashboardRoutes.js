@@ -35,6 +35,12 @@ router.get('/superadmin/integrations', dashboardAuth.requireRole('superadmin'), 
 router.get('/superadmin/security', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.security(req, res));
 router.get('/superadmin/compliance', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.compliance(req, res));
 
+// SuperAdmin Tarifario Routes
+router.get('/superadmin/vehicles', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.vehicles(req, res));
+router.get('/superadmin/services', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.services(req, res));
+router.get('/superadmin/experiences', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.experiences(req, res));
+router.get('/superadmin/greeter', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.greeter(req, res));
+
 // Admin Routes
 router.get('/admin', dashboardAuth.requireRole('admin'), (req, res) => adminController.index(req, res));
 router.get('/admin/profile', dashboardAuth.requireRole('admin'), (req, res) => adminController.profile(req, res));
@@ -55,6 +61,7 @@ router.get('/admin/services', dashboardAuth.requireRole('admin'), (req, res) => 
 router.get('/admin/a-disposicion', dashboardAuth.requireRole('admin'), (req, res) => adminController.aDisposicion(req, res));
 router.get('/admin/pricing', dashboardAuth.requireRole('admin'), (req, res) => adminController.pricing(req, res));
 router.get('/admin/tours', dashboardAuth.requireRole('admin'), (req, res) => adminController.tours(req, res));
+router.get('/admin/greeter', dashboardAuth.requireRole('admin'), (req, res) => adminController.greeter(req, res));
 router.get('/admin/quotes', dashboardAuth.requireRole('admin'), (req, res) => adminController.quotes(req, res));
 router.get('/admin/quotes/:id', dashboardAuth.requireRole('admin'), (req, res) => adminController.quoteDetail(req, res));
 router.get('/admin/invoices', dashboardAuth.requireRole('admin'), (req, res) => adminController.invoices(req, res));
@@ -89,6 +96,8 @@ router.get('/client/vehicles', dashboardAuth.requireRole('client'), (req, res) =
 router.get('/client/services', dashboardAuth.requireRole('client'), (req, res) => clientController.services(req, res));
 router.get('/client/experiences', dashboardAuth.requireRole('client'), (req, res) => clientController.experiences(req, res));
 router.get('/client/tours', dashboardAuth.requireRole('client'), (req, res) => clientController.tours(req, res));
+router.get('/client/a-disposicion', dashboardAuth.requireRole('client'), (req, res) => clientController.aDisposicion(req, res));
+router.get('/client/greeter', dashboardAuth.requireRole('client'), (req, res) => clientController.greeter(req, res));
 
 // Department Manager Routes
 router.get('/department_manager', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.index(req, res));
@@ -108,6 +117,8 @@ router.get('/department_manager/vehicles', dashboardAuth.requireRole('department
 router.get('/department_manager/services', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.services(req, res));
 router.get('/department_manager/experiences', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.experiences(req, res));
 router.get('/department_manager/tours', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.tours(req, res));
+router.get('/department_manager/a-disposicion', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.aDisposicion(req, res));
+router.get('/department_manager/greeter', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.greeter(req, res));
 router.get('/department_manager/reports', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.reports(req, res));
 router.get('/department_manager/policies', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.team(req, res));
 router.get('/department_manager/permissions', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.team(req, res));
