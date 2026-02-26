@@ -2482,9 +2482,20 @@ table.dataTable tbody tr.hover {
             } 
             // Check optimization metadata
             else if (optimizationMetadata && (optimizationMetadata.availableFormats || optimizationMetadata.formats)) {
-                const availableFormats = optimizationMetadata.availableFormats || 
-                                        optimizationMetadata.formats || 
-                                        [];
+                let availableFormats = optimizationMetadata.availableFormats || 
+                                     optimizationMetadata.formats || 
+                                     [];
+                
+                // Handle case where formats is an object instead of array
+                if (typeof availableFormats === 'object' && !Array.isArray(availableFormats)) {
+                    availableFormats = Object.keys(availableFormats);
+                }
+                
+                // Ensure it's an array
+                if (!Array.isArray(availableFormats)) {
+                    availableFormats = [];
+                }
+                
                 // Count non-original formats (AVIF, WebP, JPEG)
                 const optimizedFormats = availableFormats.filter(f => f !== 'original');
                 const formatCount = optimizedFormats.length;
