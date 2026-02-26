@@ -51,13 +51,13 @@ const RATE_MARKUPS = {
 function generatePricingData(rates, vehicleTypes) {
   const pricingData = [];
   const now = new Date();
-  
+
   for (const rate of rates) {
     for (const vehicleType of vehicleTypes) {
       const basePrice = BASE_PRICES[vehicleType.get('code')] || 1000;
       const markup = RATE_MARKUPS[rate.get('name')] || 1.0;
       const finalPrice = Math.round(basePrice * markup);
-      
+
       pricingData.push({
         rateId: rate.id,
         vehicleTypeId: vehicleType.id,
@@ -72,7 +72,7 @@ function generatePricingData(rates, vehicleTypes) {
       });
     }
   }
-  
+
   return pricingData;
 }
 
@@ -81,10 +81,10 @@ function generatePricingData(rates, vehicleTypes) {
  */
 async function seedVehicleRatePrices() {
   const startTime = Date.now();
-  
+
   try {
     logger.info(`[${SEED_NAME}] Starting Vehicle Rate Prices seed...`);
-    
+
     // Check if seed was already executed
     const isExecuted = await SeedTracker.isExecuted(SEED_NAME);
     if (isExecuted && process.env.FORCE_SEED !== 'true') {
@@ -95,84 +95,84 @@ async function seedVehicleRatePrices() {
         data: { created: 0, skipped: true }
       };
     }
-    
+
     // Fetch all rates
     const rateQuery = new Parse.Query('Rate');
     rateQuery.equalTo('exists', true);
     rateQuery.equalTo('active', true);
     const rates = await rateQuery.find({ useMasterKey: true });
-    
+
     if (rates.length === 0) {
       throw new Error('No rates found. Please run seed-005-rates first.');
     }
-    
+
     logger.info(`[${SEED_NAME}] Found ${rates.length} rates`);
-    
+
     // Fetch all vehicle types
     const vehicleQuery = new Parse.Query('VehicleType');
     vehicleQuery.equalTo('exists', true);
     vehicleQuery.equalTo('active', true);
     const vehicleTypes = await vehicleQuery.find({ useMasterKey: true });
-    
+
     if (vehicleTypes.length === 0) {
       throw new Error('No vehicle types found. Please run seed-006-vehicle-types first.');
     }
-    
+
     logger.info(`[${SEED_NAME}] Found ${vehicleTypes.length} vehicle types`);
-    
+
     // Check if prices already exist
     const existingQuery = new Parse.Query('VehicleRatePrices');
     existingQuery.doesNotExist('valid_until'); // Current prices only
     existingQuery.equalTo('exists', true);
     const existingCount = await existingQuery.count({ useMasterKey: true });
-    
+
     if (existingCount > 0) {
       logger.warn(`[${SEED_NAME}] Found ${existingCount} existing prices. Skipping to avoid duplicates.`);
-      
+
       // Record seed execution
       await SeedTracker.recordExecution(SEED_NAME, VERSION, {
         created: 0,
         skipped: existingCount,
         message: 'Prices already exist'
       });
-      
+
       return {
         success: true,
         message: `Skipped - ${existingCount} prices already exist`,
         data: { created: 0, skipped: existingCount }
       };
     }
-    
+
     // Generate pricing data
     const pricingData = generatePricingData(rates, vehicleTypes);
     logger.info(`[${SEED_NAME}] Generated ${pricingData.length} price records`);
-    
+
     // Create price records
     const VehicleRatePrices = Parse.Object.extend('VehicleRatePrices');
     const priceObjects = pricingData.map(data => {
       const price = new VehicleRatePrices();
-      
+
       // Set all fields
       Object.keys(data).forEach(key => {
         if (data[key] !== undefined && key !== 'valid_until') {
           price.set(key, data[key]);
         }
       });
-      
+
       return price;
     });
-    
+
     // Save in batches of 50
     const batchSize = 50;
     let totalCreated = 0;
-    
+
     for (let i = 0; i < priceObjects.length; i += batchSize) {
       const batch = priceObjects.slice(i, i + batchSize);
       await Parse.Object.saveAll(batch, { useMasterKey: true });
       totalCreated += batch.length;
       logger.info(`[${SEED_NAME}] Created ${totalCreated}/${priceObjects.length} prices`);
     }
-    
+
     // Log summary
     const summary = {};
     for (const rate of rates) {
@@ -182,9 +182,9 @@ async function seedVehicleRatePrices() {
         return `${vehicle.get('code')}: $${p.pricePerHour}`;
       });
     }
-    
+
     logger.info(`[${SEED_NAME}] Price summary:`, summary);
-    
+
     // Record seed execution
     await SeedTracker.recordExecution(SEED_NAME, VERSION, {
       created: totalCreated,
@@ -192,10 +192,10 @@ async function seedVehicleRatePrices() {
       vehicleTypes: vehicleTypes.length,
       summary
     });
-    
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     logger.info(`[${SEED_NAME}] ✅ Successfully created ${totalCreated} vehicle rate prices in ${duration}s`);
-    
+
     return {
       success: true,
       message: `Created ${totalCreated} vehicle rate prices`,
@@ -205,11 +205,11 @@ async function seedVehicleRatePrices() {
         summary
       }
     };
-    
+
   } catch (error) {
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     logger.error(`[${SEED_NAME}] ❌ Error seeding vehicle rate prices:`, error);
-    
+
     return {
       success: false,
       message: error.message,

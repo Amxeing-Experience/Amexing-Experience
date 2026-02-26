@@ -299,9 +299,9 @@ describe('Dashboard Header Integration Tests', () => {
         // Should render for all roles
         expect(headerHtml).toContain('user-menu-molecule');
 
-        // Should include role-specific links
+        // Should include role-specific profile link
         expect(headerHtml).toContain(`/dashboard/${role}/profile`);
-        expect(headerHtml).toContain(`/dashboard/${role}/settings`);
+        // Settings link removed in component refactoring (simplified menu)
       }
     });
   });

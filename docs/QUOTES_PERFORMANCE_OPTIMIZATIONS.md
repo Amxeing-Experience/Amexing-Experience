@@ -47,7 +47,7 @@ Este documento describe las optimizaciones de rendimiento implementadas en el si
 **Impacto**: Selectores dejaban de funcionar, UX degradada.
 
 ### 4. Capacidad de Vehículos No Visible
-**Síntoma**: Datos de capacidad/maletas/checkbox no aparecían en columna de vehículos.
+**Síntoma**: Datos de capacidad/carry-on/checkbox no aparecían en columna de vehículos.
 
 **Causa Raíz**:
 - `populateTransferData()` y `populateTourData()` actualizaban datos en memoria
@@ -252,7 +252,7 @@ function populateTransferData(dayIndex, subconceptIndex, transferData) {
 
     capacityDiv.innerHTML = `
         <div><i class="ti ti-users"></i> Capacidad: ${capacity} personas</div>
-        <div><i class="ti ti-briefcase"></i> Maletas: ${trunk}</div>
+        <div><i class="ti ti-briefcase"></i> Carry-on: ${trunk}</div>
     `;
 
     // Crear o actualizar checkbox
@@ -375,7 +375,7 @@ node scripts/debug/check_tour_availability.js
 - ✅ 5-7 llamadas API por cotización (65% reducción)
 - ✅ 0-1 render completo por acción (80% reducción)
 - ✅ Zero errores de TomSelect
-- ✅ Capacidad/maletas/checkbox siempre visibles
+- ✅ Capacidad/carry-on/checkbox siempre visibles
 - ✅ Cálculos de surcharge optimizados
 - ✅ No más "too many requests" errors
 
@@ -416,7 +416,7 @@ quoteAPI.getCacheStats();
 
 5. **Capacidad Display**:
    - [ ] Agregar traslado → seleccionar rate → transfer → vehículo
-   - [ ] Ver capacidad, maletas, checkbox inmediatamente
+   - [ ] Ver capacidad, carry-on, checkbox inmediatamente
    - [ ] Checkbox funcional (duplica precio al activar)
 
 6. **Capacity Warnings**:

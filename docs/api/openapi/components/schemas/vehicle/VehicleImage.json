@@ -1,0 +1,44 @@
+{
+  "type": "object",
+  "description": "Vehicle image with S3 presigned URL",
+  "required": ["id", "url"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Image record ID",
+      "example": "image123"
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Presigned S3 URL (expires in 24 hours)",
+      "example": "https://amexing-bucket.s3.amazonaws.com/vehicles/abc123/image.jpg?X-Amz-Algorithm=..."
+    },
+    "fileName": {
+      "type": "string",
+      "description": "Original file name",
+      "example": "mercedes-sprinter-front.jpg"
+    },
+    "fileSize": {
+      "type": "integer",
+      "description": "File size in bytes",
+      "example": 1024000
+    },
+    "isPrimary": {
+      "type": "boolean",
+      "description": "Whether this is the primary/cover image",
+      "example": true
+    },
+    "displayOrder": {
+      "type": "integer",
+      "description": "Display order (0 = first)",
+      "example": 0
+    },
+    "uploadedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Upload timestamp",
+      "example": "2024-01-15T10:00:00.000Z"
+    }
+  }
+}

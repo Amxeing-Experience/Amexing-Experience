@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" style="background: #f8f9fa;">
+  <rect width="400" height="300" fill="#e9ecef"/>
+  <text x="200" y="140" font-family="Arial, sans-serif" font-size="16" fill="#6c757d" text-anchor="middle">Imagen no disponible</text>
+  <text x="200" y="160" font-family="Arial, sans-serif" font-size="12" fill="#6c757d" text-anchor="middle">Problema al cargar desde S3</text>
+  <circle cx="200" cy="120" r="30" fill="none" stroke="#6c757d" stroke-width="2"/>
+  <circle cx="185" cy="105" r="3" fill="#6c757d"/>
+  <circle cx="215" cy="105" r="3" fill="#6c757d"/>
+  <path d="M180 130 Q200 150 220 130" stroke="#6c757d" stroke-width="2" fill="none"/>
+</svg>

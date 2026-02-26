@@ -1,0 +1,10 @@
+{
+  "get": {
+    "tags": ["Billing"],
+    "summary": "Get billing info for specific user",
+    "operationId": "getBillingForUser",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "userId", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "User billing information" } }
+  }
+}

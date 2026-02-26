@@ -187,8 +187,7 @@ describe('User Menu Molecule Component', () => {
       });
 
       expect(html).toContain('My Profile');
-      expect(html).toContain('Settings');
-      // Help & Support removed from menu
+      // Settings removed in component refactoring (simplified menu)
       expect(html).toContain('Sign Out');
     });
 
@@ -198,8 +197,7 @@ describe('User Menu Molecule Component', () => {
       });
 
       expect(html).toContain('/dashboard/admin/profile');
-      expect(html).toContain('/dashboard/admin/settings');
-      // Help & Support link removed
+      // Settings link removed in component refactoring
       expect(html).toContain('/logout');
     });
 
@@ -207,8 +205,7 @@ describe('User Menu Molecule Component', () => {
       const html = await renderComponent(componentPath);
 
       expect(html).toContain('ti-user');
-      expect(html).toContain('ti-settings');
-      // ti-help icon removed
+      // ti-settings icon removed in component refactoring
       expect(html).toContain('ti-logout');
     });
 

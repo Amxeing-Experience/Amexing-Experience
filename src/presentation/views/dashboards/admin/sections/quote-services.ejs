@@ -809,6 +809,13 @@ tr[data-row-type="subconcept"] {
             } else {
                 tbody.appendChild(subRow);
             }
+
+            // Update people quantities display if this is an experience with existing data
+            if (subconcept.type === 'experiencia' && subconcept.experienceId) {
+                setTimeout(() => {
+                    updateExperiencePeopleQuantitiesDisplay(dayIndex, subIdx, subconcept);
+                }, 100);
+            }
         });
 
         // Add separator after last subconcept
@@ -1086,6 +1093,12 @@ tr[data-row-type="subconcept"] {
                             id="experienceSelector_${dayIndex}_${subconceptIndex}">
                         <option value="">Seleccionar experiencia...</option>
                     </select>
+                    <div id="experiencePeopleQuantities_${dayIndex}_${subconceptIndex}" class="mt-2" style="display: none;">
+                        <small class="text-muted d-block">
+                            <i class="ti ti-users me-1"></i>
+                            <span id="peopleQuantitiesText_${dayIndex}_${subconceptIndex}">Personas: ...</span>
+                        </small>
+                    </div>
                     <div id="experiencePackageTable_${dayIndex}_${subconceptIndex}" class="mt-2" style="display: none;"></div>
                 </td>
             `;
@@ -3480,6 +3493,9 @@ tr[data-row-type="subconcept"] {
                     }
                 }
 
+                // Show people quantities if they exist in the subconcept
+                updateExperiencePeopleQuantitiesDisplay(dayIndex, subconceptIndex, subconcept);
+
                 // Show/hide package table
                 if (hasIncluded) {
                     renderExperiencePackageTable(dayIndex, subconceptIndex, experience.experienceDetails, experience);
@@ -3545,6 +3561,38 @@ tr[data-row-type="subconcept"] {
 
         packageTableContainer.innerHTML = listHTML;
         packageTableContainer.style.display = 'block';
+    }
+
+    function updateExperiencePeopleQuantitiesDisplay(dayIndex, subconceptIndex, subconcept) {
+        const peopleQuantitiesContainer = document.getElementById(`experiencePeopleQuantities_${dayIndex}_${subconceptIndex}`);
+        const peopleQuantitiesText = document.getElementById(`peopleQuantitiesText_${dayIndex}_${subconceptIndex}`);
+        
+        if (!peopleQuantitiesContainer || !peopleQuantitiesText) return;
+
+        // Check if we have detailed people quantities
+        const adultsQuantity = subconcept.adultsQuantity || 0;
+        const childrenQuantity = subconcept.childrenQuantity || 0;
+        const adultsNoAlcoholQuantity = subconcept.adultsNoAlcoholQuantity || 0;
+        
+        // If we have detailed quantities, show them
+        if (adultsQuantity > 0 || childrenQuantity > 0 || adultsNoAlcoholQuantity > 0) {
+            let quantitiesText = [];
+            if (adultsQuantity > 0) {
+                quantitiesText.push(`${adultsQuantity} adulto${adultsQuantity > 1 ? 's' : ''}`);
+            }
+            if (childrenQuantity > 0) {
+                quantitiesText.push(`${childrenQuantity} niño${childrenQuantity > 1 ? 's' : ''}`);
+            }
+            if (adultsNoAlcoholQuantity > 0) {
+                quantitiesText.push(`${adultsNoAlcoholQuantity} adulto${adultsNoAlcoholQuantity > 1 ? 's' : ''} sin alcohol`);
+            }
+            
+            peopleQuantitiesText.textContent = quantitiesText.join(', ');
+            peopleQuantitiesContainer.style.display = 'block';
+        } else {
+            // Hide the quantities display if no detailed quantities
+            peopleQuantitiesContainer.style.display = 'none';
+        }
     }
 
     /**
@@ -4043,6 +4091,7 @@ tr[data-row-type="subconcept"] {
     document.addEventListener('DOMContentLoaded', async function() {
         const pageLoadStart = Date.now();
         console.log(`🌟 [${pageLoadStart}] Page DOM loaded, starting initialization sequence`);
+        console.log('🚨 QUOTE SERVICES PAGE - JAVASCRIPT IS WORKING!');
         
         try {
             console.log(`📊 Page state check:`, {
@@ -4081,6 +4130,143 @@ tr[data-row-type="subconcept"] {
         const confirmDeleteSubconceptBtn = document.getElementById('confirmDeleteSubconceptBtn');
         if (confirmDeleteSubconceptBtn) {
             confirmDeleteSubconceptBtn.addEventListener('click', confirmDeleteSubconcept);
+        }
+
+        // ==================
+        // MODAL HANDLING
+        // ==================
+        
+        console.log('🚀 QUOTE SERVICES MODAL JAVASCRIPT LOADED - VERSION 2.0');
+
+        // Initialize modal state and handle service type selection
+        function initializeModalState() {
+            // Check which service type is initially checked
+            const checkedServiceType = document.querySelector('input[name="serviceType"]:checked');
+            if (checkedServiceType) {
+                const selectedType = checkedServiceType.value;
+                console.log('Initial service type:', selectedType);
+                
+                // Hide all content sections first
+                const contentSections = document.querySelectorAll('.service-content');
+                contentSections.forEach(section => section.classList.add('d-none'));
+                
+                // Hide all pricing sections
+                const experiencePricingSection = document.getElementById('experiencePricingSection');
+                const transportTypeSelector = document.getElementById('transportTypeSelector');
+                
+                if (experiencePricingSection) experiencePricingSection.classList.add('d-none');
+                if (transportTypeSelector) transportTypeSelector.classList.add('d-none');
+                
+                // Show appropriate content based on selection
+                switch(selectedType) {
+                    case 'experience':
+                        const experienceContent = document.getElementById('experienceContent');
+                        if (experienceContent) {
+                            experienceContent.classList.remove('d-none');
+                            console.log('Experience content shown');
+                        }
+                        break;
+                    case 'tour':
+                        const tourContent = document.getElementById('tourContent');
+                        if (tourContent) tourContent.classList.remove('d-none');
+                        break;
+                    case 'transport':
+                        const transportContent = document.getElementById('transportContent');
+                        if (transportContent) transportContent.classList.remove('d-none');
+                        if (transportTypeSelector) transportTypeSelector.classList.remove('d-none');
+                        break;
+                    case 'concepto':
+                        const conceptoContent = document.getElementById('conceptoContent');
+                        if (conceptoContent) conceptoContent.classList.remove('d-none');
+                        break;
+                }
+            }
+        }
+
+        // Handle service type selection in modal
+        const serviceTypeRadios = document.querySelectorAll('input[name="serviceType"]');
+        serviceTypeRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                const selectedType = this.value;
+                console.log('Service type changed to:', selectedType);
+                initializeModalState();
+            });
+        });
+
+        // Handle experience selection to show detailed fields
+        // Use event delegation to handle dynamically loaded content
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.id === 'experienceSelect') {
+                console.log('=== EXPERIENCE SELECTION CHANGED ===');
+                const selectedExperience = e.target.value;
+                const experiencePricingSection = document.getElementById('experiencePricingSection');
+                
+                console.log('Selected experience:', selectedExperience);
+                console.log('Pricing section exists:', !!experiencePricingSection);
+                
+                if (experiencePricingSection) {
+                    console.log('Pricing section current classes:', experiencePricingSection.className);
+                    console.log('Pricing section current display:', window.getComputedStyle(experiencePricingSection).display);
+                }
+                
+                if (selectedExperience && experiencePricingSection) {
+                    console.log('SHOWING experience pricing section');
+                    experiencePricingSection.classList.remove('d-none');
+                    console.log('Pricing section classes after show:', experiencePricingSection.className);
+                    console.log('Pricing section display after show:', window.getComputedStyle(experiencePricingSection).display);
+                    
+                    // Here you would typically load the experience details
+                    // and populate the pricing section fields
+                } else if (experiencePricingSection) {
+                    console.log('HIDING experience pricing section');
+                    experiencePricingSection.classList.add('d-none');
+                } else {
+                    console.error('experiencePricingSection element not found!');
+                }
+            }
+        });
+
+        // Also add a direct handler for when the modal is shown
+        const serviceModal = document.getElementById('serviceModal');
+        if (serviceModal) {
+            serviceModal.addEventListener('shown.bs.modal', function() {
+                console.log('=== SERVICE MODAL SHOWN ===');
+                
+                // Check if all required elements exist
+                const experienceSelect = document.getElementById('experienceSelect');
+                const experiencePricingSection = document.getElementById('experiencePricingSection');
+                const experienceContent = document.getElementById('experienceContent');
+                
+                console.log('Modal elements check:');
+                console.log('- experienceSelect:', !!experienceSelect);
+                console.log('- experiencePricingSection:', !!experiencePricingSection);
+                console.log('- experienceContent:', !!experienceContent);
+                
+                if (experiencePricingSection) {
+                    console.log('- experiencePricingSection classes:', experiencePricingSection.className);
+                    console.log('- experiencePricingSection display:', window.getComputedStyle(experiencePricingSection).display);
+                }
+                
+                // Initialize the modal state based on selected service type
+                initializeModalState();
+                
+                // Set up experience handler and check current value
+                if (experienceSelect) {
+                    console.log('Experience select found, current value:', experienceSelect.value);
+                    // Trigger change event if already has a value
+                    if (experienceSelect.value) {
+                        console.log('Triggering change event for pre-selected experience');
+                        experienceSelect.dispatchEvent(new Event('change'));
+                    }
+                    
+                    // Also force show pricing section if experience is selected
+                    if (experienceSelect.value && experiencePricingSection) {
+                        console.log('Force showing pricing section since experience is already selected');
+                        experiencePricingSection.classList.remove('d-none');
+                        console.log('Pricing section classes after force show:', experiencePricingSection.className);
+                    }
+                }
+            });
         }
 
         window.addEventListener('beforeunload', (e) => {

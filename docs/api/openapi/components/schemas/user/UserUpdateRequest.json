@@ -1,0 +1,48 @@
+{
+  "type": "object",
+  "properties": {
+    "firstName": {
+      "type": "string",
+      "description": "Update first name",
+      "example": "Jane"
+    },
+    "lastName": {
+      "type": "string",
+      "description": "Update last name",
+      "example": "Smith"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Update email address",
+      "example": "updated.email@amexing.com"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["admin", "client", "department_manager", "employee", "employee_amexing", "driver", "guest"],
+      "description": "Update user role (requires appropriate permissions)",
+      "example": "department_manager"
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Update active status",
+      "example": true
+    },
+    "password": {
+      "type": "string",
+      "minLength": 8,
+      "description": "Update password",
+      "example": "NewSecureP@ssw0rd!"
+    },
+    "clientId": {
+      "type": "string",
+      "description": "Update client assignment",
+      "example": "client456"
+    },
+    "departmentId": {
+      "type": "string",
+      "description": "Update department assignment",
+      "example": "dept456"
+    }
+  }
+}

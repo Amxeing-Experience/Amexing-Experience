@@ -1,0 +1,40 @@
+{
+  "put": {
+    "tags": ["User Management"],
+    "summary": "Reactivate user",
+    "operationId": "reactivateUser",
+    "description": "Reactivate a soft-deleted user (sets exists=true).",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "User ID"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "User reactivated successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../../components/schemas/common/SuccessResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      },
+      "404": {
+        "$ref": "../../../components/responses/NotFoundError.json"
+      }
+    }
+  }
+}

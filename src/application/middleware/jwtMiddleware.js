@@ -243,7 +243,25 @@ const requirePermission = (permission, contextExtractor = () => ({})) => async (
     const context = typeof contextExtractor === 'function' ? contextExtractor(req) : contextExtractor || {};
 
     // Check if user has permission
-    const hasPermission = await req.user.hasPermission(permission, context);
+    // Note: req.user is a raw Parse.Object (AmexingUser subclass not registered due to set()+save() issues)
+    // So we use req.roleObject.hasPermission() directly since Role IS registered as a subclass
+    let hasPermission = false;
+
+    if (req.roleObject && typeof req.roleObject.hasPermission === 'function') {
+      // Use roleObject directly (Role class is properly registered)
+      hasPermission = await req.roleObject.hasPermission(permission, context);
+    } else if (req.user && typeof req.user.hasPermission === 'function') {
+      // Fallback: if req.user somehow has hasPermission (e.g., future AmexingUser registration)
+      hasPermission = await req.user.hasPermission(permission, context);
+    } else {
+      // No valid permission check method available
+      logger.warn('No permission check method available:', {
+        userId: req.userId,
+        hasRoleObject: !!req.roleObject,
+        roleObjectType: req.roleObject ? typeof req.roleObject.hasPermission : 'N/A',
+        userRole: req.userRole,
+      });
+    }
 
     if (!hasPermission) {
       logger.warn('Permission denied:', {

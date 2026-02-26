@@ -54,6 +54,7 @@
 const Parse = require('parse/node');
 const crypto = require('crypto');
 const logger = require('../../infrastructure/logger');
+const { getEnvironmentRegion } = require('../../infrastructure/aws/awsRegionValidator');
 
 /**
  * AWS S3 Direct Upload File Storage Service
@@ -105,25 +106,34 @@ class FileStorageService {
    */
   async uploadFile(fileBuffer, fileName, mimeType, options = {}) {
     try {
-      const { entityId, metadata = {} } = options;
+      const { entityId, metadata = {}, customS3Key } = options;
 
       logger.info('FileStorageService.uploadFile - Direct S3 upload with AWS SDK', {
         fileName,
         mimeType,
         bufferLength: fileBuffer?.length,
         timestamp: new Date().toISOString(),
+        customS3Key,
       });
 
-      // Generate unique filename with path structure
-      const uniqueFileName = this._generateFileName(fileName, entityId);
-
-      // Add environment prefix (dev/ or prod/)
-      const s3Prefix = process.env.S3_PREFIX || '';
-      const s3Key = `${s3Prefix}${uniqueFileName}`;
+      // Use customS3Key if provided, otherwise generate unique filename
+      let s3Key;
+      let uniqueFileName;
+      if (customS3Key) {
+        s3Key = customS3Key;
+        // Extract filename from customS3Key for logging
+        uniqueFileName = customS3Key.split('/').pop();
+      } else {
+        // Generate unique filename with path structure
+        uniqueFileName = this._generateFileName(fileName, entityId);
+        // Add environment prefix (dev/ or prod/)
+        const s3Prefix = process.env.S3_PREFIX || '';
+        s3Key = `${s3Prefix}${uniqueFileName}`;
+      }
 
       // Initialize AWS S3 client using credential chain (IAM role, env vars, etc.)
       const AWS = require('aws-sdk');
-      const region = process.env.AWS_REGION || 'us-east-2';
+      const region = getEnvironmentRegion(); // Use validated region
 
       // Configure AWS to use EC2 instance metadata with IMDSv2
       AWS.config.update({
@@ -193,7 +203,7 @@ class FileStorageService {
         s3Key: uploadResult.Key,
         s3Url: uploadResult.Location,
         bucket: uploadResult.Bucket,
-        region: process.env.AWS_REGION || 'us-east-2',
+        region,
         eTag: uploadResult.ETag,
         encryption: uploadParams.ServerSideEncryption,
       };
@@ -277,7 +287,7 @@ class FileStorageService {
   async getPresignedUrl(s3Key, expiresIn = null) {
     try {
       const bucket = process.env.S3_BUCKET;
-      const region = process.env.AWS_REGION || 'us-east-2';
+      const region = getEnvironmentRegion();
 
       // Validate inputs
       if (!bucket) {
@@ -485,7 +495,7 @@ class FileStorageService {
       // Use AWS SDK directly for copy/delete operations
       // Parse.File doesn't support move/copy natively
       const AWS = require('aws-sdk');
-      const region = process.env.AWS_REGION || 'us-east-2';
+      const region = getEnvironmentRegion();
 
       // Configure AWS to use EC2 instance metadata with IMDSv2
       AWS.config.update({
@@ -575,7 +585,7 @@ class FileStorageService {
   async _hardDelete(parseFile, options) {
     try {
       const AWS = require('aws-sdk');
-      const region = process.env.AWS_REGION || 'us-east-2';
+      const region = getEnvironmentRegion();
 
       // Configure AWS to use EC2 instance metadata with IMDSv2
       AWS.config.update({
@@ -636,7 +646,7 @@ class FileStorageService {
   async listFiles(prefix) {
     try {
       const AWS = require('aws-sdk');
-      const region = process.env.AWS_REGION || 'us-east-2';
+      const region = getEnvironmentRegion();
 
       // Configure AWS to use EC2 instance metadata with IMDSv2
       AWS.config.update({

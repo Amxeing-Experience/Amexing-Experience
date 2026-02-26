@@ -187,9 +187,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                 <div class="form-text">Número de pasajeros</div>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="luggageCapacity" class="form-label">Capacidad de Maletas</label>
+                                <label for="luggageCapacity" class="form-label">Capacidad de Carry-on</label>
                                 <input type="number" class="form-control" id="luggageCapacity" name="luggageCapacity" min="0" max="20" placeholder="Ej: 2">
-                                <div class="form-text">Número de maletas grandes</div>
+                                <div class="form-text">Número de carry-on grandes</div>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="color" class="form-label">Color <span class="text-danger">*</span></label>
@@ -238,6 +238,53 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         </div>
     </div>
 </div>
+
+<!-- Custom styles to hide DataTable sorting arrows -->
+<style>
+/* Hide ALL DataTables sorting indicators including arrows */
+#<%= dtTableId %> thead th:after,
+#<%= dtTableId %> thead th:before,
+table.dataTable thead .sorting:after,
+table.dataTable thead .sorting:before,
+table.dataTable thead .sorting_asc:after,
+table.dataTable thead .sorting_asc:before,
+table.dataTable thead .sorting_desc:after,
+table.dataTable thead .sorting_desc:before,
+table.dataTable thead .sorting_asc_disabled:after,
+table.dataTable thead .sorting_asc_disabled:before,
+table.dataTable thead .sorting_desc_disabled:after,
+table.dataTable thead .sorting_desc_disabled:before {
+    display: none !important;
+    content: "" !important;
+    opacity: 0 !important;
+}
+
+/* Remove sorting classes background images */
+table.dataTable thead .sorting,
+table.dataTable thead .sorting_asc,
+table.dataTable thead .sorting_desc,
+table.dataTable thead .sorting_asc_disabled,
+table.dataTable thead .sorting_desc_disabled {
+    background-image: none !important;
+    cursor: default !important;
+}
+
+/* Ensure header text doesn't have extra padding where arrows would be */
+#<%= dtTableId %> thead th {
+    padding-right: 12px !important;
+}
+
+/* Remove any potential sorting icons from specific DataTables themes */
+.dataTables_wrapper .dataTables_sort_icon,
+.dataTables_wrapper .sorting:after,
+.dataTables_wrapper .sorting:before,
+.dataTables_wrapper .sorting_asc:after,
+.dataTables_wrapper .sorting_asc:before,
+.dataTables_wrapper .sorting_desc:after,
+.dataTables_wrapper .sorting_desc:before {
+    display: none !important;
+}
+</style>
 
 <script>
 (function() {
@@ -398,7 +445,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         const luggageCapacity = row.luggageCapacity || 0;
                         return `<div class="text-center">
                             <span class="badge bg-secondary">${data} pax</span>
-                            <br><small class="text-muted">${luggageCapacity} maletas</small>
+                            <br><small class="text-muted">${luggageCapacity} carry-on</small>
                         </div>`;
                     }
                 });
@@ -489,7 +536,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
                             // Manage images button
                             actions += `<button type="button"
-                                            class="btn btn-info manage-images-btn"
+                                            class="btn btn-info manage-vehicle-images-btn"
                                             data-id="${data.objectId || data.id}"
                                             data-brand="${data.brand}"
                                             data-model="${data.model}"
@@ -535,7 +582,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando vehículos...'
             },
-            order: [[0, 'asc']], // Sort by vehicle name by default
+            ordering: false, // Disable sorting completely
+            order: [], // No default sorting
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
@@ -550,7 +598,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
         $('#createVehicleBtn').on('click', function() { openVehicleModal(); });
         $(`#${tableId}`).on('click', '.edit-vehicle-btn', function() { loadVehicleData($(this).data('id')); });
-        $(`#${tableId}`).on('click', '.manage-images-btn', function() {
+        $(`#${tableId}`).on('click', '.manage-vehicle-images-btn', function() {
             const vehicleId = $(this).data('id');
             const brand = $(this).data('brand');
             const model = $(this).data('model');

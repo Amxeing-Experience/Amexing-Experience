@@ -1,0 +1,1323 @@
+<%
+/**
+ * Combined Experiences Cards Display
+ * Displays both regular experiences and provider experiences in a card layout
+ * Similar to vehicles page style
+ *
+ * @param {string} userRole - Current user role
+ * Created by Denisse Maldonado
+ */
+
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+%>
+
+<!-- Main Content -->
+<div class="row mt-4">
+    <div class="col-12">
+        <!-- Combined Experiences Section with Card View -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); border: none;">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h5 class="card-title mb-0 text-white">
+                            <i class="ti ti-star me-2"></i>Catálogo de Experiencias
+                        </h5>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search and Filters -->
+            <div class="card-body border-bottom bg-light">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="searchExperience" class="form-label fw-semibold">
+                            <i class="ti ti-search me-1"></i>Buscar Experiencia
+                        </label>
+                        <input type="text" class="form-control" id="searchExperience" placeholder="Buscar por nombre o descripción...">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filterCurrency" class="form-label fw-semibold">
+                            <i class="ti ti-currency-dollar me-1"></i>Moneda
+                        </label>
+                        <select class="form-select" id="filterCurrency">
+                            <option value="MXN">MXN</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filterPayment" class="form-label fw-semibold">
+                            <i class="ti ti-credit-card me-1"></i>Pago
+                        </label>
+                        <select class="form-select" id="filterPayment">
+                            <option value="efectivo">Efectivo</option>
+                            <option value="transferencia" selected>Transferencia</option>
+                            <option value="tarjeta">Tarjeta Crédito/Débito</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <!-- Loading state -->
+                <div id="experiencesLoading" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando experiencias...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Cargando experiencias...</p>
+                </div>
+
+                <!-- Experiences Grid -->
+                <div id="experiencesGrid" class="row g-4" style="display: none;">
+                    <!-- Experience cards will be dynamically inserted here -->
+                </div>
+
+                <!-- No results message -->
+                <div id="noExperiencesMessage" class="text-center py-5" style="display: none;">
+                    <i class="ti ti-mood-sad" style="font-size: 3rem; color: #dee2e6;"></i>
+                    <p class="mt-3 text-muted">No se encontraron experiencias con los filtros seleccionados</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Experience Card Styles */
+.experience-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.experience-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.experience-card-image {
+    height: 200px;
+    position: relative;
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.experience-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.experience-card-image .no-image {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    width: 100%;
+    height: 100%;
+}
+
+.experience-card-image .no-image i {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+}
+
+.experience-source-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.experience-source-badge.amexing {
+    color: #059669;
+    border: 1px solid #059669;
+}
+
+.experience-source-badge.provider {
+    color: #8b5cf6;
+    border: 1px solid #8b5cf6;
+}
+
+.experience-type-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.experience-card-body {
+    padding: 1.25rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.experience-card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #111827;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.experience-provider-name {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 0.75rem;
+}
+
+.experience-card-description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 1rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    flex: 1;
+}
+
+.experience-card-info {
+    border-top: 1px solid #e5e7eb;
+    padding-top: 0.75rem;
+    margin-top: auto;
+}
+
+.experience-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.375rem 0;
+    font-size: 0.875rem;
+}
+
+.experience-info-label {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.experience-info-value {
+    color: #111827;
+    font-weight: 600;
+}
+
+.experience-price {
+    font-size: 1.25rem;
+    color: #059669;
+    font-weight: 700;
+}
+
+.type-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.type-badge.tour {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.type-badge.actividad {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.type-badge.experiencia {
+    background: #e9d5ff;
+    color: #6b21a8;
+}
+
+.type-badge.otro {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+</style>
+
+<!-- Load centralized pricing utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Experience management functionality
+    let allExperiences = [];
+    let filteredExperiences = [];
+    let currentExchangeRate = 20; // Default exchange rate MXN to USD
+    let currentTransferRate = 0; // Transfer payment surcharge percentage
+    let currentAgencyRate = 0; // Credit card payment surcharge percentage
+    
+    // Load exchange rate
+    async function loadExchangeRate() {
+        try {
+            const response = await fetch('/api/exchange-rate/current', {
+                credentials: 'include',
+                headers: { 
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Authorization': `Bearer ${getAccessToken()}`
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.data && data.data.value !== undefined) {
+                    currentExchangeRate = parseFloat(data.data.value);
+                    console.log('✅ Exchange rate loaded:', currentExchangeRate, 'MXN per USD');
+                }
+            }
+        } catch (error) {
+            console.warn('Could not load exchange rate, using default:', currentExchangeRate);
+        }
+    }
+    
+    // Load transfer rate (for transferencia payments)
+    async function loadTransferRate() {
+        try {
+            const response = await fetch('/api/transfer-rate/current', {
+                credentials: 'include',
+                headers: { 
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Authorization': `Bearer ${getAccessToken()}`
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.data && data.data.value !== undefined) {
+                    currentTransferRate = parseFloat(data.data.value);
+                }
+            }
+        } catch (error) {
+            console.warn('Could not load transfer rate, using default:', currentTransferRate);
+        }
+    }
+    
+    // Load agency rate (for credit card payments)
+    async function loadAgencyRate() {
+        try {
+            const response = await fetch('/api/agency-rate/current', {
+                credentials: 'include',
+                headers: { 
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Authorization': `Bearer ${getAccessToken()}`
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.data && data.data.value !== undefined) {
+                    currentAgencyRate = parseFloat(data.data.value);
+                }
+            }
+        } catch (error) {
+            console.warn('Could not load agency rate, using default:', currentAgencyRate);
+        }
+    }
+    
+    // Convert and format price based on currency and payment type
+    function convertExperiencePrice(priceInput, currency, paymentType) {
+        const price = parseFloat(priceInput || 0);
+        
+        if (price <= 0) {
+            return currency === 'USD' ? '$0.00 USD' : '$0.00';
+        }
+        
+        // First apply payment surcharge if not cash
+        let adjustedPrice = price;
+        if (paymentType === 'transferencia' && currentTransferRate > 0) {
+            adjustedPrice = price * (1 + currentTransferRate / 100);
+        } else if (paymentType === 'tarjeta' && currentAgencyRate > 0) {
+            adjustedPrice = price * (1 + currentAgencyRate / 100);
+        }
+        
+        // Then convert currency if needed
+        if (currency === 'USD' && currentExchangeRate > 0) {
+            const convertedValue = adjustedPrice / currentExchangeRate;
+            const roundedValue = PricingUtils.applyUSDRoundingRules(convertedValue);
+            // Debug: Verify USD rounding with 2.7 rule
+            if (convertedValue !== roundedValue) {
+                console.log(`USD Rounding: ${convertedValue.toFixed(2)} → ${roundedValue} (using 2.7 rule)`);
+            }
+            return formatExperiencePrice(roundedValue, 'USD');
+        } else {
+            return formatExperiencePrice(adjustedPrice, 'MXN');
+        }
+    }
+    
+    // Format price with currency
+    function formatExperiencePrice(price, currency) {
+        if (currency === 'USD') {
+            return `$${price.toFixed(2)} USD`;
+        } else {
+            return `$${price.toLocaleString('es-MX', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            })}`;
+        }
+    }
+
+    // Get JWT token for API calls
+    function getAccessToken() {
+        // Try to get token from various sources
+        let token = localStorage.getItem('accessToken') || 
+                   localStorage.getItem('authToken') || 
+                   localStorage.getItem('token') ||
+                   sessionStorage.getItem('accessToken') ||
+                   sessionStorage.getItem('authToken');
+        
+        // Try to get from server-rendered variable if available
+        if (!token || token === '') {
+            const serverToken = '<%= typeof accessToken !== "undefined" ? accessToken : "" %>';
+            if (serverToken && serverToken !== '') {
+                token = serverToken;
+            }
+        }
+        
+        // Try to extract from cookies as last resort
+        if (!token || token === '') {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'token' || name === 'accessToken' || name === 'authToken') {
+                    token = value;
+                    break;
+                }
+            }
+        }
+        
+        if (!token || token === '' || token === 'undefined' || token === 'null') {
+            console.warn('No authentication token found in localStorage, sessionStorage, server variables, or cookies');
+            return null;
+        }
+        
+        return token;
+    }
+
+    // Load images for an experience with timeout and error handling
+    async function loadExperienceImages(experienceId) {
+        try {
+            const token = getAccessToken();
+            
+            // Set a shorter timeout for image requests to avoid blocking the main load
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Image loading timeout')), 3000)
+            );
+
+            const response = await Promise.race([
+                fetch(`/api/experiences/${experienceId}/images`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json',
+                        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+                        'Cache-Control': 'max-age=300'
+                    }
+                }),
+                timeoutPromise
+            ]);
+            
+            if (response.ok) {
+                const data = await response.json();
+                // Process images to extract optimized formats with URL validation
+                const images = (data.data || []).map(img => {
+                    // Build optimized versions from formats or optimizationMetadata
+                    const optimized = {};
+                    
+                    // Helper function to validate URLs (don't use expired S3 URLs)
+                    const isValidUrl = (url) => {
+                        if (!url || typeof url !== 'string') return false;
+                        
+                        // Check if it's an S3 presigned URL
+                        const urlDate = url.match(/X-Amz-Date=(\d{8}T\d{6}Z)/);
+                        if (urlDate) {
+                            const dateStr = urlDate[1];
+                            const urlTimestamp = new Date(dateStr.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).getTime();
+                            const now = Date.now();
+                            
+                            // Check URL expiration (S3 URLs typically expire after 24 hours)
+                            // We'll be conservative and consider URLs older than 20 hours as potentially expired
+                            if (now - urlTimestamp > 20 * 60 * 60 * 1000) {
+                                console.warn('⚠️ Skipping potentially expired S3 URL (older than 20 hours):', url.substring(0, 100) + '...');
+                                return false;
+                            }
+                        }
+                        
+                        return true;
+                    };
+                    
+                    // Check formats object first with validation
+                    if (img.formats) {
+                        optimized.avif = (img.formats.avif && isValidUrl(img.formats.avif)) ? img.formats.avif : null;
+                        optimized.webp = (img.formats.webp && isValidUrl(img.formats.webp)) ? img.formats.webp : null;
+                        optimized.jpeg = (img.formats.jpeg && isValidUrl(img.formats.jpeg)) ? img.formats.jpeg : null;
+                    }
+                    
+                    // Check optimizationMetadata as fallback
+                    if (img.optimizationMetadata && img.optimizationMetadata.formats) {
+                        Object.keys(img.optimizationMetadata.formats).forEach(format => {
+                            const formatData = img.optimizationMetadata.formats[format];
+                            if (formatData && formatData.url && isValidUrl(formatData.url)) {
+                                optimized[format] = formatData.url;
+                            }
+                        });
+                    }
+                    
+                    return {
+                        ...img,
+                        optimized,
+                        optimizedUrl: isValidUrl(img.url) ? img.url : null,
+                        isPrincipal: img.isPrimary || img.isPrincipal
+                    };
+                });
+                
+                return images.filter(img => img.optimizedUrl || img.optimized.avif || img.optimized.webp || img.optimized.jpeg);
+            }
+        } catch (error) {
+            // Don't log timeout errors as they're expected for performance
+            if (!error.message.includes('timeout')) {
+                console.warn('Error loading images for experience', experienceId, error);
+            }
+        }
+        return [];
+    }
+
+    // Load both experiences and provider experiences with performance optimizations
+    async function loadExperiences() {
+        try {
+            const token = getAccessToken();
+            const startTime = performance.now();
+            
+            // Check if we have a valid token
+            if (!token || token === '' || token === 'undefined') {
+                console.error('No valid authentication token available');
+                throw new Error('Autenticación requerida. Por favor, inicie sesión nuevamente.');
+            }
+            
+            // Load regular experiences and provider experiences in parallel with timeout
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Request timeout')), 10000)
+            );
+
+            const [experiencesResponse, providerExperiencesResponse] = await Promise.race([
+                Promise.all([
+                    fetch('/api/experiences?type=Experience', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/json',
+                            'Cache-Control': 'max-age=300' // Cache for 5 minutes
+                        }
+                    }),
+                    fetch('/api/provider-experiencias/all', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/json',
+                            'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+                            'Cache-Control': 'max-age=300'
+                        }
+                    })
+                ]),
+                timeoutPromise
+            ]);
+
+            if (!experiencesResponse.ok || !providerExperiencesResponse.ok) {
+                // Provide more detailed error information
+                let errorMsg = 'Error loading experiences';
+                if (!experiencesResponse.ok) {
+                    errorMsg += ` - Experiences API returned ${experiencesResponse.status}`;
+                    if (experiencesResponse.status === 401) {
+                        errorMsg = 'Sesión expirada. Por favor, inicie sesión nuevamente.';
+                    }
+                }
+                if (!providerExperiencesResponse.ok) {
+                    errorMsg += ` - Provider API returned ${providerExperiencesResponse.status}`;
+                }
+                throw new Error(errorMsg);
+            }
+
+            const [experiencesData, providerExperiencesData] = await Promise.all([
+                experiencesResponse.json(),
+                providerExperiencesResponse.json()
+            ]);
+
+            console.log(`⚡ API calls completed in ${(performance.now() - startTime).toFixed(2)}ms`);
+
+            // Day mapping for numbers and names to abbreviated Spanish days
+            const dayMap = {
+                '0': 'Do', '7': 'Do', 'sunday': 'Do', 'domingo': 'Do',
+                '1': 'Lu', 'monday': 'Lu', 'lunes': 'Lu',
+                '2': 'Ma', 'tuesday': 'Ma', 'martes': 'Ma',
+                '3': 'Mi', 'wednesday': 'Mi', 'miércoles': 'Mi', 'miercoles': 'Mi',
+                '4': 'Ju', 'thursday': 'Ju', 'jueves': 'Ju',
+                '5': 'Vi', 'friday': 'Vi', 'viernes': 'Vi',
+                '6': 'Sa', 'saturday': 'Sa', 'sábado': 'Sa', 'sabado': 'Sa'
+            };
+
+            // Helper function to format availability
+            const formatAvailability = (availability) => {
+                if (!availability) return null;
+                
+                if (Array.isArray(availability)) {
+                    const days = availability.map(day => {
+                        // Handle different formats of day data
+                        let dayValue = null;
+                        
+                        if (typeof day === 'object' && day !== null) {
+                            // If it's an object, try to get the day property
+                            dayValue = day.day !== undefined ? day.day : (day.Day || day.name || day.value);
+                        } else if (typeof day === 'string' || typeof day === 'number') {
+                            // If it's already a string or number, use it directly
+                            dayValue = day;
+                        }
+                        
+                        // Convert to string and lowercase for mapping
+                        if (dayValue !== null && dayValue !== undefined) {
+                            const key = String(dayValue).toLowerCase().trim();
+                            return dayMap[key] || dayValue; // Return mapped value or original if not found
+                        }
+                        
+                        return null;
+                    }).filter(Boolean);
+                    
+                    // Remove duplicates and sort by day order
+                    const dayOrder = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
+                    const uniqueDays = [...new Set(days)];
+                    const sortedDays = uniqueDays.sort((a, b) => {
+                        const indexA = dayOrder.indexOf(a);
+                        const indexB = dayOrder.indexOf(b);
+                        if (indexA === -1) return 1;
+                        if (indexB === -1) return -1;
+                        return indexA - indexB;
+                    });
+                    
+                    return sortedDays.length > 0 ? sortedDays.join(', ') : null;
+                } else {
+                    return availability;
+                }
+            };
+
+            // Helper function to get the principal image with optimization strategy
+            const getPrincipalImage = (photos) => {
+                if (!photos || !Array.isArray(photos) || photos.length === 0) {
+                    return null;
+                }
+                
+                
+                // Look for principal image first
+                const principalPhoto = photos.find(photo => 
+                    photo.isPrincipal === true || 
+                    photo.principal === true ||
+                    photo.order === 0 ||
+                    photo.displayOrder === 0
+                );
+                
+                const targetPhoto = principalPhoto || photos[0];
+                
+                // Image optimization strategy - prioritize optimized versions
+                // Check for responsive optimized versions (AVIF, WebP, JPEG)
+                const imageData = {
+                    avif: null,
+                    webp: null,
+                    jpeg: null,
+                    original: null
+                };
+                
+                // Extract optimized versions if available
+                // Check multiple possible locations for optimized formats
+                if (targetPhoto.optimized) {
+                    // From regular experiences loaded via loadExperienceImages
+                    imageData.avif = targetPhoto.optimized.avif || null;
+                    imageData.webp = targetPhoto.optimized.webp || null;
+                    imageData.jpeg = targetPhoto.optimized.jpeg || null;
+                } else if (targetPhoto.formats && typeof targetPhoto.formats === 'object') {
+                    // From provider experiences API response
+                    // Check if formats contains direct URLs (strings) or nested objects
+                    if (typeof targetPhoto.formats.avif === 'string') {
+                        // Direct URL strings from provider experiences
+                        imageData.avif = targetPhoto.formats.avif;
+                        imageData.webp = targetPhoto.formats.webp || null;
+                        imageData.jpeg = targetPhoto.formats.jpeg || null;
+                    } else if (targetPhoto.formats.avif && typeof targetPhoto.formats.avif === 'object') {
+                        // Nested format objects
+                        imageData.avif = targetPhoto.formats.avif.url || null;
+                        imageData.webp = targetPhoto.formats.webp ? targetPhoto.formats.webp.url : null;
+                        imageData.jpeg = targetPhoto.formats.jpeg ? targetPhoto.formats.jpeg.url : null;
+                    }
+                } else if (targetPhoto.optimizationMetadata && targetPhoto.optimizationMetadata.formats) {
+                    // From optimizationMetadata structure
+                    const formats = targetPhoto.optimizationMetadata.formats;
+                    if (typeof formats.avif === 'string') {
+                        // Direct URLs in optimizationMetadata
+                        imageData.avif = formats.avif;
+                        imageData.webp = formats.webp || null;
+                        imageData.jpeg = formats.jpeg || null;
+                    } else {
+                        // Nested objects in optimizationMetadata
+                        imageData.avif = formats.avif ? formats.avif.url : null;
+                        imageData.webp = formats.webp ? formats.webp.url : null;
+                        imageData.jpeg = formats.jpeg ? formats.jpeg.url : null;
+                    }
+                }
+                
+                // Fallback to original URL
+                imageData.original = targetPhoto.optimizedUrl || 
+                                   targetPhoto.url || 
+                                   targetPhoto.s3Url || 
+                                   targetPhoto.imageUrl ||
+                                   targetPhoto.dataUrl ||
+                                   (typeof targetPhoto === 'string' ? targetPhoto : null);
+                
+                // Return image data object for responsive picture element
+                // Priority: AVIF > WebP > JPEG > original
+                const result = {
+                    avif: imageData.avif,
+                    webp: imageData.webp, 
+                    jpeg: imageData.jpeg,
+                    fallback: imageData.jpeg || imageData.original
+                };
+                
+                console.log('getPrincipalImage returning for', photos[0]?.name || 'experience:', {
+                    hasAvif: !!result.avif,
+                    hasWebp: !!result.webp,
+                    hasJpeg: !!result.jpeg,
+                    hasFallback: !!result.fallback,
+                    actualUrls: {
+                        avif: result.avif ? result.avif.substring(0, 100) + '...' : null,
+                        webp: result.webp ? result.webp.substring(0, 100) + '...' : null,
+                        fallback: result.fallback ? result.fallback.substring(0, 100) + '...' : null
+                    }
+                });
+                
+                return result;
+            };
+
+            // Process regular experiences first (faster, no image loading)
+            const regularExperiences = (experiencesData.data || []).map(exp => ({
+                ...exp,
+                source: 'amexing',
+                providerName: 'Amexing',
+                displayName: exp.name,
+                displayPrice: exp.cost || 0,
+                displayPriceChild: null,
+                displayPriceNoAlcohol: null,
+                displayDuration: exp.duration,
+                displayCapacity: exp.capacity,
+                displayType: exp.experienceType || 'experiencia',
+                displayDescription: exp.description || '',
+                displayAdvanceBooking: exp.advance_booking_time || exp.advanceBookingTime || null,
+                displayAvailability: formatAvailability(exp.availability),
+                photos: [], // Will load images asynchronously
+                displayImage: exp.mainImage ? {
+                    avif: null,
+                    webp: null,
+                    jpeg: null,
+                    fallback: exp.mainImage
+                } : null
+            }));
+
+            // Load images for regular experiences asynchronously (don't block initial render)
+            setTimeout(async () => {
+                const imagePromises = regularExperiences.map(async (exp, index) => {
+                    if (exp.id) {
+                        try {
+                            const images = await loadExperienceImages(exp.id);
+                            regularExperiences[index].photos = images;
+                            
+                            // Debug: Check what images structure we got
+                            if (index === 0 && images.length > 0) {
+                                console.log('🔍 Regular experience image structure:', {
+                                    experienceName: exp.displayName,
+                                    firstImage: images[0],
+                                    hasOptimized: !!images[0].optimized,
+                                    optimizedKeys: images[0].optimized ? Object.keys(images[0].optimized) : [],
+                                    hasFormats: !!images[0].formats,
+                                    formatKeys: images[0].formats ? Object.keys(images[0].formats) : []
+                                });
+                            }
+                            
+                            regularExperiences[index].displayImage = getPrincipalImage(images) || regularExperiences[index].displayImage;
+                        } catch (error) {
+                            // Ignore image loading errors to not block the experience display
+                        }
+                    }
+                });
+
+                // Load images in batches to avoid overwhelming the browser
+                for (let i = 0; i < imagePromises.length; i += 3) {
+                    const batch = imagePromises.slice(i, i + 3);
+                    await Promise.all(batch);
+                    // Update display after each batch
+                    allExperiences = [...regularExperiences, ...providerExps];
+                    
+                    // Sort experiences alphabetically by name
+                    allExperiences.sort((a, b) => {
+                        const nameA = (a.name || '').toLowerCase().trim();
+                        const nameB = (b.name || '').toLowerCase().trim();
+                        return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+                    });
+                    
+                    filteredExperiences = [...allExperiences];
+                    if (document.getElementById('experiencesGrid').style.display === 'flex') {
+                        displayExperiences();
+                    }
+                }
+            }, 100); // Small delay to let initial render complete
+
+            // Debug provider experience photos
+            if (providerExperiencesData.data && providerExperiencesData.data.length > 0) {
+                console.log('🔍 Provider Experience Photos Debug:', {
+                    firstExp: providerExperiencesData.data[0].name,
+                    totalExperiences: providerExperiencesData.data.length,
+                    firstExpPhotos: providerExperiencesData.data[0].photos?.length || 0,
+                    firstExpImages: providerExperiencesData.data[0].images?.length || 0
+                });
+                
+                // Debug formats in first photo
+                if (providerExperiencesData.data[0].photos && providerExperiencesData.data[0].photos[0]) {
+                    const firstPhoto = providerExperiencesData.data[0].photos[0];
+                    console.log('🖼️ First provider photo analysis:', {
+                        hasFormats: !!firstPhoto.formats,
+                        formatsKeys: firstPhoto.formats ? Object.keys(firstPhoto.formats) : [],
+                        formatsStructure: firstPhoto.formats,
+                        hasUrl: !!firstPhoto.url,
+                        urlPreview: firstPhoto.url ? firstPhoto.url.substring(0, 100) + '...' : null
+                    });
+                    
+                    // Check if formats contain actual URLs vs nested objects
+                    if (firstPhoto.formats) {
+                        Object.keys(firstPhoto.formats).forEach(format => {
+                            const formatData = firstPhoto.formats[format];
+                            console.log(`📷 Format ${format}:`, {
+                                type: typeof formatData,
+                                isString: typeof formatData === 'string',
+                                isObject: typeof formatData === 'object' && formatData !== null,
+                                preview: typeof formatData === 'string' ? 
+                                    formatData.substring(0, 80) + '...' : 
+                                    (formatData ? JSON.stringify(formatData).substring(0, 80) + '...' : null)
+                            });
+                        });
+                    }
+                }
+            }
+            
+            const providerExps = (providerExperiencesData.data || []).map(exp => {
+                // Format availability days if it's an array
+                let formattedAvailability = null;
+                
+                // Day mapping for numbers and names to abbreviated Spanish days
+                const dayMap = {
+                    '0': 'Do', '7': 'Do', 'sunday': 'Do', 'domingo': 'Do',
+                    '1': 'Lu', 'monday': 'Lu', 'lunes': 'Lu',
+                    '2': 'Ma', 'tuesday': 'Ma', 'martes': 'Ma',
+                    '3': 'Mi', 'wednesday': 'Mi', 'miércoles': 'Mi', 'miercoles': 'Mi',
+                    '4': 'Ju', 'thursday': 'Ju', 'jueves': 'Ju',
+                    '5': 'Vi', 'friday': 'Vi', 'viernes': 'Vi',
+                    '6': 'Sa', 'saturday': 'Sa', 'sábado': 'Sa', 'sabado': 'Sa'
+                };
+                
+                if (exp.availability && Array.isArray(exp.availability)) {
+                    const days = exp.availability.map(day => {
+                        // Handle different formats of day data
+                        let dayValue = null;
+                        
+                        if (typeof day === 'object' && day !== null) {
+                            // If it's an object, try to get the day property
+                            dayValue = day.day || day.Day || day.name || day.value;
+                        } else if (typeof day === 'string' || typeof day === 'number') {
+                            // If it's already a string or number, use it directly
+                            dayValue = day;
+                        }
+                        
+                        // Convert to string and lowercase for mapping
+                        if (dayValue !== null && dayValue !== undefined) {
+                            const key = String(dayValue).toLowerCase().trim();
+                            return dayMap[key] || dayValue; // Return mapped value or original if not found
+                        }
+                        
+                        return null;
+                    }).filter(Boolean);
+                    
+                    // Remove duplicates and sort by day order
+                    const dayOrder = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
+                    const uniqueDays = [...new Set(days)];
+                    const sortedDays = uniqueDays.sort((a, b) => {
+                        const indexA = dayOrder.indexOf(a);
+                        const indexB = dayOrder.indexOf(b);
+                        if (indexA === -1) return 1;
+                        if (indexB === -1) return -1;
+                        return indexA - indexB;
+                    });
+                    
+                    formattedAvailability = sortedDays.length > 0 ? sortedDays.join(', ') : null;
+                } else if (exp.availability) {
+                    formattedAvailability = exp.availability;
+                }
+                
+                return {
+                    ...exp,
+                    source: 'provider',
+                    providerName: exp.provider?.name || 'Proveedor Externo',
+                    displayName: exp.name,
+                    displayPrice: exp.price || 0,  // Adult price
+                    displayPriceChild: exp.price_child || 0,  // Child price
+                    displayPriceNoAlcohol: exp.price_no_alcohol || 0,  // Adult without alcohol price
+                    displayDuration: exp.duration,
+                    displayCapacity: exp.max_people || exp.capacity,
+                    displayType: exp.tipo || 'experiencia',
+                    displayDescription: exp.description || '',
+                    displayAdvanceBooking: exp.advance_booking_time || exp.advanceBookingTime || null,
+                    displayAvailability: formattedAvailability,
+                    displayImage: getPrincipalImage(exp.photos || exp.images)
+                };
+            });
+
+            allExperiences = [...regularExperiences, ...providerExps];
+            
+            // Sort experiences alphabetically by name
+            allExperiences.sort((a, b) => {
+                const nameA = (a.name || '').toLowerCase().trim();
+                const nameB = (b.name || '').toLowerCase().trim();
+                return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+            });
+            
+            filteredExperiences = [...allExperiences];
+
+            // Show initial experiences immediately
+            displayExperiences();
+            
+            // Update loading state
+            document.getElementById('experiencesLoading').style.display = 'none';
+            document.getElementById('experiencesGrid').style.display = 'flex';
+            
+            // Add performance timing
+            console.log(`⚡ Initial page load completed in ${(performance.now() - startTime).toFixed(2)}ms`);
+        } catch (error) {
+            console.error('Error loading experiences:', error);
+            document.getElementById('experiencesLoading').innerHTML = `
+                <i class="ti ti-alert-circle text-danger" style="font-size: 3rem;"></i>
+                <p class="mt-3 text-danger">Error al cargar experiencias</p>
+                <p class="text-muted">${error.message}</p>
+            `;
+        }
+    }
+
+
+    // Display experiences as cards
+    function displayExperiences() {
+        const grid = document.getElementById('experiencesGrid');
+        const noResults = document.getElementById('noExperiencesMessage');
+
+        if (filteredExperiences.length === 0) {
+            grid.style.display = 'none';
+            noResults.style.display = 'block';
+            return;
+        }
+
+        grid.style.display = 'flex';
+        noResults.style.display = 'none';
+
+        // Get current filter values
+        const currency = document.getElementById('filterCurrency').value;
+        const paymentType = document.getElementById('filterPayment').value;
+
+        grid.innerHTML = filteredExperiences.map((experience, index) => {
+            const typeClass = experience.displayType ? experience.displayType.toLowerCase() : 'otro';
+            const typeName = experience.displayType || 'Experiencia';
+            
+            // Debug image URLs being used
+            if (index < 3) { // Only log first 3 for brevity
+                console.log(`🎯 Experience "${experience.displayName}" image debug:`, {
+                    hasDisplayImage: !!experience.displayImage,
+                    displayImageStructure: experience.displayImage,
+                    source: experience.source
+                });
+            }
+            
+            return `
+                <div class="col-md-6 col-lg-4">
+                    <div class="experience-card">
+                        <div class="experience-card-image" data-image-container>
+                            ${experience.displayImage && experience.displayImage.fallback ? 
+                                `<div class="image-loading-container">
+                                    <picture class="experience-picture">
+                                        ${experience.displayImage.avif ? `<source srcset="${experience.displayImage.avif}" type="image/avif">` : ''}
+                                        ${experience.displayImage.webp ? `<source srcset="${experience.displayImage.webp}" type="image/webp">` : ''}
+                                        <img src="${experience.displayImage.fallback}" 
+                                             alt="${experience.displayName}" 
+                                             class="experience-img ${!experience.displayImage.avif && !experience.displayImage.webp ? 'loading' : ''}" 
+                                             loading="lazy"
+>
+                                    </picture>
+                                    ${!experience.displayImage.avif && !experience.displayImage.webp ? 
+                                        '<div class="progressive-loader"><div class="loading-pulse"></div></div>' : ''}
+                                </div>` :
+                                `<div class="no-image">
+                                    <i class="ti ti-photo"></i>
+                                    <span>Sin imagen</span>
+                                </div>`
+                            }
+                        </div>
+                        <div class="experience-card-body">
+                            <h5 class="experience-card-title" title="${experience.displayName}">
+                                ${experience.displayName}
+                            </h5>
+                            <div class="experience-card-description">
+                                ${experience.displayDescription || 'Sin descripción disponible'}
+                            </div>
+                            <div class="experience-card-info">
+                                <div class="experience-info-row">
+                                    <span class="experience-info-label">
+                                        <i class="ti ti-clock me-1"></i>Duración
+                                    </span>
+                                    <span class="experience-info-value">
+                                        ${experience.displayDuration ? experience.displayDuration + ' min' : 'Por definir'}
+                                    </span>
+                                </div>
+                                <div class="experience-info-row">
+                                    <span class="experience-info-label">
+                                        <i class="ti ti-calendar-time me-1"></i>Reserva anticipada
+                                    </span>
+                                    <span class="experience-info-value">
+                                        ${(() => {
+                                            if (!experience.displayAdvanceBooking) return 'Reserva inmediata';
+                                            const totalMinutes = parseInt(experience.displayAdvanceBooking);
+                                            if (isNaN(totalMinutes)) return 'Reserva inmediata';
+                                            
+                                            const hours = Math.floor(totalMinutes / 60);
+                                            const minutes = totalMinutes % 60;
+                                            
+                                            if (hours > 0 && minutes > 0) {
+                                                return `${hours}h ${minutes}min`;
+                                            } else if (hours > 0) {
+                                                return `${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+                                            } else {
+                                                return `${minutes} min`;
+                                            }
+                                        })()}
+                                    </span>
+                                </div>
+                                <div class="experience-info-row">
+                                    <span class="experience-info-label">
+                                        <i class="ti ti-calendar-event me-1"></i>Días disponibles
+                                    </span>
+                                    <span class="experience-info-value" style="font-size: 0.8rem;">
+                                        ${experience.displayAvailability || 'Todos los días'}
+                                    </span>
+                                </div>
+                                <div class="experience-info-row">
+                                    ${experience.source === 'provider' ? 
+                                        // For provider experiences, show all three prices with label
+                                        `<span class="experience-info-label">
+                                            <i class="ti ti-currency-dollar me-1"></i>Precios
+                                        </span>
+                                        <div class="d-flex gap-3" style="font-size: 0.75rem;">
+                                            ${experience.displayPrice > 0 ? 
+                                                `<div>
+                                                    <small class="text-muted">Adulto:</small>
+                                                    <strong>${convertExperiencePrice(experience.displayPrice, currency, paymentType)}</strong>
+                                                </div>` 
+                                                : ''}
+                                            ${experience.displayPriceChild > 0 ? 
+                                                `<div>
+                                                    <small class="text-muted">Niños:</small>
+                                                    <strong>${convertExperiencePrice(experience.displayPriceChild, currency, paymentType)}</strong>
+                                                </div>` 
+                                                : ''}
+                                            ${experience.displayPriceNoAlcohol > 0 ? 
+                                                `<div>
+                                                    <small class="text-muted">Sin alcohol:</small>
+                                                    <strong>${convertExperiencePrice(experience.displayPriceNoAlcohol, currency, paymentType)}</strong>
+                                                </div>` 
+                                                : ''}
+                                            ${(!experience.displayPrice && !experience.displayPriceChild && !experience.displayPriceNoAlcohol) ? 
+                                                '<div>Por cotizar</div>' : ''}
+                                        </div>` 
+                                        : 
+                                        // For regular experiences, show single cost with label
+                                        `<span class="experience-info-label">
+                                            <i class="ti ti-currency-dollar me-1"></i>Precio
+                                        </span>
+                                        <span class="experience-price">
+                                            ${experience.displayPrice > 0 ? 
+                                                convertExperiencePrice(experience.displayPrice, currency, paymentType) : 'Por cotizar'}
+                                        </span>`
+                                    }
+                                </div>
+                                <div class="experience-info-row border-0 pt-3">
+                                    <button class="btn btn-outline-primary btn-sm w-100 view-more-btn" 
+                                            data-experience-id="${experience.id || experience.objectId}" 
+                                            data-experience-name="${experience.displayName}"
+                                            data-experience-type="${experience.source}">
+                                        <i class="ti ti-eye me-1"></i>Ver más
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // Set up proper event listeners for images (CSP-compliant)
+        setTimeout(() => {
+            const images = document.querySelectorAll('.experience-img');
+            images.forEach(img => {
+                // Handle successful image load
+                img.addEventListener('load', function() {
+                    this.classList.remove('loading');
+                    // Hide the loading indicator
+                    const loader = this.closest('.image-loading-container')?.querySelector('.progressive-loader');
+                    if (loader) {
+                        loader.style.display = 'none';
+                    }
+                });
+                
+                // Handle image load error (403 = expired URL, try fallback formats)
+                img.addEventListener('error', function() {
+                    console.warn('❌ Image failed to load (likely expired S3 URL):', this.src);
+                    
+                    // Try to fall back to other formats if AVIF fails
+                    const picture = this.parentElement;
+                    const sources = picture.querySelectorAll('source');
+                    
+                    // If this was AVIF that failed, try removing AVIF sources to fall back to WebP/JPEG
+                    if (this.src.includes('.avif')) {
+                        sources.forEach(source => {
+                            if (source.type === 'image/avif') {
+                                source.remove();
+                            }
+                        });
+                        
+                        // Try to reload without AVIF
+                        if (sources.length > 0) {
+                            console.log('🔄 Retrying without AVIF...');
+                            this.src = this.src; // Trigger reload
+                            return;
+                        }
+                    }
+                    
+                    // If all formats fail, show no-image fallback
+                    const container = this.closest('.experience-card-image');
+                    if (container) {
+                        container.innerHTML = `
+                            <div class="no-image" style="display: flex; align-items: center; justify-content: center; height: 200px; background: #f8f9fa; color: #6c757d;">
+                                <i class="ti ti-photo me-1"></i>
+                                <span>Imagen no disponible</span>
+                            </div>
+                        `;
+                    }
+                });
+            });
+        }, 50);
+    }
+
+    // Search and filter experiences
+    function searchExperiences() {
+        const searchFilter = document.getElementById('searchExperience').value.toLowerCase();
+
+        filteredExperiences = allExperiences.filter(experience => {
+            // Only apply search filter, not currency/payment filters
+            const matchesSearch = !searchFilter || 
+                experience.displayName.toLowerCase().includes(searchFilter) ||
+                (experience.displayDescription && experience.displayDescription.toLowerCase().includes(searchFilter)) ||
+                (experience.providerName && experience.providerName.toLowerCase().includes(searchFilter));
+
+            return matchesSearch;
+        });
+        
+        // Sort filtered results alphabetically by name
+        filteredExperiences.sort((a, b) => {
+            const nameA = (a.displayName || a.name || '').toLowerCase().trim();
+            const nameB = (b.displayName || b.name || '').toLowerCase().trim();
+            return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+        });
+
+        displayExperiences();
+    }
+
+    // Set up event listeners for search and filters
+    document.getElementById('searchExperience').addEventListener('input', searchExperiences);
+    document.getElementById('filterCurrency').addEventListener('change', function() {
+        // Only update display to recalculate prices, don't filter
+        displayExperiences();
+    });
+    document.getElementById('filterPayment').addEventListener('change', function() {
+        // Only update display to recalculate prices, don't filter
+        displayExperiences();
+    });
+
+    // Set up event listener for "Ver más" buttons
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.view-more-btn')) {
+            const button = e.target.closest('.view-more-btn');
+            const experienceId = button.dataset.experienceId;
+            const experienceName = button.dataset.experienceName;
+            const experienceType = button.dataset.experienceType;
+            
+            // For now, show an alert with the experience details
+            // This can be replaced with a modal or navigation to a detail page
+            alert(`Ver detalles de: ${experienceName}\nID: ${experienceId}\nTipo: ${experienceType}`);
+            
+            // TODO: Implement experience detail view
+            // Options:
+            // 1. Open a modal with full experience details
+            // 2. Navigate to a detail page
+            // 3. Expand the card to show more information
+        }
+    });
+
+    // Function to refresh images for a specific experience
+    window.refreshExperienceImages = async function(experienceId) {
+        console.log('🔄 Refreshing images for experience:', experienceId);
+        
+        // Find the experience in our data
+        const experienceIndex = allExperiences.findIndex(exp => exp.id === experienceId);
+        if (experienceIndex === -1) {
+            console.log('❌ Experience not found:', experienceId);
+            return;
+        }
+        
+        try {
+            // Reload images for this specific experience
+            const images = await loadExperienceImages(experienceId);
+            
+            // Update the experience in our data
+            allExperiences[experienceIndex].photos = images;
+            allExperiences[experienceIndex].displayImage = getPrincipalImage(images) || allExperiences[experienceIndex].displayImage;
+            
+            // Update the filtered experiences too
+            const filteredIndex = filteredExperiences.findIndex(exp => exp.id === experienceId);
+            if (filteredIndex !== -1) {
+                filteredExperiences[filteredIndex].photos = images;
+                filteredExperiences[filteredIndex].displayImage = getPrincipalImage(images) || filteredExperiences[filteredIndex].displayImage;
+            }
+            
+            // Refresh the display to show the updated primary image
+            displayExperiences();
+            
+            console.log('✅ Successfully refreshed images for experience:', experienceId);
+        } catch (error) {
+            console.error('❌ Error refreshing experience images:', error);
+        }
+    };
+    
+    // Listen for image change events from the modal
+    window.addEventListener('experienceImageChanged', function(event) {
+        const { experienceId } = event.detail;
+        console.log('📢 Received experienceImageChanged event for:', experienceId);
+        if (experienceId) {
+            refreshExperienceImages(experienceId);
+        }
+    });
+
+    // Load all rates and experiences on page load
+    loadExchangeRate();
+    loadTransferRate();
+    loadAgencyRate();
+    loadExperiences();
+});
+</script>
+
+<style>
+/* Progressive Image Loading */
+.image-loading-container {
+    position: relative;
+    width: 100%;
+    height: 200px;
+}
+
+.experience-img.loading {
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.experience-img:not(.loading) {
+    opacity: 1;
+}
+
+.progressive-loader {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    pointer-events: none;
+}
+
+.loading-pulse {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(248, 250, 252, 0.9);
+    position: relative;
+    animation: pulse 2s ease-in-out infinite;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.loading-pulse::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    background: #6c757d;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulseInner 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% { 
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+@keyframes pulseInner {
+    0%, 100% { 
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.6;
+    }
+    50% { 
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 1;
+    }
+}
+
+/* Hide loading indicator when image loads */
+.experience-img:not(.loading) ~ .progressive-loader {
+    display: none;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .loading-pulse { animation: none; }
+    .loading-pulse::before { animation: none; }
+    .experience-img { transition: none; }
+}
+</style>

@@ -1,0 +1,6 @@
+{
+  "type": "apiKey",
+  "in": "cookie",
+  "name": "accessToken",
+  "description": "HTTP-only cookie containing JWT access token.\n\n**Security Features:**\n- HttpOnly: Cannot be accessed via JavaScript\n- Secure: Only transmitted over HTTPS in production\n- SameSite=strict: Prevents CSRF attacks\n- Max-Age: 8 hours\n\nThis is automatically set by the server upon successful authentication."
+}

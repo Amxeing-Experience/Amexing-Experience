@@ -55,10 +55,18 @@ const logger = require('../../infrastructure/logger');
  * const tokens = await core.generateTokens(user);
  */
 class AuthenticationServiceCore {
-  constructor() {
-    this.jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
-    this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
-    this.refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+  // Use getters to ensure environment variables are read at runtime
+  // This is critical for test environments where env vars may be set after module load
+  get jwtSecret() {
+    return process.env.JWT_SECRET || 'your-secret-key';
+  }
+
+  get jwtExpiresIn() {
+    return process.env.JWT_EXPIRES_IN || '8h';
+  }
+
+  get refreshExpiresIn() {
+    return process.env.JWT_REFRESH_EXPIRES_IN || '7d';
   }
 
   /**

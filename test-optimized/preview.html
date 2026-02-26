@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Image Optimization Test</title>
+  <style>
+    body { font-family: Arial; max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .card { border: 1px solid #ddd; padding: 10px; border-radius: 8px; }
+    img { width: 100%; height: auto; }
+    .stats { font-size: 12px; color: #666; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Image Optimization Results</h1>
+  
+  <div class="grid">
+    <div class="card">
+      <h3>Original JPEG</h3>
+      <img src="../test-image.jpg" alt="Original">
+      <div class="stats">Size: 12.22 KB</div>
+    </div>
+    
+    <div class="card">
+      <h3>AVIF (96.4% smaller)</h3>
+      <img src="test-image.avif" alt="AVIF">
+      <div class="stats">Size: 0.44 KB</div>
+    </div>
+    
+    <div class="card">
+      <h3>WebP (69.6% smaller)</h3>
+      <img src="test-image.webp" alt="WebP">
+      <div class="stats">Size: 3.71 KB</div>
+    </div>
+    
+    <div class="card">
+      <h3>Optimized JPEG (-1.9% smaller)</h3>
+      <img src="test-image-optimized.jpg" alt="Optimized JPEG">
+      <div class="stats">Size: 12.45 KB</div>
+    </div>
+  </div>
+  
+  <h2>Summary</h2>
+  <ul>
+    <li>AVIF: 96.4% size reduction (best compression)</li>
+    <li>WebP: 69.6% size reduction (good balance)</li>
+    <li>JPEG: -1.9% size reduction (universal support)</li>
+  </ul>
+  
+  <h2>Processing Times</h2>
+  <ul>
+    <li>AVIF: 64ms</li>
+    <li>WebP: 58ms</li>
+    <li>JPEG: 12ms</li>
+  </ul>
+</body>
+</html>

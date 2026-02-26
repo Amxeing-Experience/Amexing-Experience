@@ -1,0 +1,9 @@
+{
+  "in": "query",
+  "name": "sortField",
+  "schema": {
+    "type": "string",
+    "default": "lastName"
+  },
+  "description": "Field to sort by"
+}

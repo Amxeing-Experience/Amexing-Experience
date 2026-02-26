@@ -1,0 +1,48 @@
+{
+  "delete": {
+    "tags": ["OAuth"],
+    "summary": "Unlink OAuth account",
+    "operationId": "unlinkOAuthAccount",
+    "description": "Remove OAuth provider link from user account.",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "provider",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "enum": ["apple", "corporate"]
+        },
+        "description": "OAuth provider name"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "Account unlinked successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/SuccessResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../components/responses/UnauthorizedError.json"
+      },
+      "400": {
+        "description": "Cannot unlink only authentication method",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/ErrorResponse.json"
+            }
+          }
+        }
+      }
+    }
+  }
+}

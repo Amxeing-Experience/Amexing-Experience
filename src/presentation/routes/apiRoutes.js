@@ -131,25 +131,77 @@ router.get('/auth/current-token', jwtMiddleware.authenticateToken, (req, res) =>
   }
 });
 
-// CSP Report endpoint
-router.post(
-  '/csp-report',
-  express.json({
-    type: ['application/csp-report', 'application/json'],
-    limit: '1mb',
-  }),
-  (req, res) => {
-    try {
-      if (req.body && Object.keys(req.body).length > 0) {
-        logger.warn('CSP Violation Report:', JSON.stringify(req.body, null, 2));
-      }
-      res.status(204).end();
-    } catch (error) {
-      logger.warn('CSP Report parsing error:', error);
-      res.status(204).end();
-    }
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Logout user session (API/Mobile)
+ *     description: |
+ *       Clears authentication cookies and terminates user session.
+ *       This endpoint is designed for API clients (mobile apps) that don't use CSRF tokens.
+ *
+ *       **No CSRF Required** - Uses Bearer token authentication
+ *       **Rate Limited:** 200 requests per 15 minutes
+ *
+ *       **Security:**
+ *       - Clears both access and refresh tokens
+ *       - Invalidates HTTP-only cookies
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Logged out successfully
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Logout failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.post('/auth/logout', jwtMiddleware.authenticateToken, async (req, res) => {
+  try {
+    // Log the logout event
+    logger.logSecurityEvent('USER_LOGOUT', {
+      userId: req.userId,
+      userRole: req.userRole,
+      ip: req.ip,
+    });
+
+    // Clear authentication cookies
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+
+    res.json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  } catch (error) {
+    logger.error('API logout error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Logout failed',
+    });
   }
-);
+});
 
 // Enable test endpoint in development and test environments only
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') {
@@ -284,6 +336,11 @@ const formRoutes = require('./api/formRoutes');
 
 router.use('/forms', formRoutes);
 
+// Debug routes (before JWT middleware for troubleshooting)
+const DebugController = require('../../application/controllers/api/DebugController');
+
+router.post('/debug/load-vehicle-images-call', DebugController.logLoadVehicleImagesCall);
+
 // Protected API endpoints - use JWT authentication for API routes
 router.use(jwtMiddleware.authenticateToken);
 
@@ -302,6 +359,8 @@ const serviceTypesRoutes = require('./api/serviceTypesRoutes');
 const servicesRoutes = require('./api/servicesRoutes');
 const servicesNewRoutes = require('./api/servicesNewRoutes');
 const ratesRoutes = require('./api/ratesRoutes');
+// Greeter Services Management API routes
+const greeterRoutes = require('./api/greeterRoutes');
 // Experience Management API routes
 const experiencesRoutes = require('./api/experiencesRoutes');
 const experienceImagesRoutes = require('./api/experienceImagesRoutes');
@@ -327,11 +386,15 @@ const inflationRateRoutes = require('./api/inflationRateRoutes');
 const agencyRateRoutes = require('./api/agencyRateRoutes');
 const transferRateRoutes = require('./api/transferRateRoutes');
 const driverTourRateRoutes = require('./api/driverTourRateRoutes');
+const guideTransportRateRoutes = require('./api/guideTransportRateRoutes');
 const vehicleRatePricesRoutes = require('./api/vehicleRatePricesRoutes');
+const disposablePricesRoutes = require('./api/disposablePricesRoutes');
 // Notifications API controller
 const NotificationsController = require('../../application/controllers/api/NotificationsController');
 
 router.use('/users', userManagementRoutes);
+router.use('/profile', require('./api/profileImageRoutes'));
+// Profile image endpoints
 router.use('/amexingusers', amexingUsersRoutes);
 router.use('/clients', clientsRoutes);
 router.use('/employees', employeesRoutes);
@@ -344,8 +407,11 @@ router.use('/service-types', serviceTypesRoutes);
 router.use('/services', servicesRoutes);
 router.use('/services-new', servicesNewRoutes);
 router.use('/rates', ratesRoutes);
+router.use('/greeter', greeterRoutes);
 router.use('/experiences', experiencesRoutes);
 router.use('/experiences', experienceImagesRoutes); // Experience images endpoints
+router.use('/tours', require('./api/tourImagesRoutes'));
+// Tour images endpoints
 router.use('/', providerExperienciasRoutes); // Provider experiencias endpoints
 router.use('/tours', toursRoutes);
 router.use('/audit', auditRoutes); // Audit log endpoints
@@ -360,7 +426,9 @@ router.use('/inflation-rate', inflationRateRoutes); // Inflation rate management
 router.use('/agency-rate', agencyRateRoutes); // Agency rate management endpoints
 router.use('/transfer-rate', transferRateRoutes); // Transfer rate management endpoints
 router.use('/driver-tour-rate', driverTourRateRoutes); // Driver tour rate management endpoints
+router.use('/guide-transport-rate', guideTransportRateRoutes); // Guide transport rate management endpoints
 router.use('/vehicle-rate-prices', vehicleRatePricesRoutes); // Vehicle rate prices management endpoints
+router.use('/disposable-prices', disposablePricesRoutes); // Disposable prices (A Disposición) management endpoints
 
 /**
  * Email Test Endpoint - SuperAdmin Only

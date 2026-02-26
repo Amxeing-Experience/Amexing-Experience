@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "example": false
+    },
+    "error": {
+      "type": "string",
+      "example": "Error message"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "example": "2024-10-01T12:00:00.000Z"
+    }
+  }
+}

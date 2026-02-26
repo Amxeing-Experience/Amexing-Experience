@@ -87,6 +87,17 @@ router.post(
 router.get('/:id/images', authenticateToken, controller.listImages.bind(controller));
 
 /**
+ * Get vehicle images grouped by disposable price combinations.
+ * GET /api/vehicles/images/by-disposable-combinations.
+ * @access public
+ */
+router.get(
+  '/images/by-disposable-combinations',
+  authenticateToken,
+  controller.getImagesByDisposableCombinations.bind(controller)
+);
+
+/**
  * Delete (soft delete) a vehicle image.
  * DELETE /api/vehicles/:id/images/:imageId.
  * @access public
@@ -122,5 +133,21 @@ router.patch(
   requireRole(['admin', 'superadmin']),
   controller.setPrimary.bind(controller)
 );
+
+/**
+ * Serve optimized images with format negotiation
+ * GET /api/vehicles/optimized/:vehicleId/:imageName
+ * Alternative to CloudFront - serves best format based on Accept header.
+ * @access public
+ */
+// Optional: Only enable if image optimization is configured
+if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
+  try {
+    const { serveOptimizedImageRoute } = require('../../../application/middleware/imageFormatNegotiation');
+    router.get('/optimized/:vehicleId/:imageName', serveOptimizedImageRoute);
+  } catch (error) {
+    console.warn('Image optimization route not enabled:', error.message);
+  }
+}
 
 module.exports = router;

@@ -48,7 +48,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <tr>
                         <th>Nombre</th>
                         <th>Capacidad</th>
-                        <th>Maletas</th>
+                        <th>Carry-on</th>
                         <% if (dtUserRole !== 'department_manager') { %>
                             <th>Estado</th>
                         <% } %>
@@ -121,7 +121,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             <div class="col-md-6 mb-3">
                                 <label for="trunkCapacity" class="form-label">Capacidad del Maletero</label>
                                 <input type="number" class="form-control" id="trunkCapacity" name="trunkCapacity" min="0" max="50" placeholder="Ej: 3" value="2">
-                                <div class="form-text">Número de maletas que caben</div>
+                                <div class="form-text">Número de carry-on que caben</div>
                             </div>
                         </div>
 

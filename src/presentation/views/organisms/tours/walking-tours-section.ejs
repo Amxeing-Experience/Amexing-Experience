@@ -75,6 +75,9 @@ const apiEndpoint = typeof walkingApiEndpoint !== 'undefined' ? walkingApiEndpoi
     </div>
 </div>
 
+<!-- Load centralized pricing utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     loadWalkingTours();
@@ -487,16 +490,7 @@ function formatWalkingTourPrice(price, currency) {
     }
 }
 
-// Apply USD rounding rules (same as main tours table)
-function applyWalkingUSDRoundingRules(usdPrice) {
-    if (usdPrice <= 50) {
-        return Math.round(usdPrice);
-    } else if (usdPrice <= 100) {
-        return Math.round(usdPrice / 5) * 5;
-    } else {
-        return Math.round(usdPrice / 10) * 10;
-    }
-}
+// USD rounding rules now handled by centralized PricingUtils.applyUSDRoundingRules()
 
 // Convert and format price based on currency and payment type
 function convertWalkingTourPrice(priceInput, currency, paymentType) {
@@ -527,7 +521,7 @@ function convertWalkingTourPrice(priceInput, currency, paymentType) {
     // Then convert currency if needed
     if (currency === 'USD' && walkingCurrentExchangeRate > 0) {
         const convertedValue = adjustedPrice / walkingCurrentExchangeRate;
-        const roundedValue = applyWalkingUSDRoundingRules(convertedValue);
+        const roundedValue = PricingUtils.applyUSDRoundingRules(convertedValue);
         return formatWalkingTourPrice(roundedValue, 'USD');
     } else {
         return formatWalkingTourPrice(adjustedPrice, 'MXN');
@@ -558,11 +552,26 @@ function updateWalkingToursPrices(paymentType, currency) {
     });
 }
 
-// Initialize walking tours filters when document is ready
-$(document).ready(function() {
-    // Load rates for walking tours (these are global and can be loaded immediately)
-    loadWalkingTransferRate();
-    loadWalkingAgencyRate();
-    loadWalkingExchangeRate();
-});
+// Initialize walking tours filters when document and jQuery are ready
+function initWalkingToursWhenReady() {
+    if (typeof $ === 'undefined') {
+        // jQuery not loaded yet, wait and try again
+        setTimeout(initWalkingToursWhenReady, 100);
+        return;
+    }
+    
+    // jQuery is available, proceed with initialization
+    $(document).ready(function() {
+        // Load rates for walking tours (these are global and can be loaded immediately)
+        loadWalkingTransferRate();
+        loadWalkingAgencyRate();
+        loadWalkingExchangeRate();
+        
+        // Initialize walking tours functionality
+        initWalkingToursFilters();
+    });
+}
+
+// Start the initialization process
+initWalkingToursWhenReady();
 </script>
