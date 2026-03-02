@@ -296,6 +296,7 @@ class VehicleImage extends BaseModel {
       query.equalTo('vehicleId', vehicle);
       query.equalTo('exists', true);
       query.ascending('displayOrder');
+      query.include('vehicleId'); // Include the vehicle pointer to get its ID
 
       return await query.find({ useMasterKey: true });
     } catch (error) {
