@@ -472,7 +472,8 @@ class ImageOptimizationService extends FileStorageService {
         };
 
         // Get vehicle ID for optimized route URL generation
-        const vehicle = vehicleImageRecord.get('vehicle') || vehicleImageRecord.get('vehicleId');
+        // IMPORTANT: Use vehicleId field (not vehicle field which can be wrong)
+        const vehicle = vehicleImageRecord.get('vehicleId');
         const vehicleId = vehicle ? (vehicle.id || vehicle.objectId || vehicle) : null;
 
         // Get original filename for optimized route
