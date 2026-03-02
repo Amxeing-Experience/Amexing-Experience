@@ -57,7 +57,7 @@ const CONFIG = {
   dryRun: process.argv.includes('--dry-run'),
   limit: parseInt(process.argv.find(arg => arg.startsWith('--limit='))?.split('=')[1]) || 5,
   verbose: process.argv.includes('--verbose'),
-  logFile: `production-optimization-log-${Date.now()}.json`
+  logFile: `logs/optimization/production-optimization-log-${Date.now()}.json`
 };
 
 // Color codes
@@ -139,6 +139,21 @@ async function s3ObjectExists(key) {
     return true;
   } catch (error) {
     return false;
+  }
+}
+
+/**
+ * Get S3 object size
+ */
+async function getS3ObjectSize(key) {
+  try {
+    const result = await s3.headObject({
+      Bucket: CONFIG.bucket,
+      Key: key
+    }).promise();
+    return result.ContentLength || 0;
+  } catch (error) {
+    return 0;
   }
 }
 
@@ -609,27 +624,83 @@ async function optimizeProductionVehicleImages() {
     // Fetch vehicle images from production
     log('\n📊 Fetching vehicle images from PRODUCTION database...', 'yellow');
     
-    const query = new Parse.Query('VehicleImage');
-    query.equalTo('exists', true);
-    query.exists('s3Key');
-    query.limit(CONFIG.limit);
-    query.include('vehicle');
-    query.ascending('createdAt');
+    // First, fetch ALL images to check optimization status
+    const allQuery = new Parse.Query('VehicleImage');
+    allQuery.equalTo('exists', true);
+    allQuery.exists('s3Key');
+    allQuery.limit(1000); // Fetch up to 1000 to check all
+    allQuery.include('vehicle');
+    allQuery.ascending('createdAt');
     
-    const allImages = await query.find({ useMasterKey: true });
+    const allImages = await allQuery.find({ useMasterKey: true });
     
-    // Filter images that need optimization
-    const vehicleImages = allImages.filter(img => {
+    // Filter images that need optimization with improved logic
+    const unoptimizedImages = [];
+    
+    log('🔍 Analyzing images for optimization needs...', 'blue');
+    
+    for (const img of allImages) {
       const variants = img.get('optimizedVariants');
-      return !variants || !variants.jpeg || !variants.webp || !variants.avif;
-    });
+      const vehicleId = img.get('vehicle')?.id || 'unknown';
+      const s3Key = img.get('s3Key');
+      const fileName = img.get('fileName');
+      
+      // Skip if no S3 key (can't optimize)
+      if (!s3Key) {
+        continue;
+      }
+      
+      // If database says fully optimized, skip
+      if (variants && variants.jpeg && variants.webp && variants.avif) {
+        continue;
+      }
+      
+      // Check if S3 variants actually exist (but not recorded in DB)
+      // Extract the actual vehicle ID from S3 key path (more reliable than DB vehicle reference)
+      const s3VehicleId = s3Key.includes('/') ? s3Key.split('/')[2] : vehicleId;
+      const basePath = `prod/vehicles/optimized/${s3VehicleId}/${s3Key.split('/').pop().replace(/\.[^.]+$/, '')}`;
+      const jpegExists = await s3ObjectExists(basePath + '.jpeg');
+      const webpExists = await s3ObjectExists(basePath + '.webp');  
+      const avifExists = await s3ObjectExists(basePath + '.avif');
+      
+      // If all variants exist in S3 but not in DB, update DB
+      if (jpegExists && webpExists && avifExists) {
+        log(`  📝 Syncing DB for ${fileName} - variants exist but not recorded`, 'yellow');
+        
+        try {
+          // Get file sizes for proper DB update
+          const jpegSize = await getS3ObjectSize(basePath + '.jpeg');
+          const webpSize = await getS3ObjectSize(basePath + '.webp');
+          const avifSize = await getS3ObjectSize(basePath + '.avif');
+          
+          img.set('optimizedVariants', {
+            jpeg: { s3Key: basePath + '.jpeg', fileSize: jpegSize, contentType: 'image/jpeg' },
+            webp: { s3Key: basePath + '.webp', fileSize: webpSize, contentType: 'image/webp' },
+            avif: { s3Key: basePath + '.avif', fileSize: avifSize, contentType: 'image/avif' }
+          });
+          
+          await img.save(null, { useMasterKey: true });
+          log(`    ✓ Updated DB record for ${fileName}`, 'green');
+          continue; // Skip adding to unoptimized list
+        } catch (error) {
+          log(`    ⚠️  Failed to update DB for ${fileName}: ${error.message}`, 'red');
+          // Continue to add to unoptimized list for manual processing
+        }
+      }
+      
+      // Add to unoptimized list if missing any variants
+      unoptimizedImages.push(img);
+    }
     
-    if (vehicleImages.length === 0) {
+    if (unoptimizedImages.length === 0) {
       log('  ✓ All vehicle images are already optimized!', 'green');
       return;
     }
     
-    log(`  ✓ Found ${vehicleImages.length} images to optimize (of ${allImages.length} total)`, 'green');
+    // Now limit to CONFIG.limit for processing
+    const vehicleImages = unoptimizedImages.slice(0, CONFIG.limit);
+    
+    log(`  ✓ Found ${unoptimizedImages.length} images to optimize (processing ${vehicleImages.length} in this batch)`, 'green');
     
     // Link any unlinked optimized images to vehicles before processing
     log('\n🔗 Checking for unlinked optimized images...', 'yellow');
