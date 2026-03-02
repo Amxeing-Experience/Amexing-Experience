@@ -1,0 +1,60 @@
+[
+  {
+    "timestamp": "2026-03-01T23:13:49.302Z",
+    "action": "start",
+    "totalImages": 1,
+    "environment": "PRODUCTION",
+    "dryRun": false
+  },
+  {
+    "timestamp": "2026-03-01T23:13:50.628Z",
+    "action": "upload",
+    "key": "prod/vehicles/optimized/2OQ34OxJER/1761865558413-114625d34e83db0c.jpeg",
+    "size": 14282,
+    "contentType": "image/jpeg"
+  },
+  {
+    "timestamp": "2026-03-01T23:13:51.368Z",
+    "action": "upload",
+    "key": "prod/vehicles/optimized/2OQ34OxJER/1761865558413-114625d34e83db0c.webp",
+    "size": 16486,
+    "contentType": "image/webp"
+  },
+  {
+    "timestamp": "2026-03-01T23:13:52.133Z",
+    "action": "upload",
+    "key": "prod/vehicles/optimized/2OQ34OxJER/1761865558413-114625d34e83db0c.avif",
+    "size": 14640,
+    "contentType": "image/avif"
+  },
+  {
+    "timestamp": "2026-03-01T23:13:52.480Z",
+    "action": "database_update",
+    "imageId": "cRcSPHGBqN",
+    "variants": [
+      "jpeg",
+      "webp",
+      "avif",
+      "original"
+    ]
+  },
+  {
+    "timestamp": "2026-03-01T23:13:52.481Z",
+    "action": "optimization_complete",
+    "imageId": "cRcSPHGBqN",
+    "vehicleName": "Unknown Vehicle",
+    "fileName": "suburban1.jpeg",
+    "s3Key": "prod/vehicles/2OQ34OxJER/1761865558413-114625d34e83db0c.jpeg",
+    "success": true
+  },
+  {
+    "timestamp": "2026-03-01T23:13:52.481Z",
+    "action": "complete",
+    "total": 1,
+    "success": 1,
+    "skipped": 0,
+    "failed": 0,
+    "orphaned": 0,
+    "orphanedImages": []
+  }
+]

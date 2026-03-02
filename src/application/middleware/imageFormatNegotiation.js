@@ -27,18 +27,61 @@ function isImageRequest(imagePath) {
 }
 
 /**
- * Detect preferred format from Accept header.
+ * Detect preferred format from Accept header and User-Agent.
  * @param {string} acceptHeader - Accept header value.
+ * @param {string} userAgent - User-Agent header value.
  * @returns {string} Preferred format (avif, webp, or jpeg).
  * @example
  */
-function detectPreferredFormat(acceptHeader) {
-  if (acceptHeader.includes('image/avif')) {
+function detectPreferredFormat(acceptHeader, userAgent = '') {
+  // First, check if Accept header explicitly mentions formats
+  if (acceptHeader && acceptHeader.includes('image/avif')) {
     return 'avif';
   }
-  if (acceptHeader.includes('image/webp')) {
+  if (acceptHeader && acceptHeader.includes('image/webp')) {
     return 'webp';
   }
+
+  // If Accept header is generic (*/* or image/*), detect from User-Agent
+  if (!acceptHeader || acceptHeader.includes('*/*') || acceptHeader === 'image/*') {
+    // Modern browsers that support AVIF (Chrome 85+, Firefox 93+, Safari 16+)
+    if (userAgent) {
+      // Chrome 85+ supports AVIF
+      const chromeMatch = userAgent.match(/Chrome\/(\d+)/);
+      if (chromeMatch && parseInt(chromeMatch[1], 10) >= 85) {
+        return 'avif';
+      }
+
+      // Firefox 93+ supports AVIF
+      const firefoxMatch = userAgent.match(/Firefox\/(\d+)/);
+      if (firefoxMatch && parseInt(firefoxMatch[1], 10) >= 93) {
+        return 'avif';
+      }
+
+      // Safari 16+ supports AVIF
+      const safariMatch = userAgent.match(/Version\/(\d+).*Safari/);
+      if (safariMatch && parseInt(safariMatch[1]) >= 16) {
+        return 'avif';
+      }
+
+      // Edge 85+ supports AVIF
+      const edgeMatch = userAgent.match(/Edg\/(\d+)/);
+      if (edgeMatch && parseInt(edgeMatch[1]) >= 85) {
+        return 'avif';
+      }
+
+      // If not AVIF-capable, check for WebP support (much broader)
+      // Chrome 9+, Firefox 65+, Safari 14+, Edge 18+
+      if (userAgent.includes('Chrome')
+          || userAgent.includes('Firefox')
+          || userAgent.includes('Safari')
+          || userAgent.includes('Edge')
+          || userAgent.includes('Edg/')) {
+        return 'webp';
+      }
+    }
+  }
+
   return 'jpeg';
 }
 
@@ -237,60 +280,146 @@ async function serveOptimizedImageRoute(req, res) {
         error: 'Image optimization service not available',
       });
     }
+
     const { vehicleId, imageName } = req.params;
     const acceptHeader = req.get('accept') || '';
-    const format = detectPreferredFormat(acceptHeader);
+    const userAgent = req.get('user-agent') || '';
+    const preferredFormat = detectPreferredFormat(acceptHeader, userAgent);
 
-    // Construct S3 keys for different formats
-    const keys = {
-      avif: `optimized/avif/vehicles/${vehicleId}/${imageName}.avif`,
-      webp: `optimized/webp/vehicles/${vehicleId}/${imageName}.webp`,
-      jpeg: `optimized/jpeg/vehicles/${vehicleId}/${imageName}.jpg`,
-      original: `vehicles/${vehicleId}/${imageName}.jpg`,
-    };
-
-    // Try to serve in order of preference
-    let formats;
-    if (format === 'avif') {
-      formats = ['avif', 'webp', 'jpeg', 'original'];
-    } else if (format === 'webp') {
-      formats = ['webp', 'jpeg', 'original'];
-    } else {
-      formats = ['jpeg', 'original'];
+    // Look up the vehicle image from the database to get stored S3 keys
+    let Parse;
+    try {
+      Parse = require('parse/node');
+    } catch (error) {
+      throw new Error('Parse SDK not available');
     }
 
-    for (const fmt of formats) {
-      try {
-        const s3Object = await s3
-          .getObject({
-            Bucket: process.env.S3_BUCKET,
-            Key: keys[fmt],
-          })
-          .promise();
+    // Find the vehicle image by vehicle and filename
+    const imageQuery = new Parse.Query('VehicleImage');
+    const vehiclePointer = {
+      __type: 'Pointer',
+      className: 'Vehicle',
+      objectId: vehicleId,
+    };
+    imageQuery.equalTo('vehicleId', vehiclePointer);
 
-        res.set({
-          'Content-Type': getContentType(fmt),
-          'Cache-Control': 'public, max-age=31536000',
-          Vary: 'Accept',
-          'X-Served-Format': fmt,
-        });
+    // Match by filename (try both with and without extension)
+    // Escape special regex characters in imageName for safe regex matching
+    const escapedImageName = imageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const orQuery = Parse.Query.or(
+      // eslint-disable-next-line security/detect-non-literal-regexp
+      new Parse.Query('VehicleImage').matches('fileName', new RegExp(`^${escapedImageName}\\.[^.]+$`, 'i')),
+      new Parse.Query('VehicleImage').equalTo('fileName', imageName),
+      new Parse.Query('VehicleImage').equalTo('fileName', `${imageName}.jpg`),
+      new Parse.Query('VehicleImage').equalTo('fileName', `${imageName}.jpeg`),
+      new Parse.Query('VehicleImage').equalTo('fileName', `${imageName}.png`),
+      new Parse.Query('VehicleImage').equalTo('fileName', `${imageName}.webp`),
+      new Parse.Query('VehicleImage').equalTo('fileName', `${imageName}.avif`)
+    );
 
-        return res.send(s3Object.Body);
-      } catch (error) {
-        // Try next format
-        // eslint-disable-next-line no-continue
-        continue;
+    const combinedQuery = Parse.Query.and(imageQuery, orQuery);
+    combinedQuery.exists('optimizedVariants');
+
+    const vehicleImages = await combinedQuery.find({ useMasterKey: true });
+
+    if (vehicleImages.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Vehicle image not found in database',
+      });
+    }
+
+    const vehicleImage = vehicleImages[0];
+    const optimizedVariants = vehicleImage.get('optimizedVariants');
+
+    if (!optimizedVariants) {
+      return res.status(404).json({
+        success: false,
+        error: 'No optimized variants available for this image',
+      });
+    }
+
+    // Build format preference order based on Accept header
+    let formatOrder;
+    if (preferredFormat === 'avif') {
+      formatOrder = ['avif', 'webp', 'jpeg', 'original'];
+    } else if (preferredFormat === 'webp') {
+      formatOrder = ['webp', 'jpeg', 'original'];
+    } else {
+      formatOrder = ['jpeg', 'original'];
+    }
+
+    // Try each format in order of preference
+    for (const format of formatOrder) {
+      const variant = optimizedVariants[format];
+      if (variant) {
+        // Handle nested structure with size variants (thumb, mobile, desktop, original)
+        let s3Key;
+        if (variant.original && variant.original.s3Key) {
+          // New structure with size variants
+          ({ s3Key } = variant.original);
+        } else if (variant.s3Key) {
+          // Old structure with direct s3Key
+          ({ s3Key } = variant);
+        }
+
+        if (s3Key) {
+          try {
+            const s3Object = await s3
+              .getObject({
+                Bucket: process.env.S3_BUCKET,
+                Key: s3Key,
+              })
+              .promise();
+
+            res.set({
+              'Content-Type': getContentType(format),
+              'Cache-Control': 'public, max-age=31536000, immutable',
+              Vary: 'Accept',
+              'X-Served-Format': format,
+              'X-Original-Format': preferredFormat,
+              'X-S3-Key': s3Key,
+            });
+
+            logger.info('Served optimized vehicle image', {
+              vehicleId,
+              imageName,
+              servedFormat: format,
+              preferredFormat,
+              s3Key,
+              acceptHeader,
+              userAgent: userAgent.substring(0, 100), // Truncate for logs
+            });
+
+            return res.send(s3Object.Body);
+          } catch (s3Error) {
+            logger.warn('Failed to fetch variant from S3, trying next format', {
+              format,
+              s3Key,
+              error: s3Error.message,
+            });
+            // Continue to next format
+          }
+        }
       }
     }
 
-    // No format found
+    // No format could be served
+    logger.error('No optimized variants could be served', {
+      vehicleId,
+      imageName,
+      availableVariants: Object.keys(optimizedVariants),
+      preferredFormat,
+    });
+
     res.status(404).json({
       success: false,
-      error: 'Image not found',
+      error: 'Image variants not found in S3',
     });
   } catch (error) {
     logger.error('Failed to serve optimized image', {
       error: error.message,
+      stack: error.stack,
       vehicleId: req.params.vehicleId,
       imageName: req.params.imageName,
     });

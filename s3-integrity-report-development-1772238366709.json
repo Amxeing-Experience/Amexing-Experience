@@ -1,0 +1,251 @@
+{
+  "environment": "development",
+  "timestamp": "2026-02-28T00:26:06.709Z",
+  "bucket": "amexing-bucket",
+  "results": {
+    "total": 74,
+    "valid": 66,
+    "missing": 14,
+    "missingImages": [
+      {
+        "id": "GfnHe8ERyB",
+        "fileName": "SDLC-Thumbnail.jpg",
+        "s3Key": "dev/vehicles/1770666386412-4f69e3e3efcb4887.jpg",
+        "vehicleName": "Mercedes Benz Clase E",
+        "vehicleId": "ubYLLjbQAH",
+        "hasOptimizedVariants": true
+      },
+      {
+        "id": "GfnHe8ERyB",
+        "fileName": "SDLC-Thumbnail.jpg (original variant)",
+        "s3Key": "dev/vehicles/1770666386412-4f69e3e3efcb4887.jpg",
+        "vehicleName": "Mercedes Benz Clase E",
+        "vehicleId": "ubYLLjbQAH",
+        "isVariant": true,
+        "format": "original"
+      },
+      {
+        "id": "CrgvdAGure",
+        "fileName": "1718697261200_feedImg.jpg",
+        "s3Key": "dev/vehicles/1770672284778-f53870292de6d6c4.jpg",
+        "vehicleName": "a a",
+        "vehicleId": "YtuCemqCpI",
+        "hasOptimizedVariants": true
+      },
+      {
+        "id": "CrgvdAGure",
+        "fileName": "1718697261200_feedImg.jpg (original variant)",
+        "s3Key": "dev/vehicles/1770672284778-f53870292de6d6c4.jpg",
+        "vehicleName": "a a",
+        "vehicleId": "YtuCemqCpI",
+        "isVariant": true,
+        "format": "original"
+      },
+      {
+        "id": "21gjXbh8Ye",
+        "fileName": "eevawave.png",
+        "s3Key": "dev/vehicles/1770750090354-9d6fc993eb238cdb.png",
+        "vehicleName": "a a",
+        "vehicleId": "YtuCemqCpI",
+        "hasOptimizedVariants": true
+      },
+      {
+        "id": "21gjXbh8Ye",
+        "fileName": "eevawave.png (original variant)",
+        "s3Key": "dev/vehicles/1770750090354-9d6fc993eb238cdb.png",
+        "vehicleName": "a a",
+        "vehicleId": "YtuCemqCpI",
+        "isVariant": true,
+        "format": "original"
+      },
+      {
+        "id": "PWlzHBQgNF",
+        "fileName": "610CLkGjWWS._AC_SX679_.jpg",
+        "s3Key": "staging/vehicles/1771908186817-11f775905e010072.jpg",
+        "vehicleName": "Mercedes Benz Clase E",
+        "vehicleId": "ubYLLjbQAH",
+        "hasOptimizedVariants": true
+      },
+      {
+        "id": "PWlzHBQgNF",
+        "fileName": "610CLkGjWWS._AC_SX679_.jpg (original variant)",
+        "s3Key": "staging/vehicles/1771908186817-11f775905e010072.jpg",
+        "vehicleName": "Mercedes Benz Clase E",
+        "vehicleId": "ubYLLjbQAH",
+        "isVariant": true,
+        "format": "original"
+      },
+      {
+        "id": "VBVwQSeaVT",
+        "fileName": "osmo_create-coronavirus-6752363_1920.png",
+        "s3Key": "staging/vehicles/1771908450701-5b4e2ba55c989f41.png",
+        "vehicleName": "Mercedes Benz Clase E",
+        "vehicleId": "ubYLLjbQAH",
+        "hasOptimizedVariants": true
+      },
+      {
+        "id": "VBVwQSeaVT",
+        "fileName": "osmo_create-coronavirus-6752363_1920.png (original variant)",
+        "s3Key": "staging/vehicles/1771908450701-5b4e2ba55c989f41.png",
+        "vehicleName": "Mercedes Benz Clase E",
+        "vehicleId": "ubYLLjbQAH",
+        "isVariant": true,
+        "format": "original"
+      },
+      {
+        "id": "gqdPZK6ZqS",
+        "fileName": "1770756821880-a069b0a337a8865a.png",
+        "s3Key": "dev/vehicles/UOlBVhKRSQ/1772082447197-qtvpgvly-UOlBVhKRSQ-1772082447196-bb152408c0825fef.png",
+        "vehicleName": "Nissan Versa",
+        "vehicleId": "dLMBPhVExZ",
+        "hasOptimizedVariants": true
+      },
+      {
+        "id": "aIMBqufVIq",
+        "fileName": "486550748_1123624476444010_493318187263531286_n.jpg",
+        "s3Key": "dev/vehicles/UOlBVhKRSQ/1772082743023-cqv609r1-UOlBVhKRSQ-1772082743023-d72939816a449332.jpg",
+        "vehicleName": "a a",
+        "vehicleId": "YtuCemqCpI",
+        "hasOptimizedVariants": true
+      },
+      {
+        "id": "aIMBqufVIq",
+        "fileName": "486550748_1123624476444010_493318187263531286_n.jpg (jpeg variant)",
+        "s3Key": "dev/vehicles/UOlBVhKRSQ/1772082743023-cqv609r1-UOlBVhKRSQ-1772082743023-d72939816a449332.jpg",
+        "vehicleName": "a a",
+        "vehicleId": "YtuCemqCpI",
+        "isVariant": true,
+        "format": "jpeg"
+      },
+      {
+        "id": "ET2nr2zkLx",
+        "fileName": "1770756821880-a069b0a337a8865a.png",
+        "s3Key": "dev/vehicles/UOlBVhKRSQ/1772082891678-v142oi29-UOlBVhKRSQ-1772082891678-864348eec86d73c5.png",
+        "vehicleName": "Audi Clase A",
+        "vehicleId": "UOlBVhKRSQ",
+        "hasOptimizedVariants": true
+      }
+    ],
+    "errors": 0
+  },
+  "missingFiles": [
+    {
+      "id": "GfnHe8ERyB",
+      "fileName": "SDLC-Thumbnail.jpg",
+      "s3Key": "dev/vehicles/1770666386412-4f69e3e3efcb4887.jpg",
+      "vehicleName": "Mercedes Benz Clase E",
+      "vehicleId": "ubYLLjbQAH",
+      "hasOptimizedVariants": true
+    },
+    {
+      "id": "GfnHe8ERyB",
+      "fileName": "SDLC-Thumbnail.jpg (original variant)",
+      "s3Key": "dev/vehicles/1770666386412-4f69e3e3efcb4887.jpg",
+      "vehicleName": "Mercedes Benz Clase E",
+      "vehicleId": "ubYLLjbQAH",
+      "isVariant": true,
+      "format": "original"
+    },
+    {
+      "id": "CrgvdAGure",
+      "fileName": "1718697261200_feedImg.jpg",
+      "s3Key": "dev/vehicles/1770672284778-f53870292de6d6c4.jpg",
+      "vehicleName": "a a",
+      "vehicleId": "YtuCemqCpI",
+      "hasOptimizedVariants": true
+    },
+    {
+      "id": "CrgvdAGure",
+      "fileName": "1718697261200_feedImg.jpg (original variant)",
+      "s3Key": "dev/vehicles/1770672284778-f53870292de6d6c4.jpg",
+      "vehicleName": "a a",
+      "vehicleId": "YtuCemqCpI",
+      "isVariant": true,
+      "format": "original"
+    },
+    {
+      "id": "21gjXbh8Ye",
+      "fileName": "eevawave.png",
+      "s3Key": "dev/vehicles/1770750090354-9d6fc993eb238cdb.png",
+      "vehicleName": "a a",
+      "vehicleId": "YtuCemqCpI",
+      "hasOptimizedVariants": true
+    },
+    {
+      "id": "21gjXbh8Ye",
+      "fileName": "eevawave.png (original variant)",
+      "s3Key": "dev/vehicles/1770750090354-9d6fc993eb238cdb.png",
+      "vehicleName": "a a",
+      "vehicleId": "YtuCemqCpI",
+      "isVariant": true,
+      "format": "original"
+    },
+    {
+      "id": "PWlzHBQgNF",
+      "fileName": "610CLkGjWWS._AC_SX679_.jpg",
+      "s3Key": "staging/vehicles/1771908186817-11f775905e010072.jpg",
+      "vehicleName": "Mercedes Benz Clase E",
+      "vehicleId": "ubYLLjbQAH",
+      "hasOptimizedVariants": true
+    },
+    {
+      "id": "PWlzHBQgNF",
+      "fileName": "610CLkGjWWS._AC_SX679_.jpg (original variant)",
+      "s3Key": "staging/vehicles/1771908186817-11f775905e010072.jpg",
+      "vehicleName": "Mercedes Benz Clase E",
+      "vehicleId": "ubYLLjbQAH",
+      "isVariant": true,
+      "format": "original"
+    },
+    {
+      "id": "VBVwQSeaVT",
+      "fileName": "osmo_create-coronavirus-6752363_1920.png",
+      "s3Key": "staging/vehicles/1771908450701-5b4e2ba55c989f41.png",
+      "vehicleName": "Mercedes Benz Clase E",
+      "vehicleId": "ubYLLjbQAH",
+      "hasOptimizedVariants": true
+    },
+    {
+      "id": "VBVwQSeaVT",
+      "fileName": "osmo_create-coronavirus-6752363_1920.png (original variant)",
+      "s3Key": "staging/vehicles/1771908450701-5b4e2ba55c989f41.png",
+      "vehicleName": "Mercedes Benz Clase E",
+      "vehicleId": "ubYLLjbQAH",
+      "isVariant": true,
+      "format": "original"
+    },
+    {
+      "id": "gqdPZK6ZqS",
+      "fileName": "1770756821880-a069b0a337a8865a.png",
+      "s3Key": "dev/vehicles/UOlBVhKRSQ/1772082447197-qtvpgvly-UOlBVhKRSQ-1772082447196-bb152408c0825fef.png",
+      "vehicleName": "Nissan Versa",
+      "vehicleId": "dLMBPhVExZ",
+      "hasOptimizedVariants": true
+    },
+    {
+      "id": "aIMBqufVIq",
+      "fileName": "486550748_1123624476444010_493318187263531286_n.jpg",
+      "s3Key": "dev/vehicles/UOlBVhKRSQ/1772082743023-cqv609r1-UOlBVhKRSQ-1772082743023-d72939816a449332.jpg",
+      "vehicleName": "a a",
+      "vehicleId": "YtuCemqCpI",
+      "hasOptimizedVariants": true
+    },
+    {
+      "id": "aIMBqufVIq",
+      "fileName": "486550748_1123624476444010_493318187263531286_n.jpg (jpeg variant)",
+      "s3Key": "dev/vehicles/UOlBVhKRSQ/1772082743023-cqv609r1-UOlBVhKRSQ-1772082743023-d72939816a449332.jpg",
+      "vehicleName": "a a",
+      "vehicleId": "YtuCemqCpI",
+      "isVariant": true,
+      "format": "jpeg"
+    },
+    {
+      "id": "ET2nr2zkLx",
+      "fileName": "1770756821880-a069b0a337a8865a.png",
+      "s3Key": "dev/vehicles/UOlBVhKRSQ/1772082891678-v142oi29-UOlBVhKRSQ-1772082891678-864348eec86d73c5.png",
+      "vehicleName": "Audi Clase A",
+      "vehicleId": "UOlBVhKRSQ",
+      "hasOptimizedVariants": true
+    }
+  ]
+}
