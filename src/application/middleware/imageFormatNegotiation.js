@@ -73,10 +73,10 @@ function detectPreferredFormat(acceptHeader, userAgent = '') {
       // If not AVIF-capable, check for WebP support (much broader)
       // Chrome 9+, Firefox 65+, Safari 14+, Edge 18+
       if (userAgent.includes('Chrome')
-          || userAgent.includes('Firefox')
-          || userAgent.includes('Safari')
-          || userAgent.includes('Edge')
-          || userAgent.includes('Edg/')) {
+        || userAgent.includes('Firefox')
+        || userAgent.includes('Safari')
+        || userAgent.includes('Edge')
+        || userAgent.includes('Edg/')) {
         return 'webp';
       }
     }
