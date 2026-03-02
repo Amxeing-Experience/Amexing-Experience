@@ -47,6 +47,7 @@ const upload = multer({
  * @param next
  * @example
  */
+// eslint-disable-next-line consistent-return
 const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     // Multer-specific errors (file size, file count, etc.)
@@ -134,20 +135,7 @@ router.patch(
   controller.setPrimary.bind(controller)
 );
 
-/**
- * Serve optimized images with format negotiation
- * GET /api/vehicles/optimized/:vehicleId/:imageName
- * Alternative to CloudFront - serves best format based on Accept header.
- * @access public
- */
-// Optional: Only enable if image optimization is configured
-if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
-  try {
-    const { serveOptimizedImageRoute } = require('../../../application/middleware/imageFormatNegotiation');
-    router.get('/optimized/:vehicleId/:imageName', serveOptimizedImageRoute);
-  } catch (error) {
-    console.warn('Image optimization route not enabled:', error.message);
-  }
-}
+// NOTE: The optimized images route is now defined in apiRoutes.js as a public route
+// This was moved there to avoid the global authentication middleware
 
 module.exports = router;

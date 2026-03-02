@@ -341,6 +341,24 @@ const DebugController = require('../../application/controllers/api/DebugControll
 
 router.post('/debug/load-vehicle-images-call', DebugController.logLoadVehicleImagesCall);
 
+// PUBLIC ROUTES - No authentication required (must be before router.use(authenticateToken))
+
+/**
+ * Public optimized vehicle images route for browser image requests
+ * GET /api/vehicles/optimized/:vehicleId/:imageName
+ * Serves images with format negotiation based on Accept header (AVIF/WebP/JPEG)
+ * Must be public because browsers can't send Authorization headers with <img> requests.
+ */
+if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
+  try {
+    const { serveOptimizedImageRoute } = require('../../application/middleware/imageFormatNegotiation');
+    router.get('/vehicles/optimized/:vehicleId/:imageName', serveOptimizedImageRoute);
+    console.log('✅ Public optimized vehicle images route enabled at /api/vehicles/optimized/:vehicleId/:imageName');
+  } catch (error) {
+    console.warn('⚠️ Public optimized vehicle images route not enabled:', error.message);
+  }
+}
+
 // Protected API endpoints - use JWT authentication for API routes
 router.use(jwtMiddleware.authenticateToken);
 

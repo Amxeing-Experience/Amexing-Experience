@@ -902,11 +902,7 @@ class VehicleImageController {
 
         for (const vehicle of vehicles) {
           const imageQuery = new Parse.Query('VehicleImage');
-          imageQuery.equalTo('vehicleId', {
-            __type: 'Pointer',
-            className: 'Vehicle',
-            objectId: vehicle.id,
-          });
+          imageQuery.equalTo('vehicleId', vehicle);
           imageQuery.equalTo('exists', true);
           imageQuery.ascending('order');
 

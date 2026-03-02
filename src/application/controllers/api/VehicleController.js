@@ -207,33 +207,32 @@ class VehicleController {
           try {
             const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
             if (primaryImage) {
-              // Use same logic as VehicleImageController for consistency
-              const s3Key = primaryImage.get('s3Key');
-              const imageFile = primaryImage.get('imageFile');
+              // Use optimized endpoint for better performance (AVIF/WebP support)
+              const fileName = primaryImage.get('fileName');
+              if (fileName) {
+                // Remove file extension for the endpoint
+                const imageName = fileName.replace(/\.\w+$/, '');
+                // Use the optimized endpoint that serves AVIF/WebP based on Accept headers
+                imageUrl = `/api/vehicles/optimized/${vehicle.id}/${encodeURIComponent(imageName)}`;
 
-              // Generate presigned URL from s3Key, or fallback to legacy imageFile or url
-              if (s3Key) {
-                imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
-              } else if (imageFile) {
-                imageUrl = imageFile.url(); // Legacy Parse.File
+                logger.debug('Using optimized endpoint for primary image', {
+                  vehicleId: vehicle.id,
+                  fileName,
+                  imageUrl,
+                });
               } else {
-                imageUrl = primaryImage.get('url') || ''; // Legacy URL field
-              }
+                // Fallback to S3 URL if no fileName
+                const s3Key = primaryImage.get('s3Key');
+                const imageFile = primaryImage.get('imageFile');
 
-              let method;
-              if (s3Key) {
-                method = 's3Key (presigned)';
-              } else if (imageFile) {
-                method = 'imageFile (legacy)';
-              } else {
-                method = 'url (legacy)';
+                if (s3Key) {
+                  imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+                } else if (imageFile) {
+                  imageUrl = imageFile.url(); // Legacy Parse.File
+                } else {
+                  imageUrl = primaryImage.get('url') || ''; // Legacy URL field
+                }
               }
-
-              logger.debug('Found primary image for vehicle', {
-                vehicleId: vehicle.id,
-                imageUrl,
-                method,
-              });
             } else {
               logger.debug('No primary image found for vehicle', {
                 vehicleId: vehicle.id,
@@ -331,17 +330,31 @@ class VehicleController {
       try {
         const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
         if (primaryImage) {
-          // Use same logic as VehicleImageController for consistency
-          const s3Key = primaryImage.get('s3Key');
-          const imageFile = primaryImage.get('imageFile');
+          // Use optimized endpoint for better performance (AVIF/WebP support)
+          const fileName = primaryImage.get('fileName');
+          if (fileName) {
+            // Remove file extension for the endpoint
+            const imageName = fileName.replace(/\.\w+$/, '');
+            // Use the optimized endpoint that serves AVIF/WebP based on Accept headers
+            imageUrl = `/api/vehicles/optimized/${vehicle.id}/${encodeURIComponent(imageName)}`;
 
-          // Generate presigned URL from s3Key, or fallback to legacy imageFile or url
-          if (s3Key) {
-            imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
-          } else if (imageFile) {
-            imageUrl = imageFile.url(); // Legacy Parse.File
+            logger.debug('Using optimized endpoint for primary image', {
+              vehicleId: vehicle.id,
+              fileName,
+              imageUrl,
+            });
           } else {
-            imageUrl = primaryImage.get('url') || ''; // Legacy URL field
+            // Fallback to S3 URL if no fileName
+            const s3Key = primaryImage.get('s3Key');
+            const imageFile = primaryImage.get('imageFile');
+
+            if (s3Key) {
+              imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+            } else if (imageFile) {
+              imageUrl = imageFile.url(); // Legacy Parse.File
+            } else {
+              imageUrl = primaryImage.get('url') || ''; // Legacy URL field
+            }
           }
         }
       } catch (error) {
@@ -359,8 +372,8 @@ class VehicleController {
         licensePlate: vehicle.get('licensePlate'),
         vin: vehicle.get('vin'),
         vehicleId: vehicle.get('vehicleId'),
-        vehicleTypeId: vehicle.get('vehicleTypeId')?.id,
-        rateId: vehicle.get('rateId')?.id,
+        vehicleTypeId: vehicle.get('vehicleTypeId')?.id || null,
+        rateId: vehicle.get('rateId')?.id || null,
         capacity: vehicle.get('capacity'),
         luggageCapacity: vehicle.get('luggageCapacity'),
         color: vehicle.get('color'),

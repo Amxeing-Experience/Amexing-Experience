@@ -471,43 +471,61 @@ class ImageOptimizationService extends FileStorageService {
           return null;
         };
 
-        // Try preferred format first
-        const preferredS3Key = getS3KeyFromVariant(optimizedVariants[preferredFormat]);
-        if (preferredS3Key) {
-          bestFormat = preferredFormat;
-          bestS3Key = preferredS3Key;
-          bestUrl = await fileService.getPresignedUrl(bestS3Key);
-          console.log('Using preferred format:', bestFormat, 'S3 key:', bestS3Key);
+        // Get vehicle ID for optimized route URL generation
+        // IMPORTANT: Use vehicleId field (not vehicle field which can be wrong)
+        const vehicle = vehicleImageRecord.get('vehicleId');
+        const vehicleId = vehicle ? (vehicle.id || vehicle.objectId || vehicle) : null;
+
+        // Get original filename for optimized route
+        const fileName = vehicleImageRecord.get('fileName') || 'image';
+        const baseName = fileName.replace(/\.[^.]+$/, ''); // Remove extension
+
+        console.log('Generating optimized route URL for vehicle:', vehicleId, 'image:', baseName);
+
+        // Use optimized route URL instead of direct S3 URLs for format negotiation
+        if (vehicleId) {
+          bestUrl = `/api/vehicles/optimized/${vehicleId}/${baseName}`;
+          bestFormat = preferredFormat; // Let the route handler decide the actual format
+          console.log('Using optimized route URL:', bestUrl, 'for format negotiation');
         } else {
-          // Fallback chain: avif -> webp -> jpeg -> original
-          for (const format of ['avif', 'webp', 'jpeg']) {
-            const formatS3Key = getS3KeyFromVariant(optimizedVariants[format]);
-            if (formatS3Key) {
-              bestFormat = format;
-              bestS3Key = formatS3Key;
-              bestUrl = await fileService.getPresignedUrl(bestS3Key);
-              console.log('Using fallback format:', bestFormat, 'S3 key:', bestS3Key);
-              break;
+          // Fallback: Try preferred format first with direct S3 URLs
+          const preferredS3Key = getS3KeyFromVariant(optimizedVariants[preferredFormat]);
+          if (preferredS3Key) {
+            bestFormat = preferredFormat;
+            bestS3Key = preferredS3Key;
+            bestUrl = await fileService.getPresignedUrl(bestS3Key);
+            console.log('Using preferred format (no vehicle ID):', bestFormat, 'S3 key:', bestS3Key);
+          } else {
+            // Fallback chain: avif -> webp -> jpeg -> original
+            for (const format of ['avif', 'webp', 'jpeg']) {
+              const formatS3Key = getS3KeyFromVariant(optimizedVariants[format]);
+              if (formatS3Key) {
+                bestFormat = format;
+                bestS3Key = formatS3Key;
+                bestUrl = await fileService.getPresignedUrl(bestS3Key);
+                console.log('Using fallback format (no vehicle ID):', bestFormat, 'S3 key:', bestS3Key);
+                break;
+              }
             }
           }
-        }
 
-        // Final fallback to original file if no optimized variants
-        if (!bestUrl) {
-          const originalS3Key = getS3KeyFromVariant(optimizedVariants.original);
-          if (originalS3Key) {
-            bestFormat = 'original';
-            bestS3Key = originalS3Key;
-            bestUrl = await fileService.getPresignedUrl(bestS3Key);
-            console.log('Using original format as fallback, S3 key:', bestS3Key);
+          // Final fallback to original file if no optimized variants
+          if (!bestUrl) {
+            const originalS3Key = getS3KeyFromVariant(optimizedVariants.original);
+            if (originalS3Key) {
+              bestFormat = 'original';
+              bestS3Key = originalS3Key;
+              bestUrl = await fileService.getPresignedUrl(bestS3Key);
+              console.log('Using original format as fallback (no vehicle ID), S3 key:', bestS3Key);
+            }
           }
-        }
 
-        // Last resort: use the main s3Key if nothing else works
-        if (!bestUrl) {
-          bestUrl = await fileService.getPresignedUrl(s3Key);
-          bestFormat = 'original';
-          console.log('Using main s3Key as last resort:', s3Key);
+          // Last resort: use the main s3Key if nothing else works
+          if (!bestUrl) {
+            bestUrl = await fileService.getPresignedUrl(s3Key);
+            bestFormat = 'original';
+            console.log('Using main s3Key as last resort (no vehicle ID):', s3Key);
+          }
         }
 
         // Ensure we return a proper response object
@@ -761,7 +779,8 @@ class ImageOptimizationService extends FileStorageService {
       const match = url.match(/X-Amz-Date=(\d{8}T\d{6}Z)/);
       if (match) {
         const dateStr = match[1];
-        return new Date(dateStr.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).getTime();
+        const isoDate = dateStr.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z');
+        return new Date(isoDate).getTime();
       }
     } catch (error) {
       // Ignore parsing errors
