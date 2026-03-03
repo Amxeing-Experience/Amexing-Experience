@@ -349,13 +349,6 @@ class ExperienceController {
       return { error: 'Name must be 200 characters or less', status: 400 };
     }
 
-    if (description.length > 1000) {
-      return {
-        error: 'Description must be 1000 characters or less',
-        status: 400,
-      };
-    }
-
     return null;
   }
 
@@ -813,12 +806,6 @@ class ExperienceController {
     if (description !== undefined) {
       if (!description) {
         return { error: 'Description cannot be empty', status: 400 };
-      }
-      if (description.length > 1000) {
-        return {
-          error: 'Description must be 1000 characters or less',
-          status: 400,
-        };
       }
       experienceObj.set('description', description);
     }

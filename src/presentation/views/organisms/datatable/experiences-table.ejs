@@ -286,7 +286,7 @@ const isClient = dtUserRole === 'client';
 
                         <div class="mb-3">
                             <label for="description" class="form-label">Descripción <span class="text-danger">*</span></label>
-                            <textarea class="form-control" id="description" name="description" required rows="4" maxlength="1000" placeholder="Describe la experiencia en detalle..."></textarea>
+                            <textarea class="form-control" id="description" name="description" required rows="4" placeholder="Describe la experiencia en detalle..."></textarea>
                             <div class="invalid-feedback" id="description-error"></div>
                             <div class="form-text">Descripción completa de la experiencia</div>
                         </div>
@@ -2754,8 +2754,7 @@ const isClient = dtUserRole === 'client';
             },
             description: {
                 required: true,
-                minLength: 10,
-                maxLength: 1000
+                minLength: 10
             },
             cost: {
                 required: true,
