@@ -759,6 +759,9 @@ table.dataTable tbody tr.hover {
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
 
 <script>
+// Global variables for walking tour functionality
+const globalApiEndpoint = '<%= dtApiEndpoint %>';
+
 (function() {
     // Wait for DOM and all dependencies to be ready
     function initWhenReady() {
@@ -2123,6 +2126,8 @@ table.dataTable tbody tr.hover {
         loadRatesForFilter();
         // Load POIs for dropdowns
         loadDropdownData();
+        // Load POIs for walking tour modal dropdown
+        loadWalkingTourDropdownData();
 
         // Object to store day schedules
         let daySchedules = {};
@@ -2333,6 +2338,60 @@ table.dataTable tbody tr.hover {
                 },
                 error: function(xhr, status, error) {
                     console.error('Error loading POIs for Tours:', error);
+                }
+            });
+        }
+
+        // Load dropdown data for walking tours modal
+        function loadWalkingTourDropdownData() {
+            // Load Active POIs (filtered by Tours service type)
+            $.ajax({
+                url: '/api/pois/active?serviceType=Tours',
+                type: 'GET',
+                success: function(data) {
+                    if (data.success && data.data) {
+                        const selectElement = document.getElementById('walkingDestinationPOI');
+
+                        // Destroy existing Tom Select instance if it exists
+                        if (selectElement && selectElement.tomselect) {
+                            selectElement.tomselect.destroy();
+                        }
+
+                        // Clear the select element
+                        const select = $('#walkingDestinationPOI');
+                        select.empty();
+
+                        // Initialize Tom Select first (on empty select)
+                        if (typeof TomSelect !== 'undefined') {
+                            const tomSelectInstance = new TomSelect('#walkingDestinationPOI', {
+                                plugins: [],
+                                maxOptions: 1000,
+                                placeholder: 'Seleccionar destino del tour a pie',
+                                maxItems: 1,
+                                highlight: true,
+                                searchField: ['text'],
+                                valueField: 'value',
+                                labelField: 'text',
+                                sortField: 'text',
+                                closeAfterSelect: true,
+                                persist: false
+                            });
+
+                            // Store instance reference
+                            selectElement.tomselect = tomSelectInstance;
+
+                            // Load options using Tom Select API (prevents auto-selection)
+                            tomSelectInstance.clearOptions();
+                            data.data.forEach(poi => {
+                                tomSelectInstance.addOption({ value: poi.value, text: poi.label });
+                            });
+                            tomSelectInstance.refreshOptions(false);
+                            tomSelectInstance.clear(); // Clear selection to start empty
+                        }
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading POIs for Walking Tours:', error);
                 }
             });
         }
@@ -5386,7 +5445,438 @@ setTimeout(() => {
 
 // ========== END DRIVER RATE FUNCTIONALITY ==========
 
+// ========== WALKING TOUR FUNCTIONALITY ==========
+
+// Walking tour modal event handlers - ensure jQuery is loaded
+function attachWalkingTourHandlers() {
+    if (typeof $ === 'undefined') {
+        setTimeout(attachWalkingTourHandlers, 100);
+        return;
+    }
+    
+    // Save button handler
+    $(document).off('click.walkingTourSave', '#saveWalkingTourBtn').on('click.walkingTourSave', '#saveWalkingTourBtn', function(e) {
+        e.preventDefault();
+        if (typeof saveWalkingTour === 'function') {
+            saveWalkingTour();
+        } else if (typeof window.saveWalkingTour === 'function') {
+            window.saveWalkingTour();
+        }
+    });
+    
+    // Clear form when modal is hidden
+    $(document).off('hidden.bs.modal.walkingTour', '#walkingTourModal').on('hidden.bs.modal.walkingTour', '#walkingTourModal', function() {
+        // Clear form when modal is closed
+        const form = document.getElementById('walkingTourForm');
+        if (form) form.reset();
+        
+        // Clear all specific fields
+        const fieldsToReset = [
+            'walkingTourId', 'walkingTourDescription', 'walkingPriceSmall',
+            'walkingPriceMedium', 'walkingPriceLarge', 'walkingDuration',
+            'walkingAdvanceTime', 'walkingIncludes', 'walkingNotIncludes', 'walkingLanguages'
+        ];
+        
+        fieldsToReset.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) field.value = '';
+        });
+        
+        // Clear TomSelect
+        const walkingDestElement = document.getElementById('walkingDestinationPOI');
+        if (walkingDestElement && walkingDestElement.tomselect) {
+            walkingDestElement.tomselect.clear();
+        }
+    });
+}
+attachWalkingTourHandlers();
+
+// No additional handler needed - already attached above
+
+// Modal shown handler removed - using single handler attached above
+
+
+// Function to open walking tour modal in create mode
+function openWalkingTourModal() {
+    // Check if jQuery is available
+    if (typeof $ === 'undefined') {
+        console.error('jQuery not loaded - cannot open modal');
+        return;
+    }
+    
+    // Clear any previous modal alerts
+    const alertsContainer = document.getElementById('walkingTourModalAlerts');
+    if (alertsContainer) {
+        alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+    }
+
+    // Reset form using vanilla JS
+    const form = document.getElementById('walkingTourForm');
+    if (form) form.reset();
+    
+    // Explicitly clear all form fields to ensure they're empty
+    const fieldsToReset = [
+        'walkingTourId',
+        'walkingTourDescription', 
+        'walkingPriceSmall',
+        'walkingPriceMedium', 
+        'walkingPriceLarge',
+        'walkingDuration',
+        'walkingAdvanceTime',
+        'walkingIncludes',
+        'walkingNotIncludes',
+        'walkingLanguages'
+    ];
+    
+    fieldsToReset.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.value = '';
+        }
+    });
+    
+    // Reset labels and button text
+    const modalLabel = document.getElementById('walkingTourModalLabel');
+    if (modalLabel) modalLabel.innerHTML = '<i class="ti ti-walk me-2"></i>Crear Nuevo Tour a Pie';
+    
+    const saveButtonText = document.getElementById('saveWalkingButtonText');
+    if (saveButtonText) saveButtonText.textContent = 'Crear Tour a Pie';
+    
+    // Reset save button state
+    const saveButton = document.getElementById('saveWalkingTourBtn');
+    if (saveButton) saveButton.disabled = false;
+    
+    // Show modal using jQuery (required for Bootstrap modal)
+    $('#walkingTourModal').modal('show');
+    
+    // Clear Tom Select dropdown after modal is shown
+    setTimeout(() => {
+        const walkingDestElement = document.getElementById('walkingDestinationPOI');
+        if (walkingDestElement && walkingDestElement.tomselect) {
+            walkingDestElement.tomselect.clear();
+            walkingDestElement.tomselect.clearOptions();
+            walkingDestElement.tomselect.refreshOptions(false);
+        }
+    }, 500);
+}
+
+// Function to open walking tour modal for editing
+function openWalkingTourModalForEdit(tourId) {
+    if (typeof loadWalkingTourForEdit === 'function') {
+        loadWalkingTourForEdit(tourId);
+    } else {
+        console.error('loadWalkingTourForEdit function not available');
+        alert('Función de edición no disponible. Recargue la página e intente de nuevo.');
+    }
+}
+
+// Function to save walking tour
+async function saveWalkingTour() {
+    // Check if jQuery is available
+    if (typeof $ === 'undefined') {
+        console.error('jQuery not loaded');
+        return;
+    }
+    
+    // Disable save button to prevent double submission
+    $('#saveWalkingTourBtn').prop('disabled', true);
+    
+    try {
+        // Get form data using vanilla JS where possible
+        const walkingDestElement = document.getElementById('walkingDestinationPOI');
+        const destinationPOI = walkingDestElement && walkingDestElement.tomselect ? 
+                              walkingDestElement.tomselect.getValue() : '';
+        
+        // Helper function to safely get value
+        const getFieldValue = (id) => {
+            const element = document.getElementById(id);
+            return element ? element.value : '';
+        };
+        
+        const formData = {
+            tourType: 'walking',
+            destinationPOI: destinationPOI,
+            description: getFieldValue('walkingTourDescription'),
+            time: parseFloat(getFieldValue('walkingDuration') || '0') * 60, // Convert hours to minutes
+            anticipation: parseInt(getFieldValue('walkingAdvanceTime') || '1440'),
+            advance_booking_time: parseInt(getFieldValue('walkingAdvanceTime') || '1440'), // Alternative field name
+            walkingPriceSmall: parseFloat(getFieldValue('walkingPriceSmall') || '0'),
+            walkingPriceMedium: parseFloat(getFieldValue('walkingPriceMedium') || '0'),
+            walkingPriceLarge: parseFloat(getFieldValue('walkingPriceLarge') || '0'),
+            walkingPriceCurrency: 'MXN',
+            walkingRangeSmall: '1-5 pax',
+            walkingRangeMedium: '6-10 pax',
+            walkingRangeLarge: '11-15 pax',
+            includes: getFieldValue('walkingIncludes') ? getFieldValue('walkingIncludes').split('\n').filter(item => item.trim()) : [],
+            notincludes: getFieldValue('walkingNotIncludes') ? getFieldValue('walkingNotIncludes').split('\n').filter(item => item.trim()) : [],
+            languages: getFieldValue('walkingLanguages') ? getFieldValue('walkingLanguages').split('\n').filter(item => item.trim()) : [],
+            isWalkingTour: true,
+            active: true,
+            exists: true
+        };
+        
+        // Validate required fields
+        if (!destinationPOI) {
+            showWalkingTourAlert('Por favor seleccione un destino para el tour.', 'danger');
+            $('#saveWalkingTourBtn').prop('disabled', false);
+            return;
+        }
+        
+        if (!formData.walkingPriceSmall || !formData.walkingPriceMedium || !formData.walkingPriceLarge) {
+            showWalkingTourAlert('Por favor complete todos los precios por grupo.', 'danger');
+            $('#saveWalkingTourBtn').prop('disabled', false);
+            return;
+        }
+        
+        // Determine if this is create or edit operation
+        const tourId = getFieldValue('walkingTourId');
+        const isEdit = tourId && tourId.trim() !== '';
+        
+        // Get access token
+        const token = getAccessToken();
+        if (!token) {
+            showWalkingTourAlert('Error de autenticación. Por favor vuelva a iniciar sesión.', 'danger');
+            $('#saveWalkingTourBtn').prop('disabled', false);
+            return;
+        }
+        
+        // Prepare API call
+        const apiUrl = isEdit ? `${globalApiEndpoint}/${tourId}` : globalApiEndpoint;
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        // Send to API
+        const response = await fetch(apiUrl, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            const successMsg = isEdit ? 'Tour a pie actualizado exitosamente.' : 'Tour a pie creado exitosamente.';
+            showWalkingTourAlert(successMsg, 'success');
+            
+            // Close modal after short delay
+            setTimeout(() => {
+                $('#walkingTourModal').modal('hide');
+                // Refresh the table if it exists
+                if (typeof table !== 'undefined' && table.ajax) {
+                    table.ajax.reload(null, false);
+                }
+                // Refresh walking tours section if it exists
+                if (typeof loadWalkingTours === 'function') {
+                    loadWalkingTours();
+                }
+            }, 1500);
+        } else {
+            const defaultErrorMsg = isEdit ? 'Error al actualizar el tour a pie' : 'Error al crear el tour a pie';
+            const errorMsg = result.error || result.message || defaultErrorMsg;
+            showWalkingTourAlert(errorMsg, 'danger');
+            $('#saveWalkingTourBtn').prop('disabled', false);
+        }
+        
+    } catch (error) {
+        console.error('Error saving walking tour:', error);
+        showWalkingTourAlert('Error al conectar con el servidor.', 'danger');
+        $('#saveWalkingTourBtn').prop('disabled', false);
+    }
+}
+
+// Make saveWalkingTour globally accessible
+window.saveWalkingTour = saveWalkingTour;
+
+// Function to show walking tour modal alerts
+function showWalkingTourAlert(message, type) {
+    const alertsContainer = document.getElementById('walkingTourModalAlerts');
+    if (!alertsContainer) return;
+    
+    // Remove existing alerts
+    alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+    
+    // Create new alert
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    alertsContainer.appendChild(alert);
+    
+    // Auto-hide success alerts
+    if (type === 'success') {
+        setTimeout(() => {
+            alert.remove();
+        }, 3000);
+    }
+}
+
+// ========== END WALKING TOUR FUNCTIONALITY ==========
+
+
 </script>
+
+<!-- Walking Tour Modal -->
+<div class="modal fade" id="walkingTourModal" tabindex="-1" aria-labelledby="walkingTourModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title text-white" id="walkingTourModalLabel">
+                    <i class="ti ti-walk me-2"></i>Crear Nuevo Tour a Pie
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="walkingTourModalAlerts"></div>
+                
+                <form id="walkingTourForm">
+                    <input type="hidden" id="walkingTourId">
+                    
+                    <!-- Destino -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            Destino <span class="text-danger">*</span>
+                        </label>
+                        <%- include('../../atoms/common/tom-select', {
+                            id: 'walkingDestinationPOI',
+                            name: 'walkingDestinationPOI',
+                            multiple: false,
+                            placeholder: 'Seleccionar destino del tour a pie',
+                            label: false,
+                            required: true,
+                            helpText: false,
+                            options: [],
+                            selected: []
+                        }) %>
+                    </div>
+                    
+                    <!-- Descripción -->
+                    <div class="mb-3">
+                        <label for="walkingTourDescription" class="form-label form-label-sm fw-medium text-success">
+                            Descripción
+                        </label>
+                        <textarea class="form-control" id="walkingTourDescription" rows="2" maxlength="1000"
+                                  placeholder="Descripción detallada del recorrido a pie..."></textarea>
+                    </div>
+
+                    <!-- Precios por Grupo -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-medium text-success mb-3">
+                            <i class="ti ti-walk me-1"></i>Precios por Grupo de Personas
+                        </label>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label form-label-sm text-muted">Grupo Pequeño (1-5 personas)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="walkingPriceSmall" min="0" step="0.01" 
+                                           placeholder="1050.00" required>
+                                    <span class="input-group-text">MXN</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label form-label-sm text-muted">Grupo Mediano (6-10 personas)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="walkingPriceMedium" min="0" step="0.01" 
+                                           placeholder="2100.00" required>
+                                    <span class="input-group-text">MXN</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label form-label-sm text-muted">Grupo Grande (11-15 personas)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="walkingPriceLarge" min="0" step="0.01" 
+                                           placeholder="3150.00" required>
+                                    <span class="input-group-text">MXN</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="alert alert-info mt-3 mb-0" role="alert">
+                            <i class="ti ti-info-circle me-2"></i>
+                            <small>Los Tours a Pie se cobran por grupo, no por persona individual. Los precios incluyen guía certificado para caminar por el centro histórico.</small>
+                        </div>
+                    </div>
+
+                    <!-- Duración -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm fw-medium text-success">Duración (hrs) mínima</label>
+                            <input type="number" class="form-control" id="walkingDuration" min="0" step="0.5" 
+                                   placeholder="2" value="2">
+                            <div class="form-text">
+                                <small>Tiempo total del tour a pie</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipación (min)</label>
+                            <input type="number" class="form-control" id="walkingAdvanceTime" min="0" step="1" 
+                                   placeholder="1440" value="1440">
+                            <div class="form-text">
+                                <small>Ej: 1440 = 24hrs</small>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <!-- Incluye y No Incluye -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm fw-medium text-success">
+                                Incluye <span class="text-muted">(uno por línea)</span>
+                            </label>
+                            <textarea class="form-control" id="walkingIncludes" rows="4" maxlength="1000"
+                                      placeholder="Guía bilingüe certificado&#10;Recorrido histórico&#10;Degustación de platillos locales&#10;Agua embotellada"
+                                      style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm fw-medium text-success">
+                                No incluye <span class="text-muted">(uno por línea)</span>
+                            </label>
+                            <textarea class="form-control" id="walkingNotIncludes" rows="4" maxlength="1000"
+                                      placeholder="Transporte&#10;Comidas no especificadas&#10;Souvenirs"
+                                      style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Idiomas -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            Idiomas <span class="text-muted">(uno por línea)</span>
+                        </label>
+                        <textarea class="form-control" id="walkingLanguages" rows="2" maxlength="500"
+                                  placeholder="Español&#10;Inglés"
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                    </div>
+
+                    <!-- Alert informativo para tours a pie -->
+                    <div class="alert alert-success d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Tour a Pie:</strong>
+                            <p class="mb-0 mt-1">Define un recorrido peatonal por zonas históricas. Los precios son por grupo completo, ideales para experiencias gastronómicas y culturales.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-success" id="saveWalkingTourBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveWalkingButtonText">Crear Tour a Pie</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Tour Client Pricing Modal -->
 <div class="modal fade" id="tourClientPricingModal" tabindex="-1" aria-labelledby="tourClientPricingModalLabel" aria-hidden="true">

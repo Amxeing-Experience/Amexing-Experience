@@ -12,8 +12,8 @@
 const rolesHierarchy = {
   superadmin: 7,
   admin: 6,
-  client: 5,
-  department_manager: 4,
+  department_manager: 5,
+  client: 4,
   employee: 3,
   driver: 2,
   guest: 1
@@ -22,13 +22,33 @@ const rolesHierarchy = {
 const allDashboards = [
   { name: "Dashboard Super Admin", icon: "settings", path: "/dashboard/superadmin", level: 7 },
   { name: "Dashboard Admin", icon: "shield-check", path: "/dashboard/admin", level: 6 },
-  { name: "Dashboard Department Manager", icon: "screen-share", path: "/dashboard/department-manager", level: 5 },
-  { name: "Dashboard Employee", icon: "building", path: "/dashboard/employee", level: 4 },
-  { name: "Dashboard Driver", icon: "steering-wheel", path: "/dashboard/driver", level: 3 },
-  { name: "Dashboard Client", icon: "user", path: "/dashboard/client", level: 2 },
-  { name: "Dashboard Guest", icon: "world", path: "/dashboard/guest", level: 1 }
+  { name: "Dashboard Agente Admin", icon: "screen-share", path: "/dashboard/department_manager", level: 5 },
+  { name: "Dashboard Agente", icon: "user", path: "/dashboard/client", level: 4 }
 ];
-const dashboards =allDashboards.filter( dashboard => dashboard.level <= rolesHierarchy[user.role] );
+// Get the actual logged-in user's role
+// Try to get from passed user object first, then from locals (res.locals is available in all EJS templates)
+let actualUserRole = userRole; // Default to the dashboard being viewed
+if (typeof user !== 'undefined' && user && user.role) {
+    actualUserRole = user.role; // Use passed user object
+} else if (typeof locals !== 'undefined' && locals.user && locals.user.role) {
+    actualUserRole = locals.user.role; // Use res.locals.user from middleware
+}
+
+// For the dropdown, use the actual user's role to determine access
+const dashboards = allDashboards.filter( dashboard => dashboard.level <= rolesHierarchy[actualUserRole] );
+
+// Check if admin/superadmin is viewing another dashboard
+// If currentPath is empty, determine from userRole parameter (which indicates the dashboard being viewed)
+const isViewingDifferentDashboard = (viewedRole, actualRole) => {
+    // If we're viewing a dashboard different from our actual role
+    return viewedRole !== actualRole;
+};
+
+const isAdminViewingOtherDashboard = actualUserRole === 'admin' && 
+  (userRole === 'client' || userRole === 'department_manager' || userRole === 'superadmin');
+   
+const isSuperAdminViewingOtherDashboard = actualUserRole === 'superadmin' && 
+  (userRole === 'client' || userRole === 'department_manager' || userRole === 'admin');
 
 // Navigation items based on role
 const navigationItems = {
@@ -91,6 +111,21 @@ const navigationItems = {
         ]}
     ],
     client: [
+        // Show System Management section if admin/superadmin is viewing this dashboard
+        ...(isAdminViewingOtherDashboard ? [
+            { section: 'System Management', icon: 'ti-settings', items: [
+                { name: 'Dashboard Agente', icon: 'user', path: '/dashboard/client', id: 'dashboard',
+                  dropdown: dashboards
+                }
+            ]}
+        ] : []),
+        ...(isSuperAdminViewingOtherDashboard ? [
+            { section: 'System Management', icon: 'ti-settings', items: [
+                { name: 'Dashboard Agente', icon: 'user', path: '/dashboard/client', id: 'dashboard',
+                  dropdown: dashboards
+                }
+            ]}
+        ] : []),
         { section: 'My Business', icon: 'ti-building', items: [
             { name: 'My Team', icon: 'users', path: '/dashboard/client/team', id: 'team' }
         ]},
@@ -104,6 +139,21 @@ const navigationItems = {
         ]}
     ],
     department_manager: [
+        // Show System Management section if admin/superadmin is viewing this dashboard
+        ...(isAdminViewingOtherDashboard ? [
+            { section: 'System Management', icon: 'ti-settings', items: [
+                { name: 'Dashboard Agente Admin', icon: 'screen-share', path: '/dashboard/department_manager', id: 'dashboard',
+                  dropdown: dashboards
+                }
+            ]}
+        ] : []),
+        ...(isSuperAdminViewingOtherDashboard ? [
+            { section: 'System Management', icon: 'ti-settings', items: [
+                { name: 'Dashboard Agente Admin', icon: 'screen-share', path: '/dashboard/department_manager', id: 'dashboard',
+                  dropdown: dashboards
+                }
+            ]}
+        ] : []),
         { section: 'Team Management', icon: 'ti-users', items: [
             { name: 'My Team', icon: 'users', path: '/dashboard/department_manager/team', id: 'team' },
             { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/department_manager/quotes', id: 'quotes', badge: { text: 'Beta', color: 'info' } },
@@ -154,6 +204,8 @@ const navigationItems = {
     ]
 };
 
+// Always show the menu based on the dashboard being viewed (userRole)
+// The return button logic is now inside each role's navigation items
 const menuSections = navigationItems[userRole] || navigationItems.guest;
 %>
 
