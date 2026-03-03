@@ -488,10 +488,6 @@ class Experience extends BaseModel {
       errors.push('Description is required');
     }
 
-    if (this.getDescription().length > 1000) {
-      errors.push('Description must be 1000 characters or less');
-    }
-
     if (!this.getType()) {
       errors.push('Type is required');
     }
