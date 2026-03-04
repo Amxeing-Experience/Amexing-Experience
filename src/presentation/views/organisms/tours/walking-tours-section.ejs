@@ -136,9 +136,6 @@ async function loadWalkingTours() {
         const allTours = data.data || [];
         const walkingTours = allTours.filter(tour => tour.isWalkingTour === true);
         
-        console.log('🚶‍♀️ WALKING TOURS SECTION - Filtering:');
-        console.log('  📍 Total tours received:', allTours.length);
-        console.log('  📍 Walking tours found:', walkingTours.length);
         
         displayWalkingTours(walkingTours);
         
@@ -330,17 +327,16 @@ function displayWalkingTours(tours) {
         
         // Force load transfer rate if needed and apply pricing
         const ensureCorrectPricing = () => {
-            console.log('🔍 Checking rates for', initialPayment, '- Transfer:', walkingCurrentTransferRate);
-            
+
             if (initialPayment === 'transferencia') {
                 if (walkingCurrentTransferRate <= 0) {
-                    console.log('🔄 Transfer rate not loaded, forcing reload...');
+
                     loadWalkingTransferRate().then(() => {
-                        console.log('✅ Transfer rate loaded:', walkingCurrentTransferRate, '- applying prices');
+
                         updateWalkingToursPrices(initialPayment, initialCurrency);
                     });
                 } else {
-                    console.log('✅ Transfer rate already loaded:', walkingCurrentTransferRate, '- applying prices');
+
                     updateWalkingToursPrices(initialPayment, initialCurrency);
                 }
             } else if (initialPayment === 'tarjeta') {
@@ -390,8 +386,7 @@ let walkingCurrentAgencyRate = 0;
 // Initialize filter event handlers
 function initWalkingToursFilters() {
     const sectionId = '<%= sectionId %>';
-    console.log('🔧 Initializing walking tours filters for section:', sectionId);
-    
+
     // Remove any existing event handlers to prevent duplicates
     $(`#walkingCurrencyFilter-${sectionId}`).off('change.walkingtours');
     $(`#walkingPaymentFilter-${sectionId}`).off('change.walkingtours');
@@ -400,8 +395,7 @@ function initWalkingToursFilters() {
     $(`#walkingCurrencyFilter-${sectionId}`).on('change.walkingtours', function() {
         const selectedCurrency = $(this).val();
         const selectedPaymentType = $(`#walkingPaymentFilter-${sectionId}`).val();
-        console.log('💱 Currency changed to:', selectedCurrency, 'Payment:', selectedPaymentType);
-        
+
         if (selectedCurrency === 'USD' && walkingCurrentExchangeRate <= 0) {
             loadWalkingExchangeRate().then(() => {
                 updateWalkingToursPrices(selectedPaymentType, selectedCurrency);
@@ -415,8 +409,7 @@ function initWalkingToursFilters() {
     $(`#walkingPaymentFilter-${sectionId}`).on('change.walkingtours', function() {
         const selectedPaymentType = $(this).val();
         const selectedCurrency = $(`#walkingCurrencyFilter-${sectionId}`).val();
-        console.log('💳 Payment type changed to:', selectedPaymentType, 'Currency:', selectedCurrency);
-        
+
         // Handle payment type specific rates
         if (selectedPaymentType === 'transferencia' && walkingCurrentTransferRate <= 0) {
             loadWalkingTransferRate().then(() => {
@@ -432,8 +425,6 @@ function initWalkingToursFilters() {
     });
     
     // Test that selectors work
-    console.log('🔍 Currency selector found:', $(`#walkingCurrencyFilter-${sectionId}`).length > 0);
-    console.log('🔍 Payment selector found:', $(`#walkingPaymentFilter-${sectionId}`).length > 0);
 }
 
 // Get JWT token from localStorage or cookies
@@ -469,7 +460,7 @@ function loadWalkingExchangeRate() {
         success: function(response) {
             if (response.success && response.data) {
                 walkingCurrentExchangeRate = response.data.value || 0;
-                console.log('✅ Walking tours exchange rate loaded:', walkingCurrentExchangeRate, 'MXN per USD');
+
             } else {
                 console.warn('⚠️ No active exchange rate found for walking tours');
                 walkingCurrentExchangeRate = 0;
@@ -520,7 +511,7 @@ function loadWalkingAgencyRate() {
         success: function(response) {
             if (response.success && response.data) {
                 walkingCurrentAgencyRate = response.data.value || 0;
-                console.log('✅ Walking tours agency rate loaded:', walkingCurrentAgencyRate + '%');
+
             } else {
                 console.warn('⚠️ No active agency rate found for walking tours');
                 walkingCurrentAgencyRate = 0;
@@ -615,8 +606,7 @@ function addWalkingTourEventHandlers() {
         e.stopPropagation();
         
         const tourId = $(this).data('id');
-        console.log('Edit walking tour clicked:', tourId);
-        
+
         // Load walking tour data and open modal in edit mode
         loadWalkingTourForEdit(tourId);
     });
@@ -625,8 +615,7 @@ function addWalkingTourEventHandlers() {
 // Function to load walking tour data for editing
 async function loadWalkingTourForEdit(tourId) {
     try {
-        console.log('Loading walking tour for edit:', tourId);
-        
+
         // Get access token
         const token = getAccessToken();
         if (!token) {
@@ -642,9 +631,7 @@ async function loadWalkingTourForEdit(tourId) {
         });
         
         const result = await response.json();
-        console.log('🔍 API Response:', result);
-        console.log('🔍 Response status:', response.status, response.ok);
-        
+
         if (!response.ok || !result.success) {
             console.error('❌ Error loading walking tour:', result.error);
             alert('Error al cargar el tour a pie: ' + (result.error || 'Error desconocido'));
@@ -652,11 +639,7 @@ async function loadWalkingTourForEdit(tourId) {
         }
         
         const tour = result.data;
-        console.log('✅ Walking tour loaded successfully:', tour);
-        console.log('🔍 Tour data structure:', JSON.stringify(tour, null, 2));
-        console.log('🔍 Tour is null/undefined?', tour == null);
-        console.log('🔍 Tour is object?', typeof tour === 'object');
-        console.log('🔍 Tour has keys?', tour && Object.keys(tour).length > 0);
+
         
         // Check if there's a walking tour modal
         const walkingTourModal = document.getElementById('walkingTourModal');
@@ -676,8 +659,7 @@ async function loadWalkingTourForEdit(tourId) {
         
         // Wait for modal to be fully shown before populating data
         walkingTourModal.addEventListener('shown.bs.modal', function modalShownHandler() {
-            console.log('🎭 Modal is now fully visible, populating form...');
-            
+
             // Remove this event listener to prevent multiple calls
             walkingTourModal.removeEventListener('shown.bs.modal', modalShownHandler);
             
@@ -689,7 +671,7 @@ async function loadWalkingTourForEdit(tourId) {
         
         // Fallback: Also try to populate after a longer delay in case the event doesn't fire
         setTimeout(() => {
-            console.log('🔄 Fallback form population attempt...');
+
             if ($('#walkingTourModal').hasClass('show')) {
                 populateWalkingTourForm(tour);
             }
