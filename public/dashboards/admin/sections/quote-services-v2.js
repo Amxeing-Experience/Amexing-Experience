@@ -27,6 +27,11 @@ class ItineraryBuilder {
         this.vehiclesCache = null;
         this.experiencesCache = new Map();
         this.toursCache = new Map();
+        
+        // Cache for pricing data
+        this.tourPricesMap = new Map();     // Key: `${tourId}_${rateId}` -> Array of TourPrices
+        this.clientPricesMap = new Map();   // Key: `${tourId}_${rateId}_${vehiclePtr}` -> ClientPrice
+        this.vehicleTypesMap = new Map();   // Key: vehicleTypeId -> VehicleType info
         this.ratesCache = null;
         this.providerExperiencesCache = null;
         this.agencyRateCache = null;
@@ -110,6 +115,9 @@ class ItineraryBuilder {
                 this.loadAllRates(),
                 this.loadAllExperiences(),
                 this.loadAllTours(),
+                this.loadAllTourPrices(),
+                this.loadAllClientPrices(),
+                this.loadVehicleTypes(),
                 this.loadProviderExperiences(),
                 this.loadAgencyRate(),
                 this.loadDriverTourRate()
@@ -122,7 +130,6 @@ class ItineraryBuilder {
             if (this.clientId) {
                 await this.loadClientSpecificPricing();
             }
-
 
             // Setup UI
             this.setupEventListeners();
@@ -186,6 +193,26 @@ class ItineraryBuilder {
         // Tour selection handler  
         document.getElementById('tourSelect')?.addEventListener('change', (e) => {
             this.handleTourSelection(e.target.value);
+        });
+        
+        // Tour requires transport checkbox handler
+        document.getElementById('tourRequiresTransport')?.addEventListener('change', (e) => {
+            this.handleTourTransportToggle(e.target.checked);
+        });
+
+        // Rate selection handler for tour vehicles
+        document.getElementById('transportCategory')?.addEventListener('change', (e) => {
+            this.handleRateSelection(e.target.value);
+        });
+
+        // Vehicle selection handler for price update
+        document.getElementById('vehicleSelect')?.addEventListener('change', (e) => {
+            this.handleVehicleSelection(e.target.value);
+        });
+        
+        // Include guide checkbox listener for tours (Guía + Chofer)
+        document.getElementById('includeGuide')?.addEventListener('change', (e) => {
+            this.handleIncludeGuideChange(e.target.checked);
         });
 
         // Delete Confirmation
@@ -358,12 +385,6 @@ class ItineraryBuilder {
                 this.days.push(newDay);
             }
 
-            console.log('Attempting to save day:', {
-                daysCount: this.days.length,
-                days: this.days,
-                quoteId: this.quoteId
-            });
-
             // Save to backend
             await this.saveToBackend();
 
@@ -408,6 +429,9 @@ class ItineraryBuilder {
         // Load day-specific data
         this.loadDayExperiences(dayId);
         this.loadDayTours(dayId);
+        
+        // Populate rates dropdown when modal opens
+        this.populateRatesDropdown();
 
         // Reset or populate form
         if (serviceId && this.services.has(serviceId)) {
@@ -417,6 +441,26 @@ class ItineraryBuilder {
         } else {
             document.getElementById('serviceModalLabel').innerHTML = '<i class="ti ti-plus-circle me-2"></i>Agregar Servicio';
             form.reset();
+            
+            // Clear tour details when opening a new service modal
+            const tourDetails = document.getElementById('tourDetails');
+            if (tourDetails) {
+                tourDetails.style.display = 'none';
+                tourDetails.innerHTML = '';
+            }
+            
+            // Clear tour schedule/horarios disponibles
+            this.clearTourSchedule();
+            
+            // Also clear experience schedule
+            this.clearExperienceSchedule();
+            
+            // Clear tour transport checkbox
+            const tourRequiresTransport = document.getElementById('tourRequiresTransport');
+            if (tourRequiresTransport) {
+                tourRequiresTransport.checked = false;
+            }
+            
             this.handleServiceTypeChange('experience'); // Default to experience
         }
 
@@ -431,10 +475,26 @@ class ItineraryBuilder {
         document.querySelectorAll('.service-content').forEach(content => {
             content.classList.add('d-none');
         });
+        
+        // Clear tour details and schedules when switching away from tour type
+        if (type !== 'tour') {
+            const tourDetails = document.getElementById('tourDetails');
+            if (tourDetails) {
+                tourDetails.style.display = 'none';
+                tourDetails.innerHTML = '';
+            }
+            this.clearTourSchedule();
+        }
+        
+        // Clear experience schedules when switching away from experience type
+        if (type !== 'experience') {
+            this.clearExperienceSchedule();
+        }
 
         // Show/hide transport-specific selectors
         const transportTypeSelector = document.getElementById('transportTypeSelector');
         const tripTypeSelector = document.getElementById('tripTypeSelector');
+        const tourTransportCheckbox = document.getElementById('tourTransportCheckboxContainer');
 
         if (type === 'transport') {
             transportTypeSelector?.classList.remove('d-none');
@@ -442,9 +502,24 @@ class ItineraryBuilder {
             // Initialize transport form based on current selections
             this.handleTransportTypeChange();
             this.handleTripTypeChange();
+            // Hide tour transport checkbox
+            if (tourTransportCheckbox) {
+                tourTransportCheckbox.style.display = 'none';
+            }
+        } else if (type === 'tour') {
+            transportTypeSelector?.classList.add('d-none');
+            tripTypeSelector?.classList.add('d-none');
+            // Show tour transport checkbox
+            if (tourTransportCheckbox) {
+                tourTransportCheckbox.style.display = 'block';
+            }
         } else {
             transportTypeSelector?.classList.add('d-none');
             tripTypeSelector?.classList.add('d-none');
+            // Hide tour transport checkbox
+            if (tourTransportCheckbox) {
+                tourTransportCheckbox.style.display = 'none';
+            }
         }
 
         // Show/hide category, vehicle and guide fields based on service type
@@ -477,7 +552,7 @@ class ItineraryBuilder {
 
                 // Update labels to remove asterisk
                 if (priceLabel) {
-                    priceLabel.innerHTML = 'Precio Unitario';
+                    priceLabel.innerHTML = 'Precio';
                 }
                 if (currencyLabel) {
                     currencyLabel.innerHTML = 'Moneda';
@@ -493,7 +568,7 @@ class ItineraryBuilder {
 
                 // Update labels to add asterisk
                 if (priceLabel) {
-                    priceLabel.innerHTML = 'Precio Unitario <span class="text-danger">*</span>';
+                    priceLabel.innerHTML = 'Precio <span class="text-danger">*</span>';
                 }
                 if (currencyLabel) {
                     currencyLabel.innerHTML = 'Moneda <span class="text-danger">*</span>';
@@ -503,10 +578,68 @@ class ItineraryBuilder {
                 }
             }
         } else if (type === 'tour') {
-            // Show all fields for Tour with combined guide + driver checkbox
-            categoryField?.classList.remove('d-none');
-            vehicleField?.classList.remove('d-none');
-            guideField?.classList.remove('d-none');
+            // For tours, visibility of transport fields depends on the checkbox
+            const requiresTransport = document.getElementById('tourRequiresTransport');
+            const showTransportFields = requiresTransport?.checked || false;
+            
+            // Get the standard pricing section
+            const standardPricingSection = document.getElementById('standardPricingSection');
+            
+            if (showTransportFields) {
+                // Show transport fields if required
+                categoryField?.classList.remove('d-none');
+                vehicleField?.classList.remove('d-none');
+                guideField?.classList.remove('d-none');
+                document.getElementById('transportCategory')?.setAttribute('required', 'required');
+                
+                // Show pricing fields
+                if (standardPricingSection) {
+                    standardPricingSection.style.display = '';
+                }
+                
+                // Set pricing fields as required
+                priceField?.setAttribute('required', 'required');
+                currencyField?.setAttribute('required', 'required');
+                priceTypeField?.setAttribute('required', 'required');
+                
+                // Update labels to add asterisk
+                if (priceLabel) {
+                    priceLabel.innerHTML = 'Precio <span class="text-danger">*</span>';
+                }
+                if (currencyLabel) {
+                    currencyLabel.innerHTML = 'Moneda <span class="text-danger">*</span>';
+                }
+                if (priceTypeLabel) {
+                    priceTypeLabel.innerHTML = 'Pago <span class="text-danger">*</span>';
+                }
+            } else {
+                // Hide transport fields if not required
+                categoryField?.classList.add('d-none');
+                vehicleField?.classList.add('d-none');
+                guideField?.classList.add('d-none');
+                document.getElementById('transportCategory')?.removeAttribute('required');
+                
+                // Hide pricing fields
+                if (standardPricingSection) {
+                    standardPricingSection.style.display = 'none';
+                }
+                
+                // Remove required from pricing fields
+                priceField?.removeAttribute('required');
+                currencyField?.removeAttribute('required');
+                priceTypeField?.removeAttribute('required');
+                
+                // Update labels to remove asterisk
+                if (priceLabel) {
+                    priceLabel.innerHTML = 'Precio';
+                }
+                if (currencyLabel) {
+                    currencyLabel.innerHTML = 'Moneda';
+                }
+                if (priceTypeLabel) {
+                    priceTypeLabel.innerHTML = 'Pago';
+                }
+            }
 
             // Change title and checkbox label for Tour
             if (serviciosLabel) {
@@ -514,23 +647,6 @@ class ItineraryBuilder {
             }
             if (guideLabel) {
                 guideLabel.textContent = 'Guía + Chofer';
-            }
-
-            // Restore required to category, price, currency and price type
-            document.getElementById('transportCategory')?.setAttribute('required', 'required');
-            priceField?.setAttribute('required', 'required');
-            currencyField?.setAttribute('required', 'required');
-            priceTypeField?.setAttribute('required', 'required');
-
-            // Update labels to add asterisk
-            if (priceLabel) {
-                priceLabel.innerHTML = 'Precio Unitario <span class="text-danger">*</span>';
-            }
-            if (currencyLabel) {
-                currencyLabel.innerHTML = 'Moneda <span class="text-danger">*</span>';
-            }
-            if (priceTypeLabel) {
-                priceTypeLabel.innerHTML = 'Pago <span class="text-danger">*</span>';
             }
         } else {
             // Show category, vehicle and guide for Transport only
@@ -554,7 +670,7 @@ class ItineraryBuilder {
 
             // Update labels to add asterisk
             if (priceLabel) {
-                priceLabel.innerHTML = 'Precio Unitario <span class="text-danger">*</span>';
+                priceLabel.innerHTML = 'Precio <span class="text-danger">*</span>';
             }
             if (currencyLabel) {
                 currencyLabel.innerHTML = 'Moneda <span class="text-danger">*</span>';
@@ -580,6 +696,14 @@ class ItineraryBuilder {
         // Update current service type and restore fields for the new type
         this.currentServiceType = type;
         this.restoreServiceTypeFields(type);
+        
+        // Load tours when tour type is selected
+        if (type === 'tour' && this.currentDayId) {
+            this.loadDayTours(this.currentDayId);
+        }
+        
+        // Repopulate rates dropdown to filter based on service type
+        this.populateRatesDropdown();
     }
 
     // Save current form values for the current service type
@@ -835,18 +959,6 @@ class ItineraryBuilder {
                     ...serviceData
                 };
 
-                console.log('🔄 UPDATING EXISTING SERVICE:', {
-                    serviceId: this.currentServiceId,
-                    existingService: existingService,
-                    newServiceData: serviceData,
-                    updatedService: updatedService,
-                    quantitiesInUpdate: {
-                        adultsQuantity: updatedService.adultsQuantity,
-                        childrenQuantity: updatedService.childrenQuantity,
-                        adultsNoAlcoholQuantity: updatedService.adultsNoAlcoholQuantity
-                    }
-                });
-
                 this.services.set(this.currentServiceId, updatedService);
             } else {
                 // Add new service
@@ -880,13 +992,23 @@ class ItineraryBuilder {
 
     collectServiceData() {
         const type = document.querySelector('input[name="serviceType"]:checked')?.value;
+        const vehicleSelectValue = document.getElementById('vehicleSelect')?.value;
+        
         const data = {
             type,
-            vehicleId: document.getElementById('vehicleSelect')?.value,
             price: parseFloat(document.getElementById('servicePrice')?.value || 0),
             quantity: parseInt(document.getElementById('serviceQuantity')?.value || 1),
             notes: document.getElementById('serviceNotes')?.value
         };
+        
+        // For tours with transport, store vehicle type information (not vehicleId)
+        if (type === 'tour' && vehicleSelectValue) {
+            data.vehicleType = vehicleSelectValue; // Store the vehicle type name
+            data.vehicleTypeName = vehicleSelectValue; // For display purposes
+        } else if (vehicleSelectValue) {
+            // For non-tour services, store as vehicleId
+            data.vehicleId = vehicleSelectValue;
+        }
 
         // Collect type-specific data
         switch (type) {
@@ -909,19 +1031,32 @@ class ItineraryBuilder {
                 data.childPrice = parseFloat(document.getElementById('childPrice')?.value || 0);
                 data.noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0);
 
-                console.log('💾 COLLECT EXPERIENCE DATA - Final data object:', {
-                    experienceId: data.experienceId,
-                    adultsQuantity: data.adultsQuantity,
-                    childrenQuantity: data.childrenQuantity,
-                    adultsNoAlcoholQuantity: data.adultsNoAlcoholQuantity,
-                    selectedSchedule: data.selectedSchedule,
-                    adultPrice: data.adultPrice,
-                    childPrice: data.childPrice,
-                    noAlcoholPrice: data.noAlcoholPrice
-                });
                 break;
             case 'tour':
                 data.tourId = document.getElementById('tourSelect')?.value;
+                data.rateId = document.getElementById('transportCategory')?.value; // Store rate for vehicle pricing
+                
+                // Collect includeGuide checkbox state for tours
+                const includeGuideCheckbox = document.getElementById('includeGuide');
+                data.includeGuide = includeGuideCheckbox ? includeGuideCheckbox.checked : false;
+                
+                // Collect passenger quantities for tours (same as experiences)
+                data.adultsQuantity = parseInt(document.getElementById('tourAdultsQuantity')?.value || 0);
+                data.childrenQuantity = parseInt(document.getElementById('tourChildrenQuantity')?.value || 0);
+                data.adultsNoAlcoholQuantity = parseInt(document.getElementById('tourAdultsNoAlcoholQuantity')?.value || 0);
+                
+                // Collect tour-specific prices
+                data.adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
+                data.childPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0);
+                data.noAlcoholPrice = parseFloat(document.getElementById('tourNoAlcoholPrice')?.value || 0);
+                
+                // Collect schedule data - get the text content of selected option, not the index value
+                const tourScheduleSelect = document.getElementById('tourMultipleTime');
+                if (tourScheduleSelect && tourScheduleSelect.selectedIndex > 0) {
+                    data.selectedSchedule = tourScheduleSelect.options[tourScheduleSelect.selectedIndex].textContent;
+                } else {
+                    data.selectedSchedule = '';
+                }
                 break;
             case 'transport':
                 data.transportType = document.querySelector('input[name="transportType"]:checked')?.value;
@@ -974,7 +1109,17 @@ class ItineraryBuilder {
             return false;
         }
 
-        if (data.type !== 'concepto' && data.price <= 0) {
+        // For tours and experiences, validate that we have either a price OR people quantities with prices
+        if (data.type === 'tour' || data.type === 'experience') {
+            const hasPeopleQuantities = (data.adultsQuantity > 0 && data.adultPrice > 0) || 
+                                       (data.childrenQuantity > 0 && data.childPrice > 0) || 
+                                       (data.adultsNoAlcoholQuantity > 0 && data.noAlcoholPrice > 0);
+            
+            if (!hasPeopleQuantities && data.price <= 0) {
+                this.showModalAlert('serviceModalAlert', 'Por favor ingresa cantidades de personas con precios o un precio base', 'warning');
+                return false;
+            }
+        } else if (data.type !== 'concepto' && data.price <= 0) {
             this.showModalAlert('serviceModalAlert', 'Por favor ingresa un precio válido', 'warning');
             return false;
         }
@@ -1025,20 +1170,6 @@ class ItineraryBuilder {
     populateServiceForm(service) {
         if (!service) return;
 
-        console.log('🔧 EDIT SERVICE DEBUG - Full service object:', {
-            id: service.id,
-            type: service.type,
-            concept: service.concept,
-            experienceId: service.experienceId,
-            adultsQuantity: service.adultsQuantity,
-            childrenQuantity: service.childrenQuantity,
-            adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity,
-            adultPrice: service.adultPrice,
-            childPrice: service.childPrice,
-            noAlcoholPrice: service.noAlcoholPrice,
-            fullService: service
-        });
-
         // Set service type
         const serviceTypeRadio = document.querySelector(`input[name="serviceType"][value="${service.type}"]`);
         if (serviceTypeRadio) {
@@ -1048,8 +1179,21 @@ class ItineraryBuilder {
 
         // Populate common fields
         document.getElementById('transportCategory').value = service.category || '';
-        document.getElementById('vehicleSelect').value = service.vehicleId || '';
-        document.getElementById('servicePrice').value = this.calculateServicePrice(service);
+        // For tours with vehicle type, use vehicleType, otherwise use vehicleId
+        const vehicleSelectValue = service.vehicleType || service.vehicleTypeName || service.vehicleId || '';
+        document.getElementById('vehicleSelect').value = vehicleSelectValue;
+        // For tours, show only vehicle cost in price field; for others, show full calculated price
+        if (service.type === 'tour') {
+            // For tours, only show vehicle cost (not people costs)
+            if (service.vehicleId || service.vehicleType || service.vehicleTypeName) {
+                const vehicleCost = this.getVehicleCost(service);
+                document.getElementById('servicePrice').value = vehicleCost || 0;
+            } else {
+                document.getElementById('servicePrice').value = 0; // No vehicle, show 0
+            }
+        } else {
+            document.getElementById('servicePrice').value = this.calculateServicePrice(service);
+        }
         document.getElementById('serviceQuantity').value = service.quantity || 1;
         document.getElementById('serviceNotes').value = service.notes || '';
         document.getElementById('currencySelect').value = service.currency || 'MXN';
@@ -1069,34 +1213,18 @@ class ItineraryBuilder {
                     experienceSelect.value = service.experienceId;
                     // Trigger the experience selection to show pricing section
                     if (this.handleExperienceSelection) {
-                        console.log('🔧 EDIT: Triggering experience selection for:', service.experienceId);
                         this.handleExperienceSelection(service.experienceId);
                     }
                 }
 
                 // Use multiple setTimeout attempts to ensure DOM elements are visible before populating
                 const populateQuantityFields = (attempt = 1) => {
-                    console.log(`🔧 Attempt ${attempt} - Restoring experience quantity fields...`);
 
                     const adultsQuantityField = document.getElementById('adultsQuantity');
                     const childrenQuantityField = document.getElementById('childrenQuantity');
                     const adultsNoAlcoholQuantityField = document.getElementById('adultsNoAlcoholQuantity');
                     const experienceContent = document.getElementById('experienceContent');
                     const experiencePricingSection = document.getElementById('experiencePricingSection');
-
-                    console.log('🔧 Field availability check:', {
-                        attempt: attempt,
-                        adultsQuantity: service.adultsQuantity,
-                        childrenQuantity: service.childrenQuantity,
-                        adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity,
-                        adultsQuantityField: !!adultsQuantityField,
-                        childrenQuantityField: !!childrenQuantityField,
-                        adultsNoAlcoholQuantityField: !!adultsNoAlcoholQuantityField,
-                        experienceContent: !!experienceContent,
-                        experienceContentVisible: experienceContent ? !experienceContent.classList.contains('d-none') : false,
-                        experiencePricingSection: !!experiencePricingSection,
-                        experiencePricingSectionVisible: experiencePricingSection ? !experiencePricingSection.classList.contains('d-none') : false
-                    });
 
                     // Check if all fields are available and visible
                     if (adultsQuantityField && childrenQuantityField && adultsNoAlcoholQuantityField &&
@@ -1144,7 +1272,7 @@ class ItineraryBuilder {
                                         const optionText = updatedScheduleField.options[i].textContent;
                                         if (optionText === service.selectedSchedule) {
                                             updatedScheduleField.selectedIndex = i;
-                                            console.log('✅ Restored schedule selection:', service.selectedSchedule);
+
                                             break;
                                         }
                                     }
@@ -1154,7 +1282,7 @@ class ItineraryBuilder {
 
                     } else if (attempt < 5) {
                         // Retry with longer delay
-                        console.log(`⏳ Fields not ready, retrying in ${100 * attempt}ms...`);
+
                         setTimeout(() => populateQuantityFields(attempt + 1), 100 * attempt);
                     } else {
                         console.error('❌ Failed to populate quantity fields after 5 attempts');
@@ -1168,7 +1296,95 @@ class ItineraryBuilder {
                 const tourSelect = document.getElementById('tourSelect');
                 if (tourSelect && service.tourId) {
                     tourSelect.value = service.tourId;
+                    // Trigger tour selection to show tour content
+                    this.handleTourSelection(service.tourId);
                 }
+
+                // Handle transport/vehicle information for tours
+                const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
+                
+                if (hasVehicle) {
+                    // Check the "Se requiere traslado" checkbox
+                    const requiresTransportCheckbox = document.getElementById('tourRequiresTransport');
+                    if (requiresTransportCheckbox) {
+                        requiresTransportCheckbox.checked = true;
+                        // Trigger the transport toggle to show transport fields
+                        if (this.handleTourTransportToggle) {
+                            this.handleTourTransportToggle(true);
+                        }
+                    }
+
+                    // Set the rate if available
+                    setTimeout(() => {
+                        if (service.rateId) {
+                            const transportCategorySelect = document.getElementById('transportCategory');
+                            if (transportCategorySelect) {
+                                transportCategorySelect.value = service.rateId;
+                                // Trigger rate selection to populate vehicles
+                                this.handleRateSelection(service.rateId);
+                                
+                                // After rate selection, set the vehicle
+                                setTimeout(() => {
+                                    const vehicleValue = service.vehicleType || service.vehicleTypeName || service.vehicleId;
+                                    if (vehicleValue) {
+                                        const vehicleSelect = document.getElementById('vehicleSelect');
+                                        if (vehicleSelect) {
+                                            vehicleSelect.value = vehicleValue;
+                                            // Trigger vehicle selection for price update
+                                            this.handleVehicleSelection(vehicleValue);
+                                        }
+                                    }
+                                }, 500);
+                            }
+                        }
+                    }, 300);
+                }
+                
+                // Populate tour passenger quantities (similar to experiences)
+                const populateTourQuantityFields = (attempt = 1) => {
+
+                    const tourAdultsQuantityField = document.getElementById('tourAdultsQuantity');
+                    const tourChildrenQuantityField = document.getElementById('tourChildrenQuantity');
+                    const tourAdultsNoAlcoholQuantityField = document.getElementById('tourAdultsNoAlcoholQuantity');
+                    const tourContent = document.getElementById('tourContent');
+
+                    // Check if all fields are available and visible
+                    if (tourAdultsQuantityField && tourChildrenQuantityField && tourAdultsNoAlcoholQuantityField &&
+                        tourContent && !tourContent.classList.contains('d-none')) {
+
+                        // Populate the fields
+                        if (service.adultsQuantity !== undefined) {
+                            tourAdultsQuantityField.value = service.adultsQuantity;
+                        }
+                        if (service.childrenQuantity !== undefined) {
+                            tourChildrenQuantityField.value = service.childrenQuantity;
+                        }
+                        if (service.adultsNoAlcoholQuantity !== undefined) {
+                            tourAdultsNoAlcoholQuantityField.value = service.adultsNoAlcoholQuantity;
+                        }
+
+                        // Also restore schedule selection if available
+                        const tourScheduleSelect = document.getElementById('tourMultipleTime');
+                        if (tourScheduleSelect && service.selectedSchedule) {
+                            // Find the option that matches the saved schedule
+                            for (let i = 0; i < tourScheduleSelect.options.length; i++) {
+                                if (tourScheduleSelect.options[i].textContent === service.selectedSchedule) {
+                                    tourScheduleSelect.selectedIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+
+                    } else if (attempt < 5) {
+                        // Retry with longer delay
+
+                        setTimeout(() => populateTourQuantityFields(attempt + 1), 100 * attempt);
+                    } else {
+                        console.error('❌ Failed to populate tour quantity fields after 5 attempts');
+                    }
+                };
+
+                setTimeout(populateTourQuantityFields, 50);
                 break;
 
             case 'transport':
@@ -1368,19 +1584,25 @@ class ItineraryBuilder {
                                                 ${service.startTime}${service.endTime ? ` - ${service.endTime}` : ''}
                                             </div>
                                         ` : ''}
-                                        ${service.vehicleId ? `
-                                            <div class="col-auto">
-                                                <i class="ti ti-car me-1"></i>
-                                                ${this.getVehicleName(service.vehicleId)}
-                                            </div>
-                                        ` : ''}
-                                        ${service.quantity > 1 ? `
-                                            <div class="col-auto">
-                                                <i class="ti ti-x me-1"></i>${service.quantity}
-                                            </div>
-                                        ` : ''}
                                     </div>
                                     ${this.renderPeopleQuantities(service)}
+                                    ${(service.vehicleId || service.vehicleType || service.vehicleTypeName) ? `
+                                        <div class="row g-2 text-muted small mt-1">
+                                            <div class="col-auto">
+                                                <i class="ti ti-car me-1"></i>
+                                                ${this.getVehicleDisplayName(service)}
+                                                ${service.quantity > 1 ? ` x${service.quantity}` : ''}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                    ${service.type === 'tour' && service.includeGuide ? `
+                                        <div class="row g-2 text-success small mt-1">
+                                            <div class="col-auto">
+                                                <i class="ti ti-user me-1"></i>
+                                                <strong>Incluye Guía + Chofer</strong>
+                                            </div>
+                                        </div>
+                                    ` : ''}
                                     ${service.notes ? `
                                         <div class="service-notes mt-1 text-muted small d-flex align-items-start">
                                             <i class="ti ti-notes me-1"></i>
@@ -1423,8 +1645,10 @@ class ItineraryBuilder {
     }
 
     calculateServicePrice(service) {
-        // For experience services, calculate based on people quantities and individual prices
-        if (service.type === 'experience') {
+        console.log('🔍 calculateServicePrice called for service:', service.type, service.id || 'no-id');
+        
+        // For experience and tour services, calculate based on people quantities and individual prices
+        if (service.type === 'experience' || service.type === 'tour') {
             const adultsQuantity = service.adultsQuantity || 0;
             const childrenQuantity = service.childrenQuantity || 0;
             const adultsNoAlcoholQuantity = service.adultsNoAlcoholQuantity || 0;
@@ -1433,39 +1657,106 @@ class ItineraryBuilder {
             const childPrice = service.childPrice || 0;
             const noAlcoholPrice = service.noAlcoholPrice || 0;
 
-            const totalPrice =
-                (adultsQuantity * adultPrice) +
-                (childrenQuantity * childPrice) +
-                (adultsNoAlcoholQuantity * noAlcoholPrice);
+            let totalPrice = 0;
 
-            console.log('💰 Experience price calculation:', {
-                adultsQuantity, adultPrice, adultsTotal: adultsQuantity * adultPrice,
-                childrenQuantity, childPrice, childrenTotal: childrenQuantity * childPrice,
-                adultsNoAlcoholQuantity, noAlcoholPrice, noAlcoholTotal: adultsNoAlcoholQuantity * noAlcoholPrice,
-                totalPrice
-            });
+            // Debug logging for people calculation
+            if (service.type === 'tour') {
+                console.log('👥 calculateServicePrice - People data:', {
+                    adultsQuantity, childrenQuantity, adultsNoAlcoholQuantity,
+                    adultPrice, childPrice, noAlcoholPrice,
+                    includeGuide: service.includeGuide
+                });
+                console.log('👥 calculateServicePrice - Full service object:', service);
+                
+                // Check if we need to fetch tour prices
+                if (service.tourId && this.toursCache) {
+                    const tourData = this.toursCache.get('all')?.find(t => t.id === service.tourId);
+                    if (tourData) {
+                        console.log('🎯 Tour data from cache:', tourData);
+                        console.log('🎯 Tour prices should be - Adult:', tourData.price, 'Child:', tourData.price_child, 'No Alcohol:', tourData.price_no_alcohol);
+                    }
+                }
+            }
 
+            // If we have individual prices, calculate based on quantities
+            if (adultPrice > 0 || childPrice > 0 || noAlcoholPrice > 0) {
+                totalPrice = (adultsQuantity * adultPrice) +
+                            (childrenQuantity * childPrice) +
+                            (adultsNoAlcoholQuantity * noAlcoholPrice);
+                
+                if (service.type === 'tour') {
+                    console.log('👥 calculateServicePrice - People total calculated:', totalPrice);
+                }
+            }
+
+            // For tours with transport, add vehicle costs
+            if (service.type === 'tour' && (service.vehicleId || service.vehicleType || service.vehicleTypeName)) {
+                const vehicleQuantity = service.quantity || 1; // Number of vehicles needed
+                const vehicleCost = this.getVehicleCost(service);
+                const vehicleTotal = vehicleCost * vehicleQuantity;
+                totalPrice += vehicleTotal;
+            }
+            
+            // For tours with includeGuide (Guía + Chofer), add driver tour rate
+            if (service.type === 'tour' && service.includeGuide && this.driverTourRateCache) {
+                const driverTourRate = this.driverTourRateCache.value || 0;
+                totalPrice += driverTourRate;
+                console.log('🚗 calculateServicePrice: Adding driver tour rate to total:', driverTourRate, 'New total:', totalPrice);
+            } else if (service.type === 'tour') {
+                console.log('🚗 calculateServicePrice: Tour without includeGuide:', service.includeGuide, 'or no driverTourRateCache');
+            }
+            
             return totalPrice;
         }
 
-        // For other service types, use the regular price
+        // For other service types or when no individual prices, use the regular price
+        console.log('🔍 calculateServicePrice: Using fallback price for type:', service.type, 'Price:', service.price || 0);
+        return service.price || 0;
+    }
+
+    getVehicleCost(service) {
+        // Try to get vehicle cost from the pricing data
+        const tourId = service.tourId;
+        const rateId = service.rateId; // You might need to store this in the service
+        const vehicleType = service.vehicleType || service.vehicleTypeName || service.vehicleId;
+
+        console.log('💰 getVehicleCost called with:', {tourId, rateId, vehicleType});
+
+        if (!tourId || !vehicleType) {
+            console.log('❌ Missing tourId or vehicleType, returning 0');
+            return 0;
+        }
+
+        // First try client-specific pricing
+        if (this.clientId) {
+            const clientPrices = this.getClientPricesFromCache(tourId, rateId);
+            const clientPrice = clientPrices.find(price => price.vehiclePtr === vehicleType);
+            if (clientPrice && clientPrice.price !== undefined) {
+                return clientPrice.price;
+            }
+        }
+
+        // Fallback to tour pricing
+        const tourPrices = this.getTourPricesFromCache(tourId, rateId);
+        console.log('🎯 Tour prices from cache:', tourPrices);
+        console.log('🔍 Looking for vehicleType:', vehicleType);
+        const tourPrice = tourPrices.find(price => price.vehicleType === vehicleType);
+        console.log('🎯 Found tour price:', tourPrice);
+        if (tourPrice && tourPrice.price !== undefined) {
+            return tourPrice.price;
+        }
+
+        // If no specific pricing found, try to use the regular service price
         return service.price || 0;
     }
 
     renderPeopleQuantities(service) {
         // Debug: Only log if there are quantities or schedule to show
-        if (service.type === 'experience' && (service.adultsQuantity || service.childrenQuantity || service.adultsNoAlcoholQuantity || service.selectedSchedule)) {
-            console.log('🧑‍👩‍👧 Rendering experience with quantities/schedule:', {
-                concept: service.concept,
-                adultsQuantity: service.adultsQuantity,
-                childrenQuantity: service.childrenQuantity,
-                adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity,
-                selectedSchedule: service.selectedSchedule
-            });
+        if ((service.type === 'experience' || service.type === 'tour') && (service.adultsQuantity || service.childrenQuantity || service.adultsNoAlcoholQuantity || service.selectedSchedule)) {
         }
 
-        // Only show people quantities for experiences
-        if (service.type !== 'experience') {
+        // Show people quantities for experiences and tours
+        if (service.type !== 'experience' && service.type !== 'tour') {
             return '';
         }
 
@@ -1616,6 +1907,38 @@ class ItineraryBuilder {
         const vehicle = this.vehiclesCache?.find(v => v.objectId === vehicleId);
         return vehicle ? `${vehicle.brand} ${vehicle.model}` : 'Vehículo';
     }
+    
+    getVehicleDisplayName(service) {
+        // For tours with vehicle type, show the vehicle type name
+        if (service.type === 'tour' && service.vehicleType) {
+            // Try to get the proper display name from the vehicle types cache
+            const vehicleInfo = this.getVehicleTypeInfo(service.vehicleType);
+            if (vehicleInfo && vehicleInfo.name) {
+                return vehicleInfo.name;
+            }
+            return service.vehicleType;
+        }
+        // For tours with vehicleTypeName, use that
+        if (service.type === 'tour' && service.vehicleTypeName) {
+            return service.vehicleTypeName;
+        }
+        // Special case: For tours, check if vehicleId is actually a vehicle type name
+        if (service.type === 'tour' && service.vehicleId) {
+            // Check if this vehicleId is actually a vehicle type name
+            const vehicleInfo = this.getVehicleTypeInfo(service.vehicleId);
+            if (vehicleInfo && vehicleInfo.name) {
+                // It's a vehicle type, return the proper name
+                return vehicleInfo.name;
+            }
+            // If not found in vehicle types, it might be a raw vehicle type name, so return it directly
+            return service.vehicleId;
+        }
+        // For non-tour services with specific vehicles, show brand and model
+        if (service.vehicleId) {
+            return this.getVehicleName(service.vehicleId);
+        }
+        return 'Vehículo';
+    }
 
     getExperienceName(experienceId) {
         if (!experienceId) return 'Experiencia';
@@ -1641,8 +1964,46 @@ class ItineraryBuilder {
     }
 
     getTourName(tourId) {
-        // Implementation depends on your data structure
-        return 'Tour'; // Placeholder
+        if (!tourId) return 'Tour';
+        
+        // Find the tour from cache
+        if (this.toursCache.has('all')) {
+            const tours = this.toursCache.get('all');
+            const tour = tours.find(t => t.id === tourId || t.objectId === tourId);
+            if (tour) {
+                // Handle destinationPOI as both string and Parse object
+                let destinationName = null;
+                const destinationPOI = tour.destinationPOI;
+                
+                if (destinationPOI) {
+                    if (typeof destinationPOI === 'string') {
+                        destinationName = destinationPOI;
+                    } else if (typeof destinationPOI === 'object' && destinationPOI !== null) {
+                        // Try various possible field names
+                        destinationName = destinationPOI.name || 
+                                        destinationPOI.destinationName || 
+                                        destinationPOI.location || 
+                                        destinationPOI.title ||
+                                        destinationPOI.label ||
+                                        destinationPOI.objectId ||
+                                        destinationPOI.id;
+                        
+                        // If it's a Parse object with a get method
+                        if (typeof destinationPOI.get === 'function') {
+                            destinationName = destinationPOI.get('name') || 
+                                            destinationPOI.get('destinationName') || 
+                                            destinationPOI.get('location') ||
+                                            destinationPOI.get('title') ||
+                                            destinationPOI.get('label');
+                        }
+                    }
+                }
+                
+                return destinationName || tour.name || tour.title || 'Tour';
+            }
+        }
+        
+        return 'Tour'; // Fallback
     }
 
     scrollToDay(dayId) {
@@ -1786,7 +2147,6 @@ class ItineraryBuilder {
                 return;
             }
 
-
             const response = await fetch(`/api/quotes/${this.quoteId}`, {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -1794,13 +2154,11 @@ class ItineraryBuilder {
                 }
             });
 
-
             if (response.ok) {
                 const result = await response.json();
 
                 if (result.success && result.data) {
-                    console.log('✅ Quote data loaded successfully');
-
+    
                     // Process service items if they exist
                     if (result.data.serviceItems) {
                         this.processServiceItems(result.data.serviceItems);
@@ -1847,11 +2205,14 @@ class ItineraryBuilder {
                         startTime: subconcept.time || subconcept.startTime,  // Backend sends 'time'
                         endTime: subconcept.endTime,
                         vehicleId: subconcept.vehicleId,
+                        vehicleType: subconcept.vehicleType, // Load vehicle type for tours
+                        vehicleTypeName: subconcept.vehicleTypeName, // Load vehicle type display name
                         price: subconcept.unitPrice || 0,
                         quantity: subconcept.quantity || 1,
                         notes: subconcept.notes || '',
                         experienceId: subconcept.experienceId,
                         tourId: subconcept.tourId,
+                        rateId: subconcept.rateId,
                         hotelName: subconcept.hotelName,
                         checkIn: subconcept.checkIn,
                         checkOut: subconcept.checkOut,
@@ -1864,18 +2225,18 @@ class ItineraryBuilder {
                         // Individual prices for experiences (from backend)
                         adultPrice: subconcept.adultPrice || 0,
                         childPrice: subconcept.childPrice || 0,
-                        noAlcoholPrice: subconcept.noAlcoholPrice || 0
+                        noAlcoholPrice: subconcept.noAlcoholPrice || 0,
+                        // Tour-specific fields (from backend)
+                        includeGuide: subconcept.includeGuide || false
                     });
 
                     // Debug logging for people quantities and schedule loading
                     if (subconcept.type === 'experience' && (subconcept.adultsQuantity || subconcept.childrenQuantity || subconcept.adultsNoAlcoholQuantity || subconcept.selectedSchedule)) {
-                        console.log('✅ Loaded experience with people quantities and schedule:', {
-                            concept: subconcept.concept,
-                            adultsQuantity: subconcept.adultsQuantity,
-                            childrenQuantity: subconcept.childrenQuantity,
-                            adultsNoAlcoholQuantity: subconcept.adultsNoAlcoholQuantity,
-                            selectedSchedule: subconcept.selectedSchedule
-                        });
+                    }
+                    
+                    // Debug logging for includeGuide loading
+                    if (subconcept.type === 'tour' && subconcept.includeGuide) {
+                        console.log('🔄 Loading tour with includeGuide from backend:', subconcept.includeGuide);
                     }
 
                     dayData.services.push(serviceId);
@@ -1940,12 +2301,265 @@ class ItineraryBuilder {
                 } else if (Array.isArray(result)) {
                     this.ratesCache = result;
                 }
-                console.log('✅ Rates loaded:', this.ratesCache?.length || 0);
+                // Populate the rates dropdown after loading
+                this.populateRatesDropdown();
             } else {
                 console.warn(`Rates API returned ${response.status}: ${response.statusText}`);
             }
         } catch (error) {
             console.error('Error loading rates:', error);
+        }
+    }
+
+    async loadAllTourPrices() {
+        try {
+            
+            const accessToken = this.getAccessToken();
+            if (!accessToken) {
+                console.warn('No access token found, skipping TourPrices load');
+                return;
+            }
+
+            // Try to use API endpoint if available, otherwise fallback to Parse SDK
+            let tourPrices = [];
+            
+            try {
+                // First try API endpoint (following pattern of existing functions)
+                // Add cache buster to force reload with fixed vehicle names
+                const response = await fetch(`/api/tour-prices?_t=${Date.now()}`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        tourPrices = result.data;
+                    } else {
+                        throw new Error('API response format invalid');
+                    }
+                } else {
+                    throw new Error(`API returned ${response.status}: ${response.statusText}`);
+                }
+            } catch (apiError) {
+
+                // Fallback to Parse Cloud Function
+                try {
+                    const cloudResponse = await fetch('/parse/functions/getTourPrices', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                            'X-Parse-Application-Id': 'CrTRTaJpoJFNt8PJ'
+                        },
+                        body: JSON.stringify({})
+                    });
+
+                    if (cloudResponse.ok) {
+                        const cloudResult = await cloudResponse.json();
+                        if (cloudResult.result) {
+                            tourPrices = cloudResult.result;
+                        } else {
+                            throw new Error('Cloud function response invalid');
+                        }
+                    } else {
+                        throw new Error(`Cloud function returned ${cloudResponse.status}: ${cloudResponse.statusText}`);
+                    }
+                } catch (cloudError) {
+
+                    // For now, use empty array but we need to create the cloud function
+                    tourPrices = [];
+                }
+            }
+            
+            // Clear existing cache
+            this.tourPricesMap.clear();
+            
+            // Index by tour+rate for fast lookup
+            tourPrices.forEach(tp => {
+                const tourId = tp.tourPtr;
+                const rateId = tp.ratePtr;
+                
+                if (tourId && rateId) {
+                    const key = `${tourId}_${rateId}`;
+                    
+                    if (!this.tourPricesMap.has(key)) {
+                        this.tourPricesMap.set(key, []);
+                    }
+                    
+                    // Store the essential data
+                    this.tourPricesMap.get(key).push({
+                        id: tp.id,
+                        tourId: tourId,
+                        rateId: rateId,
+                        vehicleType: tp.vehicleType,
+                        price: tp.price,
+                        valid_until: tp.valid_until
+                    });
+                }
+            });
+            
+        } catch (error) {
+            console.error('❌ Error loading TourPrices:', error);
+            // Don't break initialization if this fails
+            this.tourPricesMap.clear();
+        }
+    }
+
+    async loadAllClientPrices() {
+        try {
+            const clientId = this.getClientId();
+            if (!clientId) {
+                this.clientPricesMap.clear();
+                return;
+            }
+
+            const accessToken = this.getAccessToken();
+            if (!accessToken) {
+                console.warn('No access token found, skipping ClientPrices load');
+                return;
+            }
+
+            // Try API endpoint first, fallback to Parse SDK
+            let clientPrices = [];
+            
+            try {
+                // First try API endpoint with cache buster
+                const response = await fetch(`/api/client-prices?clientId=${clientId}&itemType=TOUR&_t=${Date.now()}`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        clientPrices = result.data;
+                    } else {
+                        throw new Error('API response format invalid');
+                    }
+                } else {
+                    throw new Error(`API returned ${response.status}: ${response.statusText}`);
+                }
+            } catch (apiError) {
+
+                // Fallback to Parse Cloud Function
+                try {
+                    const cloudResponse = await fetch('/parse/functions/getClientPrices', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                            'X-Parse-Application-Id': 'CrTRTaJpoJFNt8PJ'
+                        },
+                        body: JSON.stringify({
+                            clientId: clientId,
+                            itemType: 'TOUR'
+                        })
+                    });
+
+                    if (cloudResponse.ok) {
+                        const cloudResult = await cloudResponse.json();
+                        if (cloudResult.result) {
+                            clientPrices = cloudResult.result;
+                        } else {
+                            throw new Error('Cloud function response invalid');
+                        }
+                    } else {
+                        throw new Error(`Cloud function returned ${cloudResponse.status}: ${cloudResponse.statusText}`);
+                    }
+                } catch (cloudError) {
+
+                    // For now, use empty array but we need to create the cloud function
+                    clientPrices = [];
+                }
+            }
+            
+            // Clear existing cache
+            this.clientPricesMap.clear();
+            
+            // Index by tour+rate+vehicle for fast lookup
+            clientPrices.forEach(cp => {
+                const tourId = cp.itemPtr;
+                const rateId = cp.ratePtr;
+                const vehiclePtr = cp.vehiclePtr;
+                
+                if (tourId && rateId) {
+                    const key = `${tourId}_${rateId}_${vehiclePtr || 'default'}`;
+                    
+                    // Store the essential data
+                    this.clientPricesMap.set(key, {
+                        id: cp.id,
+                        tourId: tourId,
+                        rateId: rateId,
+                        vehiclePtr: vehiclePtr,
+                        price: cp.price,
+                        valid_until: cp.valid_until,
+                        clientPtr: cp.clientPtr,
+                        itemType: cp.itemType
+                    });
+                }
+            });
+            
+        } catch (error) {
+            console.error('❌ Error loading ClientPrices:', error);
+            // Don't break initialization if this fails
+            this.clientPricesMap.clear();
+        }
+    }
+
+    async loadVehicleTypes() {
+        try {
+            
+            const accessToken = this.getAccessToken();
+            if (!accessToken) {
+                console.warn('No access token found, skipping vehicle types load');
+                return;
+            }
+
+            const response = await fetch('/api/vehicle-types/active', {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success && result.data) {
+                    // Store vehicle types by both ID and name/code for easy lookup
+                    result.data.forEach(vt => {
+                        this.vehicleTypesMap.set(vt.value, {
+                            id: vt.value,
+                            name: vt.label,
+                            code: vt.code,
+                            capacity: vt.capacity,
+                            trunkCapacity: vt.trunkCapacity,
+                            icon: vt.icon
+                        });
+                        
+                        // Also store by code/name for lookup by string
+                        if (vt.code) {
+                            this.vehicleTypesMap.set(vt.code, this.vehicleTypesMap.get(vt.value));
+                        }
+                        if (vt.label) {
+                            this.vehicleTypesMap.set(vt.label, this.vehicleTypesMap.get(vt.value));
+                        }
+                    });
+                } else if (Array.isArray(result)) {
+                    // Handle direct array response
+                    result.forEach(vt => {
+                        this.vehicleTypesMap.set(vt.value || vt.id, vt);
+                    });
+                }
+            } else {
+                console.warn(`Vehicle types API returned ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Error loading vehicle types:', error);
         }
     }
 
@@ -1970,13 +2584,10 @@ class ItineraryBuilder {
                 // Handle DataTables format response
                 if (result.data && Array.isArray(result.data)) {
                     this.experiencesCache.set('all', result.data);
-                    console.log('✅ Experiences loaded (DataTables format):', result.data.length);
                 } else if (result.success && result.data) {
                     this.experiencesCache.set('all', result.data);
-                    console.log('✅ Experiences loaded (standard format):', result.data.length);
                 } else if (Array.isArray(result)) {
                     this.experiencesCache.set('all', result);
-                    console.log('✅ Experiences loaded (array format):', result.length);
                 }
             } else {
                 console.warn(`Experiences API returned ${response.status}: ${response.statusText}`);
@@ -1989,27 +2600,28 @@ class ItineraryBuilder {
     async loadAllTours() {
         try {
             const accessToken = this.getAccessToken();
-            if (!accessToken) {
+                if (!accessToken) {
                 console.warn('No access token found, skipping tours load');
                 return;
             }
 
             // Use DataTables format to get all tours
-            const response = await fetch('/api/tours?draw=1&start=0&length=1000&search[value]=', {
+            const url = '/api/tours?draw=1&start=0&length=1000&search[value]=';
+                const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 }
             });
 
-            if (response.ok) {
+                if (response.ok) {
                 const result = await response.json();
-                if (result.data && Array.isArray(result.data)) {
+                    if (result.data && Array.isArray(result.data)) {
                     this.toursCache.set('all', result.data);
-                    console.log('✅ Tours loaded:', result.data.length);
                 } else if (result.success && result.data) {
                     this.toursCache.set('all', result.data);
-                    console.log('✅ Tours loaded:', result.data.length);
+                } else {
+                    console.warn('Unexpected tours API response format:', result);
                 }
             } else {
                 console.warn(`Tours API returned ${response.status}: ${response.statusText}`);
@@ -2040,7 +2652,6 @@ class ItineraryBuilder {
             if (response.ok) {
                 const result = await response.json();
 
-
                 if (result.success && result.data) {
                     this.providerExperiencesCache = result.data;
                 } else if (result.data && Array.isArray(result.data)) {
@@ -2050,7 +2661,6 @@ class ItineraryBuilder {
                 } else {
                     this.providerExperiencesCache = [];
                 }
-                console.log('✅ Provider experiences loaded:', this.providerExperiencesCache?.length || 0);
             } else {
                 console.warn(`Provider experiences API returned ${response.status}: ${response.statusText}`);
             }
@@ -2081,7 +2691,6 @@ class ItineraryBuilder {
                 if (result.success && result.data) {
                     this.agencyRateCache = result.data;
                 }
-                console.log('✅ Agency rate loaded:', this.agencyRateCache);
             } else {
                 console.warn(`Agency rate API returned ${response.status}: ${response.statusText}`);
             }
@@ -2091,12 +2700,14 @@ class ItineraryBuilder {
     }
 
     async loadDriverTourRate() {
+        console.log('🚀 Starting loadDriverTourRate...');
         try {
             const accessToken = this.getAccessToken();
             if (!accessToken) {
                 console.warn('No access token found, skipping driver tour rate load');
                 return;
             }
+            console.log('📍 Access token found, fetching driver tour rate...');
 
             const response = await fetch('/api/driver-tour-rate/current', {
                 headers: {
@@ -2107,10 +2718,13 @@ class ItineraryBuilder {
 
             if (response.ok) {
                 const result = await response.json();
+                console.log('📊 Driver Tour Rate API response:', result);
                 if (result.success && result.data) {
                     this.driverTourRateCache = result.data;
+                    console.log('✅ Driver Tour Rate loaded successfully:', this.driverTourRateCache);
+                } else {
+                    console.warn('⚠️ Driver Tour Rate API returned success=false or no data');
                 }
-                console.log('✅ Driver tour rate loaded:', this.driverTourRateCache);
             } else {
                 console.warn(`Driver tour rate API returned ${response.status}: ${response.statusText}`);
             }
@@ -2140,9 +2754,7 @@ class ItineraryBuilder {
                 if (result.success && result.data) {
                     this.guideTransportRateCache = result.data;
                 }
-                console.log('✅ Guide transport rate loaded:', this.guideTransportRateCache);
             } else if (response.status === 404) {
-                console.log('ℹ️ Guide transport rate endpoint not available yet');
                 this.guideTransportRateCache = null;
             } else {
                 console.warn(`Guide transport rate API returned ${response.status}: ${response.statusText}`);
@@ -2173,9 +2785,7 @@ class ItineraryBuilder {
                 if (result.success && result.data) {
                     this.transferRateCache = result.data;
                 }
-                console.log('✅ Transfer rate loaded:', this.transferRateCache);
             } else if (response.status === 404) {
-                console.log('ℹ️ Transfer rate endpoint not available yet');
                 this.transferRateCache = null;
             } else {
                 console.warn(`Transfer rate API returned ${response.status}: ${response.statusText}`);
@@ -2188,8 +2798,7 @@ class ItineraryBuilder {
 
     async loadClientSpecificPricing() {
         if (!this.clientId) {
-            console.log('No client ID available, skipping client-specific pricing');
-            return;
+                return;
         }
 
         try {
@@ -2253,7 +2862,6 @@ class ItineraryBuilder {
             }
 
             await Promise.all(pricingPromises);
-            console.log('✅ Client-specific pricing loaded - Services:', this.clientPricesCache.size, 'Tours:', this.clientTourPricesCache.size);
 
         } catch (error) {
             console.error('Error loading client-specific pricing:', error);
@@ -2269,7 +2877,6 @@ class ItineraryBuilder {
                 const newClientId = this.getClientId();
                 if (newClientId !== this.clientId) {
                     this.clientId = newClientId;
-                    console.log('🔄 Client changed, reloading pricing for:', this.clientId);
 
                     // Clear existing client pricing cache
                     this.clientPricesCache.clear();
@@ -2289,7 +2896,6 @@ class ItineraryBuilder {
                 const newClientId = this.getClientId();
                 if (newClientId !== this.clientId) {
                     this.clientId = newClientId;
-                    console.log('🔄 Client changed via TomSelect, reloading pricing for:', this.clientId);
 
                     // Clear existing client pricing cache
                     this.clientPricesCache.clear();
@@ -2355,8 +2961,6 @@ class ItineraryBuilder {
     }
 
     fillExperienceFields(experience) {
-        console.log('🎯 fillExperienceFields called with experience:', experience);
-        console.log('🔍 Current service ID:', this.currentServiceId, '- Is editing?', !!this.currentServiceId);
 
         // Only fill quantity fields if we're NOT in edit mode
         // In edit mode, the quantities should be restored by populateServiceForm
@@ -2366,35 +2970,29 @@ class ItineraryBuilder {
             const childrenQuantityField = document.getElementById('childrenQuantity');
             const adultsNoAlcoholQuantityField = document.getElementById('adultsNoAlcoholQuantity');
 
-            console.log('🔍 Looking for quantity fields (NEW service):', {
-                adultsQuantityField: !!adultsQuantityField,
-                childrenQuantityField: !!childrenQuantityField,
-                adultsNoAlcoholQuantityField: !!adultsNoAlcoholQuantityField
-            });
-
             // Set default values for people quantities
             if (adultsQuantityField) {
                 adultsQuantityField.value = experience.defaultAdults || 2;
-                console.log('✅ Set adultsQuantity to:', adultsQuantityField.value);
+
             } else {
-                console.log('❌ adultsQuantity field not found');
+
             }
 
             if (childrenQuantityField) {
                 childrenQuantityField.value = experience.defaultChildren || 0;
-                console.log('✅ Set childrenQuantity to:', childrenQuantityField.value);
+
             } else {
-                console.log('❌ childrenQuantity field not found');
+
             }
 
             if (adultsNoAlcoholQuantityField) {
                 adultsNoAlcoholQuantityField.value = experience.defaultAdultsNoAlcohol || 0;
-                console.log('✅ Set adultsNoAlcoholQuantity to:', adultsNoAlcoholQuantityField.value);
+
             } else {
-                console.log('❌ adultsNoAlcoholQuantity field not found');
+
             }
         } else {
-            console.log('⏭️ Skipping quantity fields - in edit mode, will be restored by populateServiceForm');
+
         }
 
         // Fill read-only experience information fields
@@ -2405,19 +3003,10 @@ class ItineraryBuilder {
         const advanceBookingTimeField = document.getElementById('advanceBookingTime');
         const experienceClientNotesField = document.getElementById('experienceClientNotes');
 
-        console.log('🔍 Looking for read-only fields:', {
-            experienceDescription: !!experienceDescriptionField,
-            experienceLanguages: !!experienceLanguagesField,
-            experienceIncludes: !!experienceIncludesField,
-            experienceNotIncludes: !!experienceNotIncludesField,
-            advanceBookingTime: !!advanceBookingTimeField,
-            experienceClientNotes: !!experienceClientNotesField
-        });
-
         // Fill description
         if (experienceDescriptionField && experience.description) {
             experienceDescriptionField.value = experience.description;
-            console.log('✅ Set description');
+
         }
 
         // Fill languages
@@ -2426,7 +3015,7 @@ class ItineraryBuilder {
                 ? experience.languages.join(', ')
                 : experience.languages;
             experienceLanguagesField.value = languagesText;
-            console.log('✅ Set languages:', languagesText);
+
         }
 
         // Fill includes
@@ -2435,7 +3024,7 @@ class ItineraryBuilder {
                 ? experience.includes.join('\n')
                 : experience.includes;
             experienceIncludesField.value = includesText;
-            console.log('✅ Set includes');
+
         }
 
         // Fill excludes/not includes
@@ -2444,20 +3033,19 @@ class ItineraryBuilder {
                 ? experience.notincludes.join('\n')
                 : experience.notincludes;
             experienceNotIncludesField.value = notIncludesText;
-            console.log('✅ Set not includes');
+
         }
 
         // Fill advance booking time (convert minutes to hours and minutes)
         if (advanceBookingTimeField && experience.advance_booking_time) {
             const formattedTime = this.formatMinutesToHoursAndMinutes(experience.advance_booking_time);
             advanceBookingTimeField.value = formattedTime;
-            console.log('✅ Set advance booking time:', formattedTime, `(${experience.advance_booking_time} minutes)`);
         }
 
         // Fill client notes
         if (experienceClientNotesField && experience.client_booking_notes) {
             experienceClientNotesField.value = experience.client_booking_notes;
-            console.log('✅ Set client notes');
+
         }
 
         // Handle price fields - Precios
@@ -2467,32 +3055,25 @@ class ItineraryBuilder {
 
         if (adultPriceField && experience.price) {
             adultPriceField.value = experience.price;
-            console.log('✅ Set adult price:', experience.price);
+
         }
 
         if (childPriceField && experience.price_child) {
             childPriceField.value = experience.price_child;
-            console.log('✅ Set child price:', experience.price_child);
+
         }
 
         if (noAlcoholPriceField && experience.price_no_alcohol) {
             noAlcoholPriceField.value = experience.price_no_alcohol;
-            console.log('✅ Set no alcohol price:', experience.price_no_alcohol);
+
         }
 
         // Handle schedule/availability - Horarios Disponibles
         // Get current day info for schedule filtering
         const currentDayInfo = this.getCurrentDayContext();
-        console.log('🔍 FILL EXPERIENCE DEBUG - dayContext:', {
-            currentDayInfo,
-            currentDayId: this.currentDayId,
-            dayOfWeek: currentDayInfo?.dayOfWeek,
-            dayDate: currentDayInfo?.dayDate,
-            experienceName: experience.name || experience.title
-        });
+
         this.handleExperienceSchedule(experience, currentDayInfo);
 
-        console.log('✅ Experience fields filling completed');
     }
 
     getCurrentDayContext() {
@@ -2512,21 +3093,6 @@ class ItineraryBuilder {
     }
 
     handleExperienceSchedule(experience, dayContext = null) {
-        console.log('⏰ handleExperienceSchedule called with:', {
-            experienceName: experience.name || experience.title,
-            availability: experience.availability,
-            startTime: experience.startTime,
-            endTime: experience.endTime,
-            availableDays: experience.availableDays,
-            dayContext
-        });
-
-        console.log('🔍 DETAILED AVAILABILITY DEBUG:', {
-            availabilityType: typeof experience.availability,
-            availabilityValue: experience.availability,
-            isArray: Array.isArray(experience.availability),
-            availabilityLength: Array.isArray(experience.availability) ? experience.availability.length : 'N/A'
-        });
 
         const singleTimeField = document.getElementById('experienceSingleTime');
         const multipleTimeField = document.getElementById('experienceMultipleTime');
@@ -2553,29 +3119,21 @@ class ItineraryBuilder {
             if (singleTimeField) {
                 singleTimeField.value = timeRange;
                 singleTimeField.style.display = 'block';
-                console.log('✅ Set single time schedule:', timeRange);
+
             }
         } else if (experience.availability && typeof experience.availability === 'object') {
             // Handle availability array - extract schedules for current day
-            console.log('🔍 Processing availability for schedule extraction:', experience.availability);
 
             if (Array.isArray(experience.availability) && currentDayOfWeek !== null) {
-                console.log('🔍 About to extract time options for day:', {
-                    currentDayOfWeek,
-                    availabilityArray: experience.availability,
-                    arrayLength: experience.availability.length
-                });
+
                 const timeOptions = this.extractTimeOptionsForDay(experience.availability, currentDayOfWeek);
-                console.log('🕐 Extracted time options for current day:', timeOptions);
 
                 if (timeOptions.length > 0 && multipleTimeField) {
                     // Clear existing options
                     const currentSelection = multipleTimeField.value;
                     const currentSelectionText = multipleTimeField.selectedIndex > 0 ? 
                         multipleTimeField.options[multipleTimeField.selectedIndex].textContent : '';
-                    
-                    console.log('🔄 About to repopulate dropdown - current selection:', currentSelectionText);
-                    
+
                     multipleTimeField.innerHTML = '<option value="">-- Selecciona un horario --</option>';
 
                     // Add time options
@@ -2592,20 +3150,19 @@ class ItineraryBuilder {
                         for (let i = 0; i < multipleTimeField.options.length; i++) {
                             if (multipleTimeField.options[i].textContent === currentSelectionText) {
                                 multipleTimeField.selectedIndex = i;
-                                console.log('🔄 Restored selection after repopulation:', currentSelectionText);
+
                                 break;
                             }
                         }
                     }
 
                     multipleTimeField.style.display = 'block';
-                    console.log('✅ Set multiple time options:', timeOptions.length);
+
                 } else {
                     // No specific times found, show generic availability message
                     if (availabilityStatusDiv && availabilityMessageSpan) {
                         availabilityMessageSpan.textContent = 'Horario según disponibilidad';
                         availabilityStatusDiv.style.display = 'block';
-                        console.log('✅ Set generic availability message (no times found)');
                     }
                 }
             } else if (experience.availability.times && Array.isArray(experience.availability.times)) {
@@ -2619,14 +3176,13 @@ class ItineraryBuilder {
                         multipleTimeField.appendChild(option);
                     });
                     multipleTimeField.style.display = 'block';
-                    console.log('✅ Set availability times:', experience.availability.times.length);
+
                 }
             } else {
                 // Show availability status message
                 if (availabilityStatusDiv && availabilityMessageSpan) {
                     availabilityMessageSpan.textContent = 'Horario según disponibilidad';
                     availabilityStatusDiv.style.display = 'block';
-                    console.log('✅ Set availability status message (fallback)');
                 }
             }
         } else {
@@ -2634,22 +3190,16 @@ class ItineraryBuilder {
             if (availabilityStatusDiv && availabilityMessageSpan) {
                 availabilityMessageSpan.textContent = 'Horario según disponibilidad';
                 availabilityStatusDiv.style.display = 'block';
-                console.log('✅ Set default availability message');
+
             }
         }
 
-        console.log('✅ Schedule handling completed');
     }
 
     extractTimeOptionsForDay(availabilityArray, dayOfWeek) {
         if (!Array.isArray(availabilityArray) || dayOfWeek === null) {
             return [];
         }
-
-        console.log('🔍 Extracting time options for day:', {
-            dayOfWeek,
-            availabilityArray
-        });
 
         const timeOptions = [];
         const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -2662,7 +3212,6 @@ class ItineraryBuilder {
 
         for (let i = 0; i < availabilityArray.length; i++) {
             const availabilityObj = availabilityArray[i];
-            console.log(`🔍 Examining availability object ${i}:`, availabilityObj);
 
             if (!availabilityObj || typeof availabilityObj !== 'object') {
                 continue;
@@ -2678,7 +3227,7 @@ class ItineraryBuilder {
                 if (dayData) {
                     appliesToCurrentDay = true;
                     scheduleData = dayData;
-                    console.log(`✅ Found day number ${dayOfWeek}:`, dayData);
+
                 }
             }
 
@@ -2688,7 +3237,7 @@ class ItineraryBuilder {
                 if (dayData) {
                     appliesToCurrentDay = true;
                     scheduleData = dayData;
-                    console.log(`✅ Found English day ${currentDayName}:`, dayData);
+
                 }
             }
 
@@ -2698,7 +3247,7 @@ class ItineraryBuilder {
                 if (dayData) {
                     appliesToCurrentDay = true;
                     scheduleData = dayData;
-                    console.log(`✅ Found Spanish day ${currentDayNameEs}:`, dayData);
+
                 }
             }
 
@@ -2708,7 +3257,7 @@ class ItineraryBuilder {
                 if (dayData) {
                     appliesToCurrentDay = true;
                     scheduleData = dayData;
-                    console.log(`✅ Found Spanish abbrev ${currentDayAbbrevEs}:`, dayData);
+
                 }
             }
 
@@ -2716,7 +3265,7 @@ class ItineraryBuilder {
             if (!appliesToCurrentDay && availabilityObj.day === dayOfWeek) {
                 appliesToCurrentDay = true;
                 scheduleData = availabilityObj;
-                console.log(`✅ Found day property matching ${dayOfWeek}:`, availabilityObj);
+
             }
 
             // If this applies to current day, extract time information
@@ -2726,13 +3275,11 @@ class ItineraryBuilder {
             }
         }
 
-        console.log('🕐 Final extracted time options:', timeOptions);
         return timeOptions;
     }
 
     extractTimesFromScheduleData(scheduleData, index = 0) {
         const times = [];
-        console.log('🕐 Extracting times from schedule data:', scheduleData);
 
         if (!scheduleData) {
             return times;
@@ -2782,7 +3329,7 @@ class ItineraryBuilder {
                         label: `${startTime} - ${endTime}`,
                         data: { startTime: time.start, endTime: time.end, source: `object_${index}_time_${timeIndex}` }
                     });
-                    console.log('✅ Added time slot from start/end format:', `${startTime} - ${endTime}`);
+
                 }
             });
         }
@@ -2805,7 +3352,7 @@ class ItineraryBuilder {
                         label: `${startTime} - ${endTime}`,
                         data: { startTime: item.start, endTime: item.end, source: `object_${index}_item_${itemIndex}` }
                     });
-                    console.log('✅ Added time slot from array item start/end format:', `${startTime} - ${endTime}`);
+
                 } else if (typeof item === 'string') {
                     times.push({
                         label: item,
@@ -2823,7 +3370,6 @@ class ItineraryBuilder {
             });
         }
 
-        console.log('🕐 Extracted times from this schedule data:', times);
         return times;
     }
 
@@ -2859,11 +3405,554 @@ class ItineraryBuilder {
         return String(timeString);
     }
 
+    handleTourTransportToggle(requiresTransport) {
+
+        // Get the transport field elements
+        const categoryField = document.getElementById('transportCategory')?.closest('.col-md-6');
+        const vehicleField = document.getElementById('vehicleSelect')?.closest('.col-md-4');
+        const guideField = document.getElementById('includeGuide')?.closest('.col-md-2');
+        
+        // Get the pricing fields (Precio and Cantidad)
+        const transportFieldsRow = document.getElementById('transportFieldsRow');
+        const standardPricingSection = document.getElementById('standardPricingSection');
+        
+        if (requiresTransport) {
+            // Show transport fields
+            categoryField?.classList.remove('d-none');
+            vehicleField?.classList.remove('d-none');
+            guideField?.classList.remove('d-none');
+            document.getElementById('transportCategory')?.setAttribute('required', 'required');
+            
+            // Show pricing fields
+            if (standardPricingSection) {
+                standardPricingSection.style.display = '';
+            }
+
+        } else {
+            // Hide transport fields
+            categoryField?.classList.add('d-none');
+            vehicleField?.classList.add('d-none');
+            guideField?.classList.add('d-none');
+            document.getElementById('transportCategory')?.removeAttribute('required');
+            
+            // Hide pricing fields
+            if (standardPricingSection) {
+                standardPricingSection.style.display = 'none';
+            }
+            
+            // Clear transport field values when hidden
+            const transportCategory = document.getElementById('transportCategory');
+            const vehicleSelect = document.getElementById('vehicleSelect');
+            const includeGuide = document.getElementById('includeGuide');
+            
+            if (transportCategory) transportCategory.value = '';
+            if (vehicleSelect) vehicleSelect.value = '';
+            if (includeGuide) includeGuide.checked = false;
+            
+            // Clear pricing field values when hidden
+            const servicePrice = document.getElementById('servicePrice');
+            const quantity = document.getElementById('quantity');
+            const currencySelect = document.getElementById('currencySelect');
+            const priceTypeSelect = document.getElementById('priceTypeSelect');
+            
+            if (quantity) quantity.value = '1';
+            if (currencySelect) currencySelect.value = 'USD';
+            if (priceTypeSelect) priceTypeSelect.value = 'per_person';
+            
+            // Recalculate price without vehicle costs for tours
+            this.recalculateTourPrice();
+            
+            // Update the current service data to reflect no vehicle
+            if (this.currentServiceId) {
+                const currentService = this.services.get(this.currentServiceId);
+                if (currentService && currentService.type === 'tour') {
+                    // Clear vehicle data
+                    currentService.vehicleId = null;
+                    currentService.vehicleType = null;
+                    currentService.vehicleTypeName = null;
+                    currentService.rateId = null;
+                    // Update the display immediately
+                    this.updateTotals();
+                    this.renderDays();
+                }
+            }
+
+        }
+    }
+
+    recalculateTourPrice() {
+        // Get current tour data from form
+        const adultsQuantity = parseInt(document.getElementById('tourAdultsQuantity')?.value || 0);
+        const childrenQuantity = parseInt(document.getElementById('tourChildrenQuantity')?.value || 0);
+        const adultsNoAlcoholQuantity = parseInt(document.getElementById('tourAdultsNoAlcoholQuantity')?.value || 0);
+        
+        const adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
+        const childPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0);
+        const noAlcoholPrice = parseFloat(document.getElementById('tourNoAlcoholPrice')?.value || 0);
+        
+        console.log('👥 People quantities:', {adultsQuantity, childrenQuantity, adultsNoAlcoholQuantity});
+        console.log('💰 People prices:', {adultPrice, childPrice, noAlcoholPrice});
+        
+        // Calculate people costs
+        let totalPrice = (adultsQuantity * adultPrice) + 
+                         (childrenQuantity * childPrice) + 
+                         (adultsNoAlcoholQuantity * noAlcoholPrice);
+        
+        console.log('👥 People total calculated:', totalPrice);
+        
+        // Add vehicle costs if a vehicle is selected
+        const vehicleSelect = document.getElementById('vehicleSelect');
+        const tourSelect = document.getElementById('tourSelect');
+        const rateSelect = document.getElementById('transportCategory');
+        const serviceQuantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
+        
+        if (vehicleSelect && vehicleSelect.value && tourSelect && tourSelect.value) {
+            // Create a temporary service object to calculate vehicle cost
+            const tempService = {
+                type: 'tour',
+                tourId: tourSelect.value,
+                rateId: rateSelect ? rateSelect.value : null,
+                vehicleId: vehicleSelect.value,
+                vehicleType: vehicleSelect.value, // Use the actual value, not text content
+                quantity: serviceQuantity
+            };
+            
+            const vehicleCost = this.getVehicleCost(tempService);
+            const vehicleTotal = vehicleCost * serviceQuantity;
+            totalPrice += vehicleTotal;
+            console.log('🚛 Recalculation - Tour:', tourSelect.value, 'Rate:', rateSelect?.value, 'Vehicle:', vehicleSelect.value);
+            console.log('🚛 Adding vehicle cost in recalculation:', vehicleCost, '× quantity:', serviceQuantity, '= Total vehicle cost:', vehicleTotal);
+        }
+        
+        // Add driver tour rate if includeGuide is checked (Guía + Chofer)
+        const includeGuideCheckbox = document.getElementById('includeGuide');
+        if (includeGuideCheckbox && includeGuideCheckbox.checked && this.driverTourRateCache) {
+            const driverTourRate = this.driverTourRateCache.value || 0;
+            totalPrice += driverTourRate;
+            console.log('🚗 Adding driver tour rate in recalculation:', driverTourRate, 'New total:', totalPrice);
+        }
+        
+        // Update the price field - ONLY show vehicle cost, not the total
+        const servicePriceField = document.getElementById('servicePrice');
+        if (servicePriceField) {
+            // Only show the vehicle cost in the price field
+            if (vehicleSelect && vehicleSelect.value && tourSelect && tourSelect.value) {
+                // We already calculated vehicleCost above, let's extract just that
+                const tempService2 = {
+                    type: 'tour',
+                    tourId: tourSelect.value,
+                    rateId: rateSelect ? rateSelect.value : null,
+                    vehicleId: vehicleSelect.value,
+                    vehicleType: vehicleSelect.value,
+                    quantity: serviceQuantity
+                };
+                const vehicleOnlyCost = this.getVehicleCost(tempService2);
+                servicePriceField.value = vehicleOnlyCost.toFixed(2);
+                console.log('💰 Setting price field to vehicle cost only:', vehicleOnlyCost);
+            } else {
+                // No vehicle selected, show 0
+                servicePriceField.value = '0.00';
+            }
+        }
+        
+        // Update the service data with current form values
+        if (this.currentServiceId) {
+            const currentService = this.services.get(this.currentServiceId);
+            if (currentService && currentService.type === 'tour') {
+                // Update people data
+                currentService.adultsQuantity = adultsQuantity;
+                currentService.childrenQuantity = childrenQuantity;
+                currentService.adultsNoAlcoholQuantity = adultsNoAlcoholQuantity;
+                currentService.adultPrice = adultPrice;
+                currentService.childPrice = childPrice;
+                currentService.noAlcoholPrice = noAlcoholPrice;
+                currentService.price = peopleTotal;
+                
+                // Update includeGuide state
+                if (includeGuideCheckbox) {
+                    currentService.includeGuide = includeGuideCheckbox.checked;
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle rate selection for tour vehicles
+     */
+    handleRateSelection(rateId) {
+        console.log('📍 handleRateSelection called with rateId:', rateId);
+        
+        // Clear price field immediately when rate changes
+        const servicePriceField = document.getElementById('servicePrice');
+        if (servicePriceField) {
+            console.log('📍 Clearing price field to 0.00');
+            servicePriceField.value = '0.00';
+        } else {
+            console.log('📍 Price field not found!');
+        }
+
+        // Check if we're currently in tour mode with transport enabled
+        const serviceTypeInputs = document.querySelectorAll('input[name="serviceType"]');
+        let currentServiceType = 'experience'; // default
+        serviceTypeInputs.forEach(input => {
+            if (input.checked) {
+                currentServiceType = input.value;
+            }
+        });
+        
+        if (currentServiceType !== 'tour') {
+
+            return;
+        }
+        
+        const tourSelect = document.getElementById('tourSelect');
+        const tourId = tourSelect?.value;
+        const transportCheckbox = document.getElementById('tourRequiresTransport');
+        const transportEnabled = transportCheckbox?.checked || false;
+        
+        if (!transportEnabled) {
+
+            return;
+        }
+        
+        if (!tourId || !rateId) {
+            // Clear vehicle dropdown if no tour or rate selected
+            this.clearVehicleDropdown();
+            return;
+        }
+
+        try {
+            // Get tour prices from cache
+            const tourPrices = this.getTourPricesFromCache(tourId, rateId);
+            
+            // Get client prices from cache  
+            const clientPrices = this.getClientPricesFromCache(tourId, rateId);
+
+            // Extract vehicle types from prices
+            const vehicleTypes = this.extractVehicleTypesFromPrices(tourPrices, clientPrices);
+
+            // Populate vehicle dropdown with prices
+            this.populateVehicleDropdownWithPrices(vehicleTypes, tourId, rateId);
+            
+            // After populating dropdown, ensure price stays at 0 since no vehicle is selected yet
+            const servicePriceField = document.getElementById('servicePrice');
+            if (servicePriceField) {
+                servicePriceField.value = '0.00';
+                console.log('📍 Resetting price to 0.00 after dropdown population');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error handling rate selection:', error);
+            this.clearVehicleDropdown();
+        }
+    }
+
+    /**
+     * Handle include guide checkbox change for tours (Guía + Chofer)
+     */
+    handleIncludeGuideChange(isChecked) {
+        console.log('👤 Include Guide checkbox changed:', isChecked);
+        
+        // Only recalculate if we're in tour mode
+        const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+        if (serviceType !== 'tour') {
+            return;
+        }
+        
+        // Recalculate the tour total price when the checkbox changes
+        this.recalculateTourPrice();
+    }
+    
+    /**
+     * Handle vehicle selection for price update
+     */
+    handleVehicleSelection(vehicleType) {
+
+        if (!vehicleType) {
+            // Clear price field if no vehicle selected
+            const servicePriceField = document.getElementById('servicePrice');
+            if (servicePriceField) {
+                servicePriceField.value = '';
+            }
+            return;
+        }
+
+        const tourSelect = document.getElementById('tourSelect');
+        const rateSelect = document.getElementById('transportCategory');
+        const tourId = tourSelect?.value;
+        const rateId = rateSelect?.value;
+        
+        if (!tourId || !rateId) {
+            console.warn('⚠️ Missing tour or rate for vehicle price calculation');
+            return;
+        }
+
+        try {
+            // Check if we're in a tour service
+            const serviceTypeRadio = document.querySelector('input[name="serviceType"]:checked');
+            const isEditingTour = serviceTypeRadio && serviceTypeRadio.value === 'tour';
+            
+            if (isEditingTour) {
+                // For tours, recalculate complete price (people + vehicle + driver)
+                this.recalculateTourPrice();
+            } else {
+                // For non-tour services, use vehicle price only
+                const finalPrice = this.getVehiclePriceWithPriority(vehicleType, tourId, rateId);
+                this.updatePriceField(finalPrice);
+            }
+            
+        } catch (error) {
+            console.error('❌ Error handling vehicle selection:', error);
+        }
+    }
+
+    /**
+     * Get tour prices from cache for specific tour and rate
+     */
+    getTourPricesFromCache(tourId, rateId) {
+        const key = `${tourId}_${rateId}`;
+        return this.tourPricesMap.get(key) || [];
+    }
+
+    /**
+     * Get client prices from cache for specific tour and rate
+     */
+    getClientPricesFromCache(tourId, rateId) {
+        if (!this.clientId) {
+            return [];
+        }
+        
+        // Return all client prices for this tour+rate combination
+        // Filter by tour, rate and client in the returned array
+        return Array.from(this.clientPricesMap.values()).filter(price => {
+            return price.tourId === tourId && 
+                   price.rateId === rateId && 
+                   price.clientPtr === this.clientId;
+        });
+    }
+
+    /**
+     * Extract unique vehicle types from tour and client prices
+     */
+    extractVehicleTypesFromPrices(tourPrices, clientPrices) {
+        const vehicleTypesMap = new Map(); // Use Map to store unique vehicleTypeId -> vehicleTypeName
+        
+        // Add vehicle types from tour prices
+        tourPrices.forEach(price => {
+            const vehicleType = price.vehicleType;
+            const vehicleTypeId = price.vehicleTypeId || price.vehicleType; // fallback to vehicleType if no ID
+            
+            if (vehicleType) {
+                vehicleTypesMap.set(vehicleTypeId, vehicleType);
+            }
+        });
+        
+        // Add vehicle types from client prices  
+        clientPrices.forEach(price => {
+            const vehicleType = price.vehiclePtr;
+            // For client prices, vehiclePtr is the vehicle type name/ID
+            if (vehicleType) {
+                vehicleTypesMap.set(vehicleType, vehicleType);
+            }
+        });
+        
+        return Array.from(vehicleTypesMap.values());
+    }
+
+    /**
+     * Populate vehicle dropdown with vehicle types and their prices
+     */
+    populateVehicleDropdownWithPrices(vehicleTypes, tourId, rateId) {
+        const vehicleSelect = document.getElementById('vehicleSelect');
+        if (!vehicleSelect) {
+            console.error('❌ Vehicle select element not found');
+            return;
+        }
+
+        // Clear existing options except the default one
+        vehicleSelect.innerHTML = '<option value="">-- Sin vehículo --</option>';
+        vehicleSelect.value = ''; // Ensure the value is cleared
+
+        if (vehicleTypes.length === 0) {
+            const noOption = document.createElement('option');
+            noOption.value = '';
+            noOption.textContent = '-- Sin vehículos disponibles --';
+            noOption.disabled = true;
+            vehicleSelect.appendChild(noOption);
+
+            return;
+        }
+
+        // Add options for each vehicle type with capacity info
+        vehicleTypes.forEach(vehicleType => {
+            const vehicleInfo = this.getVehicleTypeInfo(vehicleType);
+            const isClientPrice = this.hasClientPrice(vehicleType, tourId, rateId);
+            
+            const option = document.createElement('option');
+            option.value = vehicleType;
+            
+            // Format capacity display
+            let capacityDisplay = '';
+            if (vehicleInfo) {
+                const pax = vehicleInfo.capacity || 0;
+                const trunk = vehicleInfo.trunkCapacity || 0;
+                capacityDisplay = `${pax} pax, ${trunk} carry-on`;
+            } else {
+                capacityDisplay = 'Capacidad no disponible';
+            }
+            
+            const clientIndicator = isClientPrice ? ' ⭐' : '';
+            option.textContent = `${vehicleType} - ${capacityDisplay}${clientIndicator}`;
+            
+            vehicleSelect.appendChild(option);
+        });
+
+    }
+
+    /**
+     * Get vehicle price with ClientPrice priority over TourPrice
+     */
+    getVehiclePriceWithPriority(vehicleType, tourId, rateId) {
+        // First try client price (highest priority)
+        if (this.clientId) {
+            const clientPrices = this.getClientPricesFromCache(tourId, rateId);
+            const clientPrice = clientPrices.find(price => price.vehiclePtr === vehicleType);
+            if (clientPrice && clientPrice.price !== undefined) {
+
+                return clientPrice.price;
+            }
+        }
+        
+        // Fallback to tour price  
+        const tourPrices = this.getTourPricesFromCache(tourId, rateId);
+        const tourPrice = tourPrices.find(price => price.vehicleType === vehicleType);
+        if (tourPrice && tourPrice.price !== undefined) {
+
+            return tourPrice.price;
+        }
+        
+        console.warn('⚠️ No price found for vehicle:', vehicleType);
+        return null;
+    }
+
+    /**
+     * Get vehicle type information from cache
+     */
+    getVehicleTypeInfo(vehicleTypeKey) {
+        // Try different possible keys
+        return this.vehicleTypesMap.get(vehicleTypeKey) ||
+               this.vehicleTypesMap.get(vehicleTypeKey?.toLowerCase()) ||
+               this.vehicleTypesMap.get(vehicleTypeKey?.toUpperCase()) ||
+               null;
+    }
+
+    /**
+     * Check if client has specific price for vehicle
+     */
+    hasClientPrice(vehicleType, tourId, rateId) {
+        if (!this.clientId) {
+            return false;
+        }
+        
+        const clientPrices = this.getClientPricesFromCache(tourId, rateId);
+        return clientPrices.some(price => price.vehiclePtr === vehicleType);
+    }
+
+    /**
+     * Update price field with calculated price
+     */
+    updatePriceField(price) {
+        const servicePriceField = document.getElementById('servicePrice');
+        if (!servicePriceField) {
+            console.error('❌ Service price field not found');
+            return;
+        }
+
+        if (price !== null && price !== undefined) {
+            servicePriceField.value = price.toFixed(2);
+
+        } else {
+            servicePriceField.value = '';
+
+        }
+    }
+
+    /**
+     * Clear vehicle dropdown
+     */
+    clearVehicleDropdown() {
+        const vehicleSelect = document.getElementById('vehicleSelect');
+        if (vehicleSelect) {
+            vehicleSelect.innerHTML = '<option value="">-- Sin vehículo --</option>';
+            vehicleSelect.value = '';
+
+        }
+        
+        // Also clear price field - set to 0 for tours
+        const servicePriceField = document.getElementById('servicePrice');
+        if (servicePriceField) {
+            servicePriceField.value = '0.00';
+        }
+    }
+    
     handleTourSelection(tourId) {
         if (!tourId) {
-            // Clear price and details when no tour is selected
-            document.getElementById('servicePrice').value = 0;
+            // Clear all price fields and details when no tour is selected
+            const servicePriceField = document.getElementById('servicePrice');
+            const adultPriceField = document.getElementById('tourAdultPrice');
+            const childPriceField = document.getElementById('tourChildPrice');
+            const noAlcoholPriceField = document.getElementById('tourNoAlcoholPrice');
+            
+            // Clear passenger quantity fields
+            const tourAdultsQuantityField = document.getElementById('tourAdultsQuantity');
+            const tourChildrenQuantityField = document.getElementById('tourChildrenQuantity');
+            const tourAdultsNoAlcoholQuantityField = document.getElementById('tourAdultsNoAlcoholQuantity');
+            
+            if (servicePriceField) servicePriceField.value = 0;
+            
+            // Clear and show all price and quantity fields when no tour is selected
+            if (adultPriceField) {
+                adultPriceField.value = '';
+                const adultPriceContainer = adultPriceField.closest('.col-md-4');
+                if (adultPriceContainer) adultPriceContainer.style.display = 'block';
+            }
+            if (tourAdultsQuantityField) {
+                tourAdultsQuantityField.value = 0;
+                const adultQuantityContainer = tourAdultsQuantityField.closest('.col-md-4');
+                if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
+            }
+            
+            if (childPriceField) {
+                childPriceField.value = '';
+                const childPriceContainer = childPriceField.closest('.col-md-4');
+                if (childPriceContainer) childPriceContainer.style.display = 'block';
+            }
+            if (tourChildrenQuantityField) {
+                tourChildrenQuantityField.value = 0;
+                const childQuantityContainer = tourChildrenQuantityField.closest('.col-md-4');
+                if (childQuantityContainer) childQuantityContainer.style.display = 'block';
+            }
+            
+            if (noAlcoholPriceField) {
+                noAlcoholPriceField.value = '';
+                const noAlcoholPriceContainer = noAlcoholPriceField.closest('.col-md-4');
+                if (noAlcoholPriceContainer) noAlcoholPriceContainer.style.display = 'block';
+            }
+            if (tourAdultsNoAlcoholQuantityField) {
+                tourAdultsNoAlcoholQuantityField.value = 0;
+                const noAlcoholQuantityContainer = tourAdultsNoAlcoholQuantityField.closest('.col-md-4');
+                if (noAlcoholQuantityContainer) noAlcoholQuantityContainer.style.display = 'block';
+            }
+            
             this.clearTourDetails();
+            this.clearTourSchedule();
+            
+            // Also hide the tour details info box
+            const tourDetails = document.getElementById('tourDetails');
+            if (tourDetails) {
+                tourDetails.style.display = 'none';
+                tourDetails.innerHTML = '';
+            }
             return;
         }
 
@@ -2877,25 +3966,230 @@ class ItineraryBuilder {
             }
 
             if (selectedTour) {
-                // Get client-specific tour price
+
+                // Get client-specific tour price or use base price
                 const price = this.getPriceForTour(tourId, null) || selectedTour.price || 0;
 
-                // Update the price field
-                document.getElementById('servicePrice').value = price;
+                // Auto-fill form fields
+                const servicePriceField = document.getElementById('servicePrice');
+                const serviceDescriptionField = document.getElementById('serviceDescription');
+                const internalNotesField = document.getElementById('internalNotes');
+                const clientNotesField = document.getElementById('clientNotes');
+                const providerNotesField = document.getElementById('providerNotes');
+                const teamNotesField = document.getElementById('teamNotes');
+                
+                // Tour-specific readonly fields
+                const tourDescriptionField = document.getElementById('tourDescription');
+                const tourAdvanceBookingTimeField = document.getElementById('tourAdvanceBookingTime');
+                const tourLanguagesField = document.getElementById('tourLanguages');
+                const tourIncludesField = document.getElementById('tourIncludes');
+                const tourNotIncludesField = document.getElementById('tourNotIncludes');
+                const tourClientNotesField = document.getElementById('tourClientNotes');
+                
+                // Fill price fields - for tours, set to 0 initially (vehicle cost will be added when vehicle is selected)
+                if (servicePriceField) {
+                    servicePriceField.value = 0; // Tours should show 0 until a vehicle is selected
+                }
+                
+                // Fill adult, child, and no-alcohol prices - use TOUR-specific fields
+                const tourAdultPriceField = document.getElementById('tourAdultPrice');
+                const tourChildPriceField = document.getElementById('tourChildPrice');
+                const tourNoAlcoholPriceField = document.getElementById('tourNoAlcoholPrice');
+                
+                // Get quantity fields as well
+                const tourAdultsQuantityField = document.getElementById('tourAdultsQuantity');
+                const tourChildrenQuantityField = document.getElementById('tourChildrenQuantity');
+                const tourAdultsNoAlcoholQuantityField = document.getElementById('tourAdultsNoAlcoholQuantity');
+                
+                // Adult Price Field and Quantity
+                if (tourAdultPriceField) {
+                    const adultPriceValue = selectedTour.price || price || 0;
+                    const adultPriceContainer = tourAdultPriceField.closest('.col-md-4');
+                    const adultQuantityContainer = tourAdultsQuantityField?.closest('.col-md-4');
+                    
+                    if (adultPriceValue && adultPriceValue > 0) {
+                        tourAdultPriceField.value = adultPriceValue;
+                        if (adultPriceContainer) adultPriceContainer.style.display = 'block';
+                        if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
+                    } else {
+                        tourAdultPriceField.value = '';
+                        if (adultPriceContainer) adultPriceContainer.style.display = 'none';
+                        if (adultQuantityContainer) adultQuantityContainer.style.display = 'none';
+                        if (tourAdultsQuantityField) tourAdultsQuantityField.value = 0;
+                    }
+                }
+                
+                // Child Price Field and Quantity
+                if (tourChildPriceField) {
+                    const childPriceValue = selectedTour.price_child || 0;
+                    const childPriceContainer = tourChildPriceField.closest('.col-md-4');
+                    const childQuantityContainer = tourChildrenQuantityField?.closest('.col-md-4');
+                    
+                    if (childPriceValue && childPriceValue > 0) {
+                        tourChildPriceField.value = childPriceValue;
+                        if (childPriceContainer) childPriceContainer.style.display = 'block';
+                        if (childQuantityContainer) childQuantityContainer.style.display = 'block';
+                    } else {
+                        tourChildPriceField.value = '';
+                        if (childPriceContainer) childPriceContainer.style.display = 'none';
+                        if (childQuantityContainer) childQuantityContainer.style.display = 'none';
+                        if (tourChildrenQuantityField) tourChildrenQuantityField.value = 0;
+                    }
+                }
+                
+                // No Alcohol Price Field and Quantity
+                if (tourNoAlcoholPriceField) {
+                    const noAlcoholPriceValue = selectedTour.price_no_alcohol || 0;
+                    const noAlcoholPriceContainer = tourNoAlcoholPriceField.closest('.col-md-4');
+                    const noAlcoholQuantityContainer = tourAdultsNoAlcoholQuantityField?.closest('.col-md-4');
+                    
+                    if (noAlcoholPriceValue && noAlcoholPriceValue > 0) {
+                        tourNoAlcoholPriceField.value = noAlcoholPriceValue;
+                        if (noAlcoholPriceContainer) noAlcoholPriceContainer.style.display = 'block';
+                        if (noAlcoholQuantityContainer) noAlcoholQuantityContainer.style.display = 'block';
+                    } else {
+                        tourNoAlcoholPriceField.value = '';
+                        if (noAlcoholPriceContainer) noAlcoholPriceContainer.style.display = 'none';
+                        if (noAlcoholQuantityContainer) noAlcoholQuantityContainer.style.display = 'none';
+                        if (tourAdultsNoAlcoholQuantityField) tourAdultsNoAlcoholQuantityField.value = 0;
+                    }
+                }
+                
+                // Fill passenger quantity fields with default values (only for new services)
+                if (!this.currentServiceId) {
+                    // Only set default for adults if the field is visible
+                    if (tourAdultsQuantityField && tourAdultsQuantityField.closest('.col-md-4').style.display !== 'none') {
+                        tourAdultsQuantityField.value = 2; // Default 2 adults
+                    }
+                    // Children and no alcohol fields are already set to 0 when hidden
+                } else {
+                    // When editing existing service, override with saved price values if they exist
+                    const existingService = this.services.get(this.currentServiceId);
+                    if (existingService) {
+                        // Override adult price with saved value
+                        if (tourAdultPriceField && existingService.adultPrice !== undefined) {
+                            const savedAdultPrice = existingService.adultPrice;
+                            const adultPriceContainer = tourAdultPriceField.closest('.col-md-4');
+                            const adultQuantityContainer = tourAdultsQuantityField?.closest('.col-md-4');
+                            
+                            if (savedAdultPrice && savedAdultPrice > 0) {
+                                tourAdultPriceField.value = savedAdultPrice;
+                                if (adultPriceContainer) adultPriceContainer.style.display = 'block';
+                                if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
+                            } else {
+                                tourAdultPriceField.value = '';
+                                if (adultPriceContainer) adultPriceContainer.style.display = 'none';
+                                if (adultQuantityContainer) adultQuantityContainer.style.display = 'none';
+                            }
+                        }
+                        
+                        // Override child price with saved value
+                        if (tourChildPriceField && existingService.childPrice !== undefined) {
+                            const savedChildPrice = existingService.childPrice;
+                            const childPriceContainer = tourChildPriceField.closest('.col-md-4');
+                            const childQuantityContainer = tourChildrenQuantityField?.closest('.col-md-4');
+                            
+                            if (savedChildPrice && savedChildPrice > 0) {
+                                tourChildPriceField.value = savedChildPrice;
+                                if (childPriceContainer) childPriceContainer.style.display = 'block';
+                                if (childQuantityContainer) childQuantityContainer.style.display = 'block';
+                            } else {
+                                tourChildPriceField.value = '';
+                                if (childPriceContainer) childPriceContainer.style.display = 'none';
+                                if (childQuantityContainer) childQuantityContainer.style.display = 'none';
+                            }
+                        }
+                        
+                        // Override no alcohol price with saved value
+                        if (tourNoAlcoholPriceField && existingService.noAlcoholPrice !== undefined) {
+                            const savedNoAlcoholPrice = existingService.noAlcoholPrice;
+                            const noAlcoholPriceContainer = tourNoAlcoholPriceField.closest('.col-md-4');
+                            const noAlcoholQuantityContainer = tourAdultsNoAlcoholQuantityField?.closest('.col-md-4');
+                            
+                            if (savedNoAlcoholPrice && savedNoAlcoholPrice > 0) {
+                                tourNoAlcoholPriceField.value = savedNoAlcoholPrice;
+                                if (noAlcoholPriceContainer) noAlcoholPriceContainer.style.display = 'block';
+                                if (noAlcoholQuantityContainer) noAlcoholQuantityContainer.style.display = 'block';
+                            } else {
+                                tourNoAlcoholPriceField.value = '';
+                                if (noAlcoholPriceContainer) noAlcoholPriceContainer.style.display = 'none';
+                                if (noAlcoholQuantityContainer) noAlcoholQuantityContainer.style.display = 'none';
+                            }
+                        }
+                    }
+                }
+                
+                // Fill main description from tour (editable field)
+                if (serviceDescriptionField && selectedTour.description) {
+                    serviceDescriptionField.value = selectedTour.description;
+                }
+                
+                // Fill tour-specific readonly fields
+                if (tourDescriptionField) {
+                    tourDescriptionField.value = selectedTour.description || '';
+                }
+                
+                if (tourAdvanceBookingTimeField) {
+                    const bookingTime = selectedTour.advance_booking_time || '';
+                    tourAdvanceBookingTimeField.value = bookingTime ? `${bookingTime} horas` : 'No especificado';
+                }
+                
+                if (tourLanguagesField) {
+                    const languages = selectedTour.languages;
+                    if (Array.isArray(languages)) {
+                        tourLanguagesField.value = languages.join(', ');
+                    } else {
+                        tourLanguagesField.value = languages || 'No especificado';
+                    }
+                }
+                
+                if (tourIncludesField) {
+                    tourIncludesField.value = selectedTour.includes || '';
+                }
+                
+                if (tourNotIncludesField) {
+                    tourNotIncludesField.value = selectedTour.notincludes || '';
+                }
+                
+                if (tourClientNotesField) {
+                    tourClientNotesField.value = selectedTour.client_booking_notes || '';
+                }
+                
+                // Fill editable notes fields
+                if (internalNotesField && selectedTour.internal_notes) {
+                    internalNotesField.value = selectedTour.internal_notes;
+                }
+                
+                if (clientNotesField && selectedTour.client_booking_notes) {
+                    clientNotesField.value = selectedTour.client_booking_notes;
+                }
+                
+                if (providerNotesField && selectedTour.provider_notes) {
+                    providerNotesField.value = selectedTour.provider_notes;
+                }
+                
+                if (teamNotesField && selectedTour.team_notes) {
+                    teamNotesField.value = selectedTour.team_notes;
+                }
 
                 // Show tour details
                 this.showTourDetails(selectedTour);
+                
+                // Handle tour schedule/availability
+                this.handleTourSchedule(selectedTour);
 
             } else {
                 console.warn('Tour not found in cache:', tourId);
                 document.getElementById('servicePrice').value = 0;
                 this.clearTourDetails();
+                this.clearTourSchedule();
             }
 
         } catch (error) {
             console.error('Error handling tour selection:', error);
             document.getElementById('servicePrice').value = 0;
             this.clearTourDetails();
+            this.clearTourSchedule();
         }
     }
 
@@ -2909,7 +4203,6 @@ class ItineraryBuilder {
 
             // Iterate through ALL object properties to capture EVERYTHING
             const allFields = [];
-
 
             Object.keys(experience).forEach(key => {
                 const value = experience[key];
@@ -3111,17 +4404,58 @@ class ItineraryBuilder {
     }
 
     showTourDetails(tour) {
-        // Show tour details in a dedicated area
+        // Only show the info card in development mode
+        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname.includes('dev');
+        
         const detailsContainer = document.getElementById('tourDetails');
         if (detailsContainer) {
-            detailsContainer.innerHTML = `
-                <div class="alert alert-info">
-                    <h6><i class="ti ti-info-circle"></i> ${tour.title}</h6>
-                    ${tour.description ? `<p class="mb-1">${tour.description}</p>` : ''}
-                    ${tour.duration ? `<small class="text-muted">Duración: ${tour.duration}</small>` : ''}
-                    ${tour.location ? `<small class="text-muted d-block">Ubicación: ${tour.location}</small>` : ''}
-                </div>
-            `;
+            if (isDevelopment) {
+                // Show detailed info card only in development
+                const tourName = tour.destinationPOI?.name || 'Tour sin nombre';
+                const tourDescription = tour.description || '';
+                const duration = tour.time ? `${tour.time} minutos` : (tour.travel_duration || '');
+                const minPeople = tour.min_people || 'N/A';
+                const maxPeople = tour.max_people || 'N/A';
+                const includes = tour.includes || '';
+                const notIncludes = tour.notincludes || '';
+                const languages = tour.languages ? (Array.isArray(tour.languages) ? tour.languages.join(', ') : tour.languages) : '';
+                
+                detailsContainer.innerHTML = `
+                    <div class="alert alert-info">
+                        <small class="badge bg-warning text-dark mb-2">Development Only</small>
+                        <h6><i class="ti ti-map-pin"></i> ${tourName}</h6>
+                        ${tourDescription ? `<p class="mb-2">${tourDescription}</p>` : ''}
+                        <div class="row">
+                            ${duration ? `
+                            <div class="col-md-6">
+                                <small class="text-muted d-block"><i class="ti ti-clock"></i> Duración: ${duration}</small>
+                            </div>
+                            ` : ''}
+                            <div class="col-md-6">
+                                <small class="text-muted d-block"><i class="ti ti-users"></i> Personas: ${minPeople} - ${maxPeople}</small>
+                            </div>
+                        </div>
+                        ${includes ? `
+                        <div class="mt-2">
+                            <small class="text-muted d-block"><strong>Incluye:</strong> ${includes}</small>
+                        </div>
+                        ` : ''}
+                        ${notIncludes ? `
+                        <div class="mt-1">
+                            <small class="text-muted d-block"><strong>No incluye:</strong> ${notIncludes}</small>
+                        </div>
+                        ` : ''}
+                        ${languages ? `
+                        <div class="mt-1">
+                            <small class="text-muted d-block"><i class="ti ti-language"></i> Idiomas: ${languages}</small>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            } else {
+                // In production, clear the container
+                detailsContainer.innerHTML = '';
+            }
         }
     }
 
@@ -3132,11 +4466,223 @@ class ItineraryBuilder {
         }
     }
 
+    handleTourSchedule(tour) {
+        // Get the current day context using existing method
+        const dayContext = this.getCurrentDayContext();
+        
+        // Deep inspection for Atotonilco tour
+        if (tour.destinationPOI?.name === 'Atotonilco') {
+        }
+        
+        const singleTimeField = document.getElementById('tourSingleTime');
+        const multipleTimeField = document.getElementById('tourMultipleTime');
+        const availabilityStatusDiv = document.getElementById('tourAvailabilityStatus');
+        const availabilityMessageSpan = document.getElementById('tourAvailabilityMessage');
+
+        // Hide all schedule elements initially (use setProperty to override !important)
+        if (singleTimeField) singleTimeField.style.setProperty('display', 'none', 'important');
+        if (multipleTimeField) multipleTimeField.style.display = 'none';
+        if (availabilityStatusDiv) availabilityStatusDiv.style.display = 'none';
+
+        const currentDayOfWeek = dayContext?.dayOfWeek;
+
+        // Always show the availability status div since we always have something to display
+        let scheduleDisplayed = false;
+        
+        // Check if tour has specific times
+        if (tour.startTime && tour.endTime) {
+            // Single fixed time
+            const startTime = this.formatTime(tour.startTime);
+            const endTime = this.formatTime(tour.endTime);
+            const timeRange = `${startTime} - ${endTime}`;
+
+            if (singleTimeField) {
+                singleTimeField.value = timeRange;
+                // Remove !important by setting via setAttribute
+                singleTimeField.style.setProperty('display', 'block', 'important');
+
+                scheduleDisplayed = true;
+            }
+        } else if (tour.availability && typeof tour.availability === 'object') {
+            // Handle availability array - extract schedules for current day
+
+            if (Array.isArray(tour.availability) && currentDayOfWeek !== null) {
+
+                const timeOptions = this.extractTimeOptionsForDay(tour.availability, currentDayOfWeek);
+
+                if (timeOptions.length > 0 && multipleTimeField) {
+                    // Clear existing options
+                    multipleTimeField.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+
+                    // Add time options
+                    timeOptions.forEach((timeOption, index) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = timeOption.label;
+                        option.dataset.timeData = JSON.stringify(timeOption.data);
+                        multipleTimeField.appendChild(option);
+                    });
+
+                    multipleTimeField.style.display = 'block';
+
+                    scheduleDisplayed = true;
+                } else {
+                    // No specific times found, show generic availability message
+                    if (availabilityStatusDiv && availabilityMessageSpan) {
+                        availabilityMessageSpan.textContent = 'Horario según disponibilidad';
+                        availabilityStatusDiv.style.display = 'block';
+                        scheduleDisplayed = true;
+                    }
+                }
+            } else if (tour.availability.times && Array.isArray(tour.availability.times)) {
+                // Availability object with times array
+                if (multipleTimeField) {
+                    multipleTimeField.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+                    tour.availability.times.forEach((time, index) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = time;
+                        multipleTimeField.appendChild(option);
+                    });
+                    multipleTimeField.style.display = 'block';
+
+                    scheduleDisplayed = true;
+                }
+            } else {
+                // Show availability status message
+                if (availabilityStatusDiv && availabilityMessageSpan) {
+                    availabilityMessageSpan.textContent = 'Horario según disponibilidad';
+                    availabilityStatusDiv.style.display = 'block';
+                    scheduleDisplayed = true;
+                }
+            }
+        } else if (tour.time) {
+            // If tour has duration but no specific schedule, just show availability message
+            if (availabilityStatusDiv && availabilityMessageSpan) {
+                availabilityMessageSpan.textContent = 'Horario según disponibilidad';
+                availabilityStatusDiv.style.display = 'block';
+                scheduleDisplayed = true;
+            }
+        } 
+        
+        // Always show at least a default message if nothing else was shown
+        if (!scheduleDisplayed) {
+            // Default availability message
+            if (availabilityStatusDiv && availabilityMessageSpan) {
+                availabilityMessageSpan.textContent = 'Horario flexible - coordinar con el proveedor';
+                availabilityStatusDiv.style.display = 'block';
+
+            }
+        }
+    }
+    
+    clearTourSchedule() {
+
+        // Clear tour-specific schedule fields
+        const tourSingleTime = document.getElementById('tourSingleTime');
+        const tourMultipleTime = document.getElementById('tourMultipleTime');
+        const tourAvailabilityStatus = document.getElementById('tourAvailabilityStatus');
+        
+        if (tourSingleTime) {
+            tourSingleTime.value = '';
+            tourSingleTime.style.setProperty('display', 'none', 'important');
+        }
+        
+        if (tourMultipleTime) {
+            tourMultipleTime.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+            tourMultipleTime.style.display = 'none';
+        }
+        
+        if (tourAvailabilityStatus) {
+            tourAvailabilityStatus.style.display = 'none';
+        }
+        
+        // Also clear shared schedule fields if they exist
+        const scheduleSelect = document.getElementById('scheduleSelect');
+        if (scheduleSelect) {
+            scheduleSelect.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+            scheduleSelect.disabled = true;
+        }
+        
+        // Clear time input fields
+        const startTimeInput = document.getElementById('startTime');
+        const endTimeInput = document.getElementById('endTime');
+        
+        if (startTimeInput) {
+            startTimeInput.value = '';
+            startTimeInput.disabled = false;
+        }
+        
+        if (endTimeInput) {
+            endTimeInput.value = '';
+            endTimeInput.disabled = false;
+        }
+    }
+    
+    clearExperienceSchedule() {
+
+        // Clear experience-specific schedule fields
+        const experienceSingleTime = document.getElementById('experienceSingleTime');
+        const experienceMultipleTime = document.getElementById('experienceMultipleTime');
+        const experienceAvailabilityStatus = document.getElementById('experienceAvailabilityStatus');
+        
+        if (experienceSingleTime) {
+            experienceSingleTime.value = '';
+            experienceSingleTime.style.display = 'none';
+        }
+        
+        if (experienceMultipleTime) {
+            experienceMultipleTime.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+            experienceMultipleTime.style.display = 'none';
+        }
+        
+        if (experienceAvailabilityStatus) {
+            experienceAvailabilityStatus.style.display = 'none';
+        }
+        
+        // Clear shared schedule/time fields
+        const scheduleSelect = document.getElementById('scheduleSelect');
+        if (scheduleSelect) {
+            scheduleSelect.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+            scheduleSelect.disabled = true;
+        }
+        
+        const startTime = document.getElementById('startTime');
+        const endTime = document.getElementById('endTime');
+        
+        if (startTime) {
+            startTime.value = '';
+            startTime.disabled = false;
+        }
+        
+        if (endTime) {
+            endTime.value = '';
+            endTime.disabled = false;
+        }
+    }
+    
     clearTourDetails() {
         const detailsContainer = document.getElementById('tourDetails');
         if (detailsContainer) {
             detailsContainer.innerHTML = '';
         }
+        
+        // Clear tour-specific readonly fields
+        const tourFieldIds = [
+            'tourDescription',
+            'tourAdvanceBookingTime', 
+            'tourLanguages',
+            'tourIncludes',
+            'tourNotIncludes',
+            'tourClientNotes'
+        ];
+        
+        tourFieldIds.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = '';
+            }
+        });
     }
 
     getPriceForService(serviceId, rateId) {
@@ -3145,14 +4691,14 @@ class ItineraryBuilder {
             const clientPrices = this.clientPricesCache.get(serviceId);
             const clientPrice = clientPrices.find(price => price.rate.id === rateId);
             if (clientPrice) {
-                console.log(`💰 Using client-specific price for service ${serviceId}:`, clientPrice.finalPrice);
+
                 return clientPrice.finalPrice;
             }
         }
 
         // Fallback to base RatePrice
         // This would need to be implemented based on your RatePrices structure
-        console.log(`💰 Using base rate price for service ${serviceId}`);
+
         return 0; // TODO: Implement base rate price lookup
     }
 
@@ -3162,22 +4708,22 @@ class ItineraryBuilder {
             const clientTourPrices = this.clientTourPricesCache.get(tourId);
             const clientPrice = clientTourPrices.find(price => price.rate.id === rateId);
             if (clientPrice) {
-                console.log(`💰 Using client-specific tour price for tour ${tourId}:`, clientPrice.finalPrice);
+
                 return clientPrice.finalPrice;
             }
         }
 
         // Fallback to base TourPrice
         // This would need to be implemented based on your TourPrices structure
-        console.log(`💰 Using base tour price for tour ${tourId}`);
+
         return 0; // TODO: Implement base tour price lookup
     }
 
     async loadDayExperiences(dayId) {
-        console.log('🚀 loadDayExperiences called with dayId:', dayId);
+
         const experienceSelect = document.getElementById('experienceSelect');
         if (!experienceSelect) {
-            console.log('❌ experienceSelect not found');
+
             return;
         }
 
@@ -3193,18 +4739,11 @@ class ItineraryBuilder {
             if (dayInfo && dayInfo.date) {
                 dayDate = new Date(dayInfo.date);
                 dayOfWeek = dayDate.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-                console.log('🗓️ Filtering experiences for day:', {
-                    dayId,
-                    date: dayDate.toDateString(),
-                    dayOfWeek,
-                    dayName: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayOfWeek]
-                });
             } else {
-                console.log('⚠️ No day info found for filtering, showing all experiences');
+
             }
 
             const allExperiences = [];
-
 
             // Add experiences from Experience table (only type === "Experience", not "Provider")
             if (this.experiencesCache.has('all')) {
@@ -3269,7 +4808,6 @@ class ItineraryBuilder {
                 allExperiences.push(...mappedProviderExperiences);
             }
 
-
             // Sort experiences alphabetically by title
             allExperiences.sort((a, b) => a.title.localeCompare(b.title));
 
@@ -3277,13 +4815,6 @@ class ItineraryBuilder {
             allExperiences.forEach(exp => {
                 // Debug availability structure for Testing experience
                 if (exp.title === 'Testing' || exp.name === 'Testing') {
-                    console.log('🧪 TESTING EXPERIENCE AVAILABILITY STRUCTURE:', {
-                        name: exp.title || exp.name,
-                        availability: exp.availability,
-                        availabilityType: typeof exp.availability,
-                        isArray: Array.isArray(exp.availability),
-                        availabilityObjects: Array.isArray(exp.availability) ? exp.availability.map((item, i) => ({ index: i, item })) : 'N/A'
-                    });
                 }
 
                 const option = document.createElement('option');
@@ -3318,8 +4849,6 @@ class ItineraryBuilder {
                 experienceSelect.appendChild(option);
             });
 
-            console.log(`✅ Loaded ${allExperiences.length} total experiences into dropdown`);
-
         } catch (error) {
             console.error('Error loading experiences into dropdown:', error);
             this.showModalAlert('serviceModalAlert', 'Error cargando experiencias', 'warning');
@@ -3329,35 +4858,22 @@ class ItineraryBuilder {
     isExperienceAvailableOnDay(experience, dayOfWeek, dayDate) {
         // If no day info provided, default to available (show all)
         if (dayOfWeek === null || dayDate === null) {
-            console.log('📅 No day filter - showing all experiences');
+
             return true;
         }
-
-        console.log('🔍 Checking availability for experience:', {
-            title: experience.title || experience.name || experience.experienceName,
-            dayOfWeek,
-            dayName: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayOfWeek],
-            availableDays: experience.availableDays,
-            availability: experience.availability,
-            fullExperience: experience
-        });
 
         // Check if availability is stored as a string with Spanish abbreviations (e.g., "Sa, Vi, Ju, Mi")
         if (typeof experience.availability === 'string' || typeof experience.availableDays === 'string') {
             const availabilityString = experience.availability || experience.availableDays;
             const isAvailable = this.parseSpanishDayAbbreviations(availabilityString, dayOfWeek);
-            console.log(`📅 Spanish day abbreviations check: ${isAvailable ? '✅' : '❌'}`, {
-                availabilityString,
-                dayOfWeek,
-                dayName: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayOfWeek]
-            });
+
             return isAvailable;
         }
 
         // Check availableDays array (common format: [0,1,2,3,4,5,6] where 0=Sunday)
         if (Array.isArray(experience.availableDays)) {
             const isAvailable = experience.availableDays.includes(dayOfWeek);
-            console.log(`📅 availableDays check: ${isAvailable ? '✅' : '❌'}`, experience.availableDays);
+
             return isAvailable;
         }
 
@@ -3365,16 +4881,16 @@ class ItineraryBuilder {
         if (experience.availability && typeof experience.availability === 'object') {
             // Handle array of availability objects (common format)
             if (Array.isArray(experience.availability)) {
-                console.log('🔍 Processing availability array:', experience.availability);
+
                 const isAvailable = this.checkAvailabilityArray(experience.availability, dayOfWeek);
-                console.log(`📅 availability array check: ${isAvailable ? '✅' : '❌'}`);
+
                 return isAvailable;
             }
 
             // Handle different availability structures
             if (experience.availability.days && Array.isArray(experience.availability.days)) {
                 const isAvailable = experience.availability.days.includes(dayOfWeek);
-                console.log(`📅 availability.days check: ${isAvailable ? '✅' : '❌'}`, experience.availability.days);
+
                 return isAvailable;
             }
 
@@ -3386,13 +4902,13 @@ class ItineraryBuilder {
 
             if (experience.availability[dayName] !== undefined) {
                 const isAvailable = experience.availability[dayName];
-                console.log(`📅 availability.${dayName} check: ${isAvailable ? '✅' : '❌'}`);
+
                 return isAvailable;
             }
 
             if (experience.availability[dayNameEs] !== undefined) {
                 const isAvailable = experience.availability[dayNameEs];
-                console.log(`📅 availability.${dayNameEs} check: ${isAvailable ? '✅' : '❌'}`);
+
                 return isAvailable;
             }
 
@@ -3403,7 +4919,7 @@ class ItineraryBuilder {
                     experience.availability.schedule[dayOfWeek];
                 if (hasScheduleForDay !== undefined) {
                     const isAvailable = hasScheduleForDay !== null && hasScheduleForDay !== false;
-                    console.log(`📅 availability.schedule.${dayName} check: ${isAvailable ? '✅' : '❌'}`);
+
                     return isAvailable;
                 }
             }
@@ -3415,12 +4931,12 @@ class ItineraryBuilder {
 
         if (experience[dayName] !== undefined) {
             const isAvailable = experience[dayName];
-            console.log(`📅 experience.${dayName} check: ${isAvailable ? '✅' : '❌'}`);
+
             return isAvailable;
         }
 
         // If no availability info found, default to available
-        console.log('📅 No availability info found - defaulting to available ✅');
+
         return true;
     }
 
@@ -3446,35 +4962,71 @@ class ItineraryBuilder {
             .split(/[,;|\s]+/)
             .filter(day => day.trim().length > 0);
 
-        console.log('🔍 Parsing Spanish day abbreviations:', {
-            original: availabilityString,
-            parsed: dayAbbreviations,
-            dayOfWeek,
-            spanishDayMap
-        });
-
         // Check if the current day of week is in the available days
         for (const dayAbbr of dayAbbreviations) {
             const trimmedDay = dayAbbr.trim();
             if (spanishDayMap.hasOwnProperty(trimmedDay)) {
                 const availableDay = spanishDayMap[trimmedDay];
                 if (availableDay === dayOfWeek) {
-                    console.log(`✅ Found matching day: ${trimmedDay} = ${availableDay} (current: ${dayOfWeek})`);
                     return true;
                 }
             }
         }
 
-        console.log(`❌ No matching day found in: ${dayAbbreviations.join(', ')}`);
         return false;
     }
 
+    checkTourAvailability(tour, dayOfWeek) {
+
+        // If no availability data, assume tour is available every day
+        if (!tour.availability && !tour.availableDays) {
+
+            return true;
+        }
+        
+        // Check availableDays array (e.g., [0,1,2,3,4,5,6] where 0=Sunday)
+        if (tour.availableDays && Array.isArray(tour.availableDays)) {
+            const isAvailable = tour.availableDays.includes(dayOfWeek);
+
+            return isAvailable;
+        }
+        
+        // Check availability array
+        if (tour.availability && Array.isArray(tour.availability)) {
+            const isAvailable = this.checkAvailabilityArray(tour.availability, dayOfWeek);
+
+            return isAvailable;
+        }
+        
+        // Check availability object
+        if (tour.availability && typeof tour.availability === 'object') {
+            // Check for days array in availability object
+            if (tour.availability.days && Array.isArray(tour.availability.days)) {
+                const isAvailable = tour.availability.days.includes(dayOfWeek);
+
+                return isAvailable;
+            }
+            
+            // Check for day-specific properties (monday, tuesday, etc.)
+            const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+            const dayName = dayNames[dayOfWeek];
+            
+            if (tour.availability[dayName] !== undefined) {
+                const isAvailable = tour.availability[dayName];
+
+                return isAvailable;
+            }
+        }
+        
+        // If we can't determine availability, assume tour is available
+
+        return true;
+    }
+    
     checkAvailabilityArray(availabilityArray, dayOfWeek) {
         if (!Array.isArray(availabilityArray)) {
             return false;
         }
-
-        console.log('🔍 Analyzing availability array objects:', availabilityArray);
 
         // Map day numbers to various possible property names
         const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -3489,7 +5041,6 @@ class ItineraryBuilder {
 
         for (let i = 0; i < availabilityArray.length; i++) {
             const availabilityObj = availabilityArray[i];
-            console.log(`🔍 Checking availability object ${i}:`, availabilityObj);
 
             if (!availabilityObj || typeof availabilityObj !== 'object') {
                 continue;
@@ -3498,42 +5049,42 @@ class ItineraryBuilder {
             // Check for day number property
             if (availabilityObj.hasOwnProperty(dayOfWeek.toString())) {
                 const isAvailable = availabilityObj[dayOfWeek.toString()];
-                console.log(`✅ Found day number ${dayOfWeek}: ${isAvailable}`);
+
                 if (isAvailable) return true;
             }
 
             // Check for English day names
             if (availabilityObj.hasOwnProperty(currentDayName)) {
                 const isAvailable = availabilityObj[currentDayName];
-                console.log(`✅ Found English day ${currentDayName}: ${isAvailable}`);
+
                 if (isAvailable) return true;
             }
 
             // Check for Spanish day names
             if (availabilityObj.hasOwnProperty(currentDayNameEs)) {
                 const isAvailable = availabilityObj[currentDayNameEs];
-                console.log(`✅ Found Spanish day ${currentDayNameEs}: ${isAvailable}`);
+
                 if (isAvailable) return true;
             }
 
             // Check for English abbreviations
             if (availabilityObj.hasOwnProperty(currentDayAbbrevEn)) {
                 const isAvailable = availabilityObj[currentDayAbbrevEn];
-                console.log(`✅ Found English abbrev ${currentDayAbbrevEn}: ${isAvailable}`);
+
                 if (isAvailable) return true;
             }
 
             // Check for Spanish abbreviations
             if (availabilityObj.hasOwnProperty(currentDayAbbrevEs)) {
                 const isAvailable = availabilityObj[currentDayAbbrevEs];
-                console.log(`✅ Found Spanish abbrev ${currentDayAbbrevEs}: ${isAvailable}`);
+
                 if (isAvailable) return true;
             }
 
             // Check for 'day' property with day number
             if (availabilityObj.day !== undefined) {
                 if (availabilityObj.day === dayOfWeek) {
-                    console.log(`✅ Found day property matching ${dayOfWeek}: ${availabilityObj}`);
+
                     return true;
                 }
             }
@@ -3541,7 +5092,7 @@ class ItineraryBuilder {
             // Check for 'dayOfWeek' property
             if (availabilityObj.dayOfWeek !== undefined) {
                 if (availabilityObj.dayOfWeek === dayOfWeek) {
-                    console.log(`✅ Found dayOfWeek property matching ${dayOfWeek}: ${availabilityObj}`);
+
                     return true;
                 }
             }
@@ -3550,40 +5101,83 @@ class ItineraryBuilder {
             Object.keys(availabilityObj).forEach(key => {
                 const value = availabilityObj[key];
                 if (typeof value === 'string' && this.parseSpanishDayAbbreviations(value, dayOfWeek)) {
-                    console.log(`✅ Found matching day abbreviations in ${key}: ${value}`);
+
                     return true;
                 }
             });
         }
 
-        console.log(`❌ No matching day found in availability array for day ${dayOfWeek} (${dayNamesEs[dayOfWeek]})`);
         return false;
     }
 
     async loadDayTours(dayId) {
+
         const tourSelect = document.getElementById('tourSelect');
-        if (!tourSelect) return;
+        if (!tourSelect) {
+            console.error('❌ tourSelect element not found!');
+            return;
+        }
 
         // Clear existing options except the first placeholder
         tourSelect.innerHTML = '<option value="">-- Selecciona un tour --</option>';
+        
+        // Get the day information to check availability
+        const dayInfo = this.days.find(d => d.id === dayId);
+        let dayOfWeek = null;
+        let dayDate = null;
+        
+        if (dayInfo && dayInfo.date) {
+            dayDate = new Date(dayInfo.date);
+            dayOfWeek = dayDate.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        } else {
+
+        }
 
         try {
+            // Load tours if not in cache
+            if (!this.toursCache.has('all')) {
+
+                await this.loadAllTours();
+            }
+            
             // Add tours from cache
             if (this.toursCache.has('all')) {
                 const tours = this.toursCache.get('all');
 
-                // Filter and sort tours alphabetically by title (with null checks)
-                const validTours = tours.filter(tour => tour && tour.title && tour.id);
-                validTours.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                // Filter tours with destinationPOI that has a name
+                let validTours = tours.filter(tour => {
+                    return tour && tour.destinationPOI && tour.destinationPOI.name && tour.objectId;
+                });
+                
+                // Filter by availability if we have a specific day
+                if (dayOfWeek !== null) {
+                    validTours = validTours.filter(tour => {
+                        // Check if tour is available on this day
+                        const isAvailable = this.checkTourAvailability(tour, dayOfWeek);
+                        if (!isAvailable) {
+
+                        }
+                        return isAvailable;
+                    });
+
+                }
+                
+                // Sort tours alphabetically by destinationPOI name
+                validTours.sort((a, b) => {
+                    const nameA = a.destinationPOI?.name || '';
+                    const nameB = b.destinationPOI?.name || '';
+                    return nameA.localeCompare(nameB);
+                });
 
                 validTours.forEach(tour => {
                     const option = document.createElement('option');
-                    option.value = tour.id;
-                    option.textContent = tour.title;
+                    option.value = tour.objectId || tour.id;
+                    option.textContent = tour.destinationPOI?.name || tour.description || 'Tour sin nombre';
                     tourSelect.appendChild(option);
                 });
 
-                console.log(`✅ Loaded ${validTours.length} tours into dropdown`);
+                } else {
+                console.warn('⚠️ No tours in cache after loading attempt');
             }
 
         } catch (error) {
@@ -3617,6 +5211,8 @@ class ItineraryBuilder {
                         time: service.startTime || null,  // Backend expects 'time' not 'startTime'
                         endTime: service.endTime || null,
                         vehicleId: service.vehicleId || null,
+                        vehicleType: service.vehicleType || null,  // Store vehicle type for tours
+                        vehicleTypeName: service.vehicleTypeName || null,  // Store display name
                         unitPrice: servicePrice,
                         quantity: service.quantity || 1,
                         notes: service.notes || '',
@@ -3625,6 +5221,7 @@ class ItineraryBuilder {
                         // Type-specific fields
                         experienceId: service.experienceId || null,
                         tourId: service.tourId || null,
+                        rateId: service.rateId || null, // Store rate for vehicle pricing
                         hotelName: service.hotelName || null,
                         // People quantities for experiences
                         adultsQuantity: service.adultsQuantity || null,
@@ -3637,21 +5234,19 @@ class ItineraryBuilder {
                         childPrice: service.childPrice || null,
                         noAlcoholPrice: service.noAlcoholPrice || null,
                         checkIn: service.checkIn || null,
-                        checkOut: service.checkOut || null
+                        checkOut: service.checkOut || null,
+                        // Tour-specific fields
+                        includeGuide: service.includeGuide || false // Save Guía + Chofer checkbox state
                     };
+
+                    // Debug logging for includeGuide
+                    if (service.type === 'tour' && service.includeGuide) {
+                        console.log('💾 Saving tour with includeGuide:', service.includeGuide);
+                    }
 
                     // Debug logging for saving people quantities and schedule
                     if (service.type === 'experience' && (service.adultsQuantity || service.childrenQuantity || service.adultsNoAlcoholQuantity || service.selectedSchedule)) {
-                        console.log('💾 Saving experience with people quantities and schedule:', {
-                            concept: subconcept.concept,
-                            adultsQuantity: subconcept.adultsQuantity,
-                            childrenQuantity: subconcept.childrenQuantity,
-                            adultsNoAlcoholQuantity: subconcept.adultsNoAlcoholQuantity,
-                            selectedSchedule: subconcept.selectedSchedule,
-                            adultPrice: subconcept.adultPrice,
-                            childPrice: subconcept.childPrice,
-                            noAlcoholPrice: subconcept.noAlcoholPrice
-                        });
+
                     }
 
                     return subconcept;
@@ -3671,11 +5266,6 @@ class ItineraryBuilder {
             total: total
         };
 
-        console.log('Sending to backend:', {
-            url: `/api/quotes/${this.quoteId}/service-items`,
-            data: serviceItemsData
-        });
-
         // Get access token from cookie
         const accessToken = this.getAccessToken();
 
@@ -3683,8 +5273,6 @@ class ItineraryBuilder {
             console.error('No access token found in cookies');
             throw new Error('No access token found - please login again');
         }
-
-        console.log('Access token found:', accessToken.substring(0, 20) + '...');
 
         const response = await fetch(`/api/quotes/${this.quoteId}/service-items`, {
             method: 'PUT',
@@ -3694,8 +5282,6 @@ class ItineraryBuilder {
             },
             body: JSON.stringify(serviceItemsData)
         });
-
-        console.log('Response status:', response.status);
 
         if (!response.ok) {
             let errorMessage = 'Failed to save to backend';
@@ -3733,7 +5319,6 @@ class ItineraryBuilder {
         let result;
         try {
             const responseText = await response.text();
-            console.log('Raw success response:', responseText);
 
             // Try to parse the response
             if (responseText) {
@@ -3748,7 +5333,6 @@ class ItineraryBuilder {
             result = { success: true };
         }
 
-        console.log('Save successful:', result);
         return result;
     }
 
@@ -3766,7 +5350,6 @@ class ItineraryBuilder {
         return subtotal;
     }
 
-
     populateVehicleSelect() {
         const select = document.getElementById('vehicleSelect');
         if (!select || !this.vehiclesCache) return;
@@ -3779,6 +5362,53 @@ class ItineraryBuilder {
                 </option>
             `;
         });
+    }
+
+    populateRatesDropdown() {
+        const select = document.getElementById('transportCategory');
+        if (!select || !this.ratesCache) return;
+
+        // Store current value to restore after population
+        const currentValue = select.value;
+        
+        // Check if current service type is Tour
+        const serviceTypeInputs = document.querySelectorAll('input[name="serviceType"]');
+        let currentServiceType = 'experience'; // default
+        serviceTypeInputs.forEach(input => {
+            if (input.checked) {
+                currentServiceType = input.value;
+            }
+        });
+        
+        select.innerHTML = '<option value="">-- Seleccionar segmento --</option>';
+        this.ratesCache.forEach(rate => {
+            const label = rate.label || rate.name;
+            
+            // Skip "Economico/Económico" option when Tour is selected
+            // Check for both spellings with and without accent
+            if (currentServiceType === 'tour' && label) {
+                const normalizedLabel = label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                if (normalizedLabel === 'economico' || normalizedLabel === 'economica') {
+
+                    return;
+                }
+            }
+            
+            // Format percentage display (e.g., "Standard (15%)")
+            const percentage = rate.formattedPercentage || (rate.percentage ? `${rate.percentage}%` : '');
+            const displayText = percentage ? `${label} (${percentage})` : label;
+            
+            select.innerHTML += `
+                <option value="${rate.value || rate.objectId || rate.id}">
+                    ${displayText}
+                </option>
+            `;
+        });
+        
+        // Restore previous value if it still exists
+        if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
+            select.value = currentValue;
+        }
     }
 
     // Additional Methods for duplication and deletion
@@ -4419,8 +6049,6 @@ class ItineraryBuilder {
     fixDateSequence() {
         if (this.days.length === 0) return;
 
-        console.log('🔧 Fixing date sequence for existing days');
-
         // Check if dates are already in proper sequence
         let needsFix = false;
         for (let i = 1; i < this.days.length; i++) {
@@ -4434,14 +6062,12 @@ class ItineraryBuilder {
         }
 
         if (needsFix) {
-            console.log('📅 Date sequence needs fixing, updating...');
+
             this.updateDaySequence();
 
             // Save the corrected sequence
             this.saveToBackend();
-            console.log('✅ Date sequence fixed and saved');
         } else {
-            console.log('✅ Date sequence is already correct');
         }
     }
 
@@ -4567,7 +6193,6 @@ class ItineraryBuilder {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 QUOTE SERVICES V2 JAVASCRIPT LOADED - MODAL FIX VERSION!');
 
     const quoteIdElement = document.querySelector('[data-quote-id]');
     if (quoteIdElement) {
@@ -4585,7 +6210,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const checkedServiceType = document.querySelector('input[name="serviceType"]:checked');
         if (checkedServiceType) {
             const selectedType = checkedServiceType.value;
-            console.log('Initial service type:', selectedType);
 
             // Hide all content sections first
             const contentSections = document.querySelectorAll('.service-content');
@@ -4599,6 +6223,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (experiencePricingSection) experiencePricingSection.classList.add('d-none');
             if (standardPricingSection) standardPricingSection.classList.remove('d-none'); // Show standard pricing by default
             if (transportTypeSelector) transportTypeSelector.classList.add('d-none');
+            
+            // Clear tour schedule when switching away from tour
+            if (selectedType !== 'tour' && window.quoteServicesManager) {
+                window.quoteServicesManager.clearTourSchedule();
+            }
 
             // Show appropriate content based on selection
             switch (selectedType) {
@@ -4606,7 +6235,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const experienceContent = document.getElementById('experienceContent');
                     if (experienceContent) {
                         experienceContent.classList.remove('d-none');
-                        console.log('Experience content shown');
+
                     }
                     break;
                 case 'tour':
@@ -4631,7 +6260,7 @@ document.addEventListener('DOMContentLoaded', () => {
     serviceTypeRadios.forEach(radio => {
         radio.addEventListener('change', function () {
             const selectedType = this.value;
-            console.log('Service type changed to:', selectedType);
+
             initializeModalState();
         });
     });
@@ -4640,28 +6269,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // Use event delegation to handle dynamically loaded content
     document.addEventListener('change', function (e) {
         if (e.target && e.target.id === 'experienceSelect') {
-            console.log('=== EXPERIENCE SELECTION CHANGED ===');
+
             const selectedExperience = e.target.value;
             const experiencePricingSection = document.getElementById('experiencePricingSection');
 
-            console.log('Selected experience:', selectedExperience);
-            console.log('Pricing section exists:', !!experiencePricingSection);
-
             if (experiencePricingSection) {
-                console.log('Pricing section current classes:', experiencePricingSection.className);
-                console.log('Pricing section current display:', window.getComputedStyle(experiencePricingSection).display);
+
             }
 
             const standardPricingSection = document.getElementById('standardPricingSection');
 
             if (selectedExperience && experiencePricingSection) {
-                console.log('SHOWING experience pricing section and HIDING standard pricing');
+
                 experiencePricingSection.classList.remove('d-none');
                 if (standardPricingSection) standardPricingSection.classList.add('d-none');
-                console.log('Pricing section classes after show:', experiencePricingSection.className);
-                console.log('Pricing section display after show:', window.getComputedStyle(experiencePricingSection).display);
+
             } else if (experiencePricingSection) {
-                console.log('HIDING experience pricing section and SHOWING standard pricing');
+
                 experiencePricingSection.classList.add('d-none');
                 if (standardPricingSection) standardPricingSection.classList.remove('d-none');
             } else {
@@ -4674,21 +6298,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const serviceModal = document.getElementById('serviceModal');
     if (serviceModal) {
         serviceModal.addEventListener('shown.bs.modal', function () {
-            console.log('=== SERVICE MODAL SHOWN ===');
 
             // Check if all required elements exist
             const experienceSelect = document.getElementById('experienceSelect');
             const experiencePricingSection = document.getElementById('experiencePricingSection');
             const experienceContent = document.getElementById('experienceContent');
 
-            console.log('Modal elements check:');
-            console.log('- experienceSelect:', !!experienceSelect);
-            console.log('- experiencePricingSection:', !!experiencePricingSection);
-            console.log('- experienceContent:', !!experienceContent);
-
             if (experiencePricingSection) {
-                console.log('- experiencePricingSection classes:', experiencePricingSection.className);
-                console.log('- experiencePricingSection display:', window.getComputedStyle(experiencePricingSection).display);
+
             }
 
             // Initialize the modal state based on selected service type
@@ -4696,20 +6313,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Set up experience handler and check current value
             if (experienceSelect) {
-                console.log('Experience select found, current value:', experienceSelect.value);
+
                 // Trigger change event if already has a value
                 if (experienceSelect.value) {
-                    console.log('Triggering change event for pre-selected experience');
+
                     experienceSelect.dispatchEvent(new Event('change'));
                 }
 
                 // Also force show pricing section if experience is selected
                 if (experienceSelect.value && experiencePricingSection) {
-                    console.log('Force showing experience pricing section and hiding standard pricing since experience is already selected');
+
                     const standardPricingSection = document.getElementById('standardPricingSection');
                     experiencePricingSection.classList.remove('d-none');
                     if (standardPricingSection) standardPricingSection.classList.add('d-none');
-                    console.log('Pricing section classes after force show:', experiencePricingSection.className);
+
                 }
             }
         });
