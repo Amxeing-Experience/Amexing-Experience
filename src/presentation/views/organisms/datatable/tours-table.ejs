@@ -925,13 +925,32 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                     console.log(`📡 API URL: ${url.toString()}`);
                 }
                 
-                // Filter to show only vehicle tours (exclude walking tours)
-                url.searchParams.append('tourType', 'vehicle');
+                // Note: No API filtering needed - we'll filter client-side by isWalkingTour
+                
+                // DEBUG: Log the exact API call being made
+                console.log('🚗 VEHICLE TOURS TABLE - API Call:');
+                console.log('  📍 URL with params:', url.toString());
+                console.log('  📍 Will filter client-side by isWalkingTour !== true');
                 
                 $.ajax({
                     url: url.toString(),
                     type: 'GET',
                     success: function(response) {
+                        // DEBUG: Log the raw API response
+                        console.log('🚗 VEHICLE TOURS TABLE - Raw API Response:');
+                        console.log('  📍 Response success:', response.success);
+                        console.log('  📍 Data count:', response.data?.length || 0);
+                        console.log('  📍 Raw data sample (first 3 tours):');
+                        if (response.data && response.data.length > 0) {
+                            response.data.slice(0, 3).forEach((tour, index) => {
+                                console.log(`    Tour ${index + 1}:`, {
+                                    id: tour.id || tour.objectId,
+                                    name: tour.name || tour.title || 'No name',
+                                    isWalkingTour: tour.isWalkingTour,
+                                    destinationPOI: tour.destinationPOI?.name || 'No POI'
+                                });
+                            });
+                        }
                         if (response.success && response.data) {
                             // Preserve existing priceData if available
                             const newToursData = response.data;
@@ -956,12 +975,11 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                                 // If isWalkingTour is explicitly true, filter it out
                                 const shouldKeepTour = tour.isWalkingTour !== true;
                                 
-                                // Debug logging for each tour
-                                console.log(`🔍 Tour analysis:`, {
+                                // DEBUG: Enhanced logging for each tour
+                                console.log(`🔍 VEHICLE TOURS TABLE - Tour analysis:`, {
                                     id: tour.id,
                                     name: tour.name || tour.title,
                                     destinationPOI: tour.destinationPOI?.name,
-                                    tourType: tour.tourType,
                                     isWalkingTour: tour.isWalkingTour,
                                     shouldKeepTour: shouldKeepTour
                                 });
@@ -5587,7 +5605,6 @@ async function saveWalkingTour() {
         };
         
         const formData = {
-            tourType: 'walking',
             destinationPOI: destinationPOI,
             description: getFieldValue('walkingTourDescription'),
             time: parseFloat(getFieldValue('walkingDuration') || '0') * 60, // Convert hours to minutes
@@ -5637,6 +5654,13 @@ async function saveWalkingTour() {
         const apiUrl = isEdit ? `${globalApiEndpoint}/${tourId}` : globalApiEndpoint;
         const method = isEdit ? 'PUT' : 'POST';
         
+        // DEBUG: Print the exact data being sent
+        console.log('🔍 WALKING TOUR DEBUG - Data being sent to API:');
+        console.log('  📍 API URL:', apiUrl);
+        console.log('  📍 Method:', method);
+        console.log('  📍 isWalkingTour value:', formData.isWalkingTour);
+        console.log('  📍 Full formData:', JSON.stringify(formData, null, 2));
+        
         // Send to API
         const response = await fetch(apiUrl, {
             method: method,
@@ -5648,6 +5672,14 @@ async function saveWalkingTour() {
         });
         
         const result = await response.json();
+        
+        // DEBUG: Print the API response
+        console.log('🔍 WALKING TOUR DEBUG - API Response:');
+        console.log('  📍 Response status:', response.status);
+        console.log('  📍 Response ok:', response.ok);
+        console.log('  📍 Result success:', result.success);
+        console.log('  📍 Result data:', result.data);
+        console.log('  📍 Full result:', JSON.stringify(result, null, 2));
         
         if (response.ok && result.success) {
             const successMsg = isEdit ? 'Tour a pie actualizado exitosamente.' : 'Tour a pie creado exitosamente.';

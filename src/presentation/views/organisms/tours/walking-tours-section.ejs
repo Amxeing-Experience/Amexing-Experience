@@ -109,9 +109,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadWalkingTours() {
     try {
-        // Use tourType parameter to filter for walking tours only
+        // Get all tours and filter client-side by isWalkingTour = true
         const url = new URL('<%= apiEndpoint %>', window.location.origin);
-        url.searchParams.append('tourType', 'walking');
+        // Note: Removed tourType parameter - will filter by isWalkingTour instead
         
         // Add client ID if available to get client-specific prices
         const clientId = getClientId();
@@ -132,7 +132,15 @@ async function loadWalkingTours() {
             throw new Error(data.error || 'Error loading walking tours');
         }
         
-        displayWalkingTours(data.data || []);
+        // Filter to show only walking tours (isWalkingTour === true)
+        const allTours = data.data || [];
+        const walkingTours = allTours.filter(tour => tour.isWalkingTour === true);
+        
+        console.log('🚶‍♀️ WALKING TOURS SECTION - Filtering:');
+        console.log('  📍 Total tours received:', allTours.length);
+        console.log('  📍 Walking tours found:', walkingTours.length);
+        
+        displayWalkingTours(walkingTours);
         
     } catch (error) {
         console.error('Error loading walking tours:', error);

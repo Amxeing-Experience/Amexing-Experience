@@ -440,6 +440,7 @@ class ToursController {
         price_child: priceChild,
         travel_duration: travelDuration,
         advance_booking_time: advanceBookingTime,
+        anticipation,
         min_people: minPeople,
         max_people: maxPeople,
         includes,
@@ -450,6 +451,15 @@ class ToursController {
         client_booking_notes: clientBookingNotes,
         provider_notes: providerNotes,
         team_notes: teamNotes,
+        // Walking tour fields
+        isWalkingTour,
+        walkingPriceSmall,
+        walkingPriceMedium,
+        walkingPriceLarge,
+        walkingPriceCurrency,
+        walkingRangeSmall,
+        walkingRangeMedium,
+        walkingRangeLarge,
       } = req.body;
 
       // Validate required fields
@@ -527,6 +537,35 @@ class ToursController {
       }
       if (teamNotes !== undefined && teamNotes !== null && teamNotes !== '') {
         tour.set('team_notes', teamNotes);
+      }
+
+      // Set walking tour fields
+      if (isWalkingTour !== undefined) {
+        tour.set('isWalkingTour', Boolean(isWalkingTour));
+      }
+      if (walkingPriceSmall !== undefined && walkingPriceSmall !== null) {
+        tour.set('walkingPriceSmall', parseFloat(walkingPriceSmall));
+      }
+      if (walkingPriceMedium !== undefined && walkingPriceMedium !== null) {
+        tour.set('walkingPriceMedium', parseFloat(walkingPriceMedium));
+      }
+      if (walkingPriceLarge !== undefined && walkingPriceLarge !== null) {
+        tour.set('walkingPriceLarge', parseFloat(walkingPriceLarge));
+      }
+      if (walkingPriceCurrency !== undefined && walkingPriceCurrency !== null) {
+        tour.set('walkingPriceCurrency', walkingPriceCurrency);
+      }
+      if (walkingRangeSmall !== undefined && walkingRangeSmall !== null) {
+        tour.set('walkingRangeSmall', walkingRangeSmall);
+      }
+      if (walkingRangeMedium !== undefined && walkingRangeMedium !== null) {
+        tour.set('walkingRangeMedium', walkingRangeMedium);
+      }
+      if (walkingRangeLarge !== undefined && walkingRangeLarge !== null) {
+        tour.set('walkingRangeLarge', walkingRangeLarge);
+      }
+      if (anticipation !== undefined && anticipation !== null) {
+        tour.set('anticipation', parseInt(anticipation, 10));
       }
 
       tour.set('active', true);
@@ -623,6 +662,7 @@ class ToursController {
         price_child: priceChild,
         travel_duration: travelDuration,
         advance_booking_time: advanceBookingTime,
+        anticipation,
         min_people: minPeople,
         max_people: maxPeople,
         includes,
@@ -633,6 +673,15 @@ class ToursController {
         client_booking_notes: clientBookingNotes,
         provider_notes: providerNotes,
         team_notes: teamNotes,
+        // Walking tour fields
+        isWalkingTour,
+        walkingPriceSmall,
+        walkingPriceMedium,
+        walkingPriceLarge,
+        walkingPriceCurrency,
+        walkingRangeSmall,
+        walkingRangeMedium,
+        walkingRangeLarge,
       } = req.body;
 
       if (!tourId) {
@@ -825,6 +874,43 @@ class ToursController {
       if (teamNotes !== undefined) {
         if (teamNotes === null || teamNotes === '') tour.unset('team_notes');
         else tour.set('team_notes', teamNotes);
+      }
+
+      // Update walking tour fields
+      if (isWalkingTour !== undefined) {
+        tour.set('isWalkingTour', Boolean(isWalkingTour));
+      }
+      if (walkingPriceSmall !== undefined) {
+        if (walkingPriceSmall === null) tour.unset('walkingPriceSmall');
+        else tour.set('walkingPriceSmall', parseFloat(walkingPriceSmall));
+      }
+      if (walkingPriceMedium !== undefined) {
+        if (walkingPriceMedium === null) tour.unset('walkingPriceMedium');
+        else tour.set('walkingPriceMedium', parseFloat(walkingPriceMedium));
+      }
+      if (walkingPriceLarge !== undefined) {
+        if (walkingPriceLarge === null) tour.unset('walkingPriceLarge');
+        else tour.set('walkingPriceLarge', parseFloat(walkingPriceLarge));
+      }
+      if (walkingPriceCurrency !== undefined) {
+        if (walkingPriceCurrency === null || walkingPriceCurrency === '') tour.unset('walkingPriceCurrency');
+        else tour.set('walkingPriceCurrency', walkingPriceCurrency);
+      }
+      if (walkingRangeSmall !== undefined) {
+        if (walkingRangeSmall === null || walkingRangeSmall === '') tour.unset('walkingRangeSmall');
+        else tour.set('walkingRangeSmall', walkingRangeSmall);
+      }
+      if (walkingRangeMedium !== undefined) {
+        if (walkingRangeMedium === null || walkingRangeMedium === '') tour.unset('walkingRangeMedium');
+        else tour.set('walkingRangeMedium', walkingRangeMedium);
+      }
+      if (walkingRangeLarge !== undefined) {
+        if (walkingRangeLarge === null || walkingRangeLarge === '') tour.unset('walkingRangeLarge');
+        else tour.set('walkingRangeLarge', walkingRangeLarge);
+      }
+      if (anticipation !== undefined) {
+        if (anticipation === null) tour.unset('anticipation');
+        else tour.set('anticipation', parseInt(anticipation, 10));
       }
 
       await tour.save(null, { useMasterKey: true });
