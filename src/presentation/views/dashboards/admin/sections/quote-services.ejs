@@ -222,7 +222,6 @@
     font-size: 0.7rem;
 }
 
-
 /* Day total container with rowspan */
 .day-total-container {
     display: flex;
@@ -448,7 +447,6 @@ tr[data-row-type="subconcept"] {
                 return value;
             }
         }
-        console.warn('accessToken not found in cookies!');
 
         // Try to get from localStorage as fallback
         const localToken = localStorage.getItem('accessToken');
@@ -574,15 +572,8 @@ tr[data-row-type="subconcept"] {
 
     async function loadServiceItems() {
         const loadStart = Date.now();
-        console.log(`📥 [${loadStart}] === loadServiceItems called (OPTIMIZED) ===`);
-        console.log('   📋 Context:', {
-            quoteId,
-            isNewQuote,
-            currentServiceItemsData: serviceItemsData ? serviceItemsData.days?.length : 'none'
-        });
 
         if (isNewQuote) {
-            console.log('New quote - showing empty state');
             renderTable();
             updateTotalsDisplay();
             return;
@@ -603,13 +594,10 @@ tr[data-row-type="subconcept"] {
                 }
             });
 
-            console.log('Response status:', response.status);
             const result = await response.json();
-            console.log('Response data:', result);
 
             if (result.success && result.data) {
                 let quote = result.data;
-                console.log('Quote serviceItems:', quote.serviceItems);
 
                 // Migrate old quote structure (quote-level rate) to new (subconcept-level rate)
                 quote = migrateQuoteRateToSubconcepts(quote);
@@ -618,15 +606,12 @@ tr[data-row-type="subconcept"] {
                 quoteState.set('numberOfPeople', quote.numberOfPeople || 1);
                 quoteState.set('rateId', quote.rate?.id || null);
                 quoteState.set('rateName', quote.rate?.name || null);
-                console.log('Quote numberOfPeople:', quote.numberOfPeople);
 
                 if (quote.serviceItems) {
                     let days = quote.serviceItems.days || [];
-                    console.log('Days loaded:', days.length);
 
                     // Detect old format and migrate
                     if (days.length > 0 && days[0].concept !== undefined && days[0].subconcepts === undefined) {
-                        console.log('Migrating old format to new subconcepts structure...');
                         days = migrateOldFormatToNew(days);
                     }
 
@@ -635,7 +620,6 @@ tr[data-row-type="subconcept"] {
                         ...day,
                         subconcepts: day.subconcepts.map(migrateSubconceptToTyped)
                     }));
-                    console.log('Subconcepts migrated to typed format');
 
                     // ✨ OPTIMIZED: Update state
                     quoteState.set('serviceItems', {
@@ -645,8 +629,6 @@ tr[data-row-type="subconcept"] {
                         total: quote.serviceItems.total || 0
                     });
 
-                    console.log('serviceItemsData set:', serviceItemsData);
-                    console.log('Calling renderTable()...');
                     renderTable();
 
                     // Recalculate totals from loaded data (in case of data inconsistencies)
@@ -655,17 +637,12 @@ tr[data-row-type="subconcept"] {
 
                     // ✨ OPTIMIZED: Prefetch common data in background
                     if (quote.rate?.id) {
-                        console.log('🚀 Starting prefetch of common data...');
                         quoteAPI.prefetchCommonData(quoteId, quote.rate.id)
                             .then(() => {
-                                console.log('✅ Prefetch completed successfully');
                                 const stats = quoteAPI.getCacheStats();
-                                console.log(`📊 Cache stats: ${stats.size} entries, ${stats.hitRate}% hit rate`);
                             })
-                            .catch(err => console.warn('⚠️ Prefetch failed (non-critical):', err));
                     }
                 } else {
-                    console.log('No serviceItems in quote data - showing empty state');
                     // ✨ OPTIMIZED: Update state
                     quoteState.set('serviceItems', {
                         days: [],
@@ -677,12 +654,10 @@ tr[data-row-type="subconcept"] {
                     updateTotalsDisplay();
                 }
             } else {
-                console.log('Response not successful or no data');
             }
 
             quoteState.set('isLoading', false);
         } catch (error) {
-            console.error('Error loading service items:', error);
             showAlert('servicesAlerts', 'Error al cargar los servicios', 'danger');
             quoteState.set('isLoading', false);
         }
@@ -694,37 +669,25 @@ tr[data-row-type="subconcept"] {
 
     function renderTable() {
         const renderStart = Date.now();
-        console.log(`🎨 [${renderStart}] === renderTable called ===`);
         
         const tbody = document.getElementById('servicesTableBody');
         const emptyState = document.getElementById('emptyState');
         const tableContainer = document.getElementById('servicesTableContainer');
 
-        console.log(`   🔍 DOM elements check:`, { 
-            tbody: !!tbody, 
-            emptyState: !!emptyState, 
-            tableContainer: !!tableContainer 
-        });
-
         if (!tbody || !emptyState || !tableContainer) {
-            console.error('   ❌ Missing required DOM elements!');
             return;
         }
 
         tbody.innerHTML = '';
-        console.log(`   🧹 Cleared table body`);
 
         const daysCount = serviceItemsData.days.length;
-        console.log(`   📊 Days to render: ${daysCount}`);
 
         if (daysCount === 0) {
-            console.log('   📭 No days - showing empty state');
             emptyState.classList.remove('d-none');
             emptyState.classList.add('d-flex');
             tableContainer.classList.add('d-none');
             tableContainer.classList.remove('d-block');
         } else {
-            console.log(`   🏗️  Rendering ${daysCount} days`);
             emptyState.classList.remove('d-flex');
             emptyState.classList.add('d-none');
             tableContainer.classList.remove('d-none');
@@ -732,26 +695,21 @@ tr[data-row-type="subconcept"] {
 
             serviceItemsData.days.forEach((day, dayIndex) => {
                 const dayRenderStart = Date.now();
-                console.log(`   📅 [${dayRenderStart}] Rendering day ${dayIndex + 1}: ${day.subconcepts?.length || 0} subconcepts`);
                 
                 // Count experience subconcepts for debugging
                 const experienceSubconcepts = day.subconcepts?.filter(sub => sub.type === 'experiencia') || [];
                 if (experienceSubconcepts.length > 0) {
-                    console.log(`      🎭 Found ${experienceSubconcepts.length} experience subconcepts in day ${dayIndex + 1}`);
                     experienceSubconcepts.forEach((exp, i) => {
-                        console.log(`         🎯 Experience ${i + 1}: ${exp.experienceId || 'no ID'} - "${exp.concept || 'no concept'}"`);
                     });
                 }
                 
                 renderDay(dayIndex, true);
                 
                 const dayRenderTime = Date.now() - dayRenderStart;
-                console.log(`      ✅ Day ${dayIndex + 1} rendered in ${dayRenderTime}ms`);
             });
         }
         
         const totalRenderTime = Date.now() - renderStart;
-        console.log(`🎨 [+${totalRenderTime}ms] Table rendering completed`);
     }
 
     // Global render prevention flags
@@ -767,12 +725,10 @@ tr[data-row-type="subconcept"] {
         // Prevent concurrent renders of the same day (unless forced)
         // Force render is used when user explicitly adds/deletes subconcepts
         if (!forceRender && renderLocks.isRendering.has(dayIndex)) {
-            console.log(`⏭️  Skipping renderDay(${dayIndex}) - already rendering (use forceRender to override)`);
             return;
         }
 
         renderLocks.isRendering.add(dayIndex);
-        console.log(`🎨 Starting renderDay(${dayIndex})${forceRender ? ' [FORCED]' : ''}`);
 
         try {
             const tbody = document.getElementById('servicesTableBody');
@@ -834,7 +790,6 @@ tr[data-row-type="subconcept"] {
         } finally {
             // Always remove render lock when done
             renderLocks.isRendering.delete(dayIndex);
-            console.log(`✅ Completed renderDay(${dayIndex})`);
         }
     }
 
@@ -932,7 +887,6 @@ tr[data-row-type="subconcept"] {
             const newDate = e.target.value;
             const oldDate = serviceItemsData.days[dayIndex]?.dayDate;
             
-            console.log(`🗓️  Day ${dayIndex + 1} date changed: "${oldDate || 'none'}" → "${newDate || 'none'}"`);
             
             updateDayField(dayIndex, 'dayDate', newDate);
             
@@ -942,7 +896,6 @@ tr[data-row-type="subconcept"] {
             }
             
             const timeoutId = setTimeout(() => {
-                console.log(`🕐 Executing debounced refresh for day ${dayIndex + 1} after ${dateChangeDebounce.delay}ms delay`);
                 // Refresh experience and tour selectors when date changes
                 refreshExperienceSelectorsForDay(dayIndex);
                 refreshTourSelectorsForDay(dayIndex);
@@ -950,7 +903,6 @@ tr[data-row-type="subconcept"] {
             }, dateChangeDebounce.delay);
             
             dateChangeDebounce.timeouts.set(dayIndex, timeoutId);
-            console.log(`⏱️ Debouncing date change refresh for day ${dayIndex + 1} - will execute in ${dateChangeDebounce.delay}ms`);
         });
 
         // Attach listeners to all three "add subconcept" buttons
@@ -979,7 +931,6 @@ tr[data-row-type="subconcept"] {
         const subType = subconcept.type || 'regular';
 
         // Debug: Log numberOfPeople values
-        console.log(`Creating subconcept row - Type: ${subType}, numberOfPeople: ${subconcept.numberOfPeople}, quoteNumberOfPeople: ${quoteNumberOfPeople}`);
 
         // Build HTML based on subconcept type
         let conceptCellHTML = '';
@@ -1488,12 +1439,6 @@ tr[data-row-type="subconcept"] {
                     markDirty();
                     triggerAutoSave();
 
-                    console.log('Additional vehicle checkbox changed:', {
-                        dayIndex,
-                        subconceptIndex,
-                        isChecked,
-                        newTotal: subconcept.total
-                    });
                 }
             });
         }
@@ -1522,13 +1467,6 @@ tr[data-row-type="subconcept"] {
                     // Update unit price display immediately for better UX
                     updateUnitPriceDisplay(dayIndex, subconceptIndex, subconcept);
 
-                    console.log('Cash payment checkbox changed:', {
-                        dayIndex,
-                        subconceptIndex,
-                        isChecked,
-                        conceptName: subconcept.concept
-                    });
-
                     // Re-render the day to update pricing display
                     renderDay(dayIndex);
                 }
@@ -1544,9 +1482,7 @@ tr[data-row-type="subconcept"] {
 
         // Initialize experience selector for experiencia type
         if (subType === 'experiencia') {
-            console.log(`🚀 Scheduling initExperienceSelector for day ${dayIndex + 1}, subconcept ${subconceptIndex} (100ms delay)`);
             setTimeout(() => {
-                console.log(`⚡ Executing scheduled initExperienceSelector for day ${dayIndex + 1}, subconcept ${subconceptIndex}`);
                 initExperienceSelector(dayIndex, subconceptIndex, subconcept);
             }, 100);
         }
@@ -1652,7 +1588,6 @@ tr[data-row-type="subconcept"] {
     
     // Function to clear cache when needed (e.g., on page refresh or when data might be stale)
     function clearTourCache() {
-        console.log('🧹 Clearing tour data cache');
         tourDataCache.destinations.clear();
         tourDataCache.vehicles.clear();
     }
@@ -1665,7 +1600,6 @@ tr[data-row-type="subconcept"] {
                 
                 if (response.status === 429) {
                     const retryAfter = response.headers.get('Retry-After') || Math.pow(2, attempt);
-                    console.warn(`🚫 Rate limit hit (attempt ${attempt}/${maxRetries}). Retrying after ${retryAfter}s...`);
                     
                     if (attempt < maxRetries) {
                         await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
@@ -1679,14 +1613,12 @@ tr[data-row-type="subconcept"] {
             } catch (error) {
                 // Don't retry if request was aborted (timeout)
                 if (error.name === 'AbortError') {
-                    console.error('🕐 Request timed out');
                     throw new Error('Request timed out after 30 seconds');
                 }
                 
                 if (attempt === maxRetries) throw error;
                 
                 const delay = Math.pow(2, attempt) * 1000;
-                console.warn(`🔄 Request failed (attempt ${attempt}/${maxRetries}). Retrying in ${delay}ms...`, error.message);
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
@@ -1712,11 +1644,9 @@ tr[data-row-type="subconcept"] {
                 availableServices = result.data;
                 return availableServices;
             } else {
-                console.error('Error loading services:', result.error);
                 return [];
             }
         } catch (error) {
-            console.error('Error loading available services:', error);
             showAlert('servicesAlerts', 'Error al cargar los traslados disponibles', 'danger');
             return [];
         }
@@ -1729,7 +1659,6 @@ tr[data-row-type="subconcept"] {
     function initRateSelector(dayIndex, subconceptIndex, subconcept) {
         const selectElement = document.getElementById(`rateSelector_${dayIndex}_${subconceptIndex}`);
         if (!selectElement) {
-            console.error('Rate selector not found');
             return;
         }
 
@@ -1852,17 +1781,14 @@ tr[data-row-type="subconcept"] {
     async function loadActiveRatesForSelector() {
         try {
             // Use cached API call from quote-services-api.js
-            console.log('📋 Loading rates (using cached API)');
             const result = await quoteAPI.getRates();
 
             if (result.success && result.data) {
                 return result.data; // [{value, label}]
             } else {
-                console.error('Error loading rates:', result.error);
                 return [];
             }
         } catch (error) {
-            console.error('Error loading rates for selector:', error);
             showAlert('servicesAlerts', 'Error al cargar las tarifas', 'danger');
             return [];
         }
@@ -1875,7 +1801,6 @@ tr[data-row-type="subconcept"] {
     function initTransferSelectorByRate(dayIndex, subconceptIndex, subconcept, rateId) {
         const selectElement = document.getElementById(`transferSelector_${dayIndex}_${subconceptIndex}`);
         if (!selectElement) {
-            console.error('Transfer selector not found');
             return;
         }
 
@@ -1911,7 +1836,6 @@ tr[data-row-type="subconcept"] {
 
             // Initialize Tom Select (check if already initialized)
             if (selectElement.tomselect) {
-                console.log('Tom Select already initialized for transfer selector - destroying and recreating');
                 selectElement.tomselect.destroy();
             }
 
@@ -1941,12 +1865,6 @@ tr[data-row-type="subconcept"] {
                 }
             }
 
-            console.log('Transfer selector initialized by rate', {
-                dayIndex,
-                subconceptIndex,
-                rateId,
-                routesCount: routes.length
-            });
         });
     }
 
@@ -1964,12 +1882,6 @@ tr[data-row-type="subconcept"] {
             });
 
             const result = await response.json();
-            console.log('API Response for services-by-rate:', {
-                rateId,
-                success: result.success,
-                dataLength: result.data ? result.data.length : 'no data',
-                fullResponse: result
-            });
 
             if (result.success && result.data) {
 
@@ -1983,11 +1895,9 @@ tr[data-row-type="subconcept"] {
 
                 return result.data;
             } else {
-                console.error('Error loading services by rate:', result.error);
                 return [];
             }
         } catch (error) {
-            console.error('Error loading available services by rate:', error);
             showAlert('servicesAlerts', 'Error al cargar los traslados para esta tarifa', 'danger');
             return [];
         }
@@ -1997,7 +1907,6 @@ tr[data-row-type="subconcept"] {
     function initTransferSelector(dayIndex, subconceptIndex, subconcept) {
         const selectElement = document.getElementById(`transferSelector_${dayIndex}_${subconceptIndex}`);
         if (!selectElement) {
-            console.error('Transfer selector not found');
             return;
         }
 
@@ -2034,7 +1943,6 @@ tr[data-row-type="subconcept"] {
 
             // Initialize Tom Select (check if already initialized)
             if (selectElement.tomselect) {
-                console.log('Tom Select already initialized for transfer selector - destroying and recreating');
                 selectElement.tomselect.destroy();
             }
 
@@ -2067,34 +1975,20 @@ tr[data-row-type="subconcept"] {
                 }
             }
 
-            console.log('Tom Select initialized for transfer selector', {
-                dayIndex,
-                subconceptIndex,
-                routesCount: routes.length
-            });
         });
     }
 
     function updateVehicleTypeSelector(dayIndex, subconceptIndex, routeData, subconcept) {
         const vehicleSelector = document.getElementById(`vehicleTypeSelector_${dayIndex}_${subconceptIndex}`);
         if (!vehicleSelector) {
-            console.error('Vehicle type selector not found');
             return;
         }
 
         // Clear existing options
         vehicleSelector.innerHTML = '<option value="">Seleccionar vehículo...</option>';
 
-        console.log('updateVehicleTypeSelector called with:', {
-            dayIndex,
-            subconceptIndex,
-            routeData: routeData,
-            vehiclesCount: routeData.vehicles ? routeData.vehicles.length : 'undefined/null'
-        });
-
         // Check if vehicles exist
         if (!routeData.vehicles || !Array.isArray(routeData.vehicles)) {
-            console.warn('No vehicles available for route:', routeData);
             vehicleSelector.innerHTML = '<option value="">No hay vehículos disponibles</option>';
             return;
         }
@@ -2126,10 +2020,6 @@ tr[data-row-type="subconcept"] {
             // Restore capacity if not already set
             if (!subconcept.vehicleCapacity) {
                 subconcept.vehicleCapacity = preselectedVehicle.capacity || null;
-                console.log('Restored vehicleCapacity for pre-selected vehicle:', {
-                    vehicleType: preselectedVehicle.vehicleType,
-                    capacity: preselectedVehicle.capacity
-                });
             }
         }
         // Auto-select first vehicle if none selected (cheapest one after sorting)
@@ -2272,7 +2162,6 @@ tr[data-row-type="subconcept"] {
                         recalculateGeneralTotals();
                         markDirty();
                         triggerAutoSave();
-                        console.log('Additional vehicle checkbox changed:', { dayIndex, subconceptIndex, isChecked, newTotal: subconcept.total });
                     });
                 }
             } else {
@@ -2294,7 +2183,6 @@ tr[data-row-type="subconcept"] {
         markDirty();
         triggerAutoSave();
 
-        console.log('Transfer data populated:', subconcept);
     }
 
     // ==================
@@ -2333,7 +2221,6 @@ tr[data-row-type="subconcept"] {
         // Debug log for experiences that don't match (to see what's being filtered out)
         if (!isAvailable) {
             const availableDays = experience.availability.map(s => s.day).join(',');
-            console.log(`     ❌ "${experience.name}" not available on day ${dayCode}, available on: [${availableDays}]`);
         }
         
         return isAvailable;
@@ -2345,7 +2232,6 @@ tr[data-row-type="subconcept"] {
      */
     async function loadAvailableExperiences(targetDate = null) {
         const startTime = Date.now();
-        console.log(`   📡 [${startTime}] Starting API call to load experiences${targetDate ? ` for date ${targetDate}` : ''} (using cached API)`);
 
         try {
             const fetchStartTime = Date.now();
@@ -2354,48 +2240,38 @@ tr[data-row-type="subconcept"] {
             const result = await quoteAPI.getExperiences('Experience', targetDate);
 
             const fetchTime = Date.now() - fetchStartTime;
-            console.log(`   🌐 [+${fetchTime}ms] API fetch completed (cached)`);
 
             if (result.data && Array.isArray(result.data)) {
                 const filterStartTime = Date.now();
 
                 // Filter only active experiences
                 let experiences = result.data.filter(exp => exp.active === true);
-                console.log(`   📊 Found ${experiences.length} active experiences from ${result.data.length} total`);
 
                 // If target date is provided, filter by day availability
                 if (targetDate) {
                     const dayCode = getDayOfWeekCode(targetDate);
-                    console.log(`   📅 Target date: ${targetDate} = day code ${dayCode} (${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dayCode]})`);
                     if (dayCode !== null) {
                         const beforeCount = experiences.length;
                         experiences = experiences.filter(exp => isExperienceAvailableOnDay(exp, dayCode));
-                        console.log(`   ✅ Filtered from ${beforeCount} to ${experiences.length} experiences available on day ${dayCode}`);
                         
                         // Log sample of filtered experiences for debugging
                         if (experiences.length > 0 && experiences.length <= 3) {
                             experiences.forEach(exp => {
-                                console.log(`     🎯 Available: "${exp.name}" (${exp.id})`);
                             });
                         } else if (experiences.length > 3) {
-                            console.log(`     🎯 Available experiences: "${experiences[0].name}", "${experiences[1].name}", "${experiences[2].name}" and ${experiences.length - 3} more...`);
                         }
                     }
                 }
                 
                 const filterTime = Date.now() - filterStartTime;
                 const totalTime = Date.now() - startTime;
-                console.log(`   ✅ [+${filterTime}ms filter, +${totalTime}ms total] Returning ${experiences.length} experiences`);
                 
                 return experiences;
             } else {
-                console.error('   ❌ Error loading experiences:', result.error || 'Invalid data structure');
-                console.log(`   📊 Response structure:`, { hasData: !!result.data, isArray: Array.isArray(result.data), keys: Object.keys(result) });
                 return [];
             }
         } catch (error) {
             const errorTime = Date.now() - startTime;
-            console.error(`   ❌ [+${errorTime}ms] Error loading available experiences:`, error);
             showAlert('servicesAlerts', 'Error al cargar las experiencias disponibles', 'danger');
             return [];
         }
@@ -2407,19 +2283,16 @@ tr[data-row-type="subconcept"] {
         if (!dayData) return;
 
         const dayDate = dayData.dayDate;
-        console.log(`🔄 Refreshing experience selectors for day ${dayIndex + 1}, date: ${dayDate || 'none'}`);
 
         // Find all experience selectors for this day
         const experienceSelectors = document.querySelectorAll(`select[id^="experienceSelector_${dayIndex}_"]`);
         
         if (experienceSelectors.length === 0) {
-            console.log(`   ℹ️  No experience selectors found for day ${dayIndex + 1}`);
             return;
         }
 
         try {
             // Load experiences for the new date
-            console.log(`   🔍 Executing experience query for ${dayDate ? `day-of-week filtering (${dayDate})` : 'all experiences'}`);
             const experiences = await loadAvailableExperiences(dayDate);
 
             // Update each experience selector
@@ -2431,11 +2304,9 @@ tr[data-row-type="subconcept"] {
 
                 // Store current selection
                 const currentValue = selectElement.value;
-                console.log(`   🔧 Updating selector ${selectElement.id}, current selection: "${currentValue}"`);
 
                 if (experiences.length === 0) {
                     selectElement.innerHTML = '<option value="">No hay experiencias disponibles para esta fecha</option>';
-                    console.log(`   📝 Set "no experiences" message`);
                     
                     // Clear concept since no experiences are available
                     if (subconcept) {
@@ -2462,7 +2333,6 @@ tr[data-row-type="subconcept"] {
                     
                     // If the previously selected experience is no longer available, clear the concept
                     if (!experienceStillAvailable && currentValue) {
-                        console.log(`   🧹 Clearing concept - selected experience "${currentValue}" no longer available for this date`);
                         if (subconcept) {
                             subconcept.experienceId = null;
                             subconcept.experienceName = '';
@@ -2472,7 +2342,6 @@ tr[data-row-type="subconcept"] {
                         }
                     }
                     
-                    console.log(`   📝 Added ${experiences.length} experiences + 1 default option = ${selectElement.options.length} total options`);
                 }
 
                 // Refresh Tom Select if it exists
@@ -2487,24 +2356,18 @@ tr[data-row-type="subconcept"] {
                     // Restore selection if the option still exists
                     if (currentSelection && selectElement.querySelector(`option[value="${currentSelection}"]`)) {
                         selectElement.tomselect.setValue(currentSelection, true);
-                        console.log(`   🔄 Tom Select updated and selection "${currentSelection}" restored`);
                     } else {
-                        console.log(`   🔄 Tom Select updated, previous selection cleared (no longer available)`);
                     }
                     
-                    console.log(`   📊 Tom Select now has ${Object.keys(selectElement.tomselect.options).length} options`);
                 } else {
-                    console.log(`   ℹ️  No Tom Select instance found for ${selectElement.id}`);
                 }
             });
 
             // Recalculate totals WITHOUT re-rendering (prevents cascade)
             // The selector updates above already handle the UI changes
-            console.log(`   📊 Recalculating totals for day ${dayIndex + 1} (no re-render needed)`);
             recalculateDayTotal(dayIndex);
             recalculateGeneralTotals();
         } catch (error) {
-            console.error('Error refreshing experience selectors:', error);
         }
     }
 
@@ -2514,13 +2377,11 @@ tr[data-row-type="subconcept"] {
         if (!dayData) return;
 
         const dayDate = dayData.dayDate;
-        console.log(`🔄 Refreshing tour selectors for day ${dayIndex + 1}, date: ${dayDate || 'none'}`);
 
         // Find all tour destination selectors for this day (they depend on date availability)
         const tourDestinationSelectors = document.querySelectorAll(`select[id^="tourDestinationSelector_${dayIndex}_"]`);
         
         if (tourDestinationSelectors.length === 0) {
-            console.log(`   ℹ️  No tour destination selectors found for day ${dayIndex + 1}`);
             return;
         }
 
@@ -2534,7 +2395,6 @@ tr[data-row-type="subconcept"] {
                 const subconcept = dayData.subconcepts[parseInt(subconceptIndex)];
                 
                 if (!subconcept || subconcept.type !== 'tour' || !subconcept.rateId) {
-                    console.log(`   ⏭️  Skipping selector ${selectElement.id} - no rate selected`);
                     continue;
                 }
 
@@ -2556,15 +2416,12 @@ tr[data-row-type="subconcept"] {
             }
             
             if (selectorsToRefresh.length === 0) {
-                console.log(`   ℹ️  No tour selectors need refreshing for day ${dayIndex + 1}`);
                 return;
             }
             
-            console.log(`   📊 Found ${selectorsToRefresh.length} tour selectors across ${uniqueRatesMap.size} unique rates`);
             
             // Pre-load destinations for all unique rates to utilize caching
             const rateIds = Array.from(uniqueRatesMap.keys());
-            console.log(`   🚀 Pre-loading destinations for rates: ${rateIds.join(', ')}`);
             
             await Promise.all(rateIds.map(rateId => 
                 loadTourDestinationsByRate(rateId, dayDate)
@@ -2572,21 +2429,17 @@ tr[data-row-type="subconcept"] {
             
             // Now refresh each selector (most calls will hit cache)
             for (const { selectElement, subconceptIndex, subconcept } of selectorsToRefresh) {
-                console.log(`   🔧 Refreshing tour destinations for selector ${selectElement.id}, rate: ${subconcept.rateId}`);
                 
                 // Re-initialize the destination selector with date filtering (will use cache)
                 await initTourDestinationSelector(dayIndex, subconceptIndex, subconcept, subconcept.rateId);
                 
-                console.log(`   ✅ Refreshed tour selector ${selectElement.id}`);
             }
 
             // Recalculate totals WITHOUT re-rendering (prevents cascade)
             // The selector updates above already handle the UI changes
-            console.log(`   📊 Recalculating totals for day ${dayIndex + 1} after tour selector refresh (no re-render needed)`);
             recalculateDayTotal(dayIndex);
             recalculateGeneralTotals();
         } catch (error) {
-            console.error('Error refreshing tour selectors:', error);
         }
     }
 
@@ -2601,7 +2454,6 @@ tr[data-row-type="subconcept"] {
     function initTourRateSelector(dayIndex, subconceptIndex, subconcept) {
         const selectElement = document.getElementById(`tourRateSelector_${dayIndex}_${subconceptIndex}`);
         if (!selectElement) {
-            console.error('Tour rate selector not found');
             return;
         }
 
@@ -2735,7 +2587,6 @@ tr[data-row-type="subconcept"] {
     function initTourDestinationSelector(dayIndex, subconceptIndex, subconcept, rateId) {
         const destinationSelector = document.getElementById(`tourDestinationSelector_${dayIndex}_${subconceptIndex}`);
         if (!destinationSelector) {
-            console.error('Tour destination selector not found');
             return;
         }
 
@@ -2743,7 +2594,6 @@ tr[data-row-type="subconcept"] {
         const dayData = serviceItemsData.days[dayIndex];
         const dayDate = dayData ? dayData.dayDate : null;
         
-        console.log(`🏛️ Loading tour destinations for rate ${rateId} filtered by date: ${dayDate || 'all dates'}`);
 
         // Show loading message
         destinationSelector.innerHTML = '<option value="">Cargando destinos...</option>';
@@ -2781,7 +2631,6 @@ tr[data-row-type="subconcept"] {
 
             // Initialize TomSelect with search (check if already initialized)
             if (destinationSelector.tomselect) {
-                console.log('Tom Select already initialized for destination selector - destroying and recreating');
                 destinationSelector.tomselect.destroy();
             }
 
@@ -2847,8 +2696,6 @@ tr[data-row-type="subconcept"] {
                 }
             };
         }).catch(error => {
-            console.error(`❌ Error loading tour destinations for rate ${rateId}:`, error);
-            console.error('   Stack:', error.stack);
             destinationSelector.innerHTML = '<option value="">Error al cargar destinos - Ver consola</option>';
             destinationSelector.disabled = true;
             
@@ -2867,7 +2714,6 @@ tr[data-row-type="subconcept"] {
         try {
             // Validate rate ID
             if (!rateId) {
-                console.error('No rate ID provided for tour destinations');
                 return [];
             }
             
@@ -2879,7 +2725,6 @@ tr[data-row-type="subconcept"] {
             if (tourDataCache.destinations.has(cacheKey)) {
                 const cached = tourDataCache.destinations.get(cacheKey);
                 if (now - cached.timestamp < tourDataCache.cacheTimeout) {
-                    console.log(`🚀 Using cached tour destinations for rate ${rateId}, date: ${dayDate || 'all'}`);
                     return cached.data;
                 }
                 // Cache expired, remove it
@@ -2892,7 +2737,6 @@ tr[data-row-type="subconcept"] {
                 url += `?dayDate=${encodeURIComponent(dayDate)}`;
             }
             
-            console.log(`🌐 Fetching tour destinations from API for rate ${rateId}, date: ${dayDate || 'all'}`);
             
             // Add timeout to prevent infinite loading
             const controller = new AbortController();
@@ -2914,7 +2758,6 @@ tr[data-row-type="subconcept"] {
             // Check if response is ok first
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error(`HTTP Error ${response.status}: ${errorText}`);
                 throw new Error(`HTTP ${response.status}: ${response.statusText || 'Request failed'}`);
             }
 
@@ -2927,15 +2770,12 @@ tr[data-row-type="subconcept"] {
                     timestamp: now
                 });
                 
-                console.log(`✅ Successfully loaded ${result.data.length} tour destinations for rate ${rateId}`);
                 return result.data;
             } else {
                 const errorMsg = result.error || 'Unknown error from API';
-                console.error('API returned error:', errorMsg);
                 throw new Error(`API Error: ${errorMsg}`);
             }
         } catch (error) {
-            console.error('Error loading tour destinations:', error);
             showAlert('servicesAlerts', 'Error al cargar destinos de tours', 'danger');
             return [];
         }
@@ -2956,7 +2796,6 @@ tr[data-row-type="subconcept"] {
             if (tourDataCache.vehicles.has(cacheKey)) {
                 const cached = tourDataCache.vehicles.get(cacheKey);
                 if (now - cached.timestamp < tourDataCache.cacheTimeout) {
-                    console.log(`🚀 Using cached tour vehicles for rate ${rateId}, destination ${destinationId}, date: ${dayDate || 'all'}`);
                     return cached.data;
                 }
                 // Cache expired, remove it
@@ -2969,7 +2808,6 @@ tr[data-row-type="subconcept"] {
                 url += `&dayDate=${encodeURIComponent(dayDate)}`;
             }
             
-            console.log(`🌐 Fetching tour vehicles from API for rate ${rateId}, destination ${destinationId}, date: ${dayDate || 'all'}`);
             
             const response = await fetchWithRetry(url, {
                 method: 'GET',
@@ -2997,11 +2835,9 @@ tr[data-row-type="subconcept"] {
 
                 return result.data;
             } else {
-                console.error('Error loading tour vehicles:', result.error);
                 return [];
             }
         } catch (error) {
-            console.error('Error loading tour vehicles:', error);
             showAlert('servicesAlerts', 'Error al cargar vehículos de tours', 'danger');
             return [];
         }
@@ -3014,7 +2850,6 @@ tr[data-row-type="subconcept"] {
     function updateTourVehicleSelector(dayIndex, subconceptIndex, subconcept, rateId, destinationId) {
         const vehicleSelector = document.getElementById(`tourVehicleSelector_${dayIndex}_${subconceptIndex}`);
         if (!vehicleSelector) {
-            console.error('Tour vehicle selector not found');
             return;
         }
 
@@ -3022,7 +2857,6 @@ tr[data-row-type="subconcept"] {
         const dayData = serviceItemsData.days[dayIndex];
         const dayDate = dayData ? dayData.dayDate : null;
         
-        console.log(`🚗 Loading tour vehicles for rate ${rateId}, destination ${destinationId}, filtered by date: ${dayDate || 'all dates'}`);
 
         // Show loading message
         vehicleSelector.innerHTML = '<option value="">Cargando vehículos...</option>';
@@ -3030,12 +2864,10 @@ tr[data-row-type="subconcept"] {
 
         // Load vehicles for this rate + destination filtered by date
         loadTourVehiclesByRateAndDestination(rateId, destinationId, dayDate).then(vehicles => {
-            console.log(`🚗 Tour vehicle selector update: Found ${vehicles.length} vehicles for rate ${rateId}, destination ${destinationId}`);
             
             if (vehicles.length === 0) {
                 vehicleSelector.innerHTML = '<option value="">No hay vehículos disponibles</option>';
                 vehicleSelector.disabled = true;
-                console.log(`   ⚠️ No vehicles available - selector disabled`);
                 return;
             }
 
@@ -3044,7 +2876,6 @@ tr[data-row-type="subconcept"] {
 
             // Enable selector
             vehicleSelector.disabled = false;
-            console.log(`   ✅ Vehicle selector enabled with ${vehicles.length} options`);
 
             // Add vehicle options with capacity warnings
             vehicles.forEach(vehicle => {
@@ -3082,7 +2913,6 @@ tr[data-row-type="subconcept"] {
             const preSelectedOption = vehicleSelector.querySelector('option[selected]');
             if (preSelectedOption && preSelectedOption.dataset.vehicleData) {
                 const vehicleData = JSON.parse(preSelectedOption.dataset.vehicleData);
-                console.log(`🏗️ Populating tour pricing data for pre-selected vehicle: ${vehicleData.vehicleType}`);
                 populateTourData(dayIndex, subconceptIndex, subconcept, vehicleData, true);
             }
 
@@ -3117,7 +2947,6 @@ tr[data-row-type="subconcept"] {
                 }
             };
         }).catch(error => {
-            console.error('Error updating tour vehicle selector:', error);
             vehicleSelector.innerHTML = '<option value="">Error al cargar vehículos</option>';
             vehicleSelector.disabled = true;
         });
@@ -3141,7 +2970,6 @@ tr[data-row-type="subconcept"] {
         }
 
         if (!vehicleData) {
-            console.warn('No vehicle data available to populate');
             return;
         }
 
@@ -3165,27 +2993,12 @@ tr[data-row-type="subconcept"] {
         subconcept.surcharge = vehicleData.surcharge;
         subconcept.surchargePercentage = vehicleData.surchargePercentage;
 
-
         // Calculate vehicle multiplier based on numberOfPeople and capacity
         const numberOfPeople = subconcept.numberOfPeople || quoteNumberOfPeople;
         subconcept.vehicleMultiplier = Math.ceil(numberOfPeople / vehicleData.capacity);
 
         // Calculate total: unitPrice × vehicleMultiplier
         subconcept.total = calculateSubconceptTotal(subconcept);
-
-        console.log('Populated tour data:', {
-            tourId: subconcept.tourId,
-            destination: subconcept.destinationPOI,
-            vehicleType: subconcept.vehicleType,
-            capacity: subconcept.vehicleCapacity,
-            durationMinutes: subconcept.durationMinutes,
-            basePrice: subconcept.basePrice,
-            surcharge: subconcept.surcharge,
-            unitPrice: subconcept.unitPrice,
-            numberOfPeople,
-            vehicleMultiplier: subconcept.vehicleMultiplier,
-            total: subconcept.total
-        });
 
         // Update capacity/luggage display in vehicle column (without full re-render)
         const vehicleCell = document.querySelector(`tr[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"] td:nth-child(3)`);
@@ -3249,7 +3062,6 @@ tr[data-row-type="subconcept"] {
                         recalculateGeneralTotals();
                         markDirty();
                         triggerAutoSave();
-                        console.log('Additional vehicle checkbox changed (tour):', { dayIndex, subconceptIndex, isChecked, newTotal: subconcept.total });
                     });
                 }
             } else {
@@ -3280,10 +3092,8 @@ tr[data-row-type="subconcept"] {
         const startTime = Date.now();
         const selectElement = document.getElementById(`experienceSelector_${dayIndex}_${subconceptIndex}`);
         
-        console.log(`🎯 [${startTime}] Initializing experience selector for day ${dayIndex + 1}, subconcept ${subconceptIndex}`);
         
         if (!selectElement) {
-            console.error(`   ❌ Experience selector element not found: experienceSelector_${dayIndex}_${subconceptIndex}`);
             return;
         }
 
@@ -3291,11 +3101,9 @@ tr[data-row-type="subconcept"] {
         const dayData = serviceItemsData.days[dayIndex];
         const dayDate = dayData ? dayData.dayDate : null;
         
-        console.log(`   📅 Day data: ${JSON.stringify({dayIndex, dayDate, hasSubconcept: !!subconcept, experienceId: subconcept?.experienceId})}`);
         
         // Check if element already has TomSelect initialized
         if (selectElement.tomselect) {
-            console.log(`   🔄 Element already has TomSelect, destroying first`);
             selectElement.tomselect.destroy();
         }
         
@@ -3303,24 +3111,20 @@ tr[data-row-type="subconcept"] {
         loadAvailableExperiences(dayDate)
             .then(experiences => {
                 const loadTime = Date.now() - startTime;
-                console.log(`   📋 [+${loadTime}ms] Loaded ${experiences.length} experiences for initialization`);
                 
                 // Check if element still exists (might be removed during async operation)
                 const currentElement = document.getElementById(`experienceSelector_${dayIndex}_${subconceptIndex}`);
                 if (!currentElement) {
-                    console.log(`   ⚠️  Element disappeared during async load - aborting`);
                     return;
                 }
                 
                 if (experiences.length === 0) {
                     currentElement.innerHTML = '<option value="">No hay experiencias disponibles</option>';
-                    console.log(`   ⚠️  No experiences available for initialization`);
                     return;
                 }
 
                 // Clear existing options
                 currentElement.innerHTML = '<option value="">Seleccionar experiencia...</option>';
-                console.log(`   🧹 Cleared existing options`);
 
                 // Add experience options (only name)
                 let optionsAdded = 0;
@@ -3337,31 +3141,21 @@ tr[data-row-type="subconcept"] {
                         option.selected = true;
                         preSelectedFound = true;
                         preSelectedExperience = experience;
-                        console.log(`   🎯 Pre-selecting experience: ${experience.name} (${experience.id})`);
                     }
 
                     currentElement.appendChild(option);
                     optionsAdded++;
                 });
                 
-                console.log(`   ✅ Added ${optionsAdded} options to select element, pre-selected: ${preSelectedFound}`);
                 
                 // If we have a pre-selected experience but it wasn't found in the available experiences,
                 // this indicates a data consistency issue or filtering problem
                 if (subconcept.experienceId && !preSelectedFound) {
-                    console.warn(`   ⚠️  Pre-selected experience ID "${subconcept.experienceId}" not found in available experiences!`);
-                    console.log(`      Available experience IDs:`, experiences.map(exp => exp.id));
-                    console.log(`      Subconcept data:`, {
-                        experienceId: subconcept.experienceId,
-                        experienceName: subconcept.experienceName,
-                        concept: subconcept.concept
-                    });
                 }
 
                 // Initialize Tom Select (check if already initialized)
                 try {
                     if (currentElement.tomselect) {
-                        console.log('Tom Select already initialized for experience selector - destroying and recreating');
                         currentElement.tomselect.destroy();
                     }
 
@@ -3372,7 +3166,6 @@ tr[data-row-type="subconcept"] {
                         sortField: 'text',
                         closeAfterSelect: true,
                         onChange: function(experienceId) {
-                            console.log(`   🔄 Experience changed: ${experienceId}`);
                             if (experienceId) {
                                 populateExperienceData(dayIndex, subconceptIndex, experienceId);
                             } else {
@@ -3383,10 +3176,8 @@ tr[data-row-type="subconcept"] {
                     });
                     
                     const totalTime = Date.now() - startTime;
-                    console.log(`   ✅ [+${totalTime}ms] TomSelect initialized successfully`);
                     
                 } catch (error) {
-                    console.error(`   ❌ Error initializing TomSelect:`, error);
                 }
 
                 // Note: Don't auto-populate on init - data is already in subconcept
@@ -3394,13 +3185,11 @@ tr[data-row-type="subconcept"] {
                 
                 // However, if this is a package experience with existing data, render the package table
                 if (subconcept.isPackage && subconcept.includedExperiences && subconcept.includedExperiences.length > 0) {
-                    console.log(`   📦 Rendering existing package table for experience: ${subconcept.experienceName}`);
                     renderExperiencePackageTable(dayIndex, subconceptIndex, subconcept.includedExperiences);
                 }
             })
             .catch(error => {
                 const errorTime = Date.now() - startTime;
-                console.error(`   ❌ [+${errorTime}ms] Error during experience loading:`, error);
             });
     }
 
@@ -3432,7 +3221,6 @@ tr[data-row-type="subconcept"] {
         if (!subconcept) return;
 
         try {
-            console.log(`Loading experience details for ID: ${experienceId}`);
             const response = await fetch(`/api/experiences/${experienceId}`, {
                 method: 'GET',
                 headers: {
@@ -3517,10 +3305,8 @@ tr[data-row-type="subconcept"] {
                 markDirty();
                 triggerAutoSave();
 
-                console.log('Experience data populated:', subconcept);
             }
         } catch (error) {
-            console.error('Error loading experience details:', error);
             showAlert('servicesAlerts', 'Error al cargar los detalles de la experiencia', 'danger');
         }
     }
@@ -3605,11 +3391,6 @@ tr[data-row-type="subconcept"] {
             const quoteRateId = quote.rate.id;
             const quoteRateName = quote.rate.name;
 
-            console.log('Migrating quote-level rate to subconcepts:', {
-                rateId: quoteRateId,
-                rateName: quoteRateName
-            });
-
             quote.serviceItems.days.forEach((day, dayIndex) => {
                 if (!day.subconcepts) return;
 
@@ -3618,7 +3399,6 @@ tr[data-row-type="subconcept"] {
                         // Migrate: Set quote's rate to this traslado
                         sub.rateId = quoteRateId;
                         sub.rateName = quoteRateName;
-                        console.log(`Migrated rate to day ${dayIndex + 1}, subconcept ${subIndex + 1}`);
                     }
                 });
             });
@@ -3653,7 +3433,6 @@ tr[data-row-type="subconcept"] {
             
             return migrated;
         }
-
 
         // Otherwise, treat as "regular" type
         return {
@@ -3779,28 +3558,10 @@ tr[data-row-type="subconcept"] {
         const unitPrice = subconcept.isCashPayment ? basePrice : basePrice + surcharge;
         const numberOfPeople = parseInt(subconcept.numberOfPeople) || 1;
 
-        console.log('calculateSubconceptTotal called:', {
-            type: subconcept.type,
-            isCashPayment: subconcept.isCashPayment,
-            basePrice: basePrice,
-            surcharge: surcharge,
-            unitPrice: unitPrice,
-            numberOfPeople,
-            vehicleCapacity: subconcept.vehicleCapacity,
-            currentMultiplier: subconcept.vehicleMultiplier
-        });
-
         // TRASLADO: Direct unit price multiplied by vehicle count (1 or 2 based on checkbox)
         if (subconcept.type === 'traslado' && subconcept.vehicleCapacity) {
             // Vehicle count: 1 by default, 2 if additional vehicle for luggage is checked
             const vehicleCount = subconcept.additionalVehicleForLuggage ? 2 : 1;
-            console.log('Traslado vehicle calculation:', {
-                numberOfPeople,
-                vehicleCapacity: subconcept.vehicleCapacity,
-                additionalVehicleForLuggage: subconcept.additionalVehicleForLuggage,
-                vehicleCount,
-                calculation: `$${unitPrice} × ${vehicleCount} vehicle(s) = $${unitPrice * vehicleCount}`
-            });
             return Math.round(unitPrice * vehicleCount * 100) / 100;
         }
 
@@ -3808,36 +3569,20 @@ tr[data-row-type="subconcept"] {
         if (subconcept.type === 'tour' && subconcept.vehicleCapacity) {
             // Vehicle count: 1 by default, 2 if additional vehicle for luggage is checked
             const vehicleCount = subconcept.additionalVehicleForLuggage ? 2 : 1;
-            console.log('Tour vehicle calculation:', {
-                numberOfPeople,
-                vehicleCapacity: subconcept.vehicleCapacity,
-                additionalVehicleForLuggage: subconcept.additionalVehicleForLuggage,
-                vehicleCount,
-                calculation: `$${unitPrice} × ${vehicleCount} vehicle(s) = $${unitPrice * vehicleCount}`
-            });
             return Math.round(unitPrice * vehicleCount * 100) / 100;
         }
 
         // EXPERIENCIA: Direct unit price
         if (subconcept.type === 'experiencia') {
-            console.log('Experiencia calculation:', {
-                unitPrice,
-                calculation: `$${unitPrice}`
-            });
             return Math.round(unitPrice * 100) / 100;
         }
 
         // REGULAR: Direct unit price (same as experiencia)
         if (subconcept.type === 'regular') {
-            console.log('Regular calculation:', {
-                unitPrice,
-                calculation: `$${unitPrice}`
-            });
             return Math.round(unitPrice * 100) / 100;
         }
 
         // Fallback for traslados without vehicle capacity
-        console.log('Fallback calculation (traslado without capacity)');
         subconcept.vehicleMultiplier = 1;
         return Math.round(unitPrice * 100) / 100;
     }
@@ -3862,21 +3607,13 @@ tr[data-row-type="subconcept"] {
                 const badge = document.querySelector(
                     `.vehicle-multiplier[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"]`
                 );
-                console.log('Updating badge:', {
-                    badgeFound: !!badge,
-                    vehicleMultiplier: subconcept.vehicleMultiplier,
-                    vehicleCapacity: subconcept.vehicleCapacity,
-                    vehicleTypeId: subconcept.vehicleTypeId
-                });
                 if (badge) {
                     // Update badge text with current multiplier
                     badge.textContent = `${subconcept.vehicleMultiplier || 1}x`;
-                    console.log('Badge updated to:', badge.textContent);
 
                     // Update badge visibility
                     const hasVehicle = subconcept.vehicleCapacity || subconcept.vehicleTypeId;
                     badge.style.display = hasVehicle ? 'inline-block' : 'none';
-                    console.log('Badge visibility:', badge.style.display);
                 }
             }
 
@@ -4078,7 +3815,6 @@ tr[data-row-type="subconcept"] {
                 throw new Error(result.error || 'Error al guardar');
             }
         } catch (error) {
-            console.error('Error saving service items:', error);
             showSaveIndicator('error', 'Error al guardar');
             showAlert('servicesAlerts', error.message || 'Error al guardar los servicios', 'danger');
         }
@@ -4090,25 +3826,15 @@ tr[data-row-type="subconcept"] {
 
     document.addEventListener('DOMContentLoaded', async function() {
         const pageLoadStart = Date.now();
-        console.log(`🌟 [${pageLoadStart}] Page DOM loaded, starting initialization sequence`);
-        console.log('🚨 QUOTE SERVICES PAGE - JAVASCRIPT IS WORKING!');
         
         try {
-            console.log(`📊 Page state check:`, {
-                quoteId,
-                isNewQuote,
-                hasServiceItemsData: !!serviceItemsData,
-                currentUrl: window.location.href
-            });
             
             await loadServiceItems();
             
             const initTime = Date.now() - pageLoadStart;
-            console.log(`✅ [+${initTime}ms] Service items loaded successfully`);
             
         } catch (error) {
             const errorTime = Date.now() - pageLoadStart;
-            console.error(`❌ [+${errorTime}ms] Error during initialization:`, error);
         }
 
         // Add Day buttons (top and bottom)
@@ -4136,7 +3862,6 @@ tr[data-row-type="subconcept"] {
         // MODAL HANDLING
         // ==================
         
-        console.log('🚀 QUOTE SERVICES MODAL JAVASCRIPT LOADED - VERSION 2.0');
 
         // Initialize modal state and handle service type selection
         function initializeModalState() {
@@ -4144,7 +3869,6 @@ tr[data-row-type="subconcept"] {
             const checkedServiceType = document.querySelector('input[name="serviceType"]:checked');
             if (checkedServiceType) {
                 const selectedType = checkedServiceType.value;
-                console.log('Initial service type:', selectedType);
                 
                 // Hide all content sections first
                 const contentSections = document.querySelectorAll('.service-content');
@@ -4163,7 +3887,6 @@ tr[data-row-type="subconcept"] {
                         const experienceContent = document.getElementById('experienceContent');
                         if (experienceContent) {
                             experienceContent.classList.remove('d-none');
-                            console.log('Experience content shown');
                         }
                         break;
                     case 'tour':
@@ -4188,7 +3911,6 @@ tr[data-row-type="subconcept"] {
         serviceTypeRadios.forEach(radio => {
             radio.addEventListener('change', function() {
                 const selectedType = this.value;
-                console.log('Service type changed to:', selectedType);
                 initializeModalState();
             });
         });
@@ -4197,31 +3919,21 @@ tr[data-row-type="subconcept"] {
         // Use event delegation to handle dynamically loaded content
         document.addEventListener('change', function(e) {
             if (e.target && e.target.id === 'experienceSelect') {
-                console.log('=== EXPERIENCE SELECTION CHANGED ===');
                 const selectedExperience = e.target.value;
                 const experiencePricingSection = document.getElementById('experiencePricingSection');
                 
-                console.log('Selected experience:', selectedExperience);
-                console.log('Pricing section exists:', !!experiencePricingSection);
                 
                 if (experiencePricingSection) {
-                    console.log('Pricing section current classes:', experiencePricingSection.className);
-                    console.log('Pricing section current display:', window.getComputedStyle(experiencePricingSection).display);
                 }
                 
                 if (selectedExperience && experiencePricingSection) {
-                    console.log('SHOWING experience pricing section');
                     experiencePricingSection.classList.remove('d-none');
-                    console.log('Pricing section classes after show:', experiencePricingSection.className);
-                    console.log('Pricing section display after show:', window.getComputedStyle(experiencePricingSection).display);
                     
                     // Here you would typically load the experience details
                     // and populate the pricing section fields
                 } else if (experiencePricingSection) {
-                    console.log('HIDING experience pricing section');
                     experiencePricingSection.classList.add('d-none');
                 } else {
-                    console.error('experiencePricingSection element not found!');
                 }
             }
         });
@@ -4230,21 +3942,14 @@ tr[data-row-type="subconcept"] {
         const serviceModal = document.getElementById('serviceModal');
         if (serviceModal) {
             serviceModal.addEventListener('shown.bs.modal', function() {
-                console.log('=== SERVICE MODAL SHOWN ===');
                 
                 // Check if all required elements exist
                 const experienceSelect = document.getElementById('experienceSelect');
                 const experiencePricingSection = document.getElementById('experiencePricingSection');
                 const experienceContent = document.getElementById('experienceContent');
                 
-                console.log('Modal elements check:');
-                console.log('- experienceSelect:', !!experienceSelect);
-                console.log('- experiencePricingSection:', !!experiencePricingSection);
-                console.log('- experienceContent:', !!experienceContent);
                 
                 if (experiencePricingSection) {
-                    console.log('- experiencePricingSection classes:', experiencePricingSection.className);
-                    console.log('- experiencePricingSection display:', window.getComputedStyle(experiencePricingSection).display);
                 }
                 
                 // Initialize the modal state based on selected service type
@@ -4252,18 +3957,14 @@ tr[data-row-type="subconcept"] {
                 
                 // Set up experience handler and check current value
                 if (experienceSelect) {
-                    console.log('Experience select found, current value:', experienceSelect.value);
                     // Trigger change event if already has a value
                     if (experienceSelect.value) {
-                        console.log('Triggering change event for pre-selected experience');
                         experienceSelect.dispatchEvent(new Event('change'));
                     }
                     
                     // Also force show pricing section if experience is selected
                     if (experienceSelect.value && experiencePricingSection) {
-                        console.log('Force showing pricing section since experience is already selected');
                         experiencePricingSection.classList.remove('d-none');
-                        console.log('Pricing section classes after force show:', experiencePricingSection.className);
                     }
                 }
             });

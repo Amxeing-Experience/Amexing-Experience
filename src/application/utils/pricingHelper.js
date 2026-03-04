@@ -200,6 +200,85 @@ class PricingHelper {
   }
 
   // ============================================================
+  // GREETER PRICING CALCULATIONS
+  // ============================================================
+
+  /**
+   * Calculate greeter service price based on duration.
+   * Formula: 760 + (640 * duration)
+   * Special rounding: If last two digits < 50, round down to nearest 100; otherwise round up.
+   * @param {number} duration - Duration in hours (can be decimal).
+   * @returns {number} Calculated and rounded greeter price.
+   * @example
+   * pricingHelper.calculateGreeterPrice(0.5);  // 760 + (640 * 0.5) = 1080, rounds to 1100
+   * pricingHelper.calculateGreeterPrice(0.45); // 760 + (640 * 0.45) = 1048, rounds to 1000
+   * pricingHelper.calculateGreeterPrice(1);    // 760 + (640 * 1) = 1400, stays 1400
+   * pricingHelper.calculateGreeterPrice(0.48); // 760 + (640 * 0.48) = 1067.2, rounds to 1100
+   */
+  calculateGreeterPrice(duration) {
+    // Validate duration
+    if (!duration || duration <= 0) {
+      logger.debug('Duration is zero or negative, returning base greeter price', {
+        duration,
+      });
+      return 760; // Return base price if no duration
+    }
+
+    // Calculate raw price using formula: 760 + (640 * duration)
+    const rawPrice = 760 + (640 * duration);
+
+    // Apply special rounding logic
+    // Get the last two digits of the integer part
+    const integerPart = Math.floor(rawPrice);
+    const lastTwoDigits = integerPart % 100;
+
+    // If last two digits < 50, round down to nearest 100; otherwise round up
+    let roundedPrice;
+    if (lastTwoDigits === 0) {
+      // Already a multiple of 100
+      roundedPrice = integerPart;
+    } else if (lastTwoDigits < 50) {
+      // Round down to nearest 100
+      roundedPrice = Math.floor(integerPart / 100) * 100;
+    } else {
+      // Round up to nearest 100
+      roundedPrice = Math.ceil(integerPart / 100) * 100;
+    }
+
+    logger.debug('Greeter price calculated', {
+      duration,
+      rawPrice,
+      integerPart,
+      lastTwoDigits,
+      roundedPrice,
+    });
+
+    return roundedPrice;
+  }
+
+  /**
+   * Apply greeter-specific rounding rules to any price.
+   * If last two digits < 50, round down to nearest 100; otherwise round up.
+   * @param {number} price - Price to round.
+   * @returns {number} Rounded price.
+   * @example
+   * pricingHelper.applyGreeterRounding(1049); // Returns: 1000
+   * pricingHelper.applyGreeterRounding(1050); // Returns: 1100
+   * pricingHelper.applyGreeterRounding(1100); // Returns: 1100
+   */
+  applyGreeterRounding(price) {
+    const integerPart = Math.floor(price);
+    const lastTwoDigits = integerPart % 100;
+
+    if (lastTwoDigits === 0) {
+      return integerPart;
+    } if (lastTwoDigits < 50) {
+      return Math.floor(integerPart / 100) * 100;
+    }
+    return Math.ceil(integerPart / 100) * 100;
+  }
+
+  // ============================================================
   // CURRENCY ROUNDING UTILITIES
   // ============================================================
 
