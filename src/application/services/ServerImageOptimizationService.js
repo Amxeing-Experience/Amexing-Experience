@@ -370,8 +370,8 @@ class ServerImageOptimizationService extends FileStorageService {
     const prefix = process.env.S3_PREFIX || '';
     const entityPath = options.entityPath || 'images';
 
-    // Check if filename already has timestamp pattern (e.g., 1772057218560-ef1e7dbd.jpg)
-    const timestampPattern = /^\d{13}-[a-f0-9]{8}\./;
+    // Check if filename already has timestamp pattern (e.g., 1772057218560-ef1e7dbd.jpg or long hex strings)
+    const timestampPattern = /^\d{13}-[a-zA-Z0-9]{6,}/;
     if (timestampPattern.test(fileName)) {
       // Use filename as-is since it already has unique timestamp and random hex
       return `${prefix}${entityPath}/${fileName}`;
@@ -383,7 +383,11 @@ class ServerImageOptimizationService extends FileStorageService {
 
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '');
     const extension = this.getFileExtension(fileName);
-    const baseName = cleanFileName.replace(`.${extension}`, '');
+    // Use a safer approach without RegExp constructor
+    const extensionPattern = `.${extension}`;
+    const baseName = cleanFileName.toLowerCase().endsWith(extensionPattern.toLowerCase())
+      ? cleanFileName.slice(0, -extensionPattern.length)
+      : cleanFileName;
 
     return `${prefix}${entityPath}/${timestamp}-${randomId}-${baseName}.${extension}`;
   }

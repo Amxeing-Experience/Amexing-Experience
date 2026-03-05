@@ -4,27 +4,16 @@ const companyName = locals.companyName || 'Company';
 %>
 
 <!-- Page Header -->
-<div class="card bg-info-subtle shadow-none position-relative overflow-hidden mb-4">
-  <div class="card-body px-4 py-3">
-    <div class="row align-items-center">
-      <div class="col-9">
-        <h4 class="fw-semibold mb-8">My Team</h4>
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb">
-            <li class="breadcrumb-item">
-              <a class="text-muted text-decoration-none" href="/dashboard/client">Dashboard</a>
-            </li>
-            <li class="breadcrumb-item" aria-current="page">My Team</li>
-          </ol>
-        </nav>
-      </div>
-      <div class="col-3">
-        <div class="text-center mb-n5">
-          <img src="/public/flexy-bootstrap-lite-1.0.0/dist/images/breadcrumb/ChatBc.png" alt="" class="img-fluid mb-n4" />
-        </div>
-      </div>
-    </div>
-  </div>
+<div class="mb-4">
+  <h4 class="fw-semibold mb-2">My Team</h4>
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a class="text-muted text-decoration-none" href="/dashboard/client">Dashboard</a>
+      </li>
+      <li class="breadcrumb-item" aria-current="page">My Team</li>
+    </ol>
+  </nav>
 </div>
 
 <!-- Client Information Section -->
@@ -79,15 +68,38 @@ const companyName = locals.companyName || 'Company';
         </div>
 
         <!-- Include Employees DataTable -->
-        <%- include('../../organisms/datatable/employees-table', {
-          tableId: 'client-team-table',
-          apiEndpoint: `/api/clients/${clientId}/employees`,
-          userRole: 'client',
-          showActions: true,
-          clientId: clientId,
-          currentUserId: currentUserId,
-          accessToken: locals.accessToken || ''
-        }) %>
+        <%
+        // Check if admin is viewing
+        const actualUserRole = locals.user && locals.user.role ? locals.user.role : locals.userRole;
+        
+        if (actualUserRole === 'admin' || actualUserRole === 'superadmin') { %>
+          <div class="alert alert-info d-flex align-items-center" role="alert">
+            <i class="ti ti-info-circle me-2"></i>
+            <div>
+              <strong>Vista de Administrador</strong><br>
+              Esta es una vista de demostración. Los administradores no tienen un equipo asignado. 
+              Para ver datos reales de equipo, debe iniciar sesión como un Cliente (Agente).
+            </div>
+          </div>
+        <% } else if (clientId) { %>
+          <%- include('../../organisms/datatable/employees-table', {
+            tableId: 'client-team-table',
+            apiEndpoint: `/api/clients/${clientId}/employees`,
+            userRole: 'client',
+            showActions: true,
+            clientId: clientId,
+            currentUserId: currentUserId,
+            accessToken: locals.accessToken || ''
+          }) %>
+        <% } else { %>
+          <div class="alert alert-warning d-flex align-items-center" role="alert">
+            <i class="ti ti-alert-triangle me-2"></i>
+            <div>
+              <strong>Configuración Requerida</strong><br>
+              No se ha configurado un ID de cliente para este usuario. Contacte al administrador del sistema.
+            </div>
+          </div>
+        <% } %>
       </div>
     </div>
   </div>

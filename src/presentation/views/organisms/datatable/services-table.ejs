@@ -111,6 +111,30 @@ table.dataTable thead .sorting_desc::after {
     color: #10b981 !important;
 }
 
+/* Greeter Toggle Styling */
+#greeterToggle-<%= dtTableId %> {
+    transform: scale(1.1);
+}
+
+#greeterToggle-<%= dtTableId %>:checked {
+    background-color: #8b5cf6;
+    border-color: #8b5cf6;
+}
+
+#greeterToggle-<%= dtTableId %>:focus {
+    box-shadow: 0 0 0 0.25rem rgba(139, 92, 246, 0.25);
+}
+
+#greeterLabel-<%= dtTableId %> {
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: color 0.15s ease-in-out;
+}
+
+#greeterToggle-<%= dtTableId %>:checked + #greeterLabel-<%= dtTableId %> {
+    color: #8b5cf6 !important;
+}
+
 /* Ensure only our button shows */
 td.dt-control {
     position: relative;
@@ -193,7 +217,6 @@ table.dataTable thead th:nth-child(2) select {
 }
 </style>
 
-
 <div class="card border-0 shadow-sm">
     <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">
         <div class="row align-items-center">
@@ -244,6 +267,17 @@ table.dataTable thead th:nth-child(2) select {
                         <input class="form-check-input" type="checkbox" id="driverToggle-<%= dtTableId %>">
                         <label class="form-check-label text-muted" for="driverToggle-<%= dtTableId %>" id="driverLabel-<%= dtTableId %>">
                             Sin Guía
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Greeter Toggle -->
+                <div class="d-flex align-items-center gap-2">
+                    <label class="form-label mb-0 text-muted">Greeter:</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="greeterToggle-<%= dtTableId %>">
+                        <label class="form-check-label text-muted" for="greeterToggle-<%= dtTableId %>" id="greeterLabel-<%= dtTableId %>">
+                            Sin Greeter
                         </label>
                     </div>
                 </div>
@@ -381,7 +415,6 @@ table.dataTable thead th:nth-child(2) select {
                         </div>
                     </div>
 
-
                     <!-- Sección: Precios Base por Tarifa -->
                     <div class="mb-4" id="basePricingSection" style="display: none;">
                         <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
@@ -400,6 +433,27 @@ table.dataTable thead th:nth-child(2) select {
                         <div id="basePricesContainer">
                             <!-- Base prices will be dynamically loaded here -->
                         </div>
+                    </div>
+                    
+                    <!-- Sección: Precios por Tarifa y Tipo de Vehículo para Nuevo Traslado -->
+                    <div class="mb-4" id="newServiceRatesSection" style="display: none;">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-currency-dollar me-1"></i>
+                            Precios por Tarifa y Tipo de Vehículo
+                        </h6>
+                        
+                        <div class="alert alert-info d-flex align-items-start mb-3" role="alert">
+                            <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                            <div>
+                                <strong>Configure los precios específicos para cada combinación:</strong>
+                                <p class="mb-0 mt-1">Configure los precios específicos para cada combinación de tarifa y vehículo. Dejar en 0 el vehículo que no aplica para la tarifa.</p>
+                            </div>
+                        </div>
+                        
+                        <div id="newServicePricesContainer">
+                            <!-- Pricing grid will be dynamically loaded here -->
+                        </div>
+
                     </div>
 
                     <!-- Sección: Notas Adicionales -->
@@ -517,13 +571,11 @@ table.dataTable thead th:nth-child(2) select {
     function initWhenReady() {
         // Check if jQuery and DataTables are loaded
         if (typeof jQuery === 'undefined') {
-            console.warn('jQuery not loaded yet, waiting...');
             setTimeout(initWhenReady, 100);
             return;
         }
 
         if (!jQuery.fn.dataTable) {
-            console.warn('DataTables not loaded yet, waiting...');
             setTimeout(initWhenReady, 100);
             return;
         }
@@ -542,13 +594,52 @@ table.dataTable thead th:nth-child(2) select {
         const accessToken = '<%= accessToken || "" %>';
         const clientId = '<%= dtClientId || "" %>';
         
-        // Debug: Log the clientId to verify it's being passed correctly
-        console.log('🔍 ClientId sources:', {
-            template: clientId,
-            url: new URLSearchParams(window.location.search).get('clientId'),
-            path: window.location.pathname.includes('/clients/') ? window.location.pathname.split('/clients/')[1]?.split('/')[0] : null,
-            currentPage: window.location.pathname
+        // Debug: Log token and other variables
+        console.log('Services table initialization:', {
+            hasAccessToken: !!accessToken,
+            accessTokenLength: accessToken ? accessToken.length : 0,
+            userRole,
+            clientId
         });
+
+        // Calculate greeter price based on duration
+        // Formula: 760 + (640 * duration)
+        // Special rounding: If last two digits < 50, round down to nearest 100; otherwise round up
+        function calculateGreeterPrice(durationInHours) {
+            // Validate duration
+            if (!durationInHours || durationInHours <= 0) {
+                return 760; // Return base price if no duration
+            }
+
+            // Calculate raw price using formula: 760 + (640 * duration)
+            const rawPrice = 760 + (640 * durationInHours);
+            
+            // Apply special rounding logic
+            // Get the last two digits of the integer part
+            const integerPart = Math.floor(rawPrice);
+            const lastTwoDigits = integerPart % 100;
+            
+            // If last two digits < 50, round down to nearest 100; otherwise round up
+            let roundedPrice;
+            if (lastTwoDigits === 0) {
+                // Already a multiple of 100
+                roundedPrice = integerPart;
+            } else if (lastTwoDigits < 50) {
+                // Round down to nearest 100
+                roundedPrice = Math.floor(integerPart / 100) * 100;
+            } else {
+                // Round up to nearest 100
+                roundedPrice = Math.ceil(integerPart / 100) * 100;
+            }
+            
+            console.log('Greeter price calculated:', {
+                durationInHours,
+                rawPrice,
+                roundedPrice
+            });
+            
+            return roundedPrice;
+        }
 
         // Get JWT token from server-side template context
         function getAccessToken() {
@@ -606,9 +697,7 @@ table.dataTable thead th:nth-child(2) select {
                 if (selectedRate) {
                     const separator = url.includes('?') ? '&' : '?';
                     url += `${separator}rateId=${selectedRate}`;
-                    console.log('📡 Loading services with rate:', selectedRate);
                 } else {
-                    console.log('📡 Loading services without rate filter');
                 }
                 
                 // Add clientId parameter if available and not already in URL
@@ -619,7 +708,6 @@ table.dataTable thead th:nth-child(2) select {
                 const existingClientId = urlObj.searchParams.get('clientId');
                 
                 if (existingClientId) {
-                    console.log('📡 ClientId already in apiEndpoint:', existingClientId);
                     finalClientId = existingClientId;
                 } else {
                     // Priority 1: URL params (for admin viewing specific client)
@@ -642,19 +730,9 @@ table.dataTable thead th:nth-child(2) select {
                     if (finalClientId) {
                         const separator = url.includes('?') ? '&' : '?';
                         url += `${separator}clientId=${finalClientId}`;
-                        console.log('📡 Adding clientId to URL:', finalClientId, '(source:', urlClientId ? 'URL' : pathClientId ? 'path' : templateClientId ? 'template' : 'none', ')');
                     }
                 }
                 
-                console.log('📡 Final clientId used:', finalClientId);
-                console.log('📡 Priority breakdown:', {
-                    existingInEndpoint: existingClientId,
-                    pageUrl: new URLSearchParams(window.location.search).get('clientId'),
-                    pathSegment: window.location.pathname.includes('/clients/') ? window.location.pathname.split('/clients/')[1]?.split('/')[0] : null,
-                    template: clientId,
-                    final: finalClientId,
-                    currentUrl: window.location.href
-                });
                 
                 // Add aggressive cache-busting parameters to force fresh data
                 const separator = url.includes('?') ? '&' : '?';
@@ -662,8 +740,6 @@ table.dataTable thead th:nth-child(2) select {
                 const random = Math.random().toString(36).substr(2, 9);
                 url += `${separator}_t=${timestamp}&_r=${random}&_cb=${new Date().getTime()}`;
                 
-                console.log('📡 Full URL with aggressive cache-bust:', url);
-                console.log('⏰ Cache-busting params:', { timestamp, random, time: new Date().getTime() });
                 
                 $.ajax({
                     url: url,
@@ -682,18 +758,11 @@ table.dataTable thead th:nth-child(2) select {
                         xhr.setRequestHeader('If-None-Match', '*');
                     },
                     success: function(response) {
-                        console.log('📡 AJAX success response:', response);
-                        console.log('🔄 Data refresh - received', response.data?.length || 0, 'services');
                         
                         // Debug: Check if we got updated price data for specific services
                         if (response.data && response.data.length > 0) {
                             const sampleService = response.data.find(s => s.id === '6p4zqx7YCf'); // Querétaro Airport
                             if (sampleService) {
-                                console.log('🔍 Debug - Querétaro service data:', {
-                                    id: sampleService.id,
-                                    priceData: sampleService.priceData,
-                                    timestamp: new Date().toISOString()
-                                });
                             }
                         }
                         
@@ -701,11 +770,9 @@ table.dataTable thead th:nth-child(2) select {
                             allServicesData = response.data;
                             
                             // Debug: Log all service types
-                            console.log('✅ All services loaded:', allServicesData.length);
                             
                             // Debug: Log a sample service to see its structure, especially priceData
                             if (allServicesData.length > 0) {
-                                console.log('🔍 Sample service structure:', JSON.stringify(allServicesData[0], null, 2));
                                 
                                 // Check specifically for Queretaro services with priceData
                                 const queretaroServices = allServicesData.filter(service => 
@@ -714,8 +781,6 @@ table.dataTable thead th:nth-child(2) select {
                                 );
                                 
                                 if (queretaroServices.length > 0) {
-                                    console.log('🎯 Queretaro services found:', queretaroServices.length);
-                                    console.log('🎯 First Queretaro service priceData:', queretaroServices[0].priceData);
                                 }
                             }
                             
@@ -724,7 +789,6 @@ table.dataTable thead th:nth-child(2) select {
                                 const type = service.destinationPOI?.serviceType?.name || 'Unknown';
                                 serviceTypeCounts[type] = (serviceTypeCounts[type] || 0) + 1;
                             });
-                            console.log('Service type counts:', serviceTypeCounts);
                             
                             // Filter to show airport services by default
                             filteredData = filterServicesByType('airport');
@@ -734,9 +798,6 @@ table.dataTable thead th:nth-child(2) select {
                         }
                     },
                     error: function(xhr, status, error) {
-                        console.error('❌ Error loading services:', error);
-                        console.error('❌ Status:', status);
-                        console.error('❌ XHR:', xhr);
                         reject('Error loading services');
                     }
                 });
@@ -757,7 +818,6 @@ table.dataTable thead th:nth-child(2) select {
                 const originPOI = service.originPOI;
                 
                 if (!destinationPOI) {
-                    console.log(`❌ Service ${service.id} has no destinationPOI`);
                     return false;
                 }
                 
@@ -783,13 +843,8 @@ table.dataTable thead th:nth-child(2) select {
                         
                         // Debug logging for troubleshooting
                         if (!matches && (destServiceType === 'Aeropuerto' || originServiceType === 'Aeropuerto')) {
-                            console.log(`⚠️ EXCLUDED from airport (no code):`, {
-                                route: `${originName || 'None'} → ${destName}`,
-                                hasCode: false
-                            });
                         }
                         if (matches && allServicesData.indexOf(service) < 5) {
-                            console.log(`✅ INCLUDED in airport:`, `${originName || 'None'} → ${destName}`);
                         }
                         break;
                     case 'p2p':
@@ -821,10 +876,8 @@ table.dataTable thead th:nth-child(2) select {
                                 RESULT: matches ? '✅ INCLUDED' : '❌ EXCLUDED'
                             };
                             
-                            console.log(`P2P Debug [${serviceIndex}]:`, debugInfo);
                             
                             if (matches && (destServiceType !== 'Punto a Punto' && originServiceType !== 'Punto a Punto')) {
-                                console.warn(`⚠️ P2P service included but not 'Punto a Punto' type:`, debugInfo);
                             }
                         }
                         break;
@@ -843,7 +896,6 @@ table.dataTable thead th:nth-child(2) select {
                         
                         // Debug logging
                         if (matches && allServicesData.indexOf(service) < 5) {
-                            console.log(`✅ Local service: ${destName} (no origin)`);
                         }
                         break;
                     default:
@@ -852,20 +904,12 @@ table.dataTable thead th:nth-child(2) select {
                 
                 // Debug logging for problematic services - only log in development mode
                 if (isDevelopment && type === 'airport' && matches && !destName.includes('(') && !originName?.includes('(')) {
-                    console.log(`⚠️ Service included in airport filter but no airport code:`, {
-                        id: service.id,
-                        dest: destName,
-                        origin: originName,
-                        destType: destServiceType,
-                        originType: originServiceType
-                    });
                 }
                 
                 return matches;
             });
             
             // Log filter results with validation
-            console.log(`📋 Filter '${type}' applied: ${filtered.length} services out of ${allServicesData.length} total`);
             
             // Sort filtered data for consistent ordering
             filtered.sort((a, b) => {
@@ -906,23 +950,18 @@ table.dataTable thead th:nth-child(2) select {
                 });
                 
                 if (servicesWithAirportCodes.length > 0) {
-                    console.error(`❌ WARNING: ${servicesWithAirportCodes.length} services with airport codes in '${type}' filter!`);
                     servicesWithAirportCodes.slice(0, 5).forEach(s => {
-                        console.log(`  ❌ Should be excluded: ${s.originPOI?.name || 'None'} → ${s.destinationPOI?.name}`);
                     });
                 }
             }
             
             // Enhanced validation for P2P
             if (type === 'p2p') {
-                console.log('\n🔍 P2P FILTER ANALYSIS:');
                 
                 // Check services without origin
                 const servicesWithoutOrigin = filtered.filter(s => !s.originPOI);
                 if (servicesWithoutOrigin.length > 0) {
-                    console.error(`❌ ERROR: ${servicesWithoutOrigin.length} P2P services without origin!`);
                     servicesWithoutOrigin.slice(0, 5).forEach(s => {
-                        console.log(`  ❌ Missing origin: ${s.destinationPOI?.name} (Type: ${s.destinationPOI?.serviceType?.name})`);
                     });
                 }
                 
@@ -932,7 +971,6 @@ table.dataTable thead th:nth-child(2) select {
                     const type = s.destinationPOI?.serviceType?.name || 'Unknown';
                     typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
                 });
-                console.log('P2P Service Types:', typeBreakdown);
                 
                 // Show services that are NOT 'Punto a Punto' type
                 const nonP2PTypes = filtered.filter(s => 
@@ -941,9 +979,7 @@ table.dataTable thead th:nth-child(2) select {
                 );
                 
                 if (nonP2PTypes.length > 0) {
-                    console.warn(`⚠️ ${nonP2PTypes.length} services in P2P filter are NOT 'Punto a Punto' type:`);
                     nonP2PTypes.slice(0, 8).forEach(s => {
-                        console.log(`  ⚠️ ${s.originPOI?.name || 'No origin'} → ${s.destinationPOI?.name} (Dest: ${s.destinationPOI?.serviceType?.name}, Origin: ${s.originPOI?.serviceType?.name || 'None'})`);
                     });
                 }
             }
@@ -955,9 +991,7 @@ table.dataTable thead th:nth-child(2) select {
                     s.destinationPOI?.serviceType?.name !== 'Local'
                 );
                 if (nonLocalWithOrigin.length > 0) {
-                    console.warn(`⚠️ ${nonLocalWithOrigin.length} local services have origin (might be valid for Local type):`);
                     nonLocalWithOrigin.slice(0, 3).forEach(s => {
-                        console.log(`  ⚠️ ${s.originPOI?.name} → ${s.destinationPOI?.name} (Type: ${s.destinationPOI?.serviceType?.name})`);
                     });
                 }
             }
@@ -980,6 +1014,7 @@ table.dataTable thead th:nth-child(2) select {
                     render: function(data, type, row) {
                         const origin = row.originPOI?.name || null;
                         const destination = row.destinationPOI?.name || 'Destino';
+                        const destinationPoiId = row.destinationPOI?.id || row.destinationPOI?.objectId || null;
                         
                         if (type === 'sort') {
                             // For sorting, use the full destination name for more natural ordering
@@ -994,7 +1029,7 @@ table.dataTable thead th:nth-child(2) select {
                         if (!origin || origin === 'Sin origen') {
                             // For services without specific origin (like local services)
                             return `
-                                <div class="d-flex flex-column">
+                                <div class="d-flex flex-column" data-destination-poi-id="${destinationPoiId}">
                                     <div class="fw-semibold text-center" style="font-size: 1rem;">
                                         ${destination}
                                     </div>
@@ -1004,7 +1039,7 @@ table.dataTable thead th:nth-child(2) select {
                         
                         // Show bidirectional route for services with both origin and destination
                         return `
-                            <div class="d-flex flex-column">
+                            <div class="d-flex flex-column" data-destination-poi-id="${destinationPoiId}">
                                 <div class="fw-semibold text-center" style="font-size: 1rem;">
                                     ${origin}
                                 </div>
@@ -1028,14 +1063,6 @@ table.dataTable thead th:nth-child(2) select {
                         
                         // Debug: Log price rendering details
                         if (row.originPOI?.name?.includes('Querétaro') || row.destinationPOI?.name?.includes('Querétaro')) {
-                            console.log('💰 Rendering price for Queretaro service:', {
-                                serviceId: row.id || row.objectId,
-                                selectedRate,
-                                selectedRateText,
-                                hasPriceData: !!row.priceData,
-                                priceDataLength: row.priceData ? row.priceData.length : 0,
-                                priceData: row.priceData
-                            });
                         }
                         
                         // Check if we have expanded price data for the selected rate
@@ -1051,7 +1078,11 @@ table.dataTable thead th:nth-child(2) select {
                                 
                                 // Reduce capacity by 1 if guide is active (guide takes a seat)
                                 const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+                                const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
                                 if (includeGuide && defaultCapacity > 1) {
+                                    defaultCapacity = defaultCapacity - 1;
+                                }
+                                if (includeGreeter && defaultCapacity > 1) {
                                     defaultCapacity = defaultCapacity - 1;
                                 }
                                 
@@ -1286,7 +1317,8 @@ table.dataTable thead th:nth-child(2) select {
                 setTimeout(() => {
                     // Always apply currency formatting, even for default MXN
                     const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
-                    updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
+                    const currentGreeterState = $(`#greeterToggle-${tableId}`).is(':checked');
+                    updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState, currentGreeterState);
                 }, 50);
             }
         });
@@ -1300,23 +1332,17 @@ table.dataTable thead th:nth-child(2) select {
                 // Get the current active filter (default to 'airport' if none selected)
                 const activeFilter = $('.filter-pill.active').data('filter') || 'airport';
                 
-                console.log(`🔧 initializeTable called with active filter: '${activeFilter}'`);
-                console.log(`🔧 Active filter pill:`, $('.filter-pill.active').length, $('.filter-pill.active').text());
                 
                 // Load all services
                 await loadAllServices();
                 
-                console.log(`📊 Total services loaded: ${allServicesData.length}`);
                 
                 // Apply the active filter to the loaded data
                 filteredData = filterServicesByType(activeFilter);
                 
-                console.log(`📊 After filtering for '${activeFilter}': ${filteredData.length} services`);
                 
                 // Enhanced filter analysis
                 if (activeFilter === 'p2p') {
-                    console.log('\n🔍 DETAILED P2P FILTER RESULTS:');
-                    console.log(`Total P2P services: ${filteredData.length}`);
                     
                     // Analyze what got through
                     const analysis = {
@@ -1332,7 +1358,6 @@ table.dataTable thead th:nth-child(2) select {
                         ).length
                     };
                     
-                    console.log('P2P Analysis:', analysis);
                     
                     // Show problematic services
                     const problematic = filteredData.filter(s => 
@@ -1342,9 +1367,7 @@ table.dataTable thead th:nth-child(2) select {
                     );
                     
                     if (problematic.length > 0) {
-                        console.error(`❌ ${problematic.length} PROBLEMATIC P2P services:`);
                         problematic.slice(0, 10).forEach(s => {
-                            console.log(`  ❌ ${s.originPOI?.name || 'NO_ORIGIN'} → ${s.destinationPOI?.name} (${s.destinationPOI?.serviceType?.name})`);
                         });
                     }
                 }
@@ -1361,13 +1384,9 @@ table.dataTable thead th:nth-child(2) select {
                     });
                     
                     if (invalidServices.length > 0) {
-                        console.error(`❌ ERROR: ${invalidServices.length} services WITHOUT airport codes in airport filter!`);
-                        console.log('Invalid services (should be removed):');
                         invalidServices.slice(0, 10).forEach(service => {
-                            console.log(`  ❌ ${service.originPOI?.name || 'None'} → ${service.destinationPOI?.name}`);
                         });
                     } else {
-                        console.log('✅ All airport services have valid airport codes');
                     }
                     
                     // Show sample of valid services
@@ -1378,12 +1397,10 @@ table.dataTable thead th:nth-child(2) select {
                     });
                     
                     if (validServices.length > 0) {
-                        console.log(`✅ ${validServices.length} valid airport services:`);
                         validServices.slice(0, 3).forEach(service => {
                             const dest = service.destinationPOI?.name;
                             const origin = service.originPOI?.name || 'None';
                             const code = dest.match(airportCodePattern) || origin.match(airportCodePattern);
-                            console.log(`  ✓ ${origin} → ${dest} [${code}]`);
                         });
                     }
                 }
@@ -1400,18 +1417,15 @@ table.dataTable thead th:nth-child(2) select {
                     
                     // Log which rate is being applied based on payment type
                     if (currentPaymentType === 'transferencia') {
-                        console.log('💰 Applying Transfer Rate for Transferencia payment type');
                     } else if (currentPaymentType === 'tarjeta') {
-                        console.log('💳 Applying Agency Rate for Tarjeta payment type');
                     }
                     
                     const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
-                    updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
+                    const currentGreeterState = $(`#greeterToggle-${tableId}`).is(':checked');
+                    updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState, currentGreeterState);
                 }, 200);
                 
-                console.log('✅ DataTable updated with', filteredData.length, 'rows');
             } catch (error) {
-                console.error('Error initializing table:', error);
                 showErrorAlert('Error al cargar los traslados');
             }
         }
@@ -1453,7 +1467,6 @@ table.dataTable thead th:nth-child(2) select {
             
             // Only handle service-specific filters (airport, p2p, local), ignore tours filters (solo-guide, with-driver)
             if (!['airport', 'p2p', 'local'].includes(filterType)) {
-                console.log('🚫 Services table ignoring non-service filter:', filterType);
                 return;
             }
             
@@ -1461,17 +1474,12 @@ table.dataTable thead th:nth-child(2) select {
             $('.filter-pill[data-filter="airport"], .filter-pill[data-filter="p2p"], .filter-pill[data-filter="local"]').removeClass('active');
             $(this).addClass('active');
             
-            console.log('\n🔄 ==============================');
-            console.log(`🔄 SWITCHING TO: ${filterType.toUpperCase()}`);
-            console.log('🔄 ==============================');
-            console.log('Filter pill clicked:', filterType);
             
             // Get the current selected rate to ensure we load data with proper pricing
             const selectedRate = $(`#headerRateFilter-${tableId}`).val();
             
             if (selectedRate) {
                 // If a rate is selected, reload all data to ensure fresh pricing
-                console.log('🔄 Reloading services data for filter with rate:', selectedRate);
                 await loadAllServices();
                 
                 // Apply the new filter to the fresh data
@@ -1498,17 +1506,14 @@ table.dataTable thead th:nth-child(2) select {
             }
             
             // Update DataTable
-            console.log(`📊 Updating DataTable with ${filteredData.length} services for filter: ${filterType}`);
             dataTable.clear();
             dataTable.rows.add(filteredData);
             dataTable.draw();
             
             // Show/hide table container based on results
             if (filteredData.length === 0) {
-                console.log('⚠️ No services found for this filter');
             }
             
-            console.log('✅ Filter applied, table updated with', filteredData.length, 'rows');
         });
 
         // Load rates for header filter dropdown
@@ -1544,7 +1549,6 @@ table.dataTable thead th:nth-child(2) select {
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error loading rates for header filter:', error);
                 }
             });
         }
@@ -1557,7 +1561,6 @@ table.dataTable thead th:nth-child(2) select {
             const selectedRate = $(this).val();
             const selectedRateText = $(this).find('option:selected').text();
             
-            console.log('Rate filter changed:', { selectedRate, selectedRateText });
             
             // Reload the main services data with the selected rate
             // This ensures both main table and expanded view use the same rate-specific data
@@ -1573,7 +1576,6 @@ table.dataTable thead th:nth-child(2) select {
                 dataTable.rows.add(filteredData);
                 dataTable.draw();
             } else {
-                console.log('⚠️ DataTable not ready yet, data loaded for when table initializes');
                 // Initialize the table since data is now ready
                 setTimeout(() => {
                     if (typeof initializeTable === 'function') {
@@ -1608,7 +1610,8 @@ table.dataTable thead th:nth-child(2) select {
                     const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                     if (currentPaymentType === 'transferencia' || currentCurrency === 'USD') {
                         const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
-                        updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
+                    const currentGreeterState = $(`#greeterToggle-${tableId}`).is(':checked');
+                        updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState, currentGreeterState);
                     }
                 }, 100);
             } else {
@@ -1628,7 +1631,8 @@ table.dataTable thead th:nth-child(2) select {
                     const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                     if (currentPaymentType === 'transferencia' || currentCurrency === 'USD') {
                         const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
-                        updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
+                    const currentGreeterState = $(`#greeterToggle-${tableId}`).is(':checked');
+                        updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState, currentGreeterState);
                     }
                 }, 100);
             }
@@ -1645,6 +1649,10 @@ table.dataTable thead th:nth-child(2) select {
         
         // Store guide transport rate data globally (hourly rate)
         let currentGuideRate = 0;
+        
+        // Store greeter services data globally (all active services with POI and pricing)
+        let currentGreeterServices = [];
+        
         
         // Check if current user is department manager or client
         const isDepartmentManager = (typeof userRole !== 'undefined' && userRole === 'department_manager');
@@ -1664,24 +1672,16 @@ table.dataTable thead th:nth-child(2) select {
                 success: function(response) {
                     if (response.success && response.data) {
                         currentTransferRate = response.data.value || 0;
-                        console.log('✅ Current transfer rate loaded:', currentTransferRate + '%');
                         if (currentTransferRate > 0) {
-                            console.log('💰 Transfer rate will be applied to "Transferencia" payments');
                         } else {
-                            console.warn('⚠️ Transfer rate is 0% - no price difference will be visible');
                         }
                     } else {
-                        console.warn('⚠️ No active transfer rate found - prices won\'t change for "Transferencia"');
-                        console.info('🔧 To fix: Go to Admin > Configuración de Precios > Transfer to set a transfer rate');
                         currentTransferRate = 0;
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('❌ Error loading transfer rate:', error);
                     if (xhr.status === 404) {
-                        console.info('🔧 No transfer rate configured. Go to Admin > Configuración de Precios > Transfer to create one');
                     } else if (xhr.status === 401 || xhr.status === 403) {
-                        console.warn('🔐 Authentication issue loading transfer rate');
                     }
                     currentTransferRate = 0;
                 }
@@ -1690,9 +1690,7 @@ table.dataTable thead th:nth-child(2) select {
 
         // Function to apply transfer rate to price
         function applyTransferRate(priceString) {
-            console.log('🎯 applyTransferRate CALLED with:', priceString, 'Rate:', currentTransferRate);
             if (currentTransferRate <= 0) {
-                console.log('⚠️ Transfer rate is 0 or less, returning original price');
                 return priceString;
             }
             
@@ -1703,7 +1701,6 @@ table.dataTable thead th:nth-child(2) select {
             // Apply transfer rate percentage
             const newValue = numericValue * (1 + currentTransferRate / 100);
             
-            console.log(`Applying transfer rate ${currentTransferRate}% to $${numericValue} = $${newValue.toFixed(2)}`);
             
             // Format back to currency string
             return new Intl.NumberFormat('en-US', {
@@ -1715,9 +1712,7 @@ table.dataTable thead th:nth-child(2) select {
 
         // Function to apply agency rate to price (for admin "Transf. Agencias" option)
         function applyAgencyRate(priceString) {
-            console.log('🎯 applyAgencyRate CALLED with:', priceString, 'Rate:', currentAgencyRate);
             if (currentAgencyRate <= 0) {
-                console.log('⚠️ Agency rate is 0 or less, returning original price');
                 return priceString;
             }
             
@@ -1728,7 +1723,6 @@ table.dataTable thead th:nth-child(2) select {
             // Apply agency rate percentage
             const newValue = numericValue * (1 + currentAgencyRate / 100);
             
-            console.log(`Applying agency rate ${currentAgencyRate}% to $${numericValue} = $${newValue.toFixed(2)}`);
             
             // Format back to currency string
             return new Intl.NumberFormat('en-US', {
@@ -1769,7 +1763,6 @@ table.dataTable thead th:nth-child(2) select {
                 
                 // Debug log for rounding
                 if (console && console.log) {
-                    console.log(`USD Conversion: $${numericValue.toLocaleString()} MXN ÷ ${currentExchangeRate} = $${convertedValue.toFixed(2)} → ${formatPriceWithCurrency(roundedValue, 'USD')}`);
                 }
                 
                 return formatPriceWithCurrency(roundedValue, currency);
@@ -1781,16 +1774,8 @@ table.dataTable thead th:nth-child(2) select {
         
         // USD rounding rules now handled by centralized PricingUtils.applyUSDRoundingRules()
 
-        // Function to update all displayed prices based on payment type, currency, and guide option
-        function updatePricesForFilters(paymentType, currency, includeGuide = false) {
-            console.log('🔄 updatePricesForFilters called with:', { 
-                paymentType, 
-                currency,
-                includeGuide,
-                currentTransferRate,
-                currentAgencyRate,
-                currentGuideRate
-            });
+        // Function to update all displayed prices based on payment type, currency, guide and greeter options
+        function updatePricesForFilters(paymentType, currency, includeGuide = false, includeGreeter = false) {
             
             // Update capacity displays in main table
             const capacitySelectors = [
@@ -1817,14 +1802,21 @@ table.dataTable thead th:nth-child(2) select {
                             // Get or store the original capacity
                             let originalCapacity = capacityElement.data('original-capacity');
                             if (!originalCapacity) {
-                                originalCapacity = includeGuide ? currentDisplayCapacity + 1 : currentDisplayCapacity;
+                                // Calculate original capacity by adding back any current reductions
+                                let capacityReduction = 0;
+                                if (includeGuide) capacityReduction++;
+                                if (includeGreeter) capacityReduction++;
+                                originalCapacity = currentDisplayCapacity + capacityReduction;
                                 capacityElement.data('original-capacity', originalCapacity);
                             }
                             
-                            // Calculate the correct display capacity
+                            // Calculate the correct display capacity by reducing for active toggles
                             let displayCapacity = originalCapacity;
                             if (includeGuide && originalCapacity > 1) {
-                                displayCapacity = originalCapacity - 1;
+                                displayCapacity = displayCapacity - 1;
+                            }
+                            if (includeGreeter && displayCapacity > 1) {
+                                displayCapacity = displayCapacity - 1;
                             }
                             
                             // Update the display
@@ -1846,13 +1838,29 @@ table.dataTable thead th:nth-child(2) select {
                 
                 // Find duration from the 3rd column (Duración de Trayecto)
                 const durationText = row.find('td:nth-child(3)').text();
-                const durationMatch = durationText.match(/(\d+(?:\.\d+)?)/);
-                if (durationMatch) {
-                    // Duration is in minutes, convert to hours
-                    const durationMinutes = parseFloat(durationMatch[1]);
-                    routeDuration = durationMinutes / 60;
-                    console.log('⏰ Route duration found:', durationMinutes, 'minutes =', routeDuration.toFixed(2), 'hours');
+                
+                // Handle different duration formats: "1h 45min", "45 min", "105 min", etc.
+                const hoursMatch = durationText.match(/(\d+)\s*h/i);
+                const minutesMatch = durationText.match(/(\d+)\s*min/i);
+                
+                let totalMinutes = 0;
+                if (hoursMatch) {
+                    totalMinutes += parseInt(hoursMatch[1]) * 60;
                 }
+                if (minutesMatch) {
+                    totalMinutes += parseInt(minutesMatch[1]);
+                }
+                
+                // If no hours/minutes format found, try to get just a number (assuming minutes)
+                if (totalMinutes === 0) {
+                    const simpleMatch = durationText.match(/(\d+(?:\.\d+)?)/);
+                    if (simpleMatch) {
+                        totalMinutes = parseFloat(simpleMatch[1]);
+                    }
+                }
+                
+                // Convert to hours
+                routeDuration = totalMinutes / 60;
                 
                 originalPrices.each(function() {
                     const priceElement = $(this);
@@ -1862,18 +1870,14 @@ table.dataTable thead th:nth-child(2) select {
                     if (!originalPrice) {
                         originalPrice = priceElement.text();
                         priceElement.data('original-price', originalPrice);
-                        console.log('💰 Storing original price:', originalPrice);
                     }
                     
                     let finalPrice = originalPrice;
                     
                     // Apply appropriate rate based on payment type
-                    console.log('🔍 Checking payment type:', paymentType, '(type:', typeof paymentType, ')');
                     if (paymentType === 'transferencia') {
-                        console.log('📌 Applying Transfer Rate for transferencia, rate value:', currentTransferRate);
                         finalPrice = applyTransferRate(finalPrice);
                     } else if (paymentType === 'tarjeta') {
-                        console.log('💳 Applying Agency Rate for tarjeta');
                         finalPrice = applyAgencyRate(finalPrice);
                     }
                     
@@ -1881,7 +1885,6 @@ table.dataTable thead th:nth-child(2) select {
                     if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
                         // Calculate guide cost: duration * 2 * hourly_rate
                         const guideCost = routeDuration * 2 * currentGuideRate;
-                        console.log('🚗 Adding guide cost:', guideCost, 'MXN (', routeDuration, '* 2 *', currentGuideRate, ')');
                         
                         // Extract numeric value from price string
                         const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
@@ -1889,6 +1892,22 @@ table.dataTable thead th:nth-child(2) select {
                             const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
                             const newPrice = numericPrice + guideCost;
                             finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
+                        }
+                    }
+                    
+                    // Apply greeter cost if enabled
+                    if (includeGreeter && routeDuration > 0) {
+                        // Calculate greeter cost using formula based on duration
+                        const greeterCost = calculateGreeterPrice(routeDuration);
+                        
+                        if (greeterCost > 0) {
+                            // Extract numeric value from price string
+                            const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
+                            if (priceMatch) {
+                                const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
+                                const newPrice = numericPrice + greeterCost;
+                                finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
+                            }
                         }
                     }
                     
@@ -1916,13 +1935,29 @@ table.dataTable thead th:nth-child(2) select {
                 
                 // Find duration from the 3rd column (Duración de Trayecto)
                 const durationText = row.find('td:nth-child(3)').text();
-                const durationMatch = durationText.match(/(\d+(?:\.\d+)?)/);
-                if (durationMatch) {
-                    // Duration is in minutes, convert to hours
-                    const durationMinutes = parseFloat(durationMatch[1]);
-                    routeDuration = durationMinutes / 60;
-                    console.log('⏰ [Expanded Update] Route duration:', durationMinutes, 'minutes =', routeDuration.toFixed(2), 'hours');
+                
+                // Handle different duration formats: "1h 45min", "45 min", "105 min", etc.
+                const hoursMatch = durationText.match(/(\d+)\s*h/i);
+                const minutesMatch = durationText.match(/(\d+)\s*min/i);
+                
+                let totalMinutes = 0;
+                if (hoursMatch) {
+                    totalMinutes += parseInt(hoursMatch[1]) * 60;
                 }
+                if (minutesMatch) {
+                    totalMinutes += parseInt(minutesMatch[1]);
+                }
+                
+                // If no hours/minutes format found, try to get just a number (assuming minutes)
+                if (totalMinutes === 0) {
+                    const simpleMatch = durationText.match(/(\d+(?:\.\d+)?)/);
+                    if (simpleMatch) {
+                        totalMinutes = parseFloat(simpleMatch[1]);
+                    }
+                }
+                
+                // Convert to hours
+                routeDuration = totalMinutes / 60;
                 
                 let originalPrice = priceElement.attr('data-original-price');
                 
@@ -1930,19 +1965,15 @@ table.dataTable thead th:nth-child(2) select {
                     // Store the current text as original if not already stored
                     originalPrice = priceElement.text();
                     priceElement.attr('data-original-price', originalPrice);
-                    console.log('💰 [Expanded] Storing original price:', originalPrice);
                 }
                 
                 // Start from the clean original price
                 let finalPrice = originalPrice;
                 
                 // Apply appropriate rate based on payment type
-                console.log('🔍 [Expanded View] Checking payment type:', paymentType, '(type:', typeof paymentType, ')');
                 if (paymentType === 'transferencia') {
-                    console.log('📌 [Expanded View] Applying Transfer Rate for transferencia, rate value:', currentTransferRate);
                     finalPrice = applyTransferRate(finalPrice);
                 } else if (paymentType === 'tarjeta') {
-                    console.log('💳 [Expanded View] Applying Agency Rate for tarjeta');
                     finalPrice = applyAgencyRate(finalPrice);
                 }
                 
@@ -1950,7 +1981,6 @@ table.dataTable thead th:nth-child(2) select {
                 if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
                     // Calculate guide cost: duration * 2 * hourly_rate
                     const guideCost = routeDuration * 2 * currentGuideRate;
-                    console.log('🚗 [Expanded] Adding guide cost:', guideCost, 'MXN to', finalPrice);
                     
                     // Extract numeric value from price string
                     const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
@@ -1958,7 +1988,22 @@ table.dataTable thead th:nth-child(2) select {
                         const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
                         const newPrice = numericPrice + guideCost;
                         finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                        console.log('🚗 [Expanded] New price with guide:', finalPrice);
+                    }
+                }
+                
+                // Apply greeter cost if enabled
+                if (includeGreeter && routeDuration > 0) {
+                    // Calculate greeter cost using formula based on duration
+                    const greeterCost = calculateGreeterPrice(routeDuration);
+                    
+                    if (greeterCost > 0) {
+                        // Extract numeric value from price string
+                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
+                        if (priceMatch) {
+                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
+                            const newPrice = numericPrice + greeterCost;
+                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
+                        }
                     }
                 }
                 
@@ -1974,12 +2019,17 @@ table.dataTable thead th:nth-child(2) select {
             const includeGuide = $(this).is(':checked');
             const label = $(`#driverLabel-${tableId}`);
             
+            // If turning on Guide, turn off Greeter (mutual exclusivity)
+            if (includeGuide) {
+                $(`#greeterToggle-${tableId}`).prop('checked', false);
+                $(`#greeterLabel-${tableId}`).text('Sin Greeter');
+            }
+            
             // Update label text
             label.text(includeGuide ? 'Con Guía' : 'Sin Guía');
             
-            console.log('🚗 Guide toggle changed:', includeGuide ? 'Con Guía' : 'Sin Guía');
-            
-            // Get current filter states
+            // Get current filter states (greeter will always be false if guide is true)
+            const includeGreeter = false; // Greeter is always off when Guide is on
             const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             
@@ -1987,7 +2037,6 @@ table.dataTable thead th:nth-child(2) select {
             // Check if there are any expanded rows
             const expandedRows = $('.expand-services-prices-btn.expanded');
             if (expandedRows.length > 0) {
-                console.log('🔄 Refreshing', expandedRows.length, 'expanded rows with new guide state');
                 
                 // Close and re-open each expanded row to get fresh prices
                 expandedRows.each(function() {
@@ -2013,7 +2062,54 @@ table.dataTable thead th:nth-child(2) select {
             }
             
             // Update all prices with new guide state
-            updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
+            updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide, includeGreeter);
+        });
+        
+        // Greeter toggle change handler
+        $(`#greeterToggle-${tableId}`).on('change', function() {
+            const includeGreeter = $(this).is(':checked');
+            const label = $(`#greeterLabel-${tableId}`);
+            
+            // If turning on Greeter, turn off Guide (mutual exclusivity)
+            if (includeGreeter) {
+                $(`#driverToggle-${tableId}`).prop('checked', false);
+                $(`#driverLabel-${tableId}`).text('Sin Guía');
+            }
+            
+            // Update label text
+            label.text(includeGreeter ? 'Con Greeter' : 'Sin Greeter');
+            
+            // Get current filter states (guide will always be false if greeter is true)
+            const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+            const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
+            const includeGuide = false; // Guide is always off when Greeter is on
+            
+            // Auto-refresh expanded rows if any
+            const expandedRows = $('.expand-services-prices-btn.expanded');
+            if (expandedRows.length > 0) {
+                expandedRows.each(function() {
+                    const button = $(this);
+                    const serviceId = button.attr('data-service-id');
+                    
+                    // Find the row and simulate collapse/expand to refresh
+                    const row = button.closest('tr');
+                    const nextRow = row.next('tr.child');
+                    
+                    if (nextRow.length > 0) {
+                        // First collapse
+                        nextRow.remove();
+                        button.removeClass('expanded').html('<i class="ti ti-chevron-down me-1"></i>Ver todos');
+                        
+                        // Then expand again after a short delay
+                        setTimeout(() => {
+                            button.trigger('click');
+                        }, 100);
+                    }
+                });
+            }
+            
+            // Update all prices with new greeter state
+            updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide, includeGreeter);
         });
         
         // Payment type filter change handler
@@ -2021,12 +2117,11 @@ table.dataTable thead th:nth-child(2) select {
             const selectedPaymentType = $(this).val();
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
-            console.log('Payment type changed:', selectedPaymentType, 'Guide:', includeGuide);
+            const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
             
             // Auto-refresh expanded rows
             const expandedRows = $('.expand-services-prices-btn.expanded');
             if (expandedRows.length > 0) {
-                console.log('🔄 Refreshing', expandedRows.length, 'expanded rows with new payment type');
                 
                 expandedRows.each(function() {
                     const button = $(this);
@@ -2052,22 +2147,22 @@ table.dataTable thead th:nth-child(2) select {
                 // Transferencia always uses Transfer Rate
                 if (currentTransferRate <= 0) {
                     loadCurrentTransferRate().then(() => {
-                        updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide, includeGreeter);
                     });
                 } else {
-                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide, includeGreeter);
                 }
             } else if (selectedPaymentType === 'tarjeta') {
                 // Tarjeta always uses Agency Rate
                 if (currentAgencyRate <= 0) {
                     loadCurrentAgencyRate().then(() => {
-                        updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide, includeGreeter);
                     });
                 } else {
-                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide, includeGreeter);
                 }
             } else {
-                updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
+                updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide, includeGreeter);
             }
         });
 
@@ -2076,12 +2171,11 @@ table.dataTable thead th:nth-child(2) select {
             const selectedCurrency = $(this).val();
             const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
             const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
-            console.log('🏪 Services currency changed:', selectedCurrency, 'Guide:', includeGuide);
+            const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
             
             // Auto-refresh expanded rows
             const expandedRows = $('.expand-services-prices-btn.expanded');
             if (expandedRows.length > 0) {
-                console.log('🔄 Refreshing', expandedRows.length, 'expanded rows with new currency');
                 
                 expandedRows.each(function() {
                     const button = $(this);
@@ -2105,17 +2199,16 @@ table.dataTable thead th:nth-child(2) select {
             
             // Call global sync to update all currency dropdowns across tables
             if (typeof window.syncCurrencyDropdowns === 'function') {
-                console.log('🔄 Services calling global sync for currency:', selectedCurrency);
                 window.syncCurrencyDropdowns(selectedCurrency, this);
             }
             
             if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
                 // Try to load exchange rate if not already loaded
                 loadCurrentExchangeRate().then(() => {
-                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide, includeGreeter);
                 });
             } else {
-                updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
+                updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide, includeGreeter);
             }
         });
 
@@ -2135,14 +2228,11 @@ table.dataTable thead th:nth-child(2) select {
                 success: function(response) {
                     if (response.success && response.data) {
                         currentAgencyRate = response.data.value || 0;
-                        console.log('✅ Current agency rate loaded:', currentAgencyRate + '%');
                     } else {
-                        console.warn('⚠️ No active agency rate found');
                         currentAgencyRate = 0;
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('❌ Error loading agency rate:', error);
                     currentAgencyRate = 0;
                 }
             });
@@ -2162,14 +2252,11 @@ table.dataTable thead th:nth-child(2) select {
                 success: function(response) {
                     if (response.success && response.data) {
                         currentExchangeRate = response.data.value || 0;
-                        console.log('✅ Current exchange rate loaded:', currentExchangeRate, 'MXN per USD');
                     } else {
-                        console.warn('⚠️ No active exchange rate found');
                         currentExchangeRate = 0;
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('❌ Error loading exchange rate:', error);
                     currentExchangeRate = 0;
                 }
             });
@@ -2189,28 +2276,95 @@ table.dataTable thead th:nth-child(2) select {
                 success: function(response) {
                     if (response.success && response.data) {
                         currentGuideRate = response.data.value || 0;
-                        console.log('✅ Current guide transport rate loaded:', currentGuideRate, 'MXN per hour');
                     } else {
-                        console.warn('⚠️ No active guide transport rate found');
                         currentGuideRate = 0;
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('❌ Error loading guide transport rate:', error);
                     currentGuideRate = 0;
                 }
             });
         }
+        
+        // Load all active greeter services from API
+        function loadCurrentGreeterServices() {
+            return $.ajax({
+                url: '/api/greeter',
+                type: 'GET',
+                data: {
+                    // Only get active services, no pagination (get all)
+                    length: -1,
+                    start: 0
+                },
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data && Array.isArray(response.data)) {
+                        // Filter only active services and store globally
+                        currentGreeterServices = response.data.filter(greeter => greeter.active === true);
+                    } else {
+                        currentGreeterServices = [];
+                    }
+                },
+                error: function(xhr, status, error) {
+                    currentGreeterServices = [];
+                }
+            });
+        }
+        
+        // Helper function to find greeter services by POI
+        function findGreeterServicesByPOI(poiId) {
+            if (!poiId || !currentGreeterServices || currentGreeterServices.length === 0) {
+                return [];
+            }
+            
+            return currentGreeterServices.filter(greeter => {
+                return greeter.poi && greeter.poi.id === poiId;
+            });
+        }
+        
+        // Helper function to get greeter service by specific POI and optional criteria
+        function getGreeterServiceForPOI(poiId, criteria = {}) {
+            const services = findGreeterServicesByPOI(poiId);
+            
+            if (services.length === 0) {
+                return null;
+            }
+            
+            // If no criteria, return the first service
+            if (Object.keys(criteria).length === 0) {
+                return services[0];
+            }
+            
+            // Apply criteria (e.g., minimum price, maximum price, etc.)
+            let filteredServices = services;
+            
+            if (criteria.minPrice) {
+                filteredServices = filteredServices.filter(s => s.price >= criteria.minPrice);
+            }
+            
+            if (criteria.maxPrice) {
+                filteredServices = filteredServices.filter(s => s.price <= criteria.maxPrice);
+            }
+            
+            return filteredServices.length > 0 ? filteredServices[0] : null;
+        }
 
         // Load rates on initialization - ALL rates needed for all users now
-        // Load transfer, agency, exchange and guide rates for ALL users
-        console.log('💰 Loading all rates for all users');
+        // Load transfer, agency, exchange, guide rates and greeter services for ALL users
         
         // Load Transfer Rate
         loadCurrentTransferRate();
         
         // Load Guide Transport Rate
         loadCurrentGuideRate();
+        
+        // Load Greeter Services
+        loadCurrentGreeterServices();
         
         // Load Agency Rate
         loadCurrentAgencyRate().then(() => {
@@ -2222,7 +2376,6 @@ table.dataTable thead th:nth-child(2) select {
             
             // Note: initializeTable() will be called automatically by rate filter change event
             
-            console.log('💰 All rates loaded, table initialized');
         });
 
         // Handle expand/collapse prices functionality
@@ -2299,25 +2452,48 @@ table.dataTable thead th:nth-child(2) select {
                             
                             // Get current filter states
                             const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+                            const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
                             const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
                             const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                             let routeDuration = 0;
                             
                             // Find duration from the parent row's 3rd column
                             const durationText = row.find('td:nth-child(3)').text();
-                            const durationMatch = durationText.match(/(\d+(?:\.\d+)?)/);
-                            if (durationMatch) {
-                                // Duration is in minutes, convert to hours
-                                const durationMinutes = parseFloat(durationMatch[1]);
-                                routeDuration = durationMinutes / 60;
-                                console.log('⏰ [Expand] Route duration:', durationMinutes, 'minutes =', routeDuration.toFixed(2), 'hours');
+                            
+                            // Handle different duration formats: "1h 45min", "45 min", "105 min", etc.
+                            const hoursMatch = durationText.match(/(\d+)\s*h/i);
+                            const minutesMatch = durationText.match(/(\d+)\s*min/i);
+                            
+                            let totalMinutes = 0;
+                            if (hoursMatch) {
+                                totalMinutes += parseInt(hoursMatch[1]) * 60;
                             }
+                            if (minutesMatch) {
+                                totalMinutes += parseInt(minutesMatch[1]);
+                            }
+                            
+                            // If no hours/minutes format found, try to get just a number (assuming minutes)
+                            if (totalMinutes === 0) {
+                                const simpleMatch = durationText.match(/(\d+(?:\.\d+)?)/);
+                                if (simpleMatch) {
+                                    totalMinutes = parseFloat(simpleMatch[1]);
+                                }
+                            }
+                            
+                            // Convert to hours
+                            routeDuration = totalMinutes / 60;
                             
                             // Calculate guide cost if needed
                             let guideCost = 0;
                             if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
                                 guideCost = routeDuration * 2 * currentGuideRate;
-                                console.log('🚗 [Expand] Guide cost to add:', guideCost, 'MXN');
+                            }
+                            
+                            // Calculate greeter cost if needed
+                            let greeterCost = 0;
+                            if (includeGreeter && routeDuration > 0) {
+                                // Calculate greeter cost using formula based on duration
+                                greeterCost = calculateGreeterPrice(routeDuration);
                             }
                             
                             
@@ -2362,24 +2538,30 @@ table.dataTable thead th:nth-child(2) select {
                                         }
                                     }
                                     
-                                    // 3. Apply currency conversion
+                                    // 3. Apply greeter cost
+                                    if (greeterCost > 0) {
+                                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
+                                        if (priceMatch) {
+                                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
+                                            const newPrice = numericPrice + greeterCost;
+                                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
+                                        }
+                                    }
+                                    
+                                    // 4. Apply currency conversion
                                     finalPrice = applyCurrencyConversion(finalPrice, currentCurrency);
                                     
-                                    console.log('💰 [Expand] Price transformation:', {
-                                        vehicle: vehicleName,
-                                        original: `$${p.price.toLocaleString()} MXN`,
-                                        final: finalPrice,
-                                        paymentType: currentPaymentType,
-                                        currency: currentCurrency,
-                                        guideCost: guideCost
-                                    });
                                     
                                     // Get capacity info from database
                                     let defaultCapacity = p.vehicleType?.defaultCapacity || 4;
                                     const trunkCapacity = p.vehicleType?.trunkCapacity || 2;
                                     
                                     // Reduce capacity by 1 if guide is active (guide takes a seat)
+                                    const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
                                     if (includeGuide && defaultCapacity > 1) {
+                                        defaultCapacity = defaultCapacity - 1;
+                                    }
+                                    if (includeGreeter && defaultCapacity > 1) {
                                         defaultCapacity = defaultCapacity - 1;
                                     }
                                     
@@ -2453,7 +2635,8 @@ table.dataTable thead th:nth-child(2) select {
                                 const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                                 // Always apply current filters to expanded prices
                                 const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
-                                updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
+                    const currentGreeterState = $(`#greeterToggle-${tableId}`).is(':checked');
+                                updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState, currentGreeterState);
                             }, 100);
                         } else {
                             button.html('<i class="ti ti-chevron-down me-1"></i>Error al cargar')
@@ -2506,7 +2689,6 @@ table.dataTable thead th:nth-child(2) select {
         $(`#${tableId}`).on('click', '.view-price-history-btn', function() {
             const serviceId = $(this).data('id');
             const name = $(this).data('name');
-            console.log('Price history button clicked - serviceId:', serviceId, 'name:', name);
             openServicePriceHistoryModal(serviceId, name);
         });
 
@@ -2583,12 +2765,10 @@ table.dataTable thead th:nth-child(2) select {
                             originTS.refreshOptions(false);
                             destTS.refreshOptions(false);
                         } catch (error) {
-                            console.error('Error initializing Tom Select:', error);
                         }
                     }
                 },
                 error: function(xhr) {
-                    console.error('Error loading POIs:', xhr);
                 }
             });
 
@@ -2606,7 +2786,6 @@ table.dataTable thead th:nth-child(2) select {
                     }
                 },
                 error: function(xhr) {
-                    console.error('Error loading vehicle types:', xhr);
                 }
             });
 
@@ -2624,7 +2803,6 @@ table.dataTable thead th:nth-child(2) select {
                     }
                 },
                 error: function(xhr) {
-                    console.error('Error loading rates:', xhr);
                 }
             });
         }
@@ -2640,7 +2818,24 @@ table.dataTable thead th:nth-child(2) select {
             $('#serviceForm')[0].reset();
             $('#serviceId').val('');
             $('#modalTitle').text(isEdit ? 'Editar Traslado' : 'Crear Nuevo Traslado');
-            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Traslado');
+            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Traslados');
+
+            // Show/hide appropriate sections
+            if (!isEdit) {
+                // For new services, show rates and vehicles selection
+                $('#basePricingSection').hide();
+                $('#newServiceRatesSection').show();
+                try {
+                    await loadRatesAndVehicleTypes();
+                } catch (error) {
+                    console.error('Error loading rates and vehicle types in modal:', error);
+                    showModalError('Error al cargar tarifas y vehículos: ' + (error.message || 'Error desconocido'));
+                }
+            } else {
+                // For editing, show existing pricing
+                $('#newServiceRatesSection').hide();
+                $('#basePricingSection').show();
+            }
 
             try {
                 // Wait for and clear Tom Select instances
@@ -2650,7 +2845,6 @@ table.dataTable thead th:nth-child(2) select {
                 originTS.clear();
                 destTS.clear();
             } catch (error) {
-                console.error('Error clearing Tom Select:', error);
             }
             
             // Hide pricing section for new services, show for editing
@@ -2667,7 +2861,6 @@ table.dataTable thead th:nth-child(2) select {
         // Function to update a specific service row with fresh price data
         async function updateServiceRowWithPrices(serviceId) {
             try {
-                console.log('🔄 Updating service row with prices for ID:', serviceId);
                 
                 // Get the current rate filter to ensure we fetch pricing data
                 const selectedRate = $(`#headerRateFilter-${tableId}`).val();
@@ -2691,7 +2884,6 @@ table.dataTable thead th:nth-child(2) select {
                     apiUrl += `?${params.join('&')}`;
                 }
                 
-                console.log('📡 Fetching updated services data from main endpoint:', apiUrl);
                 
                 const response = await fetch(apiUrl, {
                     headers: {
@@ -2721,13 +2913,6 @@ table.dataTable thead th:nth-child(2) select {
                     throw new Error(`Service with ID ${serviceId} not found in response`);
                 }
                 
-                console.log('📊 Found updated service data with prices:', {
-                    id: updatedService.id,
-                    hasPriceData: !!updatedService.priceData,
-                    priceCount: updatedService.priceData?.length || 0,
-                    priceData: updatedService.priceData,
-                    fetchedAt: new Date().toISOString()
-                });
 
                 // Find the row in the DataTable
                 const table = dataTable; // Use the global dataTable instance
@@ -2744,7 +2929,6 @@ table.dataTable thead th:nth-child(2) select {
                 });
 
                 if (targetRowIndex !== -1) {
-                    console.log('🎯 Found target row at index:', targetRowIndex);
                     
                     // Update the row data with fresh service data including prices
                     table.row(targetRowIndex).data(updatedService).draw(false);
@@ -2771,23 +2955,18 @@ table.dataTable thead th:nth-child(2) select {
                                 formattedPrice: priceItem.formattedPrice
                             });
                         });
-                        console.log('🗺️ Updated servicePricesMap with', updatedService.priceData.length, 'price entries');
                     }
                     
                     // Force redraw of the specific row to ensure price updates are visible
                     setTimeout(() => {
-                        console.log('🎨 Forcing row redraw...');
                         table.row(targetRowIndex).invalidate().draw(false);
                     }, 100);
                     
-                    console.log('✅ Service row updated successfully with fresh price data');
                     return true;
                 } else {
-                    console.log('⚠️ Service row not found in DataTable');
                     return false;
                 }
             } catch (error) {
-                console.error('❌ Error updating service row with prices:', error);
                 return false;
             }
         }
@@ -2825,14 +3004,12 @@ table.dataTable thead th:nth-child(2) select {
                             // Load and display base pricing
                             await loadBasePricing(serviceId);
                         } catch (error) {
-                            console.error('Error setting Tom Select values:', error);
                         }
                     } else {
                         showErrorAlert('Formato de respuesta inválido');
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('AJAX Error:', { xhr, status, error });
                     const errorMessage = xhr.responseJSON?.error || 'Error al cargar el traslado';
                     showModalError(errorMessage);
                 }
@@ -2842,35 +3019,231 @@ table.dataTable thead th:nth-child(2) select {
         // Base Pricing Functions
         async function loadBasePricing(serviceId) {
             try {
-                console.log('Loading base pricing for service:', serviceId);
                 
                 // Show the pricing section
                 $('#basePricingSection').show();
                 
-                // Get service base prices from API
                 const token = getAccessToken();
-                const response = await fetch(`/api/services/${serviceId}/all-rate-prices`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
                 
-                if (!response.ok) {
-                    throw new Error('Failed to load base pricing');
-                }
+                // Load all rates and vehicle types, plus existing pricing data
+                const [ratesResponse, vehiclesResponse, existingPricesResponse] = await Promise.all([
+                    $.ajax({
+                        url: '/api/rates/active',
+                        type: 'GET',
+                        beforeSend: function(xhr) {
+                            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    }),
+                    $.ajax({
+                        url: '/api/vehicle-types/active',
+                        type: 'GET',
+                        beforeSend: function(xhr) {
+                            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    }),
+                    $.ajax({
+                        url: `/api/services/${serviceId}/all-rate-prices`,
+                        type: 'GET',
+                        beforeSend: function(xhr) {
+                            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    })
+                ]);
                 
-                const priceData = await response.json();
-                
-                if (priceData.success && priceData.data) {
-                    renderBasePricing(priceData.data);
+                if (ratesResponse.success && vehiclesResponse.success && existingPricesResponse.success) {
+                    renderEditPricingGrid(ratesResponse.data, vehiclesResponse.data, existingPricesResponse.data);
                 } else {
-                    throw new Error('Invalid pricing data received');
+                    throw new Error('Failed to load pricing data');
                 }
             } catch (error) {
-                console.error('Error loading base pricing:', error);
                 $('#basePricingSection').hide();
                 showModalError('Error al cargar los precios base: ' + error.message);
             }
+        }
+
+        // Color utility functions for pricing grid
+        function getLuminance(hex) {
+            const rgb = parseInt(hex.slice(1), 16);
+            const r = (rgb >> 16) & 0xff;
+            const g = (rgb >> 8) & 0xff;
+            const b = (rgb >> 0) & 0xff;
+            
+            const [rsRGB, gsRGB, bsRGB] = [r/255, g/255, b/255].map(val => {
+                return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
+            });
+            
+            return 0.2126 * rsRGB + 0.7152 * gsRGB + 0.0722 * bsRGB;
+        }
+
+        function getContrastTextColor(backgroundColor) {
+            const luminance = getLuminance(backgroundColor);
+            return luminance > 0.5 ? '#1F2937' : '#FFFFFF';
+        }
+
+        // Load rates and vehicle types pricing grid for new service creation
+        async function loadRatesAndVehicleTypes() {
+            try {
+                // Load rates using the active endpoint
+                const ratesResponse = await $.ajax({
+                    url: '/api/rates/active',
+                    type: 'GET',
+                    beforeSend: function(xhr) {
+                        const token = getAccessToken();
+                        if (token) {
+                            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    }
+                });
+                
+                // Load vehicle types using the active endpoint
+                const vehicleTypesResponse = await $.ajax({
+                    url: '/api/vehicle-types/active',
+                    type: 'GET',
+                    beforeSend: function(xhr) {
+                        const token = getAccessToken();
+                        if (token) {
+                            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    }
+                });
+                
+                // Build pricing grid
+                const pricesContainer = $('#newServicePricesContainer');
+                pricesContainer.empty();
+                
+                if (ratesResponse.success && ratesResponse.data && vehicleTypesResponse.success && vehicleTypesResponse.data) {
+                    const rates = ratesResponse.data;
+                    const vehicleTypes = vehicleTypesResponse.data;
+                    
+                    rates.forEach(rate => {
+                        const rateId = rate.id || rate.value;
+                        const rateName = rate.name || rate.label;
+                        const rateColor = rate.color || '#059669'; // Default green color
+                        const textColor = getContrastTextColor(rateColor);
+                        
+                        // Create rate card
+                        const rateCard = $(`
+                            <div class="card mb-3 border-0 shadow-sm">
+                                <div class="card-header" style="background-color: ${rateColor};">
+                                    <h6 class="mb-0 fw-medium" style="color: ${textColor};">${rateName}</h6>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="row" id="new-rate-${rateId}-prices">
+                                        <!-- Vehicle inputs will be added here -->
+                                    </div>
+                                </div>
+                            </div>
+                        `);
+                        
+                        pricesContainer.append(rateCard);
+                        
+                        // Add vehicle type inputs to this rate card
+                        const rateContainer = $(`#new-rate-${rateId}-prices`);
+                        
+                        vehicleTypes.forEach(vehicleType => {
+                            const vehicleId = vehicleType.id || vehicleType.value;
+                            const vehicleName = vehicleType.name || vehicleType.label;
+                            const vehicleCapacity = vehicleType.capacity || vehicleType.defaultCapacity;
+                            
+                            const vehicleInput = $(`
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label form-label-sm fw-medium">${vehicleName}</label>
+                                    <small class="text-muted d-block mb-1">(${vehicleCapacity} pax)</small>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" 
+                                               class="form-control service-price-input" 
+                                               data-rate-id="${rateId}"
+                                               data-vehicle-id="${vehicleId}"
+                                               value="0"
+                                               step="0.01"
+                                               min="0"
+                                               placeholder="0.00">
+                                        <span class="input-group-text">MXN</span>
+                                    </div>
+                                </div>
+                            `);
+                            
+                            rateContainer.append(vehicleInput);
+                        });
+                    });
+                } else {
+                    showModalError('Error: No se pudieron cargar las tarifas o tipos de vehículo');
+                }
+                
+            } catch (error) {
+                console.error('Error loading rates and vehicle types:', error);
+                showModalError('Error al cargar tarifas y vehículos: ' + (error.message || 'Error desconocido'));
+            }
+        }
+
+        // Render complete pricing grid for editing (shows all rates and vehicle types)
+        function renderEditPricingGrid(rates, vehicleTypes, existingPrices) {
+            const container = $('#basePricesContainer');
+            container.empty();
+            
+            // Create lookup map for existing prices
+            const existingPriceMap = {};
+            existingPrices.forEach(item => {
+                const rateId = item.rate?.id;
+                const vehicleId = item.vehicleType?.id;
+                if (rateId && vehicleId) {
+                    existingPriceMap[`${rateId}-${vehicleId}`] = item;
+                }
+            });
+            
+            // Create pricing grid for all rates and vehicle types
+            rates.forEach(rate => {
+                const rateName = rate.name || rate.label || 'Tarifa sin nombre';
+                const rateId = rate.id || rate.value;
+                const rateColor = rate.color || '#6c757d';
+                const textColor = getContrastTextColor(rateColor);
+                
+                const rateCard = $(`
+                    <div class="card mb-3 border-0 shadow-sm">
+                        <div class="card-header" style="background-color: ${rateColor};">
+                            <h6 class="mb-0 fw-medium" style="color: ${textColor};">${rateName}</h6>
+                        </div>
+                        <div class="card-body p-3">
+                            <div class="row" id="edit-rate-${rateId}-prices">
+                                <!-- Vehicle inputs will be added here -->
+                            </div>
+                        </div>
+                    </div>
+                `);
+                
+                container.append(rateCard);
+                
+                // Add vehicle type inputs for this rate
+                vehicleTypes.forEach(vehicle => {
+                    const vehicleId = vehicle.id || vehicle.value;
+                    const vehicleName = vehicle.name || vehicle.label || 'Vehículo sin nombre';
+                    const priceKey = `${rateId}-${vehicleId}`;
+                    const existingPrice = existingPriceMap[priceKey];
+                    const currentPrice = existingPrice ? existingPrice.price : '';
+                    const existingId = existingPrice ? existingPrice.id : '';
+                    
+                    const vehicleCol = $(`
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-medium text-secondary">${vehicleName}</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0 text-muted">$</span>
+                                <input type="number" 
+                                       class="form-control edit-price-input border-start-0" 
+                                       data-rate-id="${rateId}" 
+                                       data-vehicle-id="${vehicleId}"
+                                       data-existing-id="${existingId}"
+                                       value="${currentPrice}"
+                                       min="0" 
+                                       step="0.01" 
+                                       placeholder="0.00">
+                            </div>
+                        </div>
+                    `);
+                    
+                    $(`#edit-rate-${rateId}-prices`).append(vehicleCol);
+                });
+            });
         }
 
         function renderBasePricing(priceData) {
@@ -2937,8 +3310,35 @@ table.dataTable thead th:nth-child(2) select {
 
         async function saveBasePricing(serviceId) {
             const basePrices = [];
+            const newPrices = [];
             
-            // Collect all base price inputs
+            // Collect all edit price inputs (new grid format)
+            $('.edit-price-input').each(function() {
+                const input = $(this);
+                const price = parseFloat(input.val()) || 0;
+                const existingId = input.data('existing-id');
+                const rateId = input.data('rate-id');
+                const vehicleId = input.data('vehicle-id');
+                
+                if (existingId) {
+                    // Always update existing prices (even if 0 - will deactivate via valid_until)
+                    basePrices.push({
+                        id: existingId,
+                        rateId: rateId,
+                        vehicleId: vehicleId,
+                        price: price
+                    });
+                } else if (price > 0) {
+                    // Only create new prices if > 0
+                    newPrices.push({
+                        rateId: rateId,
+                        vehicleId: vehicleId,
+                        price: price
+                    });
+                }
+            });
+            
+            // Also collect legacy base price inputs (fallback for old format)
             $('.base-price-input').each(function() {
                 const input = $(this);
                 const price = parseFloat(input.val()) || 0;
@@ -2956,35 +3356,67 @@ table.dataTable thead th:nth-child(2) select {
                 }
             });
             
-            if (basePrices.length === 0) {
+            if (basePrices.length === 0 && newPrices.length === 0) {
                 return; // No prices to save
             }
             
             try {
                 const token = getAccessToken();
-                const response = await fetch(`/api/services/${serviceId}/update-base-prices`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        prices: basePrices
-                    })
-                });
+                let updatedCount = 0;
+                let createdCount = 0;
                 
-                if (!response.ok) {
-                    throw new Error('Failed to save base pricing');
+                // Update existing prices if any
+                if (basePrices.length > 0) {
+                    const updateResponse = await fetch(`/api/services/${serviceId}/update-base-prices`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            prices: basePrices
+                        })
+                    });
+                    
+                    if (!updateResponse.ok) {
+                        throw new Error('Failed to update existing prices');
+                    }
+                    
+                    const updateResult = await updateResponse.json();
+                    updatedCount = updateResult.updatedCount || 0;
                 }
                 
-                const result = await response.json();
-                if (!result.success) {
-                    throw new Error(result.error || 'Error saving base prices');
+                // Create new prices if any (using the bulk create approach)
+                if (newPrices.length > 0) {
+                    const createResponse = await fetch(`/api/services/${serviceId}/add-rate-prices`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            prices: newPrices
+                        })
+                    });
+                    
+                    if (!createResponse.ok) {
+                        // If add-rate-prices doesn't exist, we need to create it or use another approach
+                        console.warn('add-rate-prices endpoint not available, skipping new price creation');
+                    } else {
+                        const createResult = await createResponse.json();
+                        createdCount = createResult.created || newPrices.length;
+                    }
                 }
                 
-                console.log('Base pricing saved successfully');
+                const totalChanges = updatedCount + createdCount;
+                if (totalChanges === 0) {
+                    throw new Error('No prices were updated or created');
+                }
+                
+                // Success - return the counts for reporting
+                return { updated: updatedCount, created: createdCount };
+                
             } catch (error) {
-                console.error('Error saving base pricing:', error);
                 throw error;
             }
         }
@@ -3022,15 +3454,70 @@ table.dataTable thead th:nth-child(2) select {
                     return;
                 }
 
-                const serviceData = {
-                    originPOI: originPOI || null,
-                    destinationPOI: destinationPOI,
-                    note: $('#note').val().trim(),
-                    routeDuration: $('#routeDuration').val() ? parseInt($('#routeDuration').val()) : null,
-                };
-
-                const url = isEdit ? `${apiEndpoint}/${serviceId}` : apiEndpoint;
-                const method = isEdit ? 'PUT' : 'POST';
+                // For new services, prepare bulk creation data
+                let serviceData;
+                let url;
+                let method;
+                
+                if (!isEdit) {
+                    // Get pricing data from the grid
+                    const pricingData = [];
+                    let hasValidPrices = false;
+                    
+                    $('.service-price-input').each(function() {
+                        const $input = $(this);
+                        const price = parseFloat($input.val()) || 0;
+                        
+                        if (price > 0) {
+                            hasValidPrices = true;
+                            pricingData.push({
+                                rateId: $input.data('rate-id'),
+                                vehicleId: $input.data('vehicle-id'),
+                                price: price
+                            });
+                        }
+                    });
+                    
+                    if (!hasValidPrices) {
+                        showModalError('Debes configurar al menos un precio mayor a 0 para crear el traslado');
+                        $saveBtn.prop('disabled', false).html(originalBtnHtml);
+                        return;
+                    }
+                    
+                    // Transform pricing data to API format
+                    const rateIds = [...new Set(pricingData.map(item => item.rateId))];
+                    const vehicleIds = [...new Set(pricingData.map(item => item.vehicleId))];
+                    
+                    // Calculate default price (average of all prices)
+                    const totalPrice = pricingData.reduce((sum, item) => sum + item.price, 0);
+                    const defaultPrice = Math.round(totalPrice / pricingData.length);
+                    
+                    // Prepare bulk creation data with both formats for compatibility
+                    serviceData = {
+                        originPOI: originPOI || null,
+                        destinationPOI: destinationPOI,
+                        note: $('#note').val().trim(),
+                        routeDuration: $('#routeDuration').val() ? parseInt($('#routeDuration').val()) : null,
+                        rates: rateIds,
+                        vehicleTypes: vehicleIds,
+                        defaultPrice: defaultPrice,
+                        pricingData: pricingData  // Include individual pricing data
+                    };
+                    
+                    url = `${apiEndpoint}/bulk-create`;
+                    method = 'POST';
+                } else {
+                    // For editing, use existing single service data
+                    serviceData = {
+                        originPOI: originPOI || null,
+                        destinationPOI: destinationPOI,
+                        note: $('#note').val().trim(),
+                        routeDuration: $('#routeDuration').val() ? parseInt($('#routeDuration').val()) : null,
+                    };
+                    
+                    url = `${apiEndpoint}/${serviceId}`;
+                    method = 'PUT';
+                }
 
                 $.ajax({
                     url,
@@ -3040,8 +3527,19 @@ table.dataTable thead th:nth-child(2) select {
                     beforeSend: function(xhr) {
                         const token = getAccessToken();
                         
+                        console.log('Service creation - Token check:', {
+                            tokenExists: !!token,
+                            tokenLength: token ? token.length : 0,
+                            tokenStart: token ? token.substring(0, 20) + '...' : 'null'
+                        });
+                        
                         if (token) {
                             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        } else {
+                            console.error('No access token available for service creation');
+                            showModalError('Error de autenticación: Token no disponible. Por favor, recarga la página.');
+                            $saveBtn.prop('disabled', false).html(originalBtnHtml);
+                            return false;
                         }
                     },
                     success: async function(response) {
@@ -3049,11 +3547,8 @@ table.dataTable thead th:nth-child(2) select {
                             // If editing and base pricing section is visible, save base pricing
                             if (isEdit && $('#basePricingSection').is(':visible')) {
                                 try {
-                                    console.log('💾 Saving base pricing for service:', serviceId);
                                     await saveBasePricing(serviceId);
-                                    console.log('✅ Base pricing saved successfully');
                                 } catch (error) {
-                                    console.error('❌ Error saving base pricing:', error);
                                     showModalError('Servicio guardado, pero error al actualizar precios base: ' + error.message);
                                     return;
                                 }
@@ -3088,11 +3583,9 @@ table.dataTable thead th:nth-child(2) select {
                                 try {
                                     // If we saved pricing, wait a bit for the versioning to complete on the backend
                                     if ($('#basePricingSection').is(':visible')) {
-                                        console.log('⏳ Waiting for price versioning to complete...');
                                         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
                                     }
                                     
-                                    console.log('🔄 Starting targeted row update for service:', serviceId);
                                     const rowUpdated = await updateServiceRowWithPrices(serviceId);
                                     
                                     hideLoadingIndicator();
@@ -3102,16 +3595,13 @@ table.dataTable thead th:nth-child(2) select {
                                             ? 'Traslado y precios actualizados exitosamente' 
                                             : 'Traslado actualizado exitosamente';
                                         showSuccessAlert(successMessage);
-                                        console.log('✅ Targeted row update completed successfully');
                                     } else {
-                                        console.log('⚠️ Targeted row update failed, falling back to full table reload');
                                         showLoadingIndicator('Actualizando tabla...');
                                         await initializeTable();
                                         hideLoadingIndicator();
                                         showSuccessAlert('Traslado y precios actualizados exitosamente');
                                     }
                                 } catch (error) {
-                                    console.error('❌ Error in targeted row update, falling back to full reload:', error);
                                     hideLoadingIndicator();
                                     showLoadingIndicator('Actualizando tabla...');
                                     try {
@@ -3130,7 +3620,12 @@ table.dataTable thead th:nth-child(2) select {
                                 try {
                                     await initializeTable();
                                     hideLoadingIndicator();
-                                    showSuccessAlert('Traslado creado exitosamente');
+                                    // Use the actual created count from response or from pricingData
+                                    const actualCreated = response.data && response.data.created 
+                                        ? response.data.created 
+                                        : (serviceData.pricingData ? serviceData.pricingData.length : 1);
+                                    const message = `1 traslado creado exitosamente con ${actualCreated} tarifas`;
+                                    showSuccessAlert(message);
                                 } catch (error) {
                                     hideLoadingIndicator();
                                     showErrorAlert('Error al actualizar la tabla: ' + error.message);
@@ -3141,16 +3636,31 @@ table.dataTable thead th:nth-child(2) select {
                     error: function(xhr) {
                         let errorMessage = 'Error al guardar el traslado';
 
-                        if (xhr.responseJSON?.error) {
+                        console.error('Service creation error:', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText,
+                            responseJSON: xhr.responseJSON,
+                            errorType: typeof xhr.responseJSON?.error,
+                            errorValue: xhr.responseJSON?.error
+                        });
+
+                        if (xhr.status === 401) {
+                            errorMessage = 'Error de autenticación: Token inválido o expirado. Por favor, recarga la página e intenta de nuevo.';
+                        } else if (xhr.responseJSON?.error) {
                             const error = xhr.responseJSON.error;
-                            if (error.includes('already exists') || error.includes('ya existe')) {
+                            const errorStr = String(error); // Convert to string to safely use .includes()
+                            
+                            if (errorStr.includes('Invalid or malformed token')) {
+                                errorMessage = 'Token de autenticación inválido. Por favor, recarga la página e intenta de nuevo.';
+                            } else if (errorStr.includes('already exists') || errorStr.includes('ya existe')) {
                                 errorMessage = 'Ya existe un traslado con esta ruta, tipo de vehículo y tarifa.';
-                            } else if (error.includes('required')) {
+                            } else if (errorStr.includes('required')) {
                                 errorMessage = 'Todos los campos requeridos deben ser completados.';
-                            } else if (error.includes('different') || error.includes('diferentes')) {
+                            } else if (errorStr.includes('different') || errorStr.includes('diferentes')) {
                                 errorMessage = 'El origen y destino deben ser diferentes.';
                             } else {
-                                errorMessage = error;
+                                errorMessage = errorStr;
                             }
                         }
 
@@ -3166,7 +3676,6 @@ table.dataTable thead th:nth-child(2) select {
                     }
                 });
             } catch (error) {
-                console.error('Error getting Tom Select values:', error);
                 showModalError('Error al obtener los valores del formulario');
                 // Restore button state on error
                 $saveBtn.prop('disabled', false).html(originalBtnHtml);
@@ -3229,7 +3738,6 @@ table.dataTable thead th:nth-child(2) select {
                         }
                     },
                     error: function(xhr) {
-                        console.error('Toggle error:', xhr);
                         modal.hide();
                         const error = xhr.responseJSON?.error || 'Error al cambiar el estado del traslado';
                         showAlert('danger', error);
@@ -3378,7 +3886,6 @@ table.dataTable thead th:nth-child(2) select {
 
         // Configure Service Client Price functionality (only available when showClientPricing is true)
         function configureServiceClientPrice(serviceId) {
-            console.log('Configure client price for service:', serviceId);
             
             // Find the service data from the DataTable
             let serviceData = null;
@@ -3397,7 +3904,6 @@ table.dataTable thead th:nth-child(2) select {
             if (serviceData) {
                 openServiceClientPricingModal(serviceId, serviceData);
             } else {
-                console.error('Service data not found for ID:', serviceId);
                 alert('Error: No se encontró la información del servicio');
             }
         }
@@ -3435,7 +3941,6 @@ table.dataTable thead th:nth-child(2) select {
 
             try {
                 // Debug: Log the service data structure
-                console.log('Service data for modal:', serviceData);
                 
                 // Get clientId for loading client-specific prices
                 let modalClientId = null;
@@ -3469,8 +3974,6 @@ table.dataTable thead th:nth-child(2) select {
                     ? `/api/services/${serviceId}/all-rate-prices-with-client-prices?clientId=${modalClientId}`
                     : `/api/services/${serviceId}/all-rate-prices`;
 
-                console.log('Loading prices from endpoint:', endpoint);
-
                 const ratePricesResponse = await fetch(endpoint, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
@@ -3487,11 +3990,7 @@ table.dataTable thead th:nth-child(2) select {
                 
                 // Debug logging in development mode
                 if (isDevelopment) {
-                    console.log('🔍 DEBUG: RatePrices Response Data:', ratePricesData);
-                    console.log('🔍 DEBUG: RatePrices Array:', ratePrices);
                     if (ratePrices.length > 0) {
-                        console.log('🔍 DEBUG: Sample RatePrice Object:', ratePrices[0]);
-                        console.log('🔍 DEBUG: RatePrice IDs:', ratePrices.map(rp => rp.id || rp.objectId));
                     }
                 }
 
@@ -3557,7 +4056,11 @@ table.dataTable thead th:nth-child(2) select {
                                                 let capacity = vehicleType?.defaultCapacity || 'N/A';
                                                 if (capacity !== 'N/A') {
                                                     const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+                                                    const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
                                                     if (includeGuide && capacity > 1) {
+                                                        capacity = capacity - 1;
+                                                    }
+                                                    if (includeGreeter && capacity > 1) {
                                                         capacity = capacity - 1;
                                                     }
                                                 }
@@ -3622,12 +4125,6 @@ table.dataTable thead th:nth-child(2) select {
                 container.innerHTML = ratesHtml;
 
             } catch (error) {
-                console.error('Error loading rates and prices:', error);
-                console.error('Error details:', {
-                    message: error.message,
-                    stack: error.stack,
-                    serviceData: serviceData
-                });
                 container.innerHTML = `
                     <div class="text-center py-4">
                         <i class="ti ti-alert-circle" style="font-size: 2rem; color: #dc3545;"></i>
@@ -3672,7 +4169,6 @@ table.dataTable thead th:nth-child(2) select {
             saveClientId = urlClientId || pathClientId || dataClientId || templateClientId;
 
             if (!saveClientId) {
-                console.error('Error: No se pudo identificar el cliente. Por favor, recarga la página.');
                 
                 // Show error notification if available
                 if (window.showNotification) {
@@ -3713,7 +4209,6 @@ table.dataTable thead th:nth-child(2) select {
 
             if (clientPrices.length === 0) {
                 // Show warning in console instead of alert
-                console.warn('No hay cambios en los precios. Ingresa precios diferentes a los precios base.');
                 
                 // Show notification if available
                 if (window.showNotification) {
@@ -3724,12 +4219,6 @@ table.dataTable thead th:nth-child(2) select {
                 saveButton.disabled = false;
                 return;
             }
-
-            console.log('Saving client prices:', {
-                clientId: saveClientId,
-                serviceId: serviceId,
-                prices: clientPrices
-            });
 
             // Show loading state
             const saveButton = document.querySelector('#serviceClientPricingModal .btn-primary');
@@ -3774,7 +4263,6 @@ table.dataTable thead th:nth-child(2) select {
                 }
                 
                 // Log success for debugging
-                console.log('✅ Client prices saved:', result.message || 'Precios guardados exitosamente');
 
                 // Close modal
                 const modal = bootstrap.Modal.getInstance(document.getElementById('serviceClientPricingModal'));
@@ -3785,7 +4273,6 @@ table.dataTable thead th:nth-child(2) select {
                 // Refresh the table to show updated prices immediately
                 try {
                     if (window.servicesDataTable) {
-                        console.log('🔄 Refreshing client-side table data...');
                         
                         // For client-side DataTables, we need to reload the data from the API
                         // and then update the table
@@ -3793,26 +4280,20 @@ table.dataTable thead th:nth-child(2) select {
                         // Call the initializeTable function to reload all data
                         if (typeof window.initializeTable === 'function') {
                             await window.initializeTable();
-                            console.log('✅ Table data reloaded and refreshed successfully.');
                         } else if (typeof initializeTable === 'function') {
                             await initializeTable();
-                            console.log('✅ Table data reloaded and refreshed successfully.');
                         } else {
                             // Fallback: Simple page reload if functions not available
-                            console.log('🔄 Functions not available, performing simple refresh...');
                             setTimeout(() => {
                                 window.location.reload();
                             }, 1000);
                         }
                     } else {
-                        console.log('⚠️ DataTable instance not found. Prices saved but table not refreshed.');
                     }
                 } catch (refreshError) {
-                    console.warn('⚠️ Error refreshing table:', refreshError.message, '- Prices saved successfully but table not refreshed.');
                 }
 
             } catch (error) {
-                console.error('Error saving client prices:', error);
                 
                 // Show error message if notification system is available
                 if (window.showNotification) {
@@ -3820,7 +4301,6 @@ table.dataTable thead th:nth-child(2) select {
                 }
                 
                 // Log error for debugging
-                console.error('❌ Error saving prices:', error.message);
             } finally {
                 // Restore button state
                 saveButton.disabled = false;
@@ -3831,7 +4311,6 @@ table.dataTable thead th:nth-child(2) select {
         // Store the function in window scope for modal access
         window._saveAllClientPrices = saveAllClientPrices;
     }
-
 
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {

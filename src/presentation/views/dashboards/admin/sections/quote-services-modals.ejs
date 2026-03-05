@@ -466,9 +466,37 @@
                                 <label for="conceptoConcept" class="form-label">Concepto <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="conceptoConcept" placeholder="Describe el servicio...">
                             </div>
+                            
+                            <!-- Schedule Toggle -->
                             <div class="mb-3">
-                                <label for="conceptoTime" class="form-label">Horario</label>
-                                <input type="time" class="form-control" id="conceptoTime" placeholder="HH:MM">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="conceptoHasSchedule">
+                                    <label class="form-check-label" for="conceptoHasSchedule">
+                                        <i class="ti ti-clock me-1"></i>Incluir horario
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- Schedule Fields (hidden by default) -->
+                            <div id="conceptoScheduleFields" class="d-none">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="conceptoStartTime" class="form-label">Hora de inicio</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="ti ti-clock"></i></span>
+                                            <input type="text" class="form-control time-input" id="conceptoStartTime" placeholder="__:__" maxlength="5" data-placeholder="09:00">
+                                        </div>
+                                        <small class="form-text text-muted">Ej: 09:00, 14:30</small>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="conceptoEndTime" class="form-label">Hora de fin</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="ti ti-clock"></i></span>
+                                            <input type="text" class="form-control time-input" id="conceptoEndTime" placeholder="__:__" maxlength="5" data-placeholder="17:00">
+                                        </div>
+                                        <small class="form-text text-muted">Ej: 17:00, 20:30</small>
+                                    </div>
+                                </div>
                             </div>
                             
                             <!-- People Quantities for Concepto -->
@@ -492,15 +520,22 @@
                     <!-- Common Fields -->
                     <hr class="my-4">
                     
-                    <div class="row">
+                    <!-- Tour Transport Checkbox - Only visible for Tours -->
+                    <div class="mb-3" id="tourTransportCheckboxContainer" style="display: none;">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="tourRequiresTransport">
+                            <label class="form-check-label" for="tourRequiresTransport">
+                                <i class="ti ti-car me-1"></i>Se requiere traslado
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="row" id="transportFieldsRow">
                         <div class="col-md-6 mb-3">
-                            <label for="transportCategory" class="form-label">Categoría <span class="text-danger">*</span></label>
+                            <label for="transportCategory" class="form-label">Segmento <span class="text-danger">*</span></label>
                             <select class="form-select" id="transportCategory" required>
-                                <option value="">-- Seleccionar categoría --</option>
-                                <option value="economica">Económica</option>
-                                <option value="standard">Estándar</option>
-                                <option value="premium">Premium</option>
-                                <option value="lujo">Lujo</option>
+                                <option value="">-- Seleccionar segmento --</option>
+                                <!-- Options will be loaded dynamically from Rate table -->
                             </select>
                         </div>
                         <div class="col-md-4 mb-3">
@@ -511,11 +546,17 @@
                         </div>
                         <div class="col-md-2 mb-3">
                             <label class="form-label d-block">Opcional</label>
-                            <div class="d-flex align-items-center justify-content-center" style="min-height: 38px;">
-                                <div class="form-check">
+                            <div class="d-flex flex-column align-items-start" style="min-height: 38px;">
+                                <div class="form-check mb-1">
                                     <input class="form-check-input" type="checkbox" value="" id="includeGuide">
                                     <label class="form-check-label small" for="includeGuide" id="guideLabel" style="font-size: 0.875rem; line-height: 1.2;">
                                         Guía + Chofer
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="" id="includeGreeter">
+                                    <label class="form-check-label small" for="includeGreeter" id="greeterLabel" style="font-size: 0.875rem; line-height: 1.2;">
+                                        Greeter
                                     </label>
                                 </div>
                             </div>
@@ -525,7 +566,7 @@
                     <!-- Standard pricing for non-experience services -->
                     <div class="row" id="standardPricingSection">
                         <div class="col-md-6 mb-3">
-                            <label for="servicePrice" class="form-label">Precio Unitario <span class="text-danger">*</span></label>
+                            <label for="servicePrice" class="form-label">Precio <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 <input type="number" class="form-control" id="servicePrice" placeholder="0.00" step="0.01" min="0" required>

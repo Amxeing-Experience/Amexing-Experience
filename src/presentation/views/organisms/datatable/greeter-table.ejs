@@ -75,8 +75,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <tr>
                         <th>Ubicación</th>
                         <th>Precio</th>
-                        <th>Duración</th>
-                        <th>Capacidad</th>
                         <% if (['superadmin', 'admin'].includes(dtUserRole)) { %>
                             <th>Estado</th>
                         <% } %>
@@ -687,28 +685,6 @@ table.dataTable thead .sorting_desc_disabled {
                                 </div>
                             </div>
                         `;
-                    }
-                },
-                // Duración column
-                {
-                    data: 'duration',
-                    className: 'text-center',
-                    render: function(data, type, row) {
-                        if (data && data > 0) {
-                            return `<span class="badge bg-secondary">${data} min</span>`;
-                        }
-                        return '<span class="text-muted">-</span>';
-                    }
-                },
-                // Capacidad column
-                {
-                    data: 'capacity',
-                    className: 'text-center',
-                    render: function(data, type, row) {
-                        if (data && data > 0) {
-                            return `<span class="badge bg-info">${data} personas</span>`;
-                        }
-                        return '<span class="text-muted">-</span>';
                     }
                 }
             ].concat((<%= JSON.stringify(['superadmin', 'admin'].includes(dtUserRole)) %>) ? [

@@ -32,11 +32,15 @@ const hasSubmenu = navSubmenu && navSubmenu.length > 0;
 linkClasses = hasDropdown ? linkClasses + ' dropdown-toggle' : linkClasses
 %>
 
-<li class="<%= itemClasses %>"
-  <% if (hasDropdown) { %>id="dropdownMenuButton-<%= navId %>" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"<% } %>>
+<li class="<%= itemClasses %> <%= hasDropdown ? 'dropdown' : '' %>">
     <a class="<%= linkClasses %>"
-      href="<%= navHref %>"
-      <% if (hasSubmenu) { %>
+      href="<%= hasDropdown ? '#' : navHref %>"
+      <% if (hasDropdown) { %>
+      role="button"
+      id="dropdownMenuButton-<%= navId %>"
+      data-bs-toggle="dropdown"
+      aria-expanded="false"
+      <% } else if (hasSubmenu) { %>
       data-bs-toggle="collapse"
       data-bs-target="#submenu-<%= navId %>"
       aria-expanded="<%= navActive %>"
@@ -112,24 +116,71 @@ linkClasses = hasDropdown ? linkClasses + ' dropdown-toggle' : linkClasses
             <% }); %>
         </ul>
     <% } %>
+    
+    <!-- Dropdown Menu -->
+    <% if (hasDropdown) { %>
+      <ul class="dropdown-menu" 
+          aria-labelledby="dropdownMenuButton-<%= navId %>"
+          style="background-color: #ffffff !important; background: #ffffff !important; opacity: 1 !important; border: 1px solid #dee2e6 !important;">
+        <% listDropdown.forEach(function(item, index) { %>
+          <li style="background: transparent !important;">
+            <a class="dropdown-item" href="<%= item.path || '#' %>" 
+               style="background-color: transparent !important;">
+              <% if (item.icon) { %>
+                <i class="ti ti-<%=item.icon%> me-2"></i>
+              <% } %>
+              <%= item.name ? item.name : ' ' %>
+            </a>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
 </li>
 
-<% if (hasDropdown) { %>
-  <ul class="dropdown-menu dropdown-menu-sidebar animated flipInX" aria-labelledby="dropdownMenuButton-<%= navId %>">
-    <% listDropdown.forEach(function(item, index) { %>
-      <li class="<%= itemClasses %>">
-          <a class="dropdown-item <%= linkClasses.replace('dropdown-toggle', '') %>" href="<%= item.path || '#' %>">
-            <% if (item.icon) { %>
-              <span class="nav-icon">
-                <i class="ti ti-<%=item.icon%>"></i>
-              </span>
-            <% } %>
-            <span class="hide-menu nav-text"><%= item.name ? item.name : ' ' %></span>
-          </a>
-      </li>
-    <% }) %>
-  </ul>
-<% } %>
+<script>
+// Fix dropdown transparency by moving it to body when shown
+document.addEventListener('DOMContentLoaded', function() {
+    const dropdownId = 'dropdownMenuButton-<%= navId %>';
+    const dropdownToggle = document.getElementById(dropdownId);
+    
+    if (dropdownToggle) {
+        dropdownToggle.addEventListener('shown.bs.dropdown', function() {
+            const dropdownMenu = this.nextElementSibling;
+            if (dropdownMenu && dropdownMenu.classList.contains('dropdown-menu')) {
+                // Force solid background
+                dropdownMenu.style.cssText = `
+                    background-color: #ffffff !important;
+                    background: #ffffff !important;
+                    opacity: 1 !important;
+                    border: 1px solid #dee2e6 !important;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+                    z-index: 99999 !important;
+                `;
+                
+                // Move dropdown to body to escape any parent opacity
+                const rect = dropdownToggle.getBoundingClientRect();
+                document.body.appendChild(dropdownMenu);
+                dropdownMenu.style.position = 'fixed';
+                dropdownMenu.style.top = rect.bottom + 'px';
+                dropdownMenu.style.left = rect.left + 'px';
+                dropdownMenu.style.minWidth = '220px';
+                dropdownMenu.classList.add('show');
+            }
+        });
+        
+        dropdownToggle.addEventListener('hidden.bs.dropdown', function() {
+            const dropdownMenu = document.querySelector('.dropdown-menu[aria-labelledby="' + dropdownId + '"]');
+            if (dropdownMenu && dropdownMenu.parentElement === document.body) {
+                // Move it back to original position
+                this.parentElement.appendChild(dropdownMenu);
+                dropdownMenu.style.position = '';
+                dropdownMenu.style.top = '';
+                dropdownMenu.style.left = '';
+            }
+        });
+    }
+});
+</script>
 
 <style>
     /* Navigation Item Styles */
@@ -275,6 +326,82 @@ linkClasses = hasDropdown ? linkClasses + ' dropdown-toggle' : linkClasses
         position: relative;
         pointer-events: none;
     }
+    
+    /* Dropdown menu specific styles for sidebar */
+    .sidebar-item.dropdown {
+        position: relative;
+    }
+    
+    .sidebar-item .dropdown-menu {
+        position: absolute !important;
+        top: 100% !important;
+        left: 20px !important;
+        right: 20px !important;
+        width: calc(100% - 40px) !important;
+        max-width: 250px !important;
+        margin-top: 5px !important;
+        background-color: #ffffff !important;
+        background: #ffffff !important;
+        border: 1px solid #dee2e6 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+        padding: 6px !important;
+        z-index: 9999 !important;
+        opacity: 1 !important;
+    }
+    
+    .sidebar-item .dropdown-menu.show {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        background-color: #ffffff !important;
+    }
+    
+    .sidebar-item .dropdown-menu li {
+        list-style: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .sidebar-item .dropdown-item {
+        display: flex !important;
+        align-items: center !important;
+        padding: 8px 12px !important;
+        color: #495057 !important;
+        background-color: transparent !important;
+        text-decoration: none !important;
+        transition: all 0.2s ease !important;
+        font-size: 14px !important;
+        font-weight: 400 !important;
+        border: none !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    
+    .sidebar-item .dropdown-item:hover,
+    .sidebar-item .dropdown-item:focus {
+        background-color: #f8f9fa !important;
+        color: var(--primary-color, #5d87ff) !important;
+        text-decoration: none !important;
+    }
+    
+    .sidebar-item .dropdown-item:active {
+        background-color: #e9ecef !important;
+    }
+    
+    .sidebar-item .dropdown-item i {
+        width: 20px !important;
+        height: 20px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin-right: 10px !important;
+        flex-shrink: 0 !important;
+        font-size: 16px !important;
+    }
 
     .nav-loading::after {
         content: '';
@@ -295,9 +422,34 @@ linkClasses = hasDropdown ? linkClasses + ' dropdown-toggle' : linkClasses
         100% { transform: translateY(-50%) rotate(360deg); }
     }
 
-    .dropdown-menu-sidebar {
-      position: fixed !important;
-      inset: 0px auto auto 1% !important;
+    /* Ensure dropdown appears above other elements */
+    .left-sidebar .dropdown-menu {
+        position: absolute !important;
+        transform: none !important;
+        will-change: transform;
+    }
+    
+    /* Override any transparency from parent elements */
+    .sidebar-nav .dropdown-menu,
+    .sidebar-wrapper .dropdown-menu,
+    .sidebar-item .dropdown-menu,
+    .dropdown-menu.show {
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        opacity: 1 !important;
+    }
+    
+    /* Force solid background on Bootstrap dropdown */
+    .dropdown-menu {
+        --bs-dropdown-bg: #ffffff !important;
+        --bs-dropdown-link-hover-bg: #f8f9fa !important;
+        background-color: var(--bs-dropdown-bg) !important;
+    }
+    
+    /* Ensure dropdown container has solid background */
+    .dropdown-menu::before,
+    .dropdown-menu::after {
+        display: none !important;
     }
 
     .left-sidebar.collapsed .sidebar-link.dropdown-toggle .nav-icon{

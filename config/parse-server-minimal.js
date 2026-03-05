@@ -13,9 +13,6 @@ const parseServerConfig = {
   serverURL: process.env.PARSE_SERVER_URL || 'http://localhost:1337/parse',
   publicServerURL: process.env.PARSE_PUBLIC_SERVER_URL || 'http://localhost:1337/parse',
   
-  // Essential Parse Server 6.5 options
-  encodeParseObjectInCloudFunction: true,
-  
   // Basic Security Configuration
   allowClientClassCreation: false,
   enableAnonymousUsers: false,

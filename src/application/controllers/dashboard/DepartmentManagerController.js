@@ -51,9 +51,20 @@ class DepartmentManagerController extends RoleBasedController {
     try {
       // For department manager role, the user IS the client, so use their own ID
       const { user } = req;
-      const clientId = user?.id;
-      const departmentId = user?.departmentId || user?.organizationId || '';
-      const departmentName = user?.departmentName || 'Department';
+
+      // If admin is viewing, we need to use a placeholder or skip the client ID
+      // Since admin doesn't have a specific client/department, we'll use a placeholder
+      let clientId = user?.id;
+      let departmentId = user?.departmentId || user?.organizationId || '';
+      let departmentName = user?.departmentName || 'Department';
+
+      // For admin/superadmin viewing department_manager dashboard
+      // We'll use a placeholder ID that the API can handle
+      if (user?.role === 'admin' || user?.role === 'superadmin') {
+        clientId = 'admin-view'; // Special placeholder for admin viewing
+        departmentId = 'admin-department';
+        departmentName = 'Admin View';
+      }
 
       await this.renderRoleView(req, res, 'team', {
         title: 'My Team',

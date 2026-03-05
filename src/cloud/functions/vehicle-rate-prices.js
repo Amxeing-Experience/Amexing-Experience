@@ -337,6 +337,86 @@ Parse.Cloud.define('recreateVehicleRatePrices', async (request) => {
   }
 });
 
+/**
+ * Get all TourPrices for vehicle dropdown population.
+ */
+Parse.Cloud.define('getTourPrices', async (request) => {
+  const { user } = request;
+
+  try {
+    // Require authentication
+    if (!user) {
+      throw new Error('Authentication required');
+    }
+
+    const query = new Parse.Query('TourPrices');
+    query.doesNotExist('valid_until'); // Only active prices
+    query.equalTo('exists', true);
+    query.include('tourPtr');
+    query.include('ratePtr');
+    query.limit(10000);
+
+    const tourPrices = await query.find({ useMasterKey: true });
+
+    return tourPrices.map((tp) => ({
+      id: tp.id,
+      tourPtr: tp.get('tourPtr')?.id,
+      ratePtr: tp.get('ratePtr')?.id,
+      vehicleType: tp.get('vehicleType'),
+      price: tp.get('price'),
+      valid_until: tp.get('valid_until'),
+    }));
+  } catch (error) {
+    throw new Error(`Failed to get TourPrices: ${error.message}`);
+  }
+});
+
+/**
+ * Get ClientPrices for specific client and tour type.
+ */
+Parse.Cloud.define('getClientPrices', async (request) => {
+  const { user, params } = request;
+  const { clientId, itemType } = params;
+
+  try {
+    // Require authentication
+    if (!user) {
+      throw new Error('Authentication required');
+    }
+
+    if (!clientId) {
+      return []; // No client specified
+    }
+
+    const query = new Parse.Query('ClientPrices');
+    query.equalTo('clientPtr', {
+      __type: 'Pointer',
+      className: 'ClientCompanies',
+      objectId: clientId,
+    });
+    query.equalTo('itemType', itemType || 'TOUR');
+    query.doesNotExist('valid_until'); // Only active prices
+    query.include('itemPtr');
+    query.include('ratePtr');
+    query.limit(10000);
+
+    const clientPrices = await query.find({ useMasterKey: true });
+
+    return clientPrices.map((cp) => ({
+      id: cp.id,
+      itemPtr: cp.get('itemPtr')?.id,
+      ratePtr: cp.get('ratePtr')?.id,
+      vehiclePtr: cp.get('vehiclePtr'),
+      price: cp.get('price'),
+      valid_until: cp.get('valid_until'),
+      clientPtr: clientId,
+      itemType: cp.get('itemType'),
+    }));
+  } catch (error) {
+    throw new Error(`Failed to get ClientPrices: ${error.message}`);
+  }
+});
+
 module.exports = {
   // Export for testing if needed
 };

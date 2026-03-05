@@ -14,38 +14,45 @@ const apiEndpoint = typeof walkingApiEndpoint !== 'undefined' ? walkingApiEndpoi
 <!-- Walking Tours Section -->
 <div class="card mb-4" id="<%= sectionId %>">
     <div class="card-header bg-light">
+        <!-- First row: Title and Create button -->
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h5 class="card-title mb-0">
+                <i class="ti ti-walk me-2 text-success"></i>Tours a Pie
+            </h5>
+            <% 
+            // Check if user is admin or superadmin to show create button
+            const currentUserRole = typeof userRole !== 'undefined' ? userRole : '';
+            if (currentUserRole === 'admin' || currentUserRole === 'superadmin') { 
+            %>
+                <button type="button" class="btn btn-success btn-sm" id="createWalkingTourBtn">
+                    <i class="ti ti-plus me-1"></i>Nuevo Tour a Pie
+                </button>
+            <% } %>
+        </div>
+        
+        <!-- Second row: Subtitle and Filter Controls -->
         <div class="d-flex align-items-center justify-content-between">
-            <div>
-                <h5 class="card-title mb-1">
-                    <i class="ti ti-walk me-2 text-success"></i>Tours a Pie
-                </h5>
-                <p class="text-muted small mb-0">Precios por grupo de personas</p>
-            </div>
-            <div class="d-flex align-items-center gap-3">
-                <!-- Filter Controls -->
-                <div class="d-flex gap-2 align-items-center">
-                    <!-- Currency Dropdown -->
-                    <div class="d-flex align-items-center gap-1">
-                        <label for="walkingCurrencyFilter-<%= sectionId %>" class="form-label mb-0 text-muted small">Moneda:</label>
-                        <select class="form-select form-select-sm" id="walkingCurrencyFilter-<%= sectionId %>" style="min-width: 80px;">
-                            <option value="MXN" selected>MXN</option>
-                            <option value="USD">USD</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Payment Type Dropdown -->
-                    <div class="d-flex align-items-center gap-1">
-                        <label for="walkingPaymentFilter-<%= sectionId %>" class="form-label mb-0 text-muted small">Pago:</label>
-                        <select class="form-select form-select-sm" id="walkingPaymentFilter-<%= sectionId %>" style="min-width: 180px;">
-                            <option value="efectivo"<%= (typeof defaultPaymentType !== 'undefined' && defaultPaymentType === 'efectivo') ? ' selected' : '' %>>Efectivo</option>
-                            <option value="transferencia"<%= (typeof defaultPaymentType === 'undefined' || defaultPaymentType === 'transferencia') ? ' selected' : '' %>>Transferencia</option>
-                            <option value="tarjeta"<%= (typeof defaultPaymentType !== 'undefined' && defaultPaymentType === 'tarjeta') ? ' selected' : '' %>>Tarjeta de Crédito/Débito</option>
-                        </select>
-                    </div>
+            <p class="text-muted small mb-0">Precios por grupo de personas</p>
+            
+            <!-- Filter Controls -->
+            <div class="d-flex gap-2 align-items-center">
+                <!-- Currency Dropdown -->
+                <div class="d-flex align-items-center gap-1">
+                    <label for="walkingCurrencyFilter-<%= sectionId %>" class="form-label mb-0 text-muted small">Moneda:</label>
+                    <select class="form-select form-select-sm" id="walkingCurrencyFilter-<%= sectionId %>" style="min-width: 80px;">
+                        <option value="MXN" selected>MXN</option>
+                        <option value="USD">USD</option>
+                    </select>
                 </div>
                 
-                <div class="badge bg-success-subtle text-success">
-                    <i class="ti ti-users me-1"></i>Sin vehículos
+                <!-- Payment Type Dropdown -->
+                <div class="d-flex align-items-center gap-1">
+                    <label for="walkingPaymentFilter-<%= sectionId %>" class="form-label mb-0 text-muted small">Pago:</label>
+                    <select class="form-select form-select-sm" id="walkingPaymentFilter-<%= sectionId %>" style="min-width: 180px;">
+                        <option value="efectivo"<%= (typeof defaultPaymentType !== 'undefined' && defaultPaymentType === 'efectivo') ? ' selected' : '' %>>Efectivo</option>
+                        <option value="transferencia"<%= (typeof defaultPaymentType === 'undefined' || defaultPaymentType === 'transferencia') ? ' selected' : '' %>>Transferencia</option>
+                        <option value="tarjeta"<%= (typeof defaultPaymentType !== 'undefined' && defaultPaymentType === 'tarjeta') ? ' selected' : '' %>>Tarjeta de Crédito/Débito</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -81,13 +88,30 @@ const apiEndpoint = typeof walkingApiEndpoint !== 'undefined' ? walkingApiEndpoi
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     loadWalkingTours();
+    
+    // Add click handler for create walking tour button
+    const createBtn = document.getElementById('createWalkingTourBtn');
+    if (createBtn) {
+        createBtn.addEventListener('click', function() {
+            // Check if there's a walking tour modal in the parent page
+            const walkingTourModal = document.getElementById('walkingTourModal');
+            if (walkingTourModal) {
+                // Open the walking tour modal
+                const modal = new bootstrap.Modal(walkingTourModal);
+                modal.show();
+            } else {
+                console.error('Walking tour modal not found. Make sure the walking tour modal component is included in the page.');
+                alert('Para crear tours a pie, necesita incluir el componente de modal de tours a pie en la página.');
+            }
+        });
+    }
 });
 
 async function loadWalkingTours() {
     try {
-        // Use tourType parameter to filter for walking tours only
+        // Get all tours and filter client-side by isWalkingTour = true
         const url = new URL('<%= apiEndpoint %>', window.location.origin);
-        url.searchParams.append('tourType', 'walking');
+        // Note: Removed tourType parameter - will filter by isWalkingTour instead
         
         // Add client ID if available to get client-specific prices
         const clientId = getClientId();
@@ -108,7 +132,12 @@ async function loadWalkingTours() {
             throw new Error(data.error || 'Error loading walking tours');
         }
         
-        displayWalkingTours(data.data || []);
+        // Filter to show only walking tours (isWalkingTour === true)
+        const allTours = data.data || [];
+        const walkingTours = allTours.filter(tour => tour.isWalkingTour === true);
+        
+        
+        displayWalkingTours(walkingTours);
         
     } catch (error) {
         console.error('Error loading walking tours:', error);
@@ -201,10 +230,28 @@ function displayWalkingTours(tours) {
         const pricing = getWalkingTourPricing(tour);
         
         return `
-        <div class="walking-tour-item mb-3">
+        <div class="walking-tour-item mb-3" data-tour-id="${tour.objectId || tour.id}">
             <div class="row align-items-center p-3 border rounded-3 bg-white">
                 <div class="col-md-3">
-                    <h6 class="mb-1 fw-bold text-dark">${tour.destinationPOI?.name || 'Tour a pie'}</h6>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0 fw-bold text-dark">${tour.destinationPOI?.name || 'Tour a pie'}</h6>
+                        ${(() => {
+                            // Check if user has edit permissions (admin or superadmin)
+                            const currentUserRole = '<%= typeof userRole !== "undefined" ? userRole : "" %>';
+                            if (currentUserRole === 'admin' || currentUserRole === 'superadmin') {
+                                return `
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-primary btn-sm edit-walking-tour-btn" 
+                                            data-id="${tour.objectId || tour.id}" 
+                                            title="Editar tour a pie">
+                                        <i class="ti ti-edit"></i>
+                                    </button>
+                                </div>
+                                `;
+                            }
+                            return '';
+                        })()}
+                    </div>
                     <div class="d-flex align-items-center text-muted small">
                         <i class="ti ti-clock me-1"></i>
                         <span>${Math.round((tour.time || 0) / 60 * 10) / 10} horas mínimo</span>
@@ -264,6 +311,11 @@ function displayWalkingTours(tours) {
     containerEl.innerHTML = toursHtml;
     containerEl.classList.remove('d-none');
     
+    // Add event handlers for edit buttons
+    setTimeout(() => {
+        addWalkingTourEventHandlers();
+    }, 100);
+    
     // Initialize filters after tours are displayed
     setTimeout(() => {
         initWalkingToursFilters();
@@ -275,17 +327,16 @@ function displayWalkingTours(tours) {
         
         // Force load transfer rate if needed and apply pricing
         const ensureCorrectPricing = () => {
-            console.log('🔍 Checking rates for', initialPayment, '- Transfer:', walkingCurrentTransferRate);
-            
+
             if (initialPayment === 'transferencia') {
                 if (walkingCurrentTransferRate <= 0) {
-                    console.log('🔄 Transfer rate not loaded, forcing reload...');
+
                     loadWalkingTransferRate().then(() => {
-                        console.log('✅ Transfer rate loaded:', walkingCurrentTransferRate, '- applying prices');
+
                         updateWalkingToursPrices(initialPayment, initialCurrency);
                     });
                 } else {
-                    console.log('✅ Transfer rate already loaded:', walkingCurrentTransferRate, '- applying prices');
+
                     updateWalkingToursPrices(initialPayment, initialCurrency);
                 }
             } else if (initialPayment === 'tarjeta') {
@@ -335,8 +386,7 @@ let walkingCurrentAgencyRate = 0;
 // Initialize filter event handlers
 function initWalkingToursFilters() {
     const sectionId = '<%= sectionId %>';
-    console.log('🔧 Initializing walking tours filters for section:', sectionId);
-    
+
     // Remove any existing event handlers to prevent duplicates
     $(`#walkingCurrencyFilter-${sectionId}`).off('change.walkingtours');
     $(`#walkingPaymentFilter-${sectionId}`).off('change.walkingtours');
@@ -345,8 +395,7 @@ function initWalkingToursFilters() {
     $(`#walkingCurrencyFilter-${sectionId}`).on('change.walkingtours', function() {
         const selectedCurrency = $(this).val();
         const selectedPaymentType = $(`#walkingPaymentFilter-${sectionId}`).val();
-        console.log('💱 Currency changed to:', selectedCurrency, 'Payment:', selectedPaymentType);
-        
+
         if (selectedCurrency === 'USD' && walkingCurrentExchangeRate <= 0) {
             loadWalkingExchangeRate().then(() => {
                 updateWalkingToursPrices(selectedPaymentType, selectedCurrency);
@@ -360,8 +409,7 @@ function initWalkingToursFilters() {
     $(`#walkingPaymentFilter-${sectionId}`).on('change.walkingtours', function() {
         const selectedPaymentType = $(this).val();
         const selectedCurrency = $(`#walkingCurrencyFilter-${sectionId}`).val();
-        console.log('💳 Payment type changed to:', selectedPaymentType, 'Currency:', selectedCurrency);
-        
+
         // Handle payment type specific rates
         if (selectedPaymentType === 'transferencia' && walkingCurrentTransferRate <= 0) {
             loadWalkingTransferRate().then(() => {
@@ -377,8 +425,6 @@ function initWalkingToursFilters() {
     });
     
     // Test that selectors work
-    console.log('🔍 Currency selector found:', $(`#walkingCurrencyFilter-${sectionId}`).length > 0);
-    console.log('🔍 Payment selector found:', $(`#walkingPaymentFilter-${sectionId}`).length > 0);
 }
 
 // Get JWT token from localStorage or cookies
@@ -414,7 +460,7 @@ function loadWalkingExchangeRate() {
         success: function(response) {
             if (response.success && response.data) {
                 walkingCurrentExchangeRate = response.data.value || 0;
-                console.log('✅ Walking tours exchange rate loaded:', walkingCurrentExchangeRate, 'MXN per USD');
+
             } else {
                 console.warn('⚠️ No active exchange rate found for walking tours');
                 walkingCurrentExchangeRate = 0;
@@ -465,7 +511,7 @@ function loadWalkingAgencyRate() {
         success: function(response) {
             if (response.success && response.data) {
                 walkingCurrentAgencyRate = response.data.value || 0;
-                console.log('✅ Walking tours agency rate loaded:', walkingCurrentAgencyRate + '%');
+
             } else {
                 console.warn('⚠️ No active agency rate found for walking tours');
                 walkingCurrentAgencyRate = 0;
@@ -550,6 +596,158 @@ function updateWalkingToursPrices(paymentType, currency) {
             }
         });
     });
+}
+
+// Add event handlers for walking tour actions
+function addWalkingTourEventHandlers() {
+    // Edit button click handler
+    $(document).off('click', '.edit-walking-tour-btn').on('click', '.edit-walking-tour-btn', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const tourId = $(this).data('id');
+
+        // Load walking tour data and open modal in edit mode
+        loadWalkingTourForEdit(tourId);
+    });
+}
+
+// Function to load walking tour data for editing
+async function loadWalkingTourForEdit(tourId) {
+    try {
+
+        // Get access token
+        const token = getAccessToken();
+        if (!token) {
+            alert('Error de autenticación. Por favor vuelva a iniciar sesión.');
+            return;
+        }
+        
+        // Fetch tour data
+        const response = await fetch(`/api/tours/${tourId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            console.error('❌ Error loading walking tour:', result.error);
+            alert('Error al cargar el tour a pie: ' + (result.error || 'Error desconocido'));
+            return;
+        }
+        
+        const tour = result.data;
+
+        
+        // Check if there's a walking tour modal
+        const walkingTourModal = document.getElementById('walkingTourModal');
+        if (!walkingTourModal) {
+            alert('Modal de tour a pie no encontrado. Asegúrese de que el componente modal esté incluido en la página.');
+            return;
+        }
+        
+        // Update modal for edit mode first
+        $('#walkingTourModalLabel').html('<i class="ti ti-walk me-2"></i>Editar Tour a Pie');
+        $('#saveWalkingButtonText').text('Guardar Cambios');
+        $('#walkingTourId').val(tourId);
+        
+        // Open the modal
+        const modal = new bootstrap.Modal(walkingTourModal);
+        modal.show();
+        
+        // Wait for modal to be fully shown before populating data
+        walkingTourModal.addEventListener('shown.bs.modal', function modalShownHandler() {
+
+            // Remove this event listener to prevent multiple calls
+            walkingTourModal.removeEventListener('shown.bs.modal', modalShownHandler);
+            
+            // Populate the form with tour data after modal is visible
+            setTimeout(() => {
+                populateWalkingTourForm(tour);
+            }, 200);
+        }, { once: true });
+        
+        // Fallback: Also try to populate after a longer delay in case the event doesn't fire
+        setTimeout(() => {
+
+            if ($('#walkingTourModal').hasClass('show')) {
+                populateWalkingTourForm(tour);
+            }
+        }, 1500);
+        
+    } catch (error) {
+        console.error('Error loading walking tour for edit:', error);
+        alert('Error al conectar con el servidor.');
+    }
+}
+
+// Function to populate walking tour form with data
+function populateWalkingTourForm(tourData) {
+    if (!tourData) {
+        return;
+    }
+    
+    // Fix: Extract the actual tour data (it's nested under tour.tour)
+    const tour = tourData.tour || tourData;
+    
+    // Helper function to set field values
+    const setFieldValue = (elementId, value) => {
+        const element = document.getElementById(elementId);
+        if (element && value !== undefined && value !== null) {
+            element.value = value;
+        }
+        return element;
+    };
+    
+    // Set basic fields
+    setFieldValue('walkingTourDescription', tour.description || '');
+    setFieldValue('walkingDuration', tour.time ? (tour.time / 60) : '');
+    setFieldValue('walkingAdvanceTime', tour.anticipation || tour.advance_booking_time || '');
+    
+    // Walking tour pricing
+    setFieldValue('walkingPriceSmall', tour.walkingPriceSmall || tour.walking_price_small || tour.priceSmall || tour.price_small || tour.smallPrice || '');
+    setFieldValue('walkingPriceMedium', tour.walkingPriceMedium || tour.walking_price_medium || tour.priceMedium || tour.price_medium || tour.mediumPrice || '');
+    setFieldValue('walkingPriceLarge', tour.walkingPriceLarge || tour.walking_price_large || tour.priceLarge || tour.price_large || tour.largePrice || '');
+    
+    // Additional fields
+    const includesValue = tour.includes || tour.include || tour.whatIncludes || tour.included || '';
+    const notIncludesValue = tour.notincludes || tour.not_includes || tour.notInclude || tour.excluded || tour.excludes || '';
+    const languagesValue = tour.languages || tour.language || tour.supportedLanguages || '';
+    
+    setFieldValue('walkingIncludes', Array.isArray(includesValue) ? includesValue.join('\n') : includesValue);
+    setFieldValue('walkingNotIncludes', Array.isArray(notIncludesValue) ? notIncludesValue.join('\n') : notIncludesValue);
+    setFieldValue('walkingLanguages', Array.isArray(languagesValue) ? languagesValue.join('\n') : languagesValue);
+    
+    // Set destination POI
+    setTimeout(() => {
+        const walkingDestElement = document.getElementById('walkingDestinationPOI');
+        
+        if (walkingDestElement && walkingDestElement.tomselect) {
+            // Try extensive POI reference formats
+            const poiId = tour.destinationPOI?.objectId || 
+                         tour.destinationPOI?.id || 
+                         tour.destinationPOI || 
+                         tour.destination_poi || 
+                         tour.poi?.objectId ||
+                         tour.poi?.id ||
+                         tour.poi ||
+                         tour.poiId ||
+                         tour.destination?.objectId ||
+                         tour.destination?.id ||
+                         tour.destination ||
+                         tour.destinationId;
+            
+            if (poiId) {
+                try {
+                    walkingDestElement.tomselect.setValue(poiId);
+                } catch (error) {
+                    console.error('Error setting POI:', error);
+                }
+            }
+        }
+    }, 1000); // Delay to ensure TomSelect is ready
 }
 
 // Initialize walking tours filters when document and jQuery are ready
