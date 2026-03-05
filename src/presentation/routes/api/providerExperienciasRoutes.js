@@ -60,4 +60,10 @@ router.delete('/providers/:providerId/experiencias/:id', (req, res) => controlle
  */
 router.put('/providers/:providerId/experiencias/reorder', (req, res) => controller.reorderExperiencias(req, res));
 
+/**
+ * GET /api/provider-experiences/:id
+ * Get a provider experiencia by ID directly (for modal display).
+ */
+router.get('/provider-experiences/:id', (req, res) => controller.getProviderExperienciaById(req, res));
+
 module.exports = router;
