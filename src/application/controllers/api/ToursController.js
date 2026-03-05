@@ -338,6 +338,44 @@ class ToursController {
 
       const destinationPOI = tour.get('destinationPOI');
 
+      // Fetch vehicle pricing data for this tour
+      let priceData = [];
+      try {
+        const priceQuery = new Parse.Query('TourPrices'); // Note: Table name is TourPrices (plural)
+        priceQuery.equalTo('tourPtr', tour);
+        priceQuery.equalTo('exists', true);
+        priceQuery.doesNotExist('valid_until'); // Only get active prices (no end date)
+        priceQuery.include(['ratePtr', 'vehicleType']);
+
+        const tourPrices = await priceQuery.find({ useMasterKey: true });
+
+        priceData = tourPrices.map((tourPrice) => {
+          const rate = tourPrice.get('ratePtr');
+          const vehicleType = tourPrice.get('vehicleType');
+          const price = tourPrice.get('price') || 0;
+
+          return {
+            id: tourPrice.id,
+            price,
+            formattedPrice: `$${Math.round(price).toLocaleString()} MXN`,
+            rate: rate ? {
+              id: rate.id,
+              name: rate.get('name'),
+              color: rate.get('color') || '#6c757d',
+            } : null,
+            vehicleType: vehicleType ? {
+              id: vehicleType.id,
+              name: vehicleType.get('name'),
+              defaultCapacity: vehicleType.get('defaultCapacity') || 4,
+              trunkCapacity: vehicleType.get('trunkCapacity') || 2,
+              description: vehicleType.get('description') || null,
+            } : null,
+          };
+        });
+      } catch (error) {
+        logger.warn('Error fetching tour prices:', { tourId, error: error.message });
+      }
+
       const tourData = {
         id: tour.id,
         objectId: tour.id,
@@ -396,6 +434,8 @@ class ToursController {
         walkingPriceMedium: tour.get('walkingPriceMedium') || null,
         walkingPriceLarge: tour.get('walkingPriceLarge') || null,
         walkingPriceCurrency: tour.get('walkingPriceCurrency') || null,
+        // Vehicle pricing data
+        priceData,
       };
 
       res.json({

@@ -81,6 +81,139 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
     </div>
 </div>
 
+<!-- Experience Details Modal -->
+<div class="modal fade" id="experienceDetailsModal" tabindex="-1" aria-labelledby="experienceDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header p-0 border-0">
+                <div class="tour-hero w-100">
+                    <div class="experience-hero-image-container">
+                        <img id="experienceHeroImage" src="" alt="" class="experience-hero-image">
+                        <div class="tour-hero-overlay">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h3 id="experienceHeroTitle" class="text-white mb-0"></h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close-custom" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="ti ti-x"></i>
+                </button>
+            </div>
+            <!-- Tab Navigation -->
+            <div class="tour-tabs-container">
+                <ul class="nav nav-pills tour-nav-tabs" id="experienceTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="info-tab" data-bs-toggle="pill" data-bs-target="#info" type="button" role="tab">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Información
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="gallery-tab" data-bs-toggle="pill" data-bs-target="#gallery" type="button" role="tab">
+                            <i class="ti ti-photo me-1"></i>
+                            Galería
+                            <span class="badge bg-primary ms-1" id="galleryPhotoBadge">0</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="details-tab" data-bs-toggle="pill" data-bs-target="#details" type="button" role="tab">
+                            <i class="ti ti-list-details me-1"></i>
+                            Detalles
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="prices-tab" data-bs-toggle="pill" data-bs-target="#prices" type="button" role="tab">
+                            <i class="ti ti-currency-dollar me-1"></i>
+                            Precios
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="modal-body p-0">
+                <div class="tab-content" id="experienceTabContent" style="display: none;">
+                    <!-- Information Tab -->
+                    <div class="tab-pane fade show active" id="info" role="tabpanel">
+                        <div id="infoContent">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Gallery Tab -->
+                    <div class="tab-pane fade" id="gallery" role="tabpanel">
+                        <div id="galleryContent">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Details Tab -->
+                    <div class="tab-pane fade" id="details" role="tabpanel">
+                        <div id="detailsContent">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Prices Tab -->
+                    <div class="tab-pane fade" id="prices" role="tabpanel">
+                        <div id="pricesContent">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div id="experienceModalLoading" class="text-center py-5" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando detalles de la experiencia...</span>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+
+<!-- Full-Screen Gallery Modal -->
+<div class="modal fade" id="fullscreenGalleryModal" tabindex="-1" aria-labelledby="fullscreenGalleryLabel" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content fullscreen-gallery-modal">
+            <div class="modal-header border-0 position-absolute top-0 start-0 w-100" style="z-index: 1060;">
+                <div class="d-flex justify-content-between align-items-center w-100 p-3">
+                    <h5 class="modal-title text-white" id="fullscreenGalleryLabel">Galería de Fotos</h5>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-white gallery-counter" id="galleryCounter">1 / 1</span>
+                        <button type="button" class="gallery-close-btn" data-bs-dismiss="modal" aria-label="Cerrar galería" title="Cerrar galería">
+                            <i class="ti ti-x"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-body p-0 d-flex align-items-center justify-content-center position-relative">
+                <!-- Main Image Display -->
+                <div class="gallery-main-container">
+                    <img id="galleryMainImage" src="" alt="" class="gallery-main-image">
+                </div>
+                
+                <!-- Navigation Arrows -->
+                <button class="gallery-nav gallery-nav-prev" id="galleryPrevBtn">
+                    <i class="ti ti-chevron-left"></i>
+                </button>
+                <button class="gallery-nav gallery-nav-next" id="galleryNextBtn">
+                    <i class="ti ti-chevron-right"></i>
+                </button>
+                
+            </div>
+            
+            <!-- Thumbnails Strip -->
+            <div class="gallery-thumbnails position-absolute bottom-0 start-0 w-100">
+                <div class="thumbnails-container p-3" id="galleryThumbnails">
+                    <!-- Thumbnails will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
 /* Experience Card Styles */
 .experience-card {
@@ -1174,15 +1307,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const experienceName = button.dataset.experienceName;
             const experienceType = button.dataset.experienceType;
             
-            // For now, show an alert with the experience details
-            // This can be replaced with a modal or navigation to a detail page
-            alert(`Ver detalles de: ${experienceName}\nID: ${experienceId}\nTipo: ${experienceType}`);
-            
-            // TODO: Implement experience detail view
-            // Options:
-            // 1. Open a modal with full experience details
-            // 2. Navigate to a detail page
-            // 3. Expand the card to show more information
+            showExperienceDetailsModal(experienceId, experienceName, experienceType);
         }
     });
 
@@ -1235,6 +1360,986 @@ document.addEventListener('DOMContentLoaded', function() {
     loadTransferRate();
     loadAgencyRate();
     loadExperiences();
+    
+    // Modal functionality for experiences
+    let storeGalleryPhotos = [];
+    let galleryCurrentIndex = 0;
+
+    // Function to show experience details modal
+    async function showExperienceDetailsModal(experienceId, experienceName, experienceType) {
+        const modal = new bootstrap.Modal(document.getElementById('experienceDetailsModal'));
+        const heroTitle = document.getElementById('experienceHeroTitle');
+        const heroImage = document.getElementById('experienceHeroImage');
+        const modalLoading = document.getElementById('experienceModalLoading');
+        const tabContent = document.getElementById('experienceTabContent');
+        
+        // Set initial data and show loading
+        heroTitle.textContent = experienceName;
+        heroImage.src = ''; // Clear previous image
+        modalLoading.style.display = 'block';
+        tabContent.style.display = 'none';
+        
+        // Show modal
+        modal.show();
+        
+        try {
+            // Fetch complete experience data from API
+            console.log('🌐 Fetching complete experience details from API for experienceId:', experienceId);
+            console.log('🔍 Experience type passed to modal:', experienceType);
+            
+            let apiUrl = '';
+            if (experienceType === 'provider') {
+                apiUrl = `/api/provider-experiences/${experienceId}`;
+                console.log('✅ Using provider experience endpoint:', apiUrl);
+            } else {
+                apiUrl = `/api/experiences/${experienceId}`;
+                console.log('✅ Using regular experience endpoint:', apiUrl);
+            }
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Error al cargar los detalles de la experiencia');
+            }
+            
+            const experienceData = await response.json();
+            console.log('📋 Complete experience data from API:', experienceData);
+            let experienceDetail = experienceData.data || experienceData;
+            console.log('🔍 Final experience detail object:', experienceDetail);
+            
+            // Debug the photo structure from API
+            console.log('📸 Raw photos from API:', {
+                photos: experienceDetail.photos,
+                images: experienceDetail.images,
+                primaryPhoto: experienceDetail.primaryPhoto,
+                photosLength: experienceDetail.photos ? experienceDetail.photos.length : 0,
+                imagesLength: experienceDetail.images ? experienceDetail.images.length : 0
+            });
+            
+            // If no photos in main response, try to load them separately like the cards do
+            if ((!experienceDetail.photos || experienceDetail.photos.length === 0) && 
+                (!experienceDetail.images || experienceDetail.images.length === 0)) {
+                console.log('🔄 No photos in main API response, loading images separately...');
+                try {
+                    const images = await loadExperienceImages(experienceId);
+                    if (images && images.length > 0) {
+                        console.log('✅ Successfully loaded images separately:', images);
+                        experienceDetail.photos = images;
+                    } else {
+                        console.log('⚠️ No images found in separate call either');
+                    }
+                } catch (imageError) {
+                    console.warn('❌ Failed to load images separately:', imageError.message);
+                }
+            }
+            
+            // Helper function to get the principal image (copy for modal scope)
+            const getPrincipalImageForModal = (photos) => {
+                if (!photos || !Array.isArray(photos) || photos.length === 0) {
+                    return null;
+                }
+                
+                // Look for principal image first
+                const principalPhoto = photos.find(photo => 
+                    photo.isPrincipal === true || 
+                    photo.principal === true ||
+                    photo.order === 0 ||
+                    photo.position === 0
+                );
+                
+                // Use the first photo if no principal is found
+                const targetPhoto = principalPhoto || photos[0];
+                
+                // Extract image data using the same logic as cards
+                const imageData = {
+                    avif: null,
+                    webp: null,
+                    jpeg: null,
+                    original: null
+                };
+                
+                // Check for different formats in the photo object
+                if (targetPhoto.formats) {
+                    imageData.avif = targetPhoto.formats.avif;
+                    imageData.webp = targetPhoto.formats.webp;
+                    imageData.jpeg = targetPhoto.formats.jpeg;
+                }
+                
+                if (targetPhoto.optimizedVariants) {
+                    imageData.avif = imageData.avif || targetPhoto.optimizedVariants.avif?.url;
+                    imageData.webp = imageData.webp || targetPhoto.optimizedVariants.webp?.url;
+                    imageData.jpeg = imageData.jpeg || targetPhoto.optimizedVariants.jpeg?.url;
+                }
+                
+                // Fallbacks
+                imageData.original = targetPhoto.url || targetPhoto.dataUrl;
+                if (targetPhoto.s3Key) {
+                    imageData.original = imageData.original || `https://amexing-bucket.s3.us-east-2.amazonaws.com/${targetPhoto.s3Key}`;
+                }
+                
+                // Return image data object for responsive picture element
+                return {
+                    avif: imageData.avif,
+                    webp: imageData.webp, 
+                    jpeg: imageData.jpeg,
+                    fallback: imageData.jpeg || imageData.original
+                };
+            };
+            
+            // Process the experience detail to add displayImage like the cards do
+            const processedExperience = {
+                ...experienceDetail,
+                displayImage: getPrincipalImageForModal(experienceDetail.photos || experienceDetail.images)
+            };
+            
+            console.log('🎯 Processed experience with displayImage:', {
+                hasDisplayImage: !!processedExperience.displayImage,
+                displayImage: processedExperience.displayImage
+            });
+            
+            await loadExperienceDetailsIntoModal(processedExperience, experienceName);
+            
+        } catch (error) {
+            console.error('Error loading experience details:', error);
+            showModalError('No se pudieron cargar los detalles de la experiencia');
+        }
+    }
+    
+    // Function to load experience data into modal
+    async function loadExperienceDetailsIntoModal(experience, experienceName) {
+        const modalLoading = document.getElementById('experienceModalLoading');
+        const tabContent = document.getElementById('experienceTabContent');
+        const heroImage = document.getElementById('experienceHeroImage');
+        
+        try {
+            // Set optimized hero image with progressive loading
+            const heroImageContainer = heroImage.parentElement;
+            heroImageContainer.classList.remove('loading', 'loaded', 'error');
+            
+            // Clear previous event listeners to prevent multiple attachments
+            heroImage.onload = null;
+            heroImage.onerror = null;
+            
+            let imageUrl = '';
+            
+            // Debug logging for experience photos
+            console.log('🖼️ Experience photo debug:', {
+                hasPhotos: !!(experience.photos && experience.photos.length > 0),
+                photosLength: experience.photos ? experience.photos.length : 0,
+                hasPrimaryPhoto: !!experience.primaryPhoto,
+                hasDisplayImage: !!experience.displayImage,
+                displayImage: experience.displayImage,
+                firstPhoto: experience.photos && experience.photos.length > 0 ? experience.photos[0] : null
+            });
+            
+            // Priority 1: Use displayImage (processed like cards)
+            if (experience.displayImage && experience.displayImage.fallback) {
+                console.log('✅ Using displayImage.fallback:', experience.displayImage.fallback);
+                imageUrl = experience.displayImage.fallback;
+            }
+            // Priority 2: Use photos array
+            else if (experience.photos && experience.photos.length > 0) {
+                const firstPhoto = experience.photos[0];
+                console.log('🔍 First photo structure:', firstPhoto);
+                imageUrl = getOptimizedImageUrl(firstPhoto);
+                console.log('🔗 Generated image URL from first photo:', imageUrl);
+            } 
+            // Priority 3: Use primaryPhoto
+            else if (experience.primaryPhoto) {
+                console.log('🔍 Primary photo structure:', experience.primaryPhoto);
+                imageUrl = getOptimizedImageUrl(experience.primaryPhoto);
+                console.log('🔗 Generated image URL from primary photo:', imageUrl);
+            } 
+            // Priority 4: Fallback placeholder
+            else {
+                console.log('❌ No displayImage, photos or primaryPhoto found, using placeholder');
+                // Use a data URL placeholder to avoid 404 requests
+                imageUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIj48cmVjdCB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiNmOGY5ZmEiLz48cGF0aCBkPSJNMTAgMTBMMjAgMCAyMCAyMCAwIDIwWiIgZmlsbD0iI2U5ZWNlZiIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIyNTAiIGZpbGw9InVybCgjYSkiLz48dGV4dCB4PSIyMDAiIHk9IjEzNSIgZmlsbD0iIzZjNzU3ZCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkltYWdlbiBubyBkaXNwb25pYmxlPC90ZXh0Pjwvc3ZnPg==';
+            }
+            
+            // If imageUrl is null or empty, use placeholder
+            if (!imageUrl) {
+                console.log('⚠️ getOptimizedImageUrl returned null/empty, using placeholder');
+                imageUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIj48cmVjdCB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiNmOGY5ZmEiLz48cGF0aCBkPSJNMTAgMTBMMjAgMCAyMCAyMCAwIDIwWiIgZmlsbD0iI2U5ZWNlZiIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIyNTAiIGZpbGw9InVybCgjYSkiLz48dGV4dCB4PSIyMDAiIHk9IjEzNSIgZmlsbD0iIzZjNzU3ZCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkltYWdlbiBubyBkaXNwb25pYmxlPC90ZXh0Pjwvc3ZnPg==';
+            }
+            
+            // Only add loading state if we have a real image URL
+            if (imageUrl && !imageUrl.startsWith('data:')) {
+                heroImageContainer.classList.add('loading');
+                
+                // Add event listeners for real images only
+                heroImage.onload = () => {
+                    heroImageContainer.classList.remove('loading');
+                    heroImageContainer.classList.add('loaded');
+                };
+                
+                heroImage.onerror = () => {
+                    heroImageContainer.classList.remove('loading');
+                    heroImageContainer.classList.add('error');
+                    // Use inline SVG placeholder on error
+                    heroImage.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIj48cmVjdCB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiNmOGY5ZmEiLz48cGF0aCBkPSJNMTAgMTBMMjAgMCAyMCAyMCAwIDIwWiIgZmlsbD0iI2U5ZWNlZiIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIyNTAiIGZpbGw9InVybCgjYSkiLz48dGV4dCB4PSIyMDAiIHk9IjEzNSIgZmlsbD0iIzZjNzU3ZCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkVycm9yIGNhcmdhbmRvIGltYWdlbjwvdGV4dD48L3N2Zz4=';
+                };
+            }
+            
+            // Set the image source
+            heroImage.src = imageUrl;
+            
+            // If image is already loaded (from cache), trigger load event
+            if (imageUrl && !imageUrl.startsWith('data:') && heroImage.complete && heroImage.naturalHeight !== 0) {
+                heroImage.dispatchEvent(new Event('load'));
+            }
+            
+            // Load content into each tab
+            loadInformationTab(experience, experienceName);
+            loadGalleryTab(experience, experienceName);
+            loadDetailsTab(experience);
+            loadPricesTab(experience);
+            
+            // Hide loading and show content
+            modalLoading.style.display = 'none';
+            tabContent.style.display = 'block';
+            
+        } catch (error) {
+            console.error('Error loading experience details into modal:', error);
+            showModalError('Error al cargar los detalles de la experiencia');
+        }
+    }
+    
+    // Function to load Information tab
+    function loadInformationTab(experience, experienceName) {
+        const infoContent = document.getElementById('infoContent');
+        
+        infoContent.innerHTML = `
+            <div class="p-3">
+                <h4 class="mb-3">
+                    <i class="ti ti-map-pin me-2 text-primary"></i>
+                    ${experience.name || experienceName}
+                </h4>
+                
+                <!-- Basic Info Cards -->
+                <div class="row g-3 mb-4">
+                    ${experience.duration ? `
+                        <div class="col-md-4">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="ti ti-clock"></i>
+                                </div>
+                                <div>
+                                    <h6>Duración</h6>
+                                    <p class="text-muted mb-0">${formatDuration(experience.duration)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${experience.min_people || experience.max_people || experience.capacity ? `
+                        <div class="col-md-4">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="ti ti-users"></i>
+                                </div>
+                                <div>
+                                    <h6>Capacidad</h6>
+                                    <p class="text-muted mb-0">${experience.min_people || 1} - ${experience.max_people || experience.capacity || '∞'} personas</p>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${experience.location || experience.address ? `
+                        <div class="col-md-4">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="ti ti-map-pin"></i>
+                                </div>
+                                <div>
+                                    <h6>Ubicación</h6>
+                                    <p class="text-muted mb-0">${experience.location || experience.address}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <!-- Description -->
+                ${experience.description ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-file-text me-2"></i>Descripción</h5>
+                        <p>${experience.description}</p>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+    
+    // Function to load Gallery tab
+    function loadGalleryTab(experience, experienceName) {
+        const galleryContent = document.getElementById('galleryContent');
+        const galleryPhotoBadge = document.getElementById('galleryPhotoBadge');
+        
+        if (experience.photos && experience.photos.length > 0) {
+            // Update gallery tab badge with photo count
+            galleryPhotoBadge.textContent = experience.photos.length;
+            // Store photos for full-screen gallery
+            storeGalleryPhotos = experience.photos.map((photo, index) => ({
+                ...photo,
+                alt: `${experienceName} - Foto ${index + 1}`
+            }));
+            
+            const galleryHtml = experience.photos.map((photo, index) => {
+                const optimizedPicture = createOptimizedPicture(
+                    photo, 
+                    `${experienceName} - Foto ${index + 1}`, 
+                    '',
+                    '(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw'
+                );
+                
+                return `
+                    <div class="gallery-item loading" data-photo-index="${index}">
+                        ${optimizedPicture}
+                    </div>
+                `;
+            }).join('');
+            
+            galleryContent.innerHTML = `
+                <div class="photo-gallery">
+                    ${galleryHtml}
+                </div>
+            `;
+            
+            // Add event listeners to gallery items
+            galleryContent.querySelectorAll('.gallery-item').forEach((item, index) => {
+                item.addEventListener('click', () => openFullscreenGallery(index));
+                
+                // Add progressive loading event listeners
+                const img = item.querySelector('img');
+                if (img) {
+                    img.addEventListener('load', () => {
+                        item.classList.remove('loading');
+                        item.classList.add('loaded');
+                    });
+                    
+                    img.addEventListener('error', () => {
+                        item.classList.remove('loading');
+                        item.classList.add('error');
+                    });
+                    
+                    // If image is already loaded (from cache), trigger load event
+                    if (img.complete && img.naturalHeight !== 0) {
+                        img.dispatchEvent(new Event('load'));
+                    }
+                }
+            });
+        } else {
+            // Update gallery tab badge to 0 when no photos
+            galleryPhotoBadge.textContent = '0';
+            
+            galleryContent.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="ti ti-photo" style="font-size: 3rem; color: #dee2e6;"></i>
+                    <p class="mt-3 text-muted">No hay fotos disponibles para esta experiencia</p>
+                </div>
+            `;
+        }
+    }
+    
+    // Function to load Details tab
+    function loadDetailsTab(experience) {
+        const detailsContent = document.getElementById('detailsContent');
+        
+        // Helper function to format availability
+        function formatAvailability(availability) {
+            if (!availability) return '';
+            
+            // Debug: Log the full availability object structure
+            console.log('🔍 Full availability object:', availability);
+            console.log('🔍 Availability type:', typeof availability);
+            if (typeof availability === 'object') {
+                console.log('🔍 Availability keys:', Object.keys(availability));
+                console.log('🔍 Availability JSON:', JSON.stringify(availability, null, 2));
+            }
+            
+            // If it's already a string, return it
+            if (typeof availability === 'string') {
+                return availability;
+            }
+            
+            // If it's an array, format each item
+            if (Array.isArray(availability)) {
+                return availability.map((item, index) => {
+                    if (typeof item === 'object' && item !== null) {
+                        // Format complex object with detailed information
+                        const parts = [];
+                        
+                        // Handle day information - check for numeric 'day' field first
+                        let dayName = '';
+                        if (typeof item.day === 'number') {
+                            const dayNum = item.day;
+                            const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                            
+                            if (dayNum >= 0 && dayNum <= 6) {
+                                dayName = daysOfWeek[dayNum];
+                            } else if (dayNum >= 1 && dayNum <= 7) {
+                                const altDaysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+                                dayName = altDaysOfWeek[dayNum - 1];
+                            } else {
+                                dayName = `Día ${dayNum}`;
+                            }
+                        } else if (item.day || item.dia) {
+                            dayName = item.day || item.dia;
+                        } else if (typeof item.dayNumber === 'number' || typeof item.day_number === 'number') {
+                            const dayNum = item.dayNumber || item.day_number;
+                            const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                            const altDaysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+                            
+                            if (dayNum >= 0 && dayNum <= 6) {
+                                dayName = daysOfWeek[dayNum];
+                            } else if (dayNum >= 1 && dayNum <= 7) {
+                                dayName = altDaysOfWeek[dayNum - 1];
+                            }
+                        }
+                        
+                        if (dayName) parts.push(`<strong>${dayName}</strong>`);
+                        
+                        // Handle times array (the actual structure from your data)
+                        if (item.times && Array.isArray(item.times)) {
+                            const schedules = item.times.map(time => {
+                                if (typeof time === 'object' && time.start && time.end) {
+                                    return `${time.start} - ${time.end}`;
+                                }
+                                return JSON.stringify(time);
+                            }).join('<br>&nbsp;&nbsp;• ');
+                            
+                            if (schedules) {
+                                parts.push(`<span class="text-muted">Horarios:</span><br>&nbsp;&nbsp;• ${schedules}`);
+                            }
+                        }
+                        
+                        // Handle schedule/horarios information (fallback)
+                        if (item.horarios && Array.isArray(item.horarios)) {
+                            const schedules = item.horarios.map(horario => {
+                                if (typeof horario === 'object') {
+                                    const schedParts = [];
+                                    if (horario.start || horario.inicio) schedParts.push(horario.start || horario.inicio);
+                                    if (horario.end || horario.fin) schedParts.push(horario.end || horario.fin);
+                                    if (schedParts.length > 0) {
+                                        return schedParts.join(' - ');
+                                    }
+                                    return JSON.stringify(horario);
+                                }
+                                return String(horario);
+                            }).join(', ');
+                            parts.push(`<span class="text-muted">Horarios: ${schedules}</span>`);
+                        } else if (item.horarios && typeof item.horarios === 'string') {
+                            parts.push(`<span class="text-muted">Horarios: ${item.horarios}</span>`);
+                        }
+                        
+                        // Handle other schedule fields
+                        if (item.hours || item.horas || item.time || item.horario) {
+                            const timeInfo = item.hours || item.horas || item.time || item.horario;
+                            if (typeof timeInfo === 'object') {
+                                parts.push(`<span class="text-muted">${JSON.stringify(timeInfo)}</span>`);
+                            } else {
+                                parts.push(`<span class="text-muted">${timeInfo}</span>`);
+                            }
+                        }
+                        
+                        // Handle schedule as separate field
+                        if (item.schedule && item.schedule !== item.horario) {
+                            parts.push(`<span class="text-muted">Horario: ${item.schedule}</span>`);
+                        }
+                        
+                        // Handle notes
+                        if (item.notes || item.notas) {
+                            parts.push(`<em class="text-muted">${item.notes || item.notas}</em>`);
+                        }
+                        
+                        // If no specific fields found, show all properties
+                        if (parts.length === 1) { // Only day name was added
+                            const allParts = [parts[0]]; // Keep the day name
+                            Object.keys(item).forEach(key => {
+                                if (key === 'day') return; // Already handled
+                                const value = item[key];
+                                if (value !== null && value !== undefined && value !== '') {
+                                    if (typeof value === 'object') {
+                                        allParts.push(`<strong>${key}:</strong> ${JSON.stringify(value)}`);
+                                    } else {
+                                        allParts.push(`<strong>${key}:</strong> ${value}`);
+                                    }
+                                }
+                            });
+                            return allParts.join('<br>');
+                        }
+                        
+                        return parts.join('<br>');
+                    } else if (typeof item === 'number') {
+                        // Map numbers to days of the week (assuming 1-7 or 0-6)
+                        const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                        const altDaysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+                        
+                        if (item >= 0 && item <= 6) {
+                            return `<strong>${daysOfWeek[item]}</strong>`;
+                        } else if (item >= 1 && item <= 7) {
+                            return `<strong>${altDaysOfWeek[item - 1]}</strong>`;
+                        } else {
+                            return `<strong>Día ${item}</strong>`;
+                        }
+                    }
+                    return String(item);
+                }).join('<br><br>'); // Add extra space between days
+            }
+            
+            // If it's a single number, treat it as a day
+            if (typeof availability === 'number') {
+                const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                const altDaysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+                
+                if (availability >= 0 && availability <= 6) {
+                    return `<strong>${daysOfWeek[availability]}</strong>`;
+                } else if (availability >= 1 && availability <= 7) {
+                    return `<strong>${altDaysOfWeek[availability - 1]}</strong>`;
+                } else {
+                    return `<strong>Día ${availability}</strong>`;
+                }
+            }
+            
+            // If it's an object, format its properties with special handling for horarios
+            if (typeof availability === 'object' && availability !== null) {
+                const parts = [];
+                
+                // Special handling for horarios field
+                if (availability.horarios) {
+                    if (Array.isArray(availability.horarios)) {
+                        const schedules = availability.horarios.map(horario => {
+                            if (typeof horario === 'object') {
+                                const schedParts = [];
+                                if (horario.start || horario.inicio) schedParts.push(horario.start || horario.inicio);
+                                if (horario.end || horario.fin) schedParts.push(horario.end || horario.fin);
+                                if (schedParts.length > 0) {
+                                    return schedParts.join(' - ');
+                                }
+                                return JSON.stringify(horario);
+                            }
+                            return String(horario);
+                        }).join('<br>&nbsp;&nbsp;• ');
+                        parts.push(`<strong>Horarios:</strong><br>&nbsp;&nbsp;• ${schedules}`);
+                    } else if (typeof availability.horarios === 'string') {
+                        parts.push(`<strong>Horarios:</strong> ${availability.horarios}`);
+                    } else {
+                        parts.push(`<strong>Horarios:</strong> ${JSON.stringify(availability.horarios)}`);
+                    }
+                }
+                
+                // Handle other properties
+                Object.keys(availability).forEach(key => {
+                    if (key === 'horarios') return; // Already handled above
+                    
+                    const value = availability[key];
+                    if (value !== null && value !== undefined && value !== '') {
+                        if (typeof value === 'object') {
+                            if (Array.isArray(value)) {
+                                parts.push(`<strong>${key}:</strong> ${value.join(', ')}`);
+                            } else {
+                                parts.push(`<strong>${key}:</strong> ${JSON.stringify(value, null, 2)}`);
+                            }
+                        } else {
+                            parts.push(`<strong>${key}:</strong> ${value}`);
+                        }
+                    }
+                });
+                
+                return parts.join('<br>');
+            }
+            
+            // Fallback to string representation
+            return String(availability);
+        }
+        
+        detailsContent.innerHTML = `
+            ${experience.availability ? `
+                <div class="content-section">
+                    <h5 class="text-info mb-3">
+                        <i class="ti ti-calendar me-2"></i>Disponibilidad
+                    </h5>
+                    <div class="availability-info">
+                        ${formatAvailability(experience.availability)}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${experience.includes && experience.includes.length > 0 ? `
+                <div class="content-section">
+                    <h5 class="text-success mb-3">
+                        <i class="ti ti-circle-check me-2"></i>Incluye
+                    </h5>
+                    <ul class="includes-list">
+                        ${experience.includes.map(item => `<li><i class="ti ti-check text-success me-2"></i>${item}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+            
+            ${experience.notincludes && experience.notincludes.length > 0 ? `
+                <div class="content-section">
+                    <h5 class="text-danger mb-3">
+                        <i class="ti ti-circle-x me-2"></i>No Incluye
+                    </h5>
+                    <ul class="excludes-list">
+                        ${experience.notincludes.map(item => `<li><i class="ti ti-x text-danger me-2"></i>${item}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+            
+            ${experience.requirements ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-backpack me-2"></i>Requisitos</h5>
+                    <div class="requirements-content">
+                        ${experience.requirements}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${experience.notes ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-note me-2"></i>Notas</h5>
+                    <div class="notes-content">
+                        ${experience.notes}
+                    </div>
+                </div>
+            ` : ''}
+        `;
+    }
+    
+    // Function to load Prices tab (without vehicle pricing)
+    function loadPricesTab(experience) {
+        const pricesContent = document.getElementById('pricesContent');
+        
+        // Clear any existing content first
+        pricesContent.innerHTML = '';
+        
+        let pricingHtml = '';
+        
+        // Check for per-person pricing
+        if (experience.price || experience.price_child || experience.price_no_alcohol) {
+            pricingHtml += `
+                <div class="additional-pricing-section">
+                    <h6 class="mb-3"><i class="ti ti-users me-2"></i>Precios por Persona</h6>
+                    <div class="row g-3">
+                        ${experience.price ? `
+                            <div class="col-md-4">
+                                <div class="additional-price-card">
+                                    <div class="additional-price-icon bg-primary">
+                                        <i class="ti ti-user"></i>
+                                    </div>
+                                    <div class="additional-price-info">
+                                        <span class="additional-price-label">Adulto</span>
+                                        <span class="additional-price-value">${formatCurrency(experience.price)}</span>
+                                        <small class="text-muted">Precio general</small>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${experience.price_child ? `
+                            <div class="col-md-4">
+                                <div class="additional-price-card">
+                                    <div class="additional-price-icon bg-info">
+                                        <i class="ti ti-baby-carriage"></i>
+                                    </div>
+                                    <div class="additional-price-info">
+                                        <span class="additional-price-label">Niño</span>
+                                        <span class="additional-price-value">${formatCurrency(experience.price_child)}</span>
+                                        <small class="text-muted">Menor de edad</small>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${experience.price_no_alcohol ? `
+                            <div class="col-md-4">
+                                <div class="additional-price-card">
+                                    <div class="additional-price-icon bg-success">
+                                        <i class="ti ti-user-check"></i>
+                                    </div>
+                                    <div class="additional-price-info">
+                                        <span class="additional-price-label">Sin Alcohol</span>
+                                        <span class="additional-price-value">${formatCurrency(experience.price_no_alcohol)}</span>
+                                        <small class="text-muted">Sin bebidas alcohólicas</small>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // If no pricing data found, show a clean message
+        if (!pricingHtml) {
+            pricingHtml = `
+                <div class="text-center py-5">
+                    <i class="ti ti-currency-dollar" style="font-size: 3rem; color: #dee2e6;"></i>
+                    <p class="mt-3 text-muted">No hay información de precios disponible</p>
+                    <p class="small text-muted">Por favor, contacte con nosotros para obtener cotización personalizada.</p>
+                </div>
+            `;
+        }
+        
+        pricesContent.innerHTML = pricingHtml;
+    }
+    
+    // Helper functions (copied from tours)
+    function formatDuration(minutes) {
+        if (!minutes) return 'No especificada';
+        if (minutes < 60) return `${minutes} minutos`;
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+        if (remainingMinutes === 0) return `${hours}h`;
+        return `${hours}h ${remainingMinutes}min`;
+    }
+    
+    function getOptimizedImageUrl(photo, size = 'medium') {
+        console.log('🔧 getOptimizedImageUrl called with photo:', photo);
+        
+        if (!photo) {
+            console.log('❌ Photo is null/undefined');
+            return null;
+        }
+        
+        // If it's just a string URL, return it as-is
+        if (typeof photo === 'string') {
+            console.log('✅ Photo is string URL:', photo);
+            return photo;
+        }
+        
+        // Check for optimized variants first (best quality formats first)
+        if (photo.optimizedVariants) {
+            console.log('📁 Found optimizedVariants:', photo.optimizedVariants);
+            // Prefer AVIF > WebP > JPEG for best compression
+            if (photo.optimizedVariants.avif && photo.optimizedVariants.avif.url) {
+                console.log('✅ Using optimizedVariants AVIF:', photo.optimizedVariants.avif.url);
+                return photo.optimizedVariants.avif.url;
+            }
+            if (photo.optimizedVariants.webp && photo.optimizedVariants.webp.url) {
+                console.log('✅ Using optimizedVariants WebP:', photo.optimizedVariants.webp.url);
+                return photo.optimizedVariants.webp.url;
+            }
+            if (photo.optimizedVariants.jpeg && photo.optimizedVariants.jpeg.url) {
+                console.log('✅ Using optimizedVariants JPEG:', photo.optimizedVariants.jpeg.url);
+                return photo.optimizedVariants.jpeg.url;
+            }
+        }
+        
+        // Check optimization metadata formats
+        if (photo.optimizationMetadata && photo.optimizationMetadata.formats) {
+            console.log('📁 Found optimizationMetadata.formats:', photo.optimizationMetadata.formats);
+            const formats = photo.optimizationMetadata.formats;
+            // Prefer AVIF > WebP > JPEG
+            if (formats.avif && formats.avif.url) {
+                console.log('✅ Using metadata AVIF:', formats.avif.url);
+                return formats.avif.url;
+            }
+            if (formats.webp && formats.webp.url) {
+                console.log('✅ Using metadata WebP:', formats.webp.url);
+                return formats.webp.url;
+            }
+            if (formats.jpeg && formats.jpeg.url) {
+                console.log('✅ Using metadata JPEG:', formats.jpeg.url);
+                return formats.jpeg.url;
+            }
+        }
+        
+        // Check for formats property (provider experiences often have this structure)
+        if (photo.formats && typeof photo.formats === 'object') {
+            console.log('📁 Found formats object:', photo.formats);
+            // Prefer AVIF > WebP > JPEG
+            if (photo.formats.avif) {
+                console.log('✅ Using formats AVIF:', photo.formats.avif);
+                return photo.formats.avif;
+            }
+            if (photo.formats.webp) {
+                console.log('✅ Using formats WebP:', photo.formats.webp);
+                return photo.formats.webp;
+            }
+            if (photo.formats.jpeg) {
+                console.log('✅ Using formats JPEG:', photo.formats.jpeg);
+                return photo.formats.jpeg;
+            }
+        }
+        
+        // Fallback to direct properties
+        if (photo.webp) {
+            console.log('✅ Using direct webp property:', photo.webp);
+            return photo.webp;
+        }
+        if (photo.avif) {
+            console.log('✅ Using direct avif property:', photo.avif);
+            return photo.avif;
+        }
+        if (photo.jpeg) {
+            console.log('✅ Using direct jpeg property:', photo.jpeg);
+            return photo.jpeg;
+        }
+        if (photo.url) {
+            console.log('✅ Using direct url property:', photo.url);
+            return photo.url;
+        }
+        if (photo.dataUrl) {
+            console.log('✅ Using direct dataUrl property:', photo.dataUrl);
+            return photo.dataUrl;
+        }
+        if (photo.s3Key) {
+            const s3Url = `https://amexing-bucket.s3.us-east-2.amazonaws.com/${photo.s3Key}`;
+            console.log('✅ Using s3Key to construct URL:', s3Url);
+            return s3Url;
+        }
+        
+        // Return null instead of placeholder to let caller handle fallback
+        console.log('❌ No valid image URL found, returning null');
+        return null;
+    }
+    
+    function createOptimizedPicture(photo, alt, className = '', sizes = '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw') {
+        const imageUrl = getOptimizedImageUrl(photo);
+        return `<img src="${imageUrl}" alt="${alt}" class="${className}" loading="lazy" sizes="${sizes}" onload="this.classList.add('loaded')" onerror="this.classList.add('error')">`;
+    }
+    
+    function formatCurrency(amount) {
+        return new Intl.NumberFormat('es-MX', { 
+            style: 'currency', 
+            currency: 'MXN' 
+        }).format(amount);
+    }
+    
+    function showModalError(message) {
+        const modalLoading = document.getElementById('experienceModalLoading');
+        const tabContent = document.getElementById('experienceTabContent');
+        
+        modalLoading.innerHTML = `
+            <div class="text-center py-5">
+                <i class="ti ti-alert-triangle text-warning" style="font-size: 3rem;"></i>
+                <h5 class="mt-3">Error</h5>
+                <p class="text-muted">${message}</p>
+            </div>
+        `;
+    }
+    
+    function openFullscreenGallery(index) {
+        galleryCurrentIndex = index;
+        const modal = new bootstrap.Modal(document.getElementById('fullscreenGalleryModal'));
+        updateGalleryDisplay();
+        modal.show();
+        initializeGalleryEventListeners();
+    }
+    
+    function updateGalleryDisplay() {
+        if (!storeGalleryPhotos || storeGalleryPhotos.length === 0) return;
+        
+        const mainImage = document.getElementById('galleryMainImage');
+        const galleryCounter = document.getElementById('galleryCounter');
+        
+        const currentPhoto = storeGalleryPhotos[galleryCurrentIndex];
+        mainImage.src = getOptimizedImageUrl(currentPhoto);
+        mainImage.alt = currentPhoto.alt || `Foto ${galleryCurrentIndex + 1}`;
+        
+        if (galleryCounter) {
+            galleryCounter.textContent = `${galleryCurrentIndex + 1} / ${storeGalleryPhotos.length}`;
+        }
+        
+        // Update navigation buttons visibility
+        const prevBtn = document.getElementById('galleryPrevBtn');
+        const nextBtn = document.getElementById('galleryNextBtn');
+        
+        if (prevBtn) prevBtn.style.display = galleryCurrentIndex > 0 ? 'block' : 'none';
+        if (nextBtn) nextBtn.style.display = galleryCurrentIndex < storeGalleryPhotos.length - 1 ? 'block' : 'none';
+        
+        // Generate thumbnails if they don't exist
+        generateThumbnails();
+        updateThumbnailSelection();
+    }
+    
+    function initializeGalleryEventListeners() {
+        const prevBtn = document.getElementById('galleryPrevBtn');
+        const nextBtn = document.getElementById('galleryNextBtn');
+        
+        if (prevBtn) {
+            prevBtn.onclick = () => {
+                if (galleryCurrentIndex > 0) {
+                    galleryCurrentIndex--;
+                    updateGalleryDisplay();
+                }
+            };
+        }
+        
+        if (nextBtn) {
+            nextBtn.onclick = () => {
+                if (galleryCurrentIndex < storeGalleryPhotos.length - 1) {
+                    galleryCurrentIndex++;
+                    updateGalleryDisplay();
+                }
+            };
+        }
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            const modal = document.getElementById('fullscreenGalleryModal');
+            if (modal.classList.contains('show')) {
+                if (e.key === 'ArrowLeft' && galleryCurrentIndex > 0) {
+                    galleryCurrentIndex--;
+                    updateGalleryDisplay();
+                } else if (e.key === 'ArrowRight' && galleryCurrentIndex < storeGalleryPhotos.length - 1) {
+                    galleryCurrentIndex++;
+                    updateGalleryDisplay();
+                } else if (e.key === 'Escape') {
+                    bootstrap.Modal.getInstance(modal).hide();
+                }
+            }
+        });
+    }
+    
+    // Add thumbnail functions
+    function generateThumbnails() {
+        const container = document.getElementById('galleryThumbnails');
+        if (!container || !storeGalleryPhotos || storeGalleryPhotos.length <= 1) {
+            if (container) container.style.display = 'none';
+            return;
+        }
+        
+        container.style.display = 'block';
+        const thumbnailsHtml = storeGalleryPhotos.map((photo, index) => {
+            const isActive = index === galleryCurrentIndex ? 'active' : '';
+            return `
+                <div class="gallery-thumbnail ${isActive}" data-index="${index}">
+                    <img src="${getOptimizedImageUrl(photo)}" alt="Miniatura ${index + 1}" loading="lazy">
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = `
+            <div class="thumbnails-scroll">
+                ${thumbnailsHtml}
+            </div>
+        `;
+        
+        // Add click listeners to thumbnails
+        container.querySelectorAll('.gallery-thumbnail').forEach((thumbnail, index) => {
+            thumbnail.addEventListener('click', () => {
+                galleryCurrentIndex = index;
+                updateGalleryDisplay();
+            });
+        });
+    }
+    
+    function updateThumbnailSelection() {
+        const thumbnails = document.querySelectorAll('.gallery-thumbnail');
+        thumbnails.forEach((thumb, index) => {
+            thumb.classList.toggle('active', index === galleryCurrentIndex);
+        });
+    }
+    
+    // Make functions available globally
+    window.showExperienceDetailsModal = showExperienceDetailsModal;
 });
 </script>
 
@@ -1319,5 +2424,587 @@ document.addEventListener('DOMContentLoaded', function() {
     .loading-pulse { animation: none; }
     .loading-pulse::before { animation: none; }
     .experience-img { transition: none; }
+}
+
+/* Modal Styles from Tours */
+.modal-xl {
+    max-width: 1200px;
+}
+
+.tour-hero {
+    position: relative;
+    height: 350px;
+    overflow: hidden;
+}
+
+.experience-hero-image-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.experience-hero-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 0.3s ease;
+}
+
+/* Progressive Loading for Hero Image */
+.experience-hero-image-container.loading::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: shimmer 1.5s infinite;
+    z-index: 1;
+}
+
+.experience-hero-image-container.loading .experience-hero-image {
+    opacity: 0.7;
+}
+
+.experience-hero-image-container.loaded .experience-hero-image {
+    opacity: 1;
+}
+
+.experience-hero-image-container.error {
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    font-size: 1.1rem;
+}
+
+.experience-hero-image-container.error::after {
+    content: '📷 Imagen no disponible';
+    z-index: 2;
+}
+
+.tour-hero-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2rem;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+}
+
+.btn-close-custom {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: #495057;
+    z-index: 10;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.btn-close-custom:hover {
+    background: #f8f9fa;
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Tour Tabs Styling - Full Width Design */
+.tour-tabs-container {
+    background: #f8f9fa;
+    padding: 0 1.5rem;
+}
+
+.tour-nav-tabs {
+    border-bottom: none;
+    gap: 0;
+    padding-top: 1rem;
+    width: 100%;
+}
+
+.tour-nav-tabs .nav-item {
+    flex: 1;
+}
+
+.tour-nav-tabs .nav-link {
+    border: none;
+    background: transparent;
+    color: #6c757d;
+    font-weight: 500;
+    padding: 0.75rem 1.25rem;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+    width: 100%;
+    text-align: center;
+}
+
+.tour-nav-tabs .nav-link:hover {
+    background: rgba(13, 110, 253, 0.1);
+    color: #0d6efd;
+}
+
+.tour-nav-tabs .nav-link.active {
+    background: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+}
+
+.tab-content {
+    padding: 1.5rem;
+}
+
+.content-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.content-section:last-child {
+    border-bottom: none;
+}
+
+.info-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    height: 100%;
+}
+
+.info-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0d6efd;
+    color: white;
+    border-radius: 50%;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.price-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+    height: 100%;
+    transition: box-shadow 0.3s ease;
+}
+
+.price-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.price-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0d6efd;
+    color: white;
+    border-radius: 50%;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.price-info h6 {
+    margin: 0 0 0.25rem 0;
+    font-weight: 600;
+    color: #495057;
+}
+
+.price-amount {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0d6efd;
+}
+
+/* Additional pricing styles */
+.additional-pricing-section {
+    padding-top: 0.5rem;
+}
+
+.additional-price-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.additional-price-card:hover {
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.additional-price-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.additional-price-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+}
+
+.additional-price-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #495057;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.additional-price-value {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0d6efd;
+}
+
+.additional-price-info small {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.availability-info {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border-left: 4px solid #0d6efd;
+}
+
+.languages .badge {
+    font-size: 0.875rem;
+}
+
+.includes-list, .excludes-list {
+    list-style: none;
+    padding: 0;
+}
+
+.includes-list li, .excludes-list li {
+    padding: 0.5rem 0;
+    font-size: 0.95rem;
+}
+
+.requirements-content,
+.recommendations-content,
+.notes-content,
+.activities-content,
+.features-content,
+.restrictions-content {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.difficulty-info {
+    display: inline-block;
+}
+
+.capacity-info {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Gallery Styles */
+.photo-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    padding: 1rem 0;
+}
+
+.gallery-item {
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.5rem;
+}
+
+.gallery-item:hover {
+    transform: scale(1.02);
+}
+
+.gallery-item img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Progressive Loading Animation */
+.gallery-item.loading::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: shimmer 1.5s infinite;
+    z-index: 1;
+}
+
+.gallery-item.loading img {
+    opacity: 0.7;
+}
+
+.gallery-item.loaded img {
+    opacity: 1;
+}
+
+.gallery-item.error {
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.gallery-item.error::after {
+    content: '📷 Imagen no disponible';
+}
+
+@keyframes shimmer {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* Image loading placeholder */
+.image-placeholder {
+    width: 100%;
+    height: 200px;
+    background: linear-gradient(45deg, #f0f0f0 25%, #e0e0e0 25%, #e0e0e0 50%, #f0f0f0 50%, #f0f0f0 75%, #e0e0e0 75%);
+    background-size: 20px 20px;
+    animation: placeholderPulse 2s ease-in-out infinite;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    font-size: 0.9rem;
+}
+
+@keyframes placeholderPulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Full-Screen Gallery Styles */
+.fullscreen-gallery-modal {
+    background: #000;
+    border: none;
+}
+
+/* Gallery Thumbnails */
+.gallery-thumbnails {
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    z-index: 10;
+}
+
+.thumbnails-container {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 1rem;
+}
+
+.thumbnails-scroll {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 1rem;
+}
+
+.gallery-thumbnail {
+    flex-shrink: 0;
+    width: 80px;
+    height: 60px;
+    border-radius: 0.25rem;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.gallery-thumbnail:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.gallery-thumbnail.active {
+    border-color: #007bff;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+}
+
+.gallery-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.gallery-counter {
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+/* Custom Gallery Close Button */
+.gallery-close-btn {
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    color: #333;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    opacity: 1;
+    position: relative;
+    z-index: 9999;
+}
+
+.gallery-close-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: rgba(255, 255, 255, 1);
+    transform: scale(1.15);
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.6);
+    color: #dc3545;
+}
+
+.gallery-close-btn:focus {
+    outline: 3px solid rgba(255, 255, 255, 0.8);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.3);
+}
+
+.gallery-close-btn:active {
+    transform: scale(1.05);
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.gallery-close-btn i {
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+.gallery-main-container {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.gallery-main-image {
+    max-width: 90%;
+    max-height: 80vh;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+    cursor: grab;
+}
+
+.gallery-main-image:active {
+    cursor: grabbing;
+}
+
+.gallery-main-image.zoomed {
+    cursor: move;
+}
+
+.gallery-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    z-index: 10;
+}
+
+.gallery-nav:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.6);
+    color: white;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.gallery-nav-prev {
+    left: 2rem;
+}
+
+.gallery-nav-next {
+    right: 2rem;
+}
+
+.gallery-controls {
+    z-index: 10;
+}
+
+.gallery-controls .btn {
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }
 </style>

@@ -328,6 +328,48 @@ class ProviderExperienciaController {
   }
 
   /**
+   * GET /api/provider-experiences/:id - Get provider experiencia by ID directly.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/provider-experiences/xyz456
+   */
+  async getProviderExperienciaById(req, res) {
+    try {
+      if (!req.user) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      const { id } = req.params;
+
+      const query = new Parse.Query('ProviderExperiencia');
+      query.equalTo('objectId', id);
+      query.equalTo('exists', true);
+      query.include('provider');
+
+      const experiencia = await query.first({ useMasterKey: true });
+
+      if (!experiencia) {
+        return this.sendError(res, 'Provider experiencia not found', 404);
+      }
+
+      return res.json({
+        success: true,
+        data: await this.formatExperienciaForResponse(experiencia, req.get('accept') || ''),
+      });
+    } catch (error) {
+      logger.error('Error in ProviderExperienciaController.getProviderExperienciaById', {
+        error: error.message,
+        experienciaId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Failed to retrieve provider experiencia', 500);
+    }
+  }
+
+  /**
    * GET /api/providers/:providerId/experiencias/:id - Get single experiencia.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
