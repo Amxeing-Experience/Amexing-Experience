@@ -828,9 +828,6 @@ class ClientPricesController {
         for (let i = 0; i < toCreate.length; i += chunkSize) {
           const chunk = toCreate.slice(i, i + chunkSize);
           await Parse.Object.saveAll(chunk, { useMasterKey: true });
-          console.log(
-            `💾 Saved tour chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(toCreate.length / chunkSize)} (${chunk.length} items)`
-          );
         }
       }
     } catch (error) {
