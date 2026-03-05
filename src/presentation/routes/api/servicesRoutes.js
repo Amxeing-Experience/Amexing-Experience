@@ -181,6 +181,21 @@ router.get(
 // =================
 
 /**
+ * POST /api/services/bulk-create - Bulk create services with all rate-vehicle combinations.
+ *
+ * Access: Admin (level 6+)
+ * Body: { originPOI, destinationPOI, rates: [], vehicleTypes: [], defaultPrice, note, routeDuration }
+ * Returns: Created services count and results.
+ */
+router.post(
+  '/bulk-create',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ServicesController.bulkCreateServices(req, res)
+);
+
+/**
  * POST /api/services - Create new service.
  *
  * Access: Admin (level 6+)
@@ -267,6 +282,21 @@ router.post(
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
   (req, res) => ServicesController.updateBasePrices(req, res)
+);
+
+/**
+ * POST /:id/add-rate-prices - Add new rate prices to existing service.
+ * Route: POST /api/services/:id/add-rate-prices
+ * Access: Admin and above
+ * Body: { prices: [{rateId, vehicleId, price}] }
+ * Returns: Success message with created count.
+ */
+router.post(
+  '/:id/add-rate-prices',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ServicesController.addRatePrices(req, res)
 );
 
 module.exports = router;
