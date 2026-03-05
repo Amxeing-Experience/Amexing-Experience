@@ -296,7 +296,7 @@
     "eslint": "^8.56.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-import-resolver-node": "^0.3.9",
-    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jsdoc": "^61.5.0",
     "eslint-plugin-security": "^2.1.0",
     "husky": "^9.1.7",
@@ -316,8 +316,8 @@
   "resolutions": {
     "parse": "^8.2.0",
     "body-parser": ">=1.20.3",
-    "path-to-regexp": "0.1.12",
-    "router": "1.3.8",
+    "path-to-regexp": ">=8.3.0",
+    "router": ">=2.2.0",
     "undici": ">=5.19.1",
     "crypto-js": ">=4.2.0",
     "ws": ">=7.5.10",
@@ -341,7 +341,9 @@
     "jws": ">=4.0.1",
     "qs": ">=6.14.1",
     "fast-xml-parser": ">=5.3.6",
-    "markdown-it": ">=14.1.1"
+    "markdown-it": ">=14.1.1",
+    "minimatch": "3.1.3",
+    "dompurify": ">=3.3.2"
   },
   "engines": {
     "node": ">=20.0.0",
