@@ -615,10 +615,22 @@ tr[data-row-type="subconcept"] {
                         days = migrateOldFormatToNew(days);
                     }
 
-                    // Migrate subconcepts to add type field
+                    // Migrate subconcepts to add type field, remove duplicates, and sort by time
                     days = days.map(day => ({
                         ...day,
-                        subconcepts: day.subconcepts.map(migrateSubconceptToTyped)
+                        subconcepts: sortSubconceptsByTime(
+                            day.subconcepts
+                                .map(migrateSubconceptToTyped)
+                                .filter((subconcept, index, self) => {
+                                    // Remove duplicates based on concept, time, unitPrice, and type
+                                    return index === self.findIndex((s) => 
+                                        s.concept === subconcept.concept &&
+                                        s.time === subconcept.time &&
+                                        s.unitPrice === subconcept.unitPrice &&
+                                        s.type === subconcept.type
+                                    );
+                                })
+                        )
                     }));
 
                     // ✨ OPTIMIZED: Update state
@@ -695,6 +707,21 @@ tr[data-row-type="subconcept"] {
 
             serviceItemsData.days.forEach((day, dayIndex) => {
                 const dayRenderStart = Date.now();
+                
+                // Remove duplicates and sort subconcepts by time before rendering
+                if (day.subconcepts && day.subconcepts.length > 0) {
+                    // Remove duplicates based on concept, time, and price
+                    const uniqueSubconcepts = day.subconcepts.filter((subconcept, index, self) => {
+                        return index === self.findIndex((s) => 
+                            s.concept === subconcept.concept &&
+                            s.time === subconcept.time &&
+                            s.unitPrice === subconcept.unitPrice &&
+                            s.type === subconcept.type
+                        );
+                    });
+                    
+                    day.subconcepts = sortSubconceptsByTime(uniqueSubconcepts);
+                }
                 
                 // Count experience subconcepts for debugging
                 const experienceSubconcepts = day.subconcepts?.filter(sub => sub.type === 'experiencia') || [];
@@ -3451,6 +3478,60 @@ tr[data-row-type="subconcept"] {
     }
 
     // ==================
+    // SORTING UTILITIES
+    // ==================
+    
+    /**
+     * Sort subconcepts by time (horario) within a day
+     * Empty times are placed at the end
+     * @param {Array} subconcepts - Array of subconcept objects
+     * @returns {Array} - Sorted array of subconcepts
+     */
+    function sortSubconceptsByTime(subconcepts) {
+        return subconcepts.sort((a, b) => {
+            const timeA = a.time || '';
+            const timeB = b.time || '';
+            
+            // Empty times go to the end
+            if (!timeA && !timeB) return 0;
+            if (!timeA) return 1;
+            if (!timeB) return -1;
+            
+            // Parse times in HH:MM format or HH:MM - HH:MM ranges (e.g., "09:30", "14:00", "08:00 - 12:00")
+            const parseTime = (timeStr) => {
+                // First try to match a time range (e.g., "13:00 - 15:00")
+                const rangeMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+                if (rangeMatch) {
+                    // Use the start time of the range for sorting
+                    const hours = parseInt(rangeMatch[1], 10);
+                    const minutes = parseInt(rangeMatch[2], 10);
+                    return hours * 60 + minutes;
+                }
+                
+                // Otherwise, try to match a single time (e.g., "09:30", "14:00")
+                const singleMatch = timeStr.match(/^(\d{1,2}):(\d{2})/);
+                if (singleMatch) {
+                    const hours = parseInt(singleMatch[1], 10);
+                    const minutes = parseInt(singleMatch[2], 10);
+                    return hours * 60 + minutes; // Convert to minutes for comparison
+                }
+                
+                return null; // Invalid time format
+            };
+            
+            const minutesA = parseTime(timeA);
+            const minutesB = parseTime(timeB);
+            
+            // If either time is invalid, treat as empty
+            if (minutesA === null && minutesB === null) return 0;
+            if (minutesA === null) return 1;
+            if (minutesB === null) return -1;
+            
+            return minutesA - minutesB;
+        });
+    }
+
+    // ==================
     // CRUD OPERATIONS
     // ==================
 
@@ -3540,7 +3621,12 @@ tr[data-row-type="subconcept"] {
             newSubconcept.vehicleTrunkCapacity = null;          // NEW - Vehicle trunk capacity
         }
 
+        // Add the new subconcept to the array
         serviceItemsData.days[dayIndex].subconcepts.push(newSubconcept);
+        
+        // Automatically sort subconcepts by time (horario)
+        serviceItemsData.days[dayIndex].subconcepts = sortSubconceptsByTime(serviceItemsData.days[dayIndex].subconcepts);
+        
         renderDay(dayIndex, false, true);  // Force render when user adds subconcept
         markDirty();
         triggerAutoSave();
@@ -3596,6 +3682,13 @@ tr[data-row-type="subconcept"] {
             subconcept.isCashPayment = value === true || value === 'true' || value === 'on';
         } else {
             subconcept[field] = value;
+        }
+        
+        // Auto-sort subconcepts by time when time field is updated
+        if (field === 'time') {
+            serviceItemsData.days[dayIndex].subconcepts = sortSubconceptsByTime(serviceItemsData.days[dayIndex].subconcepts);
+            // Re-render the entire day to reflect the new order
+            renderDay(dayIndex, false, true);
         }
 
         // Recalculate total if any pricing field changed

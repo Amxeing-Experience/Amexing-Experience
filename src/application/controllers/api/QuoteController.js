@@ -974,9 +974,12 @@ class QuoteController {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
 
+      // Apply sorting and deduplication to days before saving
+      const sortedAndCleanedDays = this.sortAndCleanServiceDays(days);
+
       // Update serviceItems
       const serviceItems = {
-        days,
+        days: sortedAndCleanedDays,
         subtotal,
         iva,
         total,
@@ -2589,6 +2592,114 @@ class QuoteController {
         500
       );
     }
+  }
+
+  /**
+   * Sort subconcepts by time and remove duplicates within service days.
+   * @param {Array} days - Array of day objects with subconcepts.
+   * @returns {Array} Days with sorted and deduplicated subconcepts.
+   * @example
+   * const cleanedDays = this.sortAndCleanServiceDays([
+   *   {
+   *     dayNumber: 1,
+   *     subconcepts: [
+   *       { time: "13:00 - 15:00", concept: "Tour A", unitPrice: 200 },
+   *       { time: "08:00 - 12:00", concept: "Tour B", unitPrice: 100 },
+   *       { time: "13:00 - 15:00", concept: "Tour A", unitPrice: 200 } // duplicate
+   *     ]
+   *   }
+   * ]);
+   * // Returns days with subconcepts sorted by time and duplicates removed
+   */
+  sortAndCleanServiceDays(days) {
+    if (!Array.isArray(days)) {
+      return days;
+    }
+
+    return days.map((day) => {
+      if (!day.subconcepts || !Array.isArray(day.subconcepts)) {
+        return day;
+      }
+
+      // Remove duplicates based on concept, time, unitPrice, and type
+      const uniqueSubconcepts = day.subconcepts.filter(
+        (subconcept, index, self) => index === self.findIndex(
+          (s) => s.concept === subconcept.concept
+            && s.time === subconcept.time
+            && s.unitPrice === subconcept.unitPrice
+            && s.type === subconcept.type
+        )
+      );
+
+      // Sort subconcepts by time (chronological order)
+      const sortedSubconcepts = this.sortSubconceptsByTime(uniqueSubconcepts);
+
+      return {
+        ...day,
+        subconcepts: sortedSubconcepts,
+      };
+    });
+  }
+
+  /**
+   * Sort subconcepts by time (horario) within a day
+   * Empty times are placed at the end.
+   * @param {Array} subconcepts - Array of subconcept objects.
+   * @returns {Array} Sorted array of subconcepts.
+   * @example
+   * const sorted = this.sortSubconceptsByTime([
+   *   { time: "13:00 - 15:00", concept: "Afternoon Tour" },
+   *   { time: "08:00 - 12:00", concept: "Morning Tour" },
+   *   { time: "", concept: "TBD Activity" }
+   * ]);
+   * // Returns: Morning Tour, Afternoon Tour, TBD Activity
+   */
+  sortSubconceptsByTime(subconcepts) {
+    if (!Array.isArray(subconcepts)) {
+      return subconcepts;
+    }
+
+    return subconcepts.sort((a, b) => {
+      const timeA = a.time || '';
+      const timeB = b.time || '';
+
+      // Empty times go to the end
+      if (!timeA && !timeB) return 0;
+      if (!timeA) return 1;
+      if (!timeB) return -1;
+
+      // Parse times in HH:MM format or HH:MM - HH:MM ranges
+      const parseTime = (timeStr) => {
+        // First try to match a time range (e.g., "13:00 - 15:00")
+        const rangeMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+        if (rangeMatch) {
+          // Use the start time of the range for sorting
+          const hours = parseInt(rangeMatch[1], 10);
+          const minutes = parseInt(rangeMatch[2], 10);
+          return hours * 60 + minutes;
+        }
+
+        // Otherwise, try to match a single time (e.g., "09:30", "14:00")
+        const singleMatch = timeStr.match(/^(\d{1,2}):(\d{2})/);
+        if (singleMatch) {
+          const hours = parseInt(singleMatch[1], 10);
+          const minutes = parseInt(singleMatch[2], 10);
+          return hours * 60 + minutes; // Convert to minutes for comparison
+        }
+
+        return null; // Invalid time format
+      };
+
+      const minutesA = parseTime(timeA);
+      const minutesB = parseTime(timeB);
+
+      // If either time is invalid, treat as empty
+      if (minutesA === null && minutesB === null) return 0;
+      if (minutesA === null) return 1;
+      if (minutesB === null) return -1;
+
+      return minutesA - minutesB;
+    });
   }
 
   /**
