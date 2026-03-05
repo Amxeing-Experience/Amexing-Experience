@@ -434,6 +434,27 @@ table.dataTable thead th:nth-child(2) select {
                             <!-- Base prices will be dynamically loaded here -->
                         </div>
                     </div>
+                    
+                    <!-- Sección: Precios por Tarifa y Tipo de Vehículo para Nuevo Traslado -->
+                    <div class="mb-4" id="newServiceRatesSection" style="display: none;">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-currency-dollar me-1"></i>
+                            Precios por Tarifa y Tipo de Vehículo
+                        </h6>
+                        
+                        <div class="alert alert-info d-flex align-items-start mb-3" role="alert">
+                            <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                            <div>
+                                <strong>Configure los precios específicos para cada combinación:</strong>
+                                <p class="mb-0 mt-1">Configure los precios específicos para cada combinación de tarifa y vehículo. Dejar en 0 el vehículo que no aplica para la tarifa.</p>
+                            </div>
+                        </div>
+                        
+                        <div id="newServicePricesContainer">
+                            <!-- Pricing grid will be dynamically loaded here -->
+                        </div>
+
+                    </div>
 
                     <!-- Sección: Notas Adicionales -->
                     <div class="mb-4">
@@ -573,7 +594,13 @@ table.dataTable thead th:nth-child(2) select {
         const accessToken = '<%= accessToken || "" %>';
         const clientId = '<%= dtClientId || "" %>';
         
-        // Debug: Log the clientId to verify it's being passed correctly
+        // Debug: Log token and other variables
+        console.log('Services table initialization:', {
+            hasAccessToken: !!accessToken,
+            accessTokenLength: accessToken ? accessToken.length : 0,
+            userRole,
+            clientId
+        });
 
         // Calculate greeter price based on duration
         // Formula: 760 + (640 * duration)
@@ -2791,7 +2818,24 @@ table.dataTable thead th:nth-child(2) select {
             $('#serviceForm')[0].reset();
             $('#serviceId').val('');
             $('#modalTitle').text(isEdit ? 'Editar Traslado' : 'Crear Nuevo Traslado');
-            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Traslado');
+            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Traslados');
+
+            // Show/hide appropriate sections
+            if (!isEdit) {
+                // For new services, show rates and vehicles selection
+                $('#basePricingSection').hide();
+                $('#newServiceRatesSection').show();
+                try {
+                    await loadRatesAndVehicleTypes();
+                } catch (error) {
+                    console.error('Error loading rates and vehicle types in modal:', error);
+                    showModalError('Error al cargar tarifas y vehículos: ' + (error.message || 'Error desconocido'));
+                }
+            } else {
+                // For editing, show existing pricing
+                $('#newServiceRatesSection').hide();
+                $('#basePricingSection').show();
+            }
 
             try {
                 // Wait for and clear Tom Select instances
@@ -2979,29 +3023,227 @@ table.dataTable thead th:nth-child(2) select {
                 // Show the pricing section
                 $('#basePricingSection').show();
                 
-                // Get service base prices from API
                 const token = getAccessToken();
-                const response = await fetch(`/api/services/${serviceId}/all-rate-prices`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
                 
-                if (!response.ok) {
-                    throw new Error('Failed to load base pricing');
-                }
+                // Load all rates and vehicle types, plus existing pricing data
+                const [ratesResponse, vehiclesResponse, existingPricesResponse] = await Promise.all([
+                    $.ajax({
+                        url: '/api/rates/active',
+                        type: 'GET',
+                        beforeSend: function(xhr) {
+                            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    }),
+                    $.ajax({
+                        url: '/api/vehicle-types/active',
+                        type: 'GET',
+                        beforeSend: function(xhr) {
+                            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    }),
+                    $.ajax({
+                        url: `/api/services/${serviceId}/all-rate-prices`,
+                        type: 'GET',
+                        beforeSend: function(xhr) {
+                            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    })
+                ]);
                 
-                const priceData = await response.json();
-                
-                if (priceData.success && priceData.data) {
-                    renderBasePricing(priceData.data);
+                if (ratesResponse.success && vehiclesResponse.success && existingPricesResponse.success) {
+                    renderEditPricingGrid(ratesResponse.data, vehiclesResponse.data, existingPricesResponse.data);
                 } else {
-                    throw new Error('Invalid pricing data received');
+                    throw new Error('Failed to load pricing data');
                 }
             } catch (error) {
                 $('#basePricingSection').hide();
                 showModalError('Error al cargar los precios base: ' + error.message);
             }
+        }
+
+        // Color utility functions for pricing grid
+        function getLuminance(hex) {
+            const rgb = parseInt(hex.slice(1), 16);
+            const r = (rgb >> 16) & 0xff;
+            const g = (rgb >> 8) & 0xff;
+            const b = (rgb >> 0) & 0xff;
+            
+            const [rsRGB, gsRGB, bsRGB] = [r/255, g/255, b/255].map(val => {
+                return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
+            });
+            
+            return 0.2126 * rsRGB + 0.7152 * gsRGB + 0.0722 * bsRGB;
+        }
+
+        function getContrastTextColor(backgroundColor) {
+            const luminance = getLuminance(backgroundColor);
+            return luminance > 0.5 ? '#1F2937' : '#FFFFFF';
+        }
+
+        // Load rates and vehicle types pricing grid for new service creation
+        async function loadRatesAndVehicleTypes() {
+            try {
+                // Load rates using the active endpoint
+                const ratesResponse = await $.ajax({
+                    url: '/api/rates/active',
+                    type: 'GET',
+                    beforeSend: function(xhr) {
+                        const token = getAccessToken();
+                        if (token) {
+                            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    }
+                });
+                
+                // Load vehicle types using the active endpoint
+                const vehicleTypesResponse = await $.ajax({
+                    url: '/api/vehicle-types/active',
+                    type: 'GET',
+                    beforeSend: function(xhr) {
+                        const token = getAccessToken();
+                        if (token) {
+                            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    }
+                });
+                
+                // Build pricing grid
+                const pricesContainer = $('#newServicePricesContainer');
+                pricesContainer.empty();
+                
+                if (ratesResponse.success && ratesResponse.data && vehicleTypesResponse.success && vehicleTypesResponse.data) {
+                    const rates = ratesResponse.data;
+                    const vehicleTypes = vehicleTypesResponse.data;
+                    
+                    rates.forEach(rate => {
+                        const rateId = rate.id || rate.value;
+                        const rateName = rate.name || rate.label;
+                        const rateColor = rate.color || '#059669'; // Default green color
+                        const textColor = getContrastTextColor(rateColor);
+                        
+                        // Create rate card
+                        const rateCard = $(`
+                            <div class="card mb-3 border-0 shadow-sm">
+                                <div class="card-header" style="background-color: ${rateColor};">
+                                    <h6 class="mb-0 fw-medium" style="color: ${textColor};">${rateName}</h6>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="row" id="new-rate-${rateId}-prices">
+                                        <!-- Vehicle inputs will be added here -->
+                                    </div>
+                                </div>
+                            </div>
+                        `);
+                        
+                        pricesContainer.append(rateCard);
+                        
+                        // Add vehicle type inputs to this rate card
+                        const rateContainer = $(`#new-rate-${rateId}-prices`);
+                        
+                        vehicleTypes.forEach(vehicleType => {
+                            const vehicleId = vehicleType.id || vehicleType.value;
+                            const vehicleName = vehicleType.name || vehicleType.label;
+                            const vehicleCapacity = vehicleType.capacity || vehicleType.defaultCapacity;
+                            
+                            const vehicleInput = $(`
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label form-label-sm fw-medium">${vehicleName}</label>
+                                    <small class="text-muted d-block mb-1">(${vehicleCapacity} pax)</small>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" 
+                                               class="form-control service-price-input" 
+                                               data-rate-id="${rateId}"
+                                               data-vehicle-id="${vehicleId}"
+                                               value="0"
+                                               step="0.01"
+                                               min="0"
+                                               placeholder="0.00">
+                                        <span class="input-group-text">MXN</span>
+                                    </div>
+                                </div>
+                            `);
+                            
+                            rateContainer.append(vehicleInput);
+                        });
+                    });
+                } else {
+                    showModalError('Error: No se pudieron cargar las tarifas o tipos de vehículo');
+                }
+                
+            } catch (error) {
+                console.error('Error loading rates and vehicle types:', error);
+                showModalError('Error al cargar tarifas y vehículos: ' + (error.message || 'Error desconocido'));
+            }
+        }
+
+        // Render complete pricing grid for editing (shows all rates and vehicle types)
+        function renderEditPricingGrid(rates, vehicleTypes, existingPrices) {
+            const container = $('#basePricesContainer');
+            container.empty();
+            
+            // Create lookup map for existing prices
+            const existingPriceMap = {};
+            existingPrices.forEach(item => {
+                const rateId = item.rate?.id;
+                const vehicleId = item.vehicleType?.id;
+                if (rateId && vehicleId) {
+                    existingPriceMap[`${rateId}-${vehicleId}`] = item;
+                }
+            });
+            
+            // Create pricing grid for all rates and vehicle types
+            rates.forEach(rate => {
+                const rateName = rate.name || rate.label || 'Tarifa sin nombre';
+                const rateId = rate.id || rate.value;
+                const rateColor = rate.color || '#6c757d';
+                const textColor = getContrastTextColor(rateColor);
+                
+                const rateCard = $(`
+                    <div class="card mb-3 border-0 shadow-sm">
+                        <div class="card-header" style="background-color: ${rateColor};">
+                            <h6 class="mb-0 fw-medium" style="color: ${textColor};">${rateName}</h6>
+                        </div>
+                        <div class="card-body p-3">
+                            <div class="row" id="edit-rate-${rateId}-prices">
+                                <!-- Vehicle inputs will be added here -->
+                            </div>
+                        </div>
+                    </div>
+                `);
+                
+                container.append(rateCard);
+                
+                // Add vehicle type inputs for this rate
+                vehicleTypes.forEach(vehicle => {
+                    const vehicleId = vehicle.id || vehicle.value;
+                    const vehicleName = vehicle.name || vehicle.label || 'Vehículo sin nombre';
+                    const priceKey = `${rateId}-${vehicleId}`;
+                    const existingPrice = existingPriceMap[priceKey];
+                    const currentPrice = existingPrice ? existingPrice.price : '';
+                    const existingId = existingPrice ? existingPrice.id : '';
+                    
+                    const vehicleCol = $(`
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-medium text-secondary">${vehicleName}</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0 text-muted">$</span>
+                                <input type="number" 
+                                       class="form-control edit-price-input border-start-0" 
+                                       data-rate-id="${rateId}" 
+                                       data-vehicle-id="${vehicleId}"
+                                       data-existing-id="${existingId}"
+                                       value="${currentPrice}"
+                                       min="0" 
+                                       step="0.01" 
+                                       placeholder="0.00">
+                            </div>
+                        </div>
+                    `);
+                    
+                    $(`#edit-rate-${rateId}-prices`).append(vehicleCol);
+                });
+            });
         }
 
         function renderBasePricing(priceData) {
@@ -3068,8 +3310,35 @@ table.dataTable thead th:nth-child(2) select {
 
         async function saveBasePricing(serviceId) {
             const basePrices = [];
+            const newPrices = [];
             
-            // Collect all base price inputs
+            // Collect all edit price inputs (new grid format)
+            $('.edit-price-input').each(function() {
+                const input = $(this);
+                const price = parseFloat(input.val()) || 0;
+                const existingId = input.data('existing-id');
+                const rateId = input.data('rate-id');
+                const vehicleId = input.data('vehicle-id');
+                
+                if (existingId) {
+                    // Always update existing prices (even if 0 - will deactivate via valid_until)
+                    basePrices.push({
+                        id: existingId,
+                        rateId: rateId,
+                        vehicleId: vehicleId,
+                        price: price
+                    });
+                } else if (price > 0) {
+                    // Only create new prices if > 0
+                    newPrices.push({
+                        rateId: rateId,
+                        vehicleId: vehicleId,
+                        price: price
+                    });
+                }
+            });
+            
+            // Also collect legacy base price inputs (fallback for old format)
             $('.base-price-input').each(function() {
                 const input = $(this);
                 const price = parseFloat(input.val()) || 0;
@@ -3087,31 +3356,65 @@ table.dataTable thead th:nth-child(2) select {
                 }
             });
             
-            if (basePrices.length === 0) {
+            if (basePrices.length === 0 && newPrices.length === 0) {
                 return; // No prices to save
             }
             
             try {
                 const token = getAccessToken();
-                const response = await fetch(`/api/services/${serviceId}/update-base-prices`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        prices: basePrices
-                    })
-                });
+                let updatedCount = 0;
+                let createdCount = 0;
                 
-                if (!response.ok) {
-                    throw new Error('Failed to save base pricing');
+                // Update existing prices if any
+                if (basePrices.length > 0) {
+                    const updateResponse = await fetch(`/api/services/${serviceId}/update-base-prices`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            prices: basePrices
+                        })
+                    });
+                    
+                    if (!updateResponse.ok) {
+                        throw new Error('Failed to update existing prices');
+                    }
+                    
+                    const updateResult = await updateResponse.json();
+                    updatedCount = updateResult.updatedCount || 0;
                 }
                 
-                const result = await response.json();
-                if (!result.success) {
-                    throw new Error(result.error || 'Error saving base prices');
+                // Create new prices if any (using the bulk create approach)
+                if (newPrices.length > 0) {
+                    const createResponse = await fetch(`/api/services/${serviceId}/add-rate-prices`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            prices: newPrices
+                        })
+                    });
+                    
+                    if (!createResponse.ok) {
+                        // If add-rate-prices doesn't exist, we need to create it or use another approach
+                        console.warn('add-rate-prices endpoint not available, skipping new price creation');
+                    } else {
+                        const createResult = await createResponse.json();
+                        createdCount = createResult.created || newPrices.length;
+                    }
                 }
+                
+                const totalChanges = updatedCount + createdCount;
+                if (totalChanges === 0) {
+                    throw new Error('No prices were updated or created');
+                }
+                
+                // Success - return the counts for reporting
+                return { updated: updatedCount, created: createdCount };
                 
             } catch (error) {
                 throw error;
@@ -3151,15 +3454,70 @@ table.dataTable thead th:nth-child(2) select {
                     return;
                 }
 
-                const serviceData = {
-                    originPOI: originPOI || null,
-                    destinationPOI: destinationPOI,
-                    note: $('#note').val().trim(),
-                    routeDuration: $('#routeDuration').val() ? parseInt($('#routeDuration').val()) : null,
-                };
-
-                const url = isEdit ? `${apiEndpoint}/${serviceId}` : apiEndpoint;
-                const method = isEdit ? 'PUT' : 'POST';
+                // For new services, prepare bulk creation data
+                let serviceData;
+                let url;
+                let method;
+                
+                if (!isEdit) {
+                    // Get pricing data from the grid
+                    const pricingData = [];
+                    let hasValidPrices = false;
+                    
+                    $('.service-price-input').each(function() {
+                        const $input = $(this);
+                        const price = parseFloat($input.val()) || 0;
+                        
+                        if (price > 0) {
+                            hasValidPrices = true;
+                            pricingData.push({
+                                rateId: $input.data('rate-id'),
+                                vehicleId: $input.data('vehicle-id'),
+                                price: price
+                            });
+                        }
+                    });
+                    
+                    if (!hasValidPrices) {
+                        showModalError('Debes configurar al menos un precio mayor a 0 para crear el traslado');
+                        $saveBtn.prop('disabled', false).html(originalBtnHtml);
+                        return;
+                    }
+                    
+                    // Transform pricing data to API format
+                    const rateIds = [...new Set(pricingData.map(item => item.rateId))];
+                    const vehicleIds = [...new Set(pricingData.map(item => item.vehicleId))];
+                    
+                    // Calculate default price (average of all prices)
+                    const totalPrice = pricingData.reduce((sum, item) => sum + item.price, 0);
+                    const defaultPrice = Math.round(totalPrice / pricingData.length);
+                    
+                    // Prepare bulk creation data with both formats for compatibility
+                    serviceData = {
+                        originPOI: originPOI || null,
+                        destinationPOI: destinationPOI,
+                        note: $('#note').val().trim(),
+                        routeDuration: $('#routeDuration').val() ? parseInt($('#routeDuration').val()) : null,
+                        rates: rateIds,
+                        vehicleTypes: vehicleIds,
+                        defaultPrice: defaultPrice,
+                        pricingData: pricingData  // Include individual pricing data
+                    };
+                    
+                    url = `${apiEndpoint}/bulk-create`;
+                    method = 'POST';
+                } else {
+                    // For editing, use existing single service data
+                    serviceData = {
+                        originPOI: originPOI || null,
+                        destinationPOI: destinationPOI,
+                        note: $('#note').val().trim(),
+                        routeDuration: $('#routeDuration').val() ? parseInt($('#routeDuration').val()) : null,
+                    };
+                    
+                    url = `${apiEndpoint}/${serviceId}`;
+                    method = 'PUT';
+                }
 
                 $.ajax({
                     url,
@@ -3169,8 +3527,19 @@ table.dataTable thead th:nth-child(2) select {
                     beforeSend: function(xhr) {
                         const token = getAccessToken();
                         
+                        console.log('Service creation - Token check:', {
+                            tokenExists: !!token,
+                            tokenLength: token ? token.length : 0,
+                            tokenStart: token ? token.substring(0, 20) + '...' : 'null'
+                        });
+                        
                         if (token) {
                             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        } else {
+                            console.error('No access token available for service creation');
+                            showModalError('Error de autenticación: Token no disponible. Por favor, recarga la página.');
+                            $saveBtn.prop('disabled', false).html(originalBtnHtml);
+                            return false;
                         }
                     },
                     success: async function(response) {
@@ -3251,7 +3620,12 @@ table.dataTable thead th:nth-child(2) select {
                                 try {
                                     await initializeTable();
                                     hideLoadingIndicator();
-                                    showSuccessAlert('Traslado creado exitosamente');
+                                    // Use the actual created count from response or from pricingData
+                                    const actualCreated = response.data && response.data.created 
+                                        ? response.data.created 
+                                        : (serviceData.pricingData ? serviceData.pricingData.length : 1);
+                                    const message = `1 traslado creado exitosamente con ${actualCreated} tarifas`;
+                                    showSuccessAlert(message);
                                 } catch (error) {
                                     hideLoadingIndicator();
                                     showErrorAlert('Error al actualizar la tabla: ' + error.message);
@@ -3262,16 +3636,31 @@ table.dataTable thead th:nth-child(2) select {
                     error: function(xhr) {
                         let errorMessage = 'Error al guardar el traslado';
 
-                        if (xhr.responseJSON?.error) {
+                        console.error('Service creation error:', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText,
+                            responseJSON: xhr.responseJSON,
+                            errorType: typeof xhr.responseJSON?.error,
+                            errorValue: xhr.responseJSON?.error
+                        });
+
+                        if (xhr.status === 401) {
+                            errorMessage = 'Error de autenticación: Token inválido o expirado. Por favor, recarga la página e intenta de nuevo.';
+                        } else if (xhr.responseJSON?.error) {
                             const error = xhr.responseJSON.error;
-                            if (error.includes('already exists') || error.includes('ya existe')) {
+                            const errorStr = String(error); // Convert to string to safely use .includes()
+                            
+                            if (errorStr.includes('Invalid or malformed token')) {
+                                errorMessage = 'Token de autenticación inválido. Por favor, recarga la página e intenta de nuevo.';
+                            } else if (errorStr.includes('already exists') || errorStr.includes('ya existe')) {
                                 errorMessage = 'Ya existe un traslado con esta ruta, tipo de vehículo y tarifa.';
-                            } else if (error.includes('required')) {
+                            } else if (errorStr.includes('required')) {
                                 errorMessage = 'Todos los campos requeridos deben ser completados.';
-                            } else if (error.includes('different') || error.includes('diferentes')) {
+                            } else if (errorStr.includes('different') || errorStr.includes('diferentes')) {
                                 errorMessage = 'El origen y destino deben ser diferentes.';
                             } else {
-                                errorMessage = error;
+                                errorMessage = errorStr;
                             }
                         }
 
