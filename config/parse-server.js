@@ -47,10 +47,6 @@ const parseServerConfig = {
   verifyUserEmails: false,
   preventLoginWithUnverifiedEmail: false,
   
-  // Parse Server 8.x configuration - encodeParseObjectInCloudFunction deprecated but set to true (new default)
-  // This option will be removed in future versions
-  encodeParseObjectInCloudFunction: true,
-  
   // Session Configuration
   sessionLength: parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 || 900,
   revokeSessionOnPasswordReset: true,
@@ -372,6 +368,9 @@ const parseServerConfig = {
   liveQuery: {
     classNames: [],
   },
+  
+  // Disable Push Notifications to avoid ES module compatibility issues
+  push: {},
   
   // Custom Pages
   customPages: {

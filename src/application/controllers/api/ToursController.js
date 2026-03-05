@@ -338,6 +338,44 @@ class ToursController {
 
       const destinationPOI = tour.get('destinationPOI');
 
+      // Fetch vehicle pricing data for this tour
+      let priceData = [];
+      try {
+        const priceQuery = new Parse.Query('TourPrices'); // Note: Table name is TourPrices (plural)
+        priceQuery.equalTo('tourPtr', tour);
+        priceQuery.equalTo('exists', true);
+        priceQuery.doesNotExist('valid_until'); // Only get active prices (no end date)
+        priceQuery.include(['ratePtr', 'vehicleType']);
+
+        const tourPrices = await priceQuery.find({ useMasterKey: true });
+
+        priceData = tourPrices.map((tourPrice) => {
+          const rate = tourPrice.get('ratePtr');
+          const vehicleType = tourPrice.get('vehicleType');
+          const price = tourPrice.get('price') || 0;
+
+          return {
+            id: tourPrice.id,
+            price,
+            formattedPrice: `$${Math.round(price).toLocaleString()} MXN`,
+            rate: rate ? {
+              id: rate.id,
+              name: rate.get('name'),
+              color: rate.get('color') || '#6c757d',
+            } : null,
+            vehicleType: vehicleType ? {
+              id: vehicleType.id,
+              name: vehicleType.get('name'),
+              defaultCapacity: vehicleType.get('defaultCapacity') || 4,
+              trunkCapacity: vehicleType.get('trunkCapacity') || 2,
+              description: vehicleType.get('description') || null,
+            } : null,
+          };
+        });
+      } catch (error) {
+        logger.warn('Error fetching tour prices:', { tourId, error: error.message });
+      }
+
       const tourData = {
         id: tour.id,
         objectId: tour.id,
@@ -396,6 +434,8 @@ class ToursController {
         walkingPriceMedium: tour.get('walkingPriceMedium') || null,
         walkingPriceLarge: tour.get('walkingPriceLarge') || null,
         walkingPriceCurrency: tour.get('walkingPriceCurrency') || null,
+        // Vehicle pricing data
+        priceData,
       };
 
       res.json({
@@ -440,6 +480,7 @@ class ToursController {
         price_child: priceChild,
         travel_duration: travelDuration,
         advance_booking_time: advanceBookingTime,
+        anticipation,
         min_people: minPeople,
         max_people: maxPeople,
         includes,
@@ -450,6 +491,15 @@ class ToursController {
         client_booking_notes: clientBookingNotes,
         provider_notes: providerNotes,
         team_notes: teamNotes,
+        // Walking tour fields
+        isWalkingTour,
+        walkingPriceSmall,
+        walkingPriceMedium,
+        walkingPriceLarge,
+        walkingPriceCurrency,
+        walkingRangeSmall,
+        walkingRangeMedium,
+        walkingRangeLarge,
       } = req.body;
 
       // Validate required fields
@@ -527,6 +577,35 @@ class ToursController {
       }
       if (teamNotes !== undefined && teamNotes !== null && teamNotes !== '') {
         tour.set('team_notes', teamNotes);
+      }
+
+      // Set walking tour fields
+      if (isWalkingTour !== undefined) {
+        tour.set('isWalkingTour', Boolean(isWalkingTour));
+      }
+      if (walkingPriceSmall !== undefined && walkingPriceSmall !== null) {
+        tour.set('walkingPriceSmall', parseFloat(walkingPriceSmall));
+      }
+      if (walkingPriceMedium !== undefined && walkingPriceMedium !== null) {
+        tour.set('walkingPriceMedium', parseFloat(walkingPriceMedium));
+      }
+      if (walkingPriceLarge !== undefined && walkingPriceLarge !== null) {
+        tour.set('walkingPriceLarge', parseFloat(walkingPriceLarge));
+      }
+      if (walkingPriceCurrency !== undefined && walkingPriceCurrency !== null) {
+        tour.set('walkingPriceCurrency', walkingPriceCurrency);
+      }
+      if (walkingRangeSmall !== undefined && walkingRangeSmall !== null) {
+        tour.set('walkingRangeSmall', walkingRangeSmall);
+      }
+      if (walkingRangeMedium !== undefined && walkingRangeMedium !== null) {
+        tour.set('walkingRangeMedium', walkingRangeMedium);
+      }
+      if (walkingRangeLarge !== undefined && walkingRangeLarge !== null) {
+        tour.set('walkingRangeLarge', walkingRangeLarge);
+      }
+      if (anticipation !== undefined && anticipation !== null) {
+        tour.set('anticipation', parseInt(anticipation, 10));
       }
 
       tour.set('active', true);
@@ -623,6 +702,7 @@ class ToursController {
         price_child: priceChild,
         travel_duration: travelDuration,
         advance_booking_time: advanceBookingTime,
+        anticipation,
         min_people: minPeople,
         max_people: maxPeople,
         includes,
@@ -633,6 +713,15 @@ class ToursController {
         client_booking_notes: clientBookingNotes,
         provider_notes: providerNotes,
         team_notes: teamNotes,
+        // Walking tour fields
+        isWalkingTour,
+        walkingPriceSmall,
+        walkingPriceMedium,
+        walkingPriceLarge,
+        walkingPriceCurrency,
+        walkingRangeSmall,
+        walkingRangeMedium,
+        walkingRangeLarge,
       } = req.body;
 
       if (!tourId) {
@@ -825,6 +914,43 @@ class ToursController {
       if (teamNotes !== undefined) {
         if (teamNotes === null || teamNotes === '') tour.unset('team_notes');
         else tour.set('team_notes', teamNotes);
+      }
+
+      // Update walking tour fields
+      if (isWalkingTour !== undefined) {
+        tour.set('isWalkingTour', Boolean(isWalkingTour));
+      }
+      if (walkingPriceSmall !== undefined) {
+        if (walkingPriceSmall === null) tour.unset('walkingPriceSmall');
+        else tour.set('walkingPriceSmall', parseFloat(walkingPriceSmall));
+      }
+      if (walkingPriceMedium !== undefined) {
+        if (walkingPriceMedium === null) tour.unset('walkingPriceMedium');
+        else tour.set('walkingPriceMedium', parseFloat(walkingPriceMedium));
+      }
+      if (walkingPriceLarge !== undefined) {
+        if (walkingPriceLarge === null) tour.unset('walkingPriceLarge');
+        else tour.set('walkingPriceLarge', parseFloat(walkingPriceLarge));
+      }
+      if (walkingPriceCurrency !== undefined) {
+        if (walkingPriceCurrency === null || walkingPriceCurrency === '') tour.unset('walkingPriceCurrency');
+        else tour.set('walkingPriceCurrency', walkingPriceCurrency);
+      }
+      if (walkingRangeSmall !== undefined) {
+        if (walkingRangeSmall === null || walkingRangeSmall === '') tour.unset('walkingRangeSmall');
+        else tour.set('walkingRangeSmall', walkingRangeSmall);
+      }
+      if (walkingRangeMedium !== undefined) {
+        if (walkingRangeMedium === null || walkingRangeMedium === '') tour.unset('walkingRangeMedium');
+        else tour.set('walkingRangeMedium', walkingRangeMedium);
+      }
+      if (walkingRangeLarge !== undefined) {
+        if (walkingRangeLarge === null || walkingRangeLarge === '') tour.unset('walkingRangeLarge');
+        else tour.set('walkingRangeLarge', walkingRangeLarge);
+      }
+      if (anticipation !== undefined) {
+        if (anticipation === null) tour.unset('anticipation');
+        else tour.set('anticipation', parseInt(anticipation, 10));
       }
 
       await tour.save(null, { useMasterKey: true });
@@ -2131,9 +2257,28 @@ class ToursController {
           const buffer = Buffer.from(base64Data, 'base64');
 
           // Generate unique filename
-          const fileExtension = mimeType.split('/')[1] || 'jpg';
           const timestamp = Date.now();
-          const uniqueFileName = `${timestamp}_${photo.fileName || 'tour_image'}.${fileExtension}`;
+
+          // Preserve original extension if it matches the MIME type, otherwise use MIME type extension
+          let baseFileName = photo.fileName || 'tour_image';
+          let fileExtension;
+
+          const lastDotIndex = baseFileName.lastIndexOf('.');
+          if (lastDotIndex > 0) {
+            const originalExt = baseFileName.substring(lastDotIndex + 1).toLowerCase();
+            baseFileName = baseFileName.substring(0, lastDotIndex);
+
+            // For JPEG images, preserve original extension (.jpg vs .jpeg)
+            if (mimeType === 'image/jpeg' && (originalExt === 'jpg' || originalExt === 'jpeg')) {
+              fileExtension = originalExt;
+            } else {
+              fileExtension = mimeType.split('/')[1] || 'jpg';
+            }
+          } else {
+            fileExtension = mimeType.split('/')[1] || 'jpg';
+          }
+
+          const uniqueFileName = `${timestamp}_${baseFileName}.${fileExtension}`;
 
           // Process with server optimization service
           const optimizationResult = await this.serverOptimizationService.uploadOptimizedImage(
@@ -2340,17 +2485,61 @@ class ToursController {
             isPrimary: img.get('isPrimary'),
           });
 
-          if (s3Key && this.imageOptimizationService?.enableOptimization) {
-            console.log(`📸 TourImage ${index + 1}: Using optimization service`);
-            // TourImage is a Parse object, so getImageWithOptimalFormat will work!
-            imageData = await this.imageOptimizationService.getImageWithOptimalFormat(img, acceptHeader);
+          // Check file type from s3Key or fileName to determine processing approach
+          const fileName = img.get('fileName') || '';
+          const isJpegFile = fileName.toLowerCase().includes('.jpg') || fileName.toLowerCase().includes('.jpeg') || s3Key.toLowerCase().includes('.jpg');
+
+          if (s3Key && this.imageOptimizationService?.enableOptimization && !isJpegFile) {
+            console.log(`📸 TourImage ${index + 1}: Using optimization service (non-JPEG)`);
+            try {
+              // TourImage is a Parse object, so getImageWithOptimalFormat will work!
+              imageData = await this.imageOptimizationService.getImageWithOptimalFormat(img, acceptHeader);
+
+              // Verify the URL is valid
+              if (!imageData || !imageData.url) {
+                throw new Error('Optimization service returned invalid URL');
+              }
+            } catch (error) {
+              console.log(`📸 TourImage ${index + 1}: Optimization service failed, using fallback:`, error.message);
+              // Fallback to direct presigned URL
+              const presignedUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+              imageData = { url: presignedUrl };
+            }
           } else if (s3Key) {
-            console.log(`📸 TourImage ${index + 1}: Using fallback presigned URL`);
-            const presignedUrl = await this.fileStorageService.getPresignedUrl(s3Key);
-            imageData = { url: presignedUrl };
+            const logMessage = isJpegFile ? `📸 TourImage ${index + 1}: Using direct presigned URL (JPEG file)` : `📸 TourImage ${index + 1}: Using fallback presigned URL`;
+            console.log(logMessage);
+            console.log(`📸 TourImage ${index + 1}: S3 Key: ${s3Key}`);
+
+            try {
+              const presignedUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+              console.log(`📸 TourImage ${index + 1}: Generated URL: ${presignedUrl ? presignedUrl.substring(0, 100) : 'null'}...`);
+              imageData = { url: presignedUrl };
+            } catch (urlError) {
+              console.log(`📸 TourImage ${index + 1}: Presigned URL generation failed:`, urlError.message);
+              imageData = { url: null };
+            }
           } else {
             console.log(`📸 TourImage ${index + 1}: No S3 key found`);
             imageData = { url: null };
+          }
+
+          // TEMPORARY WORKAROUND: For JPG files, if URL is null or invalid, return null
+          // This will make them show as broken/missing rather than 404 errors
+          if (isJpegFile && (!imageData.url || imageData.url === img.get('fileName'))) {
+            console.log(`📸 TourImage ${index + 1}: JPG file - URL invalid, returning null to avoid 404`);
+            return {
+              id: img.id,
+              fileName: img.get('fileName'),
+              dataUrl: null, // This will show as broken image placeholder
+              url: null,
+              isPrimary: img.get('isPrimary'),
+              displayOrder: img.get('displayOrder'),
+              fileSize: img.get('fileSize'),
+              mimeType: img.get('mimeType'),
+              optimizationMetadata: img.get('optimizationMetadata'),
+              uploadedAt: img.get('uploadedAt'),
+              _debug_s3Key: s3Key, // Debug info
+            };
           }
 
           return {

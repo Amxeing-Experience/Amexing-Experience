@@ -200,7 +200,577 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
     </div>
 </div>
 
+<!-- Tour Details Modal -->
+<div class="modal fade" id="tourDetailsModal" tabindex="-1" aria-labelledby="tourDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content tour-modal">
+            <!-- Hero Section with Image -->
+            <div class="tour-hero-section">
+                <div class="tour-hero-image-container">
+                    <img id="tourHeroImage" src="" alt="" class="tour-hero-image">
+                    <div class="tour-hero-overlay">
+                        <h2 id="tourHeroTitle" class="tour-hero-title"></h2>
+                    </div>
+                </div>
+                <button type="button" class="tour-modal-close" data-bs-dismiss="modal" aria-label="Cerrar" title="Cerrar">
+                    <i class="ti ti-x"></i>
+                </button>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="tour-tabs-container">
+                <ul class="nav nav-pills tour-nav-tabs" id="tourTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="info-tab" data-bs-toggle="pill" data-bs-target="#info" type="button" role="tab">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Información
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="gallery-tab" data-bs-toggle="pill" data-bs-target="#gallery" type="button" role="tab">
+                            <i class="ti ti-photo me-1"></i>
+                            Galería
+                            <span class="badge bg-primary ms-1" id="photoCountBadge">0</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="details-tab" data-bs-toggle="pill" data-bs-target="#details" type="button" role="tab">
+                            <i class="ti ti-list-details me-1"></i>
+                            Detalles
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="prices-tab" data-bs-toggle="pill" data-bs-target="#prices" type="button" role="tab">
+                            <i class="ti ti-currency-dollar me-1"></i>
+                            Precios
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Modal Body with Tab Content -->
+            <div class="modal-body tour-modal-body">
+                <div class="tab-content" id="tourTabContent">
+                    <!-- Information Tab -->
+                    <div class="tab-pane fade show active" id="info" role="tabpanel">
+                        <div id="infoContent">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Gallery Tab -->
+                    <div class="tab-pane fade" id="gallery" role="tabpanel">
+                        <div id="galleryContent">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Details Tab -->
+                    <div class="tab-pane fade" id="details" role="tabpanel">
+                        <div id="detailsContent">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Prices Tab -->
+                    <div class="tab-pane fade" id="prices" role="tabpanel">
+                        <div id="pricesContent">
+                            <!-- Content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div id="tourModalLoading" class="text-center py-5" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando detalles del tour...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Cargando información...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Full-Screen Gallery Modal -->
+<div class="modal fade" id="fullscreenGalleryModal" tabindex="-1" aria-labelledby="fullscreenGalleryLabel" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content fullscreen-gallery-modal">
+            <div class="modal-header border-0 position-absolute top-0 start-0 w-100" style="z-index: 1060;">
+                <div class="d-flex justify-content-between align-items-center w-100 p-3">
+                    <h5 class="modal-title text-white" id="fullscreenGalleryLabel">Galería de Fotos</h5>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-white gallery-counter" id="galleryCounter">1 / 1</span>
+                        <button type="button" class="gallery-close-btn" data-bs-dismiss="modal" aria-label="Cerrar galería" title="Cerrar galería">
+                            <i class="ti ti-x"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-body p-0 d-flex align-items-center justify-content-center position-relative">
+                <!-- Main Image Display -->
+                <div class="gallery-main-container">
+                    <img id="galleryMainImage" src="" alt="" class="gallery-main-image">
+                </div>
+                
+                <!-- Navigation Arrows -->
+                <button class="gallery-nav gallery-nav-prev" id="galleryPrevBtn">
+                    <i class="ti ti-chevron-left"></i>
+                </button>
+                <button class="gallery-nav gallery-nav-next" id="galleryNextBtn">
+                    <i class="ti ti-chevron-right"></i>
+                </button>
+                
+                <!-- Zoom Controls -->
+                <div class="gallery-controls position-absolute bottom-0 start-50 translate-middle-x mb-4">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-dark btn-sm" id="zoomOutBtn">
+                            <i class="ti ti-minus"></i>
+                        </button>
+                        <button type="button" class="btn btn-dark btn-sm" id="resetZoomBtn">
+                            <i class="ti ti-refresh"></i>
+                        </button>
+                        <button type="button" class="btn btn-dark btn-sm" id="zoomInBtn">
+                            <i class="ti ti-plus"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Thumbnails Strip -->
+            <div class="gallery-thumbnails position-absolute bottom-0 start-0 w-100">
+                <div class="thumbnails-container p-3" id="galleryThumbnails">
+                    <!-- Thumbnails will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
+/* Tour Details Modal Styles */
+.tour-modal {
+    border: none;
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+.tour-hero-section {
+    position: relative;
+    height: 350px;
+    overflow: hidden;
+}
+
+.tour-hero-image-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.tour-hero-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 0.3s ease;
+}
+
+/* Progressive Loading for Hero Image */
+.tour-hero-image-container.loading::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: shimmer 1.5s infinite;
+    z-index: 1;
+}
+
+.tour-hero-image-container.loading .tour-hero-image {
+    opacity: 0.7;
+}
+
+.tour-hero-image-container.loaded .tour-hero-image {
+    opacity: 1;
+}
+
+.tour-hero-image-container.error {
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    font-size: 1.1rem;
+}
+
+.tour-hero-image-container.error::after {
+    content: '📷 Imagen no disponible';
+    z-index: 2;
+}
+
+.tour-hero-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    padding: 2rem;
+}
+
+.tour-hero-title {
+    color: white;
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 600;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.tour-modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #000;
+    font-size: 1.5rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    opacity: 1;
+    z-index: 100;
+}
+
+.tour-modal-close:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: rgba(255, 255, 255, 1);
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    color: #dc3545;
+}
+
+.tour-modal-close:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.8);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+.tour-modal-close:active {
+    transform: scale(1.05);
+}
+
+.tour-modal-close i {
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+.tour-tabs-container {
+    background: #f8f9fa;
+    padding: 0 1.5rem;
+}
+
+.tour-nav-tabs {
+    border-bottom: none;
+    gap: 0;
+    padding-top: 1rem;
+    width: 100%;
+}
+
+.tour-nav-tabs .nav-item {
+    flex: 1;
+}
+
+.tour-nav-tabs .nav-link {
+    border: none;
+    background: transparent;
+    color: #6c757d;
+    font-weight: 500;
+    padding: 0.75rem 1.25rem;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+    width: 100%;
+    text-align: center;
+}
+
+.tour-nav-tabs .nav-link:hover {
+    background: rgba(13, 110, 253, 0.1);
+    color: #0d6efd;
+}
+
+.tour-nav-tabs .nav-link.active {
+    background: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+}
+
+.tour-modal-body {
+    padding: 2rem;
+    min-height: 300px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .tour-hero-section {
+        height: 250px;
+    }
+    
+    .tour-hero-title {
+        font-size: 1.5rem;
+    }
+    
+    .tour-nav-tabs .nav-link {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+    }
+    
+    .tour-nav-tabs .nav-link span:not(.badge) {
+        display: none;
+    }
+    
+    .tour-modal-body {
+        padding: 1rem;
+    }
+}
+
+/* Modal Content Styles */
+.content-section {
+    margin-bottom: 2rem;
+}
+
+.content-section h5 {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.info-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+    height: 100%;
+}
+
+.info-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0d6efd;
+    color: white;
+    border-radius: 50%;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.info-card h6 {
+    margin: 0 0 0.25rem 0;
+    font-weight: 600;
+    color: #495057;
+}
+
+.photo-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.gallery-item {
+    border-radius: 0.5rem;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+}
+
+.gallery-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.gallery-item img:hover {
+    transform: scale(1.05);
+}
+
+.includes-list, .excludes-list {
+    list-style: none;
+    padding: 0;
+}
+
+.includes-list li, .excludes-list li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.includes-list li:last-child, .excludes-list li:last-child {
+    border-bottom: none;
+}
+
+.pricing-section h5 {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.price-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+    height: 100%;
+    transition: box-shadow 0.3s ease;
+}
+
+.price-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.price-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0d6efd;
+    color: white;
+    border-radius: 50%;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.price-info h6 {
+    margin: 0 0 0.25rem 0;
+    font-weight: 600;
+    color: #495057;
+}
+
+.price-amount {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0d6efd;
+}
+
+/* Rate grouping styles */
+.rate-group {
+    position: relative;
+    padding: 1rem 0;
+}
+
+.rate-group:not(:last-child) {
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 2rem;
+}
+
+.rate-header {
+    margin-bottom: 1rem;
+}
+
+.rate-badge {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.rate-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Additional pricing styles */
+.additional-pricing-section {
+    border-top: 2px solid #e9ecef;
+    padding-top: 1.5rem;
+}
+
+.additional-price-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.additional-price-card:hover {
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.additional-price-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.additional-price-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+}
+
+.additional-price-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #495057;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.additional-price-value {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0d6efd;
+}
+
+.additional-price-info small {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.availability-info {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border-left: 4px solid #0d6efd;
+}
+
+.languages .badge {
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+}
+
 /* Tour Card Styles */
 .tour-card {
     border: 1px solid #e5e7eb;
@@ -404,6 +974,266 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
 .vehicle-option .small {
     font-size: 0.75rem;
     line-height: 1.3;
+}
+
+/* Gallery Styles */
+.photo-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    padding: 1rem 0;
+}
+
+.gallery-item {
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.5rem;
+}
+
+.gallery-item:hover {
+    transform: scale(1.02);
+}
+
+.gallery-item img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Progressive Loading Animation */
+.gallery-item.loading::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: shimmer 1.5s infinite;
+    z-index: 1;
+}
+
+.gallery-item.loading img {
+    opacity: 0.7;
+}
+
+.gallery-item.loaded img {
+    opacity: 1;
+}
+
+.gallery-item.error {
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.gallery-item.error::after {
+    content: '📷 Imagen no disponible';
+}
+
+@keyframes shimmer {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* Image loading placeholder */
+.image-placeholder {
+    width: 100%;
+    height: 200px;
+    background: linear-gradient(45deg, #f0f0f0 25%, #e0e0e0 25%, #e0e0e0 50%, #f0f0f0 50%, #f0f0f0 75%, #e0e0e0 75%);
+    background-size: 20px 20px;
+    animation: placeholderPulse 2s ease-in-out infinite;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    font-size: 0.9rem;
+}
+
+@keyframes placeholderPulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Full-Screen Gallery Styles */
+.fullscreen-gallery-modal {
+    background: #000;
+    border: none;
+}
+
+.gallery-main-container {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.gallery-main-image {
+    max-width: 90%;
+    max-height: 80vh;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+    cursor: grab;
+}
+
+.gallery-main-image:active {
+    cursor: grabbing;
+}
+
+.gallery-main-image.zoomed {
+    cursor: move;
+}
+
+.gallery-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    z-index: 10;
+}
+
+.gallery-nav:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.6);
+    color: white;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.gallery-nav-prev {
+    left: 2rem;
+}
+
+.gallery-nav-next {
+    right: 2rem;
+}
+
+.gallery-controls {
+    z-index: 10;
+}
+
+.gallery-controls .btn {
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.gallery-thumbnails {
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    z-index: 10;
+}
+
+.thumbnails-container {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 1rem;
+}
+
+.thumbnail-item {
+    flex-shrink: 0;
+    width: 80px;
+    height: 60px;
+    border-radius: 0.25rem;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.thumbnail-item:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.thumbnail-item.active {
+    border-color: #007bff;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+}
+
+.thumbnail-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.gallery-counter {
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+/* Custom Gallery Close Button */
+.gallery-close-btn {
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #000;
+    font-size: 1.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    opacity: 1;
+    position: relative;
+    z-index: 9999;
+}
+
+.gallery-close-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: rgba(255, 255, 255, 1);
+    transform: scale(1.15);
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.6);
+    color: #dc3545;
+}
+
+.gallery-close-btn:focus {
+    outline: 3px solid rgba(255, 255, 255, 0.8);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.3);
+}
+
+.gallery-close-btn:active {
+    transform: scale(1.05);
+    background: rgba(255, 255, 255, 0.9);
+}
+
+/* Ensure icon is visible */
+.gallery-close-btn i {
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
 }
 </style>
 
@@ -1128,17 +1958,1291 @@ document.addEventListener('DOMContentLoaded', function() {
             const tourName = button.dataset.tourName;
             const tourType = button.dataset.tourType;
             
-            // For now, show an alert with the tour details
-            // This can be replaced with a modal or navigation to a detail page
-            alert(`Ver detalles de: ${tourName}\nID: ${tourId}\nTipo: ${tourType}`);
-            
-            // TODO: Implement tour detail view
-            // Options:
-            // 1. Open a modal with full tour details
-            // 2. Navigate to a detail page
-            // 3. Expand the card to show more information
+            // Show the tour details modal
+            showTourDetailsModal(tourId, tourName, tourType);
         }
     });
+
+    // Function to show tour details modal
+    async function showTourDetailsModal(tourId, tourName, tourType) {
+        const modal = new bootstrap.Modal(document.getElementById('tourDetailsModal'));
+        const heroTitle = document.getElementById('tourHeroTitle');
+        const heroImage = document.getElementById('tourHeroImage');
+        const modalLoading = document.getElementById('tourModalLoading');
+        const tabContent = document.getElementById('tourTabContent');
+        
+        // Set initial data and show loading
+        heroTitle.textContent = tourName;
+        heroImage.src = '/images/placeholder-tour.jpg'; // Default placeholder
+        modalLoading.style.display = 'block';
+        tabContent.style.display = 'none';
+        
+        // Show modal
+        modal.show();
+        
+        try {
+            // Always fetch complete tour data from individual tour API endpoint
+            // This ensures we get all tour fields including those missing from the tours list
+            console.log('🌐 Fetching complete tour details from API for tourId:', tourId);
+            const response = await fetch(`/api/tours/${tourId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Error al cargar los detalles del tour');
+            }
+            
+            const tourData = await response.json();
+            console.log('📋 Complete tour data from API:', tourData);
+            const tourDetail = tourData.data.tour || tourData.data;
+            console.log('🔍 Final tour detail object:', tourDetail);
+            console.log('🔑 All tour data fields:', Object.keys(tourDetail));
+            console.log('🔍 Tour data field categories:', {
+                basic: Object.keys(tourDetail).filter(key => !key.includes('_') && !key.includes('price') && !key.includes('Price')),
+                pricing: Object.keys(tourDetail).filter(key => key.toLowerCase().includes('price') || key.toLowerCase().includes('cost')),
+                capacity: Object.keys(tourDetail).filter(key => key.toLowerCase().includes('capacity') || key.toLowerCase().includes('people') || key.toLowerCase().includes('pax')),
+                schedule: Object.keys(tourDetail).filter(key => key.toLowerCase().includes('time') || key.toLowerCase().includes('duration') || key.toLowerCase().includes('schedule')),
+                location: Object.keys(tourDetail).filter(key => key.toLowerCase().includes('location') || key.toLowerCase().includes('point') || key.toLowerCase().includes('destination')),
+                content: Object.keys(tourDetail).filter(key => key.toLowerCase().includes('include') || key.toLowerCase().includes('description') || key.toLowerCase().includes('note'))
+            });
+            await loadTourDetailsIntoModal(tourDetail, tourName);
+            
+        } catch (error) {
+            console.error('Error loading tour details:', error);
+            showModalError('No se pudieron cargar los detalles del tour');
+        }
+    }
+    
+    // Function to load tour data into modal
+    async function loadTourDetailsIntoModal(tour, tourName) {
+        const modalLoading = document.getElementById('tourModalLoading');
+        const tabContent = document.getElementById('tourTabContent');
+        const heroImage = document.getElementById('tourHeroImage');
+        const photoCountBadge = document.getElementById('photoCountBadge');
+        
+        try {
+            // Set optimized hero image with progressive loading
+            const heroImageContainer = heroImage.parentElement;
+            heroImageContainer.classList.add('loading');
+            
+            if (tour.photos && tour.photos.length > 0) {
+                const firstPhoto = tour.photos[0];
+                heroImage.src = getOptimizedImageUrl(firstPhoto);
+                photoCountBadge.textContent = tour.photos.length;
+            } else if (tour.primaryPhoto) {
+                heroImage.src = getOptimizedImageUrl(tour.primaryPhoto);
+                photoCountBadge.textContent = '1';
+            } else {
+                heroImage.src = '/images/placeholder-tour.jpg';
+                photoCountBadge.textContent = '0';
+            }
+            
+            // Add progressive loading event listeners for hero image
+            heroImage.onload = () => {
+                heroImageContainer.classList.remove('loading');
+                heroImageContainer.classList.add('loaded');
+            };
+            
+            heroImage.onerror = () => {
+                heroImageContainer.classList.remove('loading');
+                heroImageContainer.classList.add('error');
+                heroImage.src = '/images/placeholder-tour.jpg';
+            };
+            
+            // If image is already loaded (from cache), trigger load event
+            if (heroImage.complete && heroImage.naturalHeight !== 0) {
+                heroImage.dispatchEvent(new Event('load'));
+            }
+            
+            // Load content into each tab
+            loadInformationTab(tour, tourName);
+            loadGalleryTab(tour, tourName);
+            loadDetailsTab(tour);
+            loadPricesTab(tour);
+            
+            // Hide loading and show content
+            modalLoading.style.display = 'none';
+            tabContent.style.display = 'block';
+            
+        } catch (error) {
+            console.error('Error processing tour data:', error);
+            showModalError('Error al procesar los datos del tour');
+        }
+    }
+    
+    // Function to show error in modal
+    function showModalError(message) {
+        const modalLoading = document.getElementById('tourModalLoading');
+        const tabContent = document.getElementById('tourTabContent');
+        
+        modalLoading.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="ti ti-alert-circle me-2"></i>
+                ${message}
+            </div>
+        `;
+        tabContent.style.display = 'none';
+    }
+    
+    // Helper function to format currency
+    function formatCurrency(value) {
+        if (!value || value === 0) return '$0.00';
+        const numValue = parseFloat(value);
+        return `$${numValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+    }
+    
+    // Helper function to format duration
+    function formatDuration(minutes) {
+        if (!minutes) return 'No especificada';
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (hours > 0 && mins > 0) {
+            return `${hours}h ${mins}min`;
+        } else if (hours > 0) {
+            return `${hours}h`;
+        } else {
+            return `${mins}min`;
+        }
+    }
+    
+    // Function to load Information tab
+    function loadInformationTab(tour, tourName) {
+        const infoContent = document.getElementById('infoContent');
+        
+        infoContent.innerHTML = `
+            <div class="tour-info-section">
+                <!-- Tour Header -->
+                <h4 class="mb-4">
+                    <i class="ti ti-map-pin me-2 text-primary"></i>
+                    ${tour.destinationPOI ? tour.destinationPOI.name : tourName}
+                </h4>
+                
+                <!-- Basic Info Cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="info-card">
+                            <div class="info-icon">
+                                <i class="ti ti-clock"></i>
+                            </div>
+                            <div>
+                                <h6>Mínimo de horas</h6>
+                                <p class="text-muted mb-0">${formatDuration(tour.time)}</p>
+                            </div>
+                        </div>
+                    </div>
+                    ${tour.min_people || tour.max_people ? `
+                        <div class="col-md-4">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="ti ti-users"></i>
+                                </div>
+                                <div>
+                                    <h6>Capacidad</h6>
+                                    <p class="text-muted mb-0">${tour.min_people || 1} - ${tour.max_people || '∞'} personas</p>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${tour.travel_duration ? `
+                        <div class="col-md-4">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="ti ti-car"></i>
+                                </div>
+                                <div>
+                                    <h6>Tiempo de Viaje</h6>
+                                    <p class="text-muted mb-0">${formatDuration(tour.travel_duration)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${tour.vehicleType ? `
+                        <div class="col-md-4">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="ti ti-car-suv"></i>
+                                </div>
+                                <div>
+                                    <h6>Vehículo</h6>
+                                    <p class="text-muted mb-0">${tour.vehicleType.name || 'N/A'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <!-- Tour Type and Category -->
+                ${tour.type || tour.category || tour.isWalkingTour ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-tag me-2"></i>Tipo de Tour</h5>
+                        <div class="d-flex gap-2 flex-wrap">
+                            ${tour.isWalkingTour ? '<span class="badge bg-success">Walking Tour</span>' : ''}
+                            ${tour.type ? `<span class="badge bg-primary">${tour.type}</span>` : ''}
+                            ${tour.category ? `<span class="badge bg-secondary">${tour.category}</span>` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Description -->
+                ${tour.description ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-file-text me-2"></i>Descripción</h5>
+                        <p>${tour.description}</p>
+                    </div>
+                ` : ''}
+
+                <!-- Rate Information -->
+                ${tour.rate ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-percentage me-2"></i>Tarifa</h5>
+                        <p><strong>${tour.rate.name || 'N/A'}</strong></p>
+                        ${tour.rate.description ? `<p class="text-muted">${tour.rate.description}</p>` : ''}
+                    </div>
+                ` : ''}
+
+                <!-- Meeting Point -->
+                ${tour.meetingPoint ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-map-pin me-2"></i>Punto de Encuentro</h5>
+                        <p>${tour.meetingPoint}</p>
+                    </div>
+                ` : ''}
+
+                <!-- Requirements -->
+                ${tour.requirements ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-alert-circle me-2"></i>Requisitos</h5>
+                        <p>${tour.requirements}</p>
+                    </div>
+                ` : ''}
+
+                <!-- Recommendations -->
+                ${tour.recommendations ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-lightbulb me-2"></i>Recomendaciones</h5>
+                        <p>${tour.recommendations}</p>
+                    </div>
+                ` : ''}
+                
+                <!-- Advance Booking -->
+                ${tour.advance_booking_time ? `
+                    <div class="alert alert-warning">
+                        <i class="ti ti-clock-hour-4 me-2"></i>
+                        <strong>Reservar con anticipación:</strong> Mínimo ${tour.advance_booking_time} horas antes
+                    </div>
+                ` : ''}
+                
+                <!-- Booking Notes -->
+                ${tour.client_booking_notes ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-note me-2"></i>Notas de Reserva</h5>
+                        <p>${tour.client_booking_notes}</p>
+                    </div>
+                ` : ''}
+
+                <!-- Additional Notes -->
+                ${tour.notes ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-notes me-2"></i>Notas Adicionales</h5>
+                        <p>${tour.notes}</p>
+                    </div>
+                ` : ''}
+
+                <!-- Special Features -->
+                ${tour.features && tour.features.length > 0 ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-star me-2"></i>Características Especiales</h5>
+                        <ul class="list-unstyled">
+                            ${tour.features.map(feature => `<li><i class="ti ti-check text-success me-2"></i>${feature}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+    
+    // Function to load Gallery tab
+    function loadGalleryTab(tour, tourName) {
+        const galleryContent = document.getElementById('galleryContent');
+        
+        if (tour.photos && tour.photos.length > 0) {
+            // Store photos for full-screen gallery
+            storeGalleryPhotos(tour.photos, tourName);
+            
+            const galleryHtml = tour.photos.map((photo, index) => {
+                const optimizedPicture = createOptimizedPicture(
+                    photo, 
+                    `${tourName} - Foto ${index + 1}`, 
+                    '',
+                    '(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw'
+                );
+                
+                return `
+                    <div class="gallery-item loading" data-photo-index="${index}">
+                        ${optimizedPicture}
+                    </div>
+                `;
+            }).join('');
+            
+            galleryContent.innerHTML = `
+                <div class="photo-gallery">
+                    ${galleryHtml}
+                </div>
+            `;
+            
+            // Add event listeners to gallery items
+            galleryContent.querySelectorAll('.gallery-item').forEach((item, index) => {
+                item.addEventListener('click', () => openFullscreenGallery(index));
+                
+                // Add progressive loading event listeners
+                const img = item.querySelector('img');
+                if (img) {
+                    img.addEventListener('load', () => {
+                        item.classList.remove('loading');
+                        item.classList.add('loaded');
+                    });
+                    
+                    img.addEventListener('error', () => {
+                        item.classList.remove('loading');
+                        item.classList.add('error');
+                    });
+                    
+                    // If image is already loaded (from cache), trigger load event
+                    if (img.complete && img.naturalHeight !== 0) {
+                        img.dispatchEvent(new Event('load'));
+                    }
+                }
+            });
+        } else {
+            galleryContent.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="ti ti-photo" style="font-size: 3rem; color: #dee2e6;"></i>
+                    <p class="mt-3 text-muted">No hay fotos disponibles para este tour</p>
+                </div>
+            `;
+        }
+    }
+    
+    // Function to load Details tab
+    function loadDetailsTab(tour) {
+        const detailsContent = document.getElementById('detailsContent');
+        
+        // Debug tour object to console
+        console.log('🔍 Complete tour object for details tab:', tour);
+        
+        detailsContent.innerHTML = `
+            
+            ${tour.availability ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-calendar-event me-2"></i>Disponibilidad</h5>
+                    <div class="availability-info">
+                        ${formatAvailability(tour.availability)}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${tour.notes || tour.booking_notes || tour.reservationNotes ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-note me-2"></i>Notas de Reserva</h5>
+                    <div class="notes-content">
+                        ${tour.notes || tour.booking_notes || tour.reservationNotes}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${tour.maxCapacity || tour.capacity || tour.min_pax || tour.max_pax ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-users me-2"></i>Capacidad</h5>
+                    <div class="capacity-info">
+                        ${tour.min_pax ? `<span class="badge bg-light text-dark me-2">Mínimo: ${tour.min_pax} personas</span>` : ''}
+                        ${tour.max_pax || tour.maxCapacity || tour.capacity ? `<span class="badge bg-light text-dark me-2">Máximo: ${tour.max_pax || tour.maxCapacity || tour.capacity} personas</span>` : ''}
+                    </div>
+                </div>
+            ` : ''}
+            
+            
+            ${tour.difficulty || tour.physical_level ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-activity me-2"></i>Nivel de Dificultad</h5>
+                    <div class="difficulty-info">
+                        <span class="badge bg-warning">${tour.difficulty || tour.physical_level}</span>
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${(tour.includes && tour.includes.length > 0) || (tour.notincludes && tour.notincludes.length > 0) ? `
+                <div class="row g-4">
+                    ${tour.includes && tour.includes.length > 0 ? `
+                        <div class="col-md-6">
+                            <div class="includes-section">
+                                <h5 class="text-success mb-3">
+                                    <i class="ti ti-circle-check me-2"></i>Incluye
+                                </h5>
+                                <ul class="includes-list">
+                                    ${tour.includes.map(item => `<li><i class="ti ti-check text-success me-2"></i>${item}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${tour.notincludes && tour.notincludes.length > 0 ? `
+                        <div class="col-md-6">
+                            <div class="excludes-section">
+                                <h5 class="text-danger mb-3">
+                                    <i class="ti ti-circle-x me-2"></i>No Incluye
+                                </h5>
+                                <ul class="excludes-list">
+                                    ${tour.notincludes.map(item => `<li><i class="ti ti-x text-danger me-2"></i>${item}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            ` : ''}
+            
+            ${tour.what_to_bring || tour.whatToBring || tour.requirements ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-backpack me-2"></i>Qué Traer / Requisitos</h5>
+                    <div class="requirements-content">
+                        ${tour.what_to_bring || tour.whatToBring || tour.requirements}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${tour.recommendations || tour.important_notes ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-bulb me-2"></i>Recomendaciones</h5>
+                    <div class="recommendations-content">
+                        ${tour.recommendations || tour.important_notes}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${tour.languages && tour.languages.length > 0 ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-language me-2"></i>Idiomas</h5>
+                    <div class="languages">
+                        ${tour.languages.map(lang => `<span class="badge bg-info me-2">${lang}</span>`).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${tour.activities || tour.tour_activities ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-activity me-2"></i>Actividades</h5>
+                    <div class="activities-content">
+                        ${Array.isArray(tour.activities) ? 
+                            `<ul>${tour.activities.map(activity => `<li>${activity}</li>`).join('')}</ul>` : 
+                            (tour.activities || tour.tour_activities)
+                        }
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${tour.features || tour.tour_features ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-star me-2"></i>Características Especiales</h5>
+                    <div class="features-content">
+                        ${Array.isArray(tour.features) ? 
+                            `<ul>${tour.features.map(feature => `<li>${feature}</li>`).join('')}</ul>` : 
+                            (tour.features || tour.tour_features)
+                        }
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${tour.restrictions || tour.age_restrictions ? `
+                <div class="content-section">
+                    <h5><i class="ti ti-alert-circle me-2"></i>Restricciones</h5>
+                    <div class="restrictions-content">
+                        ${tour.restrictions || tour.age_restrictions}
+                    </div>
+                </div>
+            ` : ''}
+        `;
+    }
+    
+    // Function to load Prices tab
+    function loadPricesTab(tour) {
+        const pricesContent = document.getElementById('pricesContent');
+        
+        // Debug tour pricing data to console
+        console.log('💰 Complete tour pricing data:', {
+            tourId: tour.id,
+            tourName: tour.destinationPOI?.name,
+            priceData: tour.priceData,
+            priceDataLength: tour.priceData?.length || 0,
+            priceDataType: typeof tour.priceData,
+            isWalkingTour: tour.isWalkingTour,
+            walkingPriceSmall: tour.walkingPriceSmall,
+            walkingPriceMedium: tour.walkingPriceMedium,
+            walkingPriceLarge: tour.walkingPriceLarge,
+            price: tour.price,
+            price_child: tour.price_child,
+            price_no_alcohol: tour.price_no_alcohol,
+            base_price: tour.base_price,
+            discount_price: tour.discount_price,
+            seasonal_price: tour.seasonal_price,
+            private_price: tour.private_price,
+            group_price: tour.group_price,
+            weekend_price: tour.weekend_price,
+            holiday_price: tour.holiday_price,
+            allTourKeys: Object.keys(tour),
+            allPricingFields: Object.keys(tour).filter(key => 
+                key.toLowerCase().includes('price') || 
+                key.toLowerCase().includes('cost') || 
+                key.toLowerCase().includes('tarifa') ||
+                key.toLowerCase().includes('rate')
+            )
+        });
+        
+        // Additional debug for priceData structure
+        if (tour.priceData && Array.isArray(tour.priceData)) {
+            console.log('🚗 Vehicle pricing details:');
+            tour.priceData.forEach((price, index) => {
+                console.log(`  Vehicle ${index + 1}:`, {
+                    vehicleType: price.vehicleType,
+                    price: price.price,
+                    formattedPrice: price.formattedPrice,
+                    rate: price.rate
+                });
+            });
+        }
+        
+        let pricingHtml = '';
+        
+        // Check for vehicle pricing
+        if (tour.priceData && tour.priceData.length > 0) {
+            // Group prices by rate
+            const pricesByRate = {};
+            tour.priceData.forEach(priceData => {
+                const rateKey = priceData.rate?.id || 'no-rate';
+                const rateName = priceData.rate?.name || 'Tarifa General';
+                const rateColor = priceData.rate?.color || '#6c757d';
+                
+                if (!pricesByRate[rateKey]) {
+                    pricesByRate[rateKey] = {
+                        name: rateName,
+                        color: rateColor,
+                        prices: []
+                    };
+                }
+                pricesByRate[rateKey].prices.push(priceData);
+            });
+            
+            // Sort vehicles within each rate by capacity
+            Object.values(pricesByRate).forEach(rateGroup => {
+                rateGroup.prices.sort((a, b) => {
+                    const capacityA = a.vehicleType?.defaultCapacity || 0;
+                    const capacityB = b.vehicleType?.defaultCapacity || 0;
+                    return capacityA - capacityB; // Sort ascending by capacity
+                });
+            });
+            
+            // Sort rates to ensure consistent ordering
+            const sortedRates = Object.entries(pricesByRate).sort((a, b) => {
+                // Put "no-rate" at the end
+                if (a[0] === 'no-rate') return 1;
+                if (b[0] === 'no-rate') return -1;
+                // Otherwise sort by name
+                return a[1].name.localeCompare(b[1].name);
+            });
+            
+            pricingHtml = `
+                <div class="pricing-section">
+                    <h5 class="mb-4"><i class="ti ti-car me-2"></i>Precios por Vehículo (Por hora)</h5>
+                    ${sortedRates.map(([rateKey, rateGroup]) => `
+                        <div class="rate-group mb-4">
+                            <div class="rate-header d-flex align-items-center mb-3">
+                                <span class="rate-badge" style="background-color: ${rateGroup.color}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">
+                                    <i class="ti ti-tag me-1"></i>${rateGroup.name}
+                                </span>
+                            </div>
+                            <div class="row g-3">
+                                ${rateGroup.prices.map(priceData => `
+                                    <div class="col-md-6">
+                                        <div class="price-card" style="border-left: 3px solid ${rateGroup.color};">
+                                            <div class="price-icon" style="background-color: ${rateGroup.color};">
+                                                <i class="ti ti-car"></i>
+                                            </div>
+                                            <div class="price-info">
+                                                <h6>${priceData.vehicleType?.name || 'Vehículo'}</h6>
+                                                <p class="text-muted mb-1">
+                                                    <i class="ti ti-users me-1"></i>${priceData.vehicleType?.defaultCapacity || 0} personas
+                                                </p>
+                                                <p class="price-amount">${formatCurrency(priceData.price)}</p>
+                                                ${priceData.originalPrice && priceData.originalPrice !== priceData.price ? 
+                                                    `<p class="text-decoration-line-through text-muted small">Original: ${formatCurrency(priceData.originalPrice)}</p>` : ''
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            // Add additional pricing options if they exist
+            if (tour.price || tour.price_child || tour.price_no_alcohol) {
+                pricingHtml += `
+                    <div class="additional-pricing-section mt-4">
+                        <h6 class="mb-3"><i class="ti ti-users me-2"></i>Precios por Persona</h6>
+                        <div class="row g-3">
+                            ${tour.price ? `
+                                <div class="col-md-4">
+                                    <div class="additional-price-card">
+                                        <div class="additional-price-icon bg-primary">
+                                            <i class="ti ti-user"></i>
+                                        </div>
+                                        <div class="additional-price-info">
+                                            <span class="additional-price-label">Adulto</span>
+                                            <span class="additional-price-value">${formatCurrency(tour.price)}</span>
+                                            <small class="text-muted">Con alcohol incluido</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            ${tour.price_child ? `
+                                <div class="col-md-4">
+                                    <div class="additional-price-card">
+                                        <div class="additional-price-icon bg-info">
+                                            <i class="ti ti-baby-carriage"></i>
+                                        </div>
+                                        <div class="additional-price-info">
+                                            <span class="additional-price-label">Niño</span>
+                                            <span class="additional-price-value">${formatCurrency(tour.price_child)}</span>
+                                            <small class="text-muted">Menor de edad</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            ${tour.price_no_alcohol ? `
+                                <div class="col-md-4">
+                                    <div class="additional-price-card">
+                                        <div class="additional-price-icon bg-success">
+                                            <i class="ti ti-user-check"></i>
+                                        </div>
+                                        <div class="additional-price-info">
+                                            <span class="additional-price-label">Adulto Sin Alcohol</span>
+                                            <span class="additional-price-value">${formatCurrency(tour.price_no_alcohol)}</span>
+                                            <small class="text-muted">Sin bebidas alcohólicas</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        // Check for walking tour pricing
+        else if (tour.isWalkingTour && (tour.walkingPriceSmall || tour.walkingPriceMedium || tour.walkingPriceLarge)) {
+            pricingHtml = `
+                <div class="pricing-section">
+                    <h5><i class="ti ti-walk me-2"></i>Precios Walking Tour</h5>
+                    <div class="row g-3">
+                        ${tour.walkingPriceSmall ? `
+                            <div class="col-md-4">
+                                <div class="price-card">
+                                    <div class="price-icon bg-warning">
+                                        <i class="ti ti-users"></i>
+                                    </div>
+                                    <div class="price-info">
+                                        <h6>Grupo Pequeño</h6>
+                                        <p class="text-muted mb-1">1-4 personas</p>
+                                        <p class="price-amount">${formatCurrency(tour.walkingPriceSmall)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.walkingPriceMedium ? `
+                            <div class="col-md-4">
+                                <div class="price-card">
+                                    <div class="price-icon bg-warning">
+                                        <i class="ti ti-users"></i>
+                                    </div>
+                                    <div class="price-info">
+                                        <h6>Grupo Mediano</h6>
+                                        <p class="text-muted mb-1">5-8 personas</p>
+                                        <p class="price-amount">${formatCurrency(tour.walkingPriceMedium)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.walkingPriceLarge ? `
+                            <div class="col-md-4">
+                                <div class="price-card">
+                                    <div class="price-icon bg-warning">
+                                        <i class="ti ti-users"></i>
+                                    </div>
+                                    <div class="price-info">
+                                        <h6>Grupo Grande</h6>
+                                        <p class="text-muted mb-1">9+ personas</p>
+                                        <p class="price-amount">${formatCurrency(tour.walkingPriceLarge)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        // Check for general pricing
+        else if (tour.price || tour.price_child || tour.price_no_alcohol || tour.base_price || tour.private_price || tour.group_price) {
+            pricingHtml = `
+                <div class="pricing-section">
+                    <h5><i class="ti ti-currency-dollar me-2"></i>Precios</h5>
+                    <div class="row g-3">
+                        ${tour.price || tour.base_price ? `
+                            <div class="col-md-4">
+                                <div class="price-card">
+                                    <div class="price-icon bg-success">
+                                        <i class="ti ti-user"></i>
+                                    </div>
+                                    <div class="price-info">
+                                        <h6>Adulto</h6>
+                                        <p class="text-muted mb-1">${tour.price ? 'Con alcohol' : 'Precio base'}</p>
+                                        <p class="price-amount">${formatCurrency(tour.price || tour.base_price)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.price_child ? `
+                            <div class="col-md-4">
+                                <div class="price-card">
+                                    <div class="price-icon bg-success">
+                                        <i class="ti ti-baby-carriage"></i>
+                                    </div>
+                                    <div class="price-info">
+                                        <h6>Niño</h6>
+                                        <p class="text-muted mb-1">Menor de edad</p>
+                                        <p class="price-amount">${formatCurrency(tour.price_child)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.price_no_alcohol ? `
+                            <div class="col-md-4">
+                                <div class="price-card">
+                                    <div class="price-icon bg-success">
+                                        <i class="ti ti-glass-off"></i>
+                                    </div>
+                                    <div class="price-info">
+                                        <h6>Sin Alcohol</h6>
+                                        <p class="text-muted mb-1">Bebidas no alcohólicas</p>
+                                        <p class="price-amount">${formatCurrency(tour.price_no_alcohol)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.private_price ? `
+                            <div class="col-md-4">
+                                <div class="price-card">
+                                    <div class="price-icon bg-primary">
+                                        <i class="ti ti-crown"></i>
+                                    </div>
+                                    <div class="price-info">
+                                        <h6>Tour Privado</h6>
+                                        <p class="text-muted mb-1">Exclusivo</p>
+                                        <p class="price-amount">${formatCurrency(tour.private_price)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.group_price ? `
+                            <div class="col-md-4">
+                                <div class="price-card">
+                                    <div class="price-icon bg-info">
+                                        <i class="ti ti-users"></i>
+                                    </div>
+                                    <div class="price-info">
+                                        <h6>Grupo</h6>
+                                        <p class="text-muted mb-1">Precio grupal</p>
+                                        <p class="price-amount">${formatCurrency(tour.group_price)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.weekend_price ? `
+                            <div class="col-md-4">
+                                <div class="price-card">
+                                    <div class="price-icon bg-warning">
+                                        <i class="ti ti-calendar-weekend"></i>
+                                    </div>
+                                    <div class="price-info">
+                                        <h6>Fin de Semana</h6>
+                                        <p class="text-muted mb-1">Precio especial</p>
+                                        <p class="price-amount">${formatCurrency(tour.weekend_price)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.holiday_price ? `
+                            <div class="col-md-4">
+                                <div class="price-card">
+                                    <div class="price-icon bg-danger">
+                                        <i class="ti ti-calendar-event"></i>
+                                    </div>
+                                    <div class="price-info">
+                                        <h6>Días Festivos</h6>
+                                        <p class="text-muted mb-1">Precio especial</p>
+                                        <p class="price-amount">${formatCurrency(tour.holiday_price)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.seasonal_price ? `
+                            <div class="col-md-4">
+                                <div class="price-card">
+                                    <div class="price-icon bg-secondary">
+                                        <i class="ti ti-calendar-time"></i>
+                                    </div>
+                                    <div class="price-info">
+                                        <h6>Temporada</h6>
+                                        <p class="text-muted mb-1">Precio estacional</p>
+                                        <p class="price-amount">${formatCurrency(tour.seasonal_price)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        } 
+        // If no pricing found, show simple message
+        else {
+            pricingHtml = `
+                <div class="text-center py-5">
+                    <i class="ti ti-currency-dollar" style="font-size: 3rem; color: #dee2e6;"></i>
+                    <p class="mt-3 text-muted">No hay información de precios disponible</p>
+                    <p class="small text-muted">Por favor, contacte con nosotros para obtener cotización personalizada.</p>
+                </div>
+            `;
+        }
+        
+        // Add payment methods and additional pricing info if available
+        if (tour.payment_methods || tour.currency || tour.tax_included) {
+            pricingHtml += `
+                <div class="pricing-section mt-4">
+                    <h5><i class="ti ti-info-circle me-2"></i>Información Adicional</h5>
+                    <div class="row g-3">
+                        ${tour.payment_methods ? `
+                            <div class="col-md-6">
+                                <div class="info-card">
+                                    <h6><i class="ti ti-credit-card me-2"></i>Métodos de Pago</h6>
+                                    <p class="text-muted">${Array.isArray(tour.payment_methods) ? tour.payment_methods.join(', ') : tour.payment_methods}</p>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.currency ? `
+                            <div class="col-md-6">
+                                <div class="info-card">
+                                    <h6><i class="ti ti-currency-dollar me-2"></i>Moneda</h6>
+                                    <p class="text-muted">${tour.currency}</p>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.tax_included !== undefined ? `
+                            <div class="col-md-6">
+                                <div class="info-card">
+                                    <h6><i class="ti ti-receipt me-2"></i>Impuestos</h6>
+                                    <p class="text-muted">${tour.tax_included ? 'Incluidos' : 'No incluidos'}</p>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${tour.cancellation_policy ? `
+                            <div class="col-md-6">
+                                <div class="info-card">
+                                    <h6><i class="ti ti-ban me-2"></i>Política de Cancelación</h6>
+                                    <p class="text-muted">${tour.cancellation_policy}</p>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // If no pricing data found, show a message
+        if (!pricingHtml) {
+            pricingHtml = `
+                <div class="alert alert-info" role="alert">
+                    <i class="ti ti-info-circle me-2"></i>
+                    <strong>Información de Precios</strong>
+                    <p class="mb-0 mt-2">No hay información de precios disponible para este tour en este momento.</p>
+                    <p class="mb-0 mt-1 small text-muted">Por favor, contacte con nosotros para obtener cotización personalizada.</p>
+                </div>
+            `;
+        }
+        
+        pricesContent.innerHTML = pricingHtml;
+    }
+    
+    // Helper function to format availability
+    function formatAvailability(availability) {
+        if (!availability) return 'No especificada';
+        if (typeof availability === 'string') return availability;
+        
+        if (Array.isArray(availability)) {
+            const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            return availability.map(daySchedule => {
+                if (typeof daySchedule === 'object' && daySchedule.day !== undefined) {
+                    const dayName = days[daySchedule.day] || `Día ${daySchedule.day}`;
+                    if (daySchedule.startTime && daySchedule.endTime) {
+                        return `${dayName}: ${daySchedule.startTime} - ${daySchedule.endTime}`;
+                    }
+                    return dayName;
+                }
+                return daySchedule;
+            }).join('<br>');
+        }
+        return 'Todos los días';
+    }
+    
+    // Optimized image loading utility
+    function getOptimizedImageUrl(photo, size = 'medium') {
+        // If it's just a string URL, return it as-is
+        if (typeof photo === 'string') {
+            return photo;
+        }
+        
+        // Check for optimized variants first (best quality formats first)
+        if (photo.optimizedVariants) {
+            // Prefer AVIF > WebP > JPEG for best compression
+            if (photo.optimizedVariants.avif && photo.optimizedVariants.avif.url) {
+                return photo.optimizedVariants.avif.url;
+            }
+            if (photo.optimizedVariants.webp && photo.optimizedVariants.webp.url) {
+                return photo.optimizedVariants.webp.url;
+            }
+            if (photo.optimizedVariants.jpeg && photo.optimizedVariants.jpeg.url) {
+                return photo.optimizedVariants.jpeg.url;
+            }
+        }
+        
+        // Check optimization metadata formats
+        if (photo.optimizationMetadata && photo.optimizationMetadata.formats) {
+            const formats = photo.optimizationMetadata.formats;
+            // Prefer AVIF > WebP > JPEG
+            if (formats.avif && formats.avif.url) {
+                return formats.avif.url;
+            }
+            if (formats.webp && formats.webp.url) {
+                return formats.webp.url;
+            }
+            if (formats.jpeg && formats.jpeg.url) {
+                return formats.jpeg.url;
+            }
+        }
+        
+        // Fallback to direct properties
+        if (photo.webp) return photo.webp;
+        if (photo.avif) return photo.avif;
+        if (photo.jpeg) return photo.jpeg;
+        if (photo.url) return photo.url;
+        
+        // Final fallback
+        return photo.s3Key ? `https://amexing-bucket.s3.us-east-2.amazonaws.com/${photo.s3Key}` : '/images/placeholder-tour.jpg';
+    }
+    
+    // Create optimized picture element with multiple source formats
+    function createOptimizedPicture(photo, alt, className = '', sizes = '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw') {
+        if (typeof photo === 'string') {
+            return `<img src="${photo}" alt="${alt}" class="${className}" loading="lazy" sizes="${sizes}" onload="this.classList.add('loaded')" onerror="this.classList.add('error')">`;
+        }
+        
+        let sources = [];
+        
+        // Add AVIF source (best compression)
+        if (photo.optimizedVariants?.avif?.url || photo.optimizationMetadata?.formats?.avif?.url || photo.avif) {
+            const avifUrl = photo.optimizedVariants?.avif?.url || 
+                           photo.optimizationMetadata?.formats?.avif?.url || 
+                           photo.avif;
+            sources.push(`<source srcset="${avifUrl}" type="image/avif">`);
+        }
+        
+        // Add WebP source (good compression)
+        if (photo.optimizedVariants?.webp?.url || photo.optimizationMetadata?.formats?.webp?.url || photo.webp) {
+            const webpUrl = photo.optimizedVariants?.webp?.url || 
+                           photo.optimizationMetadata?.formats?.webp?.url || 
+                           photo.webp;
+            sources.push(`<source srcset="${webpUrl}" type="image/webp">`);
+        }
+        
+        // Fallback image (JPEG or original)
+        const fallbackUrl = getOptimizedImageUrl(photo);
+        
+        return `
+            <picture>
+                ${sources.join('\n                ')}
+                <img src="${fallbackUrl}" alt="${alt}" class="${className}" loading="lazy" sizes="${sizes}" onload="this.classList.add('loaded')" onerror="this.classList.add('error')">
+            </picture>
+        `;
+    }
+    
+    // Full-screen gallery functionality
+    let currentGalleryPhotos = [];
+    let currentPhotoIndex = 0;
+    let galleryZoom = 1;
+    let galleryPanX = 0;
+    let galleryPanY = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    
+    // Store gallery photos when loading gallery tab
+    function storeGalleryPhotos(photos, tourName) {
+        currentGalleryPhotos = photos.map((photo, index) => {
+            return {
+                url: getOptimizedImageUrl(photo),
+                alt: `${tourName} - Foto ${index + 1}`,
+                photo: photo // Store original photo object for full optimization
+            };
+        });
+    }
+    
+    // Open full-screen gallery at specific photo
+    function openFullscreenGallery(photoIndex) {
+        if (currentGalleryPhotos.length === 0) return;
+        
+        currentPhotoIndex = photoIndex;
+        const modal = new bootstrap.Modal(document.getElementById('fullscreenGalleryModal'));
+        
+        updateGalleryDisplay();
+        modal.show();
+        
+        // Initialize event listeners for gallery buttons
+        setTimeout(() => {
+            initializeGalleryEventListeners();
+        }, 100);
+        
+        // Reset zoom and pan
+        resetGalleryZoom();
+    }
+    
+    // Update gallery display
+    function updateGalleryDisplay() {
+        const mainImage = document.getElementById('galleryMainImage');
+        const counter = document.getElementById('galleryCounter');
+        const prevBtn = document.getElementById('galleryPrevBtn');
+        const nextBtn = document.getElementById('galleryNextBtn');
+        const thumbnailsContainer = document.getElementById('galleryThumbnails');
+        
+        if (currentGalleryPhotos.length === 0) return;
+        
+        const currentPhoto = currentGalleryPhotos[currentPhotoIndex];
+        mainImage.src = currentPhoto.url;
+        mainImage.alt = currentPhoto.alt;
+        
+        // Update counter
+        counter.textContent = `${currentPhotoIndex + 1} / ${currentGalleryPhotos.length}`;
+        
+        // Update navigation buttons
+        prevBtn.style.display = currentGalleryPhotos.length > 1 ? 'flex' : 'none';
+        nextBtn.style.display = currentGalleryPhotos.length > 1 ? 'flex' : 'none';
+        
+        // Update thumbnails
+        if (currentGalleryPhotos.length > 1) {
+            const thumbnailsHtml = currentGalleryPhotos.map((photo, index) => `
+                <div class="thumbnail-item ${index === currentPhotoIndex ? 'active' : ''}" data-thumbnail-index="${index}">
+                    <img src="${photo.url}" alt="${photo.alt}" loading="lazy">
+                </div>
+            `).join('');
+            
+            thumbnailsContainer.innerHTML = thumbnailsHtml;
+            
+            // Add event listeners to thumbnails
+            thumbnailsContainer.querySelectorAll('.thumbnail-item').forEach((thumbnail, index) => {
+                thumbnail.addEventListener('click', () => goToPhoto(index));
+            });
+        } else {
+            thumbnailsContainer.innerHTML = '';
+        }
+    }
+    
+    // Navigation functions
+    function goToPhoto(index) {
+        if (index >= 0 && index < currentGalleryPhotos.length) {
+            currentPhotoIndex = index;
+            updateGalleryDisplay();
+            resetGalleryZoom();
+        }
+    }
+    
+    function nextPhoto() {
+        const nextIndex = currentPhotoIndex + 1;
+        if (nextIndex < currentGalleryPhotos.length) {
+            goToPhoto(nextIndex);
+        } else {
+            goToPhoto(0); // Loop to first photo
+        }
+    }
+    
+    function prevPhoto() {
+        const prevIndex = currentPhotoIndex - 1;
+        if (prevIndex >= 0) {
+            goToPhoto(prevIndex);
+        } else {
+            goToPhoto(currentGalleryPhotos.length - 1); // Loop to last photo
+        }
+    }
+    
+    // Zoom and pan functions
+    function zoomIn() {
+        galleryZoom = Math.min(galleryZoom * 1.5, 5); // Max 5x zoom
+        applyZoomAndPan();
+    }
+    
+    function zoomOut() {
+        galleryZoom = Math.max(galleryZoom / 1.5, 1); // Min 1x zoom
+        if (galleryZoom === 1) {
+            galleryPanX = 0;
+            galleryPanY = 0;
+        }
+        applyZoomAndPan();
+    }
+    
+    function resetGalleryZoom() {
+        galleryZoom = 1;
+        galleryPanX = 0;
+        galleryPanY = 0;
+        applyZoomAndPan();
+    }
+    
+    function applyZoomAndPan() {
+        const mainImage = document.getElementById('galleryMainImage');
+        mainImage.style.transform = `scale(${galleryZoom}) translate(${galleryPanX}px, ${galleryPanY}px)`;
+        
+        if (galleryZoom > 1) {
+            mainImage.classList.add('zoomed');
+        } else {
+            mainImage.classList.remove('zoomed');
+        }
+    }
+    
+    // Initialize gallery event listeners when DOM is ready
+    function initializeGalleryEventListeners() {
+        const prevBtn = document.getElementById('galleryPrevBtn');
+        const nextBtn = document.getElementById('galleryNextBtn');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const resetZoomBtn = document.getElementById('resetZoomBtn');
+        
+        if (prevBtn && !prevBtn.hasAttribute('data-listener-added')) {
+            prevBtn.addEventListener('click', prevPhoto);
+            prevBtn.setAttribute('data-listener-added', 'true');
+        }
+        
+        if (nextBtn && !nextBtn.hasAttribute('data-listener-added')) {
+            nextBtn.addEventListener('click', nextPhoto);
+            nextBtn.setAttribute('data-listener-added', 'true');
+        }
+        
+        if (zoomInBtn && !zoomInBtn.hasAttribute('data-listener-added')) {
+            zoomInBtn.addEventListener('click', zoomIn);
+            zoomInBtn.setAttribute('data-listener-added', 'true');
+        }
+        
+        if (zoomOutBtn && !zoomOutBtn.hasAttribute('data-listener-added')) {
+            zoomOutBtn.addEventListener('click', zoomOut);
+            zoomOutBtn.setAttribute('data-listener-added', 'true');
+        }
+        
+        if (resetZoomBtn && !resetZoomBtn.hasAttribute('data-listener-added')) {
+            resetZoomBtn.addEventListener('click', resetGalleryZoom);
+            resetZoomBtn.setAttribute('data-listener-added', 'true');
+        }
+    }
+    
+    // Event listeners for gallery
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize gallery event listeners
+        initializeGalleryEventListeners();
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            const modal = document.getElementById('fullscreenGalleryModal');
+            if (modal.classList.contains('show')) {
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        prevPhoto();
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        nextPhoto();
+                        break;
+                    case 'Escape':
+                        e.preventDefault();
+                        bootstrap.Modal.getInstance(modal)?.hide();
+                        break;
+                    case '+':
+                    case '=':
+                        e.preventDefault();
+                        zoomIn();
+                        break;
+                    case '-':
+                        e.preventDefault();
+                        zoomOut();
+                        break;
+                    case '0':
+                        e.preventDefault();
+                        resetGalleryZoom();
+                        break;
+                }
+            }
+        });
+        
+        // Mouse pan functionality for zoomed images
+        const mainImage = document.getElementById('galleryMainImage');
+        
+        mainImage.addEventListener('mousedown', function(e) {
+            if (galleryZoom > 1) {
+                isDragging = true;
+                dragStartX = e.clientX - galleryPanX;
+                dragStartY = e.clientY - galleryPanY;
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('mousemove', function(e) {
+            if (isDragging && galleryZoom > 1) {
+                galleryPanX = e.clientX - dragStartX;
+                galleryPanY = e.clientY - dragStartY;
+                
+                // Limit panning to reasonable bounds
+                const maxPan = 200 * galleryZoom;
+                galleryPanX = Math.max(-maxPan, Math.min(maxPan, galleryPanX));
+                galleryPanY = Math.max(-maxPan, Math.min(maxPan, galleryPanY));
+                
+                applyZoomAndPan();
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('mouseup', function() {
+            isDragging = false;
+        });
+        
+        // Wheel zoom
+        mainImage.addEventListener('wheel', function(e) {
+            e.preventDefault();
+            if (e.deltaY < 0) {
+                zoomIn();
+            } else {
+                zoomOut();
+            }
+        });
+    });
+    
+    // Make functions globally available
+    window.openFullscreenGallery = openFullscreenGallery;
+    window.goToPhoto = goToPhoto;
     
     // Authentication is handled via session cookies automatically
     

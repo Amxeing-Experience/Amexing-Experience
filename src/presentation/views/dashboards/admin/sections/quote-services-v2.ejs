@@ -337,6 +337,25 @@
             position: static;
         }
     }
+    
+    /* Schedule Overlap Warning Styles */
+    .service-item.has-overlap {
+        border-color: #dc3545 !important;
+        background-color: rgba(220, 53, 69, 0.05);
+    }
+    
+    .service-item .text-danger {
+        animation: pulse-warning 2s infinite;
+    }
+    
+    @keyframes pulse-warning {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.7;
+        }
+    }
 
     /* Drag and Drop Styles */
     .day-nav-item[draggable="true"],

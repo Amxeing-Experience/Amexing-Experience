@@ -752,6 +752,9 @@ table.dataTable tbody tr.hover {
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
 
 <script>
+// Global variables for walking tour functionality
+const globalApiEndpoint = '<%= dtApiEndpoint %>';
+
 (function() {
     // Wait for DOM and all dependencies to be ready
     function initWhenReady() {
@@ -782,26 +785,9 @@ table.dataTable tbody tr.hover {
         const clientId = '<%= dtClientId || "" %>';
         
         // Debug: Log the clientId to verify it's being passed correctly
-        console.log('🔍 Tours ClientId sources:', {
-            template: clientId,
-            url: new URLSearchParams(window.location.search).get('clientId'),
-            path: window.location.pathname.includes('/clients/') ? window.location.pathname.split('/clients/')[1]?.split('/')[0] : null,
-            currentPage: window.location.pathname
-        });
-        
-        console.log('🚀 Tours table initializing...', {
-            tableId,
-            apiEndpoint,
-            showClientPricing,
-            userRole,
-            clientId,
-            showActions
-        });
-        
+
         // Debug: Log the number of columns in HTML table
         const htmlColumnCount = $(`#${tableId} thead tr th`).length;
-        console.log('🔍 HTML table has', htmlColumnCount, 'columns');
-        console.log('🔍 Expected JS columns:', showClientPricing ? 'with client pricing' : 'without client pricing');
 
         // Get JWT token from localStorage or cookies
         function getAccessToken() {
@@ -886,16 +872,7 @@ table.dataTable tbody tr.hover {
             
             // Use the first available clientId in priority order
             const finalClientId = urlClientId || pathClientId || dataClientId || templateClientId;
-            
-            console.log('🔍 Tours clientId priority breakdown:', {
-                urlClientId,
-                pathClientId,
-                dataClientId,
-                templateClientId,
-                finalClientId,
-                source: urlClientId ? 'URL' : pathClientId ? 'path' : dataClientId ? 'data' : templateClientId ? 'template' : 'none'
-            });
-            
+
             return finalClientId;
         }
 
@@ -904,26 +881,15 @@ table.dataTable tbody tr.hover {
                 const finalClientId = getClientIdFromContext();
                 const url = new URL(apiEndpoint, window.location.origin);
                 
-                console.log('🔍 Debug context:', {
-                    pathname: window.location.pathname,
-                    clientIdFromPath: finalClientId,
-                    apiEndpoint: apiEndpoint,
-                    dataClientIdElement: document.querySelector('[data-client-id]'),
-                    dataClientIdValue: document.querySelector('[data-client-id]')?.dataset?.clientId
-                });
                 
                 // Add clientId parameter if we're in client context
                 if (finalClientId) {
                     url.searchParams.append('clientId', finalClientId);
-                    console.log(`🎯 Loading tours with client-specific prices for client: ${finalClientId}`);
-                    console.log(`📡 Full API URL: ${url.toString()}`);
-                } else {
-                    console.log('📋 Loading tours without client-specific prices');
-                    console.log(`📡 API URL: ${url.toString()}`);
+
                 }
                 
-                // Filter to show only vehicle tours (exclude walking tours)
-                url.searchParams.append('tourType', 'vehicle');
+                // Note: No API filtering needed - we'll filter client-side by isWalkingTour
+                
                 
                 $.ajax({
                     url: url.toString(),
@@ -945,33 +911,22 @@ table.dataTable tbody tr.hover {
                             
                             // Tours are already filtered by the API with tourType=vehicle
                             // Add additional client-side filter to ensure walking tours are excluded
-                            console.log('🔍 Debug: Raw tours data before filtering:', newToursData);
-                            
+
                             const vehicleOnlyTours = newToursData.filter(tour => {
                                 // Simple and explicit filter: only show tours that are NOT walking tours
                                 // If isWalkingTour is explicitly false or undefined/null, keep the tour
                                 // If isWalkingTour is explicitly true, filter it out
                                 const shouldKeepTour = tour.isWalkingTour !== true;
                                 
-                                // Debug logging for each tour
-                                console.log(`🔍 Tour analysis:`, {
-                                    id: tour.id,
-                                    name: tour.name || tour.title,
-                                    destinationPOI: tour.destinationPOI?.name,
-                                    tourType: tour.tourType,
-                                    isWalkingTour: tour.isWalkingTour,
-                                    shouldKeepTour: shouldKeepTour
-                                });
-                                
+                                // DEBUG: Enhanced logging for each tour
+
                                 if (!shouldKeepTour) {
-                                    console.log('🚫 Filtering out walking tour:', tour.destinationPOI?.name || tour.name);
+
                                 }
                                 
                                 return shouldKeepTour;
                             });
-                            
-                            console.log(`📊 Filtered ${newToursData.length - vehicleOnlyTours.length} walking tours out of ${newToursData.length} total tours`);
-                            
+
                             // Sort data alphabetically by destination name
                             vehicleOnlyTours.sort((a, b) => {
                                 const nameA = (a.destinationPOI?.name || 'Tour').trim();
@@ -1229,13 +1184,6 @@ table.dataTable tbody tr.hover {
                         
                         // Debug logging for tour IkHiggPBAF
                         if (tourId === 'IkHiggPBAF') {
-                            console.log('🔍 Client Price Column Debug for IkHiggPBAF:', {
-                                tourId,
-                                hasClientPrices,
-                                clientPrices,
-                                clientPricesKeys: Object.keys(clientPrices),
-                                rawData: data
-                            });
                         }
                         
                         if (hasClientPrices && Object.keys(clientPrices).length > 0) {
@@ -1397,10 +1345,9 @@ table.dataTable tbody tr.hover {
                 // Data loaded successfully
                 
                 // Sort data alphabetically by destination name using Spanish locale
-                console.log('🔍 BEFORE SORTING - All tours:');
+
                 filteredData.forEach((tour, index) => {
                     const name = tour.destinationPOI?.name || 'Tour';
-                    console.log(`  ${index + 1}. "${name}" (length: ${name.length})`);
                 });
                 
                 filteredData.sort((a, b) => {
@@ -1410,13 +1357,12 @@ table.dataTable tbody tr.hover {
                     // Debug specific cases
                     if (nameA.includes('Prueba') || nameB.includes('Prueba') || 
                         nameA.includes('San Miguel') || nameB.includes('San Miguel')) {
-                        console.log(`🔍 Comparing: "${nameA}" vs "${nameB}"`);
+
                         const result = nameA.localeCompare(nameB, 'es', { 
                             sensitivity: 'base',
                             numeric: true,
                             ignorePunctuation: true 
                         });
-                        console.log(`🔍 Result: ${result} (${result < 0 ? nameA + ' comes first' : result > 0 ? nameB + ' comes first' : 'equal'})`);
                         return result;
                     }
                     
@@ -1426,15 +1372,13 @@ table.dataTable tbody tr.hover {
                         ignorePunctuation: true 
                     });
                 });
-                
-                console.log('🔤 AFTER SORTING - Tours in alphabetical order:');
+
                 filteredData.forEach((tour, index) => {
                     const name = tour.destinationPOI?.name || 'Tour';
-                    console.log(`  ${index + 1}. "${name}"`);
-                    
+
                     // Highlight the problematic entries
                     if (name.includes('Prueba') || name.includes('San Miguel')) {
-                        console.log(`    ℹ️ Found: ${name}`);
+
                     }
                 });
                 
@@ -1442,8 +1386,7 @@ table.dataTable tbody tr.hover {
                 dataTable.clear();
                 dataTable.rows.add(filteredData);
                 dataTable.draw();
-                
-                console.log('✅ DataTable updated with', filteredData.length, 'rows');
+
             } catch (error) {
                 console.error('Error initializing table:', error);
                 showErrorAlert('Error al cargar los tours');
@@ -1482,7 +1425,7 @@ table.dataTable tbody tr.hover {
                 success: function(response) {
                     if (response.success && response.data) {
                         currentTransferRate = window.currentTransferRate = response.data.value || 0;
-                        console.log('✅ Current transfer rate loaded:', currentTransferRate + '%');
+
                     } else {
                         console.warn('⚠️ No active transfer rate found');
                         currentTransferRate = window.currentTransferRate = 0;
@@ -1497,9 +1440,9 @@ table.dataTable tbody tr.hover {
 
         // Function to apply transfer rate to price
         function applyTransferRate(priceString) {
-            console.log('🎯 applyTransferRate CALLED with:', priceString, 'Rate:', currentTransferRate);
+
             if (currentTransferRate <= 0) {
-                console.log('⚠️ Transfer rate is 0 or less, returning original price');
+
                 return priceString;
             }
             
@@ -1510,7 +1453,6 @@ table.dataTable tbody tr.hover {
             // Apply transfer rate percentage
             const newValue = numericValue * (1 + currentTransferRate / 100);
             
-            console.log(`Applying transfer rate ${currentTransferRate}% to $${numericValue} = $${newValue.toFixed(2)}`);
             
             // Format back to currency string
             return new Intl.NumberFormat('en-US', {
@@ -1522,9 +1464,9 @@ table.dataTable tbody tr.hover {
 
         // Function to apply agency rate to price (for admin "Transf. Agencias" option)
         function applyAgencyRate(priceString) {
-            console.log('🎯 applyAgencyRate CALLED with:', priceString, 'Rate:', currentAgencyRate);
+
             if (currentAgencyRate <= 0) {
-                console.log('⚠️ Agency rate is 0 or less, returning original price');
+
                 return priceString;
             }
             
@@ -1535,7 +1477,6 @@ table.dataTable tbody tr.hover {
             // Apply agency rate percentage
             const newValue = numericValue * (1 + currentAgencyRate / 100);
             
-            console.log(`Applying agency rate ${currentAgencyRate}% to $${numericValue} = $${newValue.toFixed(2)}`);
             
             // Format back to currency string
             return new Intl.NumberFormat('en-US', {
@@ -1613,7 +1554,7 @@ table.dataTable tbody tr.hover {
                 success: function(response) {
                     if (response.success && response.data) {
                         currentAgencyRate = window.currentAgencyRate = response.data.value || 0;
-                        console.log('✅ Current agency rate loaded:', currentAgencyRate + '%');
+
                     } else {
                         console.warn('⚠️ No active agency rate found');
                         currentAgencyRate = window.currentAgencyRate = 0;
@@ -1640,7 +1581,7 @@ table.dataTable tbody tr.hover {
                 success: function(response) {
                     if (response.success && response.data) {
                         currentExchangeRate = window.currentExchangeRate = response.data.value || 0;
-                        console.log('✅ Current exchange rate loaded:', currentExchangeRate, 'MXN per USD');
+
                     } else {
                         console.warn('⚠️ No active exchange rate found');
                         currentExchangeRate = window.currentExchangeRate = 0;
@@ -1655,8 +1596,7 @@ table.dataTable tbody tr.hover {
 
         // Load rates on initialization - BOTH rates needed for all users now
         // Load both transfer and agency rates for ALL users
-        console.log('💰 Loading both Transfer and Agency rates for all users');
-        
+
         // Load Transfer Rate
         loadCurrentTransferRate();
         
@@ -1667,8 +1607,7 @@ table.dataTable tbody tr.hover {
             
             // Initialize table with data (with correct rates applied)
             initializeTable();
-            
-            console.log('💰 Both rates loaded, table initialized');
+
         });
 
         // Load rates for header filter dropdown (excluding Económico)
@@ -1766,34 +1705,27 @@ table.dataTable tbody tr.hover {
         $(`#headerRateFilter-${tableId}`).on('change', async function() {
             // Prevent multiple rapid triggers
             if (window.isLoadingRateData) {
-                console.log('⚠️ Rate filter change ignored - already loading data');
+
                 return;
             }
             
             const selectedRate = $(this).val();
             const selectedRateText = $(this).find('option:selected').text();
-            
-            console.log('Category filter changed:', { 
-                selectedRate, 
-                selectedRateText,
-                isReloadingAfterPriceSave: window.isReloadingAfterPriceSave 
-            });
-            
+
             // Set loading flag
             window.isLoadingRateData = true;
             
             if (selectedRate) {
                 // Load tour prices for the selected category
                 try {
-                    console.log('Making API request to load tour prices for category:', selectedRate);
-                    
+
                     // Get clientId for client-specific pricing
                     const modalClientId = getClientIdFromContext();
                     const requestData = { rateId: selectedRate };
                     
                     if (modalClientId) {
                         requestData.clientId = modalClientId;
-                        console.log(`Including clientId in request: ${modalClientId}`);
+
                     }
                     
                     const response = await $.ajax({
@@ -1809,22 +1741,19 @@ table.dataTable tbody tr.hover {
                     });
                     
                     if (response.success && response.data) {
-                        console.log('✅ Tours with prices loaded:', response.data.length, 'tours');
-                        
+
                         // Apply walking tour filter to rate-filtered data
                         const vehicleOnlyTours = response.data.filter(tour => {
                             // Simple and explicit filter: only show tours that are NOT walking tours
                             const shouldKeepTour = tour.isWalkingTour !== true;
                             
                             if (!shouldKeepTour) {
-                                console.log('🚫 Filtering out walking tour from rate data:', tour.destinationPOI?.name || tour.name);
+
                             }
                             
                             return shouldKeepTour;
                         });
-                        
-                        console.log(`📊 Rate filter: Filtered ${response.data.length - vehicleOnlyTours.length} walking tours out of ${response.data.length} total tours`);
-                        
+
                         // Update the data with price information (walking tours excluded)
                         allToursData = vehicleOnlyTours;
                         
@@ -1847,13 +1776,7 @@ table.dataTable tbody tr.hover {
                             const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'efectivo';
                             const currentCurrency = $(`#currencyFilter-${tableId}`).val() || 'MXN';
                             const includeDriver = isDriverModeActive();
-                            
-                            console.log('🔄 Applying filters after category change:', { 
-                                currentPaymentType, 
-                                currentCurrency, 
-                                includeDriver 
-                            });
-                            
+
                             // Ensure driver rate is loaded if needed
                             if (includeDriver) {
                                 await ensureDriverRateLoaded();
@@ -1867,8 +1790,7 @@ table.dataTable tbody tr.hover {
                             // Use unified update function that handles both capacity and prices
                             updateToursDisplay(currentPaymentType, currentCurrency, includeDriver);
                         }, 100);
-                        
-                        console.log('✅ Table updated with rate prices');
+
                     } else {
                         console.error('❌ Invalid response format:', response);
                     }
@@ -1899,7 +1821,7 @@ table.dataTable tbody tr.hover {
                 }
             } else {
                 // No category selected, load all tours without prices
-                console.log('No category selected, loading tours without prices');
+
                 await loadAllTours();
                 dataTable.clear();
                 dataTable.rows.add(filteredData);
@@ -1947,9 +1869,7 @@ table.dataTable tbody tr.hover {
                 const endpoint = expandClientId 
                     ? `/api/tours/${rowId}/all-rate-prices-with-client-prices?clientId=${expandClientId}`
                     : `/api/tours/${rowId}/all-prices`;
-                
-                console.log('Loading expanded tour prices from endpoint:', endpoint);
-                
+
                 // Make API call to get TourPrices for this tour
                 $.ajax({
                     url: endpoint,
@@ -1961,7 +1881,7 @@ table.dataTable tbody tr.hover {
                         }
                     },
                     success: function(response) {
-                        console.log('✅ Tour all-prices response:', response);
+
                         if (response.success && response.data) {
                             // Group prices by rate
                             const pricesByRate = {};
@@ -2063,7 +1983,6 @@ table.dataTable tbody tr.hover {
                                 const currentCurrency = $(`#currencyFilter-${tableId}`).val() || 'MXN';
                                 const includeDriver = isDriverModeActive();
                                 
-                                console.log('📋 Applying filters to expanded row:', { currentPaymentType, currentCurrency, includeDriver });
                                 
                                 // Ensure required rates are loaded
                                 if (includeDriver) await ensureDriverRateLoaded();
@@ -2116,6 +2035,8 @@ table.dataTable tbody tr.hover {
         loadRatesForFilter();
         // Load POIs for dropdowns
         loadDropdownData();
+        // Load POIs for walking tour modal dropdown
+        loadWalkingTourDropdownData();
 
         // Object to store day schedules
         let daySchedules = {};
@@ -2330,6 +2251,60 @@ table.dataTable tbody tr.hover {
             });
         }
 
+        // Load dropdown data for walking tours modal
+        function loadWalkingTourDropdownData() {
+            // Load Active POIs (filtered by Tours service type)
+            $.ajax({
+                url: '/api/pois/active?serviceType=Tours',
+                type: 'GET',
+                success: function(data) {
+                    if (data.success && data.data) {
+                        const selectElement = document.getElementById('walkingDestinationPOI');
+
+                        // Destroy existing Tom Select instance if it exists
+                        if (selectElement && selectElement.tomselect) {
+                            selectElement.tomselect.destroy();
+                        }
+
+                        // Clear the select element
+                        const select = $('#walkingDestinationPOI');
+                        select.empty();
+
+                        // Initialize Tom Select first (on empty select)
+                        if (typeof TomSelect !== 'undefined') {
+                            const tomSelectInstance = new TomSelect('#walkingDestinationPOI', {
+                                plugins: [],
+                                maxOptions: 1000,
+                                placeholder: 'Seleccionar destino del tour a pie',
+                                maxItems: 1,
+                                highlight: true,
+                                searchField: ['text'],
+                                valueField: 'value',
+                                labelField: 'text',
+                                sortField: 'text',
+                                closeAfterSelect: true,
+                                persist: false
+                            });
+
+                            // Store instance reference
+                            selectElement.tomselect = tomSelectInstance;
+
+                            // Load options using Tom Select API (prevents auto-selection)
+                            tomSelectInstance.clearOptions();
+                            data.data.forEach(poi => {
+                                tomSelectInstance.addOption({ value: poi.value, text: poi.label });
+                            });
+                            tomSelectInstance.refreshOptions(false);
+                            tomSelectInstance.clear(); // Clear selection to start empty
+                        }
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading POIs for Walking Tours:', error);
+                }
+            });
+        }
+
         // Event Handlers
         $('#createTourBtn').on('click', function() {
             openTourModal();
@@ -2420,8 +2395,7 @@ table.dataTable tbody tr.hover {
         // Base Pricing Functions
         async function loadBasePricing(tourId) {
             try {
-                console.log('Loading base pricing for tour:', tourId);
-                
+
                 // Show the pricing section
                 $('#basePricingSection').show();
                 
@@ -2578,7 +2552,7 @@ table.dataTable tbody tr.hover {
             
             try {
                 container.append(photoHtml);
-                console.log('✅ Photo HTML appended to container successfully');
+
             } catch (error) {
                 console.error('❌ Error appending photo HTML to container:', error);
             }
@@ -2586,7 +2560,7 @@ table.dataTable tbody tr.hover {
 
         async function loadEmptyPricingStructure() {
             try {
-                console.log('Loading empty pricing structure...');
+
                 const container = $('#basePricesContainer');
                 container.empty();
                 
@@ -2603,10 +2577,7 @@ table.dataTable tbody tr.hover {
                 
                 const rates = ratesResponse.success ? ratesResponse.data : [];
                 const vehicles = vehiclesResponse.success ? vehiclesResponse.data : [];
-                
-                console.log('Loaded rates:', rates);
-                console.log('Loaded vehicles:', vehicles);
-                
+
                 if (rates.length === 0 || vehicles.length === 0) {
                     container.html('<div class="alert alert-warning">No se encontraron tarifas o tipos de vehículo. Por favor, configure primero las tarifas y vehículos en el sistema.</div>');
                     return;
@@ -2816,7 +2787,6 @@ table.dataTable tbody tr.hover {
         }
 
         async function saveBasePricing(tourId, isNew = false) {
-            console.log(`📋 Starting saveBasePricing for tourId: ${tourId}, isNew: ${isNew}`);
             const basePrices = [];
             
             // Collect all base price inputs
@@ -2826,9 +2796,7 @@ table.dataTable tbody tr.hover {
                 const priceId = input.data('price-id');
                 const rateId = input.data('rate-id');
                 const vehicleId = input.data('vehicle-id');
-                
-                console.log(`🔍 Processing input: priceId=${priceId}, rateId=${rateId}, vehicleId=${vehicleId}, price=${price}`);
-                
+
                 if (isNew) {
                     // For new tours, include all prices with value > 0
                     if (rateId && vehicleId && price > 0) {
@@ -2838,9 +2806,8 @@ table.dataTable tbody tr.hover {
                             price: price
                         };
                         basePrices.push(priceData);
-                        console.log(`✅ Added NEW tour price:`, priceData);
+
                     } else {
-                        console.log(`⏭️  Skipped (new tour): price=${price}, rateId=${rateId}, vehicleId=${vehicleId}`);
                     }
                 } else {
                     // For existing tours, only update prices that have a priceId
@@ -2852,17 +2819,14 @@ table.dataTable tbody tr.hover {
                             price: price
                         };
                         basePrices.push(priceData);
-                        console.log(`✅ Added EXISTING tour price:`, priceData);
+
                     } else {
-                        console.log(`⏭️  Skipped (existing tour): price=${price}, priceId=${priceId}`);
                     }
                 }
             });
-            
-            console.log(`📊 Total prices to save: ${basePrices.length}`, basePrices);
-            
+
             if (basePrices.length === 0) {
-                console.log(`⚠️  No prices to save, returning early`);
+
                 return; // No prices to save
             }
             
@@ -2872,10 +2836,7 @@ table.dataTable tbody tr.hover {
                 const requestBody = {
                     prices: basePrices
                 };
-                
-                console.log(`🌐 Making API request to: ${url}`);
-                console.log(`📤 Request body:`, requestBody);
-                
+
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: {
@@ -2885,7 +2846,6 @@ table.dataTable tbody tr.hover {
                     body: JSON.stringify(requestBody)
                 });
                 
-                console.log(`📡 API Response status: ${response.status} ${response.statusText}`);
                 
                 if (!response.ok) {
                     const errorText = await response.text();
@@ -2894,36 +2854,32 @@ table.dataTable tbody tr.hover {
                 }
                 
                 const result = await response.json();
-                console.log(`📥 API Response body:`, result);
-                
+
                 if (!result.success) {
                     console.error(`❌ API returned success=false:`, result.error);
                     throw new Error(result.error || 'Error saving base prices');
                 }
-                
-                console.log(`✅ Base pricing saved successfully! Updated count: ${result.updatedCount || 'N/A'}`);
-                
+
                 // Show success message with refresh suggestion
-                console.log('✅ Prices saved successfully - showing notification');
-                
+
                 // Show a notification that prices were saved successfully
                 if (window.showNotification) {
                     window.showNotification('success', 'Precios actualizados exitosamente. La tabla se actualizará automáticamente en unos segundos.');
                 } else {
-                    console.log('💡 Prices saved successfully. Table will refresh automatically.');
+
                 }
                 
                 // Delay reload to let the database versioning complete properly
                 setTimeout(() => {
-                    console.log('🔄 Starting delayed refresh after price save...');
+
                     const currentRateFilter = $(`#headerRateFilter-${tableId}`).val();
                     
                     if (currentRateFilter) {
-                        console.log('🎯 Triggering rate filter refresh for:', currentRateFilter);
+
                         // Just trigger the filter without setting value (it's already set)
                         $(`#headerRateFilter-${tableId}`).trigger('change');
                     } else {
-                        console.log('🔄 No rate filter set, reloading basic tours');
+
                         initializeTable();
                     }
                 }, 1500); // Wait 1.5 seconds for database operations to complete
@@ -2936,8 +2892,7 @@ table.dataTable tbody tr.hover {
         // Function to update a specific tour row with fresh price data
         async function updateTourRow(tourId) {
             try {
-                console.log('🔄 Updating tour row with prices for ID:', tourId);
-                
+
                 // Find the row in the DataTable first to check if it's expanded
                 const table = dataTable; // Use global dataTable instance
                 let targetRowIndex = -1;
@@ -2959,7 +2914,7 @@ table.dataTable tbody tr.hover {
                             // Also update the expand button state
                             const expandBtn = $(dtRow.node()).find('.expand-prices-btn');
                             expandBtn.html('<i class="ti ti-chevron-down me-1"></i>Ver todos').removeClass('expanded');
-                            console.log('🔽 Collapsed expanded row before update');
+
                         }
                         return false; // Break the loop
                     }
@@ -2993,7 +2948,6 @@ table.dataTable tbody tr.hover {
                     apiUrl += `?${params.join('&')}`;
                 }
                 
-                console.log('📡 Fetching updated tours data from main endpoint:', apiUrl);
                 
                 const response = await fetch(apiUrl, {
                     headers: {
@@ -3023,16 +2977,8 @@ table.dataTable tbody tr.hover {
                     throw new Error(`Tour with ID ${tourId} not found in response`);
                 }
                 
-                console.log('📊 Found updated tour data with prices:', {
-                    id: updatedTour.id,
-                    hasPriceData: !!updatedTour.priceData,
-                    priceCount: updatedTour.priceData?.length || 0,
-                    priceData: updatedTour.priceData,
-                    fetchedAt: new Date().toISOString()
-                });
                 if (targetRowIndex !== -1) {
-                    console.log('🎯 Found target row at index:', targetRowIndex);
-                    
+
                     // Update the row data with fresh tour data including prices
                     table.row(targetRowIndex).data(updatedTour).draw(false);
                     
@@ -3049,14 +2995,13 @@ table.dataTable tbody tr.hover {
                     
                     // Force redraw of the specific row to ensure price updates are visible
                     setTimeout(() => {
-                        console.log('🎨 Forcing row redraw...');
+
                         table.row(targetRowIndex).invalidate().draw(false);
                     }, 100);
-                    
-                    console.log('✅ Tour row updated successfully with fresh price data');
+
                     return true;
                 } else {
-                    console.log('⚠️ Tour row not found in DataTable');
+
                     return false;
                 }
             } catch (error) {
@@ -3123,8 +3068,7 @@ table.dataTable tbody tr.hover {
                             
                             // Load photos if they exist
                             if (tour.photos && Array.isArray(tour.photos) && tour.photos.length > 0) {
-                                console.log('📸 Loading photos into modal:', tour.photos.length, 'photos');
-                                
+
                                 // Ensure jQuery is available and modal exists
                                 if (typeof $ === 'undefined') {
                                     console.error('❌ jQuery not available for photo loading');
@@ -3136,8 +3080,7 @@ table.dataTable tbody tr.hover {
                                     console.error('❌ Photos container not found in modal');
                                     return;
                                 }
-                                
-                                console.log('📸 Photos container found, clearing and loading photos');
+
                                 photosContainer.empty();
                                 
                                 tour.photos.forEach((photo, index) => {
@@ -3145,24 +3088,19 @@ table.dataTable tbody tr.hover {
                                     const photoUrl = photo.dataUrl || photo.url;
                                     const fileName = photo.fileName || photo.name || 'image';
                                     
-                                    console.log(`📸 Processing photo ${index + 1}:`, { 
-                                        fileName, 
-                                        hasUrl: !!photoUrl,
-                                        urlType: photoUrl ? (photoUrl.startsWith('data:') ? 'base64' : 'url') : 'none'
-                                    });
                                     
                                     if (photoUrl) {
                                         try {
                                             // Pass the entire photo object to preserve all data
                                             addTourPhotoPreview(photosContainer, { name: fileName }, photoUrl, photo);
-                                            console.log(`📸 Successfully added photo ${index + 1} to preview`);
+
                                         } catch (error) {
                                             console.error(`❌ Error adding photo ${index + 1} to preview:`, error);
                                         }
                                     }
                                 });
                             } else {
-                                console.log('📸 No photos to load or photos array is empty');
+
                             }
 
                             // Set availability (NEW FORMAT: array of day schedules)
@@ -3452,9 +3390,6 @@ table.dataTable tbody tr.hover {
                 const url = isEdit ? `${apiEndpoint}/${tourId}` : apiEndpoint;
                 const method = isEdit ? 'PUT' : 'POST';
 
-                console.log(`🚀 Making tour ${method} request to: ${url}`);
-                console.log(`📤 Tour data being sent:`, tourData);
-
                 // Check if there are images to optimize
                 const hasImagesToOptimize = photosList.some(p => p.dataUrl && p.dataUrl.startsWith('data:'));
                 const totalImages = photosList.filter(p => p.dataUrl && p.dataUrl.startsWith('data:')).length;
@@ -3504,20 +3439,17 @@ table.dataTable tbody tr.hover {
                     contentType: 'application/json',
                     data: JSON.stringify(tourData),
                     success: async function(response) {
-                        console.log(`📥 Tour ${method} response:`, response);
-                        
+
                         if (response.success) {
-                            console.log(`✅ Tour ${isEdit ? 'updated' : 'created'} successfully in Tour table`);
-                            
+
                             // Save base pricing for both new and edited tours
                             const savedTourId = isEdit ? tourId : response.data?.tour?.id;
-                            console.log(`🔗 Resolved tour ID for pricing: ${savedTourId} (isEdit: ${isEdit})`);
                             
                             if (savedTourId && $('#basePricingSection').is(':visible')) {
                                 try {
-                                    console.log(`💾 Starting base pricing save for tour: ${savedTourId}, isNew: ${!isEdit}`);
+
                                     await saveBasePricing(savedTourId, !isEdit);
-                                    console.log('✅ Base pricing completed successfully');
+
                                 } catch (error) {
                                     console.error('❌ Error saving base pricing:', error);
                                     restoreButtonState();
@@ -3529,7 +3461,7 @@ table.dataTable tbody tr.hover {
                                     console.warn('⚠️  No savedTourId found, skipping pricing');
                                 }
                                 if (!$('#basePricingSection').is(':visible')) {
-                                    console.log('ℹ️  Pricing section not visible, skipping pricing save');
+
                                 }
                             }
                             
@@ -3587,11 +3519,10 @@ table.dataTable tbody tr.hover {
                                 try {
                                     // If we saved pricing, wait a bit for the versioning to complete on the backend
                                     if ($('#basePricingSection').is(':visible')) {
-                                        console.log('⏳ Waiting for price versioning to complete...');
+
                                         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
                                     }
-                                    
-                                    console.log('🔄 Starting targeted row update for tour:', tourId);
+
                                     const rowUpdated = await updateTourRow(tourId);
                                     
                                     hideLoadingIndicator();
@@ -3601,11 +3532,10 @@ table.dataTable tbody tr.hover {
                                             ? 'Tour y precios actualizados exitosamente' 
                                             : 'Tour actualizado exitosamente';
                                         showSuccessAlert(successMessage);
-                                        console.log('✅ Targeted row update completed successfully');
-                                        
+
                                         // Reload tour data in modal to show optimized photos
                                         if ($('#tourModal').hasClass('show') && tourId) {
-                                            console.log('🔄 Reloading tour data in modal to show optimized photos');
+
                                             setTimeout(async () => {
                                                 try {
                                                     const response = await $.ajax({
@@ -3625,7 +3555,7 @@ table.dataTable tbody tr.hover {
                                                                 addTourPhotoPreview(photosContainer, { name: fileName }, photoUrl, photo);
                                                             }
                                                         });
-                                                        console.log('✅ Tour photos reloaded in modal');
+
                                                     }
                                                 } catch (error) {
                                                     console.warn('Failed to reload tour photos in modal:', error);
@@ -3633,7 +3563,7 @@ table.dataTable tbody tr.hover {
                                             }, 1000); // Give time for S3 upload to complete
                                         }
                                     } else {
-                                        console.log('⚠️ Targeted row update failed, falling back to full table reload');
+
                                         showLoadingIndicator('Actualizando tabla...');
                                         await initializeTable();
                                         hideLoadingIndicator();
@@ -3900,8 +3830,7 @@ table.dataTable tbody tr.hover {
 
         // Configure Tour Client Price functionality (only available when showClientPricing is true)
         function configureTourClientPrice(tourId) {
-            console.log('Configure client price for tour:', tourId);
-            
+
             // Find the tour data from the DataTable
             let tourData = null;
             
@@ -3985,9 +3914,7 @@ table.dataTable tbody tr.hover {
                 const endpoint = priceModalClientId 
                     ? `/api/tours/${tourId}/all-rate-prices-with-client-prices?clientId=${priceModalClientId}`
                     : `/api/tours/${tourId}/all-prices`;
-                    
-                console.log('Loading tour prices from endpoint:', endpoint);
-                
+
                 const response = await fetch(endpoint, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
@@ -4195,9 +4122,7 @@ table.dataTable tbody tr.hover {
                         originalValue: originalValue,
                         newValue: currentValue
                     });
-                    console.log(`💡 Price changed for ${vehicleName} (${rateName}): ${originalValue} → ${currentValue}`);
                 } else if (hasChanged) {
-                    console.log(`⚠️ Price changed but not valid for ${vehicleName} (${rateName}): ${originalValue} → ${currentValue} (valid: ${isValidPrice}, different from base: ${isDifferentFromBase})`);
                 }
             });
             
@@ -4210,14 +4135,7 @@ table.dataTable tbody tr.hover {
                 
                 return;
             }
-            
-            console.log(`💾 Saving ${clientPrices.length} modified tour client prices:`, {
-                clientId: saveClientId,
-                tourId: tourId,
-                modifiedPrices: clientPrices,
-                itemType: 'TOUR'
-            });
-            
+
             // Show loading state
             const saveButton = document.querySelector('#tourClientPricingModal .btn-primary');
             const originalText = saveButton.innerHTML;
@@ -4253,12 +4171,7 @@ table.dataTable tbody tr.hover {
                 if (window.showNotification) {
                     window.showNotification('success', result.message || `Se guardaron ${totalPrices} precio(s) personalizados para este tour (itemType: ${itemType}).`);
                 }
-                
-                console.log('✅ Tour client prices saved:', {
-                    message: result.message || 'Precios guardados exitosamente',
-                    itemType: itemType
-                });
-                
+
                 // Close modal
                 const modal = bootstrap.Modal.getInstance(document.getElementById('tourClientPricingModal'));
                 if (modal) {
@@ -4282,12 +4195,12 @@ table.dataTable tbody tr.hover {
                     const currentSelectedRate = headerRateFilter.val();
                     
                     if (currentSelectedRate && currentSelectedRate !== '') {
-                        console.log(`🔄 Refreshing tours table by triggering rate filter for: ${currentSelectedRate}`);
+
                         // Trigger the rate filter change to reload data with client prices
                         headerRateFilter.trigger('change');
-                        console.log(`✅ Tours table refresh triggered for table: ${currentTableId}`);
+
                     } else {
-                        console.log('⚠️ No rate selected in filter. Table data may not refresh automatically.');
+
                         // If no rate is selected, try to show a message to user
                         if (window.showNotification) {
                             window.showNotification('info', 'Selecciona una categoría de tarifa para ver los precios actualizados.');
@@ -4335,7 +4248,7 @@ table.dataTable tbody tr.hover {
         if (saveBtn && window._saveAllTourClientPrices) {
             saveBtn.removeEventListener('click', window._saveAllTourClientPrices); // Remove any existing listener
             saveBtn.addEventListener('click', window._saveAllTourClientPrices);
-            console.log('✅ Tour client prices save button listener attached');
+
         } else {
             console.warn('⚠️ Tour save button or function not found, retrying...');
             setTimeout(attachSaveButtonListener, 500);
@@ -4546,11 +4459,11 @@ async function fetchCurrentDriverRate() {
                 const rate = data.data.value || 0;
                 TourPricingState.setDriverRate(rate);
                 currentDriverRate = rate; // Legacy support
-                console.log('✅ Current driver rate loaded:', rate);
+
                 return rate;
             }
         } else if (response.status === 404) {
-            console.log('No driver rate found, creating default...');
+
             return await createDefaultDriverRate();
         }
         
@@ -4587,7 +4500,7 @@ async function createDefaultDriverRate() {
                 const rate = data.data.value || 635;
                 TourPricingState.setDriverRate(rate);
                 currentDriverRate = rate; // Legacy support
-                console.log('✅ Default driver rate created:', rate);
+
                 return rate;
             }
         }
@@ -4627,7 +4540,7 @@ async function fetchExchangeRateVanilla() {
             if (data.success && data.data) {
                 const rate = data.data.value || 0;
                 TourPricingState.setExchangeRate(rate);
-                console.log('✅ Current exchange rate loaded:', rate, 'MXN per USD');
+
                 return rate;
             }
         }
@@ -4661,7 +4574,7 @@ async function fetchTransferRate() {
             const data = await response.json();
             if (data.success && data.data) {
                 globalTransferRate = data.data.value || 0;
-                console.log('✅ Transfer rate loaded:', globalTransferRate + '%');
+
                 return globalTransferRate;
             }
         }
@@ -4695,7 +4608,7 @@ async function fetchAgencyRate() {
             const data = await response.json();
             if (data.success && data.data) {
                 globalAgencyRate = data.data.value || 0;
-                console.log('✅ Agency rate loaded:', globalAgencyRate + '%');
+
                 return globalAgencyRate;
             }
         }
@@ -4745,11 +4658,9 @@ function applyDriverRate(basePrice) {
  * @param {boolean} includeDriver - Include driver rate
  */
 function updatePricesVanilla(paymentType = 'efectivo', currency = 'MXN', includeDriver = false) {
-    console.log('🔄 Updating prices:', { paymentType, currency, includeDriver });
 
     // Find all price containers using vanilla JavaScript
     const priceContainers = document.querySelectorAll('.price-container');
-    console.log('📋 Found price containers:', priceContainers.length);
 
     priceContainers.forEach(container => {
         const priceElements = container.querySelectorAll('.fw-bold');
@@ -4858,14 +4769,11 @@ function updateCapacityDisplays(includeDriver) {
  * @param {boolean} includeDriver - Whether to include driver
  */
 function updateToursDisplay(paymentType = 'efectivo', currency = 'MXN', includeDriver = false) {
-    console.log('🎯 updateToursDisplay called:', { paymentType, currency, includeDriver });
-    console.log('🔍 Current driver rate:', TourPricingState.getDriverRate());
-    console.log('🔍 Current exchange rate:', TourPricingState.getExchangeRate());
+
     
     updateCapacityDisplays(includeDriver);
     updatePricesVanilla(paymentType, currency, includeDriver);
-    
-    console.log('✅ updateToursDisplay completed');
+
 }
 
 /**
@@ -4875,51 +4783,43 @@ function updateToursDisplay(paymentType = 'efectivo', currency = 'MXN', includeD
  * @param {boolean} includeDriver - Include driver rate
  */
 function updateExpandedRowPrices(paymentType = 'efectivo', currency = 'MXN', includeDriver = false) {
-    console.log('🔍 updateExpandedRowPrices called:', { paymentType, currency, includeDriver });
-    
+
     // Find all price elements in expanded rows directly by looking for the expanded content structure
     // DataTables child rows contain our custom HTML with data-original-price attributes
     const priceElements = document.querySelectorAll('.p-4.bg-light.border-top .fw-bold[data-original-price]');
     
     if (priceElements.length === 0) {
-        console.log('⚠️ No expanded row price elements found');
-        
+
         // Try alternative selectors for debugging
         const expandedContainers = document.querySelectorAll('.p-4.bg-light.border-top');
-        console.log('📦 Expanded containers found:', expandedContainers.length);
-        
+
         if (expandedContainers.length > 0) {
             expandedContainers.forEach((container, i) => {
                 const prices = container.querySelectorAll('.fw-bold');
-                console.log(`Container ${i} - .fw-bold elements:`, prices.length);
+
                 prices.forEach(p => {
-                    console.log('  Price element:', p.textContent, 'has data-original-price?', p.hasAttribute('data-original-price'));
                 });
             });
         }
         
         return;
     }
-    
-    console.log('💰 Found', priceElements.length, 'price elements in expanded rows');
-    
+
     // Process each price element found
     priceElements.forEach((priceElement, index) => {
             const originalPriceAttr = priceElement.getAttribute('data-original-price');
             if (!originalPriceAttr) {
-                console.log('⚠️ No original price found for element:', priceElement);
+
                 return;
             }
             
             // Extract numeric value from original price
             const numericValue = parseFloat(originalPriceAttr.replace(/[^0-9.]/g, ''));
             if (isNaN(numericValue)) {
-                console.log('⚠️ Invalid numeric value:', originalPriceAttr);
+
                 return;
             }
-            
-            console.log(`🔄 Processing expanded row price: ${originalPriceAttr} → ${numericValue}`);
-            
+
             let finalPrice = numericValue;
             
             // Step 1: Add driver rate if active
@@ -4927,7 +4827,7 @@ function updateExpandedRowPrices(paymentType = 'efectivo', currency = 'MXN', inc
                 const driverRate = TourPricingState.getDriverRate();
                 if (driverRate > 0) {
                     finalPrice += driverRate;
-                    console.log(`➕ Added driver rate ${driverRate}: ${numericValue} → ${finalPrice}`);
+
                 }
             }
             
@@ -4936,13 +4836,13 @@ function updateExpandedRowPrices(paymentType = 'efectivo', currency = 'MXN', inc
                 const transferRate = TourPricingState.getTransferRate();
                 if (transferRate > 0) {
                     finalPrice = finalPrice * (1 + transferRate / 100);
-                    console.log(`💳 Applied transfer rate ${transferRate}%: → ${finalPrice}`);
+
                 }
             } else if (paymentType === 'tarjeta') {
                 const agencyRate = TourPricingState.getAgencyRate();
                 if (agencyRate > 0) {
                     finalPrice = finalPrice * (1 + agencyRate / 100);
-                    console.log(`💳 Applied agency rate ${agencyRate}%: → ${finalPrice}`);
+
                 }
             }
             
@@ -4951,7 +4851,7 @@ function updateExpandedRowPrices(paymentType = 'efectivo', currency = 'MXN', inc
                 const exchangeRate = TourPricingState.getExchangeRate();
                 if (exchangeRate > 0) {
                     finalPrice = finalPrice / exchangeRate;
-                    console.log(`💱 Applied exchange rate ${exchangeRate}: → ${finalPrice}`);
+
                 }
             }
             
@@ -4968,8 +4868,7 @@ function updateExpandedRowPrices(paymentType = 'efectivo', currency = 'MXN', inc
                     currency: 'MXN',
                     minimumFractionDigits: 2
                 }).format(finalPrice);
-                
-            console.log(`✅ Final expanded row price: ${originalPriceAttr} → ${formattedPrice}`);
+
             priceElement.textContent = formattedPrice;
     });
     
@@ -4990,11 +4889,9 @@ function updateExpandedRowPrices(paymentType = 'efectivo', currency = 'MXN', inc
                 /Capacidad:\s*\d+/,
                 `Capacidad: ${displayCapacity}`
             );
-            console.log(`🚗 Updated expanded row capacity: ${originalCapacity} → ${displayCapacity}`);
         }
     });
-    
-    console.log('✅ updateExpandedRowPrices completed');
+
 }
 
 // ========== GLOBAL CURRENCY SYNC FUNCTIONALITY ==========
@@ -5003,14 +4900,13 @@ function updateExpandedRowPrices(paymentType = 'efectivo', currency = 'MXN', inc
  * Global function to synchronize currency dropdowns across all tables
  */
 window.syncCurrencyDropdowns = function(selectedCurrency, sourceDropdown = null) {
-    console.log('🔄 Global sync: Currency dropdowns to:', selectedCurrency);
-    
+
     // Find all currency dropdowns on the page
     const allCurrencyDropdowns = document.querySelectorAll('[id^="currencyFilter-"]');
     
     allCurrencyDropdowns.forEach(dropdown => {
         if (dropdown.value !== selectedCurrency && dropdown !== sourceDropdown) {
-            console.log(`📝 Updating ${dropdown.id} from ${dropdown.value} to ${selectedCurrency}`);
+
             dropdown.value = selectedCurrency;
             
             // Don't trigger change events to avoid infinite loops
@@ -5026,11 +4922,11 @@ function initGlobalCurrencySync() {
     document.addEventListener('change', function(event) {
         // Check if the changed element is a currency dropdown
         if (event.target.id && event.target.id.startsWith('currencyFilter-')) {
-            console.log('🌍 Global currency change detected:', event.target.id, '→', event.target.value);
+
             window.syncCurrencyDropdowns(event.target.value, event.target);
         }
     });
-    console.log('✅ Global currency sync listener initialized');
+
 }
 
 // Initialize global sync when DOM is ready
@@ -5046,8 +4942,7 @@ if (document.readyState === 'loading') {
  * Initialize payment dropdown handler to work with driver rates
  */
 function initPaymentDropdownHandler() {
-    console.log('🔧 initPaymentDropdownHandler: Starting payment dropdown setup...');
-    
+
     function setupPaymentDropdown() {
         // Find payment dropdown specifically for tours tables (not services)
         const allPaymentDropdowns = document.querySelectorAll('[id^="paymentTypeFilter-"]');
@@ -5059,14 +4954,12 @@ function initPaymentDropdownHandler() {
                 break;
             }
         }
-        
-        console.log('🔍 Payment dropdown found:', paymentDropdown ? paymentDropdown.id : 'NOT FOUND');
-        
+
         if (paymentDropdown) {
-            console.log('✅ Adding payment dropdown change listener');
+
             paymentDropdown.addEventListener('change', async function() {
                 try {
-                    console.log('💰 Payment dropdown changed to:', this.value);
+
                     const selectedPaymentType = this.value;
                     const allCurrencyDropdowns = document.querySelectorAll('[id^="currencyFilter-"]');
                     let currencyDropdown = null;
@@ -5112,7 +5005,7 @@ function initPaymentDropdownHandler() {
     // Try to setup immediately
     if (!setupPaymentDropdown()) {
         // If failed, retry after a short delay
-        console.log('🔄 Retrying payment dropdown setup in 1 second...');
+
         setTimeout(() => {
             if (!setupPaymentDropdown()) {
                 console.warn('❌ Payment dropdown setup failed after retry');
@@ -5121,8 +5014,7 @@ function initPaymentDropdownHandler() {
     }
 
     // Find currency dropdown and add vanilla JS event listener
-    console.log('🔧 Setting up currency dropdown...');
-    
+
     function setupCurrencyDropdown() {
         // Find currency dropdown specifically for tours tables (not services)
         const allCurrencyDropdowns = document.querySelectorAll('[id^="currencyFilter-"]');
@@ -5134,14 +5026,12 @@ function initPaymentDropdownHandler() {
                 break;
             }
         }
-        
-        console.log('🔍 Currency dropdown found:', currencyDropdown ? currencyDropdown.id : 'NOT FOUND');
-        
+
         if (currencyDropdown) {
-            console.log('✅ Adding currency dropdown change listener');
+
             currencyDropdown.addEventListener('change', async function() {
                 try {
-                    console.log('💱 Currency dropdown changed to:', this.value);
+
                     const selectedCurrency = this.value;
                     const allPaymentDropdowns = document.querySelectorAll('[id^="paymentTypeFilter-"]');
                     let paymentDropdown = null;
@@ -5188,7 +5078,7 @@ function initPaymentDropdownHandler() {
     // Try to setup immediately
     if (!setupCurrencyDropdown()) {
         // If failed, retry after a short delay
-        console.log('🔄 Retrying currency dropdown setup in 1 second...');
+
         setTimeout(() => {
             if (!setupCurrencyDropdown()) {
                 console.warn('❌ Currency dropdown setup failed after retry');
@@ -5206,11 +5096,7 @@ function initFilterPills() {
     document.addEventListener('click', async function(e) {
         if (e.target.classList.contains('filter-pill')) {
             e.preventDefault();
-            
-            console.log('🔘 Filter pill clicked:', e.target.textContent, 'Filter:', e.target.dataset.filter);
-            console.log('🔍 Page context:', window.location.href);
-            console.log('🔍 Show client pricing:', typeof showClientPricing !== 'undefined' ? showClientPricing : 'undefined');
-            
+
             // Remove active class from all pills
             document.querySelectorAll('.filter-pill').forEach(pill => {
                 pill.classList.remove('active');
@@ -5220,10 +5106,8 @@ function initFilterPills() {
             e.target.classList.add('active');
             
             const filter = e.target.dataset.filter;
-            console.log('📋 Active filter set to:', filter);
             
             if (filter === 'with-driver') {
-                console.log('🚗 Entering driver mode...');
                 await ensureDriverRateLoaded();
                 
                 // Get current filters using vanilla JS (find tours dropdowns)
@@ -5276,45 +5160,34 @@ function initFilterPills() {
 
 // Initialize filter pills when the DOM is ready
 function initDriverRateFunctionality() {
-    console.log('🟢 🟢 🟢 INIT FUNCTION CALLED! 🟢 🟢 🟢');
-    console.log('🟢 Initializing driver rate functionality...');
-    console.log('🔍 Page URL:', window.location.href);
-    console.log('🔍 Client pricing context:', typeof showClientPricing !== 'undefined' ? showClientPricing : 'undefined');
-    console.log('🔍 DOM ready state:', document.readyState);
-    
+
     // Load driver rate on page load
     fetchCurrentDriverRate().then(() => {
         driverRateLoaded = true;
-        console.log('✅ Driver rate loaded');
+
     });
     
     // Initialize filter pill handlers
     initFilterPills();
-    console.log('✅ Filter pills initialized');
-    
+
     // Initialize payment dropdown handler
-    console.log('🚀 About to call initPaymentDropdownHandler...');
+
     initPaymentDropdownHandler();
-    console.log('✅ Payment dropdown handler initialized');
-    
+
     // Add basic debugging event listeners to catch ANY dropdown changes
     setTimeout(() => {
-        console.log('🔍 Adding basic test listeners...');
+
         document.addEventListener('change', function(e) {
             if (e.target.id && (e.target.id.includes('paymentTypeFilter') || e.target.id.includes('currencyFilter'))) {
-                console.log('🎯 BASIC LISTENER: Dropdown changed!', {
-                    id: e.target.id,
-                    value: e.target.value,
-                    type: e.target.tagName
-                });
+
             }
         });
-        console.log('✅ Basic test listeners added');
+
     }, 100);
     
     // Set initial display state (Solo Guía mode is default)
     setTimeout(() => {
-        console.log('🔍 Setting initial display state...');
+
         const isDriverActive = isDriverModeActive();
         // Find tours dropdowns for initial state
         const allPaymentDropdowns = document.querySelectorAll('[id^="paymentTypeFilter-"]');
@@ -5327,11 +5200,7 @@ function initDriverRateFunctionality() {
         for (let dropdown of allCurrencyDropdowns) {
             if (dropdown.id.includes('tours')) { currencyEl = dropdown; break; }
         }
-        
-        console.log('🔍 Elements found in setTimeout:', {
-            payment: paymentTypeEl ? paymentTypeEl.id : 'NOT FOUND',
-            currency: currencyEl ? currencyEl.id : 'NOT FOUND'
-        });
+
         const paymentType = paymentTypeEl ? paymentTypeEl.value : 'efectivo';
         const currency = currencyEl ? currencyEl.value : 'MXN';
         
@@ -5339,37 +5208,24 @@ function initDriverRateFunctionality() {
     }, 500); // Small delay to ensure DOM elements are fully loaded
 }
 
-// Test if script is running at all
-console.log('🚀 SCRIPT START: Tours table script is loading...');
-
-// Immediate debugging to see DOM state  
-console.log('🔍 IMMEDIATE CHECK: DOM ready state:', document.readyState);
-console.log('🔍 IMMEDIATE CHECK: Looking for dropdowns...');
 const immediatePayment = document.querySelector('[id^="paymentTypeFilter-"]');
 const immediateCurrency = document.querySelector('[id^="currencyFilter-"]');
-console.log('🔍 IMMEDIATE CHECK: Payment dropdown:', immediatePayment ? immediatePayment.id : 'NOT FOUND');
-console.log('🔍 IMMEDIATE CHECK: Currency dropdown:', immediateCurrency ? immediateCurrency.id : 'NOT FOUND');
 
 // Initialize when DOM is ready (fallback for both jQuery and vanilla JS)
 if (document.readyState === 'loading') {
-    console.log('📄 DOM still loading - adding DOMContentLoaded listener');
     document.addEventListener('DOMContentLoaded', initDriverRateFunctionality);
 } else {
-    console.log('📄 DOM already ready - calling init immediately');
     initDriverRateFunctionality();
 }
 
 // Also try to initialize with jQuery if available
 if (typeof $ !== 'undefined') {
-    console.log('💫 jQuery available - adding ready listener');
     $(document).ready(initDriverRateFunctionality);
-} else {
-    console.log('❌ jQuery not available');
 }
 
 // Force initialization after a delay as backup
 setTimeout(() => {
-    console.log('⏰ TIMEOUT INIT: Forcing initialization...');
+
     try {
         initDriverRateFunctionality();
     } catch (error) {
@@ -5379,7 +5235,435 @@ setTimeout(() => {
 
 // ========== END DRIVER RATE FUNCTIONALITY ==========
 
+// ========== WALKING TOUR FUNCTIONALITY ==========
+
+// Walking tour modal event handlers - ensure jQuery is loaded
+function attachWalkingTourHandlers() {
+    if (typeof $ === 'undefined') {
+        setTimeout(attachWalkingTourHandlers, 100);
+        return;
+    }
+    
+    // Save button handler
+    $(document).off('click.walkingTourSave', '#saveWalkingTourBtn').on('click.walkingTourSave', '#saveWalkingTourBtn', function(e) {
+        e.preventDefault();
+        if (typeof saveWalkingTour === 'function') {
+            saveWalkingTour();
+        } else if (typeof window.saveWalkingTour === 'function') {
+            window.saveWalkingTour();
+        }
+    });
+    
+    // Clear form when modal is hidden
+    $(document).off('hidden.bs.modal.walkingTour', '#walkingTourModal').on('hidden.bs.modal.walkingTour', '#walkingTourModal', function() {
+        // Clear form when modal is closed
+        const form = document.getElementById('walkingTourForm');
+        if (form) form.reset();
+        
+        // Clear all specific fields
+        const fieldsToReset = [
+            'walkingTourId', 'walkingTourDescription', 'walkingPriceSmall',
+            'walkingPriceMedium', 'walkingPriceLarge', 'walkingDuration',
+            'walkingAdvanceTime', 'walkingIncludes', 'walkingNotIncludes', 'walkingLanguages'
+        ];
+        
+        fieldsToReset.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) field.value = '';
+        });
+        
+        // Clear TomSelect
+        const walkingDestElement = document.getElementById('walkingDestinationPOI');
+        if (walkingDestElement && walkingDestElement.tomselect) {
+            walkingDestElement.tomselect.clear();
+        }
+    });
+}
+attachWalkingTourHandlers();
+
+// No additional handler needed - already attached above
+
+// Modal shown handler removed - using single handler attached above
+
+// Function to open walking tour modal in create mode
+function openWalkingTourModal() {
+    // Check if jQuery is available
+    if (typeof $ === 'undefined') {
+        console.error('jQuery not loaded - cannot open modal');
+        return;
+    }
+    
+    // Clear any previous modal alerts
+    const alertsContainer = document.getElementById('walkingTourModalAlerts');
+    if (alertsContainer) {
+        alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+    }
+
+    // Reset form using vanilla JS
+    const form = document.getElementById('walkingTourForm');
+    if (form) form.reset();
+    
+    // Explicitly clear all form fields to ensure they're empty
+    const fieldsToReset = [
+        'walkingTourId',
+        'walkingTourDescription', 
+        'walkingPriceSmall',
+        'walkingPriceMedium', 
+        'walkingPriceLarge',
+        'walkingDuration',
+        'walkingAdvanceTime',
+        'walkingIncludes',
+        'walkingNotIncludes',
+        'walkingLanguages'
+    ];
+    
+    fieldsToReset.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.value = '';
+        }
+    });
+    
+    // Reset labels and button text
+    const modalLabel = document.getElementById('walkingTourModalLabel');
+    if (modalLabel) modalLabel.innerHTML = '<i class="ti ti-walk me-2"></i>Crear Nuevo Tour a Pie';
+    
+    const saveButtonText = document.getElementById('saveWalkingButtonText');
+    if (saveButtonText) saveButtonText.textContent = 'Crear Tour a Pie';
+    
+    // Reset save button state
+    const saveButton = document.getElementById('saveWalkingTourBtn');
+    if (saveButton) saveButton.disabled = false;
+    
+    // Show modal using jQuery (required for Bootstrap modal)
+    $('#walkingTourModal').modal('show');
+    
+    // Clear Tom Select dropdown after modal is shown
+    setTimeout(() => {
+        const walkingDestElement = document.getElementById('walkingDestinationPOI');
+        if (walkingDestElement && walkingDestElement.tomselect) {
+            walkingDestElement.tomselect.clear();
+            walkingDestElement.tomselect.clearOptions();
+            walkingDestElement.tomselect.refreshOptions(false);
+        }
+    }, 500);
+}
+
+// Function to open walking tour modal for editing
+function openWalkingTourModalForEdit(tourId) {
+    if (typeof loadWalkingTourForEdit === 'function') {
+        loadWalkingTourForEdit(tourId);
+    } else {
+        console.error('loadWalkingTourForEdit function not available');
+        alert('Función de edición no disponible. Recargue la página e intente de nuevo.');
+    }
+}
+
+// Function to save walking tour
+async function saveWalkingTour() {
+    // Check if jQuery is available
+    if (typeof $ === 'undefined') {
+        console.error('jQuery not loaded');
+        return;
+    }
+    
+    // Disable save button to prevent double submission
+    $('#saveWalkingTourBtn').prop('disabled', true);
+    
+    try {
+        // Get form data using vanilla JS where possible
+        const walkingDestElement = document.getElementById('walkingDestinationPOI');
+        const destinationPOI = walkingDestElement && walkingDestElement.tomselect ? 
+                              walkingDestElement.tomselect.getValue() : '';
+        
+        // Helper function to safely get value
+        const getFieldValue = (id) => {
+            const element = document.getElementById(id);
+            return element ? element.value : '';
+        };
+        
+        const formData = {
+            destinationPOI: destinationPOI,
+            description: getFieldValue('walkingTourDescription'),
+            time: parseFloat(getFieldValue('walkingDuration') || '0') * 60, // Convert hours to minutes
+            anticipation: parseInt(getFieldValue('walkingAdvanceTime') || '1440'),
+            advance_booking_time: parseInt(getFieldValue('walkingAdvanceTime') || '1440'), // Alternative field name
+            walkingPriceSmall: parseFloat(getFieldValue('walkingPriceSmall') || '0'),
+            walkingPriceMedium: parseFloat(getFieldValue('walkingPriceMedium') || '0'),
+            walkingPriceLarge: parseFloat(getFieldValue('walkingPriceLarge') || '0'),
+            walkingPriceCurrency: 'MXN',
+            walkingRangeSmall: '1-5 pax',
+            walkingRangeMedium: '6-10 pax',
+            walkingRangeLarge: '11-15 pax',
+            includes: getFieldValue('walkingIncludes') ? getFieldValue('walkingIncludes').split('\n').filter(item => item.trim()) : [],
+            notincludes: getFieldValue('walkingNotIncludes') ? getFieldValue('walkingNotIncludes').split('\n').filter(item => item.trim()) : [],
+            languages: getFieldValue('walkingLanguages') ? getFieldValue('walkingLanguages').split('\n').filter(item => item.trim()) : [],
+            isWalkingTour: true,
+            active: true,
+            exists: true
+        };
+        
+        // Validate required fields
+        if (!destinationPOI) {
+            showWalkingTourAlert('Por favor seleccione un destino para el tour.', 'danger');
+            $('#saveWalkingTourBtn').prop('disabled', false);
+            return;
+        }
+        
+        if (!formData.walkingPriceSmall || !formData.walkingPriceMedium || !formData.walkingPriceLarge) {
+            showWalkingTourAlert('Por favor complete todos los precios por grupo.', 'danger');
+            $('#saveWalkingTourBtn').prop('disabled', false);
+            return;
+        }
+        
+        // Determine if this is create or edit operation
+        const tourId = getFieldValue('walkingTourId');
+        const isEdit = tourId && tourId.trim() !== '';
+        
+        // Get access token
+        const token = getAccessToken();
+        if (!token) {
+            showWalkingTourAlert('Error de autenticación. Por favor vuelva a iniciar sesión.', 'danger');
+            $('#saveWalkingTourBtn').prop('disabled', false);
+            return;
+        }
+        
+        // Prepare API call
+        const apiUrl = isEdit ? `${globalApiEndpoint}/${tourId}` : globalApiEndpoint;
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        
+        // Send to API
+        const response = await fetch(apiUrl, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            const successMsg = isEdit ? 'Tour a pie actualizado exitosamente.' : 'Tour a pie creado exitosamente.';
+            showWalkingTourAlert(successMsg, 'success');
+            
+            // Close modal after short delay
+            setTimeout(() => {
+                $('#walkingTourModal').modal('hide');
+                // Refresh the table if it exists
+                if (typeof table !== 'undefined' && table.ajax) {
+                    table.ajax.reload(null, false);
+                }
+                // Refresh walking tours section if it exists
+                if (typeof loadWalkingTours === 'function') {
+                    loadWalkingTours();
+                }
+            }, 1500);
+        } else {
+            const defaultErrorMsg = isEdit ? 'Error al actualizar el tour a pie' : 'Error al crear el tour a pie';
+            const errorMsg = result.error || result.message || defaultErrorMsg;
+            showWalkingTourAlert(errorMsg, 'danger');
+            $('#saveWalkingTourBtn').prop('disabled', false);
+        }
+        
+    } catch (error) {
+        console.error('Error saving walking tour:', error);
+        showWalkingTourAlert('Error al conectar con el servidor.', 'danger');
+        $('#saveWalkingTourBtn').prop('disabled', false);
+    }
+}
+
+// Make saveWalkingTour globally accessible
+window.saveWalkingTour = saveWalkingTour;
+
+// Function to show walking tour modal alerts
+function showWalkingTourAlert(message, type) {
+    const alertsContainer = document.getElementById('walkingTourModalAlerts');
+    if (!alertsContainer) return;
+    
+    // Remove existing alerts
+    alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+    
+    // Create new alert
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    alertsContainer.appendChild(alert);
+    
+    // Auto-hide success alerts
+    if (type === 'success') {
+        setTimeout(() => {
+            alert.remove();
+        }, 3000);
+    }
+}
+
+// ========== END WALKING TOUR FUNCTIONALITY ==========
+
 </script>
+
+<!-- Walking Tour Modal -->
+<div class="modal fade" id="walkingTourModal" tabindex="-1" aria-labelledby="walkingTourModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title text-white" id="walkingTourModalLabel">
+                    <i class="ti ti-walk me-2"></i>Crear Nuevo Tour a Pie
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="walkingTourModalAlerts"></div>
+                
+                <form id="walkingTourForm">
+                    <input type="hidden" id="walkingTourId">
+                    
+                    <!-- Destino -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            Destino <span class="text-danger">*</span>
+                        </label>
+                        <%- include('../../atoms/common/tom-select', {
+                            id: 'walkingDestinationPOI',
+                            name: 'walkingDestinationPOI',
+                            multiple: false,
+                            placeholder: 'Seleccionar destino del tour a pie',
+                            label: false,
+                            required: true,
+                            helpText: false,
+                            options: [],
+                            selected: []
+                        }) %>
+                    </div>
+                    
+                    <!-- Descripción -->
+                    <div class="mb-3">
+                        <label for="walkingTourDescription" class="form-label form-label-sm fw-medium text-success">
+                            Descripción
+                        </label>
+                        <textarea class="form-control" id="walkingTourDescription" rows="2" maxlength="1000"
+                                  placeholder="Descripción detallada del recorrido a pie..."></textarea>
+                    </div>
+
+                    <!-- Precios por Grupo -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-medium text-success mb-3">
+                            <i class="ti ti-walk me-1"></i>Precios por Grupo de Personas
+                        </label>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label form-label-sm text-muted">Grupo Pequeño (1-5 personas)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="walkingPriceSmall" min="0" step="0.01" 
+                                           placeholder="1050.00" required>
+                                    <span class="input-group-text">MXN</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label form-label-sm text-muted">Grupo Mediano (6-10 personas)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="walkingPriceMedium" min="0" step="0.01" 
+                                           placeholder="2100.00" required>
+                                    <span class="input-group-text">MXN</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label form-label-sm text-muted">Grupo Grande (11-15 personas)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="walkingPriceLarge" min="0" step="0.01" 
+                                           placeholder="3150.00" required>
+                                    <span class="input-group-text">MXN</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="alert alert-info mt-3 mb-0" role="alert">
+                            <i class="ti ti-info-circle me-2"></i>
+                            <small>Los Tours a Pie se cobran por grupo, no por persona individual. Los precios incluyen guía certificado para caminar por el centro histórico.</small>
+                        </div>
+                    </div>
+
+                    <!-- Duración -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm fw-medium text-success">Duración (hrs) mínima</label>
+                            <input type="number" class="form-control" id="walkingDuration" min="0" step="0.5" 
+                                   placeholder="2" value="2">
+                            <div class="form-text">
+                                <small>Tiempo total del tour a pie</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipación (min)</label>
+                            <input type="number" class="form-control" id="walkingAdvanceTime" min="0" step="1" 
+                                   placeholder="1440" value="1440">
+                            <div class="form-text">
+                                <small>Ej: 1440 = 24hrs</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Incluye y No Incluye -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm fw-medium text-success">
+                                Incluye <span class="text-muted">(uno por línea)</span>
+                            </label>
+                            <textarea class="form-control" id="walkingIncludes" rows="4" maxlength="1000"
+                                      placeholder="Guía bilingüe certificado&#10;Recorrido histórico&#10;Degustación de platillos locales&#10;Agua embotellada"
+                                      style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm fw-medium text-success">
+                                No incluye <span class="text-muted">(uno por línea)</span>
+                            </label>
+                            <textarea class="form-control" id="walkingNotIncludes" rows="4" maxlength="1000"
+                                      placeholder="Transporte&#10;Comidas no especificadas&#10;Souvenirs"
+                                      style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Idiomas -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            Idiomas <span class="text-muted">(uno por línea)</span>
+                        </label>
+                        <textarea class="form-control" id="walkingLanguages" rows="2" maxlength="500"
+                                  placeholder="Español&#10;Inglés"
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                    </div>
+
+                    <!-- Alert informativo para tours a pie -->
+                    <div class="alert alert-success d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Tour a Pie:</strong>
+                            <p class="mb-0 mt-1">Define un recorrido peatonal por zonas históricas. Los precios son por grupo completo, ideales para experiencias gastronómicas y culturales.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-success" id="saveWalkingTourBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveWalkingButtonText">Crear Tour a Pie</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Tour Client Pricing Modal -->
 <div class="modal fade" id="tourClientPricingModal" tabindex="-1" aria-labelledby="tourClientPricingModalLabel" aria-hidden="true">

@@ -3115,28 +3115,48 @@ class ServicesController {
           const priceRecord = await priceQuery.first({ useMasterKey: true });
 
           if (priceRecord) {
-            // VERSIONING: Don't update existing price, instead:
-            // 1. Mark existing price as historical (set valid_until to today)
-            priceRecord.set('valid_until', new Date());
-            priceRecord.set('lastModifiedBy', currentUser.id);
-            objectsToSave.push(priceRecord);
+            if (price <= 0) {
+              // For zero/negative prices: just deactivate the existing record
+              priceRecord.set('valid_until', new Date());
+              priceRecord.set('lastModifiedBy', currentUser.id);
+              objectsToSave.push(priceRecord);
 
-            // 2. Create NEW price record with the updated price
-            const newPriceRecord = new RatePricesClass();
+              logger.info('Price deactivated', {
+                priceId: id,
+                oldPrice: priceRecord.get('price'),
+                newPrice: price,
+                userId: currentUser.id,
+              });
+            } else {
+              // For positive prices: version the record
+              // 1. Mark existing price as historical (set valid_until to today)
+              priceRecord.set('valid_until', new Date());
+              priceRecord.set('lastModifiedBy', currentUser.id);
+              objectsToSave.push(priceRecord);
 
-            // Copy all fields from the original record
-            newPriceRecord.set('service', priceRecord.get('service'));
-            newPriceRecord.set('vehicleType', priceRecord.get('vehicleType'));
-            newPriceRecord.set('rate', priceRecord.get('rate'));
-            newPriceRecord.set('price', price); // New price value
-            newPriceRecord.set('currency', priceRecord.get('currency') || 'MXN');
-            newPriceRecord.set('active', priceRecord.get('active'));
-            newPriceRecord.set('exists', priceRecord.get('exists'));
-            newPriceRecord.set('createdBy', priceRecord.get('createdBy'));
-            newPriceRecord.set('lastModifiedBy', currentUser.id);
-            // valid_until remains null (active record)
+              // 2. Create NEW price record with the updated price
+              const newPriceRecord = new RatePricesClass();
 
-            objectsToSave.push(newPriceRecord);
+              // Copy all fields from the original record
+              newPriceRecord.set('service', priceRecord.get('service'));
+              newPriceRecord.set('vehicleType', priceRecord.get('vehicleType'));
+              newPriceRecord.set('rate', priceRecord.get('rate'));
+              newPriceRecord.set('price', price); // New price value
+              newPriceRecord.set('currency', priceRecord.get('currency') || 'MXN');
+              newPriceRecord.set('active', priceRecord.get('active'));
+              newPriceRecord.set('exists', priceRecord.get('exists'));
+              newPriceRecord.set('createdBy', priceRecord.get('createdBy'));
+              newPriceRecord.set('lastModifiedBy', currentUser.id);
+              // valid_until remains null (active record)
+
+              objectsToSave.push(newPriceRecord);
+
+              logger.info('Price updated with versioning', {
+                oldPriceId: id,
+                newPrice: price,
+                userId: currentUser.id,
+              });
+            }
           }
         }
       }
@@ -3326,6 +3346,521 @@ class ServicesController {
         userId: req.user?.id,
       });
       return this.sendError(res, 'Error retrieving price history', 500);
+    }
+  }
+
+  /**
+   * POST /api/services/bulk-create - Bulk create services with all rate-vehicle combinations.
+   *
+   * Creates a Services record for a route and all possible RatePrices combinations.
+   * Supports individual pricing per rate-vehicle combination through pricingData parameter.
+   *
+   * Body Parameters:
+   * - originPOI: string (optional) - Origin POI ID
+   * - destinationPOI: string (required) - Destination POI ID
+   * - rates: array (required) - Array of rate IDs
+   * - vehicleTypes: array (required) - Array of vehicle type IDs
+   * - defaultPrice: number (optional) - Default price for all combinations
+   * - pricingData: array (optional) - Individual pricing [{rateId, vehicleId, price}]
+   * - note: string (optional) - Service note
+   * - routeDuration: number (optional) - Route duration in minutes.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async bulkCreateServices(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const {
+        originPOI, destinationPOI, rates, vehicleTypes, defaultPrice, note, routeDuration, pricingData,
+      } = req.body;
+
+      // Validate required fields
+      if (!destinationPOI) {
+        return this.sendError(res, 'El destino es requerido', 400);
+      }
+
+      if (!rates || !Array.isArray(rates) || rates.length === 0) {
+        return this.sendError(res, 'Se requiere al menos una tarifa', 400);
+      }
+
+      if (!vehicleTypes || !Array.isArray(vehicleTypes) || vehicleTypes.length === 0) {
+        return this.sendError(res, 'Se requiere al menos un tipo de vehículo', 400);
+      }
+
+      // Validate origin !== destination (only if both exist)
+      if (originPOI && destinationPOI && originPOI === destinationPOI) {
+        return this.sendError(res, 'El origen y destino deben ser diferentes', 400);
+      }
+
+      // Verify POIs exist
+      let originPOIObj = null;
+      if (originPOI) {
+        const originQuery = new Parse.Query('POI');
+        originPOIObj = await originQuery.get(originPOI, {
+          useMasterKey: true,
+        });
+        if (!originPOIObj) {
+          return this.sendError(res, 'El origen no existe', 404);
+        }
+      }
+
+      const destQuery = new Parse.Query('POI');
+      const destPOIObj = await destQuery.get(destinationPOI, {
+        useMasterKey: true,
+      });
+      if (!destPOIObj) {
+        return this.sendError(res, 'El destino no existe', 404);
+      }
+
+      // Verify all rates exist
+      const rateQuery = new Parse.Query('Rate');
+      rateQuery.containedIn('objectId', rates);
+      const rateObjects = await rateQuery.find({ useMasterKey: true });
+      if (rateObjects.length !== rates.length) {
+        return this.sendError(res, 'Una o más tarifas no existen', 404);
+      }
+
+      // Verify all vehicle types exist
+      const vehicleQuery = new Parse.Query('VehicleType');
+      vehicleQuery.containedIn('objectId', vehicleTypes);
+      const vehicleObjects = await vehicleQuery.find({ useMasterKey: true });
+      if (vehicleObjects.length !== vehicleTypes.length) {
+        return this.sendError(res, 'Uno o más tipos de vehículo no existen', 404);
+      }
+
+      // First, check if the Services record exists for this route
+      let servicesRecord = null;
+      const servicesQuery = new Parse.Query('Services');
+
+      if (originPOI) {
+        servicesQuery.equalTo('originPOI', {
+          __type: 'Pointer',
+          className: 'POI',
+          objectId: originPOI,
+        });
+      } else {
+        servicesQuery.doesNotExist('originPOI');
+      }
+
+      servicesQuery.equalTo('destinationPOI', {
+        __type: 'Pointer',
+        className: 'POI',
+        objectId: destinationPOI,
+      });
+      servicesQuery.equalTo('exists', true);
+      servicesRecord = await servicesQuery.first({ useMasterKey: true });
+
+      // Create Services record if it doesn't exist
+      if (!servicesRecord) {
+        const ServicesClass = Parse.Object.extend('Services');
+        servicesRecord = new ServicesClass();
+
+        if (originPOI) {
+          servicesRecord.set('originPOI', {
+            __type: 'Pointer',
+            className: 'POI',
+            objectId: originPOI,
+          });
+        }
+
+        servicesRecord.set('destinationPOI', {
+          __type: 'Pointer',
+          className: 'POI',
+          objectId: destinationPOI,
+        });
+
+        if (note) {
+          servicesRecord.set('note', note.substring(0, 500));
+        }
+
+        if (routeDuration) {
+          servicesRecord.set('routeDuration', parseInt(routeDuration));
+        }
+
+        servicesRecord.set('active', true);
+        servicesRecord.set('exists', true);
+
+        await servicesRecord.save(null, { useMasterKey: true });
+      }
+
+      // Now create RatePrices combinations
+      const createdRatePrices = [];
+      const errors = [];
+      let skipped = 0;
+
+      // If pricingData is provided, only create combinations specified in pricingData
+      if (pricingData && Array.isArray(pricingData) && pricingData.length > 0) {
+        for (const priceEntry of pricingData) {
+          // Skip entries with no price or price <= 0
+          if (!priceEntry.price || priceEntry.price <= 0) {
+            // Skip this entry
+          } else {
+            try {
+              const specificPrice = priceEntry.price;
+              const rate = priceEntry.rateId;
+              const vehicleType = priceEntry.vehicleId;
+
+              // Check if combination already exists in RatePrices
+              const existingRatePriceQuery = new Parse.Query('RatePrices');
+
+              existingRatePriceQuery.equalTo('service', {
+                __type: 'Pointer',
+                className: 'Services',
+                objectId: servicesRecord.id,
+              });
+              existingRatePriceQuery.equalTo('vehicleType', {
+                __type: 'Pointer',
+                className: 'VehicleType',
+                objectId: vehicleType,
+              });
+              existingRatePriceQuery.equalTo('rate', {
+                __type: 'Pointer',
+                className: 'Rate',
+                objectId: rate,
+              });
+              existingRatePriceQuery.equalTo('exists', true);
+              const existingRatePriceCount = await existingRatePriceQuery.count({ useMasterKey: true });
+
+              if (existingRatePriceCount > 0) {
+                skipped++;
+              } else {
+                // Now create the RatePrices record
+                const RatePricesClass = Parse.Object.extend('RatePrices');
+                const ratePrice = new RatePricesClass();
+
+                // Set pointers
+                if (originPOI) {
+                  ratePrice.set('originPOI', {
+                    __type: 'Pointer',
+                    className: 'POI',
+                    objectId: originPOI,
+                  });
+                }
+
+                ratePrice.set('destinationPOI', {
+                  __type: 'Pointer',
+                  className: 'POI',
+                  objectId: destinationPOI,
+                });
+
+                ratePrice.set('rate', {
+                  __type: 'Pointer',
+                  className: 'Rate',
+                  objectId: rate,
+                });
+
+                ratePrice.set('vehicleType', {
+                  __type: 'Pointer',
+                  className: 'VehicleType',
+                  objectId: vehicleType,
+                });
+
+                ratePrice.set('service', {
+                  __type: 'Pointer',
+                  className: 'Services',
+                  objectId: servicesRecord.id,
+                });
+
+                // Set price and status fields
+                ratePrice.set('price', parseFloat(specificPrice));
+                ratePrice.set('currency', 'MXN');
+                ratePrice.set('active', true);
+                ratePrice.set('exists', true);
+
+                // Save the rate price
+                await ratePrice.save(null, { useMasterKey: true });
+
+                createdRatePrices.push({
+                  serviceId: servicesRecord.id,
+                  ratePriceId: ratePrice.id,
+                });
+              }
+            } catch (error) {
+              errors.push({
+                rateId: priceEntry.rateId,
+                vehicleId: priceEntry.vehicleId,
+                error: error.message,
+              });
+            }
+          }
+        }
+      } else {
+        // Fallback: create all combinations using defaultPrice (backward compatibility)
+        for (const rate of rates) {
+          for (const vehicleType of vehicleTypes) {
+            try {
+              const specificPrice = defaultPrice || 0;
+              // Check if combination already exists in RatePrices
+              const existingRatePriceQuery = new Parse.Query('RatePrices');
+
+              existingRatePriceQuery.equalTo('service', {
+                __type: 'Pointer',
+                className: 'Services',
+                objectId: servicesRecord.id,
+              });
+              existingRatePriceQuery.equalTo('vehicleType', {
+                __type: 'Pointer',
+                className: 'VehicleType',
+                objectId: vehicleType,
+              });
+              existingRatePriceQuery.equalTo('rate', {
+                __type: 'Pointer',
+                className: 'Rate',
+                objectId: rate,
+              });
+              existingRatePriceQuery.equalTo('exists', true);
+              const existingRatePriceCount = await existingRatePriceQuery.count({ useMasterKey: true });
+
+              if (existingRatePriceCount > 0) {
+                skipped++;
+              } else {
+                // Create the RatePrices record
+                const RatePricesClass = Parse.Object.extend('RatePrices');
+                const ratePrice = new RatePricesClass();
+
+                // Set pointers
+                if (originPOI) {
+                  ratePrice.set('originPOI', {
+                    __type: 'Pointer',
+                    className: 'POI',
+                    objectId: originPOI,
+                  });
+                }
+
+                ratePrice.set('destinationPOI', {
+                  __type: 'Pointer',
+                  className: 'POI',
+                  objectId: destinationPOI,
+                });
+
+                ratePrice.set('service', {
+                  __type: 'Pointer',
+                  className: 'Services',
+                  objectId: servicesRecord.id,
+                });
+
+                ratePrice.set('rate', {
+                  __type: 'Pointer',
+                  className: 'Rate',
+                  objectId: rate,
+                });
+
+                ratePrice.set('vehicleType', {
+                  __type: 'Pointer',
+                  className: 'VehicleType',
+                  objectId: vehicleType,
+                });
+
+                ratePrice.set('price', specificPrice);
+                ratePrice.set('currency', 'MXN');
+                ratePrice.set('active', true);
+                ratePrice.set('exists', true);
+
+                await ratePrice.save(null, { useMasterKey: true });
+
+                createdRatePrices.push({
+                  serviceId: servicesRecord.id,
+                  ratePriceId: ratePrice.id,
+                });
+              }
+            } catch (error) {
+              errors.push({
+                rate,
+                vehicleType,
+                error: error.message,
+              });
+            }
+          }
+        }
+      }
+
+      const totalRequested = pricingData && pricingData.length > 0
+        ? pricingData.filter((p) => p.price > 0).length
+        : rates.length * vehicleTypes.length;
+
+      // Log the bulk creation
+      logger.info('Bulk service creation completed', {
+        userId: currentUser.id,
+        servicesRecordId: servicesRecord.id,
+        totalRequested,
+        created: createdRatePrices.length,
+        skipped,
+        errors: errors.length,
+      });
+
+      // Return results
+      return res.status(201).json({
+        success: true,
+        data: {
+          servicesId: servicesRecord.id,
+          created: createdRatePrices.length,
+          skipped,
+          errors: errors.length > 0 ? errors : undefined,
+          total: totalRequested,
+        },
+        message: `1 traslado creado exitosamente con ${createdRatePrices.length} tarifas`,
+      });
+    } catch (error) {
+      logger.error('Error in ServicesController.bulkCreateServices', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+        body: req.body,
+      });
+
+      return this.sendError(res, 'Error al crear los servicios', 500);
+    }
+  }
+
+  /**
+   * POST /api/services/:id/add-rate-prices - Add new rate prices to existing service.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async addRatePrices(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const serviceId = req.params.id;
+      const { prices } = req.body;
+
+      // Validate input
+      if (!serviceId) {
+        return this.sendError(res, 'ID del servicio es requerido', 400);
+      }
+
+      if (!prices || !Array.isArray(prices) || prices.length === 0) {
+        return this.sendError(res, 'Lista de precios es requerida', 400);
+      }
+
+      // Verify service exists
+      const serviceQuery = new Parse.Query('Services');
+      const service = await serviceQuery.get(serviceId, { useMasterKey: true });
+      if (!service) {
+        return this.sendError(res, 'Servicio no encontrado', 404);
+      }
+
+      const createdRatePrices = [];
+      const errors = [];
+
+      // Create new rate prices
+      for (const priceData of prices) {
+        try {
+          const { rateId, vehicleId, price } = priceData;
+
+          if (!rateId || !vehicleId || typeof price !== 'number' || price <= 0) {
+            errors.push({ rateId, vehicleId, error: 'Datos inválidos' });
+          } else {
+            // Check if this rate-vehicle combination already exists
+            const existingQuery = new Parse.Query('RatePrices');
+            existingQuery.equalTo('service', {
+              __type: 'Pointer',
+              className: 'Services',
+              objectId: serviceId,
+            });
+            existingQuery.equalTo('rate', {
+              __type: 'Pointer',
+              className: 'Rate',
+              objectId: rateId,
+            });
+            existingQuery.equalTo('vehicleType', {
+              __type: 'Pointer',
+              className: 'VehicleType',
+              objectId: vehicleId,
+            });
+            existingQuery.equalTo('exists', true);
+
+            const existing = await existingQuery.first({ useMasterKey: true });
+            if (existing) {
+              errors.push({ rateId, vehicleId, error: 'Ya existe precio para esta combinación' });
+            } else {
+              // Create new RatePrice
+              const RatePrice = Parse.Object.extend('RatePrices');
+              const ratePrice = new RatePrice();
+
+              // Set references
+              ratePrice.set('service', {
+                __type: 'Pointer',
+                className: 'Services',
+                objectId: serviceId,
+              });
+              ratePrice.set('rate', {
+                __type: 'Pointer',
+                className: 'Rate',
+                objectId: rateId,
+              });
+              ratePrice.set('vehicleType', {
+                __type: 'Pointer',
+                className: 'VehicleType',
+                objectId: vehicleId,
+              });
+
+              // Copy POI references from service
+              if (service.get('originPOI')) {
+                ratePrice.set('originPOI', service.get('originPOI'));
+              }
+              ratePrice.set('destinationPOI', service.get('destinationPOI'));
+
+              // Set price and status
+              ratePrice.set('price', parseFloat(price));
+              ratePrice.set('currency', 'MXN');
+              ratePrice.set('active', true);
+              ratePrice.set('exists', true);
+
+              await ratePrice.save(null, { useMasterKey: true });
+
+              createdRatePrices.push({
+                id: ratePrice.id,
+                rateId,
+                vehicleId,
+                price: parseFloat(price),
+              });
+            }
+          }
+        } catch (error) {
+          errors.push({
+            rateId: priceData.rateId,
+            vehicleId: priceData.vehicleId,
+            error: error.message,
+          });
+        }
+      }
+
+      // Log the creation
+      logger.info('Rate prices added to service', {
+        userId: currentUser.id,
+        serviceId,
+        totalRequested: prices.length,
+        created: createdRatePrices.length,
+        errors: errors.length,
+      });
+
+      return res.status(201).json({
+        success: true,
+        created: createdRatePrices.length,
+        data: createdRatePrices,
+        errors: errors.length > 0 ? errors : undefined,
+        message: `${createdRatePrices.length} precios agregados exitosamente`,
+      });
+    } catch (error) {
+      logger.error('Error in addRatePrices', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+        serviceId: req.params.id,
+      });
+      return this.sendError(res, 'Error al agregar precios', 500);
     }
   }
 

@@ -179,7 +179,21 @@ class FileStorageService {
         },
       };
 
-      const uploadResult = await s3.upload(uploadParams).promise();
+      let uploadResult;
+      try {
+        uploadResult = await s3.upload(uploadParams).promise();
+      } catch (s3Error) {
+        logger.error('S3 upload failed', {
+          error: s3Error.message,
+          code: s3Error.code,
+          statusCode: s3Error.statusCode,
+          s3Key,
+          bucket,
+          mimeType,
+          fileSize: fileBuffer.length,
+        });
+        throw new Error(`S3 upload failed: ${s3Error.message}`);
+      }
 
       logger.info('File uploaded to S3 successfully', {
         fileName: uniqueFileName,

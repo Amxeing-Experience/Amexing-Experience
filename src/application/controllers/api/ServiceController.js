@@ -964,6 +964,273 @@ class ServiceController {
   }
 
   /**
+   * POST /api/services/bulk-create - Bulk create services with all rate-vehicle combinations.
+   *
+   * Body Parameters:
+   * - originPOI: string (optional) - Origin POI ID
+   * - destinationPOI: string (required) - Destination POI ID
+   * - rates: array (required) - Array of Rate IDs
+   * - vehicleTypes: array (required) - Array of VehicleType IDs
+   * - defaultPrice: number (optional) - Default price for all combinations
+   * - note: string (optional) - Service note
+   * - routeDuration: number (optional) - Route duration in minutes.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async bulkCreateServices(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const {
+        originPOI, destinationPOI, rates, vehicleTypes, defaultPrice, note, routeDuration, pricingData,
+      } = req.body;
+
+      // Validate required fields
+      if (!destinationPOI) {
+        return this.sendError(res, 'El destino es requerido', 400);
+      }
+
+      if (!rates || !Array.isArray(rates) || rates.length === 0) {
+        return this.sendError(res, 'Se requiere al menos una tarifa', 400);
+      }
+
+      if (!vehicleTypes || !Array.isArray(vehicleTypes) || vehicleTypes.length === 0) {
+        return this.sendError(res, 'Se requiere al menos un tipo de vehículo', 400);
+      }
+
+      // Validate origin !== destination (only if both exist)
+      if (originPOI && destinationPOI && originPOI === destinationPOI) {
+        return this.sendError(res, 'El origen y destino deben ser diferentes', 400);
+      }
+
+      // Verify POIs exist
+      let originPOIObj = null;
+      if (originPOI) {
+        const originQuery = new Parse.Query('POI');
+        originPOIObj = await originQuery.get(originPOI, {
+          useMasterKey: true,
+        });
+        if (!originPOIObj) {
+          return this.sendError(res, 'El origen no existe', 404);
+        }
+      }
+
+      const destQuery = new Parse.Query('POI');
+      const destPOIObj = await destQuery.get(destinationPOI, {
+        useMasterKey: true,
+      });
+      if (!destPOIObj) {
+        return this.sendError(res, 'El destino no existe', 404);
+      }
+
+      // Verify all rates exist
+      const rateQuery = new Parse.Query('Rate');
+      rateQuery.containedIn('objectId', rates);
+      const rateObjects = await rateQuery.find({ useMasterKey: true });
+      if (rateObjects.length !== rates.length) {
+        return this.sendError(res, 'Una o más tarifas no existen', 404);
+      }
+
+      // Verify all vehicle types exist
+      const vehicleQuery = new Parse.Query('VehicleType');
+      vehicleQuery.containedIn('objectId', vehicleTypes);
+      const vehicleObjects = await vehicleQuery.find({ useMasterKey: true });
+      if (vehicleObjects.length !== vehicleTypes.length) {
+        return this.sendError(res, 'Uno o más tipos de vehículo no existen', 404);
+      }
+
+      // First, check if the Services record exists for this route
+      let servicesRecord = null;
+      const servicesQuery = new Parse.Query('Services');
+
+      if (originPOI) {
+        servicesQuery.equalTo('originPOI', {
+          __type: 'Pointer',
+          className: 'POI',
+          objectId: originPOI,
+        });
+      } else {
+        servicesQuery.doesNotExist('originPOI');
+      }
+
+      servicesQuery.equalTo('destinationPOI', {
+        __type: 'Pointer',
+        className: 'POI',
+        objectId: destinationPOI,
+      });
+      servicesQuery.equalTo('exists', true);
+      servicesRecord = await servicesQuery.first({ useMasterKey: true });
+
+      // Create Services record if it doesn't exist
+      if (!servicesRecord) {
+        const Services = Parse.Object.extend('Services');
+        servicesRecord = new Services();
+
+        if (originPOI) {
+          servicesRecord.set('originPOI', {
+            __type: 'Pointer',
+            className: 'POI',
+            objectId: originPOI,
+          });
+        }
+
+        servicesRecord.set('destinationPOI', {
+          __type: 'Pointer',
+          className: 'POI',
+          objectId: destinationPOI,
+        });
+
+        if (note) {
+          servicesRecord.set('note', note.substring(0, 500));
+        }
+
+        if (routeDuration) {
+          servicesRecord.set('routeDuration', parseInt(routeDuration));
+        }
+
+        servicesRecord.set('active', true);
+        servicesRecord.set('exists', true);
+
+        await servicesRecord.save(null, { useMasterKey: true });
+      }
+
+      // Now create all RatePrices combinations
+      const createdRatePrices = [];
+      const errors = [];
+      let skipped = 0;
+
+      for (const rate of rates) {
+        for (const vehicleType of vehicleTypes) {
+          try {
+            // Find specific price for this rate-vehicle combination if pricingData is provided
+            let specificPrice = defaultPrice || 0;
+            if (pricingData && Array.isArray(pricingData)) {
+              const priceEntry = pricingData.find((p) => p.rateId === rate && p.vehicleId === vehicleType);
+              if (priceEntry && priceEntry.price > 0) {
+                specificPrice = priceEntry.price;
+              }
+            }
+            // Check if combination already exists in RatePrices
+            const existingRatePriceQuery = new Parse.Query('RatePrices');
+
+            existingRatePriceQuery.equalTo('service', {
+              __type: 'Pointer',
+              className: 'Services',
+              objectId: servicesRecord.id,
+            });
+            existingRatePriceQuery.equalTo('vehicleType', {
+              __type: 'Pointer',
+              className: 'VehicleType',
+              objectId: vehicleType,
+            });
+            existingRatePriceQuery.equalTo('rate', {
+              __type: 'Pointer',
+              className: 'Rate',
+              objectId: rate,
+            });
+            existingRatePriceQuery.equalTo('exists', true);
+            const existingRatePriceCount = await existingRatePriceQuery.count({ useMasterKey: true });
+
+            if (existingRatePriceCount > 0) {
+              skipped++;
+            } else {
+              // Now create the RatePrices record
+              const RatePrices = Parse.Object.extend('RatePrices');
+              const ratePrice = new RatePrices();
+
+              // Set pointers
+              if (originPOI) {
+                ratePrice.set('originPOI', {
+                  __type: 'Pointer',
+                  className: 'POI',
+                  objectId: originPOI,
+                });
+              }
+
+              ratePrice.set('destinationPOI', {
+                __type: 'Pointer',
+                className: 'POI',
+                objectId: destinationPOI,
+              });
+
+              ratePrice.set('rate', {
+                __type: 'Pointer',
+                className: 'Rate',
+                objectId: rate,
+              });
+
+              ratePrice.set('vehicleType', {
+                __type: 'Pointer',
+                className: 'VehicleType',
+                objectId: vehicleType,
+              });
+
+              ratePrice.set('service', {
+                __type: 'Pointer',
+                className: 'Services', // Correct table name with 's'
+                objectId: servicesRecord.id,
+              });
+
+              // Set price and status fields
+              ratePrice.set('price', parseFloat(specificPrice));
+              ratePrice.set('currency', 'MXN');
+              ratePrice.set('active', true);
+              ratePrice.set('exists', true);
+
+              // Save the rate price
+              await ratePrice.save(null, { useMasterKey: true });
+
+              createdRatePrices.push({
+                serviceId: servicesRecord.id,
+                ratePriceId: ratePrice.id,
+              });
+            }
+          } catch (error) {
+            errors.push({
+              rate,
+              vehicleType,
+              error: error.message,
+            });
+          }
+        }
+      }
+
+      // Log the bulk creation
+      logger.info('Bulk service creation completed', {
+        userId: currentUser.id,
+        servicesRecordId: servicesRecord.id,
+        totalRequested: rates.length * vehicleTypes.length,
+        created: createdRatePrices.length,
+        skipped,
+        errors: errors.length,
+      });
+
+      // Return results
+      return this.sendSuccess(res, {
+        servicesId: servicesRecord.id,
+        created: createdRatePrices.length,
+        skipped,
+        errors: errors.length > 0 ? errors : undefined,
+        total: rates.length * vehicleTypes.length,
+      }, `${createdRatePrices.length} tarifas creadas exitosamente para el traslado`, 201);
+    } catch (error) {
+      logger.error('Error in ServiceController.bulkCreateServices', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+        body: req.body,
+      });
+
+      return this.sendError(res, 'Error al crear los servicios', 500);
+    }
+  }
+
+  /**
    * PUT /api/services/:id - Update service.
    *
    * Body Parameters:

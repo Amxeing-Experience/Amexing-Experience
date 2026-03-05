@@ -185,47 +185,10 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'department
                     </div>
                 </div>
                 
-                <!-- Results Section (Discount Information + Price Display) -->
+                <!-- Results Section (Price Display) -->
                 <div class="row mt-4" id="price-display-section">
-                    <!-- Descuentos por Volumen (6 columns) -->
-                    <div class="col-lg-6 mb-4">
-                        <div class="card border-0" style="background-color: #f8f9fa; border-radius: 15px;">
-                            <div class="card-body p-4">
-                                <h5 class="card-title mb-3 fw-bold text-primary">
-                                    <i class="ti ti-percentage me-2"></i>Descuentos por Volumen
-                                </h5>
-                                <div class="row g-3">
-                                    <div class="col-6">
-                                        <div class="text-center p-2 bg-white rounded">
-                                            <div class="fw-bold text-success">8+ horas</div>
-                                            <div class="text-muted small">-2.5%</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="text-center p-2 bg-white rounded">
-                                            <div class="fw-bold text-success">10+ horas</div>
-                                            <div class="text-muted small">-5%</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="text-center p-2 bg-white rounded">
-                                            <div class="fw-bold text-success">12+ horas</div>
-                                            <div class="text-muted small">-7.5%</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="text-center p-2 bg-white rounded">
-                                            <div class="fw-bold text-success">16+ horas</div>
-                                            <div class="text-muted small">-10%</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Cotización Final (6 columns) -->
-                    <div class="col-lg-6 mb-4">
+                    <!-- Cotización Final (12 columns for department_manager role, centered) -->
+                    <div class="col-lg-8 offset-lg-2 mb-4">
                         <div class="card border-0" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f8f9fa 100%); border-radius: 15px;">
                             <div class="card-body p-4">
                                 <h5 class="card-title mb-3 fw-bold text-primary">
