@@ -207,32 +207,22 @@ class VehicleController {
           try {
             const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
             if (primaryImage) {
-              // Use optimized endpoint for better performance (AVIF/WebP support)
-              const fileName = primaryImage.get('fileName');
-              if (fileName) {
-                // Remove file extension for the endpoint
-                const imageName = fileName.replace(/\.\w+$/, '');
-                // Use the optimized endpoint that serves AVIF/WebP based on Accept headers
-                imageUrl = `/api/vehicles/optimized/${vehicle.id}/${encodeURIComponent(imageName)}`;
+              // Use presigned URL directly (more reliable than optimized endpoint)
+              const s3Key = primaryImage.get('s3Key');
+              const imageFile = primaryImage.get('imageFile');
 
-                logger.debug('Using optimized endpoint for primary image', {
-                  vehicleId: vehicle.id,
-                  fileName,
-                  imageUrl,
-                });
+              if (s3Key) {
+                imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+              } else if (imageFile) {
+                imageUrl = imageFile.url(); // Legacy Parse.File
               } else {
-                // Fallback to S3 URL if no fileName
-                const s3Key = primaryImage.get('s3Key');
-                const imageFile = primaryImage.get('imageFile');
-
-                if (s3Key) {
-                  imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
-                } else if (imageFile) {
-                  imageUrl = imageFile.url(); // Legacy Parse.File
-                } else {
-                  imageUrl = primaryImage.get('url') || ''; // Legacy URL field
-                }
+                imageUrl = primaryImage.get('url') || ''; // Legacy URL field
               }
+
+              logger.debug('Found primary image for vehicle', {
+                vehicleId: vehicle.id,
+                imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : 'none',
+              });
             } else {
               logger.debug('No primary image found for vehicle', {
                 vehicleId: vehicle.id,
@@ -330,32 +320,22 @@ class VehicleController {
       try {
         const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
         if (primaryImage) {
-          // Use optimized endpoint for better performance (AVIF/WebP support)
-          const fileName = primaryImage.get('fileName');
-          if (fileName) {
-            // Remove file extension for the endpoint
-            const imageName = fileName.replace(/\.\w+$/, '');
-            // Use the optimized endpoint that serves AVIF/WebP based on Accept headers
-            imageUrl = `/api/vehicles/optimized/${vehicle.id}/${encodeURIComponent(imageName)}`;
+          // Use presigned URL directly (more reliable than optimized endpoint)
+          const s3Key = primaryImage.get('s3Key');
+          const imageFile = primaryImage.get('imageFile');
 
-            logger.debug('Using optimized endpoint for primary image', {
-              vehicleId: vehicle.id,
-              fileName,
-              imageUrl,
-            });
+          if (s3Key) {
+            imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+          } else if (imageFile) {
+            imageUrl = imageFile.url(); // Legacy Parse.File
           } else {
-            // Fallback to S3 URL if no fileName
-            const s3Key = primaryImage.get('s3Key');
-            const imageFile = primaryImage.get('imageFile');
-
-            if (s3Key) {
-              imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
-            } else if (imageFile) {
-              imageUrl = imageFile.url(); // Legacy Parse.File
-            } else {
-              imageUrl = primaryImage.get('url') || ''; // Legacy URL field
-            }
+            imageUrl = primaryImage.get('url') || ''; // Legacy URL field
           }
+
+          logger.debug('Found primary image for vehicle', {
+            vehicleId: vehicle.id,
+            imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : 'none',
+          });
         }
       } catch (error) {
         logger.warn('Failed to get primary image for vehicle', {
