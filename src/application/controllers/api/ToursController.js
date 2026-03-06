@@ -1244,39 +1244,41 @@ class ToursController {
                   optimizationMetadata,
                 };
 
-                // Generate presigned URLs for optimized formats if metadata exists
-                // The ServerImageOptimizationService creates files with the same path but different extensions
-                if (optimizationMetadata?.formats && s3Key) {
+                // Generate presigned URLs for optimized formats
+                // Try optimizationMetadata.formats first, fall back to optimizedVariants on TourImage
+                const storedVariants = primaryImage.get('optimizedVariants');
+                if (s3Key && (optimizationMetadata?.formats || storedVariants)) {
                   const variants = {};
                   const basePath = s3Key.replace(/\.[^.]+$/, ''); // Remove extension
 
-                  // Priority order: webp first (always newly created), then jpeg, then avif
-                  const formatPriority = ['webp', 'jpeg', 'avif'];
+                  // Priority order for <picture> element: avif, webp, jpeg (browser negotiates)
+                  const formatPriority = ['avif', 'webp', 'jpeg'];
 
                   for (const formatName of formatPriority) {
-                    if (Object.prototype.hasOwnProperty.call(optimizationMetadata.formats, formatName)) {
-                      const formatData = optimizationMetadata.formats[formatName];
-                      if (formatData && formatData.s3Key) {
+                    // First try optimizationMetadata.formats, then storedVariants
+                    const formatData = optimizationMetadata?.formats?.[formatName]
+                      || (storedVariants && storedVariants[formatName]);
+                    if (formatData && formatData.s3Key) {
+                      try {
+                        const url = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
+                        variants[formatName] = {
+                          s3Key: formatData.s3Key,
+                          format: formatName,
+                          url,
+                        };
+                      } catch (error) {
+                        // If variant URL fails, try the simple pattern
+                        const ext = formatName === 'jpeg' ? 'jpg' : formatName;
+                        const simpleKey = `${basePath}.${ext}`;
                         try {
-                          const url = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
+                          const url = await this.fileStorageService.getPresignedUrl(simpleKey);
                           variants[formatName] = {
-                            s3Key: formatData.s3Key,
+                            s3Key: simpleKey,
                             format: formatName,
                             url,
                           };
-                        } catch (error) {
-                          // If variant URL fails, try the simple pattern
-                          const simpleKey = `${basePath}.${formatName}`;
-                          try {
-                            const url = await this.fileStorageService.getPresignedUrl(simpleKey);
-                            variants[formatName] = {
-                              s3Key: simpleKey,
-                              format: formatName,
-                              url,
-                            };
-                          } catch (innerError) {
-                            // Variant doesn't exist, skip silently
-                          }
+                        } catch (innerError) {
+                          // Variant doesn't exist, skip silently
                         }
                       }
                     }
@@ -2444,6 +2446,30 @@ class ToursController {
   }
 
   /**
+   * Queue background optimization for an image missing optimized variants.
+   * Fire-and-forget: does not block the response.
+   * @param {Parse.Object} imageRecord - TourImage Parse object.
+   * @param {string} entityPath - S3 entity path (e.g., 'tours').
+   * @example
+   */
+  // eslint-disable-next-line no-underscore-dangle
+  _queueBackgroundOptimization(imageRecord, entityPath) {
+    if (!this.serverOptimizationService?.enableOptimization) return;
+
+    setImmediate(async () => {
+      try {
+        await this.serverOptimizationService.optimizeExistingImage(imageRecord, entityPath);
+        logger.info('Background optimization completed', { imageId: imageRecord.id });
+      } catch (error) {
+        logger.warn('Background optimization failed', {
+          imageId: imageRecord.id,
+          error: error.message,
+        });
+      }
+    });
+  }
+
+  /**
    * Format TourImage objects for response with optimization.
    * @param {Array<TourImage>} tourImages - Array of TourImage Parse objects.
    * @param {string} acceptHeader - Browser accept header for format negotiation.
@@ -2464,7 +2490,7 @@ class ToursController {
           // Strategy: Use optimizedVariants first, then fall back to original s3Key
           // Priority: WebP first (always newly created), then JPEG, then AVIF
           if (optimizedVariants && typeof optimizedVariants === 'object') {
-            const formatPriority = ['webp', 'jpeg', 'avif'];
+            const formatPriority = ['avif', 'webp', 'jpeg'];
 
             for (const format of formatPriority) {
               const variant = optimizedVariants[format];
@@ -2485,6 +2511,10 @@ class ToursController {
           if (!imageUrl && s3Key) {
             try {
               imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+              // Queue background optimization for images missing variants
+              if (!optimizedVariants) {
+                this._queueBackgroundOptimization(img, 'tours'); // eslint-disable-line no-underscore-dangle
+              }
             } catch (s3KeyError) {
               // Log error but continue
               logger.warn('Failed to get presigned URL for tour image', {

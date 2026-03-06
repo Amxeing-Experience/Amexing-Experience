@@ -26,6 +26,7 @@ const Vehicle = require('../../../domain/models/Vehicle');
 const VehicleType = require('../../../domain/models/VehicleType');
 const VehicleImage = require('../../../domain/models/VehicleImage');
 const FileStorageService = require('../../services/FileStorageService');
+const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
 const logger = require('../../../infrastructure/logger');
 
 /**
@@ -40,6 +41,14 @@ class VehicleController {
     this.fileStorageService = new FileStorageService({
       baseFolder: 'vehicles',
       isPublic: false, // Use presigned URLs with IAM role credentials
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+    });
+
+    // Initialize ServerImageOptimizationService for background optimization
+    this.serverOptimizationService = new ServerImageOptimizationService({
+      baseFolder: 'vehicles',
+      isPublic: false,
       deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
       presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
     });
@@ -207,15 +216,36 @@ class VehicleController {
           try {
             const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
             if (primaryImage) {
-              // Use presigned URL directly (more reliable than optimized endpoint)
               const s3Key = primaryImage.get('s3Key');
               const imageFile = primaryImage.get('imageFile');
+              const optimizedVariants = primaryImage.get('optimizedVariants');
 
-              if (s3Key) {
+              // Prefer optimized variants: webp > jpeg > avif
+              if (optimizedVariants && typeof optimizedVariants === 'object') {
+                const formatPriority = ['avif', 'webp', 'jpeg'];
+                for (const format of formatPriority) {
+                  const variant = optimizedVariants[format];
+                  if (variant?.s3Key) {
+                    try {
+                      imageUrl = await this.fileStorageService.getPresignedUrl(variant.s3Key);
+                      break;
+                    } catch (e) {
+                      // Continue to next format
+                    }
+                  }
+                }
+              }
+
+              // Fallback to original s3Key
+              if (!imageUrl && s3Key) {
                 imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
-              } else if (imageFile) {
+                // Queue background optimization for images missing variants
+                if (!optimizedVariants) {
+                  this._queueBackgroundOptimization(primaryImage, 'vehicles'); // eslint-disable-line no-underscore-dangle
+                }
+              } else if (!imageUrl && imageFile) {
                 imageUrl = imageFile.url(); // Legacy Parse.File
-              } else {
+              } else if (!imageUrl) {
                 imageUrl = primaryImage.get('url') || ''; // Legacy URL field
               }
 
@@ -320,15 +350,36 @@ class VehicleController {
       try {
         const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
         if (primaryImage) {
-          // Use presigned URL directly (more reliable than optimized endpoint)
           const s3Key = primaryImage.get('s3Key');
           const imageFile = primaryImage.get('imageFile');
+          const optimizedVariants = primaryImage.get('optimizedVariants');
 
-          if (s3Key) {
+          // Prefer optimized variants: webp > jpeg > avif
+          if (optimizedVariants && typeof optimizedVariants === 'object') {
+            const formatPriority = ['avif', 'webp', 'jpeg'];
+            for (const format of formatPriority) {
+              const variant = optimizedVariants[format];
+              if (variant?.s3Key) {
+                try {
+                  imageUrl = await this.fileStorageService.getPresignedUrl(variant.s3Key);
+                  break;
+                } catch (e) {
+                  // Continue to next format
+                }
+              }
+            }
+          }
+
+          // Fallback to original s3Key
+          if (!imageUrl && s3Key) {
             imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
-          } else if (imageFile) {
+            // Queue background optimization for images missing variants
+            if (!optimizedVariants) {
+              this._queueBackgroundOptimization(primaryImage, 'vehicles'); // eslint-disable-line no-underscore-dangle
+            }
+          } else if (!imageUrl && imageFile) {
             imageUrl = imageFile.url(); // Legacy Parse.File
-          } else {
+          } else if (!imageUrl) {
             imageUrl = primaryImage.get('url') || ''; // Legacy URL field
           }
 
@@ -808,6 +859,30 @@ class VehicleController {
 
       return this.sendError(res, 'Failed to delete vehicle', 500);
     }
+  }
+
+  /**
+   * Queue background optimization for an image missing optimized variants.
+   * Fire-and-forget: does not block the response.
+   * @param {Parse.Object} imageRecord - VehicleImage or TourImage.
+   * @param {string} entityPath - S3 entity path (e.g., 'vehicles').
+   * @example
+   */
+  // eslint-disable-next-line no-underscore-dangle
+  _queueBackgroundOptimization(imageRecord, entityPath) {
+    if (!this.serverOptimizationService?.enableOptimization) return;
+
+    setImmediate(async () => {
+      try {
+        await this.serverOptimizationService.optimizeExistingImage(imageRecord, entityPath);
+        logger.info('Background optimization completed', { imageId: imageRecord.id });
+      } catch (error) {
+        logger.warn('Background optimization failed', {
+          imageId: imageRecord.id,
+          error: error.message,
+        });
+      }
+    });
   }
 
   // =================

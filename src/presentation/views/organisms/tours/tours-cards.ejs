@@ -1713,15 +1713,6 @@ document.addEventListener('DOMContentLoaded', function() {
             let pictureElement = '';
             const primaryPhoto = tour.primaryPhoto;
             
-            // Debug logging
-            console.log('🖼️ Tour photo data:', {
-                tourName: destination,
-                hasPrimaryPhoto: !!primaryPhoto,
-                hasOptimizedVariants: !!(primaryPhoto?.optimizedVariants),
-                optimizationMetadata: primaryPhoto?.optimizationMetadata,
-                variants: primaryPhoto?.optimizedVariants ? Object.keys(primaryPhoto.optimizedVariants) : 'none'
-            });
-            
             if (primaryPhoto?.optimizedVariants) {
                 const variants = primaryPhoto.optimizedVariants;
                 let sources = [];
