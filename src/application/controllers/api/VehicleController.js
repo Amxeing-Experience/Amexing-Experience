@@ -26,6 +26,7 @@ const Vehicle = require('../../../domain/models/Vehicle');
 const VehicleType = require('../../../domain/models/VehicleType');
 const VehicleImage = require('../../../domain/models/VehicleImage');
 const FileStorageService = require('../../services/FileStorageService');
+const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
 const logger = require('../../../infrastructure/logger');
 
 /**
@@ -40,6 +41,14 @@ class VehicleController {
     this.fileStorageService = new FileStorageService({
       baseFolder: 'vehicles',
       isPublic: false, // Use presigned URLs with IAM role credentials
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+    });
+
+    // Initialize ServerImageOptimizationService for background optimization
+    this.serverOptimizationService = new ServerImageOptimizationService({
+      baseFolder: 'vehicles',
+      isPublic: false,
       deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
       presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
     });
@@ -170,6 +179,10 @@ class VehicleController {
       // Execute query
       const vehicles = await filteredQuery.find({ useMasterKey: true });
 
+      // Batch fetch all primary images in a single query (instead of N+1)
+      const vehicleIds = vehicles.map((v) => v.id);
+      const primaryImageMap = await VehicleImage.getPrimaryImagesForVehicles(vehicleIds);
+
       // Format data for DataTables
       const data = await Promise.all(
         vehicles.map(async (vehicle) => {
@@ -202,37 +215,64 @@ class VehicleController {
             };
           }
 
-          // Get primary image for vehicle
+          // Get primary image from batch-loaded map (O(1) lookup)
           let imageUrl = '';
           try {
-            const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
+            const primaryImage = primaryImageMap.get(vehicle.id) || null;
             if (primaryImage) {
-              // Use optimized endpoint for better performance (AVIF/WebP support)
-              const fileName = primaryImage.get('fileName');
-              if (fileName) {
-                // Remove file extension for the endpoint
-                const imageName = fileName.replace(/\.\w+$/, '');
-                // Use the optimized endpoint that serves AVIF/WebP based on Accept headers
-                imageUrl = `/api/vehicles/optimized/${vehicle.id}/${encodeURIComponent(imageName)}`;
+              const s3Key = primaryImage.get('s3Key');
+              const imageFile = primaryImage.get('imageFile');
+              const optimizedVariants = primaryImage.get('optimizedVariants');
+              const optimizationMetadata = primaryImage.get('optimizationMetadata');
+              const formatPriority = ['avif', 'webp', 'jpeg'];
 
-                logger.debug('Using optimized endpoint for primary image', {
-                  vehicleId: vehicle.id,
-                  fileName,
-                  imageUrl,
-                });
-              } else {
-                // Fallback to S3 URL if no fileName
-                const s3Key = primaryImage.get('s3Key');
-                const imageFile = primaryImage.get('imageFile');
-
-                if (s3Key) {
-                  imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
-                } else if (imageFile) {
-                  imageUrl = imageFile.url(); // Legacy Parse.File
-                } else {
-                  imageUrl = primaryImage.get('url') || ''; // Legacy URL field
+              // Prefer optimized variants (direct field on record)
+              if (optimizedVariants && typeof optimizedVariants === 'object') {
+                for (const format of formatPriority) {
+                  const variant = optimizedVariants[format];
+                  if (variant?.s3Key) {
+                    try {
+                      imageUrl = await this.fileStorageService.getPresignedUrl(variant.s3Key);
+                      break;
+                    } catch (e) {
+                      // Continue to next format
+                    }
+                  }
                 }
               }
+
+              // Fallback: try optimizationMetadata.formats (older uploads store variants here)
+              if (!imageUrl && optimizationMetadata?.formats && typeof optimizationMetadata.formats === 'object') {
+                for (const format of formatPriority) {
+                  const formatData = optimizationMetadata.formats[format];
+                  if (formatData?.s3Key) {
+                    try {
+                      imageUrl = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
+                      break;
+                    } catch (e) {
+                      // Continue to next format
+                    }
+                  }
+                }
+              }
+
+              // Fallback to original s3Key
+              if (!imageUrl && s3Key) {
+                imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+                // Queue background optimization for images missing variants
+                if (!optimizedVariants) {
+                  this._queueBackgroundOptimization(primaryImage, 'vehicles'); // eslint-disable-line no-underscore-dangle
+                }
+              } else if (!imageUrl && imageFile) {
+                imageUrl = imageFile.url(); // Legacy Parse.File
+              } else if (!imageUrl) {
+                imageUrl = primaryImage.get('url') || ''; // Legacy URL field
+              }
+
+              logger.debug('Found primary image for vehicle', {
+                vehicleId: vehicle.id,
+                imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : 'none',
+              });
             } else {
               logger.debug('No primary image found for vehicle', {
                 vehicleId: vehicle.id,
@@ -330,32 +370,59 @@ class VehicleController {
       try {
         const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
         if (primaryImage) {
-          // Use optimized endpoint for better performance (AVIF/WebP support)
-          const fileName = primaryImage.get('fileName');
-          if (fileName) {
-            // Remove file extension for the endpoint
-            const imageName = fileName.replace(/\.\w+$/, '');
-            // Use the optimized endpoint that serves AVIF/WebP based on Accept headers
-            imageUrl = `/api/vehicles/optimized/${vehicle.id}/${encodeURIComponent(imageName)}`;
+          const s3Key = primaryImage.get('s3Key');
+          const imageFile = primaryImage.get('imageFile');
+          const optimizedVariants = primaryImage.get('optimizedVariants');
+          const optimizationMetadata = primaryImage.get('optimizationMetadata');
+          const formatPriority = ['avif', 'webp', 'jpeg'];
 
-            logger.debug('Using optimized endpoint for primary image', {
-              vehicleId: vehicle.id,
-              fileName,
-              imageUrl,
-            });
-          } else {
-            // Fallback to S3 URL if no fileName
-            const s3Key = primaryImage.get('s3Key');
-            const imageFile = primaryImage.get('imageFile');
-
-            if (s3Key) {
-              imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
-            } else if (imageFile) {
-              imageUrl = imageFile.url(); // Legacy Parse.File
-            } else {
-              imageUrl = primaryImage.get('url') || ''; // Legacy URL field
+          // Prefer optimized variants (direct field on record)
+          if (optimizedVariants && typeof optimizedVariants === 'object') {
+            for (const format of formatPriority) {
+              const variant = optimizedVariants[format];
+              if (variant?.s3Key) {
+                try {
+                  imageUrl = await this.fileStorageService.getPresignedUrl(variant.s3Key);
+                  break;
+                } catch (e) {
+                  // Continue to next format
+                }
+              }
             }
           }
+
+          // Fallback: try optimizationMetadata.formats (older uploads store variants here)
+          if (!imageUrl && optimizationMetadata?.formats && typeof optimizationMetadata.formats === 'object') {
+            for (const format of formatPriority) {
+              const formatData = optimizationMetadata.formats[format];
+              if (formatData?.s3Key) {
+                try {
+                  imageUrl = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
+                  break;
+                } catch (e) {
+                  // Continue to next format
+                }
+              }
+            }
+          }
+
+          // Fallback to original s3Key
+          if (!imageUrl && s3Key) {
+            imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+            // Queue background optimization for images missing variants
+            if (!optimizedVariants) {
+              this._queueBackgroundOptimization(primaryImage, 'vehicles'); // eslint-disable-line no-underscore-dangle
+            }
+          } else if (!imageUrl && imageFile) {
+            imageUrl = imageFile.url(); // Legacy Parse.File
+          } else if (!imageUrl) {
+            imageUrl = primaryImage.get('url') || ''; // Legacy URL field
+          }
+
+          logger.debug('Found primary image for vehicle', {
+            vehicleId: vehicle.id,
+            imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : 'none',
+          });
         }
       } catch (error) {
         logger.warn('Failed to get primary image for vehicle', {
@@ -828,6 +895,30 @@ class VehicleController {
 
       return this.sendError(res, 'Failed to delete vehicle', 500);
     }
+  }
+
+  /**
+   * Queue background optimization for an image missing optimized variants.
+   * Fire-and-forget: does not block the response.
+   * @param {Parse.Object} imageRecord - VehicleImage or TourImage.
+   * @param {string} entityPath - S3 entity path (e.g., 'vehicles').
+   * @example
+   */
+  // eslint-disable-next-line no-underscore-dangle
+  _queueBackgroundOptimization(imageRecord, entityPath) {
+    if (!this.serverOptimizationService?.enableOptimization) return;
+
+    setImmediate(async () => {
+      try {
+        await this.serverOptimizationService.optimizeExistingImage(imageRecord, entityPath);
+        logger.info('Background optimization completed', { imageId: imageRecord.id });
+      } catch (error) {
+        logger.warn('Background optimization failed', {
+          imageId: imageRecord.id,
+          error: error.message,
+        });
+      }
+    });
   }
 
   // =================

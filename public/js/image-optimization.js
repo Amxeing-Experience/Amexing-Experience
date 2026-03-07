@@ -148,7 +148,7 @@ class ImageOptimization {
     const fallbacks = [
       img.dataset.fallbackWebp,
       img.dataset.fallbackJpeg,
-      '/images/placeholder-vehicle.jpg'
+      '/img/amexing_logo_horizontal.avif'
     ];
 
     for (const fallback of fallbacks) {

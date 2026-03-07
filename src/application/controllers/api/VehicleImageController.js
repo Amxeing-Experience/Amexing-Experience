@@ -326,8 +326,6 @@ class VehicleImageController {
         });
       }
 
-      const acceptHeader = req.get('accept');
-
       // Verify vehicle exists
       const vehicle = await new Parse.Query('Vehicle').get(vehicleId, {
         useMasterKey: true,
@@ -347,42 +345,71 @@ class VehicleImageController {
           const s3Key = img.get('s3Key');
           const imageFile = img.get('imageFile'); // Legacy Parse.File support
 
-          // Debug log
-          console.log(
-            'Processing image:',
-            img.get('fileName'),
-            'optimizationMetadata:',
-            img.get('optimizationMetadata')
-          );
-
-          // Generate optimized URLs if optimization is enabled
+          // Generate presigned URLs directly (avoid /api/vehicles/optimized route)
           let imageData = null;
 
           try {
-            if (s3Key && this.imageOptimizationService && this.imageOptimizationService.enableOptimization) {
-              // Get optimized image with best format for client
-              imageData = await this.imageOptimizationService.getImageWithOptimalFormat(img, acceptHeader);
-            } else {
-              // Fallback to standard presigned URL
-              let url = null;
-              if (s3Key) {
-                url = await this.fileStorageService.getPresignedUrl(s3Key);
-              } else if (imageFile) {
-                url = imageFile.url(); // Legacy Parse.File
-              } else {
-                url = img.get('url'); // Very old legacy local path
-              }
+            let url = null;
+            const optimizedVariants = img.get('optimizedVariants');
+            const optimizationMetadata = img.get('optimizationMetadata');
+            const formatPriority = ['avif', 'webp', 'jpeg'];
 
-              if (!url) {
-                console.warn('No URL could be generated for image:', img.id);
-                // Create a placeholder or skip this image
-                url = '/images/placeholder-image.svg';
+            // Prefer optimized variants (direct field on record)
+            if (optimizedVariants && typeof optimizedVariants === 'object') {
+              for (const format of formatPriority) {
+                const variant = optimizedVariants[format];
+                if (variant?.s3Key) {
+                  try {
+                    url = await this.fileStorageService.getPresignedUrl(variant.s3Key);
+                    if (url) break;
+                  } catch (e) {
+                    // Continue to next format
+                  }
+                }
               }
-
-              imageData = { url };
             }
+
+            // Fallback: try optimizationMetadata.formats (older uploads store variants here)
+            if (!url && optimizationMetadata?.formats && typeof optimizationMetadata.formats === 'object') {
+              for (const format of formatPriority) {
+                const formatData = optimizationMetadata.formats[format];
+                if (formatData?.s3Key) {
+                  try {
+                    url = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
+                    if (url) break;
+                  } catch (e) {
+                    // Continue to next format
+                  }
+                }
+              }
+            }
+
+            // Fallback to original s3Key
+            if (!url && s3Key) {
+              url = await this.fileStorageService.getPresignedUrl(s3Key);
+              // Queue background optimization for images missing variants
+              if (!optimizedVariants && this.serverOptimizationService?.enableOptimization) {
+                setImmediate(async () => {
+                  try {
+                    await this.serverOptimizationService.optimizeExistingImage(img, 'vehicles');
+                    logger.info('Background optimization completed', { imageId: img.id });
+                  } catch (bgError) {
+                    logger.warn('Background optimization failed', {
+                      imageId: img.id,
+                      error: bgError.message,
+                    });
+                  }
+                });
+              }
+            } else if (!url && imageFile) {
+              url = imageFile.url(); // Legacy Parse.File
+            } else if (!url) {
+              url = img.get('url') || '/images/placeholder-image.svg';
+            }
+
+            imageData = { url };
           } catch (error) {
-            console.error('Error generating image URL:', error);
+            logger.error('Error generating image URL', { imageId: img.id, error: error.message });
             imageData = { url: '/images/placeholder-image.svg' };
           }
 
@@ -400,11 +427,6 @@ class VehicleImageController {
             uploadedAt: img.get('uploadedAt'),
             optimizationMetadata,
           };
-
-          console.log('Returning image data:', {
-            fileName: result.fileName,
-            optimizationMetadata: result.optimizationMetadata,
-          });
 
           return result;
         })
