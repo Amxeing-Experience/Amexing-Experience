@@ -785,50 +785,6 @@ class FileStorageService {
   }
 
   /**
-   * Download file from S3 by key.
-   * @param {string} s3Key - S3 object key (full path including prefix).
-   * @returns {Promise<Buffer>} File contents as Buffer.
-   * @throws {Error} If download fails.
-   * @example
-   */
-  async downloadFile(s3Key) {
-    try {
-      const AWS = require('aws-sdk');
-      const region = getEnvironmentRegion();
-
-      AWS.config.update({
-        region,
-        maxRetries: 3,
-        httpOptions: { timeout: 10000, connectTimeout: 5000 },
-      });
-
-      if (!process.env.AWS_ACCESS_KEY_ID) {
-        AWS.config.credentials = new AWS.EC2MetadataCredentials({
-          httpOptions: { timeout: 5000 },
-          maxRetries: 3,
-        });
-      }
-
-      const s3 = new AWS.S3();
-      const result = await s3
-        .getObject({
-          Bucket: process.env.S3_BUCKET,
-          Key: s3Key,
-        })
-        .promise();
-
-      logger.debug('File downloaded from S3', { s3Key, size: result.Body.length });
-      return result.Body;
-    } catch (error) {
-      logger.error('Error downloading file from S3', {
-        error: error.message,
-        s3Key,
-      });
-      throw error;
-    }
-  }
-
-  /**
    * List files in S3 with optional prefix filter.
    * @param {string} prefix - Prefix filter (folder path or entity ID).
    * @returns {Promise<Array>} Array of S3 object metadata.

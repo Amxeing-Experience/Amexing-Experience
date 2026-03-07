@@ -31,7 +31,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 </h5>
                 <small class="text-white" style="opacity: 0.9;">Administra empleados de Amexing</small>
             </div>
-            <div class="col-auto">
+            <div class="col-auto d-flex align-items-center gap-3">
+                <!-- Toggle for including unassigned users -->
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="includeUnassignedToggle" style="background-color: rgba(255,255,255,0.3); border-color: rgba(255,255,255,0.5);">
+                    <label class="form-check-label text-white small" for="includeUnassignedToggle" style="opacity: 0.95;">
+                        Mostrar usuarios administradores
+                    </label>
+                </div>
+                
                 <% if (canCreate) { %>
                     <button type="button" class="btn btn-light btn-sm" id="createEmployeeBtn">
                         <i class="ti ti-plus me-1"></i>Nuevo Empleado
@@ -302,6 +310,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 params.search = data.search.value;
             }
 
+            // Check if includeUnassigned toggle is enabled
+            const includeUnassignedToggle = document.getElementById('includeUnassignedToggle');
+            if (includeUnassignedToggle && includeUnassignedToggle.checked) {
+                params.includeUnassigned = 'true';
+            }
+
             $.ajax({
                 url: API,
                 type: 'GET',
@@ -492,6 +506,22 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             });
         }
+    });
+    
+    // Include unassigned toggle handler
+    $('#includeUnassignedToggle').on('change', function() {
+        const isChecked = $(this).is(':checked');
+        const label = $('label[for="includeUnassignedToggle"]');
+        
+        // Update label text based on toggle state
+        if (isChecked) {
+            label.text('Mostrando los usuarios admin');
+        } else {
+            label.text('Mostrar usuarios administradores');
+        }
+        
+        // Reload the DataTable with the new filter
+        table.ajax.reload(null, false); // false = don't reset pagination
     });
     
     // Multiple roles checkbox handlers
