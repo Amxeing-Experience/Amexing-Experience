@@ -648,29 +648,23 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
                 // No images found, show placeholder
                 carouselContainer.append(`
                     <div class="carousel-item active">
-                        <div class="d-flex align-items-center justify-content-center" 
-                             style="height: 150px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 5px;">
-                            <div class="text-center">
-                                <i class="ti ti-car text-muted fs-3"></i>
-                                <small class="text-muted d-block">Sin imagen</small>
-                            </div>
+                        <div class="d-flex align-items-center justify-content-center"
+                             style="height: 150px; background: #ffffff; border-radius: 5px;">
+                            <img src="/img/amexing_logo_horizontal.avif" alt="Amexing" style="max-width: 60%; max-height: 50%; object-fit: contain;">
                         </div>
                     </div>
                 `);
             }
-            
+
         } catch (error) {
             console.error('Error loading vehicle carousel:', error);
             // Show placeholder on error
             const carouselContainer = $('#carousel-images');
             carouselContainer.html(`
                 <div class="carousel-item active">
-                    <div class="d-flex align-items-center justify-content-center" 
-                         style="height: 150px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 5px;">
-                        <div class="text-center">
-                            <i class="ti ti-car text-muted fs-3"></i>
-                            <small class="text-muted d-block">Sin imagen</small>
-                        </div>
+                    <div class="d-flex align-items-center justify-content-center"
+                         style="height: 150px; background: #ffffff; border-radius: 5px;">
+                        <img src="/img/amexing_logo_horizontal.avif" alt="Amexing" style="max-width: 60%; max-height: 50%; object-fit: contain;">
                     </div>
                 </div>
             `);

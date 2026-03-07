@@ -56,6 +56,34 @@ const crypto = require('crypto');
 const logger = require('../../infrastructure/logger');
 const { getEnvironmentRegion } = require('../../infrastructure/aws/awsRegionValidator');
 
+// Module-level presigned URL cache (shared across all FileStorageService instances)
+const presignedUrlCache = new Map();
+const CACHE_TTL_MS = 50 * 60 * 1000; // 50 minutes (URLs expire in 1h, refresh 10min early)
+const MAX_CACHE_SIZE = 2000;
+
+// Module-level reusable S3 client (avoids recreating per presigned URL call)
+let _s3Client = null;
+let _s3ClientRegion = null;
+
+/**
+ * Get or create a reusable S3 client for the given region.
+ * @param {string} region - AWS region for the S3 client.
+ * @returns {object} AWS S3 client instance.
+ * @example
+ */
+function getS3Client(region) {
+  if (_s3Client && _s3ClientRegion === region) return _s3Client;
+  const AWS = require('aws-sdk');
+  AWS.config.update({
+    region,
+    maxRetries: 3,
+    httpOptions: { timeout: 5000, connectTimeout: 5000 },
+  });
+  _s3Client = new AWS.S3({ signatureVersion: 'v4' });
+  _s3ClientRegion = region;
+  return _s3Client;
+}
+
 /**
  * AWS S3 Direct Upload File Storage Service
  * Provides secure file upload, download, and deletion operations using AWS SDK directly.
@@ -246,6 +274,7 @@ class FileStorageService {
    * @param {object} options - Additional options.
    * @param {string} options.deletedBy - User ID who initiated deletion.
    * @param {string} options.reason - Deletion reason for audit.
+   * @param s3Key
    * @returns {Promise<object>} Result object with success, strategy, location.
    * @throws {Error} If deletion fails or unknown strategy.
    * @example
@@ -255,8 +284,26 @@ class FileStorageService {
    * });
    * // result: { success: true, strategy: 'move', location: 'deleted/vehicles/...' }
    */
+  static clearCacheForKey(s3Key) {
+    if (s3Key && presignedUrlCache.has(s3Key)) {
+      presignedUrlCache.delete(s3Key);
+      logger.debug('Presigned URL cache entry invalidated', { s3Key });
+    }
+  }
+
+  /**
+   * Delete a file using the configured deletion strategy.
+   * @param {object|string} parseFile - Parse File object or S3 key string.
+   * @param {object} options - Deletion options.
+   * @returns {Promise<object>} Deletion result.
+   * @example
+   */
   async deleteFile(parseFile, options = {}) {
     try {
+      // Invalidate cached presigned URL for the deleted file
+      const s3Key = typeof parseFile.name === 'function' ? parseFile.name() : parseFile;
+      FileStorageService.clearCacheForKey(s3Key);
+
       switch (this.deletionStrategy) {
         case 'soft':
           return await this._softDelete(parseFile, options);
@@ -325,27 +372,22 @@ class FileStorageService {
         return directUrl;
       }
 
+      // Check cache for existing presigned URL
+      const cached = presignedUrlCache.get(s3Key);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        logger.debug('Presigned URL cache hit', { s3Key });
+        return cached.url;
+      }
+
       // For private files, generate presigned URL with signature
-      const AWS = require('aws-sdk');
-
-      // Configure AWS to use EC2 instance metadata with IMDSv2
-      AWS.config.update({
-        region,
-        maxRetries: 3,
-        httpOptions: {
-          timeout: 5000, // 5 second timeout
-          connectTimeout: 5000,
-        },
-      });
-
-      // Use EC2 Metadata credentials explicitly if no env credentials
-      if (!process.env.AWS_ACCESS_KEY_ID) {
+      // Use EC2 Metadata credentials explicitly if no env credentials (first time only)
+      if (!process.env.AWS_ACCESS_KEY_ID && !_s3Client) {
+        const AWS = require('aws-sdk');
         const credentials = new AWS.EC2MetadataCredentials({
           httpOptions: { timeout: 5000 },
           maxRetries: 3,
         });
 
-        // IMPORTANT: Wait for credentials to load before generating URL
         await new Promise((resolve, reject) => {
           credentials.get((err) => {
             if (err) {
@@ -366,9 +408,7 @@ class FileStorageService {
         AWS.config.credentials = credentials;
       }
 
-      const s3 = new AWS.S3({
-        signatureVersion: 'v4',
-      });
+      const s3 = getS3Client(region);
 
       const expiration = expiresIn || this.presignedUrlExpires;
       const params = {
@@ -402,6 +442,13 @@ class FileStorageService {
         expiresIn: expiration,
         urlLength: url.length,
       });
+
+      // Store in cache
+      if (presignedUrlCache.size >= MAX_CACHE_SIZE) {
+        presignedUrlCache.clear();
+        logger.debug('Presigned URL cache cleared (max size reached)');
+      }
+      presignedUrlCache.set(s3Key, { url, timestamp: Date.now() });
 
       return url;
     } catch (error) {
@@ -591,6 +638,9 @@ class FileStorageService {
    */
   async _moveToDeleted(parseFile, options) {
     try {
+      // Invalidate cached presigned URL
+      FileStorageService.clearCacheForKey(parseFile.name());
+
       // Use AWS SDK directly for copy/delete operations
       // Parse.File doesn't support move/copy natively
       const AWS = require('aws-sdk');
@@ -729,6 +779,50 @@ class FileStorageService {
       logger.error('Error hard deleting file from S3', {
         error: error.message,
         fileName: parseFile.name(),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Download file from S3 by key.
+   * @param {string} s3Key - S3 object key (full path including prefix).
+   * @returns {Promise<Buffer>} File contents as Buffer.
+   * @throws {Error} If download fails.
+   * @example
+   */
+  async downloadFile(s3Key) {
+    try {
+      const AWS = require('aws-sdk');
+      const region = getEnvironmentRegion();
+
+      AWS.config.update({
+        region,
+        maxRetries: 3,
+        httpOptions: { timeout: 10000, connectTimeout: 5000 },
+      });
+
+      if (!process.env.AWS_ACCESS_KEY_ID) {
+        AWS.config.credentials = new AWS.EC2MetadataCredentials({
+          httpOptions: { timeout: 5000 },
+          maxRetries: 3,
+        });
+      }
+
+      const s3 = new AWS.S3();
+      const result = await s3
+        .getObject({
+          Bucket: process.env.S3_BUCKET,
+          Key: s3Key,
+        })
+        .promise();
+
+      logger.debug('File downloaded from S3', { s3Key, size: result.Body.length });
+      return result.Body;
+    } catch (error) {
+      logger.error('Error downloading file from S3', {
+        error: error.message,
+        s3Key,
       });
       throw error;
     }

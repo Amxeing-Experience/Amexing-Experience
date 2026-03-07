@@ -249,17 +249,11 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
 .experience-card-image .no-image {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #9ca3af;
     width: 100%;
     height: 100%;
-}
-
-.experience-card-image .no-image i {
-    font-size: 3rem;
-    margin-bottom: 0.5rem;
+    background: #ffffff;
 }
 
 .experience-source-badge {
@@ -1105,8 +1099,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         '<div class="progressive-loader"><div class="loading-pulse"></div></div>' : ''}
                                 </div>` :
                                 `<div class="no-image">
-                                    <i class="ti ti-photo"></i>
-                                    <span>Sin imagen</span>
+                                    <img src="/img/amexing_logo_horizontal.avif" alt="Amexing" style="max-width: 60%; max-height: 50%; object-fit: contain;">
                                 </div>`
                             }
                         </div>
@@ -1253,9 +1246,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     const container = this.closest('.experience-card-image');
                     if (container) {
                         container.innerHTML = `
-                            <div class="no-image" style="display: flex; align-items: center; justify-content: center; height: 200px; background: #f8f9fa; color: #6c757d;">
-                                <i class="ti ti-photo me-1"></i>
-                                <span>Imagen no disponible</span>
+                            <div class="no-image" style="display: flex; align-items: center; justify-content: center; height: 200px; background: #ffffff;">
+                                <img src="/img/amexing_logo_horizontal.avif" alt="Amexing" style="max-width: 60%; max-height: 50%; object-fit: contain;">
                             </div>
                         `;
                     }
