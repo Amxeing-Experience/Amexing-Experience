@@ -2634,6 +2634,7 @@ class ToursController {
    * Extract S3 object key from an S3 URL.
    * @param {string} url - S3 URL to extract key from.
    * @returns {string|null} S3 key or null if not extractable.
+   * @example
    */
   extractS3KeyFromUrl(url) {
     if (!url) return null;

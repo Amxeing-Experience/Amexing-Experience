@@ -425,6 +425,7 @@ class VehicleImage extends BaseModel {
   /**
    * Recalculate display order based on creation time.
    * @param {string} vehicleId - Vehicle ID.
+   * @param vehicleIds
    * @returns {Promise<void>}
    * @example
    * await VehicleImage.recalculateDisplayOrder('vehicleId123');

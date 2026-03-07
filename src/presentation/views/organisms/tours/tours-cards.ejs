@@ -1728,24 +1728,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 // Add optimized JPEG if available, otherwise use original
-                const jpegUrl = variants.jpeg?.url || primaryPhoto.url || '/images/placeholder-tour.jpg';
-                
-                pictureElement = `
-                    <picture>
-                        ${sources.join('\n                        ')}
-                        <img src="${jpegUrl}" alt="Tour ${destination}" class="tour-card-image" 
-                             onerror="this.src='/images/placeholder-tour.jpg'"
-                             loading="lazy">
-                    </picture>
-                `;
+                const jpegUrl = variants.jpeg?.url || primaryPhoto.url || '';
+
+                if (jpegUrl) {
+                    pictureElement = `
+                        <picture>
+                            ${sources.join('\n                            ')}
+                            <img src="${jpegUrl}" alt="Tour ${destination}" class="tour-card-image"
+                                 onerror="this.onerror=null; this.src='/img/amexing_logo_horizontal.avif'; this.style.objectFit='contain'; this.style.background='#ffffff'; this.style.padding='20px';"
+                                 loading="lazy">
+                        </picture>
+                    `;
+                } else {
+                    pictureElement = `
+                        <div class="tour-card-image" style="display: flex; align-items: center; justify-content: center; background: #ffffff;">
+                            <img src="/img/amexing_logo_horizontal.avif" alt="Amexing" style="max-width: 60%; max-height: 50%; object-fit: contain;">
+                        </div>
+                    `;
+                }
             } else {
                 // Fallback to simple img if no optimization available
-                const imageUrl = primaryPhoto?.url || '/images/placeholder-tour.jpg';
-                pictureElement = `
-                    <img src="${imageUrl}" alt="Tour ${destination}" class="tour-card-image" 
-                         onerror="this.src='/images/placeholder-tour.jpg'"
-                         loading="lazy">
-                `;
+                const imageUrl = primaryPhoto?.url || '';
+                if (imageUrl) {
+                    pictureElement = `
+                        <img src="${imageUrl}" alt="Tour ${destination}" class="tour-card-image"
+                             onerror="this.onerror=null; this.src='/img/amexing_logo_horizontal.avif'; this.style.objectFit='contain'; this.style.background='#ffffff'; this.style.padding='20px';"
+                             loading="lazy">
+                    `;
+                } else {
+                    pictureElement = `
+                        <div class="tour-card-image" style="display: flex; align-items: center; justify-content: center; background: #ffffff;">
+                            <img src="/img/amexing_logo_horizontal.avif" alt="Amexing" style="max-width: 60%; max-height: 50%; object-fit: contain;">
+                        </div>
+                    `;
+                }
             }
             
             return `
@@ -1964,7 +1980,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Set initial data and show loading
         heroTitle.textContent = tourName;
-        heroImage.src = '/images/placeholder-tour.jpg'; // Default placeholder
+        heroImage.src = '/img/amexing_logo_horizontal.avif'; // Default placeholder
+        heroImage.style.objectFit = 'contain';
+        heroImage.style.background = '#ffffff';
+        heroImage.style.padding = '20px';
         modalLoading.style.display = 'block';
         tabContent.style.display = 'none';
         
@@ -2023,12 +2042,21 @@ document.addEventListener('DOMContentLoaded', function() {
             if (tour.photos && tour.photos.length > 0) {
                 const firstPhoto = tour.photos[0];
                 heroImage.src = getOptimizedImageUrl(firstPhoto);
+                heroImage.style.objectFit = 'cover';
+                heroImage.style.background = '';
+                heroImage.style.padding = '';
                 photoCountBadge.textContent = tour.photos.length;
             } else if (tour.primaryPhoto) {
                 heroImage.src = getOptimizedImageUrl(tour.primaryPhoto);
+                heroImage.style.objectFit = 'cover';
+                heroImage.style.background = '';
+                heroImage.style.padding = '';
                 photoCountBadge.textContent = '1';
             } else {
-                heroImage.src = '/images/placeholder-tour.jpg';
+                heroImage.src = '/img/amexing_logo_horizontal.avif';
+                heroImage.style.objectFit = 'contain';
+                heroImage.style.background = '#ffffff';
+                heroImage.style.padding = '20px';
                 photoCountBadge.textContent = '0';
             }
             
@@ -2041,7 +2069,10 @@ document.addEventListener('DOMContentLoaded', function() {
             heroImage.onerror = () => {
                 heroImageContainer.classList.remove('loading');
                 heroImageContainer.classList.add('error');
-                heroImage.src = '/images/placeholder-tour.jpg';
+                heroImage.src = '/img/amexing_logo_horizontal.avif';
+                heroImage.style.objectFit = 'contain';
+                heroImage.style.background = '#ffffff';
+                heroImage.style.padding = '20px';
             };
             
             // If image is already loaded (from cache), trigger load event
@@ -2938,7 +2969,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (photo.url) return photo.url;
         
         // Final fallback
-        return photo.s3Key ? `https://amexing-bucket.s3.us-east-2.amazonaws.com/${photo.s3Key}` : '/images/placeholder-tour.jpg';
+        return photo.s3Key ? `https://amexing-bucket.s3.us-east-2.amazonaws.com/${photo.s3Key}` : '/img/amexing_logo_horizontal.avif';
     }
     
     // Create optimized picture element with multiple source formats

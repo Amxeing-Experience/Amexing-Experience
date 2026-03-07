@@ -69,6 +69,7 @@ let _s3ClientRegion = null;
  * Get or create a reusable S3 client for the given region.
  * @param {string} region - AWS region for the S3 client.
  * @returns {object} AWS S3 client instance.
+ * @example
  */
 function getS3Client(region) {
   if (_s3Client && _s3ClientRegion === region) return _s3Client;
@@ -273,6 +274,7 @@ class FileStorageService {
    * @param {object} options - Additional options.
    * @param {string} options.deletedBy - User ID who initiated deletion.
    * @param {string} options.reason - Deletion reason for audit.
+   * @param s3Key
    * @returns {Promise<object>} Result object with success, strategy, location.
    * @throws {Error} If deletion fails or unknown strategy.
    * @example
@@ -294,6 +296,7 @@ class FileStorageService {
    * @param {object|string} parseFile - Parse File object or S3 key string.
    * @param {object} options - Deletion options.
    * @returns {Promise<object>} Deletion result.
+   * @example
    */
   async deleteFile(parseFile, options = {}) {
     try {
