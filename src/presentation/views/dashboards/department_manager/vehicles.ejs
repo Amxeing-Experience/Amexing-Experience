@@ -227,8 +227,12 @@ const menuItems = [
 }
 
 .vehicle-card-image .no-image {
-    color: #9ca3af;
-    font-size: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background: #ffffff;
 }
 
 .vehicle-type-badge {
@@ -511,8 +515,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="vehicle-card-image">
                             ${imageUrl ? 
                                 `<img src="${imageUrl}" alt="${vehicle.brand} ${vehicle.model}" class="vehicle-main-image" data-has-fallback="true">
-                                 <div class="no-image" style="display: none;"><i class="ti ti-car"></i></div>` :
-                                `<div class="no-image"><i class="ti ti-car"></i></div>`
+                                 <div class="no-image" style="display: none;"><img src="/img/amexing_logo_horizontal.avif" alt="Amexing" style="max-width: 60%; max-height: 50%; object-fit: contain;"></div>` :
+                                `<div class="no-image"><img src="/img/amexing_logo_horizontal.avif" alt="Amexing" style="max-width: 60%; max-height: 50%; object-fit: contain;"></div>`
                             }
                             <div class="vehicle-type-badge">
                                 ${typeName}

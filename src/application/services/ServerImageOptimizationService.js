@@ -214,6 +214,104 @@ class ServerImageOptimizationService extends FileStorageService {
   }
 
   /**
+   * Optimize an existing image record that has no optimized variants.
+   * Downloads the original from S3, creates variants, and updates the record.
+   * @param {Parse.Object} imageRecord - VehicleImage or TourImage Parse object.
+   * @param {string} entityPath - S3 entity path (e.g., 'vehicles/abc123' or 'tours/xyz').
+   * @param _entityPath
+   * @returns {Promise<object>} Optimization result.
+   * @example
+   */
+  async optimizeExistingImage(imageRecord, _entityPath = 'general') {
+    const s3Key = imageRecord.get('s3Key');
+    if (!s3Key) {
+      throw new Error('Image record has no s3Key');
+    }
+
+    const fileBuffer = await this.downloadFile(s3Key);
+    const basePath = s3Key.replace(/\.[^.]+$/, '');
+    const extension = this.getFileExtension(s3Key);
+
+    const optimizedVariants = {};
+
+    // Create AVIF variant
+    try {
+      const avifBuffer = await sharp(fileBuffer).avif({ quality: 85, effort: 4 }).toBuffer();
+      const avifKey = `${basePath}.avif`;
+      await this.uploadFile(avifBuffer, avifKey, 'image/avif', { customS3Key: avifKey });
+      optimizedVariants.avif = { s3Key: avifKey, format: 'avif' };
+    } catch (error) {
+      logger.warn('Background optimization: failed to create AVIF variant', {
+        imageId: imageRecord.id,
+        error: error.message,
+      });
+    }
+
+    // Create WebP variant
+    try {
+      const webpBuffer = await sharp(fileBuffer).webp({ quality: 90, effort: 4 }).toBuffer();
+      const webpKey = `${basePath}.webp`;
+      await this.uploadFile(webpBuffer, webpKey, 'image/webp', { customS3Key: webpKey });
+      optimizedVariants.webp = { s3Key: webpKey, format: 'webp' };
+    } catch (error) {
+      logger.warn('Background optimization: failed to create WebP variant', {
+        imageId: imageRecord.id,
+        error: error.message,
+      });
+    }
+
+    // Create optimized JPEG if original isn't JPEG
+    if (extension !== 'jpg' && extension !== 'jpeg') {
+      try {
+        const jpegBuffer = await sharp(fileBuffer)
+          .jpeg({ quality: 92, progressive: true, mozjpeg: true })
+          .toBuffer();
+        const jpegKey = `${basePath}.jpg`;
+        await this.uploadFile(jpegBuffer, jpegKey, 'image/jpeg', { customS3Key: jpegKey });
+        optimizedVariants.jpeg = { s3Key: jpegKey, format: 'jpeg' };
+      } catch (error) {
+        logger.warn('Background optimization: failed to create JPEG variant', {
+          imageId: imageRecord.id,
+          error: error.message,
+        });
+      }
+    } else {
+      optimizedVariants.jpeg = { s3Key, format: 'jpeg' };
+    }
+
+    // Build optimization metadata
+    const optimizationMetadata = {
+      formats: {},
+      original: { s3Key, format: extension },
+      backgroundOptimized: true,
+      optimizedAt: new Date().toISOString(),
+    };
+
+    if (optimizedVariants.avif) {
+      optimizationMetadata.formats.avif = { s3Key: optimizedVariants.avif.s3Key };
+    }
+    if (optimizedVariants.webp) {
+      optimizationMetadata.formats.webp = { s3Key: optimizedVariants.webp.s3Key };
+    }
+    if (optimizedVariants.jpeg) {
+      optimizationMetadata.formats.jpeg = { s3Key: optimizedVariants.jpeg.s3Key };
+    }
+
+    // Update the image record
+    imageRecord.set('optimizedVariants', optimizedVariants);
+    imageRecord.set('optimizationMetadata', optimizationMetadata);
+    await imageRecord.save(null, { useMasterKey: true });
+
+    logger.info('Background optimization completed for existing image', {
+      imageId: imageRecord.id,
+      s3Key,
+      formats: Object.keys(optimizedVariants),
+    });
+
+    return { success: true, optimizedVariants, metadata: optimizationMetadata };
+  }
+
+  /**
    * Process image into specific format and size.
    * @param buffer
    * @param format

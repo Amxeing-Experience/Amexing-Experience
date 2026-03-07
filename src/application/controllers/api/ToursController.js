@@ -73,7 +73,6 @@ class ToursController {
    * // Usage example documented above
    */
   async getTours(req, res) {
-    console.log('🚀 getTours API called!', req.query);
     try {
       const currentUser = req.user;
       if (!currentUser) {
@@ -217,9 +216,6 @@ class ToursController {
       const data = tours.map((tour) => {
         const destinationPOI = tour.get('destinationPOI');
 
-        // Debug every tour
-        console.log(`🔍 Processing tour ${tour.id} - ${destinationPOI?.get('name')}`);
-
         // Add client pricing information if available
         const tourClientPrices = {};
         if (clientId && clientPricesMap.size > 0) {
@@ -230,18 +226,6 @@ class ToursController {
               tourClientPrices[`${rateId}_${vehicleId}`] = priceInfo;
             }
           }
-        }
-
-        // Debug logging for Atotonilco tour
-        if (destinationPOI?.get('name') === 'Atotonilco') {
-          console.log('🔍 DEBUG - Atotonilco tour data from database:');
-          console.log('  - description:', tour.get('description'));
-          console.log('  - price:', tour.get('price'));
-          console.log('  - price_child:', tour.get('price_child'));
-          console.log('  - price_no_alcohol:', tour.get('price_no_alcohol'));
-          console.log('  - languages:', tour.get('languages'));
-          console.log('  - includes:', tour.get('includes'));
-          console.log('  - All attributes:', Object.keys(tour.attributes));
         }
 
         return {
@@ -312,7 +296,6 @@ class ToursController {
    * @example
    */
   async getTourById(req, res) {
-    console.log('🔍 getTourById called for tour:', req.params.id);
     try {
       const currentUser = req.user;
       if (!currentUser) {
@@ -1261,37 +1244,41 @@ class ToursController {
                   optimizationMetadata,
                 };
 
-                // Generate presigned URLs for optimized formats if metadata exists
-                // The ServerImageOptimizationService creates files with the same path but different extensions
-                if (optimizationMetadata?.formats && s3Key) {
+                // Generate presigned URLs for optimized formats
+                // Try optimizationMetadata.formats first, fall back to optimizedVariants on TourImage
+                const storedVariants = primaryImage.get('optimizedVariants');
+                if (s3Key && (optimizationMetadata?.formats || storedVariants)) {
                   const variants = {};
                   const basePath = s3Key.replace(/\.[^.]+$/, ''); // Remove extension
 
-                  // Check each format from metadata
-                  for (const formatName in optimizationMetadata.formats) {
-                    if (Object.prototype.hasOwnProperty.call(optimizationMetadata.formats, formatName)) {
-                      const formatData = optimizationMetadata.formats[formatName];
-                      if (formatData && formatData.s3Key) {
+                  // Priority order for <picture> element: avif, webp, jpeg (browser negotiates)
+                  const formatPriority = ['avif', 'webp', 'jpeg'];
+
+                  for (const formatName of formatPriority) {
+                    // First try optimizationMetadata.formats, then storedVariants
+                    const formatData = optimizationMetadata?.formats?.[formatName]
+                      || (storedVariants && storedVariants[formatName]);
+                    if (formatData && formatData.s3Key) {
+                      try {
+                        const url = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
+                        variants[formatName] = {
+                          s3Key: formatData.s3Key,
+                          format: formatName,
+                          url,
+                        };
+                      } catch (error) {
+                        // If variant URL fails, try the simple pattern
+                        const ext = formatName === 'jpeg' ? 'jpg' : formatName;
+                        const simpleKey = `${basePath}.${ext}`;
                         try {
-                          const url = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
+                          const url = await this.fileStorageService.getPresignedUrl(simpleKey);
                           variants[formatName] = {
-                            s3Key: formatData.s3Key,
+                            s3Key: simpleKey,
                             format: formatName,
                             url,
                           };
-                        } catch (error) {
-                        // If variant doesn't exist, try the simple pattern
-                          const simpleKey = `${basePath}.${formatName}`;
-                          try {
-                            const url = await this.fileStorageService.getPresignedUrl(simpleKey);
-                            variants[formatName] = {
-                              s3Key: simpleKey,
-                              format: formatName,
-                              url,
-                            };
-                          } catch (innerError) {
+                        } catch (innerError) {
                           // Variant doesn't exist, skip silently
-                          }
                         }
                       }
                     }
@@ -2459,94 +2446,103 @@ class ToursController {
   }
 
   /**
+   * Queue background optimization for an image missing optimized variants.
+   * Fire-and-forget: does not block the response.
+   * @param {Parse.Object} imageRecord - TourImage Parse object.
+   * @param {string} entityPath - S3 entity path (e.g., 'tours').
+   * @example
+   */
+  // eslint-disable-next-line no-underscore-dangle
+  _queueBackgroundOptimization(imageRecord, entityPath) {
+    if (!this.serverOptimizationService?.enableOptimization) return;
+
+    setImmediate(async () => {
+      try {
+        await this.serverOptimizationService.optimizeExistingImage(imageRecord, entityPath);
+        logger.info('Background optimization completed', { imageId: imageRecord.id });
+      } catch (error) {
+        logger.warn('Background optimization failed', {
+          imageId: imageRecord.id,
+          error: error.message,
+        });
+      }
+    });
+  }
+
+  /**
    * Format TourImage objects for response with optimization.
    * @param {Array<TourImage>} tourImages - Array of TourImage Parse objects.
    * @param {string} acceptHeader - Browser accept header for format negotiation.
+   * @param _acceptHeader
    * @returns {Array} Formatted images with optimized URLs.
    * @example
    */
-  async formatTourImagesForResponse(tourImages, acceptHeader) {
-    console.log('📸 formatTourImagesForResponse START', {
-      imageCount: tourImages.length,
-      hasOptimizationService: !!this.imageOptimizationService,
-      enableOptimization: this.imageOptimizationService?.enableOptimization,
-    });
-
+  async formatTourImagesForResponse(tourImages, _acceptHeader) {
     const formattedImages = await Promise.all(
-      tourImages.map(async (img, index) => {
+      tourImages.map(async (img) => {
         try {
-          let imageData;
           const s3Key = img.get('s3Key');
-
-          console.log(`📸 Processing TourImage ${index + 1}:`, {
-            id: img.id,
-            s3Key: s3Key ? `${s3Key.substring(0, 30)}...` : 'none',
-            fileName: img.get('fileName'),
-            isPrimary: img.get('isPrimary'),
-          });
-
-          // Check file type from s3Key or fileName to determine processing approach
+          const optimizedVariants = img.get('optimizedVariants');
           const fileName = img.get('fileName') || '';
-          const isJpegFile = fileName.toLowerCase().includes('.jpg') || fileName.toLowerCase().includes('.jpeg') || s3Key.toLowerCase().includes('.jpg');
 
-          if (s3Key && this.imageOptimizationService?.enableOptimization && !isJpegFile) {
-            console.log(`📸 TourImage ${index + 1}: Using optimization service (non-JPEG)`);
-            try {
-              // TourImage is a Parse object, so getImageWithOptimalFormat will work!
-              imageData = await this.imageOptimizationService.getImageWithOptimalFormat(img, acceptHeader);
+          let imageUrl = null;
+          const optimizationMetadata = img.get('optimizationMetadata');
 
-              // Verify the URL is valid
-              if (!imageData || !imageData.url) {
-                throw new Error('Optimization service returned invalid URL');
+          // Strategy: Use optimizedVariants first, then optimizationMetadata.formats, then original s3Key
+          const formatPriority = ['avif', 'webp', 'jpeg'];
+
+          // Try optimizedVariants (flat: { avif: { s3Key } }) or nested with sizes
+          if (optimizedVariants && typeof optimizedVariants === 'object') {
+            for (const format of formatPriority) {
+              const variant = optimizedVariants[format];
+              if (variant?.s3Key) {
+                try {
+                  imageUrl = await this.fileStorageService.getPresignedUrl(variant.s3Key);
+                  if (imageUrl) break;
+                } catch (variantError) {
+                  // Continue to next format
+                }
               }
-            } catch (error) {
-              console.log(`📸 TourImage ${index + 1}: Optimization service failed, using fallback:`, error.message);
-              // Fallback to direct presigned URL
-              const presignedUrl = await this.fileStorageService.getPresignedUrl(s3Key);
-              imageData = { url: presignedUrl };
             }
-          } else if (s3Key) {
-            const logMessage = isJpegFile ? `📸 TourImage ${index + 1}: Using direct presigned URL (JPEG file)` : `📸 TourImage ${index + 1}: Using fallback presigned URL`;
-            console.log(logMessage);
-            console.log(`📸 TourImage ${index + 1}: S3 Key: ${s3Key}`);
-
-            try {
-              const presignedUrl = await this.fileStorageService.getPresignedUrl(s3Key);
-              console.log(`📸 TourImage ${index + 1}: Generated URL: ${presignedUrl ? presignedUrl.substring(0, 100) : 'null'}...`);
-              imageData = { url: presignedUrl };
-            } catch (urlError) {
-              console.log(`📸 TourImage ${index + 1}: Presigned URL generation failed:`, urlError.message);
-              imageData = { url: null };
-            }
-          } else {
-            console.log(`📸 TourImage ${index + 1}: No S3 key found`);
-            imageData = { url: null };
           }
 
-          // TEMPORARY WORKAROUND: For JPG files, if URL is null or invalid, return null
-          // This will make them show as broken/missing rather than 404 errors
-          if (isJpegFile && (!imageData.url || imageData.url === img.get('fileName'))) {
-            console.log(`📸 TourImage ${index + 1}: JPG file - URL invalid, returning null to avoid 404`);
-            return {
-              id: img.id,
-              fileName: img.get('fileName'),
-              dataUrl: null, // This will show as broken image placeholder
-              url: null,
-              isPrimary: img.get('isPrimary'),
-              displayOrder: img.get('displayOrder'),
-              fileSize: img.get('fileSize'),
-              mimeType: img.get('mimeType'),
-              optimizationMetadata: img.get('optimizationMetadata'),
-              uploadedAt: img.get('uploadedAt'),
-              _debug_s3Key: s3Key, // Debug info
-            };
+          // Fallback: try optimizationMetadata.formats (older uploads store variants here)
+          if (!imageUrl && optimizationMetadata?.formats && typeof optimizationMetadata.formats === 'object') {
+            for (const format of formatPriority) {
+              const formatData = optimizationMetadata.formats[format];
+              if (formatData?.s3Key) {
+                try {
+                  imageUrl = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
+                  if (imageUrl) break;
+                } catch (variantError) {
+                  // Continue to next format
+                }
+              }
+            }
+          }
+
+          // Fallback to original s3Key if no optimized variant worked
+          if (!imageUrl && s3Key) {
+            try {
+              imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+              // Queue background optimization for images missing variants
+              if (!optimizedVariants) {
+                this._queueBackgroundOptimization(img, 'tours'); // eslint-disable-line no-underscore-dangle
+              }
+            } catch (s3KeyError) {
+              // Log error but continue
+              logger.warn('Failed to get presigned URL for tour image', {
+                imageId: img.id,
+                error: s3KeyError.message,
+              });
+            }
           }
 
           return {
             id: img.id,
-            fileName: img.get('fileName'),
-            dataUrl: imageData.url,
-            url: imageData.url, // Keep both for compatibility
+            fileName,
+            dataUrl: imageUrl,
+            url: imageUrl, // Keep both for compatibility
             isPrimary: img.get('isPrimary'),
             displayOrder: img.get('displayOrder'),
             fileSize: img.get('fileSize'),
@@ -2555,7 +2551,6 @@ class ToursController {
             uploadedAt: img.get('uploadedAt'),
           };
         } catch (error) {
-          console.error(`❌ TourImage ${index + 1}: Error processing:`, error.message);
           logger.error('Error processing TourImage for response', {
             imageId: img.id,
             error: error.message,
@@ -2573,103 +2568,96 @@ class ToursController {
    * Format tour photos for response with optimization metadata (LEGACY).
    * @param {Parse.Object} tour - Tour object.
    * @param {string} acceptHeader - Browser accept header for format negotiation.
+   * @param _acceptHeader
    * @returns {Array} Formatted photos with optimized URLs.
    * @example
    */
-  async formatTourPhotosForResponse(tour, acceptHeader) {
-    console.log('📸 formatTourPhotosForResponse START', {
-      hasFileStorageService: !!this.fileStorageService,
-      hasImageOptimizationService: !!this.imageOptimizationService,
-      enableOptimization: this.imageOptimizationService?.enableOptimization,
-    });
-
+  async formatTourPhotosForResponse(tour, _acceptHeader) {
     const photos = tour.get('photos') || [];
 
-    console.log('formatTourPhotosForResponse called:', {
-      tourId: tour.id,
-      photoCount: photos.length,
-      acceptHeader,
-      photos: photos.map((p, i) => ({
-        index: i,
-        fileName: p?.fileName,
-        hasS3Key: !!p?.s3Key,
-        isOptimized: !!p?.isOptimized,
-      })),
-    });
-
-    logger.info('Formatting tour photos for response', {
-      tourId: tour.id,
-      photoCount: photos.length,
-      acceptHeader,
-    });
-
     if (!Array.isArray(photos) || photos.length === 0) {
-      logger.info('No photos to format', { tourId: tour.id });
       return [];
     }
 
     const formattedPhotos = await Promise.all(
-      photos.map(async (photo, index) => {
+      photos.map(async (photo) => {
         try {
-          console.log(`📸 Processing photo ${index + 1}:`, {
-            hasS3Key: !!photo.s3Key,
-            s3Key: photo.s3Key ? `${photo.s3Key.substring(0, 20)}...` : 'none',
-            fileName: photo.fileName,
-            enableOptimization: !!this.imageOptimizationService?.enableOptimization,
-          });
-        } catch (e) {
-          console.log(`📸 Processing photo ${index + 1}: [debug error]`);
-        }
-
-        try {
-          // For tours, skip optimization service and use direct presigned URLs
+          // Handle s3Key (newer legacy format)
           if (photo.s3Key) {
-            console.log(`📸 Photo ${index + 1}: Using fallback presigned URL generation`);
-            // Fallback: get presigned URL for photos without optimization
             const presignedUrl = await this.fileStorageService.getPresignedUrl(photo.s3Key);
-            console.log(`📸 Photo ${index + 1}: Generated presigned URL:`, presignedUrl ? 'SUCCESS' : 'FAILED');
             return {
               ...photo,
               dataUrl: presignedUrl,
               fileName: photo.fileName || 'image.jpg',
             };
           }
-          console.log(`📸 Photo ${index + 1}: No S3 key, returning as-is (legacy)`);
-          // Return photo as-is if no S3 key (legacy)
+
+          // Handle Parse.File format { __type: "File", name: "...", url: "https://bucket.s3..." }
+          // eslint-disable-next-line no-underscore-dangle
+          if (photo.__type === 'File' || (photo.url && photo.url.includes('amazonaws.com'))) {
+            const s3Key = this.extractS3KeyFromUrl(photo.url);
+            if (s3Key) {
+              const presignedUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+              return {
+                dataUrl: presignedUrl,
+                url: presignedUrl,
+                fileName: photo.name || photo.fileName || 'image.jpg',
+              };
+            }
+          }
+
+          // Handle base64 dataUrl (very old format)
+          if (photo.dataUrl && photo.dataUrl.startsWith('data:')) {
+            return { ...photo, fileName: photo.fileName || 'image.jpg' };
+          }
+
+          // Return photo as-is
           return {
             ...photo,
             fileName: photo.fileName || 'image.jpg',
           };
         } catch (error) {
-          console.error(`❌ Photo ${index + 1}: Error processing photo:`, error.message);
-          logger.error('Error processing photo for response', {
+          logger.error('Error processing legacy photo', {
             tourId: tour.id,
-            photoFileName: photo.fileName,
-            photoData: photo,
+            photoFileName: photo.fileName || photo.name,
             error: error.message,
-            stack: error.stack,
           });
-
-          // Return photo as-is on error
-          return {
-            ...photo,
-            fileName: photo.fileName || 'image.jpg',
-          };
+          return null;
         }
       })
     );
 
-    return formattedPhotos;
+    return formattedPhotos.filter((p) => p !== null);
   }
 
   /**
-   * Send error response.
-   * @param {object} res - Express response object.
-   * @param {string} message - Error message.
-   * @param {number} statusCode - HTTP status code.
-   * @returns {object} JSON error response.
+   * Extract S3 object key from an S3 URL.
+   * @param {string} url - S3 URL to extract key from.
+   * @returns {string|null} S3 key or null if not extractable.
    * @example
    */
+  extractS3KeyFromUrl(url) {
+    if (!url) return null;
+    try {
+      const bucket = process.env.S3_BUCKET;
+      // Format: https://bucket.s3.region.amazonaws.com/key
+      const bucketPrefix = `https://${bucket}.s3.`;
+      if (url.startsWith(bucketPrefix)) {
+        const pathStart = url.indexOf('.amazonaws.com/');
+        if (pathStart !== -1) return url.substring(pathStart + '.amazonaws.com/'.length);
+      }
+      // Format: https://s3.region.amazonaws.com/bucket/key
+      if (url.startsWith('https://s3.')) {
+        const bucketPath = `/${bucket}/`;
+        const bucketIdx = url.indexOf(bucketPath);
+        if (bucketIdx !== -1) return url.substring(bucketIdx + bucketPath.length);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   sendError(res, message, statusCode = 500) {
     return res.status(statusCode).json({
       success: false,
