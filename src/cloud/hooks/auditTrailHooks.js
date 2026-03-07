@@ -309,19 +309,100 @@ async function createAuditLogEntry(data) {
 }
 
 /**
- * Generic beforeSave hook for audit logging.
- * Captures changes before they are saved to detect modifications.
+ * Generic beforeSave hook for audit logging and email validation.
+ * Captures changes before they are saved and validates email uniqueness for user classes.
  * @param {object} request - Parse Cloud trigger request.
- * @returns {void} - No return value.
+ * @returns {Promise<void>} - Promise that resolves when validation and audit preparation is complete.
  * @example
  */
-function beforeSaveHook(request) {
-  const { object } = request;
+async function beforeSaveHook(request) {
+  const { object, master } = request;
   const { className } = object;
 
   // Skip excluded classes
   if (EXCLUDED_CLASSES.has(className)) {
     return;
+  }
+
+  // EMAIL UNIQUENESS VALIDATION for User classes (AmexingUser and Parse.User)
+  if (className === 'AmexingUser' || className === '_User') {
+    logger.info('🔍 EMAIL VALIDATION in audit beforeSave hook triggered!', {
+      className,
+      userId: object.id,
+      useMasterKey: master,
+      existed: object.existed(),
+    });
+
+    const email = object.get('email');
+    if (email) {
+      // Validate email format first
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Invalid email format');
+      }
+
+      // Trim and lowercase email for consistent validation
+      const normalizedEmail = email.trim().toLowerCase();
+      object.set('email', normalizedEmail);
+
+      // Check if email is being changed
+      const isCreating = !object.existed();
+      const originalEmail = request.original ? request.original.get('email') : null;
+      const isEmailChanged = isCreating || (originalEmail !== normalizedEmail);
+
+      logger.info('User email validation check', {
+        className,
+        userId: object.id,
+        email: `${normalizedEmail.substring(0, 3)}***`,
+        isCreating,
+        originalEmail: originalEmail ? `${originalEmail.substring(0, 3)}***` : null,
+        isEmailChanged,
+        useMasterKey: master,
+      });
+
+      if (isEmailChanged) {
+        // Determine which class to query based on the current object
+        const QueryClass = className === 'AmexingUser'
+          ? Parse.Object.extend('AmexingUser') : Parse.User;
+
+        // Query for existing users with this email
+        const query = new Parse.Query(QueryClass);
+        query.equalTo('email', normalizedEmail);
+
+        // For AmexingUser, also check exists field
+        if (className === 'AmexingUser') {
+          query.equalTo('exists', true);
+        }
+
+        if (!isCreating && object.id) {
+          query.notEqualTo('objectId', object.id);
+        }
+        query.limit(1);
+
+        const existingUser = await query.first({ useMasterKey: true });
+
+        logger.info('Email uniqueness check result', {
+          className,
+          email: `${normalizedEmail.substring(0, 3)}***`,
+          foundExisting: !!existingUser,
+          existingUserId: existingUser?.id,
+        });
+
+        if (existingUser) {
+          logger.logSecurityEvent('DUPLICATE_EMAIL_ATTEMPT', {
+            email: `${normalizedEmail.substring(0, 3)}***`,
+            attemptedUserId: object.id,
+            existingUserId: existingUser.id,
+            className,
+            isCreating,
+          });
+          throw new Parse.Error(
+            Parse.Error.DUPLICATE_VALUE,
+            'Email address is already registered. Please use a different email or contact support.'
+          );
+        }
+      }
+    }
   }
 
   // Store changes in request context for afterSave

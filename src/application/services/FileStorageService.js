@@ -440,6 +440,91 @@ class FileStorageService {
   }
 
   /**
+   * Download file from S3 and return buffer.
+   * Used by public routes to serve files without exposing S3 URLs.
+   * @param {string} s3Key - S3 key of the file to download.
+   * @returns {Promise<Buffer>} File buffer.
+   * @example
+   * const buffer = await service.downloadFile('dev/employees/123/photo.jpg');
+   */
+  async downloadFile(s3Key) {
+    try {
+      const AWS = require('aws-sdk');
+      const bucket = process.env.S3_BUCKET;
+      const region = getEnvironmentRegion();
+
+      // Validate inputs
+      if (!bucket) {
+        throw new Error('S3_BUCKET environment variable is not configured');
+      }
+      if (!s3Key) {
+        throw new Error('s3Key parameter is required');
+      }
+
+      // Configure AWS SDK based on environment
+      if (!AWS.config.credentials) {
+        if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+          // Use environment credentials (development/production with explicit credentials)
+          AWS.config.update({
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+            region,
+          });
+        } else {
+          // Use EC2 IAM roles or ECS task roles (production)
+          const credentials = new AWS.EC2MetadataCredentials();
+          await new Promise((resolve, reject) => {
+            credentials.get((err) => {
+              if (err) {
+                logger.error('Failed to load EC2 metadata credentials for download', {
+                  error: err.message,
+                  code: err.code,
+                });
+                reject(err);
+              } else {
+                resolve();
+              }
+            });
+          });
+          AWS.config.credentials = credentials;
+        }
+      }
+
+      const s3 = new AWS.S3({
+        signatureVersion: 'v4',
+      });
+
+      const params = {
+        Bucket: bucket,
+        Key: s3Key,
+      };
+
+      logger.debug('Downloading file from S3', {
+        bucket,
+        s3Key,
+      });
+
+      const data = await s3.getObject(params).promise();
+
+      logger.debug('File downloaded successfully', {
+        s3Key,
+        contentLength: data.ContentLength,
+        contentType: data.ContentType,
+      });
+
+      return data.Body;
+    } catch (error) {
+      logger.error('Error downloading file from S3', {
+        error: error.message,
+        stack: error.stack,
+        s3Key,
+        code: error.code,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Generate unique filename with folder structure.
    *
    * Format: {baseFolder}/{entityId}/{timestamp}-{randomHex}.{extension}

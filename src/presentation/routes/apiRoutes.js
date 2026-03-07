@@ -359,6 +359,20 @@ if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
   }
 }
 
+/**
+ * Public employee photo route for browser image requests
+ * GET /api/employees/photo/:employeeId
+ * Serves employee profile photos without requiring authentication
+ * Must be public because browsers can't send Authorization headers with <img> requests.
+ */
+try {
+  const { serveEmployeePhotoRoute } = require('../../application/middleware/employeePhotoRoute');
+  router.get('/employees/photo/:employeeId', serveEmployeePhotoRoute);
+  console.log('✅ Public employee photo route enabled at /api/employees/photo/:employeeId');
+} catch (error) {
+  console.warn('⚠️ Public employee photo route not enabled:', error.message);
+}
+
 // Protected API endpoints - use JWT authentication for API routes
 router.use(jwtMiddleware.authenticateToken);
 
