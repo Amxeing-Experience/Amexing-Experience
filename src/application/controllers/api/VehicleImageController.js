@@ -351,15 +351,31 @@ class VehicleImageController {
           try {
             let url = null;
             const optimizedVariants = img.get('optimizedVariants');
+            const optimizationMetadata = img.get('optimizationMetadata');
+            const formatPriority = ['avif', 'webp', 'jpeg'];
 
-            // Prefer optimized variants: avif > webp > jpeg
+            // Prefer optimized variants (direct field on record)
             if (optimizedVariants && typeof optimizedVariants === 'object') {
-              const formatPriority = ['avif', 'webp', 'jpeg'];
               for (const format of formatPriority) {
                 const variant = optimizedVariants[format];
                 if (variant?.s3Key) {
                   try {
                     url = await this.fileStorageService.getPresignedUrl(variant.s3Key);
+                    if (url) break;
+                  } catch (e) {
+                    // Continue to next format
+                  }
+                }
+              }
+            }
+
+            // Fallback: try optimizationMetadata.formats (older uploads store variants here)
+            if (!url && optimizationMetadata?.formats && typeof optimizationMetadata.formats === 'object') {
+              for (const format of formatPriority) {
+                const formatData = optimizationMetadata.formats[format];
+                if (formatData?.s3Key) {
+                  try {
+                    url = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
                     if (url) break;
                   } catch (e) {
                     // Continue to next format

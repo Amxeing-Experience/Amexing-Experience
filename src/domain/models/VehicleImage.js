@@ -290,13 +290,12 @@ class VehicleImage extends BaseModel {
       const LocalVehicleImage = Parse.Object.extend('VehicleImage');
       const query = new Parse.Query(LocalVehicleImage);
 
-      const vehicle = await new Parse.Query('Vehicle').get(vehicleId, {
-        useMasterKey: true,
-      });
-      query.equalTo('vehicleId', vehicle);
+      const Vehicle = Parse.Object.extend('Vehicle');
+      const vehiclePointer = Vehicle.createWithoutData(vehicleId);
+      query.equalTo('vehicleId', vehiclePointer);
       query.equalTo('exists', true);
       query.ascending('displayOrder');
-      query.include('vehicleId'); // Include the vehicle pointer to get its ID
+      query.include('vehicleId');
 
       return await query.find({ useMasterKey: true });
     } catch (error) {
@@ -351,10 +350,9 @@ class VehicleImage extends BaseModel {
       const LocalVehicleImage = Parse.Object.extend('VehicleImage');
       const query = new Parse.Query(LocalVehicleImage);
 
-      const vehicle = await new Parse.Query('Vehicle').get(vehicleId, {
-        useMasterKey: true,
-      });
-      query.equalTo('vehicleId', vehicle);
+      const Vehicle = Parse.Object.extend('Vehicle');
+      const vehiclePointer = Vehicle.createWithoutData(vehicleId);
+      query.equalTo('vehicleId', vehiclePointer);
       query.equalTo('exists', true);
 
       return await query.count({ useMasterKey: true });
@@ -379,10 +377,9 @@ class VehicleImage extends BaseModel {
       const LocalVehicleImage = Parse.Object.extend('VehicleImage');
       const query = new Parse.Query(LocalVehicleImage);
 
-      const vehicle = await new Parse.Query('Vehicle').get(vehicleId, {
-        useMasterKey: true,
-      });
-      query.equalTo('vehicleId', vehicle);
+      const Vehicle = Parse.Object.extend('Vehicle');
+      const vehiclePointer = Vehicle.createWithoutData(vehicleId);
+      query.equalTo('vehicleId', vehiclePointer);
       query.equalTo('exists', true);
       query.equalTo('isPrimary', true);
 
@@ -408,10 +405,9 @@ class VehicleImage extends BaseModel {
       const LocalVehicleImage = Parse.Object.extend('VehicleImage');
       const query = new Parse.Query(LocalVehicleImage);
 
-      const vehicle = await new Parse.Query('Vehicle').get(vehicleId, {
-        useMasterKey: true,
-      });
-      query.equalTo('vehicleId', vehicle);
+      const Vehicle = Parse.Object.extend('Vehicle');
+      const vehiclePointer = Vehicle.createWithoutData(vehicleId);
+      query.equalTo('vehicleId', vehiclePointer);
       query.equalTo('exists', true);
       query.equalTo('isPrimary', true);
       query.ascending('createdAt');
@@ -433,6 +429,38 @@ class VehicleImage extends BaseModel {
    * @example
    * await VehicleImage.recalculateDisplayOrder('vehicleId123');
    */
+  static async getPrimaryImagesForVehicles(vehicleIds) {
+    try {
+      if (!vehicleIds || vehicleIds.length === 0) {
+        return new Map();
+      }
+
+      const Vehicle = Parse.Object.extend('Vehicle');
+      const pointers = vehicleIds.map((id) => Vehicle.createWithoutData(id));
+
+      const LocalVehicleImage = Parse.Object.extend('VehicleImage');
+      const query = new Parse.Query(LocalVehicleImage);
+      query.containedIn('vehicleId', pointers);
+      query.equalTo('isPrimary', true);
+      query.equalTo('exists', true);
+      query.equalTo('active', true);
+      const images = await query.find({ useMasterKey: true });
+
+      const map = new Map();
+      images.forEach((img) => {
+        const vid = img.get('vehicleId')?.id;
+        if (vid) map.set(vid, img);
+      });
+      return map;
+    } catch (error) {
+      logger.error('Error batch fetching primary images', {
+        vehicleCount: vehicleIds?.length,
+        error: error.message,
+      });
+      return new Map();
+    }
+  }
+
   static async recalculateDisplayOrder(vehicleId) {
     try {
       const images = await this.findByVehicle(vehicleId);

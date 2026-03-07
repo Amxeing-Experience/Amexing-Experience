@@ -179,6 +179,10 @@ class VehicleController {
       // Execute query
       const vehicles = await filteredQuery.find({ useMasterKey: true });
 
+      // Batch fetch all primary images in a single query (instead of N+1)
+      const vehicleIds = vehicles.map((v) => v.id);
+      const primaryImageMap = await VehicleImage.getPrimaryImagesForVehicles(vehicleIds);
+
       // Format data for DataTables
       const data = await Promise.all(
         vehicles.map(async (vehicle) => {
@@ -211,23 +215,39 @@ class VehicleController {
             };
           }
 
-          // Get primary image for vehicle
+          // Get primary image from batch-loaded map (O(1) lookup)
           let imageUrl = '';
           try {
-            const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
+            const primaryImage = primaryImageMap.get(vehicle.id) || null;
             if (primaryImage) {
               const s3Key = primaryImage.get('s3Key');
               const imageFile = primaryImage.get('imageFile');
               const optimizedVariants = primaryImage.get('optimizedVariants');
+              const optimizationMetadata = primaryImage.get('optimizationMetadata');
+              const formatPriority = ['avif', 'webp', 'jpeg'];
 
-              // Prefer optimized variants: webp > jpeg > avif
+              // Prefer optimized variants (direct field on record)
               if (optimizedVariants && typeof optimizedVariants === 'object') {
-                const formatPriority = ['avif', 'webp', 'jpeg'];
                 for (const format of formatPriority) {
                   const variant = optimizedVariants[format];
                   if (variant?.s3Key) {
                     try {
                       imageUrl = await this.fileStorageService.getPresignedUrl(variant.s3Key);
+                      break;
+                    } catch (e) {
+                      // Continue to next format
+                    }
+                  }
+                }
+              }
+
+              // Fallback: try optimizationMetadata.formats (older uploads store variants here)
+              if (!imageUrl && optimizationMetadata?.formats && typeof optimizationMetadata.formats === 'object') {
+                for (const format of formatPriority) {
+                  const formatData = optimizationMetadata.formats[format];
+                  if (formatData?.s3Key) {
+                    try {
+                      imageUrl = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
                       break;
                     } catch (e) {
                       // Continue to next format
@@ -353,15 +373,31 @@ class VehicleController {
           const s3Key = primaryImage.get('s3Key');
           const imageFile = primaryImage.get('imageFile');
           const optimizedVariants = primaryImage.get('optimizedVariants');
+          const optimizationMetadata = primaryImage.get('optimizationMetadata');
+          const formatPriority = ['avif', 'webp', 'jpeg'];
 
-          // Prefer optimized variants: webp > jpeg > avif
+          // Prefer optimized variants (direct field on record)
           if (optimizedVariants && typeof optimizedVariants === 'object') {
-            const formatPriority = ['avif', 'webp', 'jpeg'];
             for (const format of formatPriority) {
               const variant = optimizedVariants[format];
               if (variant?.s3Key) {
                 try {
                   imageUrl = await this.fileStorageService.getPresignedUrl(variant.s3Key);
+                  break;
+                } catch (e) {
+                  // Continue to next format
+                }
+              }
+            }
+          }
+
+          // Fallback: try optimizationMetadata.formats (older uploads store variants here)
+          if (!imageUrl && optimizationMetadata?.formats && typeof optimizationMetadata.formats === 'object') {
+            for (const format of formatPriority) {
+              const formatData = optimizationMetadata.formats[format];
+              if (formatData?.s3Key) {
+                try {
+                  imageUrl = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
                   break;
                 } catch (e) {
                   // Continue to next format

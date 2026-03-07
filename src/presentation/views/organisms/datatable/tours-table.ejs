@@ -1618,6 +1618,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                 success: function(response) {
                     if (response.success && response.data) {
                         const select = $(`#headerRateFilter-${tableId}`);
+                        if (!select.length) return;
                         select.find('option:not(:first)').remove();
                         
                         // Filter out Económico rate and add remaining rates
@@ -2195,108 +2196,52 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
             }
         });
 
-        // Load dropdown options when modal opens
-        function loadDropdownData() {
-            // Load Active POIs (filtered by Tours service type)
+        // Load options into a Tom Select instance, waiting for atom auto-initialization
+        function loadOptionsIntoTomSelect(elementId, data) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            if (el.tomselect) {
+                el.tomselect.clearOptions();
+                data.forEach(function(poi) {
+                    el.tomselect.addOption({ value: poi.value, text: poi.label });
+                });
+                el.tomselect.refreshOptions(false);
+                el.tomselect.clear();
+                return;
+            }
+            setTimeout(function() { loadOptionsIntoTomSelect(elementId, data); }, 100);
+        }
+
+        // Load dropdown options for tour modal
+        function loadDropdownData(retryCount = 0) {
+            const maxRetries = 3;
+
             $.ajax({
                 url: '/api/pois/active?serviceType=Tours',
                 type: 'GET',
                 success: function(data) {
                     if (data.success && data.data) {
                         poisData = data.data;
-
-                        const selectElement = document.getElementById('destinationPOI');
-
-                        // Destroy existing Tom Select instance if it exists
-                        if (selectElement && selectElement.tomselect) {
-                            selectElement.tomselect.destroy();
-                        }
-
-                        // Clear the select element
-                        const select = $('#destinationPOI');
-                        select.empty();
-
-                        // Initialize Tom Select first (on empty select)
-                        if (typeof TomSelect !== 'undefined') {
-                            const tomSelectInstance = new TomSelect('#destinationPOI', {
-                                plugins: [],
-                                maxOptions: 1000,
-                                placeholder: 'Seleccionar destino',
-                                maxItems: 1,
-                                highlight: true,
-                                searchField: ['text'],
-                                valueField: 'value',
-                                labelField: 'text',
-                                sortField: 'text',
-                                closeAfterSelect: true,
-                                persist: false
-                            });
-
-                            // Store instance reference
-                            selectElement.tomselect = tomSelectInstance;
-
-                            // Load options using Tom Select API (prevents auto-selection)
-                            tomSelectInstance.clearOptions();
-                            data.data.forEach(poi => {
-                                tomSelectInstance.addOption({ value: poi.value, text: poi.label });
-                            });
-                            tomSelectInstance.refreshOptions(false);
-                            tomSelectInstance.clear(); // Clear selection to start empty
-                        }
+                        loadOptionsIntoTomSelect('destinationPOI', data.data);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error loading POIs for Tours:', error);
+                    if (xhr.status === 401 && retryCount < maxRetries) {
+                        setTimeout(function() { loadDropdownData(retryCount + 1); }, 1000);
+                    }
                 }
             });
         }
 
         // Load dropdown data for walking tours modal
         function loadWalkingTourDropdownData() {
-            // Load Active POIs (filtered by Tours service type)
             $.ajax({
                 url: '/api/pois/active?serviceType=Tours',
                 type: 'GET',
                 success: function(data) {
                     if (data.success && data.data) {
-                        const selectElement = document.getElementById('walkingDestinationPOI');
-
-                        // Destroy existing Tom Select instance if it exists
-                        if (selectElement && selectElement.tomselect) {
-                            selectElement.tomselect.destroy();
-                        }
-
-                        // Clear the select element
-                        const select = $('#walkingDestinationPOI');
-                        select.empty();
-
-                        // Initialize Tom Select first (on empty select)
-                        if (typeof TomSelect !== 'undefined') {
-                            const tomSelectInstance = new TomSelect('#walkingDestinationPOI', {
-                                plugins: [],
-                                maxOptions: 1000,
-                                placeholder: 'Seleccionar destino del tour a pie',
-                                maxItems: 1,
-                                highlight: true,
-                                searchField: ['text'],
-                                valueField: 'value',
-                                labelField: 'text',
-                                sortField: 'text',
-                                closeAfterSelect: true,
-                                persist: false
-                            });
-
-                            // Store instance reference
-                            selectElement.tomselect = tomSelectInstance;
-
-                            // Load options using Tom Select API (prevents auto-selection)
-                            tomSelectInstance.clearOptions();
-                            data.data.forEach(poi => {
-                                tomSelectInstance.addOption({ value: poi.value, text: poi.label });
-                            });
-                            tomSelectInstance.refreshOptions(false);
-                            tomSelectInstance.clear(); // Clear selection to start empty
-                        }
+                        loadOptionsIntoTomSelect('walkingDestinationPOI', data.data);
                     }
                 },
                 error: function(xhr, status, error) {
@@ -2311,8 +2256,8 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
         });
 
         // Helper function to wait for Tom Select to be initialized
-        function waitForTomSelect(elementId, maxAttempts = 50) {
-            return new Promise((resolve, reject) => {
+        function waitForTomSelect(elementId, maxAttempts = 80) {
+            return new Promise((resolve) => {
                 let attempts = 0;
                 const checkInterval = setInterval(() => {
                     const element = document.getElementById(elementId);
@@ -2323,7 +2268,8 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                         attempts++;
                         if (attempts >= maxAttempts) {
                             clearInterval(checkInterval);
-                            reject(new Error(`Tom Select not initialized on #${elementId}`));
+                            console.warn(`Tom Select not yet initialized on #${elementId}, continuing without it`);
+                            resolve(null);
                         }
                     }
                 }, 100);
@@ -2370,12 +2316,10 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                 loadEmptyPricingStructure();
             }
 
-            try {
-                // Wait for and clear Tom Select instances
-                const destTS = await waitForTomSelect('destinationPOI');
+            // Wait for and clear Tom Select instances
+            const destTS = await waitForTomSelect('destinationPOI');
+            if (destTS) {
                 destTS.clear();
-            } catch (error) {
-                console.error('Error clearing Tom Select:', error);
             }
         }
 
@@ -3021,116 +2965,92 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                     if (response.success && response.data) {
                         const tour = response.data.tour;
 
-                        try {
-                            // Wait for Tom Select instances
-                            const destTS = await waitForTomSelect('destinationPOI');
+                        // Tom Select (non-critical for photos/fields)
+                        const destTS = await waitForTomSelect('destinationPOI');
+                        if (destTS && tour.destinationPOI?.id) {
+                            destTS.setValue(tour.destinationPOI.id);
+                        } else if (tour.destinationPOI?.id) {
+                            $('#destinationPOI').val(tour.destinationPOI.id);
+                        }
 
-                            // Populate the form with the data
-                            $('#tourId').val(tour.id);
+                        // Populate the form with the data
+                        $('#tourId').val(tour.id);
 
-                            // Set Tom Select values
-                            if (tour.destinationPOI?.id) {
-                                destTS.setValue(tour.destinationPOI.id);
-                            }
+                        // Set all basic fields
+                        $('#tourType').val(tour.type || '');
+                        $('#tourDescription').val(tour.description || '');
+                        $('#tourPrice').val(tour.price || '');
+                        $('#tourPriceNoAlcohol').val(tour.price_no_alcohol || '');
+                        $('#tourPriceChild').val(tour.price_child || '');
+                        $('#tourTravelDuration').val(tour.travel_duration || '');
+                        $('#tourAdvanceTime').val(tour.advance_booking_time || '');
+                        $('#tourMinPeople').val(tour.min_people || '');
+                        $('#tourMaxPeople').val(tour.max_people || '');
 
-                            // Set all basic fields
-                            $('#tourType').val(tour.type || '');
-                            $('#tourDescription').val(tour.description || '');
-                            $('#tourPrice').val(tour.price || '');
-                            $('#tourPriceNoAlcohol').val(tour.price_no_alcohol || '');
-                            $('#tourPriceChild').val(tour.price_child || '');
-                            $('#tourTravelDuration').val(tour.travel_duration || '');
-                            $('#tourAdvanceTime').val(tour.advance_booking_time || '');
-                            $('#tourMinPeople').val(tour.min_people || '');
-                            $('#tourMaxPeople').val(tour.max_people || '');
-                            
-                            // Set time (convert from minutes to hours)
-                            const totalMinutes = tour.time || 0;
-                            const hours = totalMinutes / 60;
-                            $('#tourDuration').val(hours || '');
-                            
-                            // Set array fields
-                            if (tour.includes && Array.isArray(tour.includes)) {
-                                $('#tourIncludes').val(tour.includes.join('\n'));
-                            }
-                            if (tour.notincludes && Array.isArray(tour.notincludes)) {
-                                $('#tourNotIncludes').val(tour.notincludes.join('\n'));
-                            }
-                            if (tour.languages && Array.isArray(tour.languages)) {
-                                $('#tourLanguages').val(tour.languages.join('\n'));
-                            }
-                            
-                            // Set notes fields
-                            $('#tourInternalNotes').val(tour.internal_notes || '');
-                            $('#tourClientBookingNotes').val(tour.client_booking_notes || '');
-                            $('#tourProviderNotes').val(tour.provider_notes || '');
-                            $('#tourTeamNotes').val(tour.team_notes || '');
-                            
-                            // Load photos if they exist
-                            if (tour.photos && Array.isArray(tour.photos) && tour.photos.length > 0) {
+                        // Set time (convert from minutes to hours)
+                        const totalMinutes = tour.time || 0;
+                        const hours = totalMinutes / 60;
+                        $('#tourDuration').val(hours || '');
 
-                                // Ensure jQuery is available and modal exists
-                                if (typeof $ === 'undefined') {
-                                    console.error('❌ jQuery not available for photo loading');
-                                    return;
-                                }
-                                
-                                const photosContainer = $('#tourModal .photos-preview-container');
-                                if (photosContainer.length === 0) {
-                                    console.error('❌ Photos container not found in modal');
-                                    return;
-                                }
+                        // Set array fields
+                        if (tour.includes && Array.isArray(tour.includes)) {
+                            $('#tourIncludes').val(tour.includes.join('\n'));
+                        }
+                        if (tour.notincludes && Array.isArray(tour.notincludes)) {
+                            $('#tourNotIncludes').val(tour.notincludes.join('\n'));
+                        }
+                        if (tour.languages && Array.isArray(tour.languages)) {
+                            $('#tourLanguages').val(tour.languages.join('\n'));
+                        }
 
+                        // Set notes fields
+                        $('#tourInternalNotes').val(tour.internal_notes || '');
+                        $('#tourClientBookingNotes').val(tour.client_booking_notes || '');
+                        $('#tourProviderNotes').val(tour.provider_notes || '');
+                        $('#tourTeamNotes').val(tour.team_notes || '');
+
+                        // Load photos if they exist
+                        if (tour.photos && Array.isArray(tour.photos) && tour.photos.length > 0) {
+                            const photosContainer = $('#tourModal .photos-preview-container');
+                            if (photosContainer.length > 0) {
                                 photosContainer.empty();
-                                
+
                                 tour.photos.forEach((photo, index) => {
-                                    // Backend now provides presigned URLs in dataUrl field
                                     const photoUrl = photo.dataUrl || photo.url;
                                     const fileName = photo.fileName || photo.name || 'image';
-                                    
-                                    
+
                                     if (photoUrl) {
                                         try {
-                                            // Pass the entire photo object to preserve all data
                                             addTourPhotoPreview(photosContainer, { name: fileName }, photoUrl, photo);
-
                                         } catch (error) {
-                                            console.error(`❌ Error adding photo ${index + 1} to preview:`, error);
+                                            console.error(`Error adding photo ${index + 1} to preview:`, error);
                                         }
                                     }
                                 });
-                            } else {
-
                             }
+                        }
 
-                            // Set availability (NEW FORMAT: array of day schedules)
-                            initializeDaySelection();
-                            if (tour.availability && Array.isArray(tour.availability) && tour.availability.length > 0) {
-                                // Load day schedules from new format
-                                tour.availability.forEach(schedule => {
-                                    const dayBtn = $(`.day-btn[data-day="${schedule.day}"]`);
-                                    const dayName = dayBtn.data('day-name');
+                        // Set availability (NEW FORMAT: array of day schedules)
+                        initializeDaySelection();
+                        if (tour.availability && Array.isArray(tour.availability) && tour.availability.length > 0) {
+                            tour.availability.forEach(schedule => {
+                                const dayBtn = $(`.day-btn[data-day="${schedule.day}"]`);
+                                const dayName = dayBtn.data('day-name');
+                                addDaySchedule(schedule.day, dayName, schedule.startTime, schedule.endTime);
+                                dayBtn.removeClass('btn-outline-primary').addClass('active btn-primary');
+                            });
 
-                                    // Add day schedule with times
-                                    addDaySchedule(schedule.day, dayName, schedule.startTime, schedule.endTime);
+                            updateNoDaysMessage();
+                            updateTourAvailabilityStatus();
+                        } else {
+                            updateTourAvailabilityStatus();
+                        }
 
-                                    // Activate day button
-                                    dayBtn.removeClass('btn-outline-primary').addClass('active btn-primary');
-                                });
-
-                                updateNoDaysMessage();
-                                // Update the availability status text to show selected days
-                                updateTourAvailabilityStatus();
-                            } else {
-                                // No specific days selected, update status to show "all days"
-                                updateTourAvailabilityStatus();
-                            }
-
-                            // Load base pricing for editing
+                        // Load base pricing for editing
+                        try {
                             await loadBasePricing(tour.id);
-
                         } catch (error) {
-                            console.error('Error setting Tom Select values:', error);
+                            console.error('Error loading base pricing:', error);
                         }
                     } else {
                         showErrorAlert('Formato de respuesta inválido');
@@ -3244,7 +3164,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                 const destTS = await waitForTomSelect('destinationPOI');
 
                 // Get values from Tom Select
-                const destinationPOI = destTS.getValue();
+                const destinationPOI = destTS ? destTS.getValue() : ($('#destinationPOI').val() || '');
 
                 // Process includes field
                 const includesText = $('#tourIncludes').val().trim();
@@ -4444,7 +4364,16 @@ let agencyRateLoaded = false;
  */
 async function fetchCurrentDriverRate() {
     try {
-        const token = getAccessToken();
+        let token = localStorage.getItem('accessToken') || null;
+        if (!token) {
+            // Wait briefly for token initialization
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            token = localStorage.getItem('accessToken') || null;
+        }
+        if (!token) {
+            console.warn('No access token found, skipping driver rate fetch');
+            return 0;
+        }
         const response = await fetch('/api/driver-tour-rate/current', {
             method: 'GET',
             headers: {
@@ -5211,27 +5140,23 @@ function initDriverRateFunctionality() {
 const immediatePayment = document.querySelector('[id^="paymentTypeFilter-"]');
 const immediateCurrency = document.querySelector('[id^="currencyFilter-"]');
 
-// Initialize when DOM is ready (fallback for both jQuery and vanilla JS)
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initDriverRateFunctionality);
-} else {
-    initDriverRateFunctionality();
-}
-
-// Also try to initialize with jQuery if available
-if (typeof $ !== 'undefined') {
-    $(document).ready(initDriverRateFunctionality);
-}
-
-// Force initialization after a delay as backup
-setTimeout(() => {
-
+// Initialize once when DOM is ready
+let _driverRateInitialized = false;
+function initDriverRateOnce() {
+    if (_driverRateInitialized) return;
+    _driverRateInitialized = true;
     try {
         initDriverRateFunctionality();
     } catch (error) {
-        console.error('❌ Error in forced initialization:', error);
+        console.error('Error in driver rate initialization:', error);
     }
-}, 2000);
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDriverRateOnce);
+} else {
+    initDriverRateOnce();
+}
 
 // ========== END DRIVER RATE FUNCTIONALITY ==========
 

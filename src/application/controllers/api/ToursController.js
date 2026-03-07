@@ -2486,20 +2486,34 @@ class ToursController {
           const fileName = img.get('fileName') || '';
 
           let imageUrl = null;
+          const optimizationMetadata = img.get('optimizationMetadata');
 
-          // Strategy: Use optimizedVariants first, then fall back to original s3Key
-          // Priority: WebP first (always newly created), then JPEG, then AVIF
+          // Strategy: Use optimizedVariants first, then optimizationMetadata.formats, then original s3Key
+          const formatPriority = ['avif', 'webp', 'jpeg'];
+
+          // Try optimizedVariants (flat: { avif: { s3Key } }) or nested with sizes
           if (optimizedVariants && typeof optimizedVariants === 'object') {
-            const formatPriority = ['avif', 'webp', 'jpeg'];
-
             for (const format of formatPriority) {
               const variant = optimizedVariants[format];
               if (variant?.s3Key) {
                 try {
                   imageUrl = await this.fileStorageService.getPresignedUrl(variant.s3Key);
-                  if (imageUrl) {
-                    break;
-                  }
+                  if (imageUrl) break;
+                } catch (variantError) {
+                  // Continue to next format
+                }
+              }
+            }
+          }
+
+          // Fallback: try optimizationMetadata.formats (older uploads store variants here)
+          if (!imageUrl && optimizationMetadata?.formats && typeof optimizationMetadata.formats === 'object') {
+            for (const format of formatPriority) {
+              const formatData = optimizationMetadata.formats[format];
+              if (formatData?.s3Key) {
+                try {
+                  imageUrl = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
+                  if (imageUrl) break;
                 } catch (variantError) {
                   // Continue to next format
                 }
@@ -2568,7 +2582,7 @@ class ToursController {
     const formattedPhotos = await Promise.all(
       photos.map(async (photo) => {
         try {
-          // For tours, skip optimization service and use direct presigned URLs
+          // Handle s3Key (newer legacy format)
           if (photo.s3Key) {
             const presignedUrl = await this.fileStorageService.getPresignedUrl(photo.s3Key);
             return {
@@ -2577,40 +2591,72 @@ class ToursController {
               fileName: photo.fileName || 'image.jpg',
             };
           }
-          // Return photo as-is if no S3 key (legacy)
+
+          // Handle Parse.File format { __type: "File", name: "...", url: "https://bucket.s3..." }
+          // eslint-disable-next-line no-underscore-dangle
+          if (photo.__type === 'File' || (photo.url && photo.url.includes('amazonaws.com'))) {
+            const s3Key = this.extractS3KeyFromUrl(photo.url);
+            if (s3Key) {
+              const presignedUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+              return {
+                dataUrl: presignedUrl,
+                url: presignedUrl,
+                fileName: photo.name || photo.fileName || 'image.jpg',
+              };
+            }
+          }
+
+          // Handle base64 dataUrl (very old format)
+          if (photo.dataUrl && photo.dataUrl.startsWith('data:')) {
+            return { ...photo, fileName: photo.fileName || 'image.jpg' };
+          }
+
+          // Return photo as-is
           return {
             ...photo,
             fileName: photo.fileName || 'image.jpg',
           };
         } catch (error) {
-          logger.error('Error processing photo for response', {
+          logger.error('Error processing legacy photo', {
             tourId: tour.id,
-            photoFileName: photo.fileName,
-            photoData: photo,
+            photoFileName: photo.fileName || photo.name,
             error: error.message,
-            stack: error.stack,
           });
-
-          // Return photo as-is on error
-          return {
-            ...photo,
-            fileName: photo.fileName || 'image.jpg',
-          };
+          return null;
         }
       })
     );
 
-    return formattedPhotos;
+    return formattedPhotos.filter((p) => p !== null);
   }
 
   /**
-   * Send error response.
-   * @param {object} res - Express response object.
-   * @param {string} message - Error message.
-   * @param {number} statusCode - HTTP status code.
-   * @returns {object} JSON error response.
-   * @example
+   * Extract S3 object key from an S3 URL.
+   * @param {string} url - S3 URL to extract key from.
+   * @returns {string|null} S3 key or null if not extractable.
    */
+  extractS3KeyFromUrl(url) {
+    if (!url) return null;
+    try {
+      const bucket = process.env.S3_BUCKET;
+      // Format: https://bucket.s3.region.amazonaws.com/key
+      const bucketPrefix = `https://${bucket}.s3.`;
+      if (url.startsWith(bucketPrefix)) {
+        const pathStart = url.indexOf('.amazonaws.com/');
+        if (pathStart !== -1) return url.substring(pathStart + '.amazonaws.com/'.length);
+      }
+      // Format: https://s3.region.amazonaws.com/bucket/key
+      if (url.startsWith('https://s3.')) {
+        const bucketPath = `/${bucket}/`;
+        const bucketIdx = url.indexOf(bucketPath);
+        if (bucketIdx !== -1) return url.substring(bucketIdx + bucketPath.length);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   sendError(res, message, statusCode = 500) {
     return res.status(statusCode).json({
       success: false,
