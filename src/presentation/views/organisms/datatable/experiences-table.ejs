@@ -173,10 +173,8 @@ const isClient = dtUserRole === 'client';
                 <thead class="table-light">
                     <tr>
                         <th>Nombre</th>
-                        <th>Descripción</th>
                         <th>Duración</th>
                         <th>Mín. Personas</th>
-                        <th>Precio</th>
                         <th>Estado</th>
                         <th class="text-center">Acciones</th>
                     </tr>
@@ -1004,7 +1002,7 @@ const isClient = dtUserRole === 'client';
                 console.log(`📊 Found ${rows.length} rows in table`);
                 
                 // Precio is always column 5 now (consistent for all roles)
-                // Columns: 1=Nombre, 2=Descripción, 3=Duración, 4=Mín.Personas, 5=Precio, 6=Estado, 7=Acciones
+                // Columns: 1=Nombre, 2=Duración, 3=Mín.Personas, 4=Estado, 5=Acciones
                 const priceColumnNumber = 5;
                 console.log(`🎯 Using column ${priceColumnNumber} for prices (consistent for all roles)`);
                 
@@ -1189,81 +1187,7 @@ const isClient = dtUserRole === 'client';
                         return `<div class="fw-semibold">${data}</div>`;
                     }
                 },
-                {
-                    data: 'description',
-                    orderable: false,
-                    render: function(data, type, row) {
-                        // Show included experiences and tours instead of description for all roles
-                        if (true) {
-                            let content = '';
-                            
-                            // Check various possible field names for included experiences
-                            const experienceDetails = row.experienceDetails || row.experiences || row.includedExperiences || [];
-                            const providerExperienceDetails = row.providerExperienceDetails || row.providerExperiences || row.includedProviderExperiences || [];
-                            const tourDetails = row.tourDetails || row.tours || row.includedTours || [];
-                            
-                            // Show included experiences
-                            if (experienceDetails && experienceDetails.length > 0) {
-                                content += `<div class="mb-2"><small class="text-primary fw-semibold">Experiencias:</small></div>`;
-                                const experienceItems = experienceDetails.map(exp => {
-                                    // Handle different object structures
-                                    if (typeof exp === 'string') return exp;
-                                    const name = exp.name || exp.title || exp.destinationPOI?.name || 'Experiencia sin nombre';
-                                    return `<li style="color: var(--bs-primary);"><small class="text-primary">${name}</small></li>`;
-                                }).join('');
-                                content += `<ul class="mb-2" style="margin: 0; padding-left: 16px; list-style-type: disc;">${experienceItems}</ul>`;
-                            }
-                            
-                            // Show included provider experiences
-                            if (providerExperienceDetails && providerExperienceDetails.length > 0) {
-                                content += `<div class="mb-2"><small class="text-warning fw-semibold">Experiencias de Proveedores:</small></div>`;
-                                const providerExperienceItems = providerExperienceDetails.map(provExp => {
-                                    // Handle different object structures
-                                    if (typeof provExp === 'string') return provExp;
-                                    const name = provExp.name || provExp.title || 'Experiencia de proveedor sin nombre';
-                                    const providerName = provExp.provider?.name || 'Proveedor desconocido';
-                                    return `<li style="color: var(--bs-warning);"><small class="text-warning">${name} (${providerName})</small></li>`;
-                                }).join('');
-                                content += `<ul class="mb-2" style="margin: 0; padding-left: 16px; list-style-type: disc;">${providerExperienceItems}</ul>`;
-                            }
-                            
-                            // Show included tours
-                            if (tourDetails && tourDetails.length > 0) {
-                                content += `<div class="mb-2"><small class="text-success fw-semibold">Tours:</small></div>`;
-                                const tourItems = tourDetails.map(tour => {
-                                    // Handle different object structures
-                                    if (typeof tour === 'string') return tour;
-                                    
-                                    // Extract POI destination name from the updated API response structure
-                                    const poiName = tour.destinationPOI?.name;
-                                    const name = tour.name || tour.title || poiName || 'Tour sin nombre';
-                                    return `<li style="color: var(--bs-success);"><small class="text-success">${name}</small></li>`;
-                                }).join('');
-                                content += `<ul style="margin: 0; padding-left: 16px; list-style-type: disc;">${tourItems}</ul>`;
-                            }
-                            
-                            // Check for experienceCount and tourCount as indicators
-                            const experienceCount = row.experienceCount || 0;
-                            const tourCount = row.tourCount || 0;
-                            
-                            if (!content && (experienceCount > 0 || tourCount > 0)) {
-                                content = `<small class="text-info">Contiene: ${experienceCount > 0 ? experienceCount + ' experiencias' : ''} ${tourCount > 0 ? tourCount + ' tours' : ''}</small>`;
-                            }
-                            
-                            // If no included content, show a placeholder
-                            if (!content) {
-                                content = '<small class="text-muted">Sin contenido incluido</small>';
-                            }
-                            
-                            return content;
-                        } else {
-                            // For other roles, show truncated description as before
-                            const truncated = data.length > 100 ? data.substring(0, 100) + '...' : data;
-                            return `<small class="text-muted">${truncated}</small>`;
-                        }
-                    }
-                },
-                // 3. Duración
+                // 2. Duración
                 {
                     data: 'duration',
                     orderable: false,
@@ -1281,33 +1205,7 @@ const isClient = dtUserRole === 'client';
                         return `<span class="text-info">${data} personas</span>`;
                     }
                 },
-                // 5. Precio (base price from database)
-                {
-                    data: 'cost',
-                    orderable: false,
-                    render: function(data, type, row) {
-                        const baseCost = data || 0;
-
-                        // For sorting and filtering, use base cost
-                        if (type === 'sort' || type === 'filter') {
-                            return baseCost;
-                        }
-
-                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
-                            style: 'currency',
-                            currency: 'MXN'
-                        }).format(amount);
-
-                        return `
-                            <div class="text-center" data-original-price="${baseCost}">
-                                <div class="fw-bold text-primary" style="font-size: 1rem;">
-                                    ${formatMXN(baseCost)}
-                                </div>
-                            </div>
-                        `;
-                    }
-                },
-                // 6. Estado
+                // 4. Estado
                 {
                     data: 'active',
                     orderable: false,
@@ -1430,8 +1328,8 @@ const isClient = dtUserRole === 'client';
         // Setup filter functionality for Moneda and Pago dropdowns
         setupExperienceFilters();
 
-        $('#createExperienceBtn').on('click', function() { openExperienceModal(); });
-        $(`#${tableId}`).on('click', '.edit-experience-btn', function() { loadExperienceData($(this).data('id')); });
+        $('#createExperienceBtn').on('click', function() { window.location.href = '/dashboard/admin/experiences/new'; });
+        $(`#${tableId}`).on('click', '.edit-experience-btn', function() { window.location.href = `/dashboard/admin/experiences/${$(this).data('id')}`; });
         $(`#${tableId}`).on('click', '.manage-images-btn', function() {
             const experienceId = $(this).data('id');
             const name = $(this).data('name');

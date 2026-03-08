@@ -207,7 +207,20 @@ class ExperienceController {
       duration: experience.get('duration'),
       cost: experience.get('cost'),
       min_people: experience.get('min_people'),
+      max_people: experience.get('max_people') || null,
       time_journey: experience.get('time_journey'),
+      travel_duration: experience.get('travel_duration') || null,
+      advance_minutes: experience.get('advance_minutes') || null,
+      price_no_alcohol: experience.get('price_no_alcohol') || null,
+      price_child: experience.get('price_child') || null,
+      includes: experience.get('includes') || [],
+      notincludes: experience.get('notincludes') || [],
+      languages: experience.get('languages') || [],
+      photos: experience.get('photos') || [],
+      internal_notes: experience.get('internal_notes') || null,
+      client_booking_notes: experience.get('client_booking_notes') || null,
+      provider_notes: experience.get('provider_notes') || null,
+      team_notes: experience.get('team_notes') || null,
       vehicleType: this.formatVehicleType(vehicleType),
       vehicleTypeId: vehicleType ? vehicleType.id : null,
       experiences: includedExperiences.map((exp) => exp.id),
@@ -217,6 +230,7 @@ class ExperienceController {
       tours: includedTours.map((tour) => tour.id),
       tourDetails: this.formatTourDetails(includedTours),
       availability: experience.get('availability') || null,
+      serviceItems: experience.get('serviceItems') || null,
       active: experience.get('active'),
       createdAt: experience.createdAt,
       updatedAt: experience.updatedAt,
@@ -592,10 +606,20 @@ class ExperienceController {
       duration,
       cost,
       min_people: minPeople,
+      max_people: maxPeople,
       time_journey: timeJourney,
+      travel_duration: travelDuration,
+      advance_minutes: advanceMinutes,
+      price_no_alcohol: priceNoAlcohol,
+      price_child: priceChild,
       includes,
       notincludes,
+      languages,
       photos,
+      internal_notes: internalNotes,
+      client_booking_notes: clientBookingNotes,
+      provider_notes: providerNotes,
+      team_notes: teamNotes,
     } = data;
 
     const Experience = Parse.Object.extend('Experience');
@@ -613,8 +637,23 @@ class ExperienceController {
     if (minPeople !== undefined && minPeople !== null && minPeople !== '') {
       experienceObj.set('min_people', parseInt(minPeople, 10));
     }
+    if (maxPeople !== undefined && maxPeople !== null && maxPeople !== '') {
+      experienceObj.set('max_people', parseInt(maxPeople, 10));
+    }
     if (timeJourney !== undefined && timeJourney !== null && timeJourney !== '') {
       experienceObj.set('time_journey', parseFloat(timeJourney));
+    }
+    if (travelDuration !== undefined && travelDuration !== null && travelDuration !== '') {
+      experienceObj.set('travel_duration', parseInt(travelDuration, 10));
+    }
+    if (advanceMinutes !== undefined && advanceMinutes !== null && advanceMinutes !== '') {
+      experienceObj.set('advance_minutes', parseInt(advanceMinutes, 10));
+    }
+    if (priceNoAlcohol !== undefined && priceNoAlcohol !== null && priceNoAlcohol !== '') {
+      experienceObj.set('price_no_alcohol', parseFloat(priceNoAlcohol));
+    }
+    if (priceChild !== undefined && priceChild !== null && priceChild !== '') {
+      experienceObj.set('price_child', parseFloat(priceChild));
     }
     if (includes !== undefined && Array.isArray(includes)) {
       experienceObj.set('includes', includes);
@@ -622,8 +661,23 @@ class ExperienceController {
     if (notincludes !== undefined && Array.isArray(notincludes)) {
       experienceObj.set('notincludes', notincludes);
     }
+    if (languages !== undefined && Array.isArray(languages)) {
+      experienceObj.set('languages', languages);
+    }
     if (photos !== undefined && Array.isArray(photos)) {
       experienceObj.set('photos', photos);
+    }
+    if (internalNotes !== undefined && internalNotes !== null) {
+      experienceObj.set('internal_notes', internalNotes);
+    }
+    if (clientBookingNotes !== undefined && clientBookingNotes !== null) {
+      experienceObj.set('client_booking_notes', clientBookingNotes);
+    }
+    if (providerNotes !== undefined && providerNotes !== null) {
+      experienceObj.set('provider_notes', providerNotes);
+    }
+    if (teamNotes !== undefined && teamNotes !== null) {
+      experienceObj.set('team_notes', teamNotes);
     }
     experienceObj.set('cost', parseFloat(cost));
     experienceObj.set('active', true);
@@ -787,10 +841,20 @@ class ExperienceController {
       providerType,
       active,
       min_people: minPeople,
+      max_people: maxPeople,
       time_journey: timeJourney,
+      travel_duration: travelDuration,
+      advance_minutes: advanceMinutes,
+      price_no_alcohol: priceNoAlcohol,
+      price_child: priceChild,
       includes,
       notincludes,
+      languages,
       photos,
+      internal_notes: internalNotes,
+      client_booking_notes: clientBookingNotes,
+      provider_notes: providerNotes,
+      team_notes: teamNotes,
     } = data;
 
     if (name !== undefined) {
@@ -916,6 +980,85 @@ class ExperienceController {
       } else if (photos === null) {
         experienceObj.set('photos', []);
       }
+    }
+
+    if (languages !== undefined) {
+      if (Array.isArray(languages)) {
+        experienceObj.set('languages', languages);
+      } else if (languages === null) {
+        experienceObj.set('languages', []);
+      }
+    }
+
+    if (maxPeople !== undefined) {
+      if (maxPeople === null || maxPeople === '') {
+        experienceObj.set('max_people', null);
+      } else {
+        if (Number.isNaN(parseInt(maxPeople, 10)) || parseInt(maxPeople, 10) < 1) {
+          return {
+            error: 'Maximum people must be a positive number',
+            status: 400,
+          };
+        }
+        experienceObj.set('max_people', parseInt(maxPeople, 10));
+      }
+    }
+
+    if (travelDuration !== undefined) {
+      if (travelDuration === null || travelDuration === '') {
+        experienceObj.set('travel_duration', null);
+      } else {
+        if (Number.isNaN(parseInt(travelDuration, 10)) || parseInt(travelDuration, 10) < 0) {
+          return {
+            error: 'Travel duration must be greater than or equal to 0',
+            status: 400,
+          };
+        }
+        experienceObj.set('travel_duration', parseInt(travelDuration, 10));
+      }
+    }
+
+    if (advanceMinutes !== undefined) {
+      if (advanceMinutes === null || advanceMinutes === '') {
+        experienceObj.set('advance_minutes', null);
+      } else {
+        if (Number.isNaN(parseInt(advanceMinutes, 10)) || parseInt(advanceMinutes, 10) < 0) {
+          return {
+            error: 'Advance minutes must be greater than or equal to 0',
+            status: 400,
+          };
+        }
+        experienceObj.set('advance_minutes', parseInt(advanceMinutes, 10));
+      }
+    }
+
+    if (priceNoAlcohol !== undefined) {
+      if (priceNoAlcohol === null || priceNoAlcohol === '') {
+        experienceObj.set('price_no_alcohol', null);
+      } else {
+        experienceObj.set('price_no_alcohol', parseFloat(priceNoAlcohol));
+      }
+    }
+
+    if (priceChild !== undefined) {
+      if (priceChild === null || priceChild === '') {
+        experienceObj.set('price_child', null);
+      } else {
+        experienceObj.set('price_child', parseFloat(priceChild));
+      }
+    }
+
+    if (internalNotes !== undefined) {
+      experienceObj.set('internal_notes', internalNotes || null);
+    }
+    if (clientBookingNotes !== undefined) {
+      experienceObj.set('client_booking_notes', clientBookingNotes || null);
+    }
+    if (providerNotes !== undefined) {
+      experienceObj.set('provider_notes', providerNotes || null);
+    }
+    if (teamNotes !== undefined) {
+      experienceObj.set('team_notes', teamNotes || null);
     }
 
     if (active !== undefined) {
@@ -1770,6 +1913,155 @@ class ExperienceController {
       success: false,
       error: message,
     });
+  }
+
+  /**
+   * PUT /api/experiences/:id/service-items - Update experience service items.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Returns updated service items or error.
+   * @example
+   */
+  async updateServiceItems(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      const experienceId = req.params.id;
+      if (!experienceId) {
+        return this.sendError(res, 'Experience ID is required', 400);
+      }
+
+      const {
+        subconcepts = [], subtotal = 0, iva = 0, total = 0,
+      } = req.body;
+
+      // Validate subconcepts is array
+      if (!Array.isArray(subconcepts)) {
+        return this.sendError(res, 'El campo subconcepts debe ser un array', 400);
+      }
+
+      // Validate numeric fields
+      if (typeof subtotal !== 'number' || subtotal < 0) {
+        return this.sendError(res, 'El subtotal debe ser un número positivo', 400);
+      }
+
+      // Validate IVA calculation (16% of subtotal)
+      const expectedIva = Math.round(subtotal * 0.16 * 100) / 100;
+      const ivaRounded = Math.round(iva * 100) / 100;
+      if (Math.abs(ivaRounded - expectedIva) > 0.01) {
+        return this.sendError(res, 'El IVA debe ser el 16% del subtotal', 400);
+      }
+
+      // Validate total calculation
+      const expectedTotal = Math.round((subtotal + iva) * 100) / 100;
+      const totalRounded = Math.round(total * 100) / 100;
+      if (Math.abs(totalRounded - expectedTotal) > 0.01) {
+        return this.sendError(res, 'El total debe ser la suma del subtotal + IVA', 400);
+      }
+
+      // Validate each subconcept
+      for (let j = 0; j < subconcepts.length; j++) {
+        const sub = subconcepts[j];
+
+        // Validate time format HH:MM (optional)
+        if (sub.time && !/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(sub.time)) {
+          return this.sendError(
+            res,
+            `Hora inválida en servicio ${j + 1}. Use formato HH:MM (00:00 - 23:59)`,
+            400
+          );
+        }
+
+        // Validate numeric fields
+        if (sub.hours !== null && sub.hours !== undefined) {
+          if (typeof sub.hours !== 'number' || sub.hours < 0) {
+            return this.sendError(res, `Horas inválidas en servicio ${j + 1}`, 400);
+          }
+        }
+
+        if (sub.unitPrice !== null && sub.unitPrice !== undefined) {
+          if (typeof sub.unitPrice !== 'number' || sub.unitPrice < 0) {
+            return this.sendError(res, `Precio unitario inválido en servicio ${j + 1}`, 400);
+          }
+        }
+
+        if (sub.total !== null && sub.total !== undefined) {
+          if (typeof sub.total !== 'number' || sub.total < 0) {
+            return this.sendError(res, `Total inválido en servicio ${j + 1}`, 400);
+          }
+        }
+      }
+
+      // Query experience
+      const query = new Parse.Query('Experience');
+      query.equalTo('exists', true);
+      const experience = await query.get(experienceId, { useMasterKey: true });
+
+      if (!experience) {
+        return this.sendError(res, 'Experience not found', 404);
+      }
+
+      // Build and save serviceItems
+      const serviceItems = {
+        subconcepts,
+        subtotal,
+        iva,
+        total,
+      };
+
+      experience.set('serviceItems', serviceItems);
+
+      await experience.save(null, {
+        useMasterKey: true,
+        context: {
+          user: {
+            objectId: currentUser.id,
+            id: currentUser.id,
+            email: currentUser.get('email'),
+            username: currentUser.get('username') || currentUser.get('email'),
+          },
+        },
+      });
+
+      logger.info('Experience service items updated successfully', {
+        experienceId: experience.id,
+        name: experience.get('name'),
+        subconceptsCount: subconcepts.length,
+        subtotal,
+        iva,
+        total,
+        updatedBy: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          id: experience.id,
+          serviceItems,
+        },
+        message: 'Servicios de experiencia actualizados exitosamente',
+      });
+    } catch (error) {
+      logger.error('Error in ExperienceController.updateServiceItems', {
+        error: error.message,
+        stack: error.stack,
+        experienceId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      if (error.code === Parse.Error.OBJECT_NOT_FOUND) {
+        return this.sendError(res, 'Experience not found', 404);
+      }
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al actualizar los servicios',
+        500
+      );
+    }
   }
 }
 
