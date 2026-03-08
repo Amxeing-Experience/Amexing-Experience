@@ -86,6 +86,12 @@
                                     <span style="font-size: 0.9rem;">Transporte</span>
                                 </label>
                                 
+                                <input type="radio" class="btn-check" name="serviceType" id="typeADisposicion" value="a-disposicion">
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeADisposicion">
+                                    <i class="ti ti-clock-hour-4 me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">A Disposición</span>
+                                </label>
+
                                 <input type="radio" class="btn-check" name="serviceType" id="typeConcepto" value="concepto">
                                 <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeConcepto">
                                     <i class="ti ti-file-text me-1" style="font-size: 1.1rem;"></i>
@@ -290,7 +296,7 @@
                                 
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label">Origen <span class="text-danger">*</span></label>
+                                        <label class="form-label" id="transportOriginLabel">Origen <span class="text-danger">*</span></label>
                                         <!-- Arrival: Dropdown Origin (airports) -->
                                         <select class="form-select transport-origin-arrival" id="transportOriginSelect" required>
                                             <option value="">-- Seleccionar origen --</option>
@@ -312,7 +318,7 @@
                                         <input type="text" class="form-control transport-origin-departure d-none" id="transportOriginText" placeholder="Ej: Hotel Xcaret, Airbnb Playa">
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label">Destino <span class="text-danger">*</span></label>
+                                        <label class="form-label" id="transportDestinationLabel">Destino <span class="text-danger">*</span></label>
                                         <!-- Arrival/default: Combo Box destination -->
                                         <div class="position-relative" id="transportDestinationComboWrapper">
                                             <input type="text"
@@ -333,6 +339,8 @@
                                         <select class="form-select d-none" id="transportDestinationSelect">
                                             <option value="">-- Seleccionar destino --</option>
                                         </select>
+                                        <!-- Local Vuelta: Text destination -->
+                                        <input type="text" class="form-control d-none" id="transportDestinationText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
                                     </div>
                                 </div>
                                 
@@ -506,6 +514,48 @@
                                     </div>
                                 </div>
                                 -->
+                            </div>
+                        </div>
+
+                        <!-- A Disposición Fields -->
+                        <div id="aDisposicionContent" class="service-content d-none">
+                            <div class="mb-3">
+                                <label for="aDisposicionConcept" class="form-label">Concepto <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="aDisposicionConcept" placeholder="Ej: Servicio a disposición 8 horas...">
+                            </div>
+
+                            <!-- Schedule -->
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="aDisposicionStartTime" class="form-label">Hora de inicio</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="ti ti-clock"></i></span>
+                                        <input type="text" class="form-control time-input" id="aDisposicionStartTime" placeholder="__:__" maxlength="5" data-placeholder="09:00">
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="aDisposicionEndTime" class="form-label">Hora de fin</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="ti ti-clock"></i></span>
+                                        <input type="text" class="form-control time-input" id="aDisposicionEndTime" placeholder="__:__" maxlength="5" data-placeholder="17:00">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- People counts -->
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="aDisposicionAdults" class="form-label">Adultos</label>
+                                    <input type="number" class="form-control" id="aDisposicionAdults" min="0" max="50" value="1">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="aDisposicionChildren" class="form-label">Niños</label>
+                                    <input type="number" class="form-control" id="aDisposicionChildren" min="0" max="50" value="0">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="aDisposicionInfants" class="form-label">Infantes</label>
+                                    <input type="number" class="form-control" id="aDisposicionInfants" min="0" max="50" value="0">
+                                </div>
                             </div>
                         </div>
 

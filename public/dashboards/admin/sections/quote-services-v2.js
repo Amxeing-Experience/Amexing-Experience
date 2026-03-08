@@ -703,7 +703,7 @@ class ItineraryBuilder {
     const priceTypeLabel = document.querySelector('label[for="priceTypeSelect"]');
     const quantityField = document.getElementById('serviceQuantity')?.closest('.col-md-6');
 
-    if (type === 'concepto' || type === 'experience') {
+    if (type === 'concepto' || type === 'experience' || type === 'a-disposicion') {
       // Hide category, vehicle and guide for Concepto and Experience
       categoryField?.classList.add('d-none');
       vehicleField?.classList.add('d-none');
@@ -731,6 +731,26 @@ class ItineraryBuilder {
         }
         if (priceTypeLabel) {
           priceTypeLabel.innerHTML = 'Pago';
+        }
+      } else if (type === 'a-disposicion') {
+        // Hide quantity field for A Disposición
+        quantityField?.classList.add('d-none');
+        document.getElementById('serviceQuantity')?.removeAttribute('required');
+
+        // Price, currency and price type are required for A Disposición
+        priceField?.setAttribute('required', 'required');
+        currencyField?.setAttribute('required', 'required');
+        priceTypeField?.setAttribute('required', 'required');
+
+        // Update labels to add asterisk
+        if (priceLabel) {
+          priceLabel.innerHTML = 'Precio <span class="text-danger">*</span>';
+        }
+        if (currencyLabel) {
+          currencyLabel.innerHTML = 'Moneda <span class="text-danger">*</span>';
+        }
+        if (priceTypeLabel) {
+          priceTypeLabel.innerHTML = 'Pago <span class="text-danger">*</span>';
         }
       } else {
         // Show quantity field for Experience
@@ -873,6 +893,7 @@ class ItineraryBuilder {
       experience: 'experienceContent',
       tour: 'tourContent',
       transport: 'transportContent',
+      'a-disposicion': 'aDisposicionContent',
       concepto: 'conceptoContent',
     };
 
@@ -991,7 +1012,8 @@ class ItineraryBuilder {
 
     switch (serviceType) {
       case 'concepto':
-        // Concepto defaults to empty/0 price (optional pricing)
+      case 'a-disposicion':
+        // Concepto/A Disposición defaults to empty/0 price (optional pricing)
         if (priceField) priceField.value = '';
         break;
       case 'experience':
@@ -1042,6 +1064,8 @@ class ItineraryBuilder {
     if (destCombo) destCombo.value = '';
     const destSelect = document.getElementById('transportDestinationSelect');
     if (destSelect) destSelect.value = '';
+    const destText = document.getElementById('transportDestinationText');
+    if (destText) destText.value = '';
 
     // Clear specific location
     const specificLocation = document.getElementById('transportSpecificLocation');
@@ -1091,6 +1115,23 @@ class ItineraryBuilder {
       populateDropdownsForTransportType(transportType);
     }
 
+    // Update direction labels based on transport type
+    const arrivalLabel = document.querySelector('label[for="typeArrival"] span');
+    const departureLabel = document.querySelector('label[for="typeDeparture"] span');
+    const arrivalIcon = document.querySelector('label[for="typeArrival"] i');
+    const departureIcon = document.querySelector('label[for="typeDeparture"] i');
+    if (transportType === 'punto-a-punto' || transportType === 'local') {
+      if (arrivalLabel) arrivalLabel.textContent = 'Ida';
+      if (departureLabel) departureLabel.textContent = 'Vuelta';
+      if (arrivalIcon) { arrivalIcon.className = 'ti ti-car me-1'; arrivalIcon.style.fontSize = '1.1rem'; }
+      if (departureIcon) { departureIcon.className = 'ti ti-car me-1'; departureIcon.style.fontSize = '1.1rem'; }
+    } else {
+      if (arrivalLabel) arrivalLabel.textContent = 'Arrival';
+      if (departureLabel) departureLabel.textContent = 'Departure';
+      if (arrivalIcon) { arrivalIcon.className = 'ti ti-plane-arrival me-1'; arrivalIcon.style.fontSize = '1.1rem'; }
+      if (departureIcon) { departureIcon.className = 'ti ti-plane-departure me-1'; departureIcon.style.fontSize = '1.1rem'; }
+    }
+
     // Round trip fields handled elsewhere
 
     // Show/hide schedule and flight details based on transport type
@@ -1111,6 +1152,12 @@ class ItineraryBuilder {
       roundTripFlightDetailsIda?.classList.add('d-none');
       roundTripFlightDetailsVuelta?.classList.add('d-none');
       transportScheduleSection?.classList.remove('d-none');
+    }
+
+    // Re-evaluate direction fields (local has different field types than aeropuerto/punto-a-punto)
+    const tripType2 = document.querySelector('input[name="tripType"]:checked')?.value;
+    if (tripType2 === 'one-way') {
+      this.handleDirectionTypeChange();
     }
   }
 
@@ -1151,6 +1198,7 @@ class ItineraryBuilder {
     const originComboWrapper = document.getElementById('transportOriginComboWrapper');
     const destinationComboWrapper = document.getElementById('transportDestinationComboWrapper');
     const destinationSelect = document.getElementById('transportDestinationSelect');
+    const destinationText = document.getElementById('transportDestinationText');
 
     // Get time label element
     const timeLabel = document.querySelector('label[for="flightTime"]');
@@ -1161,36 +1209,54 @@ class ItineraryBuilder {
     originComboWrapper?.classList.add('d-none');
     destinationComboWrapper?.classList.add('d-none');
     destinationSelect?.classList.add('d-none');
+    destinationText?.classList.add('d-none');
     originSelect?.removeAttribute('required');
     originText?.removeAttribute('required');
     document.getElementById('transportOriginCombo')?.removeAttribute('required');
     document.getElementById('transportDestinationCombo')?.removeAttribute('required');
     destinationSelect?.removeAttribute('required');
+    destinationText?.removeAttribute('required');
 
-    if (directionType === 'arrival') {
+    // Update labels based on transport type and direction
+    const originLabel = document.getElementById('transportOriginLabel');
+    const destinationLabel = document.getElementById('transportDestinationLabel');
+
+    if (directionType === 'arrival' && transportType === 'local') {
+      // Local Ida: Origin = TEXT (ubicación específica), Destination = SELECT
+      originText?.classList.remove('d-none');
+      originText?.setAttribute('required', 'required');
+      destinationSelect?.classList.remove('d-none');
+      destinationSelect?.setAttribute('required', 'required');
+      if (originLabel) originLabel.innerHTML = 'Origen (San Miguel de Allende) <span class="text-danger">*</span>';
+      if (destinationLabel) destinationLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
+    } else if (directionType === 'arrival') {
       // Arrival: Origin = SELECT (airports), Destination = COMBO (hotels/cities)
       originSelect?.classList.remove('d-none');
       originSelect?.setAttribute('required', 'required');
+      if (originLabel) originLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
+      if (destinationLabel) destinationLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
       destinationComboWrapper?.classList.remove('d-none');
       document.getElementById('transportDestinationCombo')?.setAttribute('required', 'required');
 
       if (timeLabel) {
         timeLabel.textContent = 'Hora de Llegada';
       }
+    } else if (directionType === 'departure' && transportType === 'local') {
+      // Local Vuelta: Origin = SELECT, Destination = TEXT (ubicación específica)
+      originSelect?.classList.remove('d-none');
+      originSelect?.setAttribute('required', 'required');
+      if (originLabel) originLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
+      destinationText?.classList.remove('d-none');
+      destinationText?.setAttribute('required', 'required');
+      if (destinationLabel) destinationLabel.innerHTML = 'Destino (San Miguel de Allende) <span class="text-danger">*</span>';
     } else if (directionType === 'departure') {
-      if (transportType === 'aeropuerto') {
-        // Departure + Aeropuerto: Origin = COMBO (hotels/cities), Destination = SELECT (airports)
-        originComboWrapper?.classList.remove('d-none');
-        document.getElementById('transportOriginCombo')?.setAttribute('required', 'required');
-        destinationSelect?.classList.remove('d-none');
-        destinationSelect?.setAttribute('required', 'required');
-      } else {
-        // Departure + other: Origin = text, Destination = combo
-        originText?.classList.remove('d-none');
-        originText?.setAttribute('required', 'required');
-        destinationComboWrapper?.classList.remove('d-none');
-        document.getElementById('transportDestinationCombo')?.setAttribute('required', 'required');
-      }
+      // Departure + Aeropuerto / Punto a Punto: Origin = COMBO, Destination = SELECT
+      originComboWrapper?.classList.remove('d-none');
+      document.getElementById('transportOriginCombo')?.setAttribute('required', 'required');
+      if (originLabel) originLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
+      if (destinationLabel) destinationLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
+      destinationSelect?.classList.remove('d-none');
+      destinationSelect?.setAttribute('required', 'required');
 
       if (timeLabel) {
         timeLabel.textContent = 'Hora de Salida';
@@ -1354,32 +1420,56 @@ class ItineraryBuilder {
         // Get origin from appropriate field based on direction
         const directionType = data.directionType;
         const isDepartureAeropuerto = directionType === 'departure' && data.transportType === 'aeropuerto';
-        if (isDepartureAeropuerto) {
-          // Departure + Aeropuerto: origin = COMBO (local place), destination = SELECT (airport)
-          data.origin = document.getElementById('transportOriginCombo')?.value || '';
+
+        // Resolve destination from SELECT (display text, not slug)
+        const resolveDestinationSelect = () => {
           const destSelect = document.getElementById('transportDestinationSelect');
           const destSlug = destSelect?.value || '';
-          data.destination = destSlug;
-          // Resolve display name from select text
           if (destSelect && destSelect.selectedIndex > 0) {
-            data.destination = destSelect.options[destSelect.selectedIndex].textContent;
-          } else if (window.slugToOriginalMapping?.has(destSlug)) {
-            data.destination = window.slugToOriginalMapping.get(destSlug);
+            return destSelect.options[destSelect.selectedIndex].textContent;
           }
-        } else if (directionType === 'arrival') {
+          return window.slugToOriginalMapping?.get(destSlug) || destSlug;
+        };
+
+        const isDepartureWithSelect = directionType === 'departure' && (data.transportType === 'aeropuerto' || data.transportType === 'punto-a-punto');
+
+        const isLocalIda = directionType === 'arrival' && data.transportType === 'local';
+
+        if (isLocalIda) {
+          // Local Ida: origin = TEXT (ubicación específica), destination = SELECT
+          data.origin = document.getElementById('transportOriginText')?.value || '';
+          data.destination = resolveDestinationSelect();
+        } else if (isDepartureWithSelect) {
+          // Departure + Aeropuerto / Punto a Punto: origin = COMBO, destination = SELECT
+          data.origin = document.getElementById('transportOriginCombo')?.value || '';
+          data.destination = resolveDestinationSelect();
+        } else if (directionType === 'departure' && data.transportType === 'local') {
+          // Local Vuelta: origin = SELECT, destination = TEXT
+          const originSelect = document.getElementById('transportOriginSelect');
+          if (originSelect && originSelect.selectedIndex > 0) {
+            data.origin = originSelect.options[originSelect.selectedIndex].textContent;
+          } else {
+            data.origin = originSelect?.value || '';
+          }
+          data.destination = document.getElementById('transportDestinationText')?.value || '';
+        } else if (directionType === 'departure') {
+          // Departure + other: origin = COMBO, destination = COMBO
+          data.origin = document.getElementById('transportOriginCombo')?.value || '';
+          data.destination = document.getElementById('transportDestinationCombo')?.value || '';
+        } else {
           // Arrival: origin = SELECT (airport slug), destination = COMBO (text)
           data.origin = document.getElementById('transportOriginSelect')?.value || '';
           data.destination = document.getElementById('transportDestinationCombo')?.value || '';
-        } else {
-          // Other departure: origin = text, destination = COMBO
-          data.origin = document.getElementById('transportOriginText')?.value || '';
-          data.destination = document.getElementById('transportDestinationCombo')?.value || '';
         }
 
-        // If specific location is filled, append it to destination
+        // If specific location is filled, append it to origin (departure) or destination (arrival)
         const specificLocation = document.getElementById('transportSpecificLocation')?.value;
         if (specificLocation && specificLocation.trim()) {
-          data.destination = `${data.destination}, ${specificLocation.trim()}`;
+          if (directionType === 'departure') {
+            data.origin = `${data.origin}, ${specificLocation.trim()}`;
+          } else {
+            data.destination = `${data.destination}, ${specificLocation.trim()}`;
+          }
         }
 
         data.category = document.getElementById('transportCategory')?.value;
@@ -1418,19 +1508,20 @@ class ItineraryBuilder {
 
         // Resolve origin display name from the active field
         const resolveOriginName = () => {
-          if (isDepartureAeropuerto) {
-            // Departure + Aeropuerto: origin is COMBO text field
+          if (isLocalIda) {
+            // Local Ida: origin is TEXT field
+            const originText = document.getElementById('transportOriginText')?.value;
+            if (originText) return originText;
+          } else if (directionType === 'departure') {
+            // All departure: origin is COMBO text field
             const originCombo = document.getElementById('transportOriginCombo')?.value;
             if (originCombo) return originCombo;
-          } else if (directionType === 'arrival') {
+          } else {
             // Arrival: origin is SELECT
             const originSelect = document.getElementById('transportOriginSelect');
             if (originSelect && originSelect.selectedIndex > 0) {
               return originSelect.options[originSelect.selectedIndex].textContent;
             }
-          } else {
-            const originText = document.getElementById('transportOriginText')?.value;
-            if (originText) return originText;
           }
           return data.origin || 'Origen';
         };
@@ -1442,8 +1533,12 @@ class ItineraryBuilder {
         };
 
         // Generate concept with origin and destination
-        const originName = resolveOriginName();
-        data.originName = originName; // Store resolved name for display
+        let originName = resolveOriginName();
+        // For departure, append specific location to display name (matches data.origin)
+        if (directionType === 'departure' && specificLocation && specificLocation.trim()) {
+          originName = `${originName}, ${specificLocation.trim()}`;
+        }
+        data.originName = originName;
         const destinationName = data.destination || 'Destino';
         data.concept = `${transportTypes[data.transportType] || 'Transporte'}: ${originName} - ${destinationName}`;
 
@@ -1456,6 +1551,29 @@ class ItineraryBuilder {
           data.baseVehiclePrice = this.getTransportVehiclePrice(vehicleSelectValue) || data.price;
         } else {
           data.baseVehiclePrice = data.price;
+        }
+        break;
+      }
+      case 'a-disposicion': {
+        data.concept = document.getElementById('aDisposicionConcept')?.value;
+
+        // Collect people counts
+        data.transportAdults = parseInt(document.getElementById('aDisposicionAdults')?.value || 0);
+        data.transportChildren = parseInt(document.getElementById('aDisposicionChildren')?.value || 0);
+        data.transportInfants = parseInt(document.getElementById('aDisposicionInfants')?.value || 0);
+        data.persons = data.transportAdults + data.transportChildren + data.transportInfants || 1;
+
+        // Collect schedule
+        const adStartTime = document.getElementById('aDisposicionStartTime')?.value;
+        const adEndTime = document.getElementById('aDisposicionEndTime')?.value;
+        if (adStartTime) {
+          data.startTime = adStartTime;
+          if (adEndTime) {
+            data.endTime = adEndTime;
+            data.selectedSchedule = `${adStartTime} - ${adEndTime}`;
+          } else {
+            data.selectedSchedule = adStartTime;
+          }
         }
         break;
       }
@@ -1549,6 +1667,12 @@ class ItineraryBuilder {
       case 'concepto':
         if (!data.concept) {
           this.showModalAlert('serviceModalAlert', 'Por favor ingresa un concepto', 'warning');
+          return false;
+        }
+        break;
+      case 'a-disposicion':
+        if (!data.concept) {
+          this.showModalAlert('serviceModalAlert', 'Por favor ingresa un concepto para A Disposición', 'warning');
           return false;
         }
         break;
@@ -1852,12 +1976,27 @@ class ItineraryBuilder {
           }
 
           // Set origin/destination in the correct fields based on direction
-          const isDepartureAeropuerto = service.directionType === 'departure' && service.transportType === 'aeropuerto';
-          if (isDepartureAeropuerto) {
-            // Departure + Aeropuerto: origin = COMBO, destination = SELECT
+          const isDeparture = service.directionType === 'departure';
+          const isDepartureWithSelect = isDeparture && (service.transportType === 'aeropuerto' || service.transportType === 'punto-a-punto');
+          const isLocalIda = !isDeparture && service.transportType === 'local';
+          if (isLocalIda) {
+            // Local Ida: origin = TEXT, destination = SELECT
+            document.getElementById('transportOriginText').value = service.origin || '';
+            document.getElementById('transportDestinationSelect').value = service.destination || '';
+          } else if (isDepartureWithSelect) {
+            // Departure + Aeropuerto / Punto a Punto: origin = COMBO, destination = SELECT
             document.getElementById('transportOriginCombo').value = service.origin || '';
             document.getElementById('transportDestinationSelect').value = service.destination || '';
+          } else if (isDeparture && service.transportType === 'local') {
+            // Local Vuelta: origin = SELECT, destination = TEXT
+            document.getElementById('transportOriginSelect').value = service.origin || '';
+            document.getElementById('transportDestinationText').value = service.destination || '';
+          } else if (isDeparture) {
+            // Departure + other: origin = COMBO, destination = COMBO
+            document.getElementById('transportOriginCombo').value = service.origin || '';
+            document.getElementById('transportDestinationCombo').value = service.destination || '';
           } else {
+            // Arrival: origin = SELECT, destination = COMBO
             document.getElementById('transportOriginSelect').value = service.origin || '';
             document.getElementById('transportDestinationCombo').value = service.destination || '';
           }
@@ -1919,6 +2058,14 @@ class ItineraryBuilder {
         }
         break;
 
+      case 'a-disposicion':
+        document.getElementById('aDisposicionConcept').value = service.concept || '';
+        document.getElementById('aDisposicionAdults').value = service.transportAdults || 1;
+        document.getElementById('aDisposicionChildren').value = service.transportChildren || 0;
+        document.getElementById('aDisposicionInfants').value = service.transportInfants || 0;
+        if (service.startTime) document.getElementById('aDisposicionStartTime').value = service.startTime;
+        if (service.endTime) document.getElementById('aDisposicionEndTime').value = service.endTime;
+        break;
       case 'concepto':
         document.getElementById('conceptoConcept').value = service.concept || '';
 
@@ -2092,6 +2239,7 @@ class ItineraryBuilder {
     const typeLabels = {
       experience: 'Experiencia',
       tour: 'Tour',
+      'a-disposicion': 'A Disposición',
       concepto: 'Concepto',
     };
 
@@ -2206,7 +2354,7 @@ class ItineraryBuilder {
                         <div class="d-flex align-items-center mb-2">
                             <span class="badge bg-light text-dark me-2">Transporte</span>
                             <span class="badge bg-primary-subtle text-primary">${transportLabel}</span>
-                            ${service.directionType ? `<span class="badge ${service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">${service.directionType === 'arrival' ? 'Llegada' : 'Salida'}</span>` : ''}
+                            ${service.directionType ? `<span class="badge ${service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">${(service.transportType === 'punto-a-punto' || service.transportType === 'local') ? (service.directionType === 'arrival' ? 'Ida' : 'Vuelta') : (service.directionType === 'arrival' ? 'Llegada' : 'Salida')}</span>` : ''}
                         </div>
                         <div class="service-details">
                             <!-- Route display -->
@@ -2627,6 +2775,8 @@ class ItineraryBuilder {
         // For concepto, just return the concept text without "Concepto" prefix
         // since the badge already shows "Concepto"
         return service.concept || 'Concepto';
+      case 'a-disposicion':
+        return service.concept || 'A Disposición';
       default:
         return 'Servicio';
     }
@@ -5243,12 +5393,35 @@ class ItineraryBuilder {
     let originName = '';
     let destinationName = '';
 
-    if (direction === 'departure' && transportType === 'aeropuerto') {
-      // Departure + Aeropuerto: origin COMBO (local place), destination SELECT (airport)
-      originName = document.getElementById('transportOriginCombo')?.value || '';
+    const isDepartureWithSelect = direction === 'departure' && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
+
+    // Helper to resolve destination SELECT display name
+    const resolveDestSelect = () => {
       const destSelect = document.getElementById('transportDestinationSelect');
       const destSlug = destSelect?.value;
-      destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
+      return window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
+    };
+
+    const isLocalIda = direction === 'arrival' && transportType === 'local';
+
+    if (isLocalIda) {
+      // Local Ida: origin TEXT, destination SELECT
+      originName = document.getElementById('transportOriginText')?.value || '';
+      destinationName = resolveDestSelect();
+    } else if (isDepartureWithSelect) {
+      // Departure + Aeropuerto / Punto a Punto: origin COMBO, destination SELECT
+      originName = document.getElementById('transportOriginCombo')?.value || '';
+      destinationName = resolveDestSelect();
+    } else if (direction === 'departure' && transportType === 'local') {
+      // Local Vuelta: origin SELECT, destination TEXT
+      const originSelect = document.getElementById('transportOriginSelect');
+      const slug = originSelect?.value;
+      originName = window.slugToOriginalMapping?.get(slug) || slug || '';
+      destinationName = document.getElementById('transportDestinationText')?.value || '';
+    } else if (direction === 'departure') {
+      // Departure + other: origin COMBO, destination COMBO
+      originName = document.getElementById('transportOriginCombo')?.value || '';
+      destinationName = document.getElementById('transportDestinationCombo')?.value || '';
     } else if (direction === 'arrival') {
       const originSelect = document.getElementById('transportOriginSelect');
       const slug = originSelect?.value;
@@ -5269,13 +5442,12 @@ class ItineraryBuilder {
       return;
     }
 
-    // For departure + aeropuerto: swap origin/destination for API query
-    // DB stores routes as airport(origin)→hotel(destination)
-    // User selected: origin=hotel/city, destination=airport
-    // So swap to match DB: apiOrigin=airport(destination), apiDestination=hotel(origin)
+    // For departure: swap origin/destination for API query
+    // DB stores routes as origin→destination, but user selected in reverse for departure
+    // So swap to match DB ordering
     let apiOrigin = originName;
     let apiDestination = destinationName;
-    if (direction === 'departure' && transportType === 'aeropuerto') {
+    if (direction === 'departure') {
       apiOrigin = destinationName;
       apiDestination = originName;
     }
@@ -8001,8 +8173,13 @@ function populateDropdownsForTransportType(transportType, directionType) {
           destinations.add(service.destination);
         }
       }
+    } else if (directionType === 'departure') {
+      // Departure for non-aeropuerto: swap origins/destinations
+      // User departs FROM destination → TO origin (relative to DB)
+      if (service.destination) origins.add(service.destination);
+      if (service.origin) destinations.add(service.origin);
     } else {
-      // For other types: add all origins and destinations
+      // Arrival for non-aeropuerto: origins and destinations as stored
       if (service.origin) origins.add(service.origin);
       if (service.destination) destinations.add(service.destination);
     }
@@ -8011,21 +8188,15 @@ function populateDropdownsForTransportType(transportType, directionType) {
   // Create mapping from slugified values to original names (make it global)
   window.slugToOriginalMapping = new Map();
 
-  const isDeparture = directionType === 'departure' && transportType === 'aeropuerto';
+  const isDeparture = directionType === 'departure';
 
-  // Populate origin SELECT (arrival: airports, non-departure modes)
+  // Elements
   const originSelectEls = [
     document.getElementById('transportOriginSelect'),
     document.getElementById('roundTripOriginIdaSelect'),
   ];
-
-  // Populate destination SELECT (departure+aeropuerto: airports)
   const destinationSelectEl = document.getElementById('transportDestinationSelect');
-
-  // Populate origin datalist (departure+aeropuerto: local places)
   const originDatalistEl = document.getElementById('transportOriginList');
-
-  // Populate destination datalists (arrival/other: local places)
   const destinationDatalistEls = [
     document.getElementById('transportDestinationList'),
     document.getElementById('roundTripDestinationList'),
@@ -8056,19 +8227,28 @@ function populateDropdownsForTransportType(transportType, directionType) {
     });
   };
 
-  if (isDeparture) {
-    // Departure + Aeropuerto:
-    // origins (local places) → origin datalist + origin SELECT (for compatibility)
-    // destinations (airports) → destination SELECT
+  if (isDeparture && transportType === 'local') {
+    // Local Vuelta: origin = SELECT, destination = TEXT (no dropdown needed)
+    originSelectEls.forEach(el => populateSelect(el, origins));
+    // Clear unused elements
+    if (originDatalistEl) originDatalistEl.innerHTML = '';
+    if (destinationSelectEl) { while (destinationSelectEl.options.length > 1) destinationSelectEl.remove(1); }
+    destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
+  } else if (isDeparture) {
+    // Aeropuerto / Punto a Punto departure: origin = COMBO (datalist), destination = SELECT
     populateDatalist(originDatalistEl, origins);
-    originSelectEls.forEach(el => populateSelect(el, origins)); // Keep in sync for fallback
+    originSelectEls.forEach(el => populateSelect(el, origins)); // fallback for slug mapping
     populateSelect(destinationSelectEl, destinations);
-    populateDatalist(destinationDatalistEls[0], destinations); // Keep in sync
-    populateDatalist(destinationDatalistEls[1], destinations);
+    destinationDatalistEls.forEach(el => populateDatalist(el, destinations)); // keep in sync
+  } else if (transportType === 'local') {
+    // Local Ida: origin = TEXT (no dropdown needed), destination = SELECT
+    populateSelect(destinationSelectEl, destinations);
+    // Clear unused elements
+    originSelectEls.forEach(el => { if (el) { while (el.options.length > 1) el.remove(1); } });
+    if (originDatalistEl) originDatalistEl.innerHTML = '';
+    destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
   } else {
-    // Arrival / other:
-    // origins (airports or POIs) → origin SELECT
-    // destinations (local places) → destination datalists
+    // Arrival: origins → origin SELECT, destinations → destination datalists
     originSelectEls.forEach(el => populateSelect(el, origins));
     destinationDatalistEls.forEach(el => populateDatalist(el, destinations));
     // Clear departure-specific elements
@@ -8131,9 +8311,10 @@ function updateDestinationsForOrigin(selectedOrigin = null) {
   const directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
   const services = window.servicesByTransportType[transportType] || [];
 
-  // For departure+aeropuerto: user's origin is a local place stored as service.destination in DB
-  // So filter by service.destination and return service.origin (airports) as destination options
-  const isDeparture = directionType === 'departure' && transportType === 'aeropuerto';
+  // For departure: user's origin is a local place stored as service.destination in DB
+  // So filter by service.destination and return service.origin as destination options
+  const isDeparture = directionType === 'departure';
+  const isDepartureWithSelect = isDeparture && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
 
   const relevantServices = services.filter(service =>
     isDeparture ? service.destination === originalOriginName : service.origin === originalOriginName
@@ -8147,8 +8328,8 @@ function updateDestinationsForOrigin(selectedOrigin = null) {
   const destinations = new Set();
   relevantServices.forEach(service => {
     if (isDeparture) {
-      // Departure: only show airports as destinations
-      if (service.origin && service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
+      // Departure: show matching origins as destination options
+      if (service.origin) {
         destinations.add(service.origin);
       }
     } else {
@@ -8158,8 +8339,8 @@ function updateDestinationsForOrigin(selectedOrigin = null) {
     }
   });
 
-  if (isDeparture) {
-    // Departure: update destination SELECT with filtered airports
+  if (isDepartureWithSelect) {
+    // Aeropuerto / Punto a Punto departure: update destination SELECT
     const destSelect = document.getElementById('transportDestinationSelect');
     if (destSelect) {
       while (destSelect.options.length > 1) destSelect.remove(1);
@@ -8173,7 +8354,7 @@ function updateDestinationsForOrigin(selectedOrigin = null) {
       });
     }
   } else {
-    // Arrival/other: update destination datalists
+    // Arrival / Local departure: update destination datalists (COMBO)
     const datalists = [
       document.getElementById('transportDestinationList'),
       document.getElementById('roundTripDestinationList'),
@@ -8309,8 +8490,13 @@ function populateDropdownsForTransportType(transportType, directionType) {
           destinations.add(service.destination);
         }
       }
+    } else if (directionType === 'departure') {
+      // Departure for non-aeropuerto: swap origins/destinations
+      // User departs FROM destination → TO origin (relative to DB)
+      if (service.destination) origins.add(service.destination);
+      if (service.origin) destinations.add(service.origin);
     } else {
-      // For other types: add all origins and destinations
+      // Arrival for non-aeropuerto: origins and destinations as stored
       if (service.origin) origins.add(service.origin);
       if (service.destination) destinations.add(service.destination);
     }
@@ -8319,21 +8505,15 @@ function populateDropdownsForTransportType(transportType, directionType) {
   // Create mapping from slugified values to original names (make it global)
   window.slugToOriginalMapping = new Map();
 
-  const isDeparture = directionType === 'departure' && transportType === 'aeropuerto';
+  const isDeparture = directionType === 'departure';
 
-  // Populate origin SELECT (arrival: airports, non-departure modes)
+  // Elements
   const originSelectEls = [
     document.getElementById('transportOriginSelect'),
     document.getElementById('roundTripOriginIdaSelect'),
   ];
-
-  // Populate destination SELECT (departure+aeropuerto: airports)
   const destinationSelectEl = document.getElementById('transportDestinationSelect');
-
-  // Populate origin datalist (departure+aeropuerto: local places)
   const originDatalistEl = document.getElementById('transportOriginList');
-
-  // Populate destination datalists (arrival/other: local places)
   const destinationDatalistEls = [
     document.getElementById('transportDestinationList'),
     document.getElementById('roundTripDestinationList'),
@@ -8364,19 +8544,28 @@ function populateDropdownsForTransportType(transportType, directionType) {
     });
   };
 
-  if (isDeparture) {
-    // Departure + Aeropuerto:
-    // origins (local places) → origin datalist + origin SELECT (for compatibility)
-    // destinations (airports) → destination SELECT
+  if (isDeparture && transportType === 'local') {
+    // Local Vuelta: origin = SELECT, destination = TEXT (no dropdown needed)
+    originSelectEls.forEach(el => populateSelect(el, origins));
+    // Clear unused elements
+    if (originDatalistEl) originDatalistEl.innerHTML = '';
+    if (destinationSelectEl) { while (destinationSelectEl.options.length > 1) destinationSelectEl.remove(1); }
+    destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
+  } else if (isDeparture) {
+    // Aeropuerto / Punto a Punto departure: origin = COMBO (datalist), destination = SELECT
     populateDatalist(originDatalistEl, origins);
-    originSelectEls.forEach(el => populateSelect(el, origins)); // Keep in sync for fallback
+    originSelectEls.forEach(el => populateSelect(el, origins)); // fallback for slug mapping
     populateSelect(destinationSelectEl, destinations);
-    populateDatalist(destinationDatalistEls[0], destinations); // Keep in sync
-    populateDatalist(destinationDatalistEls[1], destinations);
+    destinationDatalistEls.forEach(el => populateDatalist(el, destinations)); // keep in sync
+  } else if (transportType === 'local') {
+    // Local Ida: origin = TEXT (no dropdown needed), destination = SELECT
+    populateSelect(destinationSelectEl, destinations);
+    // Clear unused elements
+    originSelectEls.forEach(el => { if (el) { while (el.options.length > 1) el.remove(1); } });
+    if (originDatalistEl) originDatalistEl.innerHTML = '';
+    destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
   } else {
-    // Arrival / other:
-    // origins (airports or POIs) → origin SELECT
-    // destinations (local places) → destination datalists
+    // Arrival: origins → origin SELECT, destinations → destination datalists
     originSelectEls.forEach(el => populateSelect(el, origins));
     destinationDatalistEls.forEach(el => populateDatalist(el, destinations));
     // Clear departure-specific elements
@@ -8439,9 +8628,10 @@ function updateDestinationsForOrigin(selectedOrigin = null) {
   const directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
   const services = window.servicesByTransportType[transportType] || [];
 
-  // For departure+aeropuerto: user's origin is a local place stored as service.destination in DB
-  // So filter by service.destination and return service.origin (airports) as destination options
-  const isDeparture = directionType === 'departure' && transportType === 'aeropuerto';
+  // For departure: user's origin is a local place stored as service.destination in DB
+  // So filter by service.destination and return service.origin as destination options
+  const isDeparture = directionType === 'departure';
+  const isDepartureWithSelect = isDeparture && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
 
   const relevantServices = services.filter(service =>
     isDeparture ? service.destination === originalOriginName : service.origin === originalOriginName
@@ -8455,8 +8645,8 @@ function updateDestinationsForOrigin(selectedOrigin = null) {
   const destinations = new Set();
   relevantServices.forEach(service => {
     if (isDeparture) {
-      // Departure: only show airports as destinations
-      if (service.origin && service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
+      // Departure: show matching origins as destination options
+      if (service.origin) {
         destinations.add(service.origin);
       }
     } else {
@@ -8466,8 +8656,8 @@ function updateDestinationsForOrigin(selectedOrigin = null) {
     }
   });
 
-  if (isDeparture) {
-    // Departure: update destination SELECT with filtered airports
+  if (isDepartureWithSelect) {
+    // Aeropuerto / Punto a Punto departure: update destination SELECT
     const destSelect = document.getElementById('transportDestinationSelect');
     if (destSelect) {
       while (destSelect.options.length > 1) destSelect.remove(1);
@@ -8481,7 +8671,7 @@ function updateDestinationsForOrigin(selectedOrigin = null) {
       });
     }
   } else {
-    // Arrival/other: update destination datalists
+    // Arrival / Local departure: update destination datalists (COMBO)
     const datalists = [
       document.getElementById('transportDestinationList'),
       document.getElementById('roundTripDestinationList'),
@@ -8565,9 +8755,11 @@ document.addEventListener('DOMContentLoaded', () => {
       originCombo.addEventListener('input', (e) => {
         const selectedOrigin = e.target.value;
 
-        // Clear destination select when origin changes
+        // Clear destination fields when origin changes
         const destSelect = document.getElementById('transportDestinationSelect');
         if (destSelect) destSelect.value = '';
+        const destCombo = document.getElementById('transportDestinationCombo');
+        if (destCombo) destCombo.value = '';
 
         if (selectedOrigin) {
           updateDestinationsForOrigin(selectedOrigin);
@@ -8591,6 +8783,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const destSelectEl = document.getElementById('transportDestinationSelect');
     if (destSelectEl) {
       destSelectEl.addEventListener('change', () => {
+        const currentRateId = document.getElementById('transportCategory')?.value;
+        if (window.itineraryBuilder && currentRateId) {
+          window.itineraryBuilder.handleTransportRateSelection(currentRateId);
+        }
+      });
+    }
+
+    // Destination combo: trigger rate selection and specific location check when destination changes
+    const destComboEl = document.getElementById('transportDestinationCombo');
+    if (destComboEl) {
+      destComboEl.addEventListener('input', () => {
+        checkSpecificLocationField();
         const currentRateId = document.getElementById('transportCategory')?.value;
         if (window.itineraryBuilder && currentRateId) {
           window.itineraryBuilder.handleTransportRateSelection(currentRateId);
@@ -8739,6 +8943,10 @@ document.addEventListener('DOMContentLoaded', () => {
         case 'concepto':
           const conceptoContent = document.getElementById('conceptoContent');
           if (conceptoContent) conceptoContent.classList.remove('d-none');
+          break;
+        case 'a-disposicion':
+          const aDisposicionContent = document.getElementById('aDisposicionContent');
+          if (aDisposicionContent) aDisposicionContent.classList.remove('d-none');
           break;
       }
     }
