@@ -413,6 +413,34 @@ class AdminController extends RoleBasedController {
   }
 
   /**
+   * Experience detail page with sections (information, services).
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   */
+  async experienceDetail(req, res) {
+    try {
+      const experienceId = req.params.id;
+      const isNewExperience = experienceId === 'new';
+
+      await this.renderRoleView(req, res, 'experience-detail', {
+        title: isNewExperience ? 'Nueva Experiencia' : 'Experiencia',
+        breadcrumb: null,
+        experienceId,
+        isNewExperience,
+        pageStyles: [
+          'https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Schedule calendar page.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.

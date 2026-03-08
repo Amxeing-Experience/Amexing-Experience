@@ -136,6 +136,22 @@ router.post(
 );
 
 /**
+ * PUT /api/experiences/:id/service-items - Update experience service items.
+ *
+ * Access: Admin (level 6+)
+ * Body: { subconcepts: [], subtotal, iva, total }
+ * Returns: Updated service items.
+ * NOTE: This route must be before /:id to avoid route conflicts.
+ */
+router.put(
+  '/:id/service-items',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ExperienceController.updateServiceItems(req, res)
+);
+
+/**
  * PUT /api/experiences/:id - Update experience.
  *
  * Access: Admin (level 6+)
