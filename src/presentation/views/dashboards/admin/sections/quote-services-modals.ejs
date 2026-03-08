@@ -306,21 +306,54 @@
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Destino <span class="text-danger">*</span></label>
-                                        <!-- Arrival: Text Destination -->
-                                        <input type="text" class="form-control transport-destination-arrival" id="transportDestinationText" placeholder="Ej: Hotel Xcaret, Aeropuerto Internacional" required>
-                                        <!-- Departure: Dropdown Destination -->
-                                        <select class="form-select transport-destination-departure d-none" id="transportDestinationSelect">
-                                            <option value="">-- Seleccionar destino --</option>
-                                            <option value="cancun">Cancún</option>
-                                            <option value="playa-del-carmen">Playa del Carmen</option>
-                                            <option value="tulum">Tulum</option>
-                                            <option value="cozumel">Cozumel</option>
-                                            <option value="merida">Mérida</option>
-                                            <option value="chichen-itza">Chichén Itzá</option>
-                                        </select>
+                                        <!-- Combo Box: Input with datalist for autocomplete -->
+                                        <div class="position-relative">
+                                            <input type="text" 
+                                                   class="form-control" 
+                                                   id="transportDestinationCombo" 
+                                                   list="transportDestinationList"
+                                                   placeholder="Seleccionar o escribir destino..." 
+                                                   required>
+                                            <datalist id="transportDestinationList">
+                                                <!-- Options will be populated dynamically from Services table -->
+                                            </datalist>
+                                            <!-- Indicator for available options -->
+                                            <small class="text-muted d-none" id="destinationOptionsIndicator">
+                                                <i class="ti ti-arrow-down"></i> Opciones disponibles
+                                            </small>
+                                        </div>
                                     </div>
                                 </div>
                                 
+                                <!-- Specific Location field (shown only for certain destinations) -->
+                                <div class="row d-none" id="specificLocationRow">
+                                    <div class="col-md-12 mb-3">
+                                        <label class="form-label">Ubicación Específica <span class="text-info">(Hotel, Dirección, etc.)</span></label>
+                                        <input type="text" 
+                                               class="form-control" 
+                                               id="transportSpecificLocation" 
+                                               placeholder="Ej: Hotel Rosewood, Casa en Aldama 15, Centro Histórico..."
+                                               aria-describedby="specificLocationHelp">
+                                        <small id="specificLocationHelp" class="form-text text-muted">
+                                            Especifique el hotel, dirección o lugar exacto dentro de <span id="selectedDestinationName"></span>
+                                        </small>
+                                    </div>
+                                </div>
+                                
+                                <!-- Transport Schedule (shown for Punto a Punto and Local) -->
+                                <div id="transportScheduleSection" class="d-none">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="transportStartTime" class="form-label">Horario Inicio</label>
+                                            <input type="text" class="form-control time-input" id="transportStartTime" placeholder="__:__" maxlength="5">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="transportEndTime" class="form-label">Horario Fin</label>
+                                            <input type="text" class="form-control time-input" id="transportEndTime" placeholder="__:__" maxlength="5">
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Flight Details (only show if Aeropuerto is selected) -->
                                 <div id="flightDetailsSection" class="d-none">
                                     <hr class="my-2">
@@ -335,14 +368,16 @@
                                         </div>
                                     </div>
                                     <div class="row">
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-12 mb-3">
                                             <label for="flightTime" class="form-label">Hora de Llegada</label>
-                                            <input type="time" class="form-control" id="flightTime">
+                                            <input type="text" class="form-control time-input" id="flightTime" placeholder="__:__" maxlength="5">
                                         </div>
+                                        <!-- Removed Número de Personas field as requested
                                         <div class="col-md-6 mb-3">
                                             <label for="transportPersons" class="form-label">Número de Personas <span class="text-danger">*</span></label>
                                             <input type="number" class="form-control" id="transportPersons" min="1" max="50" value="1" required>
                                         </div>
+                                        -->
                                     </div>
                                 </div>
                                 </div>
@@ -413,14 +448,16 @@
                                         </div>
                                         <div class="col-md-6 mb-3">
                                             <label class="form-label">Destino <span class="text-danger">*</span></label>
-                                            <!-- Departure: Dropdown Destination -->
-                                            <select class="form-select" id="roundTripDestinationVueltaSelect" required>
-                                                <option value="">-- Seleccionar destino --</option>
-                                                <option value="cancun">Cancún</option>
-                                                <option value="cozumel">Cozumel</option>
-                                                <option value="playa">Playa del Carmen</option>
-                                                <option value="tulum">Tulum</option>
-                                            </select>
+                                            <!-- Combo Box: Input with datalist for autocomplete -->
+                                            <input type="text" 
+                                                   class="form-control" 
+                                                   id="roundTripDestinationCombo" 
+                                                   list="roundTripDestinationList"
+                                                   placeholder="Seleccionar o escribir destino..." 
+                                                   required>
+                                            <datalist id="roundTripDestinationList">
+                                                <!-- Options will be populated dynamically from Services table -->
+                                            </datalist>
                                         </div>
                                     </div>
                                     <div class="row">
@@ -450,13 +487,14 @@
                                     </div>
                                 </div>
 
-                                <!-- Number of Persons -->
+                                <!-- Number of Persons - Removed as requested
                                 <div class="row mt-3">
                                     <div class="col-md-6 mb-3">
                                         <label for="roundTripPersons" class="form-label">Número de Personas <span class="text-danger">*</span></label>
                                         <input type="number" class="form-control" id="roundTripPersons" min="1" max="50" value="1" required>
                                     </div>
                                 </div>
+                                -->
                             </div>
                         </div>
 
@@ -527,6 +565,22 @@
                             <label class="form-check-label" for="tourRequiresTransport">
                                 <i class="ti ti-car me-1"></i>Se requiere traslado
                             </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Number of People Fields for Transport -->
+                    <div class="row mb-3" id="transportPeopleFieldsRow">
+                        <div class="col-md-4">
+                            <label for="transportAdults" class="form-label">Número de adultos (12+)</label>
+                            <input type="number" class="form-control" id="transportAdults" min="0" max="100" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="transportChildren" class="form-label">Número de niños (3-12)</label>
+                            <input type="number" class="form-control" id="transportChildren" min="0" max="100" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="transportInfants" class="form-label">Número de infantes (0-2)</label>
+                            <input type="number" class="form-control" id="transportInfants" min="0" max="100" value="0">
                         </div>
                     </div>
                     
