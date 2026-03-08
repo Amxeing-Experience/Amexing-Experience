@@ -1732,6 +1732,8 @@ class ExperienceController {
       providerType: experience.get('providerType'),
       duration: experience.get('duration'),
       cost: experience.get('cost'),
+      price_child: experience.get('price_child') || null,
+      price_no_alcohol: experience.get('price_no_alcohol') || null,
       min_people: experience.get('min_people'),
       experienciasCount,
       time_journey: experience.get('time_journey'),

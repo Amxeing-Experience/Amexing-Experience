@@ -389,6 +389,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('mainImageInput').value = '';
             window._mainImageFile = null;
             window._mainImageRemoved = true;
+            // Keep _mainImageId so we know which ExperienceImage to delete on save
         });
     }
 
@@ -661,6 +662,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('mainImageImg').src = primaryUrl;
                         document.getElementById('mainImagePreview').style.display = 'block';
                         document.getElementById('mainImageUpload').style.display = 'none';
+                        window._mainImageId = primaryImg.id;
                     }
                     imagesResult.data.forEach(img => {
                         if (!img.isPrimary) {
@@ -783,6 +785,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            // Delete old main image if removed (without replacement)
+            if (window._mainImageRemoved && !window._mainImageFile && window._mainImageId) {
+                try {
+                    const expIdForDelete = result.data?.id || experienceId;
+                    await fetch(`/api/experiences/${expIdForDelete}/images/${window._mainImageId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    window._mainImageId = null;
+                } catch (delErr) {
+                    console.warn('Could not delete old main image:', delErr);
+                }
+            }
+
             // Upload main image if new file
             if (window._mainImageFile && result.data && result.data.id) {
                 updateProgress('Subiendo imagen principal...');
@@ -820,6 +836,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function uploadMainImage(expId, file) {
         try {
+            // Delete old primary image if it exists
+            if (window._mainImageId) {
+                try {
+                    await fetch(`/api/experiences/${expId}/images/${window._mainImageId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                } catch (delErr) {
+                    console.warn('Could not delete old main image:', delErr);
+                }
+            }
+
             const formData = new FormData();
             formData.append('image', file);
             formData.append('isPrimary', 'true');
@@ -831,15 +859,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const result = await response.json();
-            if (result.success && result.data && result.data.url) {
-                await fetch(`/api/experiences/${expId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ mainImage: result.data.url })
-                });
+            if (result.success && result.data) {
+                window._mainImageId = result.data.id;
+            } else {
+                console.error('Main image upload failed:', result.error);
             }
         } catch (error) {
             console.error('Error uploading main image:', error);

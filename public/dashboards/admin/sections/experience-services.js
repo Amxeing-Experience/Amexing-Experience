@@ -261,6 +261,8 @@ class ExperienceServicesBuilder {
         noAlcoholPrice: sub.noAlcoholPrice || 0,
         includeGuide: sub.includeGuide || false,
         includeGreeter: sub.includeGreeter || false,
+        languages: sub.languages || '',
+        clientNotes: sub.clientNotes || '',
       });
     });
   }
@@ -571,7 +573,7 @@ class ExperienceServicesBuilder {
 
     // Advance booking time
     const advEl = document.getElementById('advanceBookingTime');
-    if (advEl) advEl.value = isProvider ? (exp.advance_booking_time || '') : (exp.advanceBookingTime || '');
+    if (advEl) advEl.value = exp.advanceBookingTime || exp.advance_booking_time || '';
 
     // Languages
     const langEl = document.getElementById('experienceLanguages');
@@ -582,15 +584,21 @@ class ExperienceServicesBuilder {
 
     // Includes
     const inclEl = document.getElementById('experienceIncludes');
-    if (inclEl) inclEl.value = isProvider ? (exp.includes || '') : (exp.includes || '');
+    if (inclEl) {
+      const incl = exp.includes || [];
+      inclEl.value = Array.isArray(incl) ? incl.join(', ') : (incl || '');
+    }
 
     // Not includes
     const notInclEl = document.getElementById('experienceNotIncludes');
-    if (notInclEl) notInclEl.value = isProvider ? (exp.notincludes || '') : (exp.notIncludes || '');
+    if (notInclEl) {
+      const notIncl = exp.notincludes || exp.notIncludes || [];
+      notInclEl.value = Array.isArray(notIncl) ? notIncl.join(', ') : (notIncl || '');
+    }
 
     // Client notes
     const notesEl = document.getElementById('experienceClientNotes');
-    if (notesEl) notesEl.value = isProvider ? (exp.client_booking_notes || '') : (exp.clientNotes || '');
+    if (notesEl) notesEl.value = exp.clientNotes || exp.client_booking_notes || '';
 
     // Set default prices
     const adultPrice = isProvider ? exp.price : exp.cost;
@@ -623,13 +631,19 @@ class ExperienceServicesBuilder {
     }
 
     const inclEl = document.getElementById('tourIncludes');
-    if (inclEl) inclEl.value = tour.includes || '';
+    if (inclEl) {
+      const incl = tour.includes || [];
+      inclEl.value = Array.isArray(incl) ? incl.join(', ') : (incl || '');
+    }
 
     const notInclEl = document.getElementById('tourNotIncludes');
-    if (notInclEl) notInclEl.value = tour.notIncludes || '';
+    if (notInclEl) {
+      const notIncl = tour.notIncludes || tour.notincludes || [];
+      notInclEl.value = Array.isArray(notIncl) ? notIncl.join(', ') : (notIncl || '');
+    }
 
     const notesEl = document.getElementById('tourClientNotes');
-    if (notesEl) notesEl.value = tour.clientNotes || '';
+    if (notesEl) notesEl.value = tour.clientNotes || tour.client_booking_notes || '';
   }
 
   handleTourTransportToggle(checked) {
@@ -799,6 +813,14 @@ class ExperienceServicesBuilder {
     if (endTime) endTime.value = service.endTime || '';
 
     if (service.experienceId) this.handleExperienceSelection(service.experienceId);
+
+    // Restore languages and clientNotes after handleExperienceSelection populates from cache
+    setTimeout(() => {
+      const langEl = document.getElementById('experienceLanguages');
+      const notesEl = document.getElementById('experienceClientNotes');
+      if (langEl && service.languages) langEl.value = service.languages;
+      if (notesEl && service.clientNotes) notesEl.value = service.clientNotes;
+    }, 100);
   }
 
   populateTourFields(service) {
@@ -830,6 +852,14 @@ class ExperienceServicesBuilder {
     if (includeGreeter) includeGreeter.checked = service.includeGreeter || false;
 
     if (service.tourId) this.handleTourSelection(service.tourId);
+
+    // Restore languages and clientNotes after handleTourSelection populates from cache
+    setTimeout(() => {
+      const langEl = document.getElementById('tourLanguages');
+      const notesEl = document.getElementById('tourClientNotes');
+      if (langEl && service.languages) langEl.value = service.languages;
+      if (notesEl && service.clientNotes) notesEl.value = service.clientNotes;
+    }, 100);
   }
 
   populateTransportFields(service) {
@@ -955,6 +985,8 @@ class ExperienceServicesBuilder {
       startTime: document.getElementById('experienceStartTime')?.value || null,
       endTime: document.getElementById('experienceEndTime')?.value || null,
       selectedSchedule: document.getElementById('experienceMultipleTime')?.value || '',
+      languages: document.getElementById('experienceLanguages')?.value || '',
+      clientNotes: document.getElementById('experienceClientNotes')?.value || '',
     };
   }
 
@@ -1001,6 +1033,8 @@ class ExperienceServicesBuilder {
       vehicleTypeName: vehicleType ? vehicleType.name : null,
       includeGuide,
       includeGreeter,
+      languages: document.getElementById('tourLanguages')?.value || '',
+      clientNotes: document.getElementById('tourClientNotes')?.value || '',
     };
   }
 
@@ -1304,6 +1338,8 @@ class ExperienceServicesBuilder {
         noAlcoholPrice: service.noAlcoholPrice || null,
         includeGuide: service.includeGuide || false,
         includeGreeter: service.includeGreeter || false,
+        languages: service.languages || '',
+        clientNotes: service.clientNotes || '',
       });
     });
 
