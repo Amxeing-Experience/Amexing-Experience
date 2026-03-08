@@ -4116,6 +4116,7 @@ class ServicesController {
    * @param {string} message - Error message to return.
    * @param {number} statusCode - HTTP status code.
    * @returns {object} Express response with error JSON.
+   * @example
    */
   sendError(res, message, statusCode = 500) {
     return res.status(statusCode).json({

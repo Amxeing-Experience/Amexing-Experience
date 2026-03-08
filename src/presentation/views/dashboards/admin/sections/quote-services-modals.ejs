@@ -291,28 +291,35 @@
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Origen <span class="text-danger">*</span></label>
-                                        <!-- Arrival: Dropdown Origin -->
+                                        <!-- Arrival: Dropdown Origin (airports) -->
                                         <select class="form-select transport-origin-arrival" id="transportOriginSelect" required>
                                             <option value="">-- Seleccionar origen --</option>
-                                            <option value="cancun">Cancún</option>
-                                            <option value="playa-del-carmen">Playa del Carmen</option>
-                                            <option value="tulum">Tulum</option>
-                                            <option value="cozumel">Cozumel</option>
-                                            <option value="merida">Mérida</option>
-                                            <option value="chichen-itza">Chichén Itzá</option>
                                         </select>
-                                        <!-- Departure: Text Origin -->
+                                        <!-- Departure: Combo Origin (hotels, cities) -->
+                                        <div class="position-relative d-none" id="transportOriginComboWrapper">
+                                            <input type="text"
+                                                   class="form-control"
+                                                   id="transportOriginCombo"
+                                                   list="transportOriginList"
+                                                   placeholder="Seleccionar o escribir origen...">
+                                            <datalist id="transportOriginList">
+                                            </datalist>
+                                            <small class="text-muted d-none" id="originOptionsIndicator">
+                                                <i class="ti ti-arrow-down"></i> Opciones disponibles
+                                            </small>
+                                        </div>
+                                        <!-- Other types: Text Origin -->
                                         <input type="text" class="form-control transport-origin-departure d-none" id="transportOriginText" placeholder="Ej: Hotel Xcaret, Airbnb Playa">
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Destino <span class="text-danger">*</span></label>
-                                        <!-- Combo Box: Input with datalist for autocomplete -->
-                                        <div class="position-relative">
-                                            <input type="text" 
-                                                   class="form-control" 
-                                                   id="transportDestinationCombo" 
+                                        <!-- Arrival/default: Combo Box destination -->
+                                        <div class="position-relative" id="transportDestinationComboWrapper">
+                                            <input type="text"
+                                                   class="form-control"
+                                                   id="transportDestinationCombo"
                                                    list="transportDestinationList"
-                                                   placeholder="Seleccionar o escribir destino..." 
+                                                   placeholder="Seleccionar o escribir destino..."
                                                    required>
                                             <datalist id="transportDestinationList">
                                                 <!-- Options will be populated dynamically from Services table -->
@@ -322,6 +329,10 @@
                                                 <i class="ti ti-arrow-down"></i> Opciones disponibles
                                             </small>
                                         </div>
+                                        <!-- Departure: Dropdown destination (airports) -->
+                                        <select class="form-select d-none" id="transportDestinationSelect">
+                                            <option value="">-- Seleccionar destino --</option>
+                                        </select>
                                     </div>
                                 </div>
                                 
@@ -593,10 +604,11 @@
                             </select>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label for="vehicleSelect" class="form-label">Vehículo</label>
+                            <label for="vehicleSelect" class="form-label">Vehículo <span id="vehicleLoadingSpinner" class="spinner-border spinner-border-sm text-primary d-none" role="status" style="width: 14px; height: 14px; border-width: 2px;"></span></label>
                             <select class="form-select" id="vehicleSelect">
                                 <option value="">-- Sin vehículo --</option>
                             </select>
+                            <small id="vehicleCapacityNote" class="text-info d-none"><i class="ti ti-info-circle me-1"></i><span id="vehicleCapacityNoteText"></span></small>
                         </div>
                         <div class="col-md-2 mb-3">
                             <label class="form-label d-block">Opcional</label>
@@ -613,6 +625,12 @@
                                         Greeter
                                     </label>
                                 </div>
+                                <div class="form-check ms-3 d-none" id="greeterInVehicleContainer">
+                                    <input class="form-check-input" type="checkbox" value="" id="greeterInVehicle">
+                                    <label class="form-check-label small text-muted" for="greeterInVehicle" style="font-size: 0.75rem; line-height: 1.2;">
+                                        Viaja en el vehículo
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -624,7 +642,7 @@
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 <input type="number" class="form-control" id="servicePrice" placeholder="0.00" step="0.01" min="0" required>
-                                <span class="input-group-text" id="currencySymbol">MXN</span>
+                                <span class="input-group-text">MXN</span>
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
@@ -632,7 +650,6 @@
                             <input type="number" class="form-control" id="serviceQuantity" value="1" min="1" required>
                         </div>
                     </div>
-                    
                     <!-- Experience pricing with adult/child/no-alcohol options -->
                     <div id="experiencePricingSection" class="d-none">
                         <!-- Experience Information (Read-only) -->
@@ -746,6 +763,24 @@
                         </div>
                     </div>
                     
+
+                    <div id="servicePriceBreakdown" class="d-none mb-3 p-2 bg-light rounded small">
+                        <div class="fw-semibold mb-1 text-muted"><i class="ti ti-list-details me-1"></i>Desglose</div>
+                        <div id="breakdownItems"></div>
+                        <hr class="my-1">
+                        <div class="d-flex justify-content-between fw-bold">
+                            <span>Total servicio</span>
+                            <span id="breakdownTotal"></span>
+                        </div>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="includeInTotal" checked>
+                        <label class="form-check-label" for="includeInTotal">
+                            Incluir en el total de la cotización
+                        </label>
+                        <small class="form-text text-muted d-block">Desmarcar si el cliente paga este servicio por separado</small>
+                    </div>
 
                     <div class="mb-3">
                         <label for="serviceNotes" class="form-label">Notas Adicionales</label>
