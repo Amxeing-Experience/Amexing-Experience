@@ -44,6 +44,9 @@ class ItineraryBuilder {
     // Transport route pricing cache
     this.transportPriceData = null;
 
+    // Vehicle rate prices cache (Tiempo de espera)
+    this.vehicleRatePricesCache = [];
+
     // Number of people from quote data
     this.numberOfPeople = 0;
 
@@ -137,6 +140,7 @@ class ItineraryBuilder {
         this.loadProviderExperiences(),
         this.loadDriverTourRate(),
         this.loadGuideTransportRate(),
+        this.loadVehicleRatePrices(),
       ]);
 
       // Load pricing rates (exchange, transfer, agency) with auth
@@ -384,6 +388,12 @@ class ItineraryBuilder {
     });
     document.getElementById('aDisposicionVehicleCount')?.addEventListener('input', () => {
       this.calculateADisposicionPrice();
+    });
+
+    // Waiting time hours listener (Transport)
+    document.getElementById('waitingTimeHours')?.addEventListener('input', () => {
+      this.recalculateTransportPrice();
+      this.updateServicePriceBreakdown();
     });
 
     // Preview
@@ -691,9 +701,13 @@ class ItineraryBuilder {
     const tourTransportCheckbox = document.getElementById('tourTransportCheckboxContainer');
     const transportPeopleFieldsRow = document.getElementById('transportPeopleFieldsRow');
 
+    // Show/hide Tiempo de espera section
+    const tiempoEsperaSection = document.getElementById('tiempoEsperaSection');
+
     if (type === 'transport') {
       transportTypeSelector?.classList.remove('d-none');
       tripTypeSelector?.classList.remove('d-none');
+      tiempoEsperaSection?.classList.remove('d-none');
       // Show transport people fields
       if (transportPeopleFieldsRow) {
         transportPeopleFieldsRow.style.display = 'flex';
@@ -706,6 +720,7 @@ class ItineraryBuilder {
         tourTransportCheckbox.style.display = 'none';
       }
     } else if (type === 'tour') {
+      tiempoEsperaSection?.classList.add('d-none');
       transportTypeSelector?.classList.add('d-none');
       tripTypeSelector?.classList.add('d-none');
       // Hide transport people fields
@@ -717,6 +732,7 @@ class ItineraryBuilder {
         tourTransportCheckbox.style.display = 'block';
       }
     } else {
+      tiempoEsperaSection?.classList.add('d-none');
       transportTypeSelector?.classList.add('d-none');
       tripTypeSelector?.classList.add('d-none');
       // Hide transport people fields
@@ -1135,6 +1151,12 @@ class ItineraryBuilder {
     if (flightNumber) flightNumber.value = '';
     const flightTime = document.getElementById('flightTime');
     if (flightTime) flightTime.value = '';
+
+    // Clear waiting time
+    const waitingTimeHours = document.getElementById('waitingTimeHours');
+    if (waitingTimeHours) waitingTimeHours.value = 0;
+    const waitingTimeRate = document.getElementById('waitingTimeRate');
+    if (waitingTimeRate) waitingTimeRate.textContent = '';
 
     // Clear price field and cached base price
     const priceField = document.getElementById('servicePrice');
@@ -1612,6 +1634,10 @@ class ItineraryBuilder {
         } else {
           data.baseVehiclePrice = data.price;
         }
+
+        // Waiting time (Tiempo de espera)
+        data.waitingTimeHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
+        data.waitingTimePricePerHour = this.getWaitingTimePrice()?.pricePerHour || 0;
         break;
       }
       case 'a-disposicion': {
@@ -2135,10 +2161,21 @@ class ItineraryBuilder {
             document.getElementById('servicePrice').value = savedPrice;
             // Update capacity note now that vehicle is populated
             this.updateVehicleCapacityNote();
+            // Restore waiting time
+            if (service.waitingTimeHours > 0) {
+              const wtHoursField = document.getElementById('waitingTimeHours');
+              if (wtHoursField) wtHoursField.value = service.waitingTimeHours;
+            }
+            this.updateWaitingTimeRateDisplay();
             // Clear flag after async population is complete
             this._populatingTransportForm = false;
           });
         } else {
+          // Restore waiting time even without category
+          if (service.waitingTimeHours > 0) {
+            const wtHoursField = document.getElementById('waitingTimeHours');
+            if (wtHoursField) wtHoursField.value = service.waitingTimeHours;
+          }
           this._populatingTransportForm = false;
         }
         break;
@@ -2396,6 +2433,14 @@ class ItineraryBuilder {
                                             </div>
                                         </div>
                                     ` : ''}
+                                    ${service.type === 'transport' && service.waitingTimeHours > 0 ? `
+                                        <div class="row g-2 text-warning small mt-1">
+                                            <div class="col-auto">
+                                                <i class="ti ti-clock me-1"></i>
+                                                <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
+                                            </div>
+                                        </div>
+                                    ` : ''}
                                     ${service.notes ? `
                                         <div class="service-notes mt-1 text-muted small d-flex align-items-start">
                                             <i class="ti ti-notes me-1"></i>
@@ -2506,6 +2551,12 @@ class ItineraryBuilder {
                                 <div class="d-flex align-items-center text-info small mt-1">
                                     <i class="ti ti-users me-1"></i>
                                     <strong>Incluye Greeter</strong>
+                                </div>
+                            ` : ''}
+                            ${service.waitingTimeHours > 0 ? `
+                                <div class="d-flex align-items-center text-warning small mt-1">
+                                    <i class="ti ti-clock me-1"></i>
+                                    <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
                                 </div>
                             ` : ''}
                             ${service.notes ? `
@@ -2638,6 +2689,11 @@ class ItineraryBuilder {
 
       if (service.includeGreeter && service.routeDuration) {
         totalPrice += this.calculateGreeterPrice(service.routeDuration);
+      }
+
+      // Waiting time (Tiempo de espera)
+      if (service.waitingTimeHours > 0 && service.waitingTimePricePerHour > 0) {
+        totalPrice += service.waitingTimePricePerHour * service.waitingTimeHours;
       }
 
       return totalPrice;
@@ -3247,6 +3303,8 @@ class ItineraryBuilder {
             airline: subconcept.airline || null,
             routeDuration: subconcept.routeDuration || null,
             baseVehiclePrice: subconcept.baseVehiclePrice || null,
+            waitingTimeHours: subconcept.waitingTimeHours || 0,
+            waitingTimePricePerHour: subconcept.waitingTimePricePerHour || 0,
           });
 
           // Debug logging for people quantities and schedule loading
@@ -4873,6 +4931,7 @@ class ItineraryBuilder {
 
     if (currentServiceType === 'transport') {
       this.handleTransportRateSelection(rateId);
+      this.updateWaitingTimeRateDisplay();
       return;
     }
 
@@ -5104,6 +5163,7 @@ class ItineraryBuilder {
     if (currentServiceType === 'transport') {
       this.recalculateTransportPrice();
       this.updateVehicleCapacityNote();
+      this.updateWaitingTimeRateDisplay();
       return;
     }
 
@@ -5362,6 +5422,16 @@ class ItineraryBuilder {
       if (document.getElementById('includeGreeter')?.checked && routeDuration) {
         const greeterCost = this.calculateGreeterPrice(routeDuration);
         items.push({ label: 'Greeter', amountMXN: greeterCost });
+      }
+      // Tiempo de espera
+      const brkWaitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
+      if (brkWaitingHours > 0) {
+        const wtPrice = this.getWaitingTimePrice();
+        if (wtPrice) {
+          const wtCost = wtPrice.pricePerHour * brkWaitingHours;
+          const displayHourly = this.getDisplayPrice(wtPrice.pricePerHour);
+          items.push({ label: `Tiempo de espera (${brkWaitingHours}h × ${this.formatCurrency(displayHourly)})`, amountMXN: wtCost });
+        }
       }
     } else if (serviceType === 'tour') {
       // Check if it's a walking tour
@@ -5736,6 +5806,63 @@ class ItineraryBuilder {
   }
 
   /**
+   * Load vehicle rate prices (Tiempo de espera hourly rates).
+   */
+  async loadVehicleRatePrices() {
+    try {
+      const accessToken = this.getAccessToken();
+      if (!accessToken) return;
+
+      const response = await fetch('/api/vehicle-rate-prices/all', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.result?.prices) {
+          this.vehicleRatePricesCache = data.result.prices;
+          console.log(`[VehicleRatePrices] Loaded ${this.vehicleRatePricesCache.length} prices`);
+        }
+      }
+    } catch (error) {
+      console.warn('[VehicleRatePrices] Failed to load:', error);
+    }
+  }
+
+  /**
+   * Look up waiting time hourly price for current vehicle + rate selection.
+   * @returns {{ pricePerHour: number, currency: string }|null}
+   */
+  getWaitingTimePrice() {
+    const vehicleTypeId = document.getElementById('vehicleSelect')?.value;
+    const rateId = document.getElementById('transportCategory')?.value;
+    if (!vehicleTypeId || !rateId || !this.vehicleRatePricesCache.length) return null;
+
+    const match = this.vehicleRatePricesCache.find(
+      (p) => p.vehicleTypeId === vehicleTypeId && p.rateId === rateId,
+    );
+    return match ? { pricePerHour: match.pricePerHour, currency: match.currency || 'MXN' } : null;
+  }
+
+  /**
+   * Update the waiting time rate display label.
+   */
+  updateWaitingTimeRateDisplay() {
+    const rateEl = document.getElementById('waitingTimeRate');
+    if (!rateEl) return;
+
+    const wtPrice = this.getWaitingTimePrice();
+    if (wtPrice) {
+      rateEl.textContent = `$${wtPrice.pricePerHour.toLocaleString()} ${wtPrice.currency}/hora`;
+    } else {
+      rateEl.textContent = '';
+    }
+  }
+
+  /**
    * Recalculate transport price including vehicle base + Guía/Greeter surcharges.
    */
   recalculateTransportPrice() {
@@ -5781,6 +5908,15 @@ class ItineraryBuilder {
     // Add Greeter — once per trip, not per vehicle
     if (includeGreeter && routeDuration) {
       totalPrice += this.calculateGreeterPrice(routeDuration);
+    }
+
+    // Add Tiempo de espera (waiting time)
+    const waitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
+    if (waitingHours > 0) {
+      const wtPrice = this.getWaitingTimePrice();
+      if (wtPrice) {
+        totalPrice += wtPrice.pricePerHour * waitingHours;
+      }
     }
 
     console.log('🔧 Final transport price:', totalPrice);
@@ -7537,6 +7673,8 @@ class ItineraryBuilder {
             airline: service.airline || null,
             routeDuration: service.routeDuration || null,
             baseVehiclePrice: service.baseVehiclePrice || null,
+            waitingTimeHours: service.waitingTimeHours || 0,
+            waitingTimePricePerHour: service.waitingTimePricePerHour || 0,
             // A Disposición fields
             vehicleCount: service.vehicleCount || null,
             hourlyPrice: service.hourlyPrice || null,

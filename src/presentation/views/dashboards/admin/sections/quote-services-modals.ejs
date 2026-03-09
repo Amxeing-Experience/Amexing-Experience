@@ -737,6 +737,22 @@
                         </div>
                     </div>
                     
+                    <!-- Tiempo de Espera (Transport only) -->
+                    <div id="tiempoEsperaSection" class="d-none mb-3">
+                        <div class="row align-items-end">
+                            <div class="col-md-4">
+                                <label for="waitingTimeHours" class="form-label"><i class="ti ti-clock me-1"></i>Tiempo de espera</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="waitingTimeHours" min="0" step="0.5" value="0" placeholder="0">
+                                    <span class="input-group-text">horas</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-center" style="min-height: 38px; padding-bottom: 4px;">
+                                <small id="waitingTimeRate" class="text-muted"></small>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Standard pricing for non-experience services -->
                     <div class="row" id="standardPricingSection">
                         <div class="col-md-6 mb-3">
