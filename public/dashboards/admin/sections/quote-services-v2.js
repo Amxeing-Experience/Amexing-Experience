@@ -1710,6 +1710,7 @@ class ItineraryBuilder {
       experience: 'Experiencia',
       tour: 'Tour',
       transport: 'Transporte',
+      'a-disposicion': 'A Disposición',
       concepto: 'Concepto',
     };
 
@@ -2050,6 +2051,8 @@ class ItineraryBuilder {
         return this.getTourName(service.tourId) || 'Tour';
       case 'transport':
         return service.concept || 'Servicio';
+      case 'a-disposicion':
+        return service.concept || 'A Disposición';
       case 'concepto':
         // For concepto, just return the concept text without "Concepto" prefix
         // since the badge already shows "Concepto"
