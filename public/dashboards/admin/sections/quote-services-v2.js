@@ -179,6 +179,9 @@ class ItineraryBuilder {
       if (loadingOverlay) {
         loadingOverlay.classList.add('d-none');
       }
+
+      // Signal that caches are ready for the drag catalog
+      document.dispatchEvent(new CustomEvent('itinerary-caches-ready'));
     } catch (error) {
       console.error('Error initializing itinerary builder:', error);
       this.showAlert('Error al cargar el itinerario', 'danger');
@@ -239,6 +242,8 @@ class ItineraryBuilder {
       this.renderDaysContent();
       this.updateTotals();
       this.updateServicePriceBreakdown();
+      this.hasUnsavedChanges = true;
+      this.scheduleAutoSave();
     });
 
     // Payment type change listener
@@ -247,6 +252,8 @@ class ItineraryBuilder {
       this.renderDaysContent();
       this.updateTotals();
       this.updateServicePriceBreakdown();
+      this.hasUnsavedChanges = true;
+      this.scheduleAutoSave();
     });
 
     // Experience selection handler
@@ -2827,7 +2834,11 @@ class ItineraryBuilder {
                                 </div>
                             </div>
                             <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-sm btn-light edit-day-btn" 
+                                <button type="button" class="btn btn-sm btn-primary add-service-btn"
+                                        data-day-id="${day.id}" title="Agregar servicio">
+                                    <i class="ti ti-plus"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-light edit-day-btn"
                                         data-day-id="${day.id}" title="Editar día">
                                     <i class="ti ti-pencil"></i>
                                 </button>
@@ -3737,6 +3748,17 @@ class ItineraryBuilder {
 
   processServiceItems(serviceItemsData) {
     if (!serviceItemsData || !serviceItemsData.days) return;
+
+    // Restore saved currency and payment type to dropdowns (if not already set by sessionStorage)
+    const quoteKey = this.quoteId || 'default';
+    if (serviceItemsData.currency && !sessionStorage.getItem(`quoteServices_currency_${quoteKey}`)) {
+      const currencyEl = document.getElementById('currencySelect');
+      if (currencyEl) currencyEl.value = serviceItemsData.currency;
+    }
+    if (serviceItemsData.paymentType && !sessionStorage.getItem(`quoteServices_paymentType_${quoteKey}`)) {
+      const paymentEl = document.getElementById('priceTypeSelect');
+      if (paymentEl) paymentEl.value = serviceItemsData.paymentType;
+    }
 
     // Clear existing data
     this.days = [];
@@ -8146,22 +8168,22 @@ class ItineraryBuilder {
   }
 
   async saveToBackend() {
-    // Calculate totals
-    const subtotal = this.calculateSubtotal();
-    const iva = Math.round(subtotal * 0.16 * 100) / 100;
-    const total = Math.round((subtotal + iva) * 100) / 100;
+    // Totals will be calculated from display prices (with surcharge + currency)
+    let grandSubtotal = 0;
 
     // Transform our data structure to match the expected format
     const serviceItemsData = {
       days: this.days.map((day, index) => {
-        // Calculate day total from services
+        // Calculate day total from services (using display prices)
         let dayTotal = 0;
         const subconcepts = day.services.map((serviceId) => {
           const service = this.services.get(serviceId);
           if (!service) return null;
 
-          const servicePrice = this.calculateServicePrice(service);
-          const serviceTotal = servicePrice * (service.quantity || 1);
+          // Apply payment surcharge + currency conversion so summary matches
+          const baseMXN = this.calculateServicePrice(service);
+          const servicePrice = this.getDisplayPrice(baseMXN);
+          const serviceTotal = servicePrice * (service.type === 'transport' ? 1 : (service.quantity || 1));
           dayTotal += serviceTotal;
 
           const subconcept = {
@@ -8259,10 +8281,18 @@ class ItineraryBuilder {
           dayTotal: Math.round(dayTotal * 100) / 100, // Backend expects dayTotal for validation
         };
       }),
-      subtotal,
-      iva,
-      total,
+      subtotal: 0, // calculated below
+      iva: 0,
+      total: 0,
+      currency: document.getElementById('currencySelect')?.value || 'MXN',
+      paymentType: document.getElementById('priceTypeSelect')?.value || 'efectivo',
     };
+
+    // Calculate totals from display-price day totals
+    serviceItemsData.days.forEach(day => { grandSubtotal += day.dayTotal; });
+    serviceItemsData.subtotal = Math.round(grandSubtotal * 100) / 100;
+    serviceItemsData.iva = Math.round(grandSubtotal * 0.16 * 100) / 100;
+    serviceItemsData.total = Math.round((serviceItemsData.subtotal + serviceItemsData.iva) * 100) / 100;
 
     // Get access token from cookie
     const accessToken = this.getAccessToken();
@@ -8520,38 +8550,133 @@ class ItineraryBuilder {
   }
 
   showPreview() {
-    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    const modalEl = document.getElementById('previewModal');
+    const modal = new bootstrap.Modal(modalEl);
     const content = document.getElementById('previewContent');
 
+    // Add price toggle button to modal header if not already there
+    const modalHeader = modalEl.querySelector('.modal-header');
+    if (!modalHeader.querySelector('#togglePreviewPrices')) {
+      const toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.className = 'btn btn-sm btn-outline-secondary ms-2';
+      toggleBtn.id = 'togglePreviewPrices';
+      toggleBtn.innerHTML = '<i class="ti ti-eye-off me-1"></i>Ocultar Precios';
+      modalHeader.querySelector('.modal-title').after(toggleBtn);
+
+      toggleBtn.addEventListener('click', () => {
+        const preview = content.querySelector('.itinerary-preview');
+        if (preview) {
+          const hidden = preview.classList.toggle('hide-prices');
+          toggleBtn.innerHTML = hidden
+            ? '<i class="ti ti-eye me-1"></i>Mostrar Precios'
+            : '<i class="ti ti-eye-off me-1"></i>Ocultar Precios';
+        }
+      });
+    }
+
+    // Color map per service type
+    const typeColors = {
+      transport: '#0d6efd',
+      experience: '#6f42c1',
+      tour: '#198754',
+      concepto: '#6c757d',
+      'a-disposicion': '#fd7e14',
+    };
+
+    const typeLabels = {
+      experience: 'Experiencia',
+      tour: 'Tour',
+      transport: 'Transporte',
+      'a-disposicion': 'A Disposición',
+      concepto: 'Concepto',
+    };
+
+    // Calculate grand total
+    let grandTotal = 0;
+
     // Generate preview HTML
-    let previewHtml = '<div class="itinerary-preview">';
+    let previewHtml = `<div class="itinerary-preview">
+      <style>
+        .itinerary-preview .pv-day-card { border: 1px solid #e9ecef; border-radius: 0.5rem; overflow: hidden; margin-bottom: 1.5rem; }
+        .itinerary-preview .pv-day-header { background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%); padding: 1rem 1.25rem; border-bottom: 1px solid #e9ecef; }
+        .itinerary-preview .pv-day-badge { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%); color: white; font-weight: 700; font-size: 0.9rem; margin-right: 0.75rem; flex-shrink: 0; }
+        .itinerary-preview .pv-day-title { font-size: 1.1rem; font-weight: 600; color: #212529; }
+        .itinerary-preview .pv-day-date { font-size: 0.85rem; color: #6c757d; }
+        .itinerary-preview .pv-day-desc { font-size: 0.85rem; color: #6c757d; margin-top: 0.25rem; }
+        .itinerary-preview .pv-services { padding: 0.75rem 1.25rem; }
+        .itinerary-preview .pv-service { display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 0.375rem; background: #fafbfc; border-left: 4px solid #dee2e6; }
+        .itinerary-preview .pv-service:last-child { margin-bottom: 0; }
+        .itinerary-preview .pv-service-info { flex: 1; min-width: 0; }
+        .itinerary-preview .pv-service-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; flex-wrap: wrap; }
+        .itinerary-preview .pv-badge { display: inline-block; padding: 0.15em 0.5em; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; }
+        .itinerary-preview .pv-service-name { font-weight: 600; font-size: 0.9rem; color: #212529; }
+        .itinerary-preview .pv-service-detail { font-size: 0.8rem; color: #6c757d; display: flex; align-items: center; gap: 0.25rem; margin-top: 0.2rem; }
+        .itinerary-preview .pv-route { display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.25rem; }
+        .itinerary-preview .pv-route-dots { display: flex; flex-direction: column; align-items: center; min-width: 14px; padding-top: 2px; }
+        .itinerary-preview .pv-route-line { width: 1.5px; height: 14px; background: linear-gradient(to bottom, #198754, #dc3545); }
+        .itinerary-preview .pv-route-names { font-size: 0.85rem; line-height: 1.5; }
+        .itinerary-preview .pv-price { font-weight: 600; font-size: 0.9rem; color: #212529; white-space: nowrap; margin-left: 1rem; padding-top: 0.15rem; }
+        .itinerary-preview .pv-price.pv-excluded { text-decoration: line-through; color: #adb5bd; }
+        .itinerary-preview .pv-day-footer { padding: 0.75rem 1.25rem; background: #f8f9fa; border-top: 1px solid #e9ecef; text-align: right; }
+        .itinerary-preview .pv-day-total { font-weight: 700; font-size: 1rem; color: #212529; }
+        .itinerary-preview .pv-grand-total { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; border-radius: 0.5rem; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .itinerary-preview .pv-grand-label { font-size: 1rem; opacity: 0.85; }
+        .itinerary-preview .pv-grand-amount { font-size: 1.5rem; font-weight: 700; }
+        .itinerary-preview .pv-grand-person { font-size: 0.85rem; opacity: 0.7; }
+        .itinerary-preview .pv-notes { font-size: 0.78rem; color: #868e96; font-style: italic; margin-top: 0.2rem; }
+        .itinerary-preview.hide-prices .pv-price,
+        .itinerary-preview.hide-prices .pv-day-footer,
+        .itinerary-preview.hide-prices .pv-grand-total { display: none !important; }
+      </style>`;
 
     this.days.forEach((day) => {
       const services = day.services.map((sid) => this.services.get(sid)).filter(Boolean);
-      const dayTotal = services.reduce((sum, service) => sum + (this.calculateServicePrice(service) * (service.type === 'transport' ? 1 : service.quantity)), 0);
+      const dayTotalMXN = services.reduce((sum, service) => {
+        if (service.includeInTotal === false) return sum;
+        return sum + (this.calculateServicePrice(service) * (service.type === 'transport' ? 1 : service.quantity));
+      }, 0);
+      const dayTotal = this.getDisplayPrice(dayTotalMXN);
+      grandTotal += dayTotalMXN;
 
       previewHtml += `
-                <div class="preview-day mb-4">
-                    <h4>Día ${day.number}: ${day.title}</h4>
-                    ${day.date ? `<p class="text-muted">${this.formatDate(day.date)}</p>` : ''}
-                    ${day.description ? `<p>${day.description}</p>` : ''}
-                    
-                    <div class="preview-services">
-                        ${services.map((service) => `
-                            <div class="preview-service mb-2">
-                                <strong>${this.getServiceTitle(service)}</strong>
-                                ${service.startTime ? ` - ${service.startTime}` : ''}
-                                <span class="float-end">${this.formatCurrency(this.calculateServicePrice(service) * (service.type === 'transport' ? 1 : service.quantity))}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                    
-                    <div class="text-end mt-2">
-                        <strong>Total del día: ${this.formatCurrency(dayTotal)}</strong>
-                    </div>
-                </div>
-            `;
+        <div class="pv-day-card">
+          <div class="pv-day-header">
+            <div style="display: flex; align-items: center;">
+              <span class="pv-day-badge">${day.number}</span>
+              <div>
+                <div class="pv-day-title">Día ${day.number} · ${day.title}</div>
+                ${day.date ? `<div class="pv-day-date"><i class="ti ti-calendar me-1"></i>${this.formatDate(day.date)}</div>` : ''}
+                ${day.description ? `<div class="pv-day-desc">${day.description}</div>` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="pv-services">
+            ${services.map((service) => this.renderPreviewService(service, typeColors, typeLabels)).join('')}
+          </div>
+          <div class="pv-day-footer">
+            <span class="pv-day-total">Total del día: ${this.formatCurrency(dayTotal)}</span>
+          </div>
+        </div>`;
     });
+
+    // Grand total
+    const grandTotalDisplay = this.getDisplayPrice(grandTotal);
+    const perPerson = this.numberOfPeople > 0 ? this.formatCurrency(grandTotalDisplay / this.numberOfPeople) : null;
+    const selectedCurrency = document.getElementById('currencySelect')?.value || 'MXN';
+    const selectedPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    const paymentLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta de Crédito/Débito' };
+    const paymentLabel = paymentLabels[selectedPaymentType] || selectedPaymentType;
+
+    previewHtml += `
+      <div class="pv-grand-total">
+        <div>
+          <div class="pv-grand-label">Total General</div>
+          <div class="pv-grand-person"><i class="ti ti-coin me-1"></i>${selectedCurrency} · <i class="ti ti-credit-card me-1"></i>${paymentLabel}</div>
+          ${perPerson ? `<div class="pv-grand-person"><i class="ti ti-users me-1"></i>Por persona (${this.numberOfPeople}): ${perPerson}</div>` : ''}
+        </div>
+        <div class="pv-grand-amount">${this.formatCurrency(grandTotalDisplay)}</div>
+      </div>`;
 
     previewHtml += '</div>';
     content.innerHTML = previewHtml;
@@ -8559,35 +8684,152 @@ class ItineraryBuilder {
     modal.show();
   }
 
+  renderPreviewService(service, typeColors, typeLabels) {
+    const color = typeColors[service.type] || '#6c757d';
+    const price = this.calculateServicePrice(service) * (service.type === 'transport' ? 1 : service.quantity);
+    const displayPrice = this.getDisplayPrice(price);
+    const isExcluded = service.includeInTotal === false;
+
+    if (service.type === 'transport') {
+      return this.renderPreviewTransport(service, color, displayPrice, isExcluded);
+    }
+    return this.renderPreviewGenericService(service, color, typeColors, typeLabels, displayPrice, isExcluded);
+  }
+
+  renderPreviewTransport(service, color, displayPrice, isExcluded) {
+    const transportTypes = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
+    const transportLabel = transportTypes[service.transportType] || 'Transporte';
+    const origin = service.originName || service.origin || 'Origen';
+    const destination = service.destination || 'Destino';
+    const vehicleName = this.getVehicleDisplayName(service);
+    const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
+    const directionLabels = {
+      arrival: service.transportType === 'aeropuerto' ? 'Llegada' : 'Ida',
+      departure: service.transportType === 'aeropuerto' ? 'Salida' : 'Vuelta',
+    };
+
+    return `
+      <div class="pv-service" style="border-left-color: ${color};">
+        <div class="pv-service-info">
+          <div class="pv-service-header">
+            <span class="pv-badge" style="background: ${color}15; color: ${color};">Transporte</span>
+            <span class="pv-badge" style="background: ${color}25; color: ${color};">${transportLabel}</span>
+            ${service.directionType ? `<span class="pv-badge" style="background: ${service.directionType === 'arrival' ? '#19875415' : '#fd7e1415'}; color: ${service.directionType === 'arrival' ? '#198754' : '#fd7e14'};">${directionLabels[service.directionType] || ''}</span>` : ''}
+            ${isExcluded ? '<span class="pv-badge" style="background: #6c757d20; color: #6c757d;">Pago externo</span>' : ''}
+          </div>
+          <div class="pv-route">
+            <div class="pv-route-dots">
+              <i class="ti ti-circle-filled text-success" style="font-size: 0.45rem;"></i>
+              <div class="pv-route-line"></div>
+              <i class="ti ti-map-pin-filled text-danger" style="font-size: 0.6rem;"></i>
+            </div>
+            <div class="pv-route-names">
+              <div>${origin}</div>
+              <div>${destination}</div>
+            </div>
+          </div>
+          ${service.selectedSchedule || service.startTime ? `<div class="pv-service-detail"><i class="ti ti-clock"></i>${service.selectedSchedule || service.startTime}</div>` : ''}
+          ${hasVehicle ? `<div class="pv-service-detail"><i class="ti ti-car"></i>${vehicleName}${service.quantity > 1 ? ` x${service.quantity}` : ''}</div>` : ''}
+          ${service.flightNumber ? `<div class="pv-service-detail"><i class="ti ti-plane"></i>${service.flightNumber}${service.airline ? ` · ${service.airline}` : ''}</div>` : ''}
+          ${service.includeGuide ? '<div class="pv-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Guía + Chofer</div>' : ''}
+          ${service.includeGreeter ? '<div class="pv-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>' : ''}
+          ${service.waitingTimeHours > 0 ? `<div class="pv-service-detail" style="color: #fd7e14;"><i class="ti ti-clock"></i>Tiempo de espera: ${service.waitingTimeHours}h</div>` : ''}
+          ${service.notes ? `<div class="pv-notes"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
+        </div>
+        <div class="pv-price ${isExcluded ? 'pv-excluded' : ''}">${this.formatCurrency(displayPrice)}</div>
+      </div>`;
+  }
+
+  renderPreviewGenericService(service, color, typeColors, typeLabels, displayPrice, isExcluded) {
+    const label = typeLabels[service.type] || service.type;
+    const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
+    const badgeLabel = (service.type === 'tour' && service.isWalkingTour) ? 'Tour a Pie' : null;
+
+    return `
+      <div class="pv-service" style="border-left-color: ${color};">
+        <div class="pv-service-info">
+          <div class="pv-service-header">
+            <span class="pv-badge" style="background: ${color}15; color: ${color};">${badgeLabel || label}</span>
+            ${isExcluded ? '<span class="pv-badge" style="background: #6c757d20; color: #6c757d;">Pago externo</span>' : ''}
+            <span class="pv-service-name">${this.getServiceTitle(service)}</span>
+          </div>
+          ${service.selectedSchedule || service.startTime ? `<div class="pv-service-detail"><i class="ti ti-clock"></i>${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}</div>` : ''}
+          ${hasVehicle ? `<div class="pv-service-detail"><i class="ti ti-car"></i>${this.getVehicleDisplayName(service)}${service.quantity > 1 ? ` x${service.quantity}` : ''}</div>` : ''}
+          ${service.type === 'tour' && service.includeGuide ? '<div class="pv-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Guía + Chofer</div>' : ''}
+          ${(service.type === 'tour' || service.type === 'transport') && service.includeGreeter ? '<div class="pv-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>' : ''}
+          ${service.notes ? `<div class="pv-notes"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
+        </div>
+        <div class="pv-price ${isExcluded ? 'pv-excluded' : ''}">${this.formatCurrency(displayPrice)}</div>
+      </div>`;
+  }
+
   async exportPdf() {
+    const btn = document.getElementById('exportPdfBtn');
+    const originalText = btn ? btn.innerHTML : '';
+
     try {
-      const response = await fetch(`/api/quotes/${this.quoteId}/export-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          days: this.days,
-          services: Array.from(this.services.values()),
-        }),
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `itinerary_${this.quoteId}.pdf`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-
-        this.showAlert('PDF exportado exitosamente', 'success');
-      } else {
-        throw new Error('Failed to export PDF');
+      // Show loading state
+      if (btn) {
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generando PDF...';
+        btn.disabled = true;
       }
+
+      // Load html2pdf dynamically if not already loaded
+      if (typeof html2pdf === 'undefined') {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('No se pudo cargar la librería de PDF'));
+          document.head.appendChild(script);
+        });
+      }
+
+      const previewContent = document.getElementById('previewContent');
+      const previewEl = previewContent?.querySelector('.itinerary-preview');
+      if (!previewEl) throw new Error('No preview content found');
+
+      // Temporarily ensure prices are visible for PDF
+      const wasHidden = previewEl.classList.contains('hide-prices');
+      if (wasHidden) previewEl.classList.remove('hide-prices');
+
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `Itinerario_${this.quoteId}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'letter',
+          orientation: 'portrait',
+          compress: true,
+        },
+        pagebreak: {
+          mode: ['css', 'legacy'],
+          avoid: ['.pv-day-header', '.pv-service', '.pv-grand-total'],
+        },
+      };
+
+      await html2pdf().set(opt).from(previewEl).save();
+
+      // Restore hidden state if it was hidden
+      if (wasHidden) previewEl.classList.add('hide-prices');
+
+      this.showAlert('PDF exportado exitosamente', 'success');
     } catch (error) {
       console.error('Error exporting PDF:', error);
       this.showAlert('Error al exportar el PDF', 'danger');
+    } finally {
+      if (btn) {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
     }
   }
 
@@ -8749,6 +8991,9 @@ class ItineraryBuilder {
 
     // Add dragover and drop to container to catch all drops
     container.addEventListener('dragover', (e) => {
+      // Skip if this is a catalog drag-and-drop (handled by DragCatalogManager)
+      if (e.dataTransfer.types.includes('application/x-catalog-item')) return;
+
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
 
@@ -8773,11 +9018,17 @@ class ItineraryBuilder {
 
     // Add dragover to container to allow dropping
     container.addEventListener('dragover', (e) => {
+      // Skip if this is a catalog drag-and-drop (handled by DragCatalogManager)
+      if (e.dataTransfer.types.includes('application/x-catalog-item')) return;
+
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
     });
 
     container.addEventListener('drop', (e) => {
+      // Skip if this is a catalog drag-and-drop (handled by DragCatalogManager)
+      if (e.dataTransfer.types.includes('application/x-catalog-item')) return;
+
       e.preventDefault();
       e.stopPropagation();
 

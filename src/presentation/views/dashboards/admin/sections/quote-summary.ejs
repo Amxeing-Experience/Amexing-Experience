@@ -89,6 +89,43 @@
         text-align: center;
     }
 
+    /* Unified quote info card */
+    .sm-quote-info {
+        border: 1px solid #e9ecef;
+        border-radius: 0.5rem;
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 2rem;
+        background: #fff;
+    }
+    .sm-quote-info-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+    }
+    .sm-quote-info-divider {
+        height: 1px;
+        background: #e9ecef;
+        margin: 1rem 0;
+    }
+    .sm-quote-info-label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: #868e96;
+        margin-bottom: 0.2rem;
+    }
+    .sm-quote-info-value {
+        font-size: 0.95rem;
+        color: #212529;
+    }
+    @media (max-width: 767.98px) {
+        .sm-quote-info-row {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
     .summary-table {
         width: 100%;
         margin-bottom: 1rem;
@@ -171,6 +208,89 @@
         color: #198754;
         font-weight: bold;
         margin-right: 0.5rem;
+    }
+
+    /* Summary Day Cards */
+    .sm-day-card { border: 1px solid #e9ecef; border-radius: 0.5rem; overflow: hidden; margin-bottom: 1.5rem; }
+    .sm-day-header { background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%); padding: 1rem 1.25rem; border-bottom: 1px solid #e9ecef; display: flex; align-items: center; }
+    .sm-day-badge { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%); color: white; font-weight: 700; font-size: 0.9rem; margin-right: 0.75rem; flex-shrink: 0; }
+    .sm-day-title { font-size: 1.1rem; font-weight: 600; color: #212529; }
+    .sm-services { padding: 0.75rem 1.25rem; }
+    .sm-service { display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 0.375rem; background: #fafbfc; border-left: 4px solid #dee2e6; }
+    .sm-service:last-child { margin-bottom: 0; }
+    .sm-service-info { flex: 1; min-width: 0; }
+    .sm-service-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; flex-wrap: wrap; }
+    .sm-badge { display: inline-block; padding: 0.15em 0.5em; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; }
+    .sm-service-name { font-weight: 600; font-size: 0.9rem; color: #212529; }
+    .sm-service-detail { font-size: 0.8rem; color: #6c757d; display: flex; align-items: center; gap: 0.25rem; margin-top: 0.2rem; }
+    .sm-route { display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.25rem; }
+    .sm-route-dots { display: flex; flex-direction: column; align-items: center; min-width: 14px; padding-top: 2px; }
+    .sm-route-line { width: 1.5px; height: 14px; background: linear-gradient(to bottom, #198754, #dc3545); }
+    .sm-route-names { font-size: 0.85rem; line-height: 1.5; }
+    .sm-price { font-weight: 600; font-size: 0.9rem; white-space: nowrap; margin-left: 1rem; text-align: right; }
+    .sm-price .sm-payment { display: block; font-size: 0.7rem; font-weight: 500; }
+    .sm-notes { font-size: 0.78rem; color: #868e96; font-style: italic; margin-top: 0.2rem; }
+    .sm-day-footer { padding: 0.75rem 1.25rem; background: #f8f9fa; border-top: 1px solid #e9ecef; text-align: right; font-weight: 700; font-size: 1rem; }
+    .sm-included-list { list-style: none; padding: 0; margin: 0.25rem 0 0 0; font-size: 0.8rem; }
+    .sm-included-list li { color: #198754; padding: 0.1rem 0; }
+    .sm-included-list li::before { content: "✓ "; font-weight: bold; margin-right: 0.25rem; }
+    .sm-empty-state { text-align: center; color: #adb5bd; padding: 3rem 1rem; font-size: 0.95rem; }
+
+    /* Services section - clean white card */
+    .sm-services-section {
+        margin-bottom: 1.5rem;
+    }
+    .sm-section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #212529;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+
+    /* Totals card */
+    .sm-totals-card {
+        border: 1px solid #e9ecef;
+        border-radius: 0.5rem;
+        padding: 1.25rem 1.5rem;
+        background: #fff;
+        margin-bottom: 2rem;
+    }
+    .sm-totals-meta {
+        display: flex;
+        gap: 2rem;
+        margin-bottom: 0;
+    }
+    .sm-totals-meta-item {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .sm-totals-meta-item strong {
+        color: #212529;
+    }
+    .sm-totals-divider {
+        height: 1px;
+        background: #e9ecef;
+        margin: 0.75rem 0;
+    }
+    .sm-totals-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.35rem 0;
+        font-size: 1rem;
+        color: #495057;
+    }
+    .sm-totals-grand {
+        font-weight: 700;
+        font-size: 1.35rem;
+        color: #0d6efd;
+        padding-top: 0.5rem;
+    }
+    .sm-totals-per-person {
+        font-weight: 600;
+        font-size: 1rem;
+        color: #495057;
     }
 
     /* Print Styles */
@@ -333,11 +453,22 @@
         page-break-inside: avoid;
     }
 
-    .pdf-export-mode .summary-totals {
+    .pdf-export-mode .summary-totals,
+    .pdf-export-mode .sm-totals-card {
         margin-top: 15px !important;
         padding: 15px !important;
         font-size: 0.95rem !important;
         page-break-inside: avoid;
+    }
+
+    .pdf-export-mode .sm-day-card {
+        page-break-inside: avoid;
+        margin-bottom: 10px !important;
+    }
+
+    .pdf-export-mode .sm-section-title {
+        font-size: 1rem !important;
+        margin-bottom: 10px !important;
     }
 
     .pdf-export-mode .summary-footer {
@@ -403,6 +534,14 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
     }
+
+    /* PDF export for new card layout */
+    .pdf-export-mode .sm-day-card { page-break-inside: avoid; margin-bottom: 1rem; border-color: #ccc; }
+    .pdf-export-mode .sm-service { padding: 0.5rem; font-size: 0.85rem; }
+    .pdf-export-mode .sm-day-badge { width: 24px; height: 24px; font-size: 0.75rem; }
+    .pdf-export-mode .sm-day-title { font-size: 0.95rem; }
+    .pdf-export-mode .sm-badge { font-size: 0.6rem; }
+    .pdf-export-mode .sm-price { font-size: 0.8rem; }
 </style>
 
 <div class="card border-0 shadow-sm">
@@ -451,113 +590,80 @@
                 </div>
             </div>
 
-            <!-- Summary Information -->
-            <div class="summary-section d-print-none">
-                <div class="summary-section-title">
-                    <i class="ti ti-info-circle me-2"></i>Información del Resumen
-                </div>
-                <div class="summary-info-grid">
-                    <div class="summary-info-item">
-                        <span class="summary-info-label">Folio de Cotización</span>
-                        <span class="summary-info-value" id="summaryFolio">-</span>
+            <!-- Quote Info -->
+            <div class="sm-quote-info">
+                <div class="sm-quote-info-row" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="sm-quote-info-item">
+                        <span class="sm-quote-info-label">Folio</span>
+                        <span class="sm-quote-info-value" id="summaryFolio">-</span>
                     </div>
-                    <div class="summary-info-item">
-                        <span class="summary-info-label">Fecha Actual</span>
-                        <span class="summary-info-value" id="summaryCurrentDate">-</span>
+                    <div class="sm-quote-info-item d-print-none">
+                        <span class="sm-quote-info-label">Fecha</span>
+                        <span class="sm-quote-info-value" id="summaryCurrentDate">-</span>
                     </div>
-                    <div class="summary-info-item">
-                        <span class="summary-info-label">Fecha de Generación</span>
-                        <span class="summary-info-value" id="summaryGenerationDate">-</span>
-                    </div>
-                    <div class="summary-info-item">
-                        <span class="summary-info-label">Estado</span>
-                        <span id="summaryStatus">-</span>
+                    <div class="sm-quote-info-item">
+                        <span class="sm-quote-info-label">Generación</span>
+                        <span class="sm-quote-info-value" id="summaryGenerationDate">-</span>
                     </div>
                 </div>
-            </div>
-
-            <!-- Atención a -->
-            <div class="summary-section">
-                <div class="summary-section-title">
-                    <i class="ti ti-user me-2"></i>Atención a
-                </div>
-                <div class="summary-attention" id="summaryContactPerson">
-                    -
-                </div>
-            </div>
-
-            <!-- Quote Details -->
-            <div class="summary-section">
-                <div class="summary-section-title">
-                    <i class="ti ti-clipboard-list me-2"></i>Detalles de la Cotización
-                </div>
-                <div class="summary-info-grid">
-                    <div class="summary-info-item">
-                        <span class="summary-info-label">Concepto/Evento</span>
-                        <span class="summary-info-value" id="summaryEventType">-</span>
+                <div class="sm-quote-info-divider"></div>
+                <div class="sm-quote-info-row">
+                    <div class="sm-quote-info-item">
+                        <span class="sm-quote-info-label">Cliente</span>
+                        <span class="sm-quote-info-value fw-semibold" id="summaryClientName">-</span>
                     </div>
-                    <div class="summary-info-item">
-                        <span class="summary-info-label">Número de Personas</span>
-                        <span class="summary-info-value" id="summaryNumberOfPeople">-</span>
+                    <div class="sm-quote-info-item">
+                        <span class="sm-quote-info-label">Atención a</span>
+                        <span class="sm-quote-info-value" id="summaryContactPerson">-</span>
                     </div>
-                    <div class="summary-info-item">
-                        <span class="summary-info-label">Cliente</span>
-                        <span class="summary-info-value" id="summaryClientName">-</span>
+                    <div class="sm-quote-info-item">
+                        <span class="sm-quote-info-label">Evento</span>
+                        <span class="sm-quote-info-value" id="summaryEventType">-</span>
+                    </div>
+                    <div class="sm-quote-info-item">
+                        <span class="sm-quote-info-label">Personas</span>
+                        <span class="sm-quote-info-value" id="summaryNumberOfPeople">-</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Services Table -->
-            <div class="summary-section">
-                <div class="summary-section-title">
+            <!-- Services & Itinerary -->
+            <div class="sm-services-section">
+                <div class="sm-section-title">
                     <i class="ti ti-calendar-event me-2"></i>Servicios e Itinerario
                 </div>
-                <div class="table-responsive">
-                    <table class="summary-table table table-bordered">
-                        <thead>
-                            <tr>
-                                <th style="width: 10%;">Día</th>
-                                <th style="width: 40%;">Concepto</th>
-                                <th style="width: 20%;">Tipo Vehículo</th>
-                                <th style="width: 15%;">Total</th>
-                                <th style="width: 15%;">Notas</th>
-                            </tr>
-                        </thead>
-                        <tbody id="summaryServicesTableBody">
-                            <tr>
-                                <td colspan="5" class="text-center text-muted py-4">
-                                    No hay servicios agregados
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div id="summaryServicesCards">
+                    <div class="sm-empty-state">No hay servicios agregados</div>
                 </div>
+            </div>
 
-                <!-- Totals -->
-                <div class="summary-totals">
-                    <div class="summary-total-row">
-                        <span>Subtotal:</span>
-                        <span id="summarySubtotal">$0.00 MXN</span>
+            <!-- Totals -->
+            <div class="sm-totals-card">
+                <div class="sm-totals-meta">
+                    <div class="sm-totals-meta-item">
+                        <i class="ti ti-coin me-1"></i>Moneda: <strong id="summaryCurrency">MXN</strong>
                     </div>
-                    <div class="summary-total-row">
-                        <span>IVA (16%):</span>
-                        <span id="summaryIVA">$0.00 MXN</span>
+                    <div class="sm-totals-meta-item">
+                        <i class="ti ti-credit-card me-1"></i>Pago: <strong id="summaryPaymentType">Efectivo</strong>
                     </div>
-                    <div class="summary-total-row total">
-                        <span>Total:</span>
-                        <span id="summaryTotal">$0.00 MXN</span>
-                    </div>
-                    
-                    <!-- Per Person Total -->
-                    <div class="summary-per-person-section mt-3 pt-3" style="border-top: 1px solid #dee2e6;">
-                        <div class="summary-total-row" style="font-size: 1.1rem;">
-                            <span>Costo por Persona:</span>
-                            <span id="summaryPerPerson">$0.00 MXN</span>
-                        </div>
-                        <div class="text-muted text-center mt-1">
-                            <small id="summaryPersonCount">(0 personas)</small>
-                        </div>
-                    </div>
+                </div>
+                <div class="sm-totals-divider"></div>
+                <div class="sm-totals-row">
+                    <span>Subtotal</span>
+                    <span id="summarySubtotal">$0.00</span>
+                </div>
+                <div class="sm-totals-row">
+                    <span>IVA (16%)</span>
+                    <span id="summaryIVA">$0.00</span>
+                </div>
+                <div class="sm-totals-row sm-totals-grand">
+                    <span>Total</span>
+                    <span id="summaryTotal">$0.00</span>
+                </div>
+                <div class="sm-totals-divider"></div>
+                <div class="sm-totals-row sm-totals-per-person">
+                    <span>Por Persona <span id="summaryPersonCount">(0)</span></span>
+                    <span id="summaryPerPerson">$0.00</span>
                 </div>
             </div>
 
@@ -597,19 +703,6 @@
             ?.split('=')[1];
     }
 
-    // Get quote status badge - matches quotes table dropdown options
-    function getStatusBadge(status) {
-        const statusMap = {
-            'requested': { label: 'SOLICITADO', class: 'bg-primary' },
-            'hold': { label: 'BLOQUEADO', class: 'bg-warning' },
-            'scheduled': { label: 'AGENDADO', class: 'bg-success' },
-            'rejected': { label: 'RECHAZADO', class: 'bg-danger' }
-        };
-
-        const statusInfo = statusMap[status] || { label: status.toUpperCase(), class: 'bg-secondary' };
-        return `<span class="badge ${statusInfo.class}">${statusInfo.label}</span>`;
-    }
-
     // Load quote summary
     async function loadQuoteSummary() {
         try {
@@ -646,27 +739,14 @@
             document.getElementById('summaryFolio').textContent = quote.folio || quote.id || 'N/A';
             document.getElementById('summaryCurrentDate').textContent = formatDateSpanish(new Date());
             document.getElementById('summaryGenerationDate').textContent = formatDateSpanish(quote.createdAt);
-            document.getElementById('summaryStatus').innerHTML = getStatusBadge(quote.status);
-
-            // Atención a - Hide section if no contact person specified
+            // Atención a
             const contactPerson = quote.contactPerson || '';
             const summaryContactPersonElement = document.getElementById('summaryContactPerson');
-            
             if (summaryContactPersonElement) {
-                // Find the parent section that contains the "Atención a" title
-                const attentionSection = summaryContactPersonElement.closest('.summary-section');
-                
-                if (!contactPerson || contactPerson.toLowerCase() === 'no especificado' || contactPerson.trim() === '') {
-                    // Hide the entire "Atención a" section
-                    if (attentionSection) {
-                        attentionSection.style.display = 'none';
-                    }
+                if (contactPerson && contactPerson.toLowerCase() !== 'no especificado' && contactPerson.trim() !== '') {
+                    summaryContactPersonElement.textContent = contactPerson;
                 } else {
-                    // Show the section and update the content
-                    if (attentionSection) {
-                        attentionSection.style.display = 'block';
-                    }
-                    summaryContactPersonElement.textContent = contactPerson.toUpperCase();
+                    summaryContactPersonElement.textContent = '-';
                 }
             }
 
@@ -686,7 +766,7 @@
             document.getElementById('summaryClientName').textContent = clientName;
 
             // Render services table
-            renderServicesTable(quote.serviceItems);
+            renderServicesTable(quote.serviceItems, quote.numberOfPeople || 0);
 
             // Show summary content
             document.getElementById('summaryLoading').style.display = 'none';
@@ -735,179 +815,195 @@
     }
 
     // Render services table
-    function renderServicesTable(serviceItems) {
-        const tbody = document.getElementById('summaryServicesTableBody');
-        tbody.innerHTML = '';
+    function renderServicesTable(serviceItems, quoteNumberOfPeople) {
+        const container = document.getElementById('summaryServicesCards');
+        const numberOfPeople = quoteNumberOfPeople || parseInt(document.getElementById('summaryNumberOfPeople').textContent) || 0;
+
+        // Currency and payment type from saved serviceItems
+        const paymentLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta de Crédito/Débito' };
+        const savedCurrency = serviceItems?.currency || 'MXN';
+        const savedPayment = serviceItems?.paymentType || 'efectivo';
+        document.getElementById('summaryCurrency').textContent = savedCurrency;
+        document.getElementById('summaryPaymentType').textContent = paymentLabels[savedPayment] || savedPayment;
 
         if (!serviceItems || !serviceItems.days || serviceItems.days.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="5" class="text-center text-muted py-4">
-                        No hay servicios agregados a esta cotización
-                    </td>
-                </tr>
-            `;
-
+            container.innerHTML = '<div class="sm-empty-state">No hay servicios agregados a esta cotización</div>';
             document.getElementById('summarySubtotal').textContent = currencyFormatter.format(0);
             document.getElementById('summaryIVA').textContent = currencyFormatter.format(0);
             document.getElementById('summaryTotal').textContent = currencyFormatter.format(0);
-            
-            // Update per person display for empty case
-            const numberOfPeople = parseInt(document.getElementById('summaryNumberOfPeople').textContent) || 1;
             document.getElementById('summaryPerPerson').textContent = currencyFormatter.format(0);
-            document.getElementById('summaryPersonCount').textContent = `(${numberOfPeople} ${numberOfPeople === 1 ? 'persona' : 'personas'})`;
+            document.getElementById('summaryPersonCount').textContent = `(${numberOfPeople})`;
             return;
         }
 
-        // Render each day
-        serviceItems.days.forEach((day, dayIndex) => {
-            const subconceptsCount = day.subconcepts?.length || 0;
-            const rowspan = subconceptsCount + 1; // +1 for day header row
+        const typeColors = {
+            traslado: '#0d6efd', transport: '#0d6efd',
+            experiencia: '#6f42c1', experience: '#6f42c1',
+            tour: '#198754',
+            regular: '#6c757d', concepto: '#6c757d',
+            'a-disposicion': '#fd7e14',
+        };
 
-            // Calculate day total from stored subconcept totals
-            let actualDayTotal = 0;
+        const typeLabels = {
+            traslado: 'Transporte', transport: 'Transporte',
+            experiencia: 'Experiencia', experience: 'Experiencia',
+            tour: 'Tour',
+            regular: 'Concepto', concepto: 'Concepto',
+            'a-disposicion': 'A Disposición',
+        };
+
+        // Normalize type to check transport/experience regardless of language
+        function isTransport(type) { return type === 'traslado' || type === 'transport'; }
+        function isExperience(type) { return type === 'experiencia' || type === 'experience'; }
+
+        let html = '';
+
+        serviceItems.days.forEach((day) => {
+            let dayTotal = 0;
             if (day.subconcepts && day.subconcepts.length > 0) {
-                day.subconcepts.forEach(subconcept => {
-                    if (subconcept.total !== null && subconcept.total !== undefined) {
-                        actualDayTotal += subconcept.total;
-                    }
+                day.subconcepts.forEach(sc => {
+                    if (sc.total != null) dayTotal += sc.total;
                 });
             }
 
-            // Day header row
-            const dayHeaderRow = document.createElement('tr');
-            dayHeaderRow.className = 'summary-day-header';
-            dayHeaderRow.innerHTML = `
-                <td rowspan="${rowspan}" class="text-center align-middle"><strong>Día ${day.dayNumber}</strong></td>
-                <td colspan="2"><strong>${day.dayTitle || `Día ${day.dayNumber}`}</strong></td>
-                <td class="text-end align-middle bg-light">
-                    <div style="font-size: 0.9rem; font-weight: bold;">Total Día</div>
-                    <div style="font-size: 1.1rem; font-weight: bold;">${currencyFormatter.format(actualDayTotal)}</div>
-                </td>
-                <td></td>
-            `;
-            tbody.appendChild(dayHeaderRow);
+            html += `<div class="sm-day-card">
+                <div class="sm-day-header">
+                    <span class="sm-day-badge">${day.dayNumber}</span>
+                    <div class="sm-day-title">Día ${day.dayNumber} · ${day.dayTitle || 'Sin título'}</div>
+                </div>
+                <div class="sm-services">`;
 
-            // Render subconcepts
             if (day.subconcepts && day.subconcepts.length > 0) {
-                day.subconcepts.forEach((subconcept, subIndex) => {
-                    const subRow = document.createElement('tr');
-                    subRow.className = 'summary-subconcept-row';
+                day.subconcepts.forEach((sc) => {
+                    const color = typeColors[sc.type] || '#6c757d';
+                    const label = typeLabels[sc.type] || sc.type || 'Servicio';
+                    const total = sc.total != null ? currencyFormatter.format(sc.total) : '-';
 
-                    // Format concept based on type
-                    let conceptHTML = '';
-                    const time = subconcept.time || '';
-                    const timeDisplay = time ? `<span class="text-muted">${time}</span> - ` : '';
+                    const paymentHtml = '';
 
-                    // Add service type badge
-                    let serviceTypeBadge = '';
-                    if (subconcept.type === 'traslado') {
-                        serviceTypeBadge = '<span class="badge bg-primary me-2">Traslado</span>';
-                    } else if (subconcept.type === 'experiencia') {
-                        serviceTypeBadge = '<span class="badge bg-success me-2">Experiencia</span>';
-                    } else if (subconcept.type === 'tour') {
-                        serviceTypeBadge = '<span class="badge bg-info me-2">Tour</span>';
-                    } else if (subconcept.type === 'regular') {
-                        serviceTypeBadge = '<span class="badge bg-secondary me-2">Servicio</span>';
-                    }
+                    html += `<div class="sm-service" style="border-left-color: ${color};">
+                        <div class="sm-service-info">
+                            <div class="sm-service-header">
+                                <span class="sm-badge" style="background: ${color}15; color: ${color};">${label}</span>`;
 
-                    if (subconcept.type === 'experiencia') {
-                        conceptHTML = `
-                            <div>${serviceTypeBadge}${timeDisplay}<strong>${subconcept.concept || subconcept.tourName || 'Experiencia'}</strong></div>
-                            ${subconcept.isPackage && subconcept.includedExperiences ? renderIncludedExperiences(subconcept.includedExperiences) : ''}
-                        `;
-                    } else if (subconcept.type === 'tour') {
-                        // For tours, prioritize destinationPOI (the actual stored field), then other fallbacks
-                        const tourDestination = subconcept.destinationPOI || subconcept.destination || subconcept.concept || subconcept.tourName || subconcept.serviceType || 'Tour';
-                        conceptHTML = `${serviceTypeBadge}${timeDisplay}<strong>${tourDestination}</strong>`;
+                    if (isTransport(sc.type)) {
+                        // Transport sub-badges (type + direction)
+                        const transportTypes = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
+                        const transportLabel = transportTypes[sc.transportType] || '';
+                        if (transportLabel) {
+                            html += `<span class="sm-badge" style="background: ${color}25; color: ${color};">${transportLabel}</span>`;
+                        }
+                        if (sc.directionType) {
+                            const dirLabels = {
+                                arrival: sc.transportType === 'aeropuerto' ? 'Llegada' : 'Ida',
+                                departure: sc.transportType === 'aeropuerto' ? 'Salida' : 'Vuelta',
+                            };
+                            const dirColor = sc.directionType === 'arrival' ? '#198754' : '#fd7e14';
+                            html += `<span class="sm-badge" style="background: ${dirColor}15; color: ${dirColor};">${dirLabels[sc.directionType] || ''}</span>`;
+                        }
+                        html += renderSummaryTransport(sc);
+                    } else if (isExperience(sc.type)) {
+                        const name = sc.concept || sc.tourName || 'Experiencia';
+                        html += `<span class="sm-service-name">${name}</span></div>`;
+                        if (sc.time || sc.selectedSchedule) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.selectedSchedule || sc.time}</div>`;
+                        if (sc.isPackage && sc.includedExperiences) {
+                            html += renderIncludedExperiencesCards(sc.includedExperiences);
+                        }
+                    } else if (sc.type === 'tour') {
+                        const tourName = sc.destinationPOI || sc.destination || sc.concept || sc.tourName || sc.serviceType || 'Tour';
+                        html += `<span class="sm-service-name">${tourName}</span></div>`;
+                        if (sc.time || sc.selectedSchedule) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.selectedSchedule || sc.time}</div>`;
+                        if (sc.vehicleType || sc.vehicleTypeName) {
+                            html += `<div class="sm-service-detail"><i class="ti ti-car"></i>${sc.vehicleTypeName || sc.vehicleType}</div>`;
+                        }
+                        if (sc.includeGuide) html += '<div class="sm-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Guía + Chofer</div>';
+                        if (sc.includeGreeter) html += '<div class="sm-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>';
                     } else {
-                        const conceptName = subconcept.concept || subconcept.tourName || subconcept.serviceType || 'Sin especificar';
-                        conceptHTML = `${serviceTypeBadge}${timeDisplay}${conceptName}`;
+                        const conceptName = sc.concept || sc.tourName || sc.serviceType || 'Sin especificar';
+                        html += `<span class="sm-service-name">${conceptName}</span></div>`;
+                        if (sc.time) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.time}</div>`;
                     }
 
-                    // Vehicle type with badge for traslados
-                    let vehicleTypeHTML = '';
-                    if (subconcept.type === 'traslado') {
-                        const vehicleType = subconcept.vehicleType || '-';
-                        const vehicleMultiplier = subconcept.vehicleMultiplier || 1;
-                        const showBadge = subconcept.vehicleCapacity && vehicleMultiplier > 1;
-                        vehicleTypeHTML = showBadge
-                            ? `<span class="badge bg-info me-1">${vehicleMultiplier}x</span>${vehicleType}`
-                            : vehicleType;
-                    } else {
-                        vehicleTypeHTML = subconcept.vehicleType || (subconcept.type === 'regular' || subconcept.type === 'experiencia' ? 'N/A' : '-');
-                    }
+                    if (sc.notes) html += `<div class="sm-notes"><i class="ti ti-notes me-1"></i>${sc.notes}</div>`;
 
-
-                    // Use the stored total directly (already calculated properly in services section)
-                    const total = subconcept.total !== null && subconcept.total !== undefined
-                        ? currencyFormatter.format(subconcept.total)
-                        : '-';
-
-                    // Notes - show actual notes or empty if none
-                    const notes = subconcept.notes ? `<small>${subconcept.notes}</small>` : '';
-
-                    // Format total with conditional payment type (only for types that have cash payment checkbox)
-                    let totalFormatted;
-                    if (subconcept.type === 'regular') {
-                        // Regular/service type: no payment type label
-                        totalFormatted = `
-                            <div class="text-end" style="font-weight: bold;">
-                                ${total}
-                            </div>
-                        `;
-                    } else {
-                        // Other types (traslado, tour, experiencia): show payment type
-                        const paymentTypeLabel = subconcept.isCashPayment ? 'Efectivo' : 'Tarjeta/Digital';
-                        const paymentTypeClass = subconcept.isCashPayment ? 'text-success' : 'text-primary';
-                        totalFormatted = `
-                            <div class="text-end" style="line-height: 1.3;">
-                                <div style="font-weight: bold;">${total}</div>
-                                <small class="${paymentTypeClass}">${paymentTypeLabel}</small>
-                            </div>
-                        `;
-                    }
-
-                    // Note: columns are: Día (skipped - rowspan), Concepto, Vehículo, Total, Notas
-                    subRow.innerHTML = `
-                        <td>${conceptHTML}</td>
-                        <td>${vehicleTypeHTML}</td>
-                        <td>${totalFormatted}</td>
-                        <td>${notes}</td>
-                    `;
-
-                    tbody.appendChild(subRow);
+                    html += `</div>
+                        <div class="sm-price">${total}${paymentHtml}</div>
+                    </div>`;
                 });
+            } else {
+                html += '<div class="sm-empty-state" style="padding: 1rem;">Sin servicios</div>';
             }
+
+            const dayPerPerson = numberOfPeople > 0 ? dayTotal / numberOfPeople : 0;
+
+            html += `</div>
+                <div class="sm-day-footer">
+                    <div>Total del día: ${currencyFormatter.format(dayTotal)}</div>
+                    ${numberOfPeople > 0 ? `<div style="font-size: 0.85rem; font-weight: 500; color: #6c757d;">Por persona: ${currencyFormatter.format(dayPerPerson)}</div>` : ''}
+                </div>
+            </div>`;
         });
 
-        // Calculate subtotal from stored subconcept totals
+        container.innerHTML = html;
+
+        // Calculate totals
         let actualSubtotal = 0;
         serviceItems.days.forEach(day => {
             if (day.subconcepts && day.subconcepts.length > 0) {
-                day.subconcepts.forEach(subconcept => {
-                    if (subconcept.total !== null && subconcept.total !== undefined) {
-                        actualSubtotal += subconcept.total;
-                    }
+                day.subconcepts.forEach(sc => {
+                    if (sc.total != null) actualSubtotal += sc.total;
                 });
             }
         });
 
-        // Calculate IVA and total
-        const actualIVA = actualSubtotal * 0.16; // 16% IVA
+        const actualIVA = actualSubtotal * 0.16;
         const actualTotal = actualSubtotal + actualIVA;
 
-        // Update totals
         document.getElementById('summarySubtotal').textContent = currencyFormatter.format(actualSubtotal);
         document.getElementById('summaryIVA').textContent = currencyFormatter.format(actualIVA);
         document.getElementById('summaryTotal').textContent = currencyFormatter.format(actualTotal);
-        
-        // Calculate and update per person total
-        const numberOfPeople = parseInt(document.getElementById('summaryNumberOfPeople').textContent) || 1;
+
         const perPersonTotal = numberOfPeople > 0 ? actualTotal / numberOfPeople : 0;
-        
         document.getElementById('summaryPerPerson').textContent = currencyFormatter.format(perPersonTotal);
-        document.getElementById('summaryPersonCount').textContent = `(${numberOfPeople} ${numberOfPeople === 1 ? 'persona' : 'personas'})`;
+        document.getElementById('summaryPersonCount').textContent = `(${numberOfPeople})`;
+    }
+
+    function renderSummaryTransport(sc) {
+        const origin = sc.originName || sc.concept || sc.origin || 'Origen';
+        const destination = sc.destination || 'Destino';
+        const vehicleType = sc.vehicleTypeName || sc.vehicleType || '';
+        const vehicleMultiplier = sc.vehicleMultiplier || sc.quantity || 1;
+        const multiplierBadge = vehicleMultiplier > 1 ? `<span class="sm-badge" style="background: #0d6efd15; color: #0d6efd;">${vehicleMultiplier}x</span>` : '';
+
+        let html = `</div>
+            <div class="sm-route">
+                <div class="sm-route-dots">
+                    <i class="ti ti-circle-filled text-success" style="font-size: 0.45rem;"></i>
+                    <div class="sm-route-line"></div>
+                    <i class="ti ti-map-pin-filled text-danger" style="font-size: 0.6rem;"></i>
+                </div>
+                <div class="sm-route-names">
+                    <div>${origin}</div>
+                    <div>${destination}</div>
+                </div>
+            </div>`;
+        if (sc.time || sc.selectedSchedule) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.selectedSchedule || sc.time}</div>`;
+        if (vehicleType) html += `<div class="sm-service-detail"><i class="ti ti-car"></i>${multiplierBadge}${vehicleType}</div>`;
+        if (sc.flightNumber) html += `<div class="sm-service-detail"><i class="ti ti-plane"></i>${sc.flightNumber}${sc.airline ? ' · ' + sc.airline : ''}</div>`;
+        if (sc.includeGuide) html += '<div class="sm-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Guía + Chofer</div>';
+        if (sc.includeGreeter) html += '<div class="sm-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>';
+        if (sc.waitingTimeHours > 0) html += `<div class="sm-service-detail" style="color: #fd7e14;"><i class="ti ti-clock"></i>Tiempo de espera: ${sc.waitingTimeHours}h</div>`;
+        return html;
+    }
+
+    function renderIncludedExperiencesCards(experiences) {
+        if (!experiences || experiences.length === 0) return '';
+        let html = '<ul class="sm-included-list">';
+        experiences.forEach(exp => {
+            html += `<li>${exp.name}${exp.description ? ': ' + exp.description : ''}</li>`;
+        });
+        html += '</ul>';
+        return html;
     }
 
     // Render included experiences for packages
@@ -1018,7 +1114,7 @@
             },
             pagebreak: {
                 mode: ['css', 'legacy'],
-                avoid: ['.summary-day-header', '.summary-totals', '.summary-banner', 'tr']
+                avoid: ['.sm-day-card', '.sm-totals-card', '.summary-banner', 'tr']
             }
         };
 
@@ -1099,61 +1195,74 @@
             doc.text('SERVICIOS E ITINERARIO', margin, yPosition);
             yPosition += 8;
 
-            // Get table data
-            const tableBody = document.querySelector('#summaryServicesTableBody');
-            if (tableBody) {
-                const rows = tableBody.querySelectorAll('tr');
-                console.log(`Processing ${rows.length} service rows for PDF`);
-                
-                doc.setFontSize(9);
-                doc.setTextColor(0, 0, 0);
-                
-                rows.forEach((row, index) => {
-                    // Check if we need a new page
+            // Get card data
+            const cardsContainer = document.querySelector('#summaryServicesCards');
+            if (cardsContainer) {
+                const dayCards = cardsContainer.querySelectorAll('.sm-day-card');
+
+                dayCards.forEach((card) => {
                     if (yPosition > 250) {
                         doc.addPage();
                         yPosition = 20;
                     }
-                    
-                    if (row.className.includes('summary-day-header')) {
-                        // Day header
-                        const dayTitle = row.querySelector('td')?.textContent || '';
-                        
-                        yPosition += 5;
-                        doc.setFontSize(11);
-                        doc.setTextColor(13, 110, 253);
-                        doc.setFillColor(231, 241, 255);
-                        doc.rect(margin, yPosition - 4, contentWidth, 8, 'F');
-                        doc.text(dayTitle.toUpperCase(), margin + 2, yPosition + 1);
-                        yPosition += 8;
-                        
-                    } else if (row.className.includes('summary-subconcept-row')) {
-                        // Service item
-                        const cells = row.querySelectorAll('td');
-                        const cellData = Array.from(cells).map(cell => cell.textContent?.trim() || '');
-                        
+
+                    // Day header
+                    const dayTitle = card.querySelector('.sm-day-title')?.textContent || '';
+                    yPosition += 5;
+                    doc.setFontSize(11);
+                    doc.setTextColor(13, 110, 253);
+                    doc.setFillColor(231, 241, 255);
+                    doc.rect(margin, yPosition - 4, contentWidth, 8, 'F');
+                    doc.text(dayTitle.toUpperCase(), margin + 2, yPosition + 1);
+                    yPosition += 8;
+
+                    // Service items
+                    const services = card.querySelectorAll('.sm-service');
+                    services.forEach((svc) => {
+                        if (yPosition > 250) {
+                            doc.addPage();
+                            yPosition = 20;
+                        }
+
                         doc.setFontSize(9);
                         doc.setTextColor(0, 0, 0);
-                        
-                        if (cellData[0]) {
-                            doc.text(`• ${cellData[0]}`, margin + 5, yPosition);
+
+                        // Service name from header
+                        const badge = svc.querySelector('.sm-badge')?.textContent || '';
+                        const name = svc.querySelector('.sm-service-name')?.textContent || '';
+                        const routeNames = svc.querySelector('.sm-route-names');
+                        const concept = name || (routeNames ? routeNames.textContent.trim().replace(/\n+/g, ' → ') : '');
+
+                        doc.text(`• [${badge}] ${concept}`, margin + 5, yPosition);
+                        yPosition += 4;
+
+                        // Details (time, vehicle)
+                        const details = svc.querySelectorAll('.sm-service-detail');
+                        details.forEach((det) => {
+                            const text = det.textContent.trim();
+                            if (text) {
+                                doc.text(`  ${text}`, margin + 8, yPosition);
+                                yPosition += 4;
+                            }
+                        });
+
+                        // Price
+                        const price = svc.querySelector('.sm-price')?.textContent?.trim() || '';
+                        if (price) {
+                            doc.text(`  Precio: ${price}`, margin + 8, yPosition);
                             yPosition += 4;
                         }
-                        if (cellData[1]) {
-                            doc.text(`  Vehículo: ${cellData[1]}`, margin + 8, yPosition);
-                            yPosition += 4;
+
+                        // Notes
+                        const notes = svc.querySelector('.sm-notes')?.textContent?.trim() || '';
+                        if (notes) {
+                            const noteLines = doc.splitTextToSize(`  Notas: ${notes}`, contentWidth - 10);
+                            doc.text(noteLines, margin + 8, yPosition);
+                            yPosition += noteLines.length * 4;
                         }
-                        if (cellData[2]) {
-                            doc.text(`  Precio: ${cellData[2]}`, margin + 8, yPosition);
-                            yPosition += 4;
-                        }
-                        if (cellData[3]) {
-                            const notes = doc.splitTextToSize(`  Notas: ${cellData[3]}`, contentWidth - 10);
-                            doc.text(notes, margin + 8, yPosition);
-                            yPosition += notes.length * 4;
-                        }
+
                         yPosition += 3;
-                    }
+                    });
                 });
             }
 

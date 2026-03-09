@@ -74,6 +74,28 @@ const baseDashboardPath = dtUserRole === 'department_manager'
 </div>
 
 <!-- Copy Quote Modal -->
+<!-- Confirm Schedule Modal (quotes list) -->
+<div class="modal fade" id="confirmScheduleListModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-bold">Confirmar reserva</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <p>¿Confirmar esta cotización y reservar tu fecha?</p>
+                <p class="mb-0 text-muted" style="font-size: 0.85rem; display: none;" id="scheduleListEmailNote">
+                    <i class="ti ti-mail me-1"></i>Se enviará un correo de confirmación a <strong id="scheduleListEmailAddress"></strong>
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-sm btn-success" id="confirmScheduleListBtn">Confirmar reserva</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="copyQuoteModal" tabindex="-1" aria-labelledby="copyQuoteModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -380,7 +402,7 @@ const baseDashboardPath = dtUserRole === 'department_manager'
                         const userRole = '<%= dtUserRole %>';
                         
                         // Define statuses based on user role
-                        const scheduledText = userRole === 'admin' ? 'APROBADO' : 'AGENDADO';
+                        const scheduledText = 'AGENDADO';
                         const statuses = [
                             { value: 'requested', text: 'SOLICITADO', class: 'bg-primary' },
                             { value: 'hold', text: 'BLOQUEADO', class: 'bg-warning' },
@@ -393,7 +415,7 @@ const baseDashboardPath = dtUserRole === 'department_manager'
                             return `<span class="badge bg-success px-3 py-2" style="font-size: 0.75rem;">${scheduledText}</span>`;
                         }
 
-                        let select = `<select class="form-select form-select-sm status-selector" data-id="${row.id}" data-folio="${row.folio}" style="font-size: 0.75rem; cursor: pointer;">`;
+                        let select = `<select class="form-select form-select-sm status-selector" data-id="${row.id}" data-folio="${row.folio}" data-email="${row.contactEmail || ''}" style="font-size: 0.75rem; cursor: pointer;">`;
                         statuses.forEach(status => {
                             const selected = status.value === data ? 'selected' : '';
                             select += `<option value="${status.value}" ${selected}>${status.text}</option>`;
@@ -581,13 +603,55 @@ const baseDashboardPath = dtUserRole === 'department_manager'
         // Event Handlers
 
         // Status dropdown change
+        let pendingSchedule = null;
         $(`#${tableId}`).on('change', '.status-selector', function() {
-            const quoteId = $(this).data('id');
-            const quoteFolio = $(this).data('folio');
-            const newStatus = $(this).val();
-            const oldStatus = $(this).find('option:not(:selected)').first().val();
+            const $select = $(this);
+            const quoteId = $select.data('id');
+            const quoteFolio = $select.data('folio');
+            const newStatus = $select.val();
+            const oldStatus = $select.data('previous-status') || 'requested';
 
-            updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus);
+            if (newStatus === 'scheduled') {
+                // Show confirmation modal
+                pendingSchedule = { quoteId, quoteFolio, newStatus, oldStatus, $select };
+                const email = $select.data('email') || '';
+                const emailNote = document.getElementById('scheduleListEmailNote');
+                const emailAddr = document.getElementById('scheduleListEmailAddress');
+                if (email && emailNote && emailAddr) {
+                    emailAddr.textContent = email;
+                    emailNote.style.display = '';
+                } else if (emailNote) {
+                    emailNote.style.display = 'none';
+                }
+                const modal = new bootstrap.Modal(document.getElementById('confirmScheduleListModal'));
+                modal.show();
+            } else {
+                $select.data('previous-status', newStatus);
+                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus);
+            }
+        });
+
+        // Track previous status on focus
+        $(`#${tableId}`).on('focus', '.status-selector', function() {
+            $(this).data('previous-status', $(this).val());
+        });
+
+        // Confirm schedule from list modal
+        $(document).on('click', '#confirmScheduleListBtn', function() {
+            if (pendingSchedule) {
+                const { quoteId, quoteFolio, newStatus, oldStatus } = pendingSchedule;
+                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus);
+                pendingSchedule = null;
+            }
+            bootstrap.Modal.getInstance(document.getElementById('confirmScheduleListModal'))?.hide();
+        });
+
+        // Revert on modal cancel
+        $(document).on('hidden.bs.modal', '#confirmScheduleListModal', function() {
+            if (pendingSchedule) {
+                pendingSchedule.$select.val(pendingSchedule.oldStatus);
+                pendingSchedule = null;
+            }
         });
 
         // Copy Quote button click

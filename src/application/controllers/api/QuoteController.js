@@ -834,6 +834,7 @@ class QuoteController {
 
       const {
         days = [], subtotal = 0, iva = 0, total = 0,
+        currency = 'MXN', paymentType = 'efectivo',
       } = req.body;
 
       // Validate serviceItems structure
@@ -992,6 +993,8 @@ class QuoteController {
         subtotal,
         iva,
         total,
+        currency,
+        paymentType,
       };
 
       quote.set('serviceItems', serviceItems);

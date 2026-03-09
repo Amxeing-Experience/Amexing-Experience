@@ -25,6 +25,9 @@
                 <p class="text-muted mb-0">Organiza los servicios por día</p>
             </div>
             <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary" id="toggleCatalogBtn" title="Catálogo de servicios">
+                    <i class="ti ti-layout-grid me-1"></i>Catálogo
+                </button>
                 <button type="button" class="btn btn-outline-primary" id="previewItineraryBtn">
                     <i class="ti ti-eye me-1"></i>Vista Previa
                 </button>
@@ -504,11 +507,17 @@
     }
 </style>
 
+<!-- Catalog Offcanvas Panel -->
+<%- include('quote-services-catalog') %>
+
 <!-- Initialize the Itinerary Builder -->
 <div data-quote-id="<%= quoteId %>"></div>
 <script>
     // Pass server-side data to client
     window.quoteAccessToken = '<%= typeof accessToken !== "undefined" ? accessToken : "" %>';
+    window.userRole = '<%= typeof userRole !== "undefined" ? userRole : "" %>';
 </script>
+<link rel="stylesheet" href="/dashboards/admin/sections/quote-services/quote-catalog-drag.css">
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
 <script src="/dashboards/admin/sections/quote-services-v2.js"></script>
+<script src="/dashboards/admin/sections/quote-services/quote-catalog-drag.js"></script>
