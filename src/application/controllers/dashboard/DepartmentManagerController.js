@@ -168,6 +168,60 @@ class DepartmentManagerController extends RoleBasedController {
   }
 
   /**
+   * Renders the department bookings/reservations list page.
+   * @function bookings
+   * @param {object} req - Express request object containing user session and authentication data.
+   * @param {object} res - Express response object for rendering the bookings view.
+   * @returns {Promise<void>} - Renders the department bookings view or handles errors.
+   * @example
+   * // GET /dashboard/department_manager/bookings
+   * await departmentManagerController.bookings(req, res);
+   */
+  async bookings(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'bookings', {
+        title: 'Reservaciones del Departamento',
+        breadcrumb: null,
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Renders the department booking detail page.
+   * @function bookingDetail
+   * @param {object} req - Express request object containing user session and authentication data.
+   * @param {object} res - Express response object for rendering the booking detail view.
+   * @returns {Promise<void>} - Renders the department booking detail view or handles errors.
+   * @example
+   * // GET /dashboard/department_manager/bookings/:id
+   * await departmentManagerController.bookingDetail(req, res);
+   */
+  async bookingDetail(req, res) {
+    try {
+      const reservationId = req.params.id;
+      await this.renderRoleView(req, res, 'booking-detail', {
+        title: `Reservación ${reservationId}`,
+        breadcrumb: null,
+        reservationId,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Renders the department invoices page for viewing and downloading invoice files.
    * Shows quotes with completed invoices that have XML and PDF files available for download.
    * Department managers can only access invoices for quotes created by users in their department.

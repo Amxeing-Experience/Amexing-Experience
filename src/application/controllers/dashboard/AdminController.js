@@ -356,6 +356,7 @@ class AdminController extends RoleBasedController {
    * Render booking detail page for a reservation.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
+   * @example
    */
   async bookingDetail(req, res) {
     try {
@@ -660,6 +661,7 @@ class AdminController extends RoleBasedController {
    * Render greeter management page.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
+   * @example
    */
   async greeter(req, res) {
     try {

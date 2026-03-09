@@ -17,17 +17,19 @@ const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/q
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
-const canEdit = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
-const canDelete = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
-const canCreate = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
-const canViewSummary = dtUserRole === 'department_manager';
+const canEdit = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
+const canViewSummary = ['department_manager', 'client'].includes(dtUserRole);
 
 // Dynamic base path based on user role
-const baseDashboardPath = dtUserRole === 'department_manager' 
-    ? '/dashboard/department_manager' 
-    : dtUserRole === 'admin' 
-        ? '/dashboard/admin' 
-        : '/dashboard/superadmin';
+const rolePaths = {
+    client: '/dashboard/client',
+    department_manager: '/dashboard/department_manager',
+    admin: '/dashboard/admin',
+    superadmin: '/dashboard/superadmin'
+};
+const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
 %>
 
 <div class="card border-0 shadow-sm">

@@ -1,6 +1,6 @@
 <%
 /**
- * Department Manager Quote Detail Page
+ * Client Quote Detail Page
  * Quote creation and editing with horizontal stepper navigation
  * Created by Denisse Maldonado
  */
@@ -9,9 +9,9 @@ const activeSection = typeof currentSection !== 'undefined' ? currentSection : '
 const quoteTitle = isNewQuote ? 'Nueva Cotización' : `Cotización`;
 
 const steps = [
-    { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/department_manager/quotes/${quoteId}`, number: 1 },
-    { label: 'Servicios', icon: 'list', section: 'services', href: `/dashboard/department_manager/quotes/${quoteId}?section=services`, number: 2 },
-    { label: 'Resumen', icon: 'calculator', section: 'summary', href: `/dashboard/department_manager/quotes/${quoteId}?section=summary`, number: 3 }
+    { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/client/quotes/${quoteId}`, number: 1 },
+    { label: 'Servicios', icon: 'list', section: 'services', href: `/dashboard/client/quotes/${quoteId}?section=services`, number: 2 },
+    { label: 'Resumen', icon: 'calculator', section: 'summary', href: `/dashboard/client/quotes/${quoteId}?section=summary`, number: 3 }
 ];
 %>
 
@@ -30,8 +30,8 @@ const steps = [
                 </h2>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item"><a href="/dashboard/department_manager"><i class="ti ti-home me-1"></i>Dashboard</a></li>
-                        <li class="breadcrumb-item"><a href="/dashboard/department_manager/quotes"><i class="ti ti-file-invoice me-1"></i>Cotizaciones</a></li>
+                        <li class="breadcrumb-item"><a href="/dashboard/client"><i class="ti ti-home me-1"></i>Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="/dashboard/client/quotes"><i class="ti ti-file-invoice me-1"></i>Cotizaciones</a></li>
                         <li class="breadcrumb-item active" id="breadcrumbQuoteTitle"><%= quoteTitle %></li>
                     </ol>
                 </nav>
@@ -66,14 +66,14 @@ const steps = [
     </div>
 </div>
 
-<!-- Department Access Alert -->
+<!-- Client Access Alert -->
 <% if (!isNewQuote) { %>
 <div class="row mb-3">
     <div class="col-12">
-        <div class="alert alert-warning d-flex align-items-center" role="alert">
-            <i class="ti ti-shield-check me-2 fs-4"></i>
+        <div class="alert alert-info d-flex align-items-center" role="alert">
+            <i class="ti ti-info-circle me-2 fs-4"></i>
             <div>
-                <strong>Acceso Departamental:</strong> Solo puede editar cotizaciones creadas por miembros de su departamento.
+                <strong>Vista de Cliente:</strong> Solo puede ver cotizaciones asociadas a su cuenta.
             </div>
         </div>
     </div>
@@ -481,7 +481,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         toast.innerHTML = `
                             <strong><i class="ti ti-check me-1"></i>Reservación creada</strong>
                             <p class="mb-1 mt-1">Folio: ${resData.folio} (${resData.servicesCount} servicios)</p>
-                            <a href="/dashboard/department_manager/bookings/${resData.id}" class="btn btn-sm btn-success">Ver Reservación</a>
+                            <a href="/dashboard/client/bookings/${resData.id}" class="btn btn-sm btn-success">Ver Reservación</a>
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         `;
                         document.body.appendChild(toast);

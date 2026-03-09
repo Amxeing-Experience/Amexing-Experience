@@ -1,0 +1,250 @@
+<%
+/**
+ * Bookings Management Page
+ * Department Manager dashboard page for managing reservations
+ *
+ * @author Denisse Maldonado
+ * @version 1.0.0
+ */
+%>
+
+<!-- Page Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="mb-1 fw-bold">
+                    <i class="ti ti-clipboard-list me-2 text-primary"></i>
+                    Reservaciones del Departamento
+                </h2>
+                <p class="text-muted mb-0">
+                    Gestiona las reservaciones de tu departamento
+                </p>
+            </div>
+            <div>
+                <select id="statusFilter" class="form-select form-select-sm" style="width: 180px;">
+                    <option value="">Todos los estados</option>
+                    <option value="pending">Pendiente</option>
+                    <option value="assigned">Asignada</option>
+                    <option value="in_progress">En Progreso</option>
+                    <option value="completed">Completada</option>
+                    <option value="cancelled">Cancelada</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page Content -->
+<div class="page-content">
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h5 class="card-title mb-0 text-white">
+                                <i class="ti ti-clipboard-list me-2"></i>Reservaciones
+                            </h5>
+                            <small class="text-white" style="opacity: 0.9;">Reservaciones creadas a partir de cotizaciones agendadas</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="reservations-table" class="table table-hover" style="width:100%">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Folio</th>
+                                    <th>Cliente</th>
+                                    <th>Tipo de Evento</th>
+                                    <th class="text-center">Fecha Inicio</th>
+                                    <th class="text-center">Personas</th>
+                                    <th class="text-end">Total</th>
+                                    <th class="text-center">Servicios</th>
+                                    <th class="text-center">Estado</th>
+                                    <th class="text-center">Fecha Creación</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Reservation Modal -->
+<div class="modal fade" id="cancelReservationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-bold">Cancelar Reservación</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <p>¿Estás seguro de cancelar esta reservación?</p>
+                <p class="text-muted mb-0" style="font-size: 0.85rem;">
+                    <i class="ti ti-alert-triangle me-1"></i>Esta acción cancelará todos los servicios asociados.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button class="btn btn-sm btn-danger" id="confirmCancelReservationBtn">Cancelar Reservación</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    let pendingCancelId = null;
+
+    function getStatusBadge(status) {
+        const map = {
+            pending: { label: 'Pendiente', cls: 'bg-warning text-dark' },
+            assigned: { label: 'Asignada', cls: 'bg-info text-white' },
+            in_progress: { label: 'En Progreso', cls: 'bg-primary text-white' },
+            completed: { label: 'Completada', cls: 'bg-success text-white' },
+            cancelled: { label: 'Cancelada', cls: 'bg-danger text-white' },
+        };
+        const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}">${s.label}</span>`;
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '—';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function formatCurrency(amount, currency) {
+        const sym = currency === 'USD' ? 'USD $' : '$';
+        return `${sym}${(amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    const table = $('#reservations-table').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: '/api/reservations',
+            type: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` },
+            data: function(d) {
+                d.statusFilter = $('#statusFilter').val();
+                return d;
+            },
+            error: function(xhr) {
+                console.error('Error loading reservations:', xhr);
+            }
+        },
+        columns: [
+            {
+                data: 'folio',
+                render: function(data, type, row) {
+                    return `<a href="/dashboard/department_manager/bookings/${row.id}" class="fw-semibold text-decoration-none">${data}</a>`;
+                }
+            },
+            { data: 'clientName' },
+            { data: 'eventType', defaultContent: '—' },
+            {
+                data: 'startDate',
+                className: 'text-center',
+                render: function(data) { return formatDate(data); }
+            },
+            { data: 'numberOfPeople', className: 'text-center' },
+            {
+                data: 'totalAmount',
+                className: 'text-end',
+                render: function(data, type, row) { return formatCurrency(data, row.currency); }
+            },
+            {
+                data: null,
+                className: 'text-center',
+                render: function(data, type, row) {
+                    return `<span class="badge bg-light text-dark">${row.assignedServices}/${row.totalServices}</span>`;
+                }
+            },
+            {
+                data: 'status',
+                className: 'text-center',
+                render: function(data) { return getStatusBadge(data); }
+            },
+            {
+                data: 'createdAt',
+                className: 'text-center',
+                render: function(data) { return formatDate(data); }
+            },
+            {
+                data: null,
+                className: 'text-center',
+                orderable: false,
+                render: function(data, type, row) {
+                    let actions = `<a href="/dashboard/department_manager/bookings/${row.id}" class="btn btn-sm btn-outline-primary me-1" title="Ver detalle"><i class="ti ti-eye"></i></a>`;
+                    if (row.quoteFolio) {
+                        actions += `<a href="/dashboard/department_manager/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-invoice"></i></a>`;
+                    }
+                    if (row.status !== 'cancelled' && row.status !== 'completed') {
+                        actions += `<button class="btn btn-sm btn-outline-danger cancel-res-btn" data-id="${row.id}" title="Cancelar"><i class="ti ti-x"></i></button>`;
+                    }
+                    return actions;
+                }
+            }
+        ],
+        order: [[8, 'desc']],
+        language: {
+            processing: 'Cargando...',
+            search: 'Buscar:',
+            lengthMenu: 'Mostrar _MENU_ registros',
+            info: 'Mostrando _START_ a _END_ de _TOTAL_ reservaciones',
+            infoEmpty: 'No hay reservaciones',
+            infoFiltered: '(filtrado de _MAX_ total)',
+            zeroRecords: 'No se encontraron reservaciones',
+            emptyTable: 'No hay reservaciones registradas',
+            paginate: { first: 'Primera', previous: 'Anterior', next: 'Siguiente', last: 'Última' },
+        },
+        responsive: true,
+        pageLength: 10,
+    });
+
+    // Status filter change
+    $('#statusFilter').on('change', function() {
+        table.ajax.reload();
+    });
+
+    // Cancel reservation
+    $(document).on('click', '.cancel-res-btn', function() {
+        pendingCancelId = $(this).data('id');
+        const modal = new bootstrap.Modal(document.getElementById('cancelReservationModal'));
+        modal.show();
+    });
+
+    document.getElementById('confirmCancelReservationBtn')?.addEventListener('click', async function() {
+        if (!pendingCancelId) return;
+        try {
+            const response = await fetch(`/api/reservations/${pendingCancelId}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            const result = await response.json();
+            if (result.success) {
+                table.ajax.reload();
+                bootstrap.Modal.getInstance(document.getElementById('cancelReservationModal'))?.hide();
+            } else {
+                alert(result.error || 'Error al cancelar reservación');
+            }
+        } catch (err) {
+            console.error('Cancel error:', err);
+            alert('Error al cancelar reservación');
+        }
+        pendingCancelId = null;
+    });
+});
+</script>
