@@ -563,10 +563,78 @@ function registerCloudFunctions() {
      * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
      * @returns {Promise<void>} - Promise that resolves when validation is complete.
      */
-    Parse.Cloud.beforeSave(AmexingUser, async (request) => {
+    // DISABLED: Email validation moved to audit trail hooks
+    /*
+    Parse.Cloud.beforeSave('AmexingUser', async (request) => {
       const { object: user, master } = request;
 
-      // Skip validation for master key requests
+      logger.info('🔍 CUSTOM AmexingUser beforeSave hook triggered!', {
+        userId: user.id,
+        useMasterKey: master,
+        existed: user.existed()
+      });
+
+      // EMAIL UNIQUENESS VALIDATION (runs even with masterKey for data integrity)
+      const email = user.get('email');
+      if (email) {
+        // Validate email format first
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Invalid email format');
+        }
+
+        // Trim and lowercase email for consistent validation
+        const normalizedEmail = email.trim().toLowerCase();
+        user.set('email', normalizedEmail);
+
+        // Check if email is being changed
+        const isCreating = !user.existed();
+        const originalEmail = request.original ? request.original.get('email') : null;
+        const isEmailChanged = isCreating || (originalEmail !== normalizedEmail);
+
+        logger.info('AmexingUser email validation check', {
+          userId: user.id,
+          email: `${normalizedEmail.substring(0, 3)}***`,
+          isCreating,
+          originalEmail: originalEmail ? `${originalEmail.substring(0, 3)}***` : null,
+          isEmailChanged,
+          useMasterKey: master
+        });
+
+        if (isEmailChanged) {
+          // Query for existing users with this email
+          const query = new Parse.Query(AmexingUser);
+          query.equalTo('email', normalizedEmail);
+          query.equalTo('exists', true); // Only check active users
+          if (!isCreating && user.id) {
+            query.notEqualTo('objectId', user.id);
+          }
+          query.limit(1);
+
+          const existingUser = await query.first({ useMasterKey: true });
+
+          logger.info('Email uniqueness check result', {
+            email: `${normalizedEmail.substring(0, 3)}***`,
+            foundExisting: !!existingUser,
+            existingUserId: existingUser?.id
+          });
+
+          if (existingUser) {
+            logger.logSecurityEvent('DUPLICATE_EMAIL_ATTEMPT', {
+              email: `${normalizedEmail.substring(0, 3)}***`,
+              attemptedUserId: user.id,
+              existingUserId: existingUser.id,
+              isCreating,
+            });
+            throw new Parse.Error(
+              Parse.Error.DUPLICATE_VALUE,
+              'Email address is already registered. Please use a different email or contact support.'
+            );
+          }
+        }
+      }
+
+      // Skip remaining validation for master key requests
       if (master) {
         return;
       }
@@ -612,16 +680,7 @@ function registerCloudFunctions() {
         }
       }
 
-      // Validate email format
-      const email = user.get('email');
-      if (email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Invalid email format');
-        }
-        // Normalize email to lowercase
-        user.set('email', email.toLowerCase());
-      }
+      // Email format validation and normalization is already handled in the EMAIL UNIQUENESS VALIDATION section above
 
       // Validate username format
       const username = user.get('username');
@@ -654,6 +713,7 @@ function registerCloudFunctions() {
         }
       }
     });
+    */ // END DISABLED AmexingUser beforeSave hook
 
     /**
      * AfterSave trigger for AmexingUser that performs post-save operations.
@@ -703,6 +763,8 @@ function registerCloudFunctions() {
      * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
      * @returns {Promise<void>} - Promise that resolves when validation is complete.
      */
+    // DISABLED: Email validation moved to audit trail hooks
+    /*
     Parse.Cloud.beforeSave(Parse.User, async (request) => {
       const { object: user, master } = request;
 
@@ -768,6 +830,7 @@ function registerCloudFunctions() {
         }
       }
     });
+    */ // END DISABLED Parse.User beforeSave hook
 
     // After Save Triggers
     /**

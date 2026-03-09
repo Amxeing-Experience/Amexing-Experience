@@ -449,7 +449,15 @@ router.post('/login', async (req, res) => {
       // Check if client expects HTML response
       if (req.accepts('html')) {
         // For web form submissions, redirect to role-specific dashboard
-        const redirectUrl = returnTo || `/dashboard/${authenticatedUser.role}`;
+        // Admin users go directly to Reservaciones instead of dashboard
+        let redirectUrl = returnTo;
+        if (!redirectUrl) {
+          if (authenticatedUser.role === 'admin') {
+            redirectUrl = '/dashboard/admin/bookings';
+          } else {
+            redirectUrl = `/dashboard/${authenticatedUser.role}`;
+          }
+        }
         logger.info('Redirecting user to dashboard', {
           from: '/auth/login',
           to: redirectUrl,
@@ -1250,7 +1258,15 @@ router.get('/oauth/:provider/callback', async (req, res) => {
       userRole = result.user.role;
     }
 
-    const redirectUrl = req.session.returnTo || `/dashboard/${userRole}`;
+    // Admin users go directly to Reservaciones instead of dashboard
+    let defaultRedirect;
+    if (userRole === 'admin') {
+      defaultRedirect = '/dashboard/admin/bookings';
+    } else {
+      defaultRedirect = `/dashboard/${userRole}`;
+    }
+
+    const redirectUrl = req.session.returnTo || defaultRedirect;
     delete req.session.returnTo;
     res.redirect(redirectUrl);
   } catch (error) {

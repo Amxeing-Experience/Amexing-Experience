@@ -1,0 +1,905 @@
+<%
+/**
+ * Experience Information Section
+ * Basic information form for experience creation/editing
+ * Created by Denisse Maldonado
+ */
+%>
+
+<div id="experienceInformationCard" class="p-4">
+    <!-- Alerts Container -->
+    <div id="experienceInfoAlerts"></div>
+
+    <form id="experienceInformationForm" class="needs-validation" novalidate>
+        <input type="hidden" id="experienceId" value="<%= typeof experienceId !== 'undefined' ? experienceId : '' %>">
+        <input type="hidden" id="experienceType" value="Experience">
+
+        <div class="row g-4">
+            <!-- Left Column: Image + Basic Info + Precios + Detalles + Personas + Vehiculo -->
+            <div class="col-md-6">
+                <!-- Imagen Principal (Portada) -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                        <i class="ti ti-photo me-1"></i>
+                        Imagen Principal (Portada)
+                    </h6>
+                    <div id="mainImageContainer">
+                        <div id="mainImagePreview" class="mb-3" style="display: none;">
+                            <div class="position-relative d-inline-block">
+                                <img id="mainImageImg" src="" alt="Portada" class="rounded shadow-sm" style="max-width: 100%; max-height: 200px; object-fit: cover;">
+                                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" id="removeMainImageBtn" title="Eliminar imagen">
+                                    <i class="ti ti-x"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="mainImageUpload" class="border border-2 border-dashed rounded p-4 text-center" style="cursor: pointer;">
+                            <i class="ti ti-cloud-upload fs-1 text-muted d-block mb-2"></i>
+                            <p class="text-muted mb-1">Arrastra una imagen o haz clic para seleccionar</p>
+                            <small class="text-muted">JPG, PNG, WebP</small>
+                            <input type="file" id="mainImageInput" accept="image/jpeg,image/png,image/webp" style="display: none;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informacion Basica -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                        <i class="ti ti-info-circle me-1"></i>
+                        Informacion Basica
+                    </h6>
+                    <div class="mb-3">
+                        <label for="experienceName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="experienceName" name="name" required maxlength="200" placeholder="Ej: Tour Gastronomico en el Centro Historico">
+                        <div class="invalid-feedback" id="name-error"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="experienceDescription" class="form-label">Descripcion <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="experienceDescription" name="description" required rows="2" placeholder="Descripcion detallada de lo que incluye esta experiencia..."></textarea>
+                        <div class="invalid-feedback" id="description-error"></div>
+                    </div>
+                </div>
+
+                <!-- Precios -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                        <i class="ti ti-currency-dollar me-1"></i>
+                        Precios
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="experienceCost" class="form-label">Precio Adulto <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experienceCost" name="cost" required min="0" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="invalid-feedback" id="cost-error"></div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="experiencePriceNoAlcohol" class="form-label">Precio Sin Alcohol</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experiencePriceNoAlcohol" name="price_no_alcohol" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="experiencePriceChild" class="form-label">Precio Nino</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experiencePriceChild" name="price_child" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tiempos -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                        <i class="ti ti-clock me-1"></i>
+                        Tiempos
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceDuration" class="form-label">Duracion (hrs)</label>
+                            <input type="number" class="form-control" id="experienceDuration" name="duration" min="0" step="0.5" placeholder="2.5">
+                            <div class="form-text"><small>Tiempo total experiencia</small></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceTravelDuration" class="form-label">Duracion Trayecto (min)</label>
+                            <input type="number" class="form-control" id="experienceTravelDuration" name="travel_duration" min="0" step="1" placeholder="60">
+                            <div class="form-text"><small>Tiempo traslado</small></div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceAdvanceMinutes" class="form-label">Anticipacion (min)</label>
+                            <input type="number" class="form-control" id="experienceAdvanceMinutes" name="advance_minutes" min="0" step="1" placeholder="1440">
+                            <div class="form-text"><small>Ej: 1440 = 24hrs</small></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Personas y Vehiculo -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                        <i class="ti ti-users me-1"></i>
+                        Capacidad
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceMinPeople" class="form-label">Min. Personas</label>
+                            <input type="number" class="form-control" id="experienceMinPeople" name="min_people" min="1" step="1" placeholder="1">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceMaxPeople" class="form-label">Max. Personas</label>
+                            <input type="number" class="form-control" id="experienceMaxPeople" name="max_people" min="1" step="1" placeholder="10">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notas -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                        <i class="ti ti-notes me-1"></i>
+                        Notas
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceInternalNotes" class="form-label">
+                                <i class="ti ti-lock me-1"></i>Notas internas <span class="text-muted">(Uso interno)</span>
+                            </label>
+                            <textarea class="form-control" id="experienceInternalNotes" rows="3" placeholder="Notas para uso exclusivo interno del equipo..."></textarea>
+                            <div class="form-text"><small>Solo visible para el equipo interno</small></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceClientBookingNotes" class="form-label">
+                                <i class="ti ti-user-check me-1"></i>Notas cliente <span class="text-muted">(Reservar)</span>
+                            </label>
+                            <textarea class="form-control" id="experienceClientBookingNotes" rows="3" placeholder="Notas que vera el cliente al reservar..."></textarea>
+                            <div class="form-text"><small>Visible para el cliente durante reserva</small></div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceProviderNotes" class="form-label">
+                                <i class="ti ti-building-store me-1"></i>Notas proveedor <span class="text-muted">(Proveedor)</span>
+                            </label>
+                            <textarea class="form-control" id="experienceProviderNotes" rows="3" placeholder="Notas e instrucciones para el proveedor..."></textarea>
+                            <div class="form-text"><small>Instrucciones para el proveedor</small></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceTeamNotes" class="form-label">
+                                <i class="ti ti-users me-1"></i>Notas colaboradores <span class="text-muted">(Equipo)</span>
+                            </label>
+                            <textarea class="form-control" id="experienceTeamNotes" rows="3" placeholder="Notas para colaboradores y equipo de Amexing..."></textarea>
+                            <div class="form-text"><small>Informacion para el equipo Amexing</small></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Incluye/NoIncluye + Idiomas + Disponibilidad + Fotos -->
+            <div class="col-md-6">
+                <!-- Incluye / No Incluye -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                        <i class="ti ti-list-check me-1"></i>
+                        Incluye / No Incluye
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceIncludes" class="form-label">Incluye <span class="text-muted">(uno por linea)</span></label>
+                            <textarea class="form-control" id="experienceIncludes" rows="4" placeholder="Transporte ida y vuelta&#10;Guia bilingue certificado&#10;Entrada al sitio&#10;Degustacion de platillos"></textarea>
+                            <div class="form-text"><small><i class="ti ti-info-circle me-1"></i>Cada elemento en una linea nueva</small></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceNotIncludes" class="form-label">No incluye <span class="text-muted">(uno por linea)</span></label>
+                            <textarea class="form-control" id="experienceNotIncludes" rows="4" placeholder="Propinas&#10;Comidas adicionales&#10;Transporte desde aeropuerto&#10;Gastos personales"></textarea>
+                            <div class="form-text"><small><i class="ti ti-alert-circle me-1"></i>Cada exclusion en una linea nueva</small></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Idiomas -->
+                <div class="mb-4">
+                    <label for="experienceLanguages" class="form-label">
+                        <i class="ti ti-language me-1"></i>Idiomas disponibles <span class="text-muted">(uno por linea)</span>
+                    </label>
+                    <textarea class="form-control" id="experienceLanguages" rows="3" placeholder="Espanol&#10;Ingles&#10;Frances"></textarea>
+                    <div class="form-text"><small><i class="ti ti-world me-1"></i>Escriba cada idioma en una linea nueva</small></div>
+                </div>
+
+                <!-- Disponibilidad -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                        <i class="ti ti-calendar-time me-1"></i>
+                        Disponibilidad <span class="text-muted fw-normal">(Opcional)</span>
+                    </h6>
+                    <div class="mb-3">
+                        <div class="d-flex gap-1 flex-wrap mb-3" id="availableDaysContainer">
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="1" data-day-name="Lunes">Lu</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="2" data-day-name="Martes">Ma</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="3" data-day-name="Miercoles">Mi</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="4" data-day-name="Jueves">Ju</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="5" data-day-name="Viernes">Vi</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="6" data-day-name="Sabado">Sa</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="0" data-day-name="Domingo">Do</button>
+                        </div>
+                    </div>
+                    <div id="daySchedulesContainer" class="mb-3">
+                        <div id="noDaysSelected" class="text-center text-muted py-2 border rounded bg-light" style="font-size: 1rem;">
+                            <i class="ti ti-calendar-off me-1"></i>
+                            <small>Selecciona dias para configurar horarios</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fotos -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                        <i class="ti ti-camera me-1"></i>
+                        Fotos <span class="text-muted fw-normal">(Opcional)</span>
+                    </h6>
+                    <div class="experience-photos-container">
+                        <div class="row g-2 mb-2" id="photosPreviewContainer"></div>
+                        <div class="d-grid">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="addPhotoBtn">
+                                <i class="ti ti-camera-plus me-1"></i>Agregar Foto
+                            </button>
+                        </div>
+                        <input type="file" class="d-none" id="experiencePhotoInput" accept=".jpg,.jpeg,.png,.webp" multiple>
+                    </div>
+                    <div class="form-text"><small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small></div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Save Button -->
+        <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+            <a href="/dashboard/admin/experiences" class="btn btn-secondary">
+                <i class="ti ti-x me-1"></i>Cancelar
+            </a>
+            <button type="button" class="btn btn-primary" id="saveExperienceInfoBtn">
+                <i class="ti ti-check me-1"></i><span id="saveButtonText"><%= isNewExperience ? 'Crear Experiencia' : 'Guardar Cambios' %></span>
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Day Schedule Row Template (multi-slot) -->
+<template id="dayScheduleRowTemplate">
+    <div class="day-schedule-row mb-2 p-2 border rounded bg-light" data-day="">
+        <div class="row align-items-center">
+            <div class="col-md-3">
+                <strong class="day-name text-primary">
+                    <i class="ti ti-calendar me-1"></i>
+                    <span></span>
+                </strong>
+            </div>
+            <div class="col-md-8">
+                <div class="time-slots-container">
+                    <div class="time-slot-row mb-1">
+                        <div class="row g-2 align-items-center">
+                            <div class="col-auto">
+                                <small class="text-muted">De:</small>
+                            </div>
+                            <div class="col">
+                                <input type="time" class="form-control form-control-sm start-time" value="09:00">
+                            </div>
+                            <div class="col-auto">
+                                <small class="text-muted">A:</small>
+                            </div>
+                            <div class="col">
+                                <input type="time" class="form-control form-control-sm end-time" value="18:00">
+                            </div>
+                            <div class="col-auto">
+                                <button type="button" class="btn btn-sm btn-outline-success add-time-slot-btn" title="Agregar horario">
+                                    <i class="ti ti-plus"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-time-slot-btn" title="Eliminar horario">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-day-btn w-100" title="Eliminar dia">
+                    <i class="ti ti-trash"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const accessToken = window.experienceAccessToken || document.cookie.split('; ')
+        .find(row => row.startsWith('accessToken='))?.split('=')[1] || '';
+    const experienceId = document.getElementById('experienceId').value;
+    const isNew = experienceId === 'new';
+
+    // Availability state
+    const selectedDays = new Map();
+
+    // Photos state
+    const pendingPhotoFiles = [];
+
+    // Initialize
+    init();
+
+    async function init() {
+        setupEventListeners();
+        setupImageUpload();
+        setupPhotoUpload();
+        if (!isNew) {
+            await loadExperienceData();
+        }
+    }
+
+    function setupEventListeners() {
+        document.getElementById('saveExperienceInfoBtn').addEventListener('click', saveExperience);
+
+        document.querySelectorAll('#availableDaysContainer .day-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const day = this.dataset.day;
+                const dayName = this.dataset.dayName;
+                if (selectedDays.has(day)) {
+                    selectedDays.delete(day);
+                    this.classList.remove('btn-primary');
+                    this.classList.add('btn-outline-primary');
+                    removeDayScheduleRow(day);
+                } else {
+                    selectedDays.set(day, true);
+                    this.classList.remove('btn-outline-primary');
+                    this.classList.add('btn-primary');
+                    addDayScheduleRow(day, dayName);
+                }
+                updateNoDaysMessage();
+            });
+        });
+    }
+
+    function setupImageUpload() {
+        const uploadArea = document.getElementById('mainImageUpload');
+        const fileInput = document.getElementById('mainImageInput');
+        const removeBtn = document.getElementById('removeMainImageBtn');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('border-primary', 'bg-light');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('border-primary', 'bg-light');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('border-primary', 'bg-light');
+            if (e.dataTransfer.files.length > 0) handleImageFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleImageFile(e.target.files[0]);
+        });
+        removeBtn.addEventListener('click', () => {
+            document.getElementById('mainImagePreview').style.display = 'none';
+            document.getElementById('mainImageUpload').style.display = 'block';
+            document.getElementById('mainImageImg').src = '';
+            document.getElementById('mainImageInput').value = '';
+            window._mainImageFile = null;
+            window._mainImageRemoved = true;
+            // Keep _mainImageId so we know which ExperienceImage to delete on save
+        });
+    }
+
+    function handleImageFile(file) {
+        if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
+            showAlert('Solo se aceptan imagenes JPG, PNG o WebP', 'warning');
+            return;
+        }
+        window._mainImageFile = file;
+        window._mainImageRemoved = false;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById('mainImageImg').src = e.target.result;
+            document.getElementById('mainImagePreview').style.display = 'block';
+            document.getElementById('mainImageUpload').style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function setupPhotoUpload() {
+        const addBtn = document.getElementById('addPhotoBtn');
+        const fileInput = document.getElementById('experiencePhotoInput');
+
+        addBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            Array.from(e.target.files).forEach(file => {
+                if (file.type.match(/^image\/(jpeg|png|webp)$/)) {
+                    pendingPhotoFiles.push(file);
+                    addPhotoPreview(file);
+                }
+            });
+            fileInput.value = '';
+        });
+    }
+
+    function addPhotoPreview(fileOrUrl, imageId, optimizationFormat) {
+        const container = document.getElementById('photosPreviewContainer');
+        const col = document.createElement('div');
+        col.className = 'col-3';
+        if (imageId) col.dataset.imageId = imageId;
+
+        const isFile = fileOrUrl instanceof File;
+
+        const formatBadge = optimizationFormat
+            ? `<span class="badge bg-success position-absolute bottom-0 start-0 m-1" style="font-size: 9px;">${optimizationFormat.toUpperCase()}</span>`
+            : '';
+
+        function renderPreview(src) {
+            col.innerHTML = `
+                <div class="position-relative">
+                    <img src="${src}" class="rounded border w-100" style="height: 80px; object-fit: cover;" alt="Foto">
+                    <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 remove-photo-btn" style="padding: 0 4px; font-size: 10px;">
+                        <i class="ti ti-x"></i>
+                    </button>
+                    ${formatBadge}
+                </div>
+            `;
+            col.querySelector('.remove-photo-btn').addEventListener('click', () => {
+                if (isFile) {
+                    const idx = pendingPhotoFiles.indexOf(fileOrUrl);
+                    if (idx > -1) pendingPhotoFiles.splice(idx, 1);
+                }
+                col.remove();
+            });
+        }
+
+        if (isFile) {
+            // Use data: URL to avoid CSP blocking blob: URLs
+            const reader = new FileReader();
+            reader.onload = (e) => renderPreview(e.target.result);
+            reader.readAsDataURL(fileOrUrl);
+        } else {
+            renderPreview(fileOrUrl);
+        }
+
+        container.appendChild(col);
+    }
+
+    function addDayScheduleRow(day, dayName, startTime = '09:00', endTime = '18:00') {
+        const container = document.getElementById('daySchedulesContainer');
+
+        // Don't add if already exists
+        if (container.querySelector(`.day-schedule-row[data-day="${day}"]`)) return;
+
+        const template = document.getElementById('dayScheduleRowTemplate');
+        const clone = template.content.cloneNode(true);
+        const row = clone.querySelector('.day-schedule-row');
+        row.dataset.day = day;
+        row.querySelector('.day-name span').textContent = dayName;
+
+        // Set initial time values
+        row.querySelector('.start-time').value = startTime;
+        row.querySelector('.end-time').value = endTime;
+
+        // Remove day button
+        row.querySelector('.remove-day-btn').addEventListener('click', () => {
+            const dayBtn = document.querySelector(`#availableDaysContainer .day-btn[data-day="${day}"]`);
+            if (dayBtn) {
+                dayBtn.classList.remove('btn-primary');
+                dayBtn.classList.add('btn-outline-primary');
+            }
+            selectedDays.delete(day);
+            row.remove();
+            updateNoDaysMessage();
+        });
+
+        // Add time slot button
+        row.querySelector('.add-time-slot-btn').addEventListener('click', function() {
+            addTimeSlotToDay(this.closest('.day-schedule-row'));
+        });
+
+        // Remove time slot button
+        row.querySelector('.remove-time-slot-btn').addEventListener('click', function() {
+            removeTimeSlot(this);
+        });
+
+        container.appendChild(row);
+    }
+
+    function addTimeSlotToDay(dayRow, startTime = '09:00', endTime = '18:00') {
+        const timeSlotsContainer = dayRow.querySelector('.time-slots-container');
+        const slotDiv = document.createElement('div');
+        slotDiv.className = 'time-slot-row mb-1';
+        slotDiv.innerHTML = `
+            <div class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <small class="text-muted">De:</small>
+                </div>
+                <div class="col">
+                    <input type="time" class="form-control form-control-sm start-time" value="${startTime}">
+                </div>
+                <div class="col-auto">
+                    <small class="text-muted">A:</small>
+                </div>
+                <div class="col">
+                    <input type="time" class="form-control form-control-sm end-time" value="${endTime}">
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-sm btn-outline-success add-time-slot-btn" title="Agregar horario">
+                        <i class="ti ti-plus"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-time-slot-btn" title="Eliminar horario">
+                        <i class="ti ti-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        slotDiv.querySelector('.add-time-slot-btn').addEventListener('click', function() {
+            addTimeSlotToDay(this.closest('.day-schedule-row'));
+        });
+
+        slotDiv.querySelector('.remove-time-slot-btn').addEventListener('click', function() {
+            removeTimeSlot(this);
+        });
+
+        timeSlotsContainer.appendChild(slotDiv);
+    }
+
+    function removeTimeSlot(btn) {
+        const timeSlotsContainer = btn.closest('.time-slots-container');
+        const timeSlotRow = btn.closest('.time-slot-row');
+        // Only remove if there's more than one time slot
+        if (timeSlotsContainer.querySelectorAll('.time-slot-row').length > 1) {
+            timeSlotRow.remove();
+        }
+    }
+
+    function removeDayScheduleRow(day) {
+        const row = document.querySelector(`#daySchedulesContainer .day-schedule-row[data-day="${day}"]`);
+        if (row) row.remove();
+    }
+
+    function updateNoDaysMessage() {
+        const noDays = document.getElementById('noDaysSelected');
+        const rows = document.querySelectorAll('#daySchedulesContainer .day-schedule-row');
+        if (noDays) noDays.style.display = rows.length === 0 ? 'block' : 'none';
+    }
+
+    // Parse textarea lines to array (filter empty lines)
+    function textareaToArray(id) {
+        const text = document.getElementById(id).value.trim();
+        return text ? text.split('\n').map(l => l.trim()).filter(l => l) : [];
+    }
+
+
+    async function loadExperienceData() {
+        try {
+            const response = await fetch(`/api/experiences/${experienceId}`, {
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();
+
+            if (!result.success || !result.data) {
+                showAlert('Error al cargar datos de la experiencia', 'danger');
+                return;
+            }
+
+            const data = result.data;
+
+            // Basic fields
+            document.getElementById('experienceName').value = data.name || '';
+            document.getElementById('experienceDescription').value = data.description || '';
+            document.getElementById('experienceCost').value = data.cost || '';
+            document.getElementById('experiencePriceNoAlcohol').value = data.price_no_alcohol || '';
+            document.getElementById('experiencePriceChild').value = data.price_child || '';
+            document.getElementById('experienceDuration').value = data.duration || '';
+            document.getElementById('experienceTravelDuration').value = data.travel_duration || '';
+            document.getElementById('experienceAdvanceMinutes').value = data.advance_minutes || '';
+            document.getElementById('experienceMinPeople').value = data.min_people || '';
+            document.getElementById('experienceMaxPeople').value = data.max_people || '';
+
+            // Includes / NotIncludes / Languages (arrays to textarea)
+            if (data.includes && data.includes.length > 0) {
+                document.getElementById('experienceIncludes').value = data.includes.join('\n');
+            }
+            if (data.notincludes && data.notincludes.length > 0) {
+                document.getElementById('experienceNotIncludes').value = data.notincludes.join('\n');
+            }
+            if (data.languages && data.languages.length > 0) {
+                document.getElementById('experienceLanguages').value = data.languages.join('\n');
+            }
+
+            // Notes
+            document.getElementById('experienceInternalNotes').value = data.internal_notes || '';
+            document.getElementById('experienceClientBookingNotes').value = data.client_booking_notes || '';
+            document.getElementById('experienceProviderNotes').value = data.provider_notes || '';
+            document.getElementById('experienceTeamNotes').value = data.team_notes || '';
+
+            // Availability (supports both old single-slot and new multi-slot formats)
+            if (data.availability && Array.isArray(data.availability)) {
+                data.availability.forEach(schedule => {
+                    // Support both formats: { day, times } (new) and { dayOfWeek, startTime, endTime } (old)
+                    const dayCode = schedule.day !== undefined ? schedule.day : schedule.dayOfWeek;
+                    const dayStr = String(dayCode);
+                    const dayBtn = document.querySelector(`#availableDaysContainer .day-btn[data-day="${dayStr}"]`);
+                    if (dayBtn) {
+                        dayBtn.classList.remove('btn-outline-primary');
+                        dayBtn.classList.add('btn-primary');
+                        selectedDays.set(dayStr, true);
+
+                        if (schedule.times && schedule.times.length > 0) {
+                            // New multi-slot format
+                            addDayScheduleRow(dayStr, dayBtn.dataset.dayName, schedule.times[0].start, schedule.times[0].end);
+                            const dayRow = document.querySelector(`#daySchedulesContainer .day-schedule-row[data-day="${dayStr}"]`);
+                            for (let i = 1; i < schedule.times.length; i++) {
+                                addTimeSlotToDay(dayRow, schedule.times[i].start, schedule.times[i].end);
+                            }
+                        } else if (schedule.startTime || schedule.endTime) {
+                            // Old single-slot format
+                            addDayScheduleRow(dayStr, dayBtn.dataset.dayName, schedule.startTime || '09:00', schedule.endTime || '18:00');
+                        } else {
+                            addDayScheduleRow(dayStr, dayBtn.dataset.dayName);
+                        }
+                    }
+                });
+                updateNoDaysMessage();
+            }
+
+            // Load images from ExperienceImage records (optimized with presigned URLs)
+            try {
+                const imagesRes = await fetch(`/api/experiences/${experienceId}/images`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                const imagesResult = await imagesRes.json();
+                if (imagesResult.success && imagesResult.data && imagesResult.data.length > 0) {
+                    const primaryImg = imagesResult.data.find(img => img.isPrimary);
+                    if (primaryImg) {
+                        const primaryUrl = primaryImg.formats?.webp || primaryImg.formats?.jpeg || primaryImg.url;
+                        document.getElementById('mainImageImg').src = primaryUrl;
+                        document.getElementById('mainImagePreview').style.display = 'block';
+                        document.getElementById('mainImageUpload').style.display = 'none';
+                        window._mainImageId = primaryImg.id;
+                    }
+                    imagesResult.data.forEach(img => {
+                        if (!img.isPrimary) {
+                            const displayUrl = img.formats?.webp || img.formats?.jpeg || img.url;
+                            const fmt = img.formats?.avif ? 'avif' : img.formats?.webp ? 'webp' : img.formats?.jpeg ? 'jpeg' : null;
+                            addPhotoPreview(displayUrl, img.id, fmt);
+                        }
+                    });
+                } else if (data.mainImage) {
+                    // Fallback: load from experience.mainImage field (backward compat)
+                    document.getElementById('mainImageImg').src = data.mainImage;
+                    document.getElementById('mainImagePreview').style.display = 'block';
+                    document.getElementById('mainImageUpload').style.display = 'none';
+                }
+            } catch (imgError) {
+                console.error('Error loading images:', imgError);
+                // Fallback to mainImage field
+                if (data.mainImage) {
+                    document.getElementById('mainImageImg').src = data.mainImage;
+                    document.getElementById('mainImagePreview').style.display = 'block';
+                    document.getElementById('mainImageUpload').style.display = 'none';
+                }
+            }
+
+        } catch (error) {
+            console.error('Error loading experience data:', error);
+            showAlert('Error al cargar datos de la experiencia', 'danger');
+        }
+    }
+
+    async function saveExperience() {
+        const name = document.getElementById('experienceName').value.trim();
+        const description = document.getElementById('experienceDescription').value.trim();
+        const cost = parseFloat(document.getElementById('experienceCost').value) || 0;
+
+        if (!name) { showAlert('El nombre es requerido', 'warning'); return; }
+        if (!description) { showAlert('La descripcion es requerida', 'warning'); return; }
+        if (cost < 0) { showAlert('El costo debe ser mayor o igual a 0', 'warning'); return; }
+
+        const saveBtn = document.getElementById('saveExperienceInfoBtn');
+        const saveText = document.getElementById('saveButtonText');
+        saveBtn.disabled = true;
+
+        // Progress helper
+        const totalSteps = 1 + (window._mainImageFile ? 1 : 0) + pendingPhotoFiles.length;
+        let currentStep = 0;
+        function updateProgress(msg) {
+            currentStep++;
+            if (totalSteps > 1) {
+                saveText.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span>${msg} (${currentStep}/${totalSteps})`;
+            } else {
+                saveText.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span>${msg}`;
+            }
+        }
+
+        try {
+            updateProgress('Guardando datos...');
+
+            // Build availability (multi-slot format matching provider)
+            const availability = [];
+            document.querySelectorAll('#daySchedulesContainer .day-schedule-row').forEach(row => {
+                const daySchedule = {
+                    day: parseInt(row.dataset.day),
+                    times: []
+                };
+                row.querySelectorAll('.time-slot-row').forEach(slotRow => {
+                    const start = slotRow.querySelector('.start-time').value;
+                    const end = slotRow.querySelector('.end-time').value;
+                    if (start && end) {
+                        daySchedule.times.push({ start, end });
+                    }
+                });
+                if (daySchedule.times.length > 0) {
+                    availability.push(daySchedule);
+                }
+            });
+
+            const body = {
+                name,
+                description,
+                type: 'Experience',
+                cost,
+                price_no_alcohol: parseFloat(document.getElementById('experiencePriceNoAlcohol').value) || null,
+                price_child: parseFloat(document.getElementById('experiencePriceChild').value) || null,
+                duration: parseFloat(document.getElementById('experienceDuration').value) || null,
+                travel_duration: parseInt(document.getElementById('experienceTravelDuration').value) || null,
+                advance_minutes: parseInt(document.getElementById('experienceAdvanceMinutes').value) || null,
+                min_people: parseInt(document.getElementById('experienceMinPeople').value) || null,
+                max_people: parseInt(document.getElementById('experienceMaxPeople').value) || null,
+                includes: textareaToArray('experienceIncludes'),
+                notincludes: textareaToArray('experienceNotIncludes'),
+                languages: textareaToArray('experienceLanguages'),
+                internal_notes: document.getElementById('experienceInternalNotes').value.trim() || null,
+                client_booking_notes: document.getElementById('experienceClientBookingNotes').value.trim() || null,
+                provider_notes: document.getElementById('experienceProviderNotes').value.trim() || null,
+                team_notes: document.getElementById('experienceTeamNotes').value.trim() || null,
+                availability: availability.length > 0 ? availability : null,
+            };
+
+            if (window._mainImageRemoved) {
+                body.mainImage = '';
+            }
+
+            const url = isNew ? '/api/experiences' : `/api/experiences/${experienceId}`;
+            const method = isNew ? 'POST' : 'PUT';
+
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                showAlert(result.error || 'Error al guardar', 'danger');
+                return;
+            }
+
+            // Delete old main image if removed (without replacement)
+            if (window._mainImageRemoved && !window._mainImageFile && window._mainImageId) {
+                try {
+                    const expIdForDelete = result.data?.id || experienceId;
+                    await fetch(`/api/experiences/${expIdForDelete}/images/${window._mainImageId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    window._mainImageId = null;
+                } catch (delErr) {
+                    console.warn('Could not delete old main image:', delErr);
+                }
+            }
+
+            // Upload main image if new file
+            if (window._mainImageFile && result.data && result.data.id) {
+                updateProgress('Subiendo imagen principal...');
+                await uploadMainImage(result.data.id, window._mainImageFile);
+            }
+
+            // Upload pending photos
+            if (pendingPhotoFiles.length > 0 && result.data && result.data.id) {
+                const photoCount = pendingPhotoFiles.length;
+                for (let i = 0; i < photoCount; i++) {
+                    updateProgress(`Optimizando foto ${i + 1} de ${photoCount}...`);
+                    await uploadPhoto(result.data.id, pendingPhotoFiles[i]);
+                }
+                pendingPhotoFiles.length = 0;
+            }
+
+            saveText.innerHTML = `<i class="ti ti-check me-1"></i>Guardado`;
+            showAlert(isNew ? 'Experiencia creada exitosamente' : 'Cambios guardados exitosamente', 'success');
+
+            if (isNew && result.data && result.data.id) {
+                setTimeout(() => {
+                    window.location.href = `/dashboard/admin/experiences/${result.data.id}`;
+                }, 800);
+            }
+        } catch (error) {
+            console.error('Error saving experience:', error);
+            showAlert('Error al guardar la experiencia', 'danger');
+        } finally {
+            saveBtn.disabled = false;
+            setTimeout(() => {
+                saveText.innerHTML = isNew ? 'Crear Experiencia' : 'Guardar Cambios';
+            }, 2000);
+        }
+    }
+
+    async function uploadMainImage(expId, file) {
+        try {
+            // Delete old primary image if it exists
+            if (window._mainImageId) {
+                try {
+                    await fetch(`/api/experiences/${expId}/images/${window._mainImageId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                } catch (delErr) {
+                    console.warn('Could not delete old main image:', delErr);
+                }
+            }
+
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('isPrimary', 'true');
+
+            const response = await fetch(`/api/experiences/${expId}/images`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${accessToken}` },
+                body: formData
+            });
+
+            const result = await response.json();
+            if (result.success && result.data) {
+                window._mainImageId = result.data.id;
+            } else {
+                console.error('Main image upload failed:', result.error);
+            }
+        } catch (error) {
+            console.error('Error uploading main image:', error);
+        }
+    }
+
+    async function uploadPhoto(expId, file) {
+        try {
+            const formData = new FormData();
+            formData.append('image', file);
+
+            const response = await fetch(`/api/experiences/${expId}/images`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${accessToken}` },
+                body: formData
+            });
+            const result = await response.json();
+            if (!result.success) {
+                console.error('Photo upload failed:', result.error);
+            }
+        } catch (error) {
+            console.error('Error uploading photo:', error);
+        }
+    }
+
+    function showAlert(message, type) {
+        const container = document.getElementById('experienceInfoAlerts');
+        container.innerHTML = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                <i class="ti ti-${type === 'success' ? 'check' : type === 'danger' ? 'alert-circle' : 'info-circle'} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        if (type === 'success') {
+            setTimeout(() => { container.innerHTML = ''; }, 3000);
+        }
+    }
+});
+</script>

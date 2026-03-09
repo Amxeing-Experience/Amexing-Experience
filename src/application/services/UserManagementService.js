@@ -2112,18 +2112,74 @@ class UserManagementService {
    */
   async filterByRoleNames(query, roleNames) {
     try {
-      // Query Role table to get roles by names
-      const roleQuery = new Parse.Query('Role');
-      roleQuery.containedIn('name', roleNames);
-      roleQuery.equalTo('exists', true);
-      const roles = await roleQuery.find({ useMasterKey: true });
+      // Check if null is included in roleNames (users with no role assigned)
+      const includeNullRoles = roleNames.includes(null);
+      // Filter out null from roleNames for the Role query
+      const nonNullRoleNames = roleNames.filter((name) => name !== null);
 
-      if (roles && roles.length > 0) {
-        // Filter users by roleId Pointers
-        query.containedIn('roleId', roles);
-      } else {
-        // If no roles found, return no results
-        logger.warn('No roles found for filtering', { roleNames });
+      logger.info('Filtering by role names', {
+        roleNames,
+        includeNullRoles,
+        nonNullRoleNames,
+      });
+
+      let hasValidFilters = false;
+      const queries = [];
+
+      // Handle users with assigned roles
+      if (nonNullRoleNames.length > 0) {
+        // Query Role table to get roles by names
+        const roleQuery = new Parse.Query('Role');
+        roleQuery.containedIn('name', nonNullRoleNames);
+        roleQuery.equalTo('exists', true);
+        const roles = await roleQuery.find({ useMasterKey: true });
+
+        if (roles && roles.length > 0) {
+          // Create a query for users with these roles
+          const roleIdQuery = new Parse.Query('AmexingUser');
+          roleIdQuery.containedIn('roleId', roles);
+          queries.push(roleIdQuery);
+          hasValidFilters = true;
+
+          logger.info('Found roles for filtering', {
+            roleCount: roles.length,
+            roleNames: roles.map((r) => r.get('name')),
+          });
+        }
+      }
+
+      // Handle users with null roles (no role assigned)
+      if (includeNullRoles) {
+        const nullRoleQuery = new Parse.Query('AmexingUser');
+        nullRoleQuery.doesNotExist('roleId');
+        queries.push(nullRoleQuery);
+        hasValidFilters = true;
+
+        logger.info('Including users with null roles');
+      }
+
+      // Combine queries with OR logic
+      if (queries.length > 1) {
+        // eslint-disable-next-line no-underscore-dangle -- Parse SDK internal method for OR queries
+        query._orQuery(queries);
+      } else if (queries.length === 1) {
+        // Apply the single query filter to the main query
+        if (includeNullRoles && nonNullRoleNames.length === 0) {
+          // Only null roles requested
+          query.doesNotExist('roleId');
+        } else {
+          // Only non-null roles requested, already handled above
+          const roleQuery = new Parse.Query('Role');
+          roleQuery.containedIn('name', nonNullRoleNames);
+          roleQuery.equalTo('exists', true);
+          const roles = await roleQuery.find({ useMasterKey: true });
+          if (roles && roles.length > 0) {
+            query.containedIn('roleId', roles);
+          }
+        }
+      } else if (!hasValidFilters) {
+        // If no valid filters, return no results
+        logger.warn('No valid role filters found', { roleNames });
         query.equalTo('objectId', 'non-existent-id');
       }
     } catch (error) {

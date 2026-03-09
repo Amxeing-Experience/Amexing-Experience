@@ -166,6 +166,24 @@ class AmexingUser extends BaseModel {
       user.set('notes', userData.notes);
     }
 
+    // Multiple roles support
+    if (userData.futureRoles) {
+      user.set('futureRoles', userData.futureRoles);
+    }
+
+    if (userData.displayRole) {
+      user.set('displayRole', userData.displayRole);
+    }
+
+    // Profile photo fields
+    if (userData.profilePhotoUrl) {
+      user.set('profilePhotoUrl', userData.profilePhotoUrl);
+    }
+
+    if (userData.profilePhotoS3Key) {
+      user.set('profilePhotoS3Key', userData.profilePhotoS3Key);
+    }
+
     // Audit fields - Handle both User objects and string IDs
     // In test environment, use strings; in production, use Pointers
     const isTestEnvironment = process.env.NODE_ENV === 'test';

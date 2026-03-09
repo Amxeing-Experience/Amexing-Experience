@@ -273,7 +273,34 @@ function validateDaySchedule(schedule) {
     errors.push(`Invalid day code: ${schedule.day}. Must be 0-6.`);
   }
 
-  // Validate startTime
+  // Support multi-slot format: { day, times: [{start, end}] }
+  if (schedule.times && Array.isArray(schedule.times)) {
+    if (schedule.times.length === 0) {
+      errors.push(`At least one time slot is required for day ${schedule.day}`);
+    }
+    schedule.times.forEach((slot, idx) => {
+      if (!slot.start) {
+        errors.push(`start time is required for day ${schedule.day} slot ${idx + 1}`);
+      } else if (!validateTimeFormat(slot.start)) {
+        errors.push(`Invalid start time format for day ${schedule.day} slot ${idx + 1}: ${slot.start}. Must be HH:MM`);
+      }
+      if (!slot.end) {
+        errors.push(`end time is required for day ${schedule.day} slot ${idx + 1}`);
+      } else if (!validateTimeFormat(slot.end)) {
+        errors.push(`Invalid end time format for day ${schedule.day} slot ${idx + 1}: ${slot.end}. Must be HH:MM`);
+      }
+      if (
+        slot.start && slot.end
+        && validateTimeFormat(slot.start) && validateTimeFormat(slot.end)
+        && slot.start >= slot.end
+      ) {
+        errors.push(`end time must be after start time for day ${schedule.day} slot ${idx + 1}`);
+      }
+    });
+    return { valid: errors.length === 0, errors };
+  }
+
+  // Legacy flat format: { day, startTime, endTime }
   if (!schedule.startTime) {
     errors.push(`startTime is required for day ${schedule.day}`);
   } else if (!validateTimeFormat(schedule.startTime)) {
@@ -282,14 +309,12 @@ function validateDaySchedule(schedule) {
     );
   }
 
-  // Validate endTime
   if (!schedule.endTime) {
     errors.push(`endTime is required for day ${schedule.day}`);
   } else if (!validateTimeFormat(schedule.endTime)) {
     errors.push(`Invalid endTime format for day ${schedule.day}: ${schedule.endTime}. Must be HH:MM (00:00 to 23:59)`);
   }
 
-  // Validate time range
   if (
     schedule.startTime
     && schedule.endTime

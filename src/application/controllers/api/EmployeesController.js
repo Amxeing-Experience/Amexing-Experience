@@ -17,7 +17,10 @@
  * await controller.getEmployees(req, res);
  */
 
+const Parse = require('parse/node');
 const UserManagementService = require('../../services/UserManagementService');
+const FileStorageService = require('../../services/FileStorageService');
+const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
 const logger = require('../../../infrastructure/logger');
 
 /**
@@ -28,10 +31,19 @@ const logger = require('../../../infrastructure/logger');
 class EmployeesController {
   constructor() {
     this.userService = new UserManagementService();
+    this.fileStorageService = new FileStorageService();
+    this.serverOptimizationService = new ServerImageOptimizationService({
+      formats: ['webp', 'jpeg'],
+      sizes: ['thumb', 'mobile', 'desktop', 'original'],
+      quality: {
+        webp: 80,
+        jpeg: 85,
+      },
+    });
     this.maxPageSize = 100;
     this.defaultPageSize = 25;
     this.employeeRole = 'employee_amexing';
-    this.allowedEmployeeRoles = ['employee_amexing', 'driver', 'guia', 'greeter', 'limpieza'];
+    this.allowedEmployeeRoles = ['employee_amexing', 'driver', 'guia', 'greeter', 'limpieza', 'admin'];
   }
 
   /**
@@ -60,14 +72,26 @@ class EmployeesController {
       // Parse and validate query parameters
       const options = this.parseQueryParams(req.query);
 
-      // Add role filter to get both employee_amexing and driver users
+      // Check if admin wants to include unassigned users (users with null roles)
+      const { includeUnassigned } = req.query;
+
+      // Add role filter to get employee users
       // Note: guia, greeter, limpieza now use 'driver' role with displayRole field
       options.filters = options.filters || {};
-      options.filters.roleNames = ['employee_amexing', 'driver'];
 
-      // Get employee users from service (filters by organization 'amexing' and roles 'employee_amexing' or 'driver')
-      // Permission validation is done in middleware
-      const result = await this.userService.getUsers(currentUser, options);
+      let result;
+      if (includeUnassigned === 'true') {
+        // Show only admin users
+        options.filters.roleNames = ['admin'];
+        logger.info('Showing admin users in employee listing', {
+          requestedBy: currentUser.id,
+        });
+        result = await this.userService.getAmexingUsers(currentUser, options, req.userRole);
+      } else {
+        // Default behavior - only show designated employee roles
+        options.filters.roleNames = ['employee_amexing', 'driver'];
+        result = await this.userService.getUsers(currentUser, options);
+      }
 
       // Add metadata for frontend consumption
       const response = {
@@ -164,7 +188,18 @@ class EmployeesController {
   async createEmployee(req, res) {
     try {
       const currentUser = req.user;
+      // Handle form data when multipart
       const employeeData = req.body;
+
+      // Parse roles if sent as JSON string (from FormData)
+      if (typeof employeeData.roles === 'string') {
+        try {
+          employeeData.roles = JSON.parse(employeeData.roles);
+        } catch (e) {
+          // If parsing fails, try splitting by comma
+          employeeData.roles = employeeData.roles.split(',').map((r) => r.trim());
+        }
+      }
 
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
@@ -236,7 +271,7 @@ class EmployeesController {
       }
 
       // Find and assign the actual roleId
-      const Parse = require('parse/node');
+
       const roleQuery = new Parse.Query('Role');
       roleQuery.equalTo('name', actualRole); // Use actual role for RBAC
       roleQuery.equalTo('active', true);
@@ -277,12 +312,76 @@ class EmployeesController {
       // Create employee user via UserManagementService
       const result = await this.userService.createUser(employeeData, userWithRole);
 
+      // Handle profile photo upload if provided
+      if (req.file) {
+        try {
+          const fileExtension = req.file.originalname.split('.').pop().toLowerCase();
+          const timestamp = Date.now();
+          const uniqueFileName = `employee_${result.id}_${timestamp}.${fileExtension}`;
+
+          // Upload and optimize the profile photo
+          const optimizationResult = await this.serverOptimizationService.uploadOptimizedImage(
+            req.file.buffer,
+            uniqueFileName,
+            req.file.mimetype,
+            {
+              entityPath: `employees/${result.id}`,
+              entityId: result.id,
+              userContext: {
+                userId: result.id,
+                email: result.email,
+                username: result.username,
+              },
+            }
+          );
+
+          if (optimizationResult && optimizationResult.originalS3Key) {
+            // Log the S3 key for debugging
+            logger.info('Employee photo S3 key stored (create)', {
+              employeeId: result.id,
+              s3Key: optimizationResult.originalS3Key,
+            });
+
+            // Use public route URL instead of presigned URL
+            const photoUrl = `/api/employees/photo/${result.id}`;
+
+            // Update the employee with the profile photo URL
+            const userQuery = new Parse.Query('AmexingUser');
+            const user = await userQuery.get(result.id, { useMasterKey: true });
+
+            user.set('profilePhotoUrl', photoUrl);
+            user.set('profilePhotoS3Key', optimizationResult.originalS3Key);
+            user.set('profilePhotoOptimization', {
+              optimizedVariants: optimizationResult.optimizedVariants,
+              metadata: optimizationResult.metadata,
+            });
+
+            await user.save(null, { useMasterKey: true });
+
+            // Update result object with photo URL
+            result.profilePhotoUrl = photoUrl;
+
+            logger.info('Employee profile photo uploaded', {
+              employeeId: result.id,
+              s3Key: optimizationResult.originalS3Key,
+            });
+          }
+        } catch (photoError) {
+          // Log error but don't fail the entire operation
+          logger.error('Failed to upload employee profile photo', {
+            error: photoError.message,
+            employeeId: result.id,
+          });
+        }
+      }
+
       logger.info('Employee created successfully', {
         employeeId: result.id,
         email: employeeData.email,
         department: employeeData.department,
         createdBy: currentUser.id,
         createdByRole: currentUserRole,
+        hasProfilePhoto: !!req.file,
       });
 
       // Return success (password NOT included in response)
@@ -305,8 +404,11 @@ class EmployeesController {
       });
 
       // Handle specific errors
-      if (error.message.includes('already exists')) {
-        return this.sendError(res, 'Ya existe un usuario con ese email', 409);
+      if (error.message.includes('already exists')
+          || error.message.includes('already registered')
+          || error.message.includes('Email address is already registered')
+          || error.code === Parse.Error.DUPLICATE_VALUE) {
+        return this.sendError(res, 'Este email ya está registrado. Por favor usa un email diferente.', 409);
       }
 
       this.sendError(res, error.message, 500);
@@ -329,6 +431,16 @@ class EmployeesController {
       const employeeId = req.params.id;
       const updateData = req.body;
 
+      // Parse roles if sent as JSON string (from FormData)
+      if (typeof updateData.roles === 'string') {
+        try {
+          updateData.roles = JSON.parse(updateData.roles);
+        } catch (e) {
+          // If parsing fails, try splitting by comma
+          updateData.roles = updateData.roles.split(',').map((r) => r.trim());
+        }
+      }
+
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
       }
@@ -348,6 +460,11 @@ class EmployeesController {
         currentUser.role = currentUserRole;
       }
 
+      // Check if the user being edited is an admin
+      const existingUser = await this.fetchEmployee(employeeId);
+      const existingRoleInfo = existingUser ? this.extractRoleInfo(existingUser, employeeId) : {};
+      const isAdminUser = existingRoleInfo.roleName === 'admin';
+
       // Validate roles - employees must have valid role(s)
       const allowedEmployeeRoles = ['employee_amexing', 'driver', 'guia', 'greeter', 'limpieza'];
 
@@ -361,7 +478,7 @@ class EmployeesController {
             400
           );
         }
-      } else if (updateData.role && !allowedEmployeeRoles.includes(updateData.role)) {
+      } else if (updateData.role && !allowedEmployeeRoles.includes(updateData.role) && !isAdminUser) {
         return this.sendError(
           res,
           `Cannot change employee role. Must be one of: ${allowedEmployeeRoles.join(', ')}`,
@@ -383,44 +500,136 @@ class EmployeesController {
           return this.sendError(res, 'At least one role must be specified', 400);
         }
 
-        // Determine actual role for RBAC system based on role priority
-        let actualRole;
+        // Store selected roles as futureRoles
+        updateData.futureRoles = selectedRoles;
+        updateData.displayRole = selectedRoles[0];
 
-        if (selectedRoles.includes('employee_amexing')) {
-          // Administrator role takes precedence
-          actualRole = 'employee_amexing';
+        if (isAdminUser) {
+          // Admin users keep their admin roleId, only update futureRoles
+          delete updateData.role;
+          delete updateData.roleId;
         } else {
-          // All other employee types map to driver for permissions
-          actualRole = 'driver';
+          // Determine actual role for RBAC system based on role priority
+          let actualRole;
+
+          if (selectedRoles.includes('employee_amexing')) {
+            // Administrator role takes precedence
+            actualRole = 'employee_amexing';
+          } else {
+            // All other employee types map to driver for permissions
+            actualRole = 'driver';
+          }
+
+          // Find and assign the actual roleId
+          const roleQuery = new Parse.Query('Role');
+          roleQuery.equalTo('name', actualRole);
+          roleQuery.equalTo('active', true);
+          roleQuery.equalTo('exists', true);
+          const roleObject = await roleQuery.first({ useMasterKey: true });
+
+          if (!roleObject) {
+            return this.sendError(
+              res,
+              `Role '${actualRole}' not found in database. Please ensure roles are properly configured.`,
+              500
+            );
+          }
+
+          // Set actual role and roleId for RBAC system
+          updateData.role = actualRole;
+          updateData.roleId = roleObject.id;
         }
-
-        // Find and assign the actual roleId
-        const Parse = require('parse/node');
-        const roleQuery = new Parse.Query('Role');
-        roleQuery.equalTo('name', actualRole); // Use actual role for RBAC
-        roleQuery.equalTo('active', true);
-        roleQuery.equalTo('exists', true);
-        const roleObject = await roleQuery.first({ useMasterKey: true });
-
-        if (!roleObject) {
-          return this.sendError(
-            res,
-            `Role '${actualRole}' not found in database. Please ensure roles are properly configured.`,
-            500
-          );
-        }
-
-        // Set multiple roles and backward compatibility fields
-        updateData.futureRoles = selectedRoles; // Store all selected roles
-        updateData.displayRole = selectedRoles[0]; // First role for backward compatibility
-
-        // Set actual role and roleId for RBAC system
-        updateData.role = actualRole;
-        updateData.roleId = roleObject.id;
       }
 
       // Update user using service
       const result = await this.userService.updateUser(employeeId, updateData, currentUser);
+
+      // Handle profile photo upload if provided
+      if (req.file) {
+        try {
+          const fileExtension = req.file.originalname.split('.').pop().toLowerCase();
+          const timestamp = Date.now();
+          const uniqueFileName = `employee_${employeeId}_${timestamp}.${fileExtension}`;
+
+          // Upload and optimize the profile photo
+          const optimizationResult = await this.serverOptimizationService.uploadOptimizedImage(
+            req.file.buffer,
+            uniqueFileName,
+            req.file.mimetype,
+            {
+              entityPath: `employees/${employeeId}`,
+              entityId: employeeId,
+              userContext: {
+                userId: employeeId,
+                email: result.email,
+                username: result.username,
+              },
+            }
+          );
+
+          if (optimizationResult && optimizationResult.originalS3Key) {
+            // Log the S3 key for debugging
+            logger.info('Employee photo S3 key stored (update)', {
+              employeeId,
+              s3Key: optimizationResult.originalS3Key,
+            });
+
+            // Use public route URL instead of presigned URL
+            const photoUrl = `/api/employees/photo/${employeeId}`;
+
+            // Update the employee with the profile photo URL
+            const userQuery = new Parse.Query('AmexingUser');
+            const user = await userQuery.get(employeeId, { useMasterKey: true });
+
+            user.set('profilePhotoUrl', photoUrl);
+            user.set('profilePhotoS3Key', optimizationResult.originalS3Key);
+            user.set('profilePhotoOptimization', {
+              optimizedVariants: optimizationResult.optimizedVariants,
+              metadata: optimizationResult.metadata,
+            });
+
+            await user.save(null, { useMasterKey: true });
+
+            // Update result object with photo URL
+            result.profilePhotoUrl = photoUrl;
+
+            logger.info('Employee profile photo updated', {
+              employeeId,
+              s3Key: optimizationResult.originalS3Key,
+            });
+          }
+        } catch (photoError) {
+          // Log error but don't fail the entire operation
+          logger.error('Failed to update employee profile photo', {
+            error: photoError.message,
+            employeeId,
+          });
+        }
+      }
+
+      // Handle photo removal if requested
+      if (updateData.removePhoto === 'true') {
+        try {
+          const userQuery = new Parse.Query('AmexingUser');
+          const user = await userQuery.get(employeeId, { useMasterKey: true });
+
+          // Clear photo fields
+          user.unset('profilePhotoUrl');
+          user.unset('profilePhotoS3Key');
+          user.unset('profilePhotoOptimization');
+
+          await user.save(null, { useMasterKey: true });
+
+          logger.info('Employee profile photo removed', {
+            employeeId,
+          });
+        } catch (removeError) {
+          logger.error('Failed to remove employee profile photo', {
+            error: removeError.message,
+            employeeId,
+          });
+        }
+      }
 
       this.sendSuccess(res, result, 'Employee updated successfully');
     } catch (error) {
@@ -429,6 +638,14 @@ class EmployeesController {
         employeeId: req.params.id,
         currentUser: req.user?.id,
       });
+
+      // Handle specific errors
+      if (error.message.includes('already exists')
+          || error.message.includes('already registered')
+          || error.message.includes('Email address is already registered')
+          || error.code === Parse.Error.DUPLICATE_VALUE) {
+        return this.sendError(res, 'Este email ya está registrado. Por favor usa un email diferente.', 409);
+      }
 
       this.sendError(res, error.message, 500);
     }
@@ -582,7 +799,6 @@ class EmployeesController {
    * const user = await this.fetchEmployee('abc123');
    */
   async fetchEmployee(employeeId) {
-    const Parse = require('parse/node');
     const query = new Parse.Query('AmexingUser');
     query.equalTo('exists', true);
     query.include('roleId');
@@ -641,11 +857,13 @@ class EmployeesController {
       organizationId: user.get('organizationId'),
       role: roleInfo.roleName,
       roleId: roleInfo.roleId,
+      // Multiple roles support
+      futureRoles: user.get('futureRoles') || [],
+      displayRole: user.get('displayRole') || roleInfo.roleName,
+      // Profile photo
+      profilePhotoUrl: user.get('profilePhotoUrl') || null,
       departmentId: user.get('departmentId')?.id || null,
       contextualData: user.get('contextualData'),
-      // Display role fields for UI
-      displayRole: user.get('displayRole') || roleInfo.roleName,
-      futureRoles: user.get('futureRoles') || [],
       jobTitle: user.get('jobTitle') || '',
     };
   }

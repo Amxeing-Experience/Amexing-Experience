@@ -53,6 +53,7 @@ class ServicesController {
     this.getAllRatePricesForServiceWithClientPrices = this.getAllRatePricesForServiceWithClientPrices.bind(this);
     this.debugRatePrices = this.debugRatePrices.bind(this);
     this.debugClientPrices = this.debugClientPrices.bind(this);
+    this.getPricesByRoute = this.getPricesByRoute.bind(this);
   }
 
   /**
@@ -313,14 +314,14 @@ class ServicesController {
       const { clientId, rateId } = req.query;
 
       // Debug logging for client pricing investigation
-      console.log('🔍 ServicesController.getServices - Request Info:', {
-        userId: currentUser.id,
-        userRole: currentUser.get ? currentUser.get('role') : 'unknown',
-        userClientId: currentUser.get ? currentUser.get('clientId') : 'N/A',
-        requestClientId: clientId,
-        requestRateId: rateId,
-        fullQuery: req.query,
-      });
+      // console.log('🔍 ServicesController.getServices - Request Info:', {
+      //   userId: currentUser.id,
+      //   userRole: currentUser.get ? currentUser.get('role') : 'unknown',
+      //   userClientId: currentUser.get ? currentUser.get('clientId') : 'N/A',
+      //   requestClientId: clientId,
+      //   requestRateId: rateId,
+      //   fullQuery: req.query,
+      // });
 
       logger.info('ServicesController.getServices called', {
         userId: currentUser.id,
@@ -736,21 +737,21 @@ class ServicesController {
                     `${serviceId}_${rateId}_${pricingData?.vehicleType?.id}`,
                   ];
 
-                  console.log(`🔍 Checking for client price overrides for service ${serviceId}:`, {
-                    serviceId,
-                    clientId,
-                    rateId,
-                    vehicleId: pricingData?.vehicleType?.id,
-                    possibleKeys,
-                    availableKeys: Object.keys(clientPricesMap).filter((k) => k.includes(serviceId)),
-                    originalPrice: pricingData?.finalPrice,
-                  });
+                  // console.log(`🔍 Checking for client price overrides for service ${serviceId}:`, {
+                  //   serviceId,
+                  //   clientId,
+                  //   rateId,
+                  //   vehicleId: pricingData?.vehicleType?.id,
+                  //   possibleKeys,
+                  //   availableKeys: Object.keys(clientPricesMap).filter((k) => k.includes(serviceId)),
+                  //   originalPrice: pricingData?.finalPrice,
+                  // });
 
                   for (const key of possibleKeys) {
                     if (clientPricesMap[key]) {
-                      console.log(
-                        `✅ Found client price override for service ${serviceId}: ${clientPricesMap[key]} MXN (key: ${key})`
-                      );
+                      // console.log(
+                      //   `✅ Found client price override for service ${serviceId}: ${clientPricesMap[key]} MXN (key: ${key})`
+                      // );
                       // Override the price from the helper with the client-specific price
                       if (pricingData) {
                         pricingData.finalPrice = clientPricesMap[key];
@@ -761,9 +762,9 @@ class ServicesController {
                   }
 
                   if (!pricingData?.isClientPrice) {
-                    console.log(
-                      `⚠️ No client price override found for service ${serviceId}, using base price: ${pricingData?.finalPrice} MXN`
-                    );
+                    // console.log(
+                    //   `⚠️ No client price override found for service ${serviceId}, using base price: ${pricingData?.finalPrice} MXN`
+                    // );
                   }
                 }
               }
@@ -783,11 +784,13 @@ class ServicesController {
                   // Add ALL vehicle types to priceData
                   const priceDataForMultiple = pricingData.allVehicleOptions.map((option) => ({
                     vehicleType: {
+                      id: option.vehicleType?.id,
                       name: option.vehicleType?.get('name'),
                       code: option.vehicleType?.get('code'),
                       defaultCapacity: option.vehicleType?.get('defaultCapacity'),
                       trunkCapacity: option.vehicleType?.get('trunkCapacity'),
                     },
+                    serviceId: service.id,
                     price: option.finalPrice,
                     formattedPrice: `$${option.finalPrice.toLocaleString()} MXN`,
                     isClientPrice: option.isClientPrice || false,
@@ -798,11 +801,13 @@ class ServicesController {
                   const priceDataForSingle = [
                     {
                       vehicleType: {
+                        id: vehicleTypeToUse?.id,
                         name: vehicleTypeToUse?.get('name'),
                         code: vehicleTypeToUse?.get('code'),
                         defaultCapacity: vehicleTypeToUse?.get('defaultCapacity'),
                         trunkCapacity: vehicleTypeToUse?.get('trunkCapacity'),
                       },
+                      serviceId: service.id,
                       price: finalPrice, // This will now use the correct updated price
                       formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
                       isClientPrice: pricingData.isClientPrice || false,
@@ -842,11 +847,13 @@ class ServicesController {
                     const priceDataForFallback = [
                       {
                         vehicleType: {
+                          id: vehicleType?.id,
                           name: vehicleType?.get('name'),
                           code: vehicleType?.get('code'),
                           defaultCapacity: vehicleType?.get('defaultCapacity'),
                           trunkCapacity: vehicleType?.get('trunkCapacity'),
                         },
+                        serviceId: service.id,
                         price,
                         formattedPrice: `$${price.toLocaleString()} MXN`,
                       },
@@ -1181,7 +1188,9 @@ class ServicesController {
       query.equalTo('exists', true);
       query.equalTo('active', true);
       query.include('originPOI');
+      query.include('originPOI.serviceType');
       query.include('destinationPOI');
+      query.include('destinationPOI.serviceType');
       query.include('vehicleType');
       query.include('rate');
       query.ascending('destinationPOI'); // Sort by destination for better UX
@@ -1190,14 +1199,44 @@ class ServicesController {
 
       // Format for dropdown usage
       const formattedServices = services.map((service) => {
-        const origin = service.get('originPOI')?.get('name') || 'Sin origen';
-        const destination = service.get('destinationPOI')?.get('name') || '-';
+        const originPOI = service.get('originPOI');
+        const destinationPOI = service.get('destinationPOI');
+
+        const origin = originPOI?.get('name') || 'Sin origen';
+        const destination = destinationPOI?.get('name') || '-';
         const vehicleType = service.get('vehicleType')?.get('name') || '-';
         const rate = service.get('rate')?.get('name') || '-';
+
+        // Get serviceType from POIs
+        const originServiceType = originPOI?.get('serviceType')?.get('name') || '';
+        const destinationServiceType = destinationPOI?.get('serviceType')?.get('name') || '';
+
+        // Debug log for San Miguel services
+        if (origin.includes('San Miguel')) {
+          logger.info('DEBUG - San Miguel de Allende service found:', {
+            serviceId: service.id,
+            origin,
+            destination,
+            originServiceType,
+            destinationServiceType,
+            originPOI_id: originPOI?.id,
+            destinationPOI_id: destinationPOI?.id,
+          });
+        }
+
+        // Get transport type from service properties (fallback)
+        const transportType = service.get('transportType') || service.get('category') || 'aeropuerto';
 
         return {
           value: service.id,
           label: `${origin} → ${destination} (${vehicleType}, ${rate})`,
+          origin,
+          destination,
+          transportType,
+          originServiceType,
+          destinationServiceType,
+          vehicleType,
+          rate,
         };
       });
 
@@ -3062,8 +3101,8 @@ class ServicesController {
    */
   async updateBasePrices(req, res) {
     try {
-      console.log('🔧 updateBasePrices called - serviceId:', req.params.id);
-      console.log('🔧 updateBasePrices called - body:', JSON.stringify(req.body, null, 2));
+      // console.log('🔧 updateBasePrices called - serviceId:', req.params.id);
+      // console.log('🔧 updateBasePrices called - body:', JSON.stringify(req.body, null, 2));
 
       const currentUser = req.user;
       const serviceId = req.params.id; // Get serviceId from the :id parameter
@@ -3872,6 +3911,218 @@ class ServicesController {
    * @returns {Promise<void>}
    * @example
    * // Usage example documented above
+   */
+  /**
+   * GET /api/services/prices-by-route - Get vehicle prices for a route (origin + destination + rate).
+   * Finds services matching the origin/destination POI pair, then returns all vehicle
+   * options with prices (base and client-specific overrides).
+   * @param {object} req - Express request with query: originPOI, destinationPOI, rateId, clientId (optional).
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async getPricesByRoute(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const {
+        originPOI: originPOIName, destinationPOI: destinationPOIName, rateId, clientId,
+      } = req.query;
+
+      if (!destinationPOIName || !rateId) {
+        return this.sendError(res, 'destinationPOI y rateId son requeridos', 400);
+      }
+
+      // Resolve POI names to Parse objects (handle duplicates — find ALL matching POIs)
+      const destPOIQuery = new Parse.Query('POI');
+      destPOIQuery.matches('name', `^${destinationPOIName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      destPOIQuery.equalTo('exists', true);
+      const destinationPOIs = await destPOIQuery.find({ useMasterKey: true });
+
+      let originPOIs = [];
+      if (originPOIName) {
+        const originPOIQuery = new Parse.Query('POI');
+        originPOIQuery.matches('name', `^${originPOIName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        originPOIQuery.equalTo('exists', true);
+        originPOIs = await originPOIQuery.find({ useMasterKey: true });
+      }
+
+      logger.info('getPricesByRoute - POI resolution', {
+        originPOIName,
+        originPOIIds: originPOIs.map((p) => p.id),
+        destinationPOIName,
+        destinationPOIIds: destinationPOIs.map((p) => p.id),
+      });
+
+      if (destinationPOIs.length === 0) {
+        return res.json({ success: true, data: { serviceId: null, vehicles: [] } });
+      }
+
+      // Find active services matching origin + destination (any matching POI)
+      const servicesQuery = new Parse.Query('Services');
+      if (originPOIs.length > 0) {
+        servicesQuery.containedIn('originPOI', originPOIs);
+      } else {
+        servicesQuery.doesNotExist('originPOI');
+      }
+      servicesQuery.containedIn('destinationPOI', destinationPOIs);
+      servicesQuery.equalTo('active', true);
+      servicesQuery.equalTo('exists', true);
+      servicesQuery.limit(100);
+
+      const services = await servicesQuery.find({ useMasterKey: true });
+
+      // Also try services without originPOI if we had an origin but found none
+      let allServices = [...services];
+      if (originPOIs.length > 0 && services.length === 0) {
+        const noOriginQuery = new Parse.Query('Services');
+        noOriginQuery.doesNotExist('originPOI');
+        noOriginQuery.containedIn('destinationPOI', destinationPOIs);
+        noOriginQuery.equalTo('active', true);
+        noOriginQuery.equalTo('exists', true);
+        noOriginQuery.limit(100);
+        const noOriginServices = await noOriginQuery.find({ useMasterKey: true });
+        allServices = [...services, ...noOriginServices];
+      }
+
+      if (allServices.length === 0) {
+        return res.json({ success: true, data: { serviceId: null, vehicles: [] } });
+      }
+
+      const serviceIds = allServices.map((s) => s.id);
+
+      const Rate = Parse.Object.extend('Rate');
+      const ratePointer = new Rate();
+      ratePointer.id = rateId;
+
+      // Query RatePrices by destinationPOI (all matching POI IDs) + rate
+      // Also query by service pointer as fallback
+      const rpByDestQuery = new Parse.Query('RatePrices');
+      rpByDestQuery.containedIn('destinationPOI', destinationPOIs);
+
+      const rpByServiceQuery = new Parse.Query('RatePrices');
+      rpByServiceQuery.containedIn('service', allServices);
+
+      // Combine: find RatePrices matching either destination POI or service
+      const combinedQuery = Parse.Query.or(rpByDestQuery, rpByServiceQuery);
+      combinedQuery.equalTo('rate', ratePointer);
+      combinedQuery.equalTo('exists', true);
+      combinedQuery.equalTo('active', true);
+      combinedQuery.doesNotExist('valid_until');
+      combinedQuery.include(['vehicleType', 'service']);
+      combinedQuery.limit(1000);
+
+      const ratePrices = await combinedQuery.find({ useMasterKey: true });
+
+      logger.info('getPricesByRoute - combined query result', {
+        destinationPOIIds: destinationPOIs.map((p) => p.id),
+        serviceIds,
+        rateId,
+        ratePricesFound: ratePrices.length,
+      });
+
+      // Get ClientPrices if clientId provided
+      const clientPricesMap = new Map();
+      if (clientId) {
+        const AmexingUser = Parse.Object.extend('AmexingUser');
+        const clientPointer = new AmexingUser();
+        clientPointer.id = clientId;
+
+        const clientPricesQuery = new Parse.Query('ClientPrices');
+        clientPricesQuery.equalTo('clientPtr', clientPointer);
+        clientPricesQuery.equalTo('itemType', 'SERVICES');
+        clientPricesQuery.containedIn('itemId', serviceIds);
+        clientPricesQuery.equalTo('ratePtr', ratePointer);
+        clientPricesQuery.equalTo('exists', true);
+        clientPricesQuery.equalTo('active', true);
+        clientPricesQuery.doesNotExist('valid_until');
+        clientPricesQuery.include(['vehiclePtr']);
+        clientPricesQuery.limit(1000);
+
+        const clientPrices = await clientPricesQuery.find({ useMasterKey: true });
+        clientPrices.forEach((cp) => {
+          const vehicleId = cp.get('vehiclePtr')?.id;
+          if (vehicleId) {
+            clientPricesMap.set(vehicleId, {
+              precio: cp.get('precio'),
+              basePrice: cp.get('basePrice'),
+            });
+          }
+        });
+      }
+
+      // Build vehicles list, merging base and client prices
+      const vehiclesMap = new Map();
+      ratePrices.forEach((rp) => {
+        const vehicleType = rp.get('vehicleType');
+        const service = rp.get('service');
+        if (!vehicleType) return;
+
+        const vehicleId = vehicleType.id;
+        const basePrice = rp.get('price') || 0;
+        const clientData = clientPricesMap.get(vehicleId);
+
+        // If duplicate vehicle, keep the one with the lower price or first found
+        if (!vehiclesMap.has(vehicleId)) {
+          vehiclesMap.set(vehicleId, {
+            vehicleTypeId: vehicleId,
+            vehicleType: vehicleType.get('name'),
+            code: vehicleType.get('code'),
+            capacity: vehicleType.get('defaultCapacity') || 0,
+            trunkCapacity: vehicleType.get('trunkCapacity') || 0,
+            basePrice,
+            clientPrice: clientData ? clientData.precio : null,
+            finalPrice: clientData ? clientData.precio : basePrice,
+            currency: rp.get('currency') || 'MXN',
+            isClientPrice: !!clientData,
+            serviceId: service?.id || serviceIds[0],
+          });
+        }
+      });
+
+      const vehicles = Array.from(vehiclesMap.values());
+
+      logger.info('getPricesByRoute completed', {
+        userId: currentUser.id,
+        originPOI: originPOIName,
+        destinationPOI: destinationPOIName,
+        rateId,
+        clientId,
+        servicesFound: services.length,
+        vehiclesFound: vehicles.length,
+      });
+
+      // Get routeDuration from the first service (all services for same route share duration)
+      const routeDuration = allServices[0]?.get('routeDuration') || null;
+
+      return res.json({
+        success: true,
+        data: {
+          serviceId: serviceIds[0],
+          vehicles,
+          routeDuration,
+        },
+      });
+    } catch (error) {
+      logger.error('Error in getPricesByRoute', {
+        error: error.message,
+        query: req.query,
+        userId: req.user?.id,
+      });
+      return this.sendError(res, 'Error al obtener precios por ruta', 500);
+    }
+  }
+
+  /**
+   * Send a standardized error response.
+   * @param {object} res - Express response object.
+   * @param {string} message - Error message to return.
+   * @param {number} statusCode - HTTP status code.
+   * @returns {object} Express response with error JSON.
+   * @example
    */
   sendError(res, message, statusCode = 500) {
     return res.status(statusCode).json({

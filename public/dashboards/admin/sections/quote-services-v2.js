@@ -41,6 +41,20 @@ class ItineraryBuilder {
     this.guideTransportRateCache = null;
     this.transferRateCache = null;
 
+    // Transport route pricing cache
+    this.transportPriceData = null;
+
+    // Vehicle rate prices cache (Tiempo de espera)
+    this.vehicleRatePricesCache = [];
+
+    // Number of people from quote data
+    this.numberOfPeople = 0;
+
+    // Pricing rates (loaded via PricingUtils)
+    this.exchangeRate = 0;
+    this.transferRate = 0;
+    this.agencyRate = 0;
+
     // Client-specific pricing cache
     this.clientId = null;
     this.clientPricesCache = new Map(); // serviceId -> client prices
@@ -104,6 +118,9 @@ class ItineraryBuilder {
   }
 
   async init() {
+    // Show loading overlay
+    const loadingOverlay = document.getElementById('itineraryLoadingOverlay');
+
     try {
       // Load initial data
       await this.loadQuoteData();
@@ -121,12 +138,13 @@ class ItineraryBuilder {
         this.loadAllClientPrices(),
         this.loadVehicleTypes(),
         this.loadProviderExperiences(),
-        this.loadAgencyRate(),
         this.loadDriverTourRate(),
-        // Note: Guide transport rate and transfer rate endpoints not available yet
-        // this.loadGuideTransportRate(),
-        // this.loadTransferRate()
+        this.loadGuideTransportRate(),
+        this.loadVehicleRatePrices(),
       ]);
+
+      // Load pricing rates (exchange, transfer, agency) with auth
+      await this.loadPricingRates();
 
       // Load client-specific pricing if client is available
       if (this.clientId) {
@@ -142,9 +160,32 @@ class ItineraryBuilder {
 
       // Watch for client changes in the information section
       this.setupClientChangeListener();
+
+      // Sync numberOfPeople from information tab input
+      const numberOfPeopleInput = document.getElementById('numberOfPeople');
+      if (numberOfPeopleInput) {
+        // Read initial value if not loaded from API yet
+        if (!this.numberOfPeople) {
+          this.numberOfPeople = parseInt(numberOfPeopleInput.value) || 0;
+        }
+        numberOfPeopleInput.addEventListener('change', () => {
+          this.numberOfPeople = parseInt(numberOfPeopleInput.value) || 0;
+          this.updateAllDayPerPerson();
+          this.updateTotals();
+        });
+      }
+
+      // Hide loading overlay
+      if (loadingOverlay) {
+        loadingOverlay.classList.add('d-none');
+      }
     } catch (error) {
       console.error('Error initializing itinerary builder:', error);
       this.showAlert('Error al cargar el itinerario', 'danger');
+      // Hide loading overlay even on error
+      if (loadingOverlay) {
+        loadingOverlay.classList.add('d-none');
+      }
     }
   }
 
@@ -178,12 +219,34 @@ class ItineraryBuilder {
       radio.addEventListener('change', () => this.handleDirectionTypeChange());
     });
 
+    // Restore persisted currency and payment type selections (scoped per quote)
+    const quoteKey = this.quoteId || 'default';
+    const savedCurrency = sessionStorage.getItem(`quoteServices_currency_${quoteKey}`);
+    const savedPaymentType = sessionStorage.getItem(`quoteServices_paymentType_${quoteKey}`);
+    const currencySelect = document.getElementById('currencySelect');
+    const priceTypeSelect = document.getElementById('priceTypeSelect');
+
+    if (savedCurrency && currencySelect) {
+      currencySelect.value = savedCurrency;
+    }
+    if (savedPaymentType && priceTypeSelect) {
+      priceTypeSelect.value = savedPaymentType;
+    }
+
     // Currency change listener
-    document.getElementById('currencySelect')?.addEventListener('change', (e) => {
-      const currencySymbol = document.getElementById('currencySymbol');
-      if (currencySymbol) {
-        currencySymbol.textContent = e.target.value;
-      }
+    currencySelect?.addEventListener('change', (e) => {
+      sessionStorage.setItem(`quoteServices_currency_${quoteKey}`, e.target.value);
+      this.renderDaysContent();
+      this.updateTotals();
+      this.updateServicePriceBreakdown();
+    });
+
+    // Payment type change listener
+    priceTypeSelect?.addEventListener('change', (e) => {
+      sessionStorage.setItem(`quoteServices_paymentType_${quoteKey}`, e.target.value);
+      this.renderDaysContent();
+      this.updateTotals();
+      this.updateServicePriceBreakdown();
     });
 
     // Experience selection handler
@@ -219,6 +282,11 @@ class ItineraryBuilder {
         if (greeterCheckbox) {
           greeterCheckbox.checked = false;
         }
+        // Hide "Viaja en el vehículo" since greeter is unchecked
+        const greeterInVehicleContainer = document.getElementById('greeterInVehicleContainer');
+        if (greeterInVehicleContainer) greeterInVehicleContainer.classList.add('d-none');
+        const greeterInVehicle = document.getElementById('greeterInVehicle');
+        if (greeterInVehicle) greeterInVehicle.checked = false;
       }
       this.handleIncludeGuideChange(e.target.checked);
     });
@@ -232,7 +300,55 @@ class ItineraryBuilder {
           guideCheckbox.checked = false;
         }
       }
+      // Show/hide "Viaja en el vehículo" sub-checkbox
+      const greeterInVehicleContainer = document.getElementById('greeterInVehicleContainer');
+      const greeterInVehicle = document.getElementById('greeterInVehicle');
+      if (greeterInVehicleContainer) {
+        if (e.target.checked) {
+          greeterInVehicleContainer.classList.remove('d-none');
+          if (greeterInVehicle) greeterInVehicle.checked = true;
+        } else {
+          greeterInVehicleContainer.classList.add('d-none');
+          if (greeterInVehicle) greeterInVehicle.checked = false;
+        }
+      }
       this.handleIncludeGreeterChange(e.target.checked);
+    });
+
+    // Greeter in vehicle checkbox listener - update capacity note
+    document.getElementById('greeterInVehicle')?.addEventListener('change', () => {
+      this.updateVehicleCapacityNote();
+    });
+
+    // Price input listener - update conversion preview when user types a price
+    document.getElementById('servicePrice')?.addEventListener('input', () => {
+      this.updateServicePriceBreakdown();
+    });
+
+    // Quantity change listener - recalculate transport price and update breakdown
+    document.getElementById('serviceQuantity')?.addEventListener('change', () => {
+      const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+      if (serviceType === 'transport') {
+        this.recalculateTransportPrice();
+      }
+      this.updateServicePriceBreakdown();
+    });
+
+    // People quantity inputs - update breakdown when quantities change
+    ['tourAdultsQuantity', 'tourChildrenQuantity', 'tourAdultsNoAlcoholQuantity',
+      'adultsQuantity', 'childrenQuantity', 'adultsNoAlcoholQuantity',
+      'conceptoAdultsQuantity', 'conceptoChildrenQuantity', 'conceptoAdultsNoAlcoholQuantity'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('change', () => {
+        this.updateServicePriceBreakdown();
+      });
+    });
+
+    // Tour/Experience price inputs - update breakdown when prices change
+    ['tourAdultPrice', 'tourChildPrice', 'tourNoAlcoholPrice',
+      'adultPrice', 'childPrice', 'noAlcoholPrice'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => {
+        this.updateServicePriceBreakdown();
+      });
     });
 
     // Concepto schedule checkbox handler
@@ -240,11 +356,45 @@ class ItineraryBuilder {
       this.handleConceptoScheduleToggle(e.target.checked);
     });
 
+    // Walking tour people count - update tier highlight and price
+    document.getElementById('walkingTourPeopleCount')?.addEventListener('input', () => {
+      const tourSelect = document.getElementById('tourSelect');
+      if (tourSelect?.value && this.toursCache.has('all')) {
+        const selectedTour = this.toursCache.get('all').find(
+          (t) => t.id === tourSelect.value || t.objectId === tourSelect.value,
+        );
+        if (selectedTour?.isWalkingTour) {
+          this.highlightWalkingTourTier(selectedTour);
+          this.updateServicePriceBreakdown();
+        }
+      }
+    });
+
     // Time input formatting and validation
     this.setupTimeInputs();
 
     // Delete Confirmation
     document.getElementById('confirmDeleteBtn')?.addEventListener('click', () => this.confirmDelete());
+
+    // A Disposición - rate, vehicle, hours, vehicle count
+    document.getElementById('aDisposicionRate')?.addEventListener('change', (e) => {
+      this.handleADisposicionRateChange(e.target.value);
+    });
+    document.getElementById('aDisposicionVehicle')?.addEventListener('change', () => {
+      this.calculateADisposicionPrice();
+    });
+    document.getElementById('aDisposicionHours')?.addEventListener('input', () => {
+      this.calculateADisposicionPrice();
+    });
+    document.getElementById('aDisposicionVehicleCount')?.addEventListener('input', () => {
+      this.calculateADisposicionPrice();
+    });
+
+    // Waiting time hours listener (Transport)
+    document.getElementById('waitingTimeHours')?.addEventListener('input', () => {
+      this.recalculateTransportPrice();
+      this.updateServicePriceBreakdown();
+    });
 
     // Preview
     document.getElementById('previewItineraryBtn')?.addEventListener('click', () => this.showPreview());
@@ -413,6 +563,15 @@ class ItineraryBuilder {
         this.days.push(newDay);
       }
 
+      // Sort days by date and reassign numbers
+      this.days.sort((a, b) => {
+        if (!a.date && !b.date) return 0;
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return a.date.localeCompare(b.date);
+      });
+      this.days.forEach((d, i) => { d.number = i + 1; });
+
       // Save to backend
       await this.saveToBackend();
 
@@ -488,6 +647,20 @@ class ItineraryBuilder {
         tourRequiresTransport.checked = false;
       }
 
+      // Clear vehicle dropdown and transport price cache
+      this.clearVehicleDropdown();
+      this.transportPriceData = null;
+
+      // Clear vehicle capacity note and greeter sub-checkbox
+      const capacityNote = document.getElementById('vehicleCapacityNote');
+      if (capacityNote) capacityNote.classList.add('d-none');
+      const greeterInVehicleContainer = document.getElementById('greeterInVehicleContainer');
+      if (greeterInVehicleContainer) greeterInVehicleContainer.classList.add('d-none');
+
+      // Clear price breakdown
+      const breakdown = document.getElementById('servicePriceBreakdown');
+      if (breakdown) breakdown.classList.add('d-none');
+
       this.handleServiceTypeChange('experience'); // Default to experience
     }
 
@@ -495,6 +668,10 @@ class ItineraryBuilder {
   }
 
   handleServiceTypeChange(type) {
+    // Clear breakdown panel when switching service types
+    const breakdown = document.getElementById('servicePriceBreakdown');
+    if (breakdown) breakdown.classList.add('d-none');
+
     // Save current service type fields before switching
     this.saveCurrentServiceTypeFields();
 
@@ -522,10 +699,19 @@ class ItineraryBuilder {
     const transportTypeSelector = document.getElementById('transportTypeSelector');
     const tripTypeSelector = document.getElementById('tripTypeSelector');
     const tourTransportCheckbox = document.getElementById('tourTransportCheckboxContainer');
+    const transportPeopleFieldsRow = document.getElementById('transportPeopleFieldsRow');
+
+    // Show/hide Tiempo de espera section
+    const tiempoEsperaSection = document.getElementById('tiempoEsperaSection');
 
     if (type === 'transport') {
       transportTypeSelector?.classList.remove('d-none');
       tripTypeSelector?.classList.remove('d-none');
+      tiempoEsperaSection?.classList.remove('d-none');
+      // Show transport people fields
+      if (transportPeopleFieldsRow) {
+        transportPeopleFieldsRow.style.display = 'flex';
+      }
       // Initialize transport form based on current selections
       this.handleTransportTypeChange();
       this.handleTripTypeChange();
@@ -534,15 +720,25 @@ class ItineraryBuilder {
         tourTransportCheckbox.style.display = 'none';
       }
     } else if (type === 'tour') {
+      tiempoEsperaSection?.classList.add('d-none');
       transportTypeSelector?.classList.add('d-none');
       tripTypeSelector?.classList.add('d-none');
+      // Hide transport people fields
+      if (transportPeopleFieldsRow) {
+        transportPeopleFieldsRow.style.display = 'none';
+      }
       // Show tour transport checkbox
       if (tourTransportCheckbox) {
         tourTransportCheckbox.style.display = 'block';
       }
     } else {
+      tiempoEsperaSection?.classList.add('d-none');
       transportTypeSelector?.classList.add('d-none');
       tripTypeSelector?.classList.add('d-none');
+      // Hide transport people fields
+      if (transportPeopleFieldsRow) {
+        transportPeopleFieldsRow.style.display = 'none';
+      }
       // Hide tour transport checkbox
       if (tourTransportCheckbox) {
         tourTransportCheckbox.style.display = 'none';
@@ -563,7 +759,7 @@ class ItineraryBuilder {
     const priceTypeLabel = document.querySelector('label[for="priceTypeSelect"]');
     const quantityField = document.getElementById('serviceQuantity')?.closest('.col-md-6');
 
-    if (type === 'concepto' || type === 'experience') {
+    if (type === 'concepto' || type === 'experience' || type === 'a-disposicion') {
       // Hide category, vehicle and guide for Concepto and Experience
       categoryField?.classList.add('d-none');
       vehicleField?.classList.add('d-none');
@@ -592,6 +788,29 @@ class ItineraryBuilder {
         if (priceTypeLabel) {
           priceTypeLabel.innerHTML = 'Pago';
         }
+      } else if (type === 'a-disposicion') {
+        // Hide quantity field for A Disposición
+        quantityField?.classList.add('d-none');
+        document.getElementById('serviceQuantity')?.removeAttribute('required');
+
+        // Price, currency and price type are required for A Disposición
+        priceField?.setAttribute('required', 'required');
+        currencyField?.setAttribute('required', 'required');
+        priceTypeField?.setAttribute('required', 'required');
+
+        // Update labels to add asterisk
+        if (priceLabel) {
+          priceLabel.innerHTML = 'Precio <span class="text-danger">*</span>';
+        }
+        if (currencyLabel) {
+          currencyLabel.innerHTML = 'Moneda <span class="text-danger">*</span>';
+        }
+        if (priceTypeLabel) {
+          priceTypeLabel.innerHTML = 'Pago <span class="text-danger">*</span>';
+        }
+
+        // Populate rate dropdown for A Disposición
+        this.populateADisposicionRates();
       } else {
         // Show quantity field for Experience
         quantityField?.classList.remove('d-none');
@@ -634,7 +853,7 @@ class ItineraryBuilder {
 
         // Show pricing fields
         if (standardPricingSection) {
-          standardPricingSection.style.display = '';
+          standardPricingSection.classList.remove('d-none');
         }
 
         // Set pricing fields as required
@@ -665,7 +884,7 @@ class ItineraryBuilder {
 
         // Hide pricing fields
         if (standardPricingSection) {
-          standardPricingSection.style.display = 'none';
+          standardPricingSection.classList.add('d-none');
         }
 
         // Remove required from pricing fields
@@ -733,6 +952,7 @@ class ItineraryBuilder {
       experience: 'experienceContent',
       tour: 'tourContent',
       transport: 'transportContent',
+      'a-disposicion': 'aDisposicionContent',
       concepto: 'conceptoContent',
     };
 
@@ -851,7 +1071,8 @@ class ItineraryBuilder {
 
     switch (serviceType) {
       case 'concepto':
-        // Concepto defaults to empty/0 price (optional pricing)
+      case 'a-disposicion':
+        // Concepto/A Disposición defaults to empty/0 price (optional pricing)
         if (priceField) priceField.value = '';
         break;
       case 'experience':
@@ -885,48 +1106,168 @@ class ItineraryBuilder {
     if (teamNotesField) teamNotesField.value = '';
   }
 
+  clearTransportFormFields() {
+    // Skip clearing during edit form population
+    if (this._populatingTransportForm) return;
+
+    // Clear origin fields
+    const originSelect = document.getElementById('transportOriginSelect');
+    if (originSelect) originSelect.value = '';
+    const originText = document.getElementById('transportOriginText');
+    if (originText) originText.value = '';
+    const originCombo = document.getElementById('transportOriginCombo');
+    if (originCombo) originCombo.value = '';
+
+    // Clear destination fields
+    const destCombo = document.getElementById('transportDestinationCombo');
+    if (destCombo) destCombo.value = '';
+    const destSelect = document.getElementById('transportDestinationSelect');
+    if (destSelect) destSelect.value = '';
+    const destText = document.getElementById('transportDestinationText');
+    if (destText) destText.value = '';
+
+    // Clear specific location
+    const specificLocation = document.getElementById('transportSpecificLocation');
+    if (specificLocation) specificLocation.value = '';
+    const specificLocationRow = document.getElementById('specificLocationRow');
+    if (specificLocationRow) specificLocationRow.classList.add('d-none');
+
+    // Clear segmento
+    const category = document.getElementById('transportCategory');
+    if (category) category.value = '';
+
+    // Clear vehicle and price
+    this.clearVehicleDropdown();
+    this.transportPriceData = null;
+
+    // Clear schedule fields
+    const transportStartTime = document.getElementById('transportStartTime');
+    if (transportStartTime) transportStartTime.value = '';
+    const transportEndTime = document.getElementById('transportEndTime');
+    if (transportEndTime) transportEndTime.value = '';
+
+    // Clear flight details
+    const flightNumber = document.getElementById('flightNumber');
+    if (flightNumber) flightNumber.value = '';
+    const flightTime = document.getElementById('flightTime');
+    if (flightTime) flightTime.value = '';
+
+    // Clear round trip fields
+    const rtFields = [
+      'roundTripOriginIdaSelect', 'roundTripOriginIdaText',
+      'roundTripDestinationIdaCombo', 'roundTripDestinationIdaSelect',
+      'roundTripOriginVueltaCombo', 'roundTripOriginVueltaSelect',
+      'roundTripDestinationVueltaSelect', 'roundTripDestinationVueltaText',
+      'roundTripTimeIda', 'roundTripTimeVuelta',
+      'roundTripAirlineIda', 'roundTripFlightNumberIda',
+      'roundTripAirlineVuelta', 'roundTripFlightNumberVuelta',
+      'roundTripSpecificLocationIda', 'roundTripSpecificLocationVuelta',
+    ];
+    rtFields.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+
+    // Hide round trip specific location rows
+    document.getElementById('roundTripSpecificLocationIdaRow')?.classList.add('d-none');
+    document.getElementById('roundTripSpecificLocationVueltaRow')?.classList.add('d-none');
+
+    // Clear waiting time
+    const waitingTimeHours = document.getElementById('waitingTimeHours');
+    if (waitingTimeHours) waitingTimeHours.value = 0;
+    const waitingTimeRate = document.getElementById('waitingTimeRate');
+    if (waitingTimeRate) waitingTimeRate.textContent = '';
+
+    // Clear price field and cached base price
+    const priceField = document.getElementById('servicePrice');
+    if (priceField) priceField.value = '';
+    this._lastTransportBasePrice = null;
+
+    // Hide breakdown panel
+    const breakdown = document.getElementById('servicePriceBreakdown');
+    if (breakdown) breakdown.classList.add('d-none');
+  }
+
   handleTransportTypeChange() {
+    this.clearTransportFormFields();
     const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
     const flightDetailsSection = document.getElementById('flightDetailsSection');
     const roundTripFlightDetailsIda = document.querySelector('.roundtrip-flight-details-ida');
     const roundTripFlightDetailsVuelta = document.querySelector('.roundtrip-flight-details-vuelta');
     const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
 
+    // Filter dropdowns based on selected transport type
+    if (transportType && typeof populateDropdownsForTransportType === 'function') {
+      populateDropdownsForTransportType(transportType);
+    }
+
+    // Update direction labels based on transport type
+    const arrivalLabel = document.querySelector('label[for="typeArrival"] span');
+    const departureLabel = document.querySelector('label[for="typeDeparture"] span');
+    const arrivalIcon = document.querySelector('label[for="typeArrival"] i');
+    const departureIcon = document.querySelector('label[for="typeDeparture"] i');
+    if (transportType === 'punto-a-punto' || transportType === 'local') {
+      if (arrivalLabel) arrivalLabel.textContent = 'Ida';
+      if (departureLabel) departureLabel.textContent = 'Vuelta';
+      if (arrivalIcon) { arrivalIcon.className = 'ti ti-car me-1'; arrivalIcon.style.fontSize = '1.1rem'; }
+      if (departureIcon) { departureIcon.className = 'ti ti-car me-1'; departureIcon.style.fontSize = '1.1rem'; }
+    } else {
+      if (arrivalLabel) arrivalLabel.textContent = 'Arrival';
+      if (departureLabel) departureLabel.textContent = 'Departure';
+      if (arrivalIcon) { arrivalIcon.className = 'ti ti-plane-arrival me-1'; arrivalIcon.style.fontSize = '1.1rem'; }
+      if (departureIcon) { departureIcon.className = 'ti ti-plane-departure me-1'; departureIcon.style.fontSize = '1.1rem'; }
+    }
+
     // Round trip fields handled elsewhere
 
-    // Show flight details only for airport transport
+    // Show/hide schedule and flight details based on transport type
+    const transportScheduleSection = document.getElementById('transportScheduleSection');
+
     if (transportType === 'aeropuerto') {
+      // Hide schedule, show flight details
+      transportScheduleSection?.classList.add('d-none');
       if (tripType === 'roundtrip' || tripType === 'round-trip') {
-        // Show flight details for both Ida and Vuelta
         roundTripFlightDetailsIda?.classList.remove('d-none');
         roundTripFlightDetailsVuelta?.classList.remove('d-none');
-
-        // Airport transport is already configured correctly in HTML:
-        // - Arrival (Ida): Origin = dropdown, Destination = text
-        // - Departure (Vuelta): Origin = text, Destination = dropdown
       } else {
         flightDetailsSection?.classList.remove('d-none');
       }
     } else {
-      // Hide all airport-related fields
+      // Punto a Punto or Local: show schedule, hide flight details
       flightDetailsSection?.classList.add('d-none');
       roundTripFlightDetailsIda?.classList.add('d-none');
       roundTripFlightDetailsVuelta?.classList.add('d-none');
+      transportScheduleSection?.classList.remove('d-none');
+    }
+
+    // Re-evaluate direction fields (local has different field types than aeropuerto/punto-a-punto)
+    const tripType2 = document.querySelector('input[name="tripType"]:checked')?.value;
+    if (tripType2 === 'one-way') {
+      this.handleDirectionTypeChange();
+    } else {
+      this.updateRoundTripFieldVisibility();
     }
   }
 
   handleTripTypeChange() {
+    this.clearTransportFormFields();
     const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
     const oneWayForm = document.getElementById('oneWayForm');
     const roundTripForm = document.getElementById('roundTripForm');
     const arrivalDepartureSelector = document.getElementById('arrivalDepartureSelector');
 
     // Show appropriate form based on trip type
+    const quantityField = document.getElementById('serviceQuantity');
+    const roundTripHint = document.getElementById('roundTripQuantityHint');
+
     if (tripType === 'one-way') {
       oneWayForm?.classList.remove('d-none');
       roundTripForm?.classList.add('d-none');
       // Show arrival/departure selector only for one-way
       arrivalDepartureSelector?.classList.remove('d-none');
+      // Reset quantity to 1 for one-way
+      if (quantityField) quantityField.value = '1';
+      roundTripHint?.classList.add('d-none');
       // Initialize direction type fields
       this.handleDirectionTypeChange();
     } else {
@@ -934,6 +1275,18 @@ class ItineraryBuilder {
       roundTripForm?.classList.remove('d-none');
       // Hide arrival/departure selector for round trip
       arrivalDepartureSelector?.classList.add('d-none');
+      // Set quantity to 2 for round trip (Ida + Regreso)
+      if (quantityField) quantityField.value = '2';
+      roundTripHint?.classList.remove('d-none');
+      // Pre-fill date fields with current day's date (or today if day has no date)
+      const currentDay = this.days.find(d => d.id === this.currentDayId);
+      const defaultDate = currentDay?.date || new Date().toISOString().split('T')[0];
+      const dateIda = document.getElementById('roundTripDateIda');
+      const dateVuelta = document.getElementById('roundTripDateVuelta');
+      if (dateIda && !dateIda.value) dateIda.value = defaultDate;
+      if (dateVuelta && !dateVuelta.value) dateVuelta.value = defaultDate;
+      // Set correct field types for round trip based on transport type
+      this.updateRoundTripFieldVisibility();
     }
 
     // Re-check transport type to show/hide flight details correctly
@@ -941,51 +1294,217 @@ class ItineraryBuilder {
   }
 
   handleDirectionTypeChange() {
+    this.clearTransportFormFields();
     const directionType = document.querySelector('input[name="directionType"]:checked')?.value;
+    const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
 
     // Get all field elements
     const originSelect = document.getElementById('transportOriginSelect');
     const originText = document.getElementById('transportOriginText');
-    const destinationText = document.getElementById('transportDestinationText');
+    const originComboWrapper = document.getElementById('transportOriginComboWrapper');
+    const destinationComboWrapper = document.getElementById('transportDestinationComboWrapper');
     const destinationSelect = document.getElementById('transportDestinationSelect');
+    const destinationText = document.getElementById('transportDestinationText');
 
     // Get time label element
     const timeLabel = document.querySelector('label[for="flightTime"]');
 
-    if (directionType === 'arrival') {
-      // Arrival: Origin is dropdown, Destination is text
+    // Hide all origin/destination variants first
+    originSelect?.classList.add('d-none');
+    originText?.classList.add('d-none');
+    originComboWrapper?.classList.add('d-none');
+    destinationComboWrapper?.classList.add('d-none');
+    destinationSelect?.classList.add('d-none');
+    destinationText?.classList.add('d-none');
+    originSelect?.removeAttribute('required');
+    originText?.removeAttribute('required');
+    document.getElementById('transportOriginCombo')?.removeAttribute('required');
+    document.getElementById('transportDestinationCombo')?.removeAttribute('required');
+    destinationSelect?.removeAttribute('required');
+    destinationText?.removeAttribute('required');
+
+    // Update labels based on transport type and direction
+    const originLabel = document.getElementById('transportOriginLabel');
+    const destinationLabel = document.getElementById('transportDestinationLabel');
+
+    if (directionType === 'arrival' && transportType === 'local') {
+      // Local Ida: Origin = TEXT (ubicación específica), Destination = SELECT
+      originText?.classList.remove('d-none');
+      originText?.setAttribute('required', 'required');
+      destinationSelect?.classList.remove('d-none');
+      destinationSelect?.setAttribute('required', 'required');
+      if (originLabel) originLabel.innerHTML = 'Origen (San Miguel de Allende) <span class="text-danger">*</span>';
+      if (destinationLabel) destinationLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
+    } else if (directionType === 'arrival') {
+      // Arrival: Origin = SELECT (airports), Destination = COMBO (hotels/cities)
       originSelect?.classList.remove('d-none');
-      originText?.classList.add('d-none');
-      destinationText?.classList.remove('d-none');
-      destinationSelect?.classList.add('d-none');
-
-      // Update required attributes
       originSelect?.setAttribute('required', 'required');
-      originText?.removeAttribute('required');
-      destinationText?.setAttribute('required', 'required');
-      destinationSelect?.removeAttribute('required');
+      if (originLabel) originLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
+      if (destinationLabel) destinationLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
+      destinationComboWrapper?.classList.remove('d-none');
+      document.getElementById('transportDestinationCombo')?.setAttribute('required', 'required');
 
-      // Update time label for Arrival
       if (timeLabel) {
         timeLabel.textContent = 'Hora de Llegada';
       }
+    } else if (directionType === 'departure' && transportType === 'local') {
+      // Local Vuelta: Origin = SELECT, Destination = TEXT (ubicación específica)
+      originSelect?.classList.remove('d-none');
+      originSelect?.setAttribute('required', 'required');
+      if (originLabel) originLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
+      destinationText?.classList.remove('d-none');
+      destinationText?.setAttribute('required', 'required');
+      if (destinationLabel) destinationLabel.innerHTML = 'Destino (San Miguel de Allende) <span class="text-danger">*</span>';
     } else if (directionType === 'departure') {
-      // Departure: Origin is text, Destination is dropdown
-      originSelect?.classList.add('d-none');
-      originText?.classList.remove('d-none');
-      destinationText?.classList.add('d-none');
+      // Departure + Aeropuerto / Punto a Punto: Origin = COMBO, Destination = SELECT
+      originComboWrapper?.classList.remove('d-none');
+      document.getElementById('transportOriginCombo')?.setAttribute('required', 'required');
+      if (originLabel) originLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
+      if (destinationLabel) destinationLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
       destinationSelect?.classList.remove('d-none');
-
-      // Update required attributes
-      originText?.setAttribute('required', 'required');
-      originSelect?.removeAttribute('required');
       destinationSelect?.setAttribute('required', 'required');
-      destinationText?.removeAttribute('required');
 
-      // Update time label for Departure
       if (timeLabel) {
         timeLabel.textContent = 'Hora de Salida';
       }
+    }
+
+    // Re-populate dropdowns considering direction
+    if (transportType) {
+      populateDropdownsForTransportType(transportType, directionType);
+    }
+  }
+
+  /**
+   * Update round trip field visibility based on transport type.
+   * Ida leg uses arrival pattern, Vuelta leg uses departure pattern.
+   */
+  updateRoundTripFieldVisibility() {
+    const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
+    if (!transportType) return;
+
+    // --- IDA (arrival pattern) ---
+    const idaOriginSelect = document.getElementById('roundTripOriginIdaSelect');
+    const idaOriginText = document.getElementById('roundTripOriginIdaText');
+    const idaDestComboWrapper = document.getElementById('roundTripDestinationIdaComboWrapper');
+    const idaDestSelect = document.getElementById('roundTripDestinationIdaSelect');
+    const idaOriginLabel = document.getElementById('roundTripOriginIdaLabel');
+
+    // Hide all Ida variants first
+    idaOriginSelect?.classList.add('d-none');
+    idaOriginText?.classList.add('d-none');
+    idaDestComboWrapper?.classList.add('d-none');
+    idaDestSelect?.classList.add('d-none');
+
+    if (transportType === 'local') {
+      // Local Ida: Origin = TEXT, Destination = SELECT
+      idaOriginText?.classList.remove('d-none');
+      idaDestSelect?.classList.remove('d-none');
+      if (idaOriginLabel) idaOriginLabel.innerHTML = 'Origen (San Miguel de Allende) <span class="text-danger">*</span>';
+    } else {
+      // Aeropuerto / Punto a Punto: Origin = SELECT, Destination = COMBO
+      idaOriginSelect?.classList.remove('d-none');
+      idaDestComboWrapper?.classList.remove('d-none');
+      if (idaOriginLabel) idaOriginLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
+    }
+
+    // --- VUELTA (departure pattern) ---
+    const vueltaOriginComboWrapper = document.getElementById('roundTripOriginVueltaComboWrapper');
+    const vueltaOriginSelect = document.getElementById('roundTripOriginVueltaSelect');
+    const vueltaDestSelect = document.getElementById('roundTripDestinationVueltaSelect');
+    const vueltaDestText = document.getElementById('roundTripDestinationVueltaText');
+    const vueltaDestLabel = document.getElementById('roundTripDestinationVueltaLabel');
+
+    // Hide all Vuelta variants first
+    vueltaOriginComboWrapper?.classList.add('d-none');
+    vueltaOriginSelect?.classList.add('d-none');
+    vueltaDestSelect?.classList.add('d-none');
+    vueltaDestText?.classList.add('d-none');
+
+    if (transportType === 'local') {
+      // Local Vuelta: Origin = SELECT, Destination = TEXT
+      vueltaOriginSelect?.classList.remove('d-none');
+      vueltaDestText?.classList.remove('d-none');
+      if (vueltaDestLabel) vueltaDestLabel.innerHTML = 'Destino (San Miguel de Allende) <span class="text-danger">*</span>';
+    } else {
+      // Aeropuerto / Punto a Punto: Origin = COMBO, Destination = SELECT
+      vueltaOriginComboWrapper?.classList.remove('d-none');
+      vueltaDestSelect?.classList.remove('d-none');
+      if (vueltaDestLabel) vueltaDestLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
+    }
+
+    // Update section headers based on transport type
+    const idaHeader = document.getElementById('roundTripIdaHeader');
+    const vueltaHeader = document.getElementById('roundTripVueltaHeader');
+    const dateIdaLabel = document.getElementById('roundTripDateIdaLabel');
+    const timeIdaLabel = document.getElementById('roundTripTimeIdaLabel');
+    const dateVueltaLabel = document.getElementById('roundTripDateVueltaLabel');
+    const timeVueltaLabel = document.getElementById('roundTripTimeVueltaLabel');
+
+    if (transportType === 'aeropuerto') {
+      if (idaHeader) idaHeader.innerHTML = '<i class="ti ti-plane-arrival me-2"></i>Arrival';
+      if (vueltaHeader) vueltaHeader.innerHTML = '<i class="ti ti-plane-departure me-2"></i>Departure';
+      if (dateIdaLabel) dateIdaLabel.textContent = 'Fecha de Llegada';
+      if (timeIdaLabel) timeIdaLabel.textContent = 'Hora de Llegada';
+      if (dateVueltaLabel) dateVueltaLabel.textContent = 'Fecha de Salida';
+      if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Salida';
+    } else {
+      if (idaHeader) idaHeader.innerHTML = '<i class="ti ti-car me-2"></i>Ida';
+      if (vueltaHeader) vueltaHeader.innerHTML = '<i class="ti ti-car me-2"></i>Vuelta';
+      if (dateIdaLabel) dateIdaLabel.textContent = 'Fecha de Ida';
+      if (timeIdaLabel) timeIdaLabel.textContent = 'Hora de Ida';
+      if (dateVueltaLabel) dateVueltaLabel.textContent = 'Fecha de Vuelta';
+      if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Vuelta';
+    }
+
+    // Populate dropdowns for both directions
+    if (typeof populateDropdownsForTransportType === 'function') {
+      populateRoundTripDropdowns(transportType);
+    }
+  }
+
+  /**
+   * Auto-fill Vuelta fields from Ida fields (swapped: origin↔destination).
+   * Only fills empty Vuelta fields to avoid overwriting user edits.
+   */
+  syncIdaToVuelta() {
+    const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+    if (tripType !== 'round-trip') return;
+
+    const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
+    if (!transportType) return;
+
+    if (transportType === 'local') {
+      // Local: Ida origin (TEXT) → Vuelta destination (TEXT)
+      const idaOrigin = document.getElementById('roundTripOriginIdaText')?.value || '';
+      const vueltaDestText = document.getElementById('roundTripDestinationVueltaText');
+      if (vueltaDestText && !vueltaDestText.value) vueltaDestText.value = idaOrigin;
+
+      // Local: Ida destination (SELECT) → Vuelta origin (SELECT)
+      const idaDestSlug = document.getElementById('roundTripDestinationIdaSelect')?.value || '';
+      const vueltaOriginSelect = document.getElementById('roundTripOriginVueltaSelect');
+      if (vueltaOriginSelect && !vueltaOriginSelect.value) vueltaOriginSelect.value = idaDestSlug;
+    } else {
+      // Aeropuerto / Punto a Punto:
+      // Ida origin (SELECT slug) → Vuelta destination (SELECT slug)
+      const idaOriginSlug = document.getElementById('roundTripOriginIdaSelect')?.value || '';
+      const vueltaDestSelect = document.getElementById('roundTripDestinationVueltaSelect');
+      if (vueltaDestSelect && !vueltaDestSelect.value) vueltaDestSelect.value = idaOriginSlug;
+
+      // Ida destination (COMBO text) → Vuelta origin (COMBO text)
+      const idaDestText = document.getElementById('roundTripDestinationIdaCombo')?.value || '';
+      const vueltaOriginCombo = document.getElementById('roundTripOriginVueltaCombo');
+      if (vueltaOriginCombo && !vueltaOriginCombo.value) vueltaOriginCombo.value = idaDestText;
+
+      // Auto-fill Ida specific location → Vuelta specific location
+      const idaSpecific = document.getElementById('roundTripSpecificLocationIda')?.value || '';
+      const vueltaSpecific = document.getElementById('roundTripSpecificLocationVuelta');
+      if (vueltaSpecific && !vueltaSpecific.value && idaSpecific) vueltaSpecific.value = idaSpecific;
+    }
+
+    // Show/hide specific location fields after sync
+    if (typeof window.checkRoundTripSpecificLocationFields === 'function') {
+      window.checkRoundTripSpecificLocationFields();
     }
   }
 
@@ -997,6 +1516,11 @@ class ItineraryBuilder {
 
     if (!this.validateServiceData(serviceData)) {
       return;
+    }
+
+    // Round-trip transport: split into two separate services (Ida + Vuelta)
+    if (serviceData.type === 'transport' && serviceData.tripType === 'round-trip') {
+      return this.saveRoundTripAsTwo(serviceData);
     }
 
     try {
@@ -1046,6 +1570,165 @@ class ItineraryBuilder {
     }
   }
 
+  /**
+   * Save round-trip transport as two separate one-way services on their respective days.
+   * Ida goes to the day matching startDate, Vuelta to the day matching endDate.
+   * Creates days automatically if they don't exist.
+   */
+  async saveRoundTripAsTwo(serviceData) {
+    try {
+      const transportLabel = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
+      const typeLabel = transportLabel[serviceData.transportType] || 'Transporte';
+
+      // --- Ida leg ---
+      const idaData = {
+        ...serviceData,
+        tripType: 'one-way',
+        directionType: 'arrival',
+        concept: `${typeLabel}: ${serviceData.origin} - ${serviceData.destination} (Ida)`,
+        startTime: serviceData.startTime,
+        endTime: '',
+        startDate: serviceData.startDate,
+        endDate: '',
+        returnOrigin: '',
+        returnDestination: '',
+        returnAirline: '',
+        returnFlightNumber: '',
+      };
+
+      // --- Vuelta leg ---
+      const vueltaData = {
+        ...serviceData,
+        tripType: 'one-way',
+        directionType: 'departure',
+        concept: `${typeLabel}: ${serviceData.returnOrigin} - ${serviceData.returnDestination} (Vuelta)`,
+        origin: serviceData.returnOrigin,
+        originName: serviceData.returnOrigin,
+        destination: serviceData.returnDestination,
+        startTime: serviceData.endTime,
+        endTime: '',
+        startDate: serviceData.endDate,
+        endDate: '',
+        airline: serviceData.returnAirline || '',
+        flightNumber: serviceData.returnFlightNumber || '',
+        returnOrigin: '',
+        returnDestination: '',
+        returnAirline: '',
+        returnFlightNumber: '',
+      };
+
+      // Find or create days for each date
+      console.log('[RoundTrip] Ida startDate:', idaData.startDate, '| Vuelta startDate:', vueltaData.startDate);
+      console.log('[RoundTrip] Available days:', this.days.map(d => ({ id: d.id, date: d.date, title: d.title })));
+      const idaDayId = this.findOrCreateDayByDate(idaData.startDate);
+      const vueltaDayId = this.findOrCreateDayByDate(vueltaData.startDate);
+      console.log('[RoundTrip] Ida → dayId:', idaDayId, '| Vuelta → dayId:', vueltaDayId);
+
+      if (this.currentServiceId) {
+        // Editing: update the existing service as Ida, create Vuelta as new
+        const existingService = this.services.get(this.currentServiceId);
+        const updatedIda = { ...existingService, ...idaData, dayId: idaDayId };
+        this.services.set(this.currentServiceId, updatedIda);
+        this.moveServiceToDay(this.currentServiceId, existingService.dayId, idaDayId);
+
+        // Create Vuelta as new service
+        const vueltaId = this.generateId('service');
+        this.services.set(vueltaId, { id: vueltaId, dayId: vueltaDayId, ...vueltaData });
+        const vueltaDay = this.days.find(d => d.id === vueltaDayId);
+        if (vueltaDay) {
+          vueltaDay.services.push(vueltaId);
+          vueltaDay.services = this.sortAndDeduplicateServices(vueltaDay.services);
+        }
+      } else {
+        // New: create both services
+        const idaId = this.generateId('service');
+        this.services.set(idaId, { id: idaId, dayId: idaDayId, ...idaData });
+        const idaDay = this.days.find(d => d.id === idaDayId);
+        if (idaDay) {
+          idaDay.services.push(idaId);
+          idaDay.services = this.sortAndDeduplicateServices(idaDay.services);
+        }
+
+        const vueltaId = this.generateId('service');
+        this.services.set(vueltaId, { id: vueltaId, dayId: vueltaDayId, ...vueltaData });
+        const vueltaDay = this.days.find(d => d.id === vueltaDayId);
+        if (vueltaDay) {
+          vueltaDay.services.push(vueltaId);
+          vueltaDay.services = this.sortAndDeduplicateServices(vueltaDay.services);
+        }
+      }
+
+      // Re-sort all days by date and renumber
+      this.days.sort((a, b) => {
+        if (!a.date && !b.date) return 0;
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return a.date.localeCompare(b.date);
+      });
+      this.days.forEach((d, i) => { d.number = i + 1; });
+
+      await this.saveToBackend();
+      this.renderItinerary();
+      this.closeModal('serviceModal');
+      this.showAlert('Servicio de ida y vuelta guardado exitosamente', 'success');
+    } catch (error) {
+      console.error('Error saving round-trip service:', error);
+      this.showModalAlert('serviceModalAlert', `Error al guardar: ${error.message}`, 'danger');
+    }
+  }
+
+  /**
+   * Find a day by its date, or create a new one if it doesn't exist.
+   * @param {string} dateStr - Date in YYYY-MM-DD format
+   * @returns {string} Day ID
+   */
+  findOrCreateDayByDate(dateStr) {
+    if (!dateStr) return this.currentDayId;
+
+    const existingDay = this.days.find(d => d.date === dateStr);
+    if (existingDay) return existingDay.id;
+
+    // Create new day
+    const newDay = {
+      id: this.generateId('day'),
+      number: this.days.length + 1,
+      title: `Día ${this.days.length + 1}`,
+      date: dateStr,
+      description: '',
+      services: [],
+    };
+    this.days.push(newDay);
+
+    // Re-sort days by date and renumber
+    this.days.sort((a, b) => {
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return a.date.localeCompare(b.date);
+    });
+    this.days.forEach((d, i) => { d.number = i + 1; });
+
+    return newDay.id;
+  }
+
+  /**
+   * Move a service from one day to another.
+   */
+  moveServiceToDay(serviceId, oldDayId, newDayId) {
+    if (oldDayId === newDayId) return;
+
+    const oldDay = this.days.find(d => d.id === oldDayId);
+    if (oldDay) {
+      oldDay.services = oldDay.services.filter(id => id !== serviceId);
+    }
+
+    const newDay = this.days.find(d => d.id === newDayId);
+    if (newDay && !newDay.services.includes(serviceId)) {
+      newDay.services.push(serviceId);
+      newDay.services = this.sortAndDeduplicateServices(newDay.services);
+    }
+  }
+
   collectServiceData() {
     const type = document.querySelector('input[name="serviceType"]:checked')?.value;
     const vehicleSelectValue = document.getElementById('vehicleSelect')?.value;
@@ -1055,14 +1738,22 @@ class ItineraryBuilder {
       price: parseFloat(document.getElementById('servicePrice')?.value || 0),
       quantity: type === 'concepto' ? 1 : parseInt(document.getElementById('serviceQuantity')?.value || 1),
       notes: document.getElementById('serviceNotes')?.value,
+      includeInTotal: document.getElementById('includeInTotal')?.checked !== false,
+      greeterInVehicle: document.getElementById('greeterInVehicle')?.checked || false,
     };
 
-    // For tours with transport, store vehicle type information (not vehicleId)
-    if (type === 'tour' && vehicleSelectValue) {
-      data.vehicleType = vehicleSelectValue; // Store the vehicle type name
-      data.vehicleTypeName = vehicleSelectValue; // For display purposes
+    // For tours and transport, store vehicle type information
+    if ((type === 'tour' || type === 'transport') && vehicleSelectValue) {
+      data.vehicleType = vehicleSelectValue; // Store the vehicle type ID
+      // Get display name from vehicle types map or transport price data
+      if (type === 'transport' && this.transportPriceData?.vehicles) {
+        const vehicle = this.transportPriceData.vehicles.find(v => v.vehicleTypeId === vehicleSelectValue);
+        data.vehicleTypeName = vehicle ? vehicle.vehicleType : vehicleSelectValue;
+      } else {
+        data.vehicleTypeName = vehicleSelectValue;
+      }
     } else if (vehicleSelectValue) {
-      // For non-tour services, store as vehicleId
+      // For other services, store as vehicleId
       data.vehicleId = vehicleSelectValue;
     }
 
@@ -1093,25 +1784,41 @@ class ItineraryBuilder {
       }
       case 'tour': {
         data.tourId = document.getElementById('tourSelect')?.value;
-        data.rateId = document.getElementById('transportCategory')?.value; // Store rate for vehicle pricing
 
-        // Collect includeGuide checkbox state for tours
-        const includeGuideCheckbox = document.getElementById('includeGuide');
-        data.includeGuide = includeGuideCheckbox ? includeGuideCheckbox.checked : false;
+        // Check if this is a walking tour
+        const selectedTourData = this.toursCache.has('all')
+          ? this.toursCache.get('all').find((t) => t.id === data.tourId || t.objectId === data.tourId)
+          : null;
 
-        // Collect includeGreeter checkbox state for tours
-        const includeGreeterCheckbox = document.getElementById('includeGreeter');
-        data.includeGreeter = includeGreeterCheckbox ? includeGreeterCheckbox.checked : false;
+        if (selectedTourData?.isWalkingTour) {
+          // Walking tour: collect tier-based pricing
+          data.isWalkingTour = true;
+          data.walkingTourPeopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10);
+          data.walkingTourPrice = this.getWalkingTourPrice(selectedTourData, data.walkingTourPeopleCount);
+          data.walkingTourCurrency = selectedTourData.walkingPriceCurrency || 'MXN';
+          data.persons = data.walkingTourPeopleCount;
+        } else {
+          // Vehicle tour: collect standard pricing
+          data.rateId = document.getElementById('transportCategory')?.value;
 
-        // Collect passenger quantities for tours (same as experiences)
-        data.adultsQuantity = parseInt(document.getElementById('tourAdultsQuantity')?.value || 0);
-        data.childrenQuantity = parseInt(document.getElementById('tourChildrenQuantity')?.value || 0);
-        data.adultsNoAlcoholQuantity = parseInt(document.getElementById('tourAdultsNoAlcoholQuantity')?.value || 0);
+          // Collect includeGuide checkbox state for tours
+          const includeGuideCheckbox = document.getElementById('includeGuide');
+          data.includeGuide = includeGuideCheckbox ? includeGuideCheckbox.checked : false;
 
-        // Collect tour-specific prices
-        data.adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
-        data.childPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0);
-        data.noAlcoholPrice = parseFloat(document.getElementById('tourNoAlcoholPrice')?.value || 0);
+          // Collect includeGreeter checkbox state for tours
+          const includeGreeterCheckbox = document.getElementById('includeGreeter');
+          data.includeGreeter = includeGreeterCheckbox ? includeGreeterCheckbox.checked : false;
+
+          // Collect passenger quantities for tours (same as experiences)
+          data.adultsQuantity = parseInt(document.getElementById('tourAdultsQuantity')?.value || 0);
+          data.childrenQuantity = parseInt(document.getElementById('tourChildrenQuantity')?.value || 0);
+          data.adultsNoAlcoholQuantity = parseInt(document.getElementById('tourAdultsNoAlcoholQuantity')?.value || 0);
+
+          // Collect tour-specific prices
+          data.adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
+          data.childPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0);
+          data.noAlcoholPrice = parseFloat(document.getElementById('tourNoAlcoholPrice')?.value || 0);
+        }
 
         // Collect schedule data - get the text content of selected option, not the index value
         const tourScheduleSelect = document.getElementById('tourMultipleTime');
@@ -1128,17 +1835,136 @@ class ItineraryBuilder {
         data.transportType = document.querySelector('input[name="transportType"]:checked')?.value;
         data.tripType = document.querySelector('input[name="tripType"]:checked')?.value;
         data.directionType = document.querySelector('input[name="directionType"]:checked')?.value;
-        data.origin = document.getElementById('transportOrigin')?.value;
-        data.destination = document.getElementById('transportDestination')?.value;
-        data.category = document.getElementById('transportCategory')?.value;
-        data.persons = parseInt(document.getElementById('transportPersons')?.value || 1);
 
-        // Collect includeGuide and includeGreeter checkbox states for transport
-        const transportGuideCheckbox = document.getElementById('includeGuide');
-        data.includeGuide = transportGuideCheckbox ? transportGuideCheckbox.checked : false;
+        // Helper: resolve SELECT display text (not slug value)
+        const resolveSelectText = (selectEl) => {
+          if (selectEl && selectEl.selectedIndex > 0) {
+            return selectEl.options[selectEl.selectedIndex].textContent;
+          }
+          const slug = selectEl?.value || '';
+          return window.slugToOriginalMapping?.get(slug) || slug;
+        };
 
-        const transportGreeterCheckbox = document.getElementById('includeGreeter');
-        data.includeGreeter = transportGreeterCheckbox ? transportGreeterCheckbox.checked : false;
+        // --- ROUND TRIP: collect from dynamic round trip fields ---
+        if (data.tripType === 'round-trip') {
+          const tType = data.transportType;
+
+          // Ida origin (arrival pattern)
+          if (tType === 'local') {
+            data.origin = document.getElementById('roundTripOriginIdaText')?.value || '';
+          } else {
+            data.origin = resolveSelectText(document.getElementById('roundTripOriginIdaSelect'));
+          }
+
+          // Ida destination (arrival pattern)
+          if (tType === 'local') {
+            data.destination = resolveSelectText(document.getElementById('roundTripDestinationIdaSelect'));
+          } else {
+            data.destination = document.getElementById('roundTripDestinationIdaCombo')?.value || '';
+          }
+
+          // Append specific location to Ida destination if filled
+          const idaSpecific = document.getElementById('roundTripSpecificLocationIda')?.value?.trim();
+          if (idaSpecific) {
+            data.destination = `${data.destination}, ${idaSpecific}`;
+          }
+
+          data.startDate = document.getElementById('roundTripDateIda')?.value || '';
+          data.startTime = document.getElementById('roundTripTimeIda')?.value || '';
+
+          // Vuelta origin (departure pattern)
+          if (tType === 'local') {
+            data.returnOrigin = resolveSelectText(document.getElementById('roundTripOriginVueltaSelect'));
+          } else {
+            data.returnOrigin = document.getElementById('roundTripOriginVueltaCombo')?.value || '';
+          }
+
+          // Append specific location to Vuelta origin if filled
+          const vueltaSpecific = document.getElementById('roundTripSpecificLocationVuelta')?.value?.trim();
+          if (vueltaSpecific) {
+            data.returnOrigin = `${data.returnOrigin}, ${vueltaSpecific}`;
+          }
+
+          // Vuelta destination (departure pattern)
+          if (tType === 'local') {
+            data.returnDestination = document.getElementById('roundTripDestinationVueltaText')?.value || '';
+          } else {
+            data.returnDestination = resolveSelectText(document.getElementById('roundTripDestinationVueltaSelect'));
+          }
+
+          data.endDate = document.getElementById('roundTripDateVuelta')?.value || '';
+          data.endTime = document.getElementById('roundTripTimeVuelta')?.value || '';
+
+          // Flight details for round trip
+          if (tType === 'aeropuerto') {
+            data.airline = document.getElementById('roundTripAirlineIda')?.value || '';
+            data.flightNumber = document.getElementById('roundTripFlightNumberIda')?.value || '';
+            data.returnAirline = document.getElementById('roundTripAirlineVuelta')?.value || '';
+            data.returnFlightNumber = document.getElementById('roundTripFlightNumberVuelta')?.value || '';
+          }
+
+          data.originName = data.origin || 'Origen';
+          const transportTypeLabels = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
+          data.concept = `${transportTypeLabels[tType] || 'Transporte'}: ${data.origin || 'Origen'} - ${data.destination || 'Destino'} (Ida y Vuelta)`;
+          data.originName = data.origin || 'Origen';
+
+        } else {
+
+        // --- ONE-WAY: existing logic ---
+
+        // Get origin from appropriate field based on direction
+        const directionType = data.directionType;
+
+        // Resolve destination from SELECT (display text, not slug)
+        const resolveDestinationSelect = () => {
+          const destSelect = document.getElementById('transportDestinationSelect');
+          const destSlug = destSelect?.value || '';
+          if (destSelect && destSelect.selectedIndex > 0) {
+            return destSelect.options[destSelect.selectedIndex].textContent;
+          }
+          return window.slugToOriginalMapping?.get(destSlug) || destSlug;
+        };
+
+        const isDepartureWithSelect = directionType === 'departure' && (data.transportType === 'aeropuerto' || data.transportType === 'punto-a-punto');
+
+        const isLocalIda = directionType === 'arrival' && data.transportType === 'local';
+
+        if (isLocalIda) {
+          // Local Ida: origin = TEXT (ubicación específica), destination = SELECT
+          data.origin = document.getElementById('transportOriginText')?.value || '';
+          data.destination = resolveDestinationSelect();
+        } else if (isDepartureWithSelect) {
+          // Departure + Aeropuerto / Punto a Punto: origin = COMBO, destination = SELECT
+          data.origin = document.getElementById('transportOriginCombo')?.value || '';
+          data.destination = resolveDestinationSelect();
+        } else if (directionType === 'departure' && data.transportType === 'local') {
+          // Local Vuelta: origin = SELECT, destination = TEXT
+          const originSelect = document.getElementById('transportOriginSelect');
+          if (originSelect && originSelect.selectedIndex > 0) {
+            data.origin = originSelect.options[originSelect.selectedIndex].textContent;
+          } else {
+            data.origin = originSelect?.value || '';
+          }
+          data.destination = document.getElementById('transportDestinationText')?.value || '';
+        } else if (directionType === 'departure') {
+          // Departure + other: origin = COMBO, destination = COMBO
+          data.origin = document.getElementById('transportOriginCombo')?.value || '';
+          data.destination = document.getElementById('transportDestinationCombo')?.value || '';
+        } else {
+          // Arrival: origin = SELECT (airport slug), destination = COMBO (text)
+          data.origin = document.getElementById('transportOriginSelect')?.value || '';
+          data.destination = document.getElementById('transportDestinationCombo')?.value || '';
+        }
+
+        // If specific location is filled, append it to origin (departure) or destination (arrival)
+        const specificLocation = document.getElementById('transportSpecificLocation')?.value;
+        if (specificLocation && specificLocation.trim()) {
+          if (directionType === 'departure') {
+            data.origin = `${data.origin}, ${specificLocation.trim()}`;
+          } else {
+            data.destination = `${data.destination}, ${specificLocation.trim()}`;
+          }
+        }
 
         // Flight details (if airport transport)
         if (data.transportType === 'aeropuerto') {
@@ -1147,17 +1973,34 @@ class ItineraryBuilder {
           data.startTime = data.flightTime; // Use flight time for sorting
           data.airline = document.getElementById('airline')?.value;
         } else {
-          data.startTime = ''; // No time for non-airport transport
+          // Punto a Punto / Local: collect schedule fields
+          const transportStartTime = document.getElementById('transportStartTime')?.value;
+          const transportEndTime = document.getElementById('transportEndTime')?.value;
+          data.startTime = transportStartTime || '';
+          data.endTime = transportEndTime || '';
+          if (transportStartTime) {
+            data.selectedSchedule = transportEndTime ? `${transportStartTime} - ${transportEndTime}` : transportStartTime;
+          }
         }
 
-        // Generate concept based on selection
-        const origins = {
-          cancun: 'Cancún',
-          'playa-del-carmen': 'Playa del Carmen',
-          tulum: 'Tulum',
-          cozumel: 'Cozumel',
-          merida: 'Mérida',
-          'chichen-itza': 'Chichén Itzá',
+        // Resolve origin display name from the active field
+        const resolveOriginName = () => {
+          if (isLocalIda) {
+            // Local Ida: origin is TEXT field
+            const originText = document.getElementById('transportOriginText')?.value;
+            if (originText) return originText;
+          } else if (directionType === 'departure') {
+            // All departure: origin is COMBO text field
+            const originCombo = document.getElementById('transportOriginCombo')?.value;
+            if (originCombo) return originCombo;
+          } else {
+            // Arrival: origin is SELECT
+            const originSelect = document.getElementById('transportOriginSelect');
+            if (originSelect && originSelect.selectedIndex > 0) {
+              return originSelect.options[originSelect.selectedIndex].textContent;
+            }
+          }
+          return data.origin || 'Origen';
         };
 
         const transportTypes = {
@@ -1167,9 +2010,69 @@ class ItineraryBuilder {
         };
 
         // Generate concept with origin and destination
-        const originName = origins[data.origin] || 'Origen';
+        let originName = resolveOriginName();
+        // For departure, append specific location to display name (matches data.origin)
+        if (directionType === 'departure' && specificLocation && specificLocation.trim()) {
+          originName = `${originName}, ${specificLocation.trim()}`;
+        }
+        data.originName = originName;
         const destinationName = data.destination || 'Destino';
         data.concept = `${transportTypes[data.transportType] || 'Transporte'}: ${originName} - ${destinationName}`;
+        } // end one-way else block
+
+        // Shared transport fields (both one-way and round-trip)
+        data.category = document.getElementById('transportCategory')?.value;
+
+        data.transportAdults = parseInt(document.getElementById('transportAdults')?.value || 0);
+        data.transportChildren = parseInt(document.getElementById('transportChildren')?.value || 0);
+        data.transportInfants = parseInt(document.getElementById('transportInfants')?.value || 0);
+        data.persons = data.transportAdults + data.transportChildren + data.transportInfants || 1;
+
+        data.includeGuide = document.getElementById('includeGuide')?.checked || false;
+        data.includeGreeter = document.getElementById('includeGreeter')?.checked || false;
+
+        // Persist route duration for pricing calculations (Guía/Greeter surcharges)
+        data.routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
+
+        // Store base vehicle price separately so calculateServicePrice can add surcharges
+        // (the price field may already include surcharges from recalculateTransportPrice)
+        if (vehicleSelectValue) {
+          data.baseVehiclePrice = this.getTransportVehiclePrice(vehicleSelectValue) || data.price;
+        } else {
+          data.baseVehiclePrice = data.price;
+        }
+
+        // Waiting time (Tiempo de espera)
+        data.waitingTimeHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
+        data.waitingTimePricePerHour = this.getWaitingTimePrice()?.pricePerHour || 0;
+        break;
+      }
+      case 'a-disposicion': {
+        data.rateId = document.getElementById('aDisposicionRate')?.value;
+        data.vehicleType = document.getElementById('aDisposicionVehicle')?.value;
+        data.vehicleCount = parseInt(document.getElementById('aDisposicionVehicleCount')?.value || 1, 10);
+        data.hours = parseFloat(document.getElementById('aDisposicionHours')?.value || 4);
+        data.hourlyPrice = this._disposicionHourlyRate || 0;
+        data.discountPercent = this.getADisposicionDiscount(data.hours);
+
+        // Store vehicle name for display
+        const adVehicleSelect = document.getElementById('aDisposicionVehicle');
+        if (adVehicleSelect?.selectedIndex > 0) {
+          data.vehicleTypeName = adVehicleSelect.options[adVehicleSelect.selectedIndex].text;
+        }
+
+        // Collect schedule
+        const adStartTime = document.getElementById('aDisposicionStartTime')?.value;
+        const adEndTime = document.getElementById('aDisposicionEndTime')?.value;
+        if (adStartTime) {
+          data.startTime = adStartTime;
+          if (adEndTime) {
+            data.endTime = adEndTime;
+            data.selectedSchedule = `${adStartTime} - ${adEndTime}`;
+          } else {
+            data.selectedSchedule = adStartTime;
+          }
+        }
         break;
       }
       case 'concepto': {
@@ -1258,10 +2161,30 @@ class ItineraryBuilder {
           this.showModalAlert('serviceModalAlert', 'Por favor ingresa un número válido de personas', 'warning');
           return false;
         }
+        if (data.tripType === 'round-trip') {
+          if (!data.startDate) {
+            this.showModalAlert('serviceModalAlert', 'Por favor selecciona la fecha de Ida', 'warning');
+            return false;
+          }
+          if (!data.endDate) {
+            this.showModalAlert('serviceModalAlert', 'Por favor selecciona la fecha de Vuelta', 'warning');
+            return false;
+          }
+        }
         break;
       case 'concepto':
         if (!data.concept) {
           this.showModalAlert('serviceModalAlert', 'Por favor ingresa un concepto', 'warning');
+          return false;
+        }
+        break;
+      case 'a-disposicion':
+        if (!data.rateId) {
+          this.showModalAlert('serviceModalAlert', 'Por favor selecciona un segmento', 'warning');
+          return false;
+        }
+        if (!data.vehicleType) {
+          this.showModalAlert('serviceModalAlert', 'Por favor selecciona un vehículo', 'warning');
           return false;
         }
         break;
@@ -1270,7 +2193,7 @@ class ItineraryBuilder {
     return true;
   }
 
-  populateServiceForm(service) {
+  async populateServiceForm(service) {
     if (!service) return;
 
     // Set service type
@@ -1278,6 +2201,12 @@ class ItineraryBuilder {
     if (serviceTypeRadio) {
       serviceTypeRadio.checked = true;
       this.handleServiceTypeChange(service.type);
+    }
+
+    // Populate include in total checkbox
+    const includeInTotalCheckbox = document.getElementById('includeInTotal');
+    if (includeInTotalCheckbox) {
+      includeInTotalCheckbox.checked = service.includeInTotal !== false;
     }
 
     // Populate common fields
@@ -1299,8 +2228,6 @@ class ItineraryBuilder {
     }
     document.getElementById('serviceQuantity').value = service.quantity || 1;
     document.getElementById('serviceNotes').value = service.notes || '';
-    document.getElementById('currencySelect').value = service.currency || 'MXN';
-    document.getElementById('priceTypeSelect').value = service.priceType || 'efectivo';
 
     // Handle guide/driver checkbox
     const includeGuideCheckbox = document.getElementById('includeGuide');
@@ -1313,6 +2240,23 @@ class ItineraryBuilder {
     if (includeGreeterCheckbox) {
       includeGreeterCheckbox.checked = service.includeGreeter || false;
     }
+
+    // Populate greeter in vehicle checkbox (must be after includeGreeter is set)
+    const greeterInVehicleCheckbox = document.getElementById('greeterInVehicle');
+    const greeterInVehicleContainer = document.getElementById('greeterInVehicleContainer');
+    if (greeterInVehicleContainer) {
+      if (service.includeGreeter) {
+        greeterInVehicleContainer.classList.remove('d-none');
+      } else {
+        greeterInVehicleContainer.classList.add('d-none');
+      }
+    }
+    if (greeterInVehicleCheckbox) {
+      greeterInVehicleCheckbox.checked = service.greeterInVehicle || false;
+    }
+
+    // Update capacity note after all checkboxes are set
+    this.updateVehicleCapacityNote();
 
     // Type-specific population
     switch (service.type) {
@@ -1336,7 +2280,7 @@ class ItineraryBuilder {
 
           // Check if all fields are available and visible
           if (adultsQuantityField && childrenQuantityField && adultsNoAlcoholQuantityField
-                        && experienceContent && !experienceContent.classList.contains('d-none')) {
+            && experienceContent && !experienceContent.classList.contains('d-none')) {
             // Populate the fields
             if (service.adultsQuantity !== undefined) {
               adultsQuantityField.value = service.adultsQuantity;
@@ -1406,6 +2350,24 @@ class ItineraryBuilder {
           this.handleTourSelection(service.tourId);
         }
 
+        // Walking tour: restore people count and tier highlight
+        if (service.isWalkingTour) {
+          setTimeout(() => {
+            const peopleCountField = document.getElementById('walkingTourPeopleCount');
+            if (peopleCountField && service.walkingTourPeopleCount !== undefined) {
+              peopleCountField.value = service.walkingTourPeopleCount;
+            }
+            // Re-highlight the correct tier
+            if (this.toursCache.has('all')) {
+              const walkingTourData = this.toursCache.get('all').find(
+                (t) => (t.id === service.tourId || t.objectId === service.tourId) && t.isWalkingTour,
+              );
+              if (walkingTourData) this.highlightWalkingTourTier(walkingTourData);
+            }
+          }, 300);
+          break;
+        }
+
         // Handle transport/vehicle information for tours
         const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
 
@@ -1455,7 +2417,7 @@ class ItineraryBuilder {
 
           // Check if all fields are available and visible
           if (tourAdultsQuantityField && tourChildrenQuantityField && tourAdultsNoAlcoholQuantityField
-                        && tourContent && !tourContent.classList.contains('d-none')) {
+            && tourContent && !tourContent.classList.contains('d-none')) {
             // Populate the fields
             if (service.adultsQuantity !== undefined) {
               tourAdultsQuantityField.value = service.adultsQuantity;
@@ -1491,6 +2453,9 @@ class ItineraryBuilder {
         break;
 
       case 'transport':
+        // Use flag to prevent clearTransportFormFields during edit population
+        this._populatingTransportForm = true;
+
         if (service.transportType) {
           const transportTypeRadio = document.querySelector(`input[name="transportType"][value="${service.transportType}"]`);
           if (transportTypeRadio) {
@@ -1507,18 +2472,80 @@ class ItineraryBuilder {
           }
         }
 
+        // Helper: set SELECT value by slug or by matching option text (for display names)
+        const setSelectByValueOrText = (selectEl, val) => {
+          if (!selectEl || !val) return;
+          selectEl.value = val;
+          if (selectEl.value === val) return;
+          for (let i = 0; i < selectEl.options.length; i++) {
+            if (selectEl.options[i].textContent.trim() === val.trim()) {
+              selectEl.selectedIndex = i;
+              return;
+            }
+          }
+        };
+
+        // Helper: split "San Miguel de Allende, Hotel Rosewood" → { baseName, specificLocation }
+        // Checks if the part before the first comma matches a known specific-location city
+        const splitSpecificLocation = (value) => {
+          if (!value || !value.includes(',')) return { baseName: value || '', specificLocation: '' };
+          const commaIdx = value.indexOf(',');
+          const candidate = value.substring(0, commaIdx).trim();
+          const rest = value.substring(commaIdx + 1).trim();
+          // Check if the base part is a known city that uses specific location
+          const knownCities = ['San Miguel de Allende', 'San Miguel Allende', 'Centro San Miguel de Allende',
+            'Guanajuato Capital', 'León', 'Ciudad de México', 'CDMX'];
+          const isKnown = knownCities.some(c => candidate.toLowerCase().includes(c.toLowerCase()));
+          if (isKnown && rest) {
+            return { baseName: candidate, specificLocation: rest };
+          }
+          return { baseName: value, specificLocation: '' };
+        };
+
         // Populate transport fields based on trip type
         if (service.tripType === 'round-trip') {
-          // Round trip fields
-          document.getElementById('roundTripOriginIdaSelect').value = service.origin || '';
-          document.getElementById('roundTripDestinationIda').value = service.destination || '';
+          // Round trip fields — set into whichever field is visible per transport type
+          // Ida origin
+          const idaOriginSelect = document.getElementById('roundTripOriginIdaSelect');
+          const idaOriginText = document.getElementById('roundTripOriginIdaText');
+          if (idaOriginSelect && !idaOriginSelect.classList.contains('d-none')) {
+            setSelectByValueOrText(idaOriginSelect, service.origin);
+          }
+          if (idaOriginText && !idaOriginText.classList.contains('d-none')) {
+            idaOriginText.value = service.origin || '';
+          }
+          // Ida destination
+          const idaDestCombo = document.getElementById('roundTripDestinationIdaCombo');
+          const idaDestSelect = document.getElementById('roundTripDestinationIdaSelect');
+          if (idaDestCombo && !document.getElementById('roundTripDestinationIdaComboWrapper')?.classList.contains('d-none')) {
+            idaDestCombo.value = service.destination || '';
+          }
+          if (idaDestSelect && !idaDestSelect.classList.contains('d-none')) {
+            setSelectByValueOrText(idaDestSelect, service.destination);
+          }
           document.getElementById('roundTripDateIda').value = service.startDate || '';
           document.getElementById('roundTripTimeIda').value = service.startTime || '';
-          document.getElementById('roundTripOriginVuelta').value = service.returnOrigin || '';
-          document.getElementById('roundTripDestinationVueltaSelect').value = service.returnDestination || '';
+
+          // Vuelta origin
+          const vueltaOriginCombo = document.getElementById('roundTripOriginVueltaCombo');
+          const vueltaOriginSelect = document.getElementById('roundTripOriginVueltaSelect');
+          if (vueltaOriginCombo && !document.getElementById('roundTripOriginVueltaComboWrapper')?.classList.contains('d-none')) {
+            vueltaOriginCombo.value = service.returnOrigin || '';
+          }
+          if (vueltaOriginSelect && !vueltaOriginSelect.classList.contains('d-none')) {
+            setSelectByValueOrText(vueltaOriginSelect, service.returnOrigin);
+          }
+          // Vuelta destination
+          const vueltaDestSelect = document.getElementById('roundTripDestinationVueltaSelect');
+          const vueltaDestText = document.getElementById('roundTripDestinationVueltaText');
+          if (vueltaDestSelect && !vueltaDestSelect.classList.contains('d-none')) {
+            setSelectByValueOrText(vueltaDestSelect, service.returnDestination);
+          }
+          if (vueltaDestText && !vueltaDestText.classList.contains('d-none')) {
+            vueltaDestText.value = service.returnDestination || '';
+          }
           document.getElementById('roundTripDateVuelta').value = service.endDate || '';
           document.getElementById('roundTripTimeVuelta').value = service.endTime || '';
-          document.getElementById('roundTripPersons').value = service.persons || 1;
 
           // Flight details
           if (service.airline) {
@@ -1536,24 +2563,151 @@ class ItineraryBuilder {
             if (directionTypeRadio) {
               directionTypeRadio.checked = true;
               this.handleDirectionTypeChange();
+              // Re-populate dropdowns for correct direction (departure vs arrival have different options)
+              if (typeof populateDropdownsForTransportType === 'function') {
+                populateDropdownsForTransportType(service.transportType, service.directionType);
+              }
             }
           }
 
-          document.getElementById('transportOriginSelect').value = service.origin || '';
-          document.getElementById('transportOriginText').value = service.origin || '';
-          document.getElementById('transportDestinationText').value = service.destination || '';
-          document.getElementById('transportDestinationSelect').value = service.destination || '';
-          document.getElementById('transportPersons').value = service.persons || 1;
+          // Split specific location from origin/destination if embedded (e.g., "San Miguel, Hotel X")
+          const originSplit = splitSpecificLocation(service.origin);
+          const destSplit = splitSpecificLocation(service.destination);
+          let extractedSpecificLocation = '';
 
-          // Flight details
-          if (service.airline) {
-            document.getElementById('airline').value = service.airline;
-            document.getElementById('flightNumber').value = service.flightNumber || '';
-            document.getElementById('flightTime').value = service.startTime || '';
+          // Set origin/destination in the correct fields based on direction
+          const isDeparture = service.directionType === 'departure';
+          const isDepartureWithSelect = isDeparture && (service.transportType === 'aeropuerto' || service.transportType === 'punto-a-punto');
+          const isLocalIda = !isDeparture && service.transportType === 'local';
+          if (isLocalIda) {
+            // Local Ida: origin = TEXT, destination = SELECT
+            document.getElementById('transportOriginText').value = originSplit.baseName;
+            setSelectByValueOrText(document.getElementById('transportDestinationSelect'), destSplit.baseName);
+          } else if (isDepartureWithSelect) {
+            // Departure + Aeropuerto / Punto a Punto: origin = COMBO, destination = SELECT
+            document.getElementById('transportOriginCombo').value = originSplit.baseName;
+            setSelectByValueOrText(document.getElementById('transportDestinationSelect'), destSplit.baseName);
+            extractedSpecificLocation = originSplit.specificLocation; // departure: specific is on origin
+          } else if (isDeparture && service.transportType === 'local') {
+            // Local Vuelta: origin = SELECT, destination = TEXT
+            setSelectByValueOrText(document.getElementById('transportOriginSelect'), originSplit.baseName);
+            document.getElementById('transportDestinationText').value = destSplit.baseName;
+          } else if (isDeparture) {
+            // Departure + other: origin = COMBO, destination = COMBO
+            document.getElementById('transportOriginCombo').value = originSplit.baseName;
+            document.getElementById('transportDestinationCombo').value = destSplit.baseName;
+            extractedSpecificLocation = originSplit.specificLocation;
+          } else {
+            // Arrival: origin = SELECT, destination = COMBO
+            setSelectByValueOrText(document.getElementById('transportOriginSelect'), originSplit.baseName);
+            document.getElementById('transportDestinationCombo').value = destSplit.baseName;
+            extractedSpecificLocation = destSplit.specificLocation; // arrival: specific is on destination
           }
+          document.getElementById('transportOriginText').value = originSplit.baseName;
+
+          // Populate the new people fields for transport
+          document.getElementById('transportAdults').value = service.transportAdults || 0;
+          document.getElementById('transportChildren').value = service.transportChildren || 0;
+          document.getElementById('transportInfants').value = service.transportInfants || 0;
+
+          // Restore specific location — from explicit field or extracted from origin/destination
+          const specificToRestore = service.specificLocation || extractedSpecificLocation;
+          if (specificToRestore) {
+            const specificLocationField = document.getElementById('transportSpecificLocation');
+            if (specificLocationField) specificLocationField.value = specificToRestore;
+            const specificLocationRow = document.getElementById('specificLocationRow');
+            if (specificLocationRow) specificLocationRow.classList.remove('d-none');
+          }
+
+          // Populate the new people fields for transport
+          document.getElementById('transportAdults').value = service.transportAdults || 0;
+          document.getElementById('transportChildren').value = service.transportChildren || 0;
+          document.getElementById('transportInfants').value = service.transportInfants || 0;
+
+          // Flight details (airport)
+          if (service.transportType === 'aeropuerto') {
+            if (service.airline) document.getElementById('airline').value = service.airline;
+            if (service.flightNumber) document.getElementById('flightNumber').value = service.flightNumber;
+            if (service.startTime) document.getElementById('flightTime').value = service.startTime;
+          } else {
+            // Punto a Punto / Local: restore schedule fields
+            if (service.startTime) document.getElementById('transportStartTime').value = service.startTime;
+            if (service.endTime) document.getElementById('transportEndTime').value = service.endTime;
+          }
+        }
+
+        // Restore category/segmento and trigger vehicle population
+        if (service.category) {
+          document.getElementById('transportCategory').value = service.category;
+          const savedPrice = service.price || 0;
+          // Trigger rate selection to fetch and populate vehicles
+          // Pass origin/destination from service data as fallback for race conditions
+          // Strip specific location suffix from origin/destination for API lookup
+          const editOrigin = (service.originName || service.origin || '').split(',')[0].trim();
+          const editDestination = (service.destination || '').split(',')[0].trim();
+          this.handleTransportRateSelection(service.category, editOrigin, editDestination).then(() => {
+            // After vehicles are loaded, set the saved vehicle
+            if (service.vehicleType) {
+              const vehicleSelect = document.getElementById('vehicleSelect');
+              if (vehicleSelect) {
+                vehicleSelect.value = service.vehicleType;
+                // Fallback: match by vehicle name if ID doesn't match
+                if (!vehicleSelect.value && service.vehicleTypeName) {
+                  for (let i = 0; i < vehicleSelect.options.length; i++) {
+                    if (vehicleSelect.options[i].textContent.includes(service.vehicleTypeName)) {
+                      vehicleSelect.selectedIndex = i;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+            // Restore price (populateTransportVehicleDropdown resets it to 0)
+            document.getElementById('servicePrice').value = savedPrice;
+            // Update capacity note now that vehicle is populated
+            this.updateVehicleCapacityNote();
+            // Restore waiting time
+            if (service.waitingTimeHours > 0) {
+              const wtHoursField = document.getElementById('waitingTimeHours');
+              if (wtHoursField) wtHoursField.value = service.waitingTimeHours;
+            }
+            this.updateWaitingTimeRateDisplay();
+            // Clear flag after async population is complete
+            this._populatingTransportForm = false;
+          });
+        } else {
+          // Restore waiting time even without category
+          if (service.waitingTimeHours > 0) {
+            const wtHoursField = document.getElementById('waitingTimeHours');
+            if (wtHoursField) wtHoursField.value = service.waitingTimeHours;
+          }
+          this._populatingTransportForm = false;
         }
         break;
 
+      case 'a-disposicion':
+        if (service.startTime) document.getElementById('aDisposicionStartTime').value = service.startTime;
+        if (service.endTime) document.getElementById('aDisposicionEndTime').value = service.endTime;
+
+        // Restore rate → load vehicles → set vehicle → recalculate price
+        if (service.rateId) {
+          const adRateSelect = document.getElementById('aDisposicionRate');
+          if (adRateSelect) {
+            adRateSelect.value = service.rateId;
+            await this.handleADisposicionRateChange(service.rateId);
+            if (service.vehicleType) {
+              document.getElementById('aDisposicionVehicle').value = service.vehicleType;
+            }
+          }
+        }
+        if (service.vehicleCount) {
+          document.getElementById('aDisposicionVehicleCount').value = service.vehicleCount;
+        }
+        if (service.hours) {
+          document.getElementById('aDisposicionHours').value = service.hours;
+        }
+        await this.calculateADisposicionPrice();
+        break;
       case 'concepto':
         document.getElementById('conceptoConcept').value = service.concept || '';
 
@@ -1648,7 +2802,11 @@ class ItineraryBuilder {
 
   renderDayCard(day) {
     const services = day.services.map((sid) => this.services.get(sid)).filter(Boolean);
-    const dayTotal = services.reduce((sum, service) => sum + (this.calculateServicePrice(service) * service.quantity), 0);
+    const dayTotalMXN = services.reduce((sum, service) => {
+      if (service.includeInTotal === false) return sum;
+      return sum + (this.calculateServicePrice(service) * (service.type === 'transport' ? 1 : service.quantity));
+    }, 0);
+    const dayTotal = this.getDisplayPrice(dayTotalMXN);
 
     return `
             <div class="day-card mb-4" data-day-id="${day.id}" id="day-${day.id}" draggable="false">
@@ -1699,6 +2857,16 @@ class ItineraryBuilder {
                             <span class="text-muted">Total del día:</span>
                             <span class="fw-bold day-total">${this.formatCurrency(dayTotal)}</span>
                         </div>
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <span class="text-muted d-flex align-items-center gap-1">
+                                Total por persona
+                                <span class="d-inline-flex align-items-center">
+                                    (<input type="number" class="day-person-count-input" value="${this.numberOfPeople || 0}" min="0" style="width: 40px; border: none; border-bottom: 1px dashed #6c757d; background: transparent; text-align: center; padding: 0; font-size: inherit; color: inherit; outline: none;">
+)
+                                </span>
+                            </span>
+                            <span class="fw-semibold text-info day-per-person">${this.numberOfPeople > 0 ? this.formatCurrency(dayTotal / this.numberOfPeople) : '$0.00'}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1706,10 +2874,17 @@ class ItineraryBuilder {
   }
 
   renderServiceItem(service) {
+    if (service.type === 'transport') {
+      return this.renderTransportServiceItem(service);
+    }
+
+    const badgeLabel = (service.type === 'tour' && service.isWalkingTour)
+      ? 'Tour a Pie' : null;
     const typeLabels = {
       experience: 'Experiencia',
       tour: 'Tour',
       transport: 'Transporte',
+      'a-disposicion': 'A Disposición',
       concepto: 'Concepto',
     };
 
@@ -1720,7 +2895,7 @@ class ItineraryBuilder {
                         <div class="d-flex align-items-start mb-2">
                             <div class="flex-grow-1">
                                 <div class="d-flex align-items-center mb-1">
-                                    <span class="badge bg-light text-dark me-2">${typeLabels[service.type]}</span>
+                                    <span class="badge bg-light text-dark me-2">${badgeLabel || typeLabels[service.type] || service.type}</span>
                                     <h6 class="mb-0 service-title">${this.getServiceTitle(service)}</h6>
                                 </div>
                                 <div class="service-details">
@@ -1764,6 +2939,14 @@ class ItineraryBuilder {
                                             </div>
                                         </div>
                                     ` : ''}
+                                    ${service.type === 'transport' && service.waitingTimeHours > 0 ? `
+                                        <div class="row g-2 text-warning small mt-1">
+                                            <div class="col-auto">
+                                                <i class="ti ti-clock me-1"></i>
+                                                <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
+                                            </div>
+                                        </div>
+                                    ` : ''}
                                     ${service.notes ? `
                                         <div class="service-notes mt-1 text-muted small d-flex align-items-start">
                                             <i class="ti ti-notes me-1"></i>
@@ -1777,23 +2960,147 @@ class ItineraryBuilder {
                     <div class="d-flex flex-column align-items-end">
                         <div class="service-actions mb-2">
                             <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-light edit-service-btn" 
+                                <button type="button" class="btn btn-light edit-service-btn"
                                         data-day-id="${service.dayId}" data-service-id="${service.id}" title="Editar">
                                     <i class="ti ti-pencil"></i>
                                 </button>
-                                <button type="button" class="btn btn-light duplicate-service-btn" 
+                                <button type="button" class="btn btn-light duplicate-service-btn"
                                         data-service-id="${service.id}" title="Duplicar">
                                     <i class="ti ti-copy"></i>
                                 </button>
-                                <button type="button" class="btn btn-light delete-service-btn" 
+                                <button type="button" class="btn btn-light delete-service-btn"
                                         data-service-id="${service.id}" title="Eliminar">
                                     <i class="ti ti-trash"></i>
                                 </button>
                             </div>
                         </div>
-                        <div class="fw-semibold text-primary">
-                            ${this.formatCurrency(this.calculateServicePrice(service))}
+                        ${service.includeInTotal === false ? `
+                        <span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span>
+                        ` : ''}
+                        <div class="fw-semibold ${service.includeInTotal === false ? 'text-muted text-decoration-line-through' : 'text-primary'}">
+                            ${this.formatCurrency(this.getDisplayPrice(this.calculateServicePrice(service)))}
                         </div>
+                        <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
+                                data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
+                            <i class="ti ${service.includeInTotal === false ? 'ti-circle-plus text-success' : 'ti-circle-minus text-muted'}" style="font-size: 0.85rem;"></i>
+                            <small class="${service.includeInTotal === false ? 'text-success' : 'text-muted'}" style="font-size: 0.7rem;">${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}</small>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+  }
+
+  renderTransportServiceItem(service) {
+    const transportTypes = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
+    const transportLabel = transportTypes[service.transportType] || 'Transporte';
+    const origin = service.originName || service.origin || 'Origen';
+    const destination = service.destination || 'Destino';
+    const vehicleName = this.getVehicleDisplayName(service);
+    const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
+    const isAirport = service.transportType === 'aeropuerto';
+
+    return `
+            <div class="service-item mb-3 p-3 border rounded hover-shadow ${service.hasOverlap ? 'has-overlap' : ''}" data-service-id="${service.id}">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-light text-dark me-2">Transporte</span>
+                            <span class="badge bg-primary-subtle text-primary">${transportLabel}</span>
+                            ${service.directionType ? `<span class="badge ${service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">${(service.transportType === 'punto-a-punto' || service.transportType === 'local') ? (service.directionType === 'arrival' ? 'Ida' : 'Vuelta') : (service.directionType === 'arrival' ? 'Llegada' : 'Salida')}</span>` : ''}
+                        </div>
+                        <div class="service-details">
+                            <!-- Route display -->
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <div class="d-flex align-items-center gap-2 small" style="line-height: 1.6;">
+                                    <div class="d-flex flex-column align-items-center" style="min-width: 14px;">
+                                        <i class="ti ti-circle-filled text-success" style="font-size: 0.5rem;"></i>
+                                        <div style="width: 1.5px; height: 16px; background: linear-gradient(to bottom, #198754, #6c757d);"></div>
+                                        <i class="ti ti-map-pin-filled text-danger" style="font-size: 0.7rem;"></i>
+                                    </div>
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-medium">${origin}</span>
+                                        <span class="fw-medium">${destination}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Time -->
+                            ${service.selectedSchedule || service.startTime ? `
+                                <div class="d-flex align-items-center text-muted small mb-1">
+                                    <i class="ti ti-clock me-1"></i>
+                                    ${isAirport ? '<span class="text-muted me-1">Hora:</span>' : ''}
+                                    ${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}
+                                    ${service.hasOverlap ? `
+                                        <span class="text-danger ms-2" title="${this.getOverlapTooltip(service)}">
+                                            <i class="ti ti-alert-triangle"></i>
+                                            <small>Conflicto de horario</small>
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            ` : ''}
+                            ${this.renderPeopleQuantities(service)}
+                            <!-- Vehicle -->
+                            ${hasVehicle ? `
+                                <div class="d-flex align-items-center text-muted small mt-1">
+                                    <i class="ti ti-car me-1"></i>
+                                    ${vehicleName}
+                                    ${service.quantity > 1 ? ` x${service.quantity}` : ''}
+                                </div>
+                            ` : ''}
+                            ${service.includeGuide ? `
+                                <div class="d-flex align-items-center text-success small mt-1">
+                                    <i class="ti ti-user me-1"></i>
+                                    <strong>Incluye Guía + Chofer</strong>
+                                </div>
+                            ` : ''}
+                            ${service.includeGreeter ? `
+                                <div class="d-flex align-items-center text-info small mt-1">
+                                    <i class="ti ti-users me-1"></i>
+                                    <strong>Incluye Greeter</strong>
+                                </div>
+                            ` : ''}
+                            ${service.waitingTimeHours > 0 ? `
+                                <div class="d-flex align-items-center text-warning small mt-1">
+                                    <i class="ti ti-clock me-1"></i>
+                                    <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
+                                </div>
+                            ` : ''}
+                            ${service.notes ? `
+                                <div class="service-notes mt-1 text-muted small d-flex align-items-start">
+                                    <i class="ti ti-notes me-1"></i>
+                                    <span>${service.notes}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div class="d-flex flex-column align-items-end">
+                        <div class="service-actions mb-2">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-light edit-service-btn"
+                                        data-day-id="${service.dayId}" data-service-id="${service.id}" title="Editar">
+                                    <i class="ti ti-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-light duplicate-service-btn"
+                                        data-service-id="${service.id}" title="Duplicar">
+                                    <i class="ti ti-copy"></i>
+                                </button>
+                                <button type="button" class="btn btn-light delete-service-btn"
+                                        data-service-id="${service.id}" title="Eliminar">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        ${service.includeInTotal === false ? `
+                        <span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span>
+                        ` : ''}
+                        <div class="fw-semibold ${service.includeInTotal === false ? 'text-muted text-decoration-line-through' : 'text-primary'}">
+                            ${this.formatCurrency(this.getDisplayPrice(this.calculateServicePrice(service)))}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
+                                data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
+                            <i class="ti ${service.includeInTotal === false ? 'ti-circle-plus text-success' : 'ti-circle-minus text-muted'}" style="font-size: 0.85rem;"></i>
+                            <small class="${service.includeInTotal === false ? 'text-success' : 'text-muted'}" style="font-size: 0.7rem;">${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}</small>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1807,6 +3114,11 @@ class ItineraryBuilder {
 
   calculateServicePrice(service) {
     // console.log('🔍 calculateServicePrice called for service:', service.type, service.id || 'no-id');
+
+    // Walking tour: return the tier-based price directly
+    if (service.type === 'tour' && service.isWalkingTour) {
+      return service.walkingTourPrice || service.price || 0;
+    }
 
     // For experience and tour services, calculate based on people quantities and individual prices
     if (service.type === 'experience' || service.type === 'tour') {
@@ -1842,8 +3154,8 @@ class ItineraryBuilder {
       // If we have individual prices, calculate based on quantities
       if (adultPrice > 0 || childPrice > 0 || noAlcoholPrice > 0) {
         totalPrice = (adultsQuantity * adultPrice)
-                            + (childrenQuantity * childPrice)
-                            + (adultsNoAlcoholQuantity * noAlcoholPrice);
+          + (childrenQuantity * childPrice)
+          + (adultsNoAlcoholQuantity * noAlcoholPrice);
 
         if (service.type === 'tour') {
           // console.log('👥 calculateServicePrice - People total calculated:', totalPrice);
@@ -1870,8 +3182,30 @@ class ItineraryBuilder {
       return totalPrice;
     }
 
+    // For transport services: (vehiclePrice * quantity) + Guía + Greeter
+    // Returns the full total so callers should NOT multiply by quantity again
+    if (service.type === 'transport') {
+      const vehiclePrice = service.baseVehiclePrice || service.price || 0;
+      const quantity = service.quantity || 1;
+      let totalPrice = vehiclePrice * quantity;
+
+      if (service.includeGuide && service.routeDuration) {
+        totalPrice += this.calculateGuideTransportCost(service.routeDuration);
+      }
+
+      if (service.includeGreeter && service.routeDuration) {
+        totalPrice += this.calculateGreeterPrice(service.routeDuration);
+      }
+
+      // Waiting time (Tiempo de espera)
+      if (service.waitingTimeHours > 0 && service.waitingTimePricePerHour > 0) {
+        totalPrice += service.waitingTimePricePerHour * service.waitingTimeHours;
+      }
+
+      return totalPrice;
+    }
+
     // For other service types or when no individual prices, use the regular price
-    // console.log('🔍 calculateServicePrice: Using fallback price for type:', service.type, 'Price:', service.price || 0);
     return service.price || 0;
   }
 
@@ -1916,6 +3250,25 @@ class ItineraryBuilder {
     if ((service.type === 'experience' || service.type === 'tour' || service.type === 'concepto') && (service.adultsQuantity || service.childrenQuantity || service.adultsNoAlcoholQuantity)) {
     }
 
+    // Show people quantities for transport services
+    if (service.type === 'transport') {
+      const adults = service.transportAdults || 0;
+      const children = service.transportChildren || 0;
+      const infants = service.transportInfants || 0;
+      if (adults > 0 || children > 0 || infants > 0) {
+        const parts = [];
+        if (adults > 0) parts.push(`<span class="badge bg-primary-subtle text-primary d-inline-flex align-items-center gap-1 me-2 mb-1"><i class="ti ti-user fs-6"></i><span>${adults} adulto${adults > 1 ? 's' : ''}</span></span>`);
+        if (children > 0) parts.push(`<span class="badge bg-success-subtle text-success d-inline-flex align-items-center gap-1 me-2 mb-1"><i class="ti ti-mood-kid fs-6"></i><span>${children} niño${children > 1 ? 's' : ''} (3-12)</span></span>`);
+        if (infants > 0) parts.push(`<span class="badge bg-warning-subtle text-warning d-inline-flex align-items-center gap-1 me-2 mb-1"><i class="ti ti-baby-carriage fs-6"></i><span>${infants} infante${infants > 1 ? 's' : ''} (0-2)</span></span>`);
+        let flightHtml = '';
+        if (service.transportType === 'aeropuerto' && service.flightNumber) {
+          flightHtml = `<span class="badge bg-secondary-subtle text-secondary d-inline-flex align-items-center gap-1 me-2 mb-1"><i class="ti ti-plane fs-6"></i><span>${service.airline ? service.airline + ' ' : ''}${service.flightNumber}</span></span>`;
+        }
+        return `<div class="people-quantities mt-2 d-flex flex-wrap align-items-center">${parts.join('')}${flightHtml}</div>`;
+      }
+      return '';
+    }
+
     // Show people quantities for experiences, tours, and concepto services
     if (service.type !== 'experience' && service.type !== 'tour' && service.type !== 'concepto') {
       return '';
@@ -1941,7 +3294,7 @@ class ItineraryBuilder {
       if (childrenQuantity > 0) {
         quantitiesHtml.push(`
                     <span class="badge bg-success-subtle text-success d-inline-flex align-items-center gap-1 me-2 mb-1">
-                        <i class="ti ti-baby-carriage fs-6"></i>
+                        <i class="ti ti-mood-kid fs-6"></i>
                         <span>${childrenQuantity} niño${childrenQuantity > 1 ? 's' : ''}</span>
                     </span>
                 `);
@@ -1970,12 +3323,49 @@ class ItineraryBuilder {
   }
 
   formatCurrency(amount) {
+    const currency = document.getElementById('currencySelect')?.value || 'MXN';
+    if (currency === 'USD') {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount);
+    }
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
       currency: 'MXN',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+  }
+
+  /**
+   * Apply payment surcharge + currency conversion for display.
+   * All internal prices stay in MXN; this is display-only.
+   */
+  getDisplayPrice(mxnPrice) {
+    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    const currency = document.getElementById('currencySelect')?.value || 'MXN';
+
+    // Step 1: Apply payment surcharge
+    let withSurcharge = mxnPrice;
+    if (window.PricingUtils) {
+      withSurcharge = PricingUtils.applyPaymentRate(
+        mxnPrice, paymentType, this.transferRate, this.agencyRate
+      );
+    } else if (paymentType === 'transferencia' && this.transferRate > 0) {
+      withSurcharge = mxnPrice * (1 + this.transferRate / 100);
+    } else if (paymentType === 'tarjeta' && this.agencyRate > 0) {
+      withSurcharge = mxnPrice * (1 + this.agencyRate / 100);
+    }
+
+    // Step 2: Currency conversion
+    if (currency === 'USD' && this.exchangeRate > 0) {
+      const usdPrice = withSurcharge / this.exchangeRate;
+      return window.PricingUtils ? PricingUtils.applyUSDRoundingRules(usdPrice) : Math.round(usdPrice);
+    }
+    return withSurcharge;
   }
 
   formatMinutesToHoursAndMinutes(minutes) {
@@ -2049,11 +3439,13 @@ class ItineraryBuilder {
       case 'tour':
         return this.getTourName(service.tourId) || 'Tour';
       case 'transport':
-        return service.concept || 'Servicio';
+        return service.concept || 'Transporte';
       case 'concepto':
         // For concepto, just return the concept text without "Concepto" prefix
         // since the badge already shows "Concepto"
         return service.concept || 'Concepto';
+      case 'a-disposicion':
+        return service.vehicleTypeName || 'A Disposición';
       default:
         return 'Servicio';
     }
@@ -2065,6 +3457,17 @@ class ItineraryBuilder {
   }
 
   getVehicleDisplayName(service) {
+    // For transport, try vehicleType, vehicleTypeName, or vehicleId (backwards compat)
+    if (service.type === 'transport') {
+      if (service.vehicleTypeName) return service.vehicleTypeName;
+      const vtId = service.vehicleType || service.vehicleId;
+      if (vtId) {
+        const vehicleInfo = this.getVehicleTypeInfo(vtId);
+        if (vehicleInfo && vehicleInfo.name) return vehicleInfo.name;
+        return vtId;
+      }
+      return 'Vehículo';
+    }
     // For tours with vehicle type, show the vehicle type name
     if (service.type === 'tour' && service.vehicleType) {
       // Try to get the proper display name from the vehicle types cache
@@ -2137,20 +3540,20 @@ class ItineraryBuilder {
           } else if (typeof destinationPOI === 'object' && destinationPOI !== null) {
             // Try various possible field names
             destinationName = destinationPOI.name
-                                        || destinationPOI.destinationName
-                                        || destinationPOI.location
-                                        || destinationPOI.title
-                                        || destinationPOI.label
-                                        || destinationPOI.objectId
-                                        || destinationPOI.id;
+              || destinationPOI.destinationName
+              || destinationPOI.location
+              || destinationPOI.title
+              || destinationPOI.label
+              || destinationPOI.objectId
+              || destinationPOI.id;
 
             // If it's a Parse object with a get method
             if (typeof destinationPOI.get === 'function') {
               destinationName = destinationPOI.get('name')
-                                            || destinationPOI.get('destinationName')
-                                            || destinationPOI.get('location')
-                                            || destinationPOI.get('title')
-                                            || destinationPOI.get('label');
+                || destinationPOI.get('destinationName')
+                || destinationPOI.get('location')
+                || destinationPOI.get('title')
+                || destinationPOI.get('label');
             }
           }
         }
@@ -2188,29 +3591,30 @@ class ItineraryBuilder {
   }
 
   updateTotals() {
-    let subtotal = 0;
+    let subtotalMXN = 0;
 
     this.days.forEach((day) => {
       day.services.forEach((serviceId) => {
         const service = this.services.get(serviceId);
-        if (service) {
+        if (service && service.includeInTotal !== false) {
           const servicePrice = this.calculateServicePrice(service);
-          subtotal += servicePrice * service.quantity;
+          subtotalMXN += servicePrice * (service.type === 'transport' ? 1 : service.quantity);
         }
       });
     });
 
-    const iva = subtotal * 0.16;
-    const total = subtotal + iva;
-    const passengers = parseInt(localStorage.getItem(`quote_${this.quoteId}_passengers`) || '0');
+    const displaySubtotal = this.getDisplayPrice(subtotalMXN);
+    const iva = displaySubtotal * 0.16;
+    const total = displaySubtotal + iva;
+    const passengers = this.numberOfPeople || 0;
     const perPerson = passengers > 0 ? total / passengers : 0;
 
     // Update displays
-    document.getElementById('subtotalAmount').textContent = `${this.formatCurrency(subtotal)}`;
+    document.getElementById('subtotalAmount').textContent = `${this.formatCurrency(displaySubtotal)}`;
     document.getElementById('ivaAmount').textContent = `${this.formatCurrency(iva)}`;
     document.getElementById('totalAmount').textContent = `${this.formatCurrency(total)}`;
     document.getElementById('perPersonAmount').textContent = `${this.formatCurrency(perPerson)}`;
-    document.getElementById('personCount').textContent = `(${passengers} personas)`;
+    document.getElementById('personCount').textContent = `(${passengers} ${passengers === 1 ? 'persona' : 'personas'})`;
   }
 
   showModalAlert(containerId, message, type = 'danger') {
@@ -2312,6 +3716,9 @@ class ItineraryBuilder {
         const result = await response.json();
 
         if (result.success && result.data) {
+          // Cache numberOfPeople from quote data
+          this.numberOfPeople = result.data.numberOfPeople || 0;
+
           // Process service items if they exist
           if (result.data.serviceItems) {
             this.processServiceItems(result.data.serviceItems);
@@ -2382,6 +3789,35 @@ class ItineraryBuilder {
             // Tour-specific fields (from backend)
             includeGuide: subconcept.includeGuide || false,
             includeGreeter: subconcept.includeGreeter || false,
+            greeterInVehicle: subconcept.greeterInVehicle || false,
+            includeInTotal: subconcept.includeInTotal !== undefined ? subconcept.includeInTotal : true,
+            // Transport-specific fields (from backend)
+            transportType: subconcept.transportType || null,
+            tripType: subconcept.tripType || null,
+            directionType: subconcept.directionType || null,
+            origin: subconcept.origin || null,
+            originName: subconcept.originName || null,
+            destination: subconcept.destination || null,
+            destinationPOI: subconcept.destinationPOI || null,
+            specificLocation: subconcept.specificLocation || null,
+            category: subconcept.category || null,
+            transportAdults: subconcept.transportAdults || 0,
+            transportChildren: subconcept.transportChildren || 0,
+            transportInfants: subconcept.transportInfants || 0,
+            persons: subconcept.persons || 0,
+            flightNumber: subconcept.flightNumber || null,
+            airline: subconcept.airline || null,
+            routeDuration: subconcept.routeDuration || null,
+            baseVehiclePrice: subconcept.baseVehiclePrice || null,
+            waitingTimeHours: subconcept.waitingTimeHours || 0,
+            waitingTimePricePerHour: subconcept.waitingTimePricePerHour || 0,
+            // Round trip fields
+            startDate: subconcept.startDate || null,
+            endDate: subconcept.endDate || null,
+            returnOrigin: subconcept.returnOrigin || null,
+            returnDestination: subconcept.returnDestination || null,
+            returnAirline: subconcept.returnAirline || null,
+            returnFlightNumber: subconcept.returnFlightNumber || null,
           });
 
           // Debug logging for people quantities and schedule loading
@@ -3150,7 +4586,7 @@ class ItineraryBuilder {
         return;
       }
 
-      const response = await fetch('/api/transfer-rates/current', {
+      const response = await fetch('/api/transfer-rate/current', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -3170,6 +4606,56 @@ class ItineraryBuilder {
     } catch (error) {
       console.error('Error loading transfer rate:', error);
       this.transferRateCache = null;
+    }
+  }
+
+  async loadPricingRates() {
+    try {
+      const accessToken = this.getAccessToken();
+      if (!accessToken) {
+        console.warn('No access token found, skipping pricing rates load');
+        return;
+      }
+
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      };
+
+      const [exchangeRes, transferRes, agencyRes] = await Promise.all([
+        fetch('/api/exchange-rate/current', { headers }),
+        fetch('/api/transfer-rate/current', { headers }),
+        fetch('/api/agency-rate/current', { headers }),
+      ]);
+
+      if (exchangeRes.ok) {
+        const data = await exchangeRes.json();
+        if (data.success && data.data) {
+          this.exchangeRate = data.data.value || data.data.rate || 0;
+        }
+      }
+
+      if (transferRes.ok) {
+        const data = await transferRes.json();
+        if (data.success && data.data) {
+          this.transferRate = data.data.value || data.data.rate || 0;
+        }
+      }
+
+      if (agencyRes.ok) {
+        const data = await agencyRes.json();
+        if (data.success && data.data) {
+          this.agencyRate = data.data.value || data.data.rate || 0;
+        }
+      }
+
+      console.log('Pricing rates loaded:', {
+        exchangeRate: this.exchangeRate,
+        transferRate: this.transferRate,
+        agencyRate: this.agencyRate,
+      });
+    } catch (error) {
+      console.error('Error loading pricing rates:', error);
     }
   }
 
@@ -3770,7 +5256,7 @@ class ItineraryBuilder {
 
       // Show pricing fields
       if (standardPricingSection) {
-        standardPricingSection.style.display = '';
+        standardPricingSection.classList.remove('d-none');
       }
     } else {
       // Hide transport fields
@@ -3781,7 +5267,7 @@ class ItineraryBuilder {
 
       // Hide pricing fields
       if (standardPricingSection) {
-        standardPricingSection.style.display = 'none';
+        standardPricingSection.classList.add('d-none');
       }
 
       // Clear transport field values when hidden
@@ -3840,8 +5326,8 @@ class ItineraryBuilder {
 
     // Calculate people costs
     let totalPrice = (adultsQuantity * adultPrice)
-                         + (childrenQuantity * childPrice)
-                         + (adultsNoAlcoholQuantity * noAlcoholPrice);
+      + (childrenQuantity * childPrice)
+      + (adultsNoAlcoholQuantity * noAlcoholPrice);
 
     // console.log('👥 People total calculated:', totalPrice);
 
@@ -3925,6 +5411,9 @@ class ItineraryBuilder {
         }
       }
     }
+
+    // Update breakdown after tour price recalculation
+    this.updateServicePriceBreakdown();
   }
 
   /**
@@ -3952,6 +5441,12 @@ class ItineraryBuilder {
         currentServiceType = input.value;
       }
     });
+
+    if (currentServiceType === 'transport') {
+      this.handleTransportRateSelection(rateId);
+      this.updateWaitingTimeRateDisplay();
+      return;
+    }
 
     if (currentServiceType !== 'tour') {
       return;
@@ -4003,16 +5498,14 @@ class ItineraryBuilder {
    * @example
    */
   handleIncludeGuideChange(isChecked) {
-    // console.log('👤 Include Guide checkbox changed:', isChecked);
-
-    // Only recalculate if we're in tour mode
     const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
-    if (serviceType !== 'tour') {
-      return;
+    if (serviceType === 'tour') {
+      this.recalculateTourPrice();
+    } else if (serviceType === 'transport') {
+      this.recalculateTransportPrice();
     }
-
-    // Recalculate the tour total price when the checkbox changes
-    this.recalculateTourPrice();
+    this.updateVehicleCapacityNote();
+    this.updateServicePriceBreakdown();
   }
 
   /**
@@ -4021,19 +5514,56 @@ class ItineraryBuilder {
    * @example
    */
   handleIncludeGreeterChange(isChecked) {
-    // console.log('🤝 Include Greeter checkbox changed:', isChecked);
-
-    // Only recalculate if we're in tour mode or transport mode
     const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
-    if (serviceType !== 'tour' && serviceType !== 'transport') {
+    if (serviceType === 'tour') {
+      this.recalculateTourPrice();
+    } else if (serviceType === 'transport') {
+      this.recalculateTransportPrice();
+    }
+    this.updateVehicleCapacityNote();
+    this.updateServicePriceBreakdown();
+  }
+
+  updateVehicleCapacityNote() {
+    const noteEl = document.getElementById('vehicleCapacityNote');
+    const noteTextEl = document.getElementById('vehicleCapacityNoteText');
+    if (!noteEl || !noteTextEl) return;
+
+    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+    const includeGuide = document.getElementById('includeGuide')?.checked;
+    const includeGreeter = document.getElementById('includeGreeter')?.checked;
+    const greeterInVehicle = document.getElementById('greeterInVehicle')?.checked;
+    const vehicleSelect = document.getElementById('vehicleSelect');
+    const selectedVehicleId = vehicleSelect?.value;
+
+    const reducesCapacity = includeGuide || (includeGreeter && greeterInVehicle);
+
+    if (serviceType !== 'transport' || !reducesCapacity || !selectedVehicleId) {
+      noteEl.classList.add('d-none');
       return;
     }
 
-    // Recalculate the service total price when the checkbox changes
-    if (serviceType === 'tour') {
-      this.recalculateTourPrice();
+    // Get vehicle capacity from transport price data or global vehicle types map
+    let capacity = 0;
+    if (this.transportPriceData?.vehicles) {
+      const vehicle = this.transportPriceData.vehicles.find((v) => v.vehicleTypeId === selectedVehicleId);
+      if (vehicle) capacity = vehicle.capacity || 0;
     }
-    // Note: For transport, pricing calculation will be handled in the general pricing logic
+    if (!capacity) {
+      const vehicleInfo = this.getVehicleTypeInfo(selectedVehicleId);
+      if (vehicleInfo) capacity = vehicleInfo.capacity || vehicleInfo.defaultCapacity || 0;
+    }
+
+    const occupant = includeGuide ? 'El guía' : 'El greeter';
+
+    if (capacity > 0) {
+      const effectiveCapacity = capacity - 1;
+      noteTextEl.textContent = `${occupant} ocupa 1 lugar. Capacidad disponible: ${effectiveCapacity} de ${capacity} pax`;
+      noteEl.classList.remove('d-none');
+    } else {
+      noteTextEl.textContent = `${occupant} ocupa 1 lugar del vehículo`;
+      noteEl.classList.remove('d-none');
+    }
   }
 
   /**
@@ -4090,11 +5620,11 @@ class ItineraryBuilder {
   restrictTimeInputKeys(e) {
     // Allow: backspace, delete, tab, escape, enter
     if ([8, 9, 27, 13, 46].indexOf(e.keyCode) !== -1
-            // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
-            || (e.keyCode === 65 && e.ctrlKey === true)
-            || (e.keyCode === 67 && e.ctrlKey === true)
-            || (e.keyCode === 86 && e.ctrlKey === true)
-            || (e.keyCode === 88 && e.ctrlKey === true)) {
+      // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+      || (e.keyCode === 65 && e.ctrlKey === true)
+      || (e.keyCode === 67 && e.ctrlKey === true)
+      || (e.keyCode === 86 && e.ctrlKey === true)
+      || (e.keyCode === 88 && e.ctrlKey === true)) {
       return;
     }
 
@@ -4135,6 +5665,18 @@ class ItineraryBuilder {
       if (servicePriceField) {
         servicePriceField.value = '';
       }
+      this.updateVehicleCapacityNote();
+      return;
+    }
+
+    const serviceTypeRadio = document.querySelector('input[name="serviceType"]:checked');
+    const currentServiceType = serviceTypeRadio?.value;
+
+    // Transport: recalculate full price including Guía/Greeter surcharges
+    if (currentServiceType === 'transport') {
+      this.recalculateTransportPrice();
+      this.updateVehicleCapacityNote();
+      this.updateWaitingTimeRateDisplay();
       return;
     }
 
@@ -4144,16 +5686,12 @@ class ItineraryBuilder {
     const rateId = rateSelect?.value;
 
     if (!tourId || !rateId) {
-      console.warn('⚠️ Missing tour or rate for vehicle price calculation');
+      console.warn('Missing tour or rate for vehicle price calculation');
       return;
     }
 
     try {
-      // Check if we're in a tour service
-      const serviceTypeRadio = document.querySelector('input[name="serviceType"]:checked');
-      const isEditingTour = serviceTypeRadio && serviceTypeRadio.value === 'tour';
-
-      if (isEditingTour) {
+      if (currentServiceType === 'tour') {
         // For tours, recalculate complete price (people + vehicle + driver)
         this.recalculateTourPrice();
       } else {
@@ -4162,7 +5700,7 @@ class ItineraryBuilder {
         this.updatePriceField(finalPrice);
       }
     } catch (error) {
-      console.error('❌ Error handling vehicle selection:', error);
+      console.error('Error handling vehicle selection:', error);
     }
   }
 
@@ -4191,8 +5729,8 @@ class ItineraryBuilder {
     // Return all client prices for this tour+rate combination
     // Filter by tour, rate and client in the returned array
     return Array.from(this.clientPricesMap.values()).filter((price) => price.tourId === tourId
-                   && price.rateId === rateId
-                   && price.clientPtr === this.clientId);
+      && price.rateId === rateId
+      && price.clientPtr === this.clientId);
   }
 
   /**
@@ -4315,9 +5853,9 @@ class ItineraryBuilder {
   getVehicleTypeInfo(vehicleTypeKey) {
     // Try different possible keys
     return this.vehicleTypesMap.get(vehicleTypeKey)
-               || this.vehicleTypesMap.get(vehicleTypeKey?.toLowerCase())
-               || this.vehicleTypesMap.get(vehicleTypeKey?.toUpperCase())
-               || null;
+      || this.vehicleTypesMap.get(vehicleTypeKey?.toLowerCase())
+      || this.vehicleTypesMap.get(vehicleTypeKey?.toUpperCase())
+      || null;
   }
 
   /**
@@ -4353,6 +5891,208 @@ class ItineraryBuilder {
     } else {
       servicePriceField.value = '';
     }
+
+    this.updateServicePriceBreakdown();
+  }
+
+  /**
+   * Show an itemized price breakdown in the modal based on service type.
+   * Applies Moneda/Pago conversion to all displayed amounts.
+   */
+  updateServicePriceBreakdown() {
+    const container = document.getElementById('servicePriceBreakdown');
+    const itemsDiv = document.getElementById('breakdownItems');
+    const totalSpan = document.getElementById('breakdownTotal');
+    if (!container || !itemsDiv || !totalSpan) return;
+
+    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+    const items = []; // {label, amountMXN}
+    let totalMXN = 0;
+
+    if (serviceType === 'transport') {
+      const vehicleSelect = document.getElementById('vehicleSelect');
+      const selectedVehicleId = vehicleSelect?.value;
+      const quantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
+      let unitPrice = 0;
+
+      if (selectedVehicleId && this.transportPriceData?.vehicles) {
+        unitPrice = this.getTransportVehiclePrice(selectedVehicleId) || 0;
+      }
+      if (unitPrice === 0) {
+        unitPrice = this._lastTransportBasePrice || parseFloat(document.getElementById('servicePrice')?.value || 0);
+      }
+
+      if (unitPrice > 0) {
+        const displayUnit = this.getDisplayPrice(unitPrice);
+        const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+        const vehicleLabel = tripType === 'round-trip'
+          ? `Vehículo Ida y Regreso (${quantity} × ${this.formatCurrency(displayUnit)})`
+          : `Vehículo (${quantity} × ${this.formatCurrency(displayUnit)})`;
+        items.push({ label: vehicleLabel, amountMXN: unitPrice * quantity });
+      }
+
+      const routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
+      const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+      const brkLegMultiplier = tripType === 'round-trip' ? 2 : 1;
+      const legSuffix = tripType === 'round-trip' ? ' (×2 Ida y Regreso)' : '';
+
+      if (document.getElementById('includeGuide')?.checked && routeDuration) {
+        const guideCost = this.calculateGuideTransportCost(routeDuration) * brkLegMultiplier;
+        items.push({ label: `Guía + Chofer${legSuffix}`, amountMXN: guideCost });
+      }
+      if (document.getElementById('includeGreeter')?.checked && routeDuration) {
+        const greeterCost = this.calculateGreeterPrice(routeDuration) * brkLegMultiplier;
+        items.push({ label: `Greeter${legSuffix}`, amountMXN: greeterCost });
+      }
+      // Tiempo de espera
+      const brkWaitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
+      if (brkWaitingHours > 0) {
+        const wtPrice = this.getWaitingTimePrice();
+        if (wtPrice) {
+          const wtCost = wtPrice.pricePerHour * brkWaitingHours * brkLegMultiplier;
+          const displayHourly = this.getDisplayPrice(wtPrice.pricePerHour);
+          items.push({ label: `Tiempo de espera (${brkWaitingHours}h × ${this.formatCurrency(displayHourly)})${legSuffix}`, amountMXN: wtCost });
+        }
+      }
+    } else if (serviceType === 'tour') {
+      // Check if it's a walking tour
+      let isWalkingTourBreakdown = false;
+      const tourSelectBreakdown = document.getElementById('tourSelect');
+      if (tourSelectBreakdown?.value && this.toursCache.has('all')) {
+        const walkingTourData = this.toursCache.get('all').find(
+          (t) => (t.id === tourSelectBreakdown.value || t.objectId === tourSelectBreakdown.value) && t.isWalkingTour,
+        );
+        if (walkingTourData) {
+          isWalkingTourBreakdown = true;
+          const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10);
+          const priceCurrency = walkingTourData.walkingPriceCurrency || 'MXN';
+          let walkingPrice = this.getWalkingTourPrice(walkingTourData, peopleCount);
+          if (priceCurrency === 'USD' && this.exchangeRate) {
+            // Already normalized in getWalkingTourPrice, just display
+          }
+          items.push({ label: `Tour a Pie (${peopleCount} personas)`, amountMXN: walkingPrice });
+        }
+      }
+
+      if (!isWalkingTourBreakdown) {
+      const adultsQty = parseInt(document.getElementById('tourAdultsQuantity')?.value || 0);
+      const childrenQty = parseInt(document.getElementById('tourChildrenQuantity')?.value || 0);
+      const noAlcoholQty = parseInt(document.getElementById('tourAdultsNoAlcoholQuantity')?.value || 0);
+      const adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
+      const childPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0);
+      const noAlcoholPrice = parseFloat(document.getElementById('tourNoAlcoholPrice')?.value || 0);
+
+      if (adultsQty > 0 && adultPrice > 0) {
+        const displayUnit = this.getDisplayPrice(adultPrice);
+        items.push({ label: `Adultos (${adultsQty} × ${this.formatCurrency(displayUnit)})`, amountMXN: adultsQty * adultPrice });
+      }
+      if (childrenQty > 0 && childPrice > 0) {
+        const displayUnit = this.getDisplayPrice(childPrice);
+        items.push({ label: `Niños (${childrenQty} × ${this.formatCurrency(displayUnit)})`, amountMXN: childrenQty * childPrice });
+      }
+      if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
+        const displayUnit = this.getDisplayPrice(noAlcoholPrice);
+        items.push({ label: `Sin alcohol (${noAlcoholQty} × ${this.formatCurrency(displayUnit)})`, amountMXN: noAlcoholQty * noAlcoholPrice });
+      }
+
+      // Vehicle cost
+      const vehicleSelect = document.getElementById('vehicleSelect');
+      const vehicleQty = parseInt(document.getElementById('serviceQuantity')?.value || 1);
+      if (vehicleSelect?.value) {
+        const vehicleCost = parseFloat(document.getElementById('servicePrice')?.value || 0);
+        if (vehicleCost > 0) {
+          const displayUnit = this.getDisplayPrice(vehicleCost);
+          items.push({ label: `Vehículo (${vehicleQty} × ${this.formatCurrency(displayUnit)})`, amountMXN: vehicleCost * vehicleQty });
+        }
+      }
+
+      // Driver tour rate (Guía + Chofer)
+      if (document.getElementById('includeGuide')?.checked && this.driverTourRateCache) {
+        const driverRate = this.driverTourRateCache.value || 0;
+        if (driverRate > 0) {
+          items.push({ label: 'Guía + Chofer', amountMXN: driverRate });
+        }
+      }
+      } // end if (!isWalkingTourBreakdown)
+    } else if (serviceType === 'experience') {
+      const adultsQty = parseInt(document.getElementById('adultsQuantity')?.value || 0);
+      const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value || 0);
+      const noAlcoholQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
+      const adultPrice = parseFloat(document.getElementById('adultPrice')?.value || 0);
+      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0);
+      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0);
+
+      if (adultsQty > 0 && adultPrice > 0) {
+        const displayUnit = this.getDisplayPrice(adultPrice);
+        items.push({ label: `Adultos (${adultsQty} × ${this.formatCurrency(displayUnit)})`, amountMXN: adultsQty * adultPrice });
+      }
+      if (childrenQty > 0 && childPrice > 0) {
+        const displayUnit = this.getDisplayPrice(childPrice);
+        items.push({ label: `Niños (${childrenQty} × ${this.formatCurrency(displayUnit)})`, amountMXN: childrenQty * childPrice });
+      }
+      if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
+        const displayUnit = this.getDisplayPrice(noAlcoholPrice);
+        items.push({ label: `Sin alcohol (${noAlcoholQty} × ${this.formatCurrency(displayUnit)})`, amountMXN: noAlcoholQty * noAlcoholPrice });
+      }
+    } else if (serviceType === 'a-disposicion') {
+      const hourlyRate = this._disposicionHourlyRate || 0;
+      const hours = parseFloat(document.getElementById('aDisposicionHours')?.value || 0);
+      const vehicleCount = parseInt(document.getElementById('aDisposicionVehicleCount')?.value || 1, 10);
+      const discount = this.getADisposicionDiscount(hours);
+
+      if (hourlyRate > 0 && hours > 0) {
+        const displayHourly = this.getDisplayPrice(hourlyRate);
+        items.push({ label: `Tarifa por hora (${this.formatCurrency(displayHourly)})`, amountMXN: hourlyRate });
+
+        const baseCost = hourlyRate * hours * vehicleCount;
+        if (vehicleCount > 1) {
+          items.push({ label: `${hours}h × ${vehicleCount} vehículos`, amountMXN: baseCost });
+        } else {
+          items.push({ label: `${hours} horas`, amountMXN: baseCost });
+        }
+
+        if (discount > 0) {
+          const discountAmount = baseCost * (discount / 100);
+          items.push({ label: `Descuento por volumen (-${discount}%)`, amountMXN: -discountAmount });
+        }
+      }
+    } else if (serviceType === 'concepto') {
+      const price = parseFloat(document.getElementById('servicePrice')?.value || 0);
+      if (price > 0) {
+        items.push({ label: 'Precio', amountMXN: price });
+      }
+    }
+
+    // Calculate total
+    totalMXN = items.reduce((sum, item) => sum + item.amountMXN, 0);
+
+    // Hide if no items or total is 0
+    if (items.length === 0 || totalMXN <= 0) {
+      container.classList.add('d-none');
+      return;
+    }
+
+    // Render breakdown items
+    itemsDiv.innerHTML = items.map((item) => {
+      const displayAmt = this.getDisplayPrice(item.amountMXN);
+      return `<div class="d-flex justify-content-between"><span class="text-muted">${item.label}</span><span>${this.formatCurrency(displayAmt)}</span></div>`;
+    }).join('');
+
+    const displayTotal = this.getDisplayPrice(totalMXN);
+    totalSpan.textContent = this.formatCurrency(displayTotal);
+    container.classList.remove('d-none');
+
+    // Update price label when conversion is active
+    const currency = document.getElementById('currencySelect')?.value || 'MXN';
+    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    const priceLabel = document.querySelector('label[for="servicePrice"]');
+    if (priceLabel) {
+      if (currency !== 'MXN' || paymentType !== 'efectivo') {
+        priceLabel.innerHTML = 'Precio base <small class="text-muted">(MXN)</small> <span class="text-danger">*</span>';
+      } else {
+        priceLabel.innerHTML = 'Precio <span class="text-danger">*</span>';
+      }
+    }
   }
 
   /**
@@ -4373,8 +6113,673 @@ class ItineraryBuilder {
     }
   }
 
+  // =================
+  // TRANSPORT PRICE LOOKUP
+  // =================
+
+  /**
+   * Handle rate (Segmento) selection for transport services.
+   * Looks up vehicle prices for the selected origin + destination + rate combination.
+   */
+  async handleTransportRateSelection(rateId, fallbackOrigin = null, fallbackDestination = null) {
+    if (!rateId) {
+      this.clearVehicleDropdown();
+      this.transportPriceData = null;
+      return;
+    }
+
+    // Get origin and destination from the appropriate fields based on direction
+    const directionRadio = document.querySelector('input[name="directionType"]:checked');
+    const direction = directionRadio?.value || 'arrival';
+    const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
+    const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+
+    let originName = '';
+    let destinationName = '';
+
+    if (tripType === 'round-trip') {
+      // Round trip: read from Ida fields (arrival leg)
+      if (transportType === 'local') {
+        // Local: Ida origin = TEXT, Ida destination = SELECT
+        originName = document.getElementById('roundTripOriginIdaText')?.value || '';
+        const destSelect = document.getElementById('roundTripDestinationIdaSelect');
+        const destSlug = destSelect?.value;
+        destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
+      } else {
+        // Aeropuerto / Punto a Punto: Ida origin = SELECT (slug), Ida destination = COMBO (text)
+        const originSelect = document.getElementById('roundTripOriginIdaSelect');
+        const slug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(slug) || slug || '';
+        destinationName = document.getElementById('roundTripDestinationIdaCombo')?.value || '';
+      }
+    } else {
+      // One-way: read from one-way fields based on direction
+      const isDepartureWithSelect = direction === 'departure' && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
+
+      // Helper to resolve destination SELECT display name
+      const resolveDestSelect = () => {
+        const destSelect = document.getElementById('transportDestinationSelect');
+        const destSlug = destSelect?.value;
+        return window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
+      };
+
+      const isLocalIda = direction === 'arrival' && transportType === 'local';
+
+      if (isLocalIda) {
+        // Local Ida: origin TEXT, destination SELECT
+        originName = document.getElementById('transportOriginText')?.value || '';
+        destinationName = resolveDestSelect();
+      } else if (isDepartureWithSelect) {
+        // Departure + Aeropuerto / Punto a Punto: origin COMBO, destination SELECT
+        originName = document.getElementById('transportOriginCombo')?.value || '';
+        destinationName = resolveDestSelect();
+      } else if (direction === 'departure' && transportType === 'local') {
+        // Local Vuelta: origin SELECT, destination TEXT
+        const originSelect = document.getElementById('transportOriginSelect');
+        const slug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(slug) || slug || '';
+        destinationName = document.getElementById('transportDestinationText')?.value || '';
+      } else if (direction === 'departure') {
+        // Departure + other: origin COMBO, destination COMBO
+        originName = document.getElementById('transportOriginCombo')?.value || '';
+        destinationName = document.getElementById('transportDestinationCombo')?.value || '';
+      } else if (direction === 'arrival') {
+        const originSelect = document.getElementById('transportOriginSelect');
+        const slug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(slug) || slug || '';
+        destinationName = document.getElementById('transportDestinationCombo')?.value || '';
+      } else {
+        originName = document.getElementById('transportOriginText')?.value || '';
+        destinationName = document.getElementById('transportDestinationCombo')?.value || '';
+      }
+    }
+
+    // Use fallbacks from service data if form fields are empty (edit race condition)
+    if (!originName && fallbackOrigin) originName = fallbackOrigin;
+    if (!destinationName && fallbackDestination) destinationName = fallbackDestination;
+
+    if (!originName || !destinationName) {
+      this.clearVehicleDropdown();
+      this.transportPriceData = null;
+      return;
+    }
+
+    // For one-way departure: swap origin/destination for API query
+    // DB stores routes as origin→destination, but user selected in reverse for departure
+    // Round trip uses Ida (arrival) data which is already in DB order
+    let apiOrigin = originName;
+    let apiDestination = destinationName;
+    if (tripType !== 'round-trip' && direction === 'departure') {
+      apiOrigin = destinationName;
+      apiDestination = originName;
+    }
+
+    // Show loading spinner next to Vehículo label
+    const vehicleSpinner = document.getElementById('vehicleLoadingSpinner');
+    vehicleSpinner?.classList.remove('d-none');
+
+    try {
+      const params = new URLSearchParams({
+        originPOI: apiOrigin,
+        destinationPOI: apiDestination,
+        rateId,
+      });
+      if (this.clientId) {
+        params.append('clientId', this.clientId);
+      }
+
+      const accessToken = this.getAccessToken();
+      const response = await fetch(`/api/services/prices-by-route?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken || ''}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (!result.success || !result.data) {
+        this.clearVehicleDropdown();
+        this.transportPriceData = null;
+        return;
+      }
+
+      // Cache the transport price data for vehicle selection
+      this.transportPriceData = result.data;
+      // Cache routeDuration separately so it persists even if transportPriceData is cleared
+      this.cachedRouteDuration = result.data.routeDuration || null;
+      this.populateTransportVehicleDropdown(result.data.vehicles);
+    } catch (error) {
+      console.error('Error looking up transport prices:', error);
+      this.clearVehicleDropdown();
+      this.transportPriceData = null;
+    } finally {
+      vehicleSpinner?.classList.add('d-none');
+    }
+  }
+
+  /**
+   * Populate vehicle dropdown with transport route price data.
+   */
+  populateTransportVehicleDropdown(vehicles) {
+    const vehicleSelect = document.getElementById('vehicleSelect');
+    if (!vehicleSelect) return;
+
+    vehicleSelect.innerHTML = '<option value="">-- Sin vehículo --</option>';
+    vehicleSelect.value = '';
+
+    if (!vehicles || vehicles.length === 0) {
+      const noOption = document.createElement('option');
+      noOption.value = '';
+      noOption.textContent = '-- Sin vehículos disponibles --';
+      noOption.disabled = true;
+      vehicleSelect.appendChild(noOption);
+      return;
+    }
+
+    vehicles.forEach((vehicle) => {
+      const option = document.createElement('option');
+      option.value = vehicle.vehicleTypeId;
+
+      const pax = vehicle.capacity || 0;
+      const trunk = vehicle.trunkCapacity || 0;
+      const clientIndicator = vehicle.isClientPrice ? ' *' : '';
+      option.textContent = `${vehicle.vehicleType} - ${pax} pax, ${trunk} carry-on${clientIndicator}`;
+
+      vehicleSelect.appendChild(option);
+    });
+
+    // Reset price since no vehicle is selected yet
+    const servicePriceField = document.getElementById('servicePrice');
+    if (servicePriceField) {
+      servicePriceField.value = '0.00';
+    }
+  }
+
+  /**
+   * Get transport vehicle price from cached route price data.
+   */
+  getTransportVehiclePrice(vehicleTypeId) {
+    if (!this.transportPriceData || !this.transportPriceData.vehicles) {
+      return null;
+    }
+
+    const vehicle = this.transportPriceData.vehicles.find(
+      (v) => v.vehicleTypeId === vehicleTypeId
+    );
+
+    return vehicle ? vehicle.finalPrice : null;
+  }
+
+  /**
+   * Calculate guide cost for transport: durationHours * 2 * guideRate.
+   * The * 2 accounts for round trip (outbound + return).
+   * @param {number} durationMinutes - Route duration in minutes.
+   * @returns {number} Guide cost.
+   */
+  calculateGuideTransportCost(durationMinutes) {
+    const durationHours = durationMinutes / 60;
+    if (!durationHours || durationHours <= 0) return 0;
+    const guideRate = this.guideTransportRateCache?.value || 400;
+    return durationHours * 2 * guideRate;
+  }
+
+  /**
+   * Calculate greeter price based on route duration.
+   * Formula: 760 + (640 * durationHours) with special rounding.
+   * @param {number} durationMinutes - Route duration in minutes.
+   * @returns {number} Greeter price.
+   */
+  calculateGreeterPrice(durationMinutes) {
+    const durationHours = durationMinutes / 60;
+    if (!durationHours || durationHours <= 0) return 760;
+
+    const rawPrice = 760 + (640 * durationHours);
+    const integerPart = Math.floor(rawPrice);
+    const lastTwoDigits = integerPart % 100;
+
+    if (lastTwoDigits === 0) return integerPart;
+    if (lastTwoDigits < 50) return Math.floor(integerPart / 100) * 100;
+    return Math.ceil(integerPart / 100) * 100;
+  }
+
+  /**
+   * Load vehicle rate prices (Tiempo de espera hourly rates).
+   */
+  async loadVehicleRatePrices() {
+    try {
+      const accessToken = this.getAccessToken();
+      if (!accessToken) return;
+
+      const response = await fetch('/api/vehicle-rate-prices/all', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.result?.prices) {
+          this.vehicleRatePricesCache = data.result.prices;
+          console.log(`[VehicleRatePrices] Loaded ${this.vehicleRatePricesCache.length} prices`);
+        }
+      }
+    } catch (error) {
+      console.warn('[VehicleRatePrices] Failed to load:', error);
+    }
+  }
+
+  /**
+   * Look up waiting time hourly price for current vehicle + rate selection.
+   * @returns {{ pricePerHour: number, currency: string }|null}
+   */
+  getWaitingTimePrice() {
+    const vehicleTypeId = document.getElementById('vehicleSelect')?.value;
+    const rateId = document.getElementById('transportCategory')?.value;
+    if (!vehicleTypeId || !rateId || !this.vehicleRatePricesCache.length) return null;
+
+    const match = this.vehicleRatePricesCache.find(
+      (p) => p.vehicleTypeId === vehicleTypeId && p.rateId === rateId,
+    );
+    return match ? { pricePerHour: match.pricePerHour, currency: match.currency || 'MXN' } : null;
+  }
+
+  /**
+   * Update the waiting time rate display label.
+   */
+  updateWaitingTimeRateDisplay() {
+    const rateEl = document.getElementById('waitingTimeRate');
+    if (!rateEl) return;
+
+    const wtPrice = this.getWaitingTimePrice();
+    if (wtPrice) {
+      rateEl.textContent = `$${wtPrice.pricePerHour.toLocaleString()} ${wtPrice.currency}/hora`;
+    } else {
+      rateEl.textContent = '';
+    }
+  }
+
+  /**
+   * Recalculate transport price including vehicle base + Guía/Greeter surcharges.
+   */
+  recalculateTransportPrice() {
+    const vehicleSelect = document.getElementById('vehicleSelect');
+    const selectedVehicleId = vehicleSelect?.value;
+    let basePrice = 0;
+
+    // Try to get vehicle base price from cached API data
+    if (selectedVehicleId && this.transportPriceData?.vehicles) {
+      basePrice = this.getTransportVehiclePrice(selectedVehicleId) || 0;
+    }
+
+    // Fallback: if no cached data, read current price field (which has the vehicle price)
+    if (basePrice === 0 && selectedVehicleId) {
+      if (!this._lastTransportBasePrice) {
+        const currentPrice = parseFloat(document.getElementById('servicePrice')?.value || 0);
+        basePrice = currentPrice;
+      } else {
+        basePrice = this._lastTransportBasePrice;
+      }
+    }
+
+    // Cache the base price for later use
+    if (basePrice > 0 && this.transportPriceData?.vehicles) {
+      this._lastTransportBasePrice = basePrice;
+    }
+
+    // Multiply vehicle price by quantity (number of vehicles)
+    const quantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
+    let totalPrice = basePrice * quantity;
+
+    // Get routeDuration from multiple sources
+    const routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
+
+    const includeGuide = document.getElementById('includeGuide')?.checked;
+    const includeGreeter = document.getElementById('includeGreeter')?.checked;
+
+    // Round trip multiplier: surcharges apply per leg (×2 for round trip)
+    const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+    const legMultiplier = tripType === 'round-trip' ? 2 : 1;
+
+    // Add Guía (Traslados) — once per leg
+    if (includeGuide && routeDuration) {
+      totalPrice += this.calculateGuideTransportCost(routeDuration) * legMultiplier;
+    }
+
+    // Add Greeter — once per leg
+    if (includeGreeter && routeDuration) {
+      totalPrice += this.calculateGreeterPrice(routeDuration) * legMultiplier;
+    }
+
+    // Add Tiempo de espera (waiting time) — per leg
+    const waitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
+    if (waitingHours > 0) {
+      const wtPrice = this.getWaitingTimePrice();
+      if (wtPrice) {
+        totalPrice += wtPrice.pricePerHour * waitingHours * legMultiplier;
+      }
+    }
+
+    console.log('🔧 Final transport price:', totalPrice);
+    this.updatePriceField(totalPrice);
+
+    // Update breakdown after transport price recalculation
+    this.updateServicePriceBreakdown();
+  }
+
+  // =====================
+  // A Disposición Methods
+  // =====================
+
+  /**
+   * Populate the A Disposición rate dropdown with active rates.
+   */
+  async populateADisposicionRates() {
+    const rateSelect = document.getElementById('aDisposicionRate');
+    if (!rateSelect) return;
+
+    // Use cached rates if available, otherwise fetch
+    if (!this.ratesCache || this.ratesCache.length === 0) {
+      await this.loadAllRates();
+    }
+
+    rateSelect.innerHTML = '<option value="">-- Seleccionar segmento --</option>';
+    (this.ratesCache || []).forEach((rate) => {
+      const label = rate.label || rate.name;
+
+      // Filter out "Económico" for A Disposición (same as admin page)
+      if (label) {
+        const normalizedLabel = label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (normalizedLabel === 'economico' || normalizedLabel === 'economica') {
+          return;
+        }
+      }
+
+      const percentage = rate.formattedPercentage || (rate.percentage ? `${rate.percentage}%` : '');
+      const displayText = percentage ? `${label} (${percentage})` : label;
+
+      const option = document.createElement('option');
+      option.value = rate.value || rate.objectId || rate.id;
+      option.textContent = displayText;
+      rateSelect.appendChild(option);
+    });
+  }
+
+  /**
+   * Handle A Disposición rate change — load available vehicles.
+   */
+  async handleADisposicionRateChange(rateId) {
+    const vehicleSelect = document.getElementById('aDisposicionVehicle');
+    if (!vehicleSelect) return;
+
+    // Reset vehicle and price
+    vehicleSelect.innerHTML = '<option value="">-- Seleccionar vehículo --</option>';
+    this._disposicionHourlyRate = null;
+    this._disposicionPriceCacheKey = null;
+    document.getElementById('servicePrice').value = '';
+    document.getElementById('aDisposicionDiscountInfo').textContent = '';
+
+    if (!rateId) return;
+
+    try {
+      const accessToken = this.getAccessToken();
+      const response = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const vehicles = result.data || [];
+
+        vehicles.forEach((vehicle) => {
+          const option = document.createElement('option');
+          option.value = vehicle.value || vehicle.id;
+          option.textContent = `${vehicle.label} - ${vehicle.capacity} pax`;
+          vehicleSelect.appendChild(option);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading vehicles for A Disposición:', error);
+    }
+  }
+
+  /**
+   * Calculate A Disposición price based on rate, vehicle, hours, and vehicle count.
+   */
+  async calculateADisposicionPrice() {
+    const rateId = document.getElementById('aDisposicionRate')?.value;
+    const vehicleTypeId = document.getElementById('aDisposicionVehicle')?.value;
+    const hours = parseFloat(document.getElementById('aDisposicionHours')?.value || 0);
+    const vehicleCount = parseInt(document.getElementById('aDisposicionVehicleCount')?.value || 1, 10);
+    const priceField = document.getElementById('servicePrice');
+    const discountInfo = document.getElementById('aDisposicionDiscountInfo');
+
+    if (!rateId || !vehicleTypeId || hours <= 0) {
+      if (priceField) priceField.value = '';
+      if (discountInfo) discountInfo.textContent = '';
+      return;
+    }
+
+    try {
+      // Fetch hourly rate if not cached for this combination
+      const cacheKey = `${vehicleTypeId}_${rateId}`;
+      if (this._disposicionPriceCacheKey !== cacheKey) {
+        const accessToken = this.getAccessToken();
+        const response = await fetch(`/api/disposable-prices/price?vehicleTypeId=${vehicleTypeId}&rateId=${rateId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) return;
+        const result = await response.json();
+        const priceData = result.data || {};
+        this._disposicionHourlyRate = priceData.hourlyPrice || 0;
+        this._disposicionCurrency = priceData.currency || 'MXN';
+        this._disposicionPriceCacheKey = cacheKey;
+      }
+
+      const discount = this.getADisposicionDiscount(hours);
+      const totalPrice = this._disposicionHourlyRate * hours * vehicleCount * (1 - discount / 100);
+
+      if (priceField) priceField.value = Math.round(totalPrice);
+
+      // Set currency to match
+      const currencySelect = document.getElementById('currencySelect');
+      if (currencySelect) currencySelect.value = this._disposicionCurrency;
+
+      // Show discount info
+      if (discountInfo) {
+        discountInfo.textContent = discount > 0
+          ? `Descuento por volumen: -${discount}%`
+          : '';
+      }
+
+      this.updateServicePriceBreakdown();
+    } catch (error) {
+      console.error('Error calculating A Disposición price:', error);
+    }
+  }
+
+  /**
+   * Get volume discount percentage based on hours.
+   */
+  getADisposicionDiscount(hours) {
+    if (hours >= 16) return 10;
+    if (hours >= 12) return 7.5;
+    if (hours >= 10) return 5;
+    if (hours >= 8) return 2.5;
+    return 0;
+  }
+
+  // =====================
+  // Walking Tour Methods
+  // =====================
+
+  /**
+   * Handle walking tour selection — show tier pricing, hide vehicle fields.
+   */
+  handleWalkingTourSelection(tour) {
+    // Hide transport checkbox (walking tours don't need vehicles)
+    const tourTransportCheckbox = document.getElementById('tourTransportCheckboxContainer');
+    if (tourTransportCheckbox) tourTransportCheckbox.style.display = 'none';
+
+    // Populate tier cards
+    document.getElementById('walkingRangeSmallLabel').textContent = tour.walkingRangeSmall || '—';
+    document.getElementById('walkingRangeMediumLabel').textContent = tour.walkingRangeMedium || '—';
+    document.getElementById('walkingRangeLargeLabel').textContent = tour.walkingRangeLarge || '—';
+
+    const currency = tour.walkingPriceCurrency || 'MXN';
+    document.getElementById('walkingPriceSmallLabel').textContent = `$${parseFloat(tour.walkingPriceSmall || 0).toLocaleString()} ${currency}`;
+    document.getElementById('walkingPriceMediumLabel').textContent = `$${parseFloat(tour.walkingPriceMedium || 0).toLocaleString()} ${currency}`;
+    document.getElementById('walkingPriceLargeLabel').textContent = `$${parseFloat(tour.walkingPriceLarge || 0).toLocaleString()} ${currency}`;
+    document.getElementById('walkingTourCurrency').value = currency;
+
+    // Pre-fill people count from quote data
+    const peopleCountField = document.getElementById('walkingTourPeopleCount');
+    if (peopleCountField && this.numberOfPeople > 0) {
+      peopleCountField.value = this.numberOfPeople;
+    }
+
+    // Highlight matching tier
+    this.highlightWalkingTourTier(tour);
+
+    // Fill detail fields
+    const tourDescriptionField = document.getElementById('tourDescription');
+    const tourAdvanceBookingTimeField = document.getElementById('tourAdvanceBookingTime');
+    const tourLanguagesField = document.getElementById('tourLanguages');
+    const tourIncludesField = document.getElementById('tourIncludes');
+    const tourNotIncludesField = document.getElementById('tourNotIncludes');
+    const tourClientNotesField = document.getElementById('tourClientNotes');
+
+    if (tourDescriptionField) tourDescriptionField.value = tour.description || '';
+    if (tourAdvanceBookingTimeField) {
+      const bookingTime = tour.advance_booking_time;
+      tourAdvanceBookingTimeField.value = bookingTime ? this.formatMinutesToHoursAndMinutes(parseInt(bookingTime, 10)) : 'No especificado';
+    }
+    if (tourLanguagesField) tourLanguagesField.value = (tour.languages || []).join(', ') || '';
+    if (tourIncludesField) tourIncludesField.value = tour.includes || '';
+    if (tourNotIncludesField) tourNotIncludesField.value = tour.notincludes || '';
+    if (tourClientNotesField) tourClientNotesField.value = tour.client_booking_notes || '';
+
+    // Show tour details and schedule
+    this.showTourDetails(tour);
+    this.handleTourSchedule(tour);
+    this.updateServicePriceBreakdown();
+  }
+
+  /**
+   * Parse walking tour range string like "1-5 pax" or "15+".
+   */
+  parseWalkingTourRange(rangeStr) {
+    if (!rangeStr) return null;
+    const trimmed = rangeStr.trim();
+    const plusMatch = trimmed.match(/^(\d+)\+/);
+    if (plusMatch) return { min: parseInt(plusMatch[1], 10), max: Infinity };
+    const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)/);
+    if (rangeMatch) return { min: parseInt(rangeMatch[1], 10), max: parseInt(rangeMatch[2], 10) };
+    return null;
+  }
+
+  /**
+   * Highlight the matching walking tour tier based on people count.
+   */
+  highlightWalkingTourTier(tour) {
+    const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 0, 10);
+
+    const tiers = ['Small', 'Medium', 'Large'].map((tier) => ({
+      range: this.parseWalkingTourRange(tour[`walkingRange${tier}`]),
+      price: parseFloat(tour[`walkingPrice${tier}`] || 0),
+      card: document.getElementById(`walkingTier${tier}`),
+    }));
+
+    // Remove all highlights
+    tiers.forEach((tier) => {
+      if (tier.card) {
+        tier.card.style.border = '';
+        tier.card.style.backgroundColor = '';
+      }
+    });
+
+    if (peopleCount <= 0) return;
+
+    // Find matching tier
+    let matchedTier = null;
+    for (const tier of tiers) {
+      if (tier.range && peopleCount >= tier.range.min && peopleCount <= tier.range.max) {
+        matchedTier = tier;
+        break;
+      }
+    }
+
+    // If no exact match, use the largest tier
+    if (!matchedTier) {
+      matchedTier = tiers[tiers.length - 1];
+    }
+
+    // Highlight matching tier
+    if (matchedTier?.card) {
+      matchedTier.card.style.border = '2px solid #0d6efd';
+      matchedTier.card.style.backgroundColor = '#e7f1ff';
+    }
+
+    // Set service price using getWalkingTourPrice (normalizes to MXN)
+    const servicePriceField = document.getElementById('servicePrice');
+    if (servicePriceField) {
+      const mxnPrice = this.getWalkingTourPrice(tour, peopleCount);
+      servicePriceField.value = mxnPrice;
+    }
+  }
+
+  /**
+   * Get walking tour price for a given people count, normalized to MXN.
+   */
+  getWalkingTourPrice(tour, peopleCount) {
+    const tiers = [
+      { range: this.parseWalkingTourRange(tour.walkingRangeSmall), price: parseFloat(tour.walkingPriceSmall || 0) },
+      { range: this.parseWalkingTourRange(tour.walkingRangeMedium), price: parseFloat(tour.walkingPriceMedium || 0) },
+      { range: this.parseWalkingTourRange(tour.walkingRangeLarge), price: parseFloat(tour.walkingPriceLarge || 0) },
+    ];
+
+    const priceCurrency = tour.walkingPriceCurrency || 'MXN';
+
+    // Find matching tier
+    let matchedPrice = 0;
+    for (const tier of tiers) {
+      if (tier.range && peopleCount >= tier.range.min && peopleCount <= tier.range.max) {
+        matchedPrice = tier.price;
+        break;
+      }
+    }
+
+    // If no match, use largest tier
+    if (matchedPrice === 0 && tiers.length > 0) {
+      matchedPrice = tiers[tiers.length - 1].price;
+    }
+
+    // Normalize to MXN if needed
+    if (priceCurrency === 'USD' && this.exchangeRate) {
+      matchedPrice = Math.round(matchedPrice * this.exchangeRate);
+    }
+
+    return matchedPrice;
+  }
+
   handleTourSelection(tourId) {
     if (!tourId) {
+      // Reset both pricing sections to default
+      const vehiclePricingSection = document.getElementById('vehicleTourPricingSection');
+      const walkingPricingSection = document.getElementById('walkingTourPricingSection');
+      if (vehiclePricingSection) vehiclePricingSection.classList.remove('d-none');
+      if (walkingPricingSection) walkingPricingSection.classList.add('d-none');
+
       // Clear all price fields and details when no tour is selected
       const servicePriceField = document.getElementById('servicePrice');
       const adultPriceField = document.getElementById('tourAdultPrice');
@@ -4444,6 +6849,22 @@ class ItineraryBuilder {
       }
 
       if (selectedTour) {
+        // Reset pricing sections
+        const vehiclePricingSection = document.getElementById('vehicleTourPricingSection');
+        const walkingPricingSection = document.getElementById('walkingTourPricingSection');
+
+        // Walking tour: use tier-based pricing
+        if (selectedTour.isWalkingTour) {
+          if (vehiclePricingSection) vehiclePricingSection.classList.add('d-none');
+          if (walkingPricingSection) walkingPricingSection.classList.remove('d-none');
+          this.handleWalkingTourSelection(selectedTour);
+          return;
+        }
+
+        // Vehicle tour: show standard pricing
+        if (vehiclePricingSection) vehiclePricingSection.classList.remove('d-none');
+        if (walkingPricingSection) walkingPricingSection.classList.add('d-none');
+
         // Get client-specific tour price or use base price
         const price = this.getPriceForTour(tourId, null) || selectedTour.price || 0;
 
@@ -4536,7 +6957,7 @@ class ItineraryBuilder {
         if (!this.currentServiceId) {
           // Only set default for adults if the field is visible
           if (tourAdultsQuantityField && tourAdultsQuantityField.closest('.col-md-4').style.display !== 'none') {
-            tourAdultsQuantityField.value = 2; // Default 2 adults
+            tourAdultsQuantityField.value = 0; // Default 0 adults
           }
           // Children and no alcohol fields are already set to 0 when hidden
         } else {
@@ -4654,6 +7075,9 @@ class ItineraryBuilder {
 
         // Handle tour schedule/availability
         this.handleTourSchedule(selectedTour);
+
+        // Update breakdown after all tour fields are populated
+        this.updateServicePriceBreakdown();
       } else {
         console.warn('Tour not found in cache:', tourId);
         document.getElementById('servicePrice').value = 0;
@@ -4753,12 +7177,12 @@ class ItineraryBuilder {
           } else if (typeof value === 'number') {
             // Format ALL potential price/currency fields
             if (key.toLowerCase().includes('price')
-                            || key.toLowerCase().includes('cost')
-                            || key.toLowerCase().includes('rate')
-                            || key.toLowerCase().includes('tarifa')
-                            || key.toLowerCase().includes('precio')
-                            || key.toLowerCase().includes('fee')
-                            || key.toLowerCase().includes('commission')) {
+              || key.toLowerCase().includes('cost')
+              || key.toLowerCase().includes('rate')
+              || key.toLowerCase().includes('tarifa')
+              || key.toLowerCase().includes('precio')
+              || key.toLowerCase().includes('fee')
+              || key.toLowerCase().includes('commission')) {
               displayValue = `💰 $${value.toLocaleString()}`;
               fieldClass = 'text-success fw-bold';
             } else {
@@ -5300,8 +7724,8 @@ class ItineraryBuilder {
           // Check if provider experience is active and has valid provider pointer
           const isActive = exp.active !== false; // Default to true if not specified
           const hasValidProvider = exp.provider
-                        && exp.provider.active !== false
-                        && exp.provider.exists !== false;
+            && exp.provider.active !== false
+            && exp.provider.exists !== false;
 
           // Check availability for the selected day
           const isAvailableOnDay = this.isExperienceAvailableOnDay(exp, dayOfWeek, dayDate);
@@ -5426,8 +7850,8 @@ class ItineraryBuilder {
       // Check for daily schedule (if experience has times for this day)
       if (experience.availability.schedule && typeof experience.availability.schedule === 'object') {
         const hasScheduleForDay = experience.availability.schedule[dayName]
-                    || experience.availability.schedule[dayNameEs]
-                    || experience.availability.schedule[dayOfWeek];
+          || experience.availability.schedule[dayNameEs]
+          || experience.availability.schedule[dayOfWeek];
         if (hasScheduleForDay !== undefined) {
           const isAvailable = hasScheduleForDay !== null && hasScheduleForDay !== false;
 
@@ -5686,12 +8110,32 @@ class ItineraryBuilder {
           return nameA.localeCompare(nameB);
         });
 
-        validTours.forEach((tour) => {
+        // Split into vehicle tours and walking tours
+        const vehicleTours = validTours.filter((t) => !t.isWalkingTour);
+        const walkingTours = validTours.filter((t) => t.isWalkingTour === true);
+
+        const addTourOption = (tour, parent) => {
           const option = document.createElement('option');
           option.value = tour.objectId || tour.id;
           option.textContent = tour.destinationPOI?.name || tour.description || 'Tour sin nombre';
-          tourSelect.appendChild(option);
-        });
+          parent.appendChild(option);
+        };
+
+        if (vehicleTours.length > 0 && walkingTours.length > 0) {
+          // Use optgroups when both types exist
+          const vehicleGroup = document.createElement('optgroup');
+          vehicleGroup.label = 'Tours en Vehículo';
+          vehicleTours.forEach((tour) => addTourOption(tour, vehicleGroup));
+          tourSelect.appendChild(vehicleGroup);
+
+          const walkingGroup = document.createElement('optgroup');
+          walkingGroup.label = 'Tours a Pie';
+          walkingTours.forEach((tour) => addTourOption(tour, walkingGroup));
+          tourSelect.appendChild(walkingGroup);
+        } else {
+          // Single type — flat list
+          validTours.forEach((tour) => addTourOption(tour, tourSelect));
+        }
       } else {
         console.warn('⚠️ No tours in cache after loading attempt');
       }
@@ -5731,7 +8175,7 @@ class ItineraryBuilder {
             unitPrice: servicePrice,
             quantity: service.quantity || 1,
             notes: service.notes || '',
-            hours: null, // Add if needed
+            hours: service.hours || null,
             total: serviceTotal,
             // Type-specific fields
             experienceId: service.experienceId || null,
@@ -5751,8 +8195,46 @@ class ItineraryBuilder {
             checkIn: service.checkIn || null,
             checkOut: service.checkOut || null,
             // Tour-specific fields
-            includeGuide: service.includeGuide || false, // Save Guía + Chofer checkbox state
-            includeGreeter: service.includeGreeter || false, // Save Greeter checkbox state
+            includeGuide: service.includeGuide || false,
+            includeGreeter: service.includeGreeter || false,
+            greeterInVehicle: service.greeterInVehicle || false,
+            includeInTotal: service.includeInTotal !== false,
+            // Transport-specific fields
+            transportType: service.transportType || null,
+            tripType: service.tripType || null,
+            directionType: service.directionType || null,
+            origin: service.origin || null,
+            originName: service.originName || null,
+            destination: service.destination || null,
+            destinationPOI: service.destinationPOI || null,
+            specificLocation: service.specificLocation || null,
+            category: service.category || null,
+            transportAdults: service.transportAdults || null,
+            transportChildren: service.transportChildren || null,
+            transportInfants: service.transportInfants || null,
+            persons: service.persons || null,
+            flightNumber: service.flightNumber || null,
+            airline: service.airline || null,
+            routeDuration: service.routeDuration || null,
+            baseVehiclePrice: service.baseVehiclePrice || null,
+            waitingTimeHours: service.waitingTimeHours || 0,
+            waitingTimePricePerHour: service.waitingTimePricePerHour || 0,
+            // Round trip fields
+            startDate: service.startDate || null,
+            endDate: service.endDate || null,
+            returnOrigin: service.returnOrigin || null,
+            returnDestination: service.returnDestination || null,
+            returnAirline: service.returnAirline || null,
+            returnFlightNumber: service.returnFlightNumber || null,
+            // A Disposición fields
+            vehicleCount: service.vehicleCount || null,
+            hourlyPrice: service.hourlyPrice || null,
+            discountPercent: service.discountPercent || null,
+            // Walking tour fields
+            isWalkingTour: service.isWalkingTour || false,
+            walkingTourPeopleCount: service.walkingTourPeopleCount || null,
+            walkingTourPrice: service.walkingTourPrice || null,
+            walkingTourCurrency: service.walkingTourCurrency || null,
           };
 
           // Debug logging for includeGuide
@@ -5816,9 +8298,9 @@ class ItineraryBuilder {
 
           // Check different possible error message fields
           errorMessage = errorData.error
-                        || errorData.message
-                        || errorData.msg
-                        || (typeof errorData === 'string' ? errorData : errorMessage);
+            || errorData.message
+            || errorData.msg
+            || (typeof errorData === 'string' ? errorData : errorMessage);
         } catch (jsonError) {
           // Not JSON, use the text directly
           console.error('Response is not JSON:', responseBody);
@@ -6046,7 +8528,7 @@ class ItineraryBuilder {
 
     this.days.forEach((day) => {
       const services = day.services.map((sid) => this.services.get(sid)).filter(Boolean);
-      const dayTotal = services.reduce((sum, service) => sum + (this.calculateServicePrice(service) * service.quantity), 0);
+      const dayTotal = services.reduce((sum, service) => sum + (this.calculateServicePrice(service) * (service.type === 'transport' ? 1 : service.quantity)), 0);
 
       previewHtml += `
                 <div class="preview-day mb-4">
@@ -6059,7 +8541,7 @@ class ItineraryBuilder {
                             <div class="preview-service mb-2">
                                 <strong>${this.getServiceTitle(service)}</strong>
                                 ${service.startTime ? ` - ${service.startTime}` : ''}
-                                <span class="float-end">${this.formatCurrency(this.calculateServicePrice(service) * service.quantity)}</span>
+                                <span class="float-end">${this.formatCurrency(this.calculateServicePrice(service) * (service.type === 'transport' ? 1 : service.quantity))}</span>
                             </div>
                         `).join('')}
                     </div>
@@ -6706,6 +9188,585 @@ class ItineraryBuilder {
         this.deleteService(serviceId);
       });
     });
+
+    // Toggle include in total buttons
+    container.querySelectorAll('.toggle-include-total-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const { serviceId } = btn.dataset;
+        const service = this.services.get(serviceId);
+        if (service) {
+          service.includeInTotal = service.includeInTotal === false;
+          this.renderDaysContent();
+          this.updateTotals();
+        }
+      });
+    });
+
+    // Person count inputs in day footers
+    container.querySelectorAll('.day-person-count-input').forEach((input) => {
+      input.addEventListener('change', (e) => {
+        const newCount = parseInt(e.target.value) || 0;
+        this.numberOfPeople = newCount;
+        // Sync the numberOfPeople input in the information tab
+        const infoInput = document.getElementById('numberOfPeople');
+        if (infoInput) infoInput.value = newCount;
+        // Update all day cards per-person totals and global totals
+        this.updateAllDayPerPerson();
+        this.updateTotals();
+      });
+    });
+  }
+
+  updateAllDayPerPerson() {
+    const container = document.getElementById('daysContainer');
+    if (!container) return;
+
+    container.querySelectorAll('.day-card').forEach((card) => {
+      const dayId = card.dataset.dayId;
+      const day = this.days.find((d) => d.id === dayId);
+      if (!day) return;
+
+      const services = day.services.map((sid) => this.services.get(sid)).filter(Boolean);
+      const dayTotalMXN = services.reduce((sum, service) => {
+        if (service.includeInTotal === false) return sum;
+        return sum + (this.calculateServicePrice(service) * (service.type === 'transport' ? 1 : service.quantity));
+      }, 0);
+      const dayTotal = this.getDisplayPrice(dayTotalMXN);
+      const perPerson = this.numberOfPeople > 0 ? dayTotal / this.numberOfPeople : 0;
+
+      const perPersonEl = card.querySelector('.day-per-person');
+      if (perPersonEl) perPersonEl.textContent = this.formatCurrency(perPerson);
+
+      // Sync all person count inputs to same value
+      const input = card.querySelector('.day-person-count-input');
+      if (input && parseInt(input.value) !== this.numberOfPeople) {
+        input.value = this.numberOfPeople;
+      }
+    });
+  }
+}
+
+// Global variable to store services data for filtering
+let servicesData = null;
+
+/**
+ * Load active services from Services table and populate transport dropdowns
+ */
+async function loadActiveServicesForDropdowns() {
+  try {
+    // console.log('[Services] Loading active services from Services table...');
+
+    // Fetch active services from the API
+    const response = await fetch('/api/services/active', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load services: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.data) {
+      // console.log(`[Services] Loaded ${result.data.length} active services`);
+
+      // Store services data globally for filtering
+      servicesData = result.data;
+
+      // Group services by transport type
+      const servicesByType = {
+        aeropuerto: [],
+        'punto-a-punto': [],
+        local: []
+      };
+
+      result.data.forEach(service => {
+        // Use originPOI serviceType for filtering instead of service transportType
+        const originServiceType = service.originServiceType || '';
+        const destinationServiceType = service.destinationServiceType || '';
+
+        // Group services based on POI serviceType
+        // For Aeropuerto: show services where origin or destination POI has serviceType "Aeropuerto"
+        if (originServiceType.toLowerCase().includes('aeropuerto') || destinationServiceType.toLowerCase().includes('aeropuerto')) {
+          servicesByType.aeropuerto.push(service);
+        }
+
+        // For Punto a Punto: show services where POI serviceType includes "punto" or similar
+        if (originServiceType.toLowerCase().includes('punto') || destinationServiceType.toLowerCase().includes('punto') ||
+          originServiceType.toLowerCase().includes('point') || destinationServiceType.toLowerCase().includes('point')) {
+          servicesByType['punto-a-punto'].push(service);
+        }
+
+        // For Local: show services where POI serviceType includes "local"
+        if (originServiceType.toLowerCase().includes('local') || destinationServiceType.toLowerCase().includes('local')) {
+          servicesByType.local.push(service);
+        }
+
+        // If no specific serviceType is found, default to aeropuerto
+        if (!originServiceType && !destinationServiceType) {
+          servicesByType.aeropuerto.push(service);
+        }
+      });
+
+      // Store for global access
+      window.servicesByTransportType = servicesByType;
+
+
+      // Initially populate with aeropuerto services (default)
+      populateDropdownsForTransportType('aeropuerto');
+
+    }
+  } catch (error) {
+    console.error('[Services] Error loading active services:', error);
+    // Don't break the app if services can't be loaded
+  }
+}
+
+/**
+ * Populate transport dropdowns based on selected transport type
+ */
+function populateDropdownsForTransportType(transportType, directionType) {
+  if (!window.servicesByTransportType) {
+    console.warn('[Services] No services data available for filtering');
+    return;
+  }
+
+  // If directionType not passed, read from DOM
+  if (!directionType) {
+    directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
+  }
+
+  const services = window.servicesByTransportType[transportType] || [];
+
+  const origins = new Set();
+  const destinations = new Set();
+
+  services.forEach(service => {
+    if (transportType === 'aeropuerto') {
+      if (directionType === 'departure') {
+        // Departure: user leaves FROM a local destination TO the airport
+        // origin dropdown = non-airport POIs (hotels, cities — same as arrival destinations)
+        // destination combo = airports
+        if (service.destination) {
+          origins.add(service.destination);
+        }
+        if (service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
+          destinations.add(service.origin);
+        }
+      } else {
+        // Arrival: user arrives FROM the airport TO a local destination
+        // origin dropdown = airports
+        // destination combo = non-airport destinations
+        if (service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
+          origins.add(service.origin);
+        }
+        if (service.destination) {
+          destinations.add(service.destination);
+        }
+      }
+    } else if (directionType === 'departure') {
+      // Departure for non-aeropuerto: swap origins/destinations
+      // User departs FROM destination → TO origin (relative to DB)
+      if (service.destination) origins.add(service.destination);
+      if (service.origin) destinations.add(service.origin);
+    } else {
+      // Arrival for non-aeropuerto: origins and destinations as stored
+      if (service.origin) origins.add(service.origin);
+      if (service.destination) destinations.add(service.destination);
+    }
+  });
+
+  // Create mapping from slugified values to original names (make it global)
+  window.slugToOriginalMapping = new Map();
+
+  const isDeparture = directionType === 'departure';
+
+  // Elements (one-way only — round trip uses populateRoundTripDropdowns)
+  const originSelectEls = [
+    document.getElementById('transportOriginSelect'),
+  ];
+  const destinationSelectEl = document.getElementById('transportDestinationSelect');
+  const originDatalistEl = document.getElementById('transportOriginList');
+  const destinationDatalistEls = [
+    document.getElementById('transportDestinationList'),
+  ];
+
+  // Helper: populate a SELECT element with slugified values
+  const populateSelect = (element, dataSet) => {
+    if (!element) return;
+    while (element.options.length > 1) element.remove(1);
+    [...dataSet].sort().forEach(location => {
+      const option = document.createElement('option');
+      const slugValue = location.toLowerCase().replace(/\s+/g, '-');
+      option.value = slugValue;
+      option.textContent = location;
+      element.appendChild(option);
+      window.slugToOriginalMapping.set(slugValue, location);
+    });
+  };
+
+  // Helper: populate a DATALIST element with original values
+  const populateDatalist = (element, dataSet) => {
+    if (!element) return;
+    element.innerHTML = '';
+    [...dataSet].sort().forEach(location => {
+      const option = document.createElement('option');
+      option.value = location;
+      element.appendChild(option);
+    });
+  };
+
+  if (isDeparture && transportType === 'local') {
+    // Local Vuelta: origin = SELECT, destination = TEXT (no dropdown needed)
+    originSelectEls.forEach(el => populateSelect(el, origins));
+    // Clear unused elements
+    if (originDatalistEl) originDatalistEl.innerHTML = '';
+    if (destinationSelectEl) { while (destinationSelectEl.options.length > 1) destinationSelectEl.remove(1); }
+    destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
+  } else if (isDeparture) {
+    // Aeropuerto / Punto a Punto departure: origin = COMBO (datalist), destination = SELECT
+    populateDatalist(originDatalistEl, origins);
+    originSelectEls.forEach(el => populateSelect(el, origins)); // fallback for slug mapping
+    populateSelect(destinationSelectEl, destinations);
+    destinationDatalistEls.forEach(el => populateDatalist(el, destinations)); // keep in sync
+  } else if (transportType === 'local') {
+    // Local Ida: origin = TEXT (no dropdown needed), destination = SELECT
+    populateSelect(destinationSelectEl, destinations);
+    // Clear unused elements
+    originSelectEls.forEach(el => { if (el) { while (el.options.length > 1) el.remove(1); } });
+    if (originDatalistEl) originDatalistEl.innerHTML = '';
+    destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
+  } else {
+    // Arrival: origins → origin SELECT, destinations → destination datalists
+    originSelectEls.forEach(el => populateSelect(el, origins));
+    destinationDatalistEls.forEach(el => populateDatalist(el, destinations));
+    // Clear departure-specific elements
+    if (originDatalistEl) originDatalistEl.innerHTML = '';
+    if (destinationSelectEl) { while (destinationSelectEl.options.length > 1) destinationSelectEl.remove(1); }
+  }
+
+  // Update options indicators
+  updateOptionsIndicator(isDeparture ? 'transportOriginList' : 'transportDestinationList',
+    isDeparture ? 'originOptionsIndicator' : 'destinationOptionsIndicator');
+
+  // console.log(`[Services] Dropdowns updated for ${transportType}:`, {
+  //   origins: origins.size,
+  //   destinations: destinations.size
+  // });
+}
+
+/**
+ * Populate round trip dropdowns for both directions simultaneously.
+ * Ida = arrival pattern, Vuelta = departure pattern.
+ */
+function populateRoundTripDropdowns(transportType) {
+  if (!window.servicesByTransportType) return;
+
+  const services = window.servicesByTransportType[transportType] || [];
+
+  // Collect origins/destinations for both directions
+  const arrivalOrigins = new Set();
+  const arrivalDestinations = new Set();
+  const departureOrigins = new Set();
+  const departureDestinations = new Set();
+
+  services.forEach(service => {
+    if (transportType === 'aeropuerto') {
+      // Arrival: airports → origins, destinations → destinations
+      if (service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
+        arrivalOrigins.add(service.origin);
+        departureDestinations.add(service.origin); // Departure dest = airports
+      }
+      if (service.destination) {
+        arrivalDestinations.add(service.destination);
+        departureOrigins.add(service.destination); // Departure origin = hotels/cities
+      }
+    } else {
+      // Punto a Punto / Local
+      if (service.origin) {
+        arrivalOrigins.add(service.origin);
+        departureDestinations.add(service.origin);
+      }
+      if (service.destination) {
+        arrivalDestinations.add(service.destination);
+        departureOrigins.add(service.destination);
+      }
+    }
+  });
+
+  // Ensure slug mapping exists
+  if (!window.slugToOriginalMapping) window.slugToOriginalMapping = new Map();
+
+  const populateSelect = (element, dataSet) => {
+    if (!element) return;
+    while (element.options.length > 1) element.remove(1);
+    [...dataSet].sort().forEach(location => {
+      const option = document.createElement('option');
+      const slugValue = location.toLowerCase().replace(/\s+/g, '-');
+      option.value = slugValue;
+      option.textContent = location;
+      element.appendChild(option);
+      window.slugToOriginalMapping.set(slugValue, location);
+    });
+  };
+
+  const populateDatalist = (element, dataSet) => {
+    if (!element) return;
+    element.innerHTML = '';
+    [...dataSet].sort().forEach(location => {
+      const option = document.createElement('option');
+      option.value = location;
+      element.appendChild(option);
+    });
+  };
+
+  // --- IDA (arrival pattern) ---
+  const idaOriginSelect = document.getElementById('roundTripOriginIdaSelect');
+  const idaDestCombo = document.getElementById('roundTripDestinationIdaList');
+  const idaDestSelect = document.getElementById('roundTripDestinationIdaSelect');
+
+  if (transportType === 'local') {
+    // Local Ida: origin = TEXT (no dropdown), destination = SELECT
+    if (idaOriginSelect) { while (idaOriginSelect.options.length > 1) idaOriginSelect.remove(1); }
+    populateSelect(idaDestSelect, arrivalDestinations);
+    if (idaDestCombo) idaDestCombo.innerHTML = '';
+  } else {
+    // Aeropuerto / Punto a Punto: origin = SELECT, destination = COMBO
+    populateSelect(idaOriginSelect, arrivalOrigins);
+    populateDatalist(idaDestCombo, arrivalDestinations);
+    if (idaDestSelect) { while (idaDestSelect.options.length > 1) idaDestSelect.remove(1); }
+  }
+
+  // --- VUELTA (departure pattern) ---
+  const vueltaOriginCombo = document.getElementById('roundTripOriginVueltaList');
+  const vueltaOriginSelect = document.getElementById('roundTripOriginVueltaSelect');
+  const vueltaDestSelect = document.getElementById('roundTripDestinationVueltaSelect');
+
+  if (transportType === 'local') {
+    // Local Vuelta: origin = SELECT, destination = TEXT (no dropdown)
+    populateSelect(vueltaOriginSelect, departureOrigins);
+    if (vueltaOriginCombo) vueltaOriginCombo.innerHTML = '';
+    if (vueltaDestSelect) { while (vueltaDestSelect.options.length > 1) vueltaDestSelect.remove(1); }
+  } else {
+    // Aeropuerto / Punto a Punto: origin = COMBO, destination = SELECT
+    populateDatalist(vueltaOriginCombo, departureOrigins);
+    populateSelect(vueltaDestSelect, departureDestinations);
+    if (vueltaOriginSelect) { while (vueltaOriginSelect.options.length > 1) vueltaOriginSelect.remove(1); }
+  }
+}
+
+/**
+ * Show indicator when datalist has options and origin is selected
+ */
+function updateOptionsIndicator(datalistId, indicatorId) {
+  const datalist = document.getElementById(datalistId);
+  const indicator = document.getElementById(indicatorId);
+
+  if (datalist && indicator) {
+    // Check if an origin is selected
+    const transportOrigin = document.getElementById('transportOriginSelect');
+    const roundTripOrigin = document.getElementById('roundTripOriginIdaSelect');
+
+    const originSelected = (transportOrigin && transportOrigin.value && transportOrigin.value !== '') ||
+      (roundTripOrigin && roundTripOrigin.value && roundTripOrigin.value !== '');
+
+    const hasOptions = datalist.options.length > 0;
+
+    // Only show indicator if origin is selected AND there are options
+    if (hasOptions && originSelected) {
+      indicator.classList.remove('d-none');
+    } else {
+      indicator.classList.add('d-none');
+    }
+  }
+}
+
+/**
+ * Update destination combo box options based on selected origin
+ */
+function updateDestinationsForOrigin(selectedOrigin = null) {
+  console.log('🔍 updateDestinationsForOrigin called with origin:', selectedOrigin);
+
+  if (!window.servicesByTransportType || !selectedOrigin) {
+    console.log('❌ No services data or origin, returning');
+    return; // No filtering if no origin selected
+  }
+
+  // Convert slugified value back to original name
+  const originalOriginName = window.slugToOriginalMapping?.get(selectedOrigin) || selectedOrigin;
+  console.log(`🔄 Converting slug "${selectedOrigin}" to original name: "${originalOriginName}"`);
+
+  const transportType = document.querySelector('input[name="transportType"]:checked')?.value || 'aeropuerto';
+  const directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
+  const services = window.servicesByTransportType[transportType] || [];
+
+  // For departure: user's origin is a local place stored as service.destination in DB
+  // So filter by service.destination and return service.origin as destination options
+  const isDeparture = directionType === 'departure';
+  const isDepartureWithSelect = isDeparture && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
+
+  const relevantServices = services.filter(service =>
+    isDeparture ? service.destination === originalOriginName : service.origin === originalOriginName
+  );
+
+  if (relevantServices.length === 0) {
+    return;
+  }
+
+  // Get matching destinations
+  const destinations = new Set();
+  relevantServices.forEach(service => {
+    if (isDeparture) {
+      // Departure: show matching origins as destination options
+      if (service.origin) {
+        destinations.add(service.origin);
+      }
+    } else {
+      if (service.destination) {
+        destinations.add(service.destination);
+      }
+    }
+  });
+
+  if (isDepartureWithSelect) {
+    // Aeropuerto / Punto a Punto departure: update destination SELECT
+    const destSelect = document.getElementById('transportDestinationSelect');
+    if (destSelect) {
+      while (destSelect.options.length > 1) destSelect.remove(1);
+      [...destinations].sort().forEach(location => {
+        const option = document.createElement('option');
+        const slugValue = location.toLowerCase().replace(/\s+/g, '-');
+        option.value = slugValue;
+        option.textContent = location;
+        destSelect.appendChild(option);
+        window.slugToOriginalMapping?.set(slugValue, location);
+      });
+    }
+  } else {
+    // Arrival / Local departure: update destination datalists (COMBO)
+    const datalists = [
+      document.getElementById('transportDestinationList'),
+      document.getElementById('roundTripDestinationIdaList'),
+    ];
+    datalists.forEach(element => {
+      if (!element) return;
+      element.innerHTML = '';
+      [...destinations].sort().forEach(location => {
+        const option = document.createElement('option');
+        option.value = location;
+        element.appendChild(option);
+      });
+    });
+    updateOptionsIndicator('transportDestinationList', 'destinationOptionsIndicator');
+  }
+}
+
+/**
+ * Show indicator when datalist has options and origin is selected
+ */
+function updateOptionsIndicator(datalistId, indicatorId) {
+  const datalist = document.getElementById(datalistId);
+  const indicator = document.getElementById(indicatorId);
+
+  if (datalist && indicator) {
+    // Check if an origin is selected
+    const transportOrigin = document.getElementById('transportOriginSelect');
+    const roundTripOrigin = document.getElementById('roundTripOriginIdaSelect');
+
+    const originSelected = (transportOrigin && transportOrigin.value && transportOrigin.value !== '') ||
+      (roundTripOrigin && roundTripOrigin.value && roundTripOrigin.value !== '');
+
+    const hasOptions = datalist.options.length > 0;
+
+    // Only show indicator if origin is selected AND there are options
+    if (hasOptions && originSelected) {
+      indicator.classList.remove('d-none');
+    } else {
+      indicator.classList.add('d-none');
+    }
+  }
+}
+
+/**
+ * Update destination combo box options based on selected origin
+ */
+function updateDestinationsForOrigin(selectedOrigin = null) {
+  console.log('🔍 updateDestinationsForOrigin called with origin:', selectedOrigin);
+
+  if (!window.servicesByTransportType || !selectedOrigin) {
+    console.log('❌ No services data or origin, returning');
+    return; // No filtering if no origin selected
+  }
+
+  // Convert slugified value back to original name
+  const originalOriginName = window.slugToOriginalMapping?.get(selectedOrigin) || selectedOrigin;
+  console.log(`🔄 Converting slug "${selectedOrigin}" to original name: "${originalOriginName}"`);
+
+  const transportType = document.querySelector('input[name="transportType"]:checked')?.value || 'aeropuerto';
+  const directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
+  const services = window.servicesByTransportType[transportType] || [];
+
+  // For departure: user's origin is a local place stored as service.destination in DB
+  // So filter by service.destination and return service.origin as destination options
+  const isDeparture = directionType === 'departure';
+  const isDepartureWithSelect = isDeparture && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
+
+  const relevantServices = services.filter(service =>
+    isDeparture ? service.destination === originalOriginName : service.origin === originalOriginName
+  );
+
+  if (relevantServices.length === 0) {
+    return;
+  }
+
+  // Get matching destinations
+  const destinations = new Set();
+  relevantServices.forEach(service => {
+    if (isDeparture) {
+      // Departure: show matching origins as destination options
+      if (service.origin) {
+        destinations.add(service.origin);
+      }
+    } else {
+      if (service.destination) {
+        destinations.add(service.destination);
+      }
+    }
+  });
+
+  if (isDepartureWithSelect) {
+    // Aeropuerto / Punto a Punto departure: update destination SELECT
+    const destSelect = document.getElementById('transportDestinationSelect');
+    if (destSelect) {
+      while (destSelect.options.length > 1) destSelect.remove(1);
+      [...destinations].sort().forEach(location => {
+        const option = document.createElement('option');
+        const slugValue = location.toLowerCase().replace(/\s+/g, '-');
+        option.value = slugValue;
+        option.textContent = location;
+        destSelect.appendChild(option);
+        window.slugToOriginalMapping?.set(slugValue, location);
+      });
+    }
+  } else {
+    // Arrival / Local departure: update destination datalists (COMBO)
+    const datalists = [
+      document.getElementById('transportDestinationList'),
+      document.getElementById('roundTripDestinationIdaList'),
+    ];
+    datalists.forEach(element => {
+      if (!element) return;
+      element.innerHTML = '';
+      [...destinations].sort().forEach(location => {
+        const option = document.createElement('option');
+        option.value = location;
+        element.appendChild(option);
+      });
+    });
+    updateOptionsIndicator('transportDestinationList', 'destinationOptionsIndicator');
   }
 }
 
@@ -6716,6 +9777,286 @@ document.addEventListener('DOMContentLoaded', () => {
     const { quoteId } = quoteIdElement.dataset;
     window.itineraryBuilder = new ItineraryBuilder(quoteId);
   }
+
+  // Load active services from Services table for dropdowns
+  loadActiveServicesForDropdowns();
+
+  // Add event listeners for origin selectboxes to update destination combo boxes
+  setTimeout(() => {
+    // Use setTimeout to ensure the DOM elements are ready after async loading
+    const originSelects = [
+      document.getElementById('transportOriginSelect'),
+      document.getElementById('roundTripOriginIdaSelect')
+    ];
+
+    originSelects.forEach((select, index) => {
+      if (select) {
+        console.log(`✅ Adding event listener to origin select ${index}:`, select.id);
+        select.addEventListener('change', (e) => {
+          const selectedOrigin = e.target.value;
+          console.log(`🔄 Origin select ${index} changed to:`, selectedOrigin);
+
+          // Clear destination fields when origin changes
+          const destinationCombos = [
+            document.getElementById('transportDestinationCombo'),
+            document.getElementById('roundTripDestinationIdaCombo')
+          ];
+
+          destinationCombos.forEach(combo => {
+            if (combo) {
+              combo.value = '';
+              // Trigger change event to hide specific location field if it was showing
+              combo.dispatchEvent(new Event('input'));
+            }
+          });
+
+          if (selectedOrigin) {
+            updateDestinationsForOrigin(selectedOrigin);
+          } else {
+            // If no origin selected, reset to show all destinations for transport type
+            const transportType = document.querySelector('input[name="transportType"]:checked')?.value || 'aeropuerto';
+            console.log('Resetting to all destinations for transport type:', transportType);
+            populateDropdownsForTransportType(transportType);
+          }
+
+          // Re-trigger transport price lookup if rate is already selected
+          const currentRateId = document.getElementById('transportCategory')?.value;
+          if (window.itineraryBuilder && currentRateId) {
+            window.itineraryBuilder.handleTransportRateSelection(currentRateId);
+          }
+
+          // Auto-sync Ida → Vuelta (swapped) for round trip
+          if (window.itineraryBuilder) window.itineraryBuilder.syncIdaToVuelta();
+        });
+      } else {
+        console.log(`Origin select ${index} not found`);
+      }
+    });
+
+    // Departure origin combo: filter destinations when user selects/types origin
+    const originCombo = document.getElementById('transportOriginCombo');
+    if (originCombo) {
+      originCombo.addEventListener('input', (e) => {
+        const selectedOrigin = e.target.value;
+
+        // Clear destination fields when origin changes
+        const destSelect = document.getElementById('transportDestinationSelect');
+        if (destSelect) destSelect.value = '';
+        const destCombo = document.getElementById('transportDestinationCombo');
+        if (destCombo) destCombo.value = '';
+
+        if (selectedOrigin) {
+          updateDestinationsForOrigin(selectedOrigin);
+        } else {
+          const currentTransportType = document.querySelector('input[name="transportType"]:checked')?.value || 'aeropuerto';
+          populateDropdownsForTransportType(currentTransportType);
+        }
+
+        // Check if specific location field is needed
+        checkSpecificLocationField();
+
+        // Re-trigger transport price lookup if rate is already selected
+        const currentRateId = document.getElementById('transportCategory')?.value;
+        if (window.itineraryBuilder && currentRateId) {
+          window.itineraryBuilder.handleTransportRateSelection(currentRateId);
+        }
+      });
+    }
+
+    // Departure destination select: trigger rate selection when airport is selected
+    const destSelectEl = document.getElementById('transportDestinationSelect');
+    if (destSelectEl) {
+      destSelectEl.addEventListener('change', () => {
+        const currentRateId = document.getElementById('transportCategory')?.value;
+        if (window.itineraryBuilder && currentRateId) {
+          window.itineraryBuilder.handleTransportRateSelection(currentRateId);
+        }
+      });
+    }
+
+    // Destination combo: trigger rate selection and specific location check when destination changes
+    const destComboEl = document.getElementById('transportDestinationCombo');
+    if (destComboEl) {
+      destComboEl.addEventListener('input', () => {
+        checkSpecificLocationField();
+        const currentRateId = document.getElementById('transportCategory')?.value;
+        if (window.itineraryBuilder && currentRateId) {
+          window.itineraryBuilder.handleTransportRateSelection(currentRateId);
+        }
+      });
+    }
+  }, 100);
+
+  // List of locations that need the "Ubicación Específica" field
+  const needsSpecificLocation = [
+    'San Miguel de Allende',
+    'San Miguel Allende',
+    'Centro San Miguel de Allende',
+    'Guanajuato Capital',
+    'León',
+    'Ciudad de México',
+    'CDMX'
+  ];
+
+  // Check if a location value matches the specific location list
+  function locationNeedsSpecificField(value) {
+    return needsSpecificLocation.some(loc =>
+      value && value.toLowerCase().includes(loc.toLowerCase())
+    );
+  }
+
+  // Show/hide specific location field based on origin OR destination value
+  function checkSpecificLocationField() {
+    const specificLocationRow = document.getElementById('specificLocationRow');
+    if (!specificLocationRow) return;
+
+    const originCombo = document.getElementById('transportOriginCombo')?.value || '';
+    const destCombo = document.getElementById('transportDestinationCombo')?.value || '';
+    const needsField = locationNeedsSpecificField(originCombo) || locationNeedsSpecificField(destCombo);
+
+    if (needsField) {
+      specificLocationRow.classList.remove('d-none');
+    } else {
+      specificLocationRow.classList.add('d-none');
+      const specificLocationField = document.getElementById('transportSpecificLocation');
+      if (specificLocationField) specificLocationField.value = '';
+    }
+  }
+
+
+  // Show/hide round-trip specific location fields based on destination/origin values
+  // Exposed on window so ItineraryBuilder methods can call it
+  window.checkRoundTripSpecificLocationFields = checkRoundTripSpecificLocationFields;
+  function checkRoundTripSpecificLocationFields() {
+    const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
+    if (transportType === 'local') {
+      document.getElementById('roundTripSpecificLocationIdaRow')?.classList.add('d-none');
+      document.getElementById('roundTripSpecificLocationVueltaRow')?.classList.add('d-none');
+      return;
+    }
+
+    // Ida: check destination combo
+    const idaRow = document.getElementById('roundTripSpecificLocationIdaRow');
+    const idaDest = document.getElementById('roundTripDestinationIdaCombo')?.value || '';
+    if (idaRow) {
+      if (locationNeedsSpecificField(idaDest)) {
+        idaRow.classList.remove('d-none');
+      } else {
+        idaRow.classList.add('d-none');
+        const field = document.getElementById('roundTripSpecificLocationIda');
+        if (field) field.value = '';
+      }
+    }
+
+    // Vuelta: check origin combo
+    const vueltaRow = document.getElementById('roundTripSpecificLocationVueltaRow');
+    const vueltaOrigin = document.getElementById('roundTripOriginVueltaCombo')?.value || '';
+    if (vueltaRow) {
+      if (locationNeedsSpecificField(vueltaOrigin)) {
+        vueltaRow.classList.remove('d-none');
+      } else {
+        vueltaRow.classList.add('d-none');
+        const field = document.getElementById('roundTripSpecificLocationVuelta');
+        if (field) field.value = '';
+      }
+    }
+  }
+
+  // Add event listeners for destination combo boxes
+  setTimeout(() => {
+    const destinationCombos = [
+      document.getElementById('transportDestinationCombo'),
+      document.getElementById('roundTripDestinationIdaCombo')
+    ];
+
+    destinationCombos.forEach(combo => {
+      if (combo) {
+        // Handle input changes
+        combo.addEventListener('input', () => {
+          checkSpecificLocationField();
+          checkRoundTripSpecificLocationFields();
+        });
+
+        // Handle selection from datalist - also trigger transport price lookup
+        combo.addEventListener('change', (e) => {
+          checkSpecificLocationField();
+          checkRoundTripSpecificLocationFields();
+          // Re-trigger transport price lookup if rate is already selected
+          const currentRateId = document.getElementById('transportCategory')?.value;
+          if (window.itineraryBuilder && currentRateId && e.target.value) {
+            window.itineraryBuilder.handleTransportRateSelection(currentRateId);
+          }
+          // Auto-sync Ida → Vuelta (swapped) for round trip
+          if (window.itineraryBuilder) window.itineraryBuilder.syncIdaToVuelta();
+        });
+      }
+    });
+  }, 150);
+
+  // Auto-sync Ida → Vuelta for Local transport type fields + trigger vehicle reload
+  setTimeout(() => {
+    const rtIdaDestSelect = document.getElementById('roundTripDestinationIdaSelect');
+    if (rtIdaDestSelect) {
+      rtIdaDestSelect.addEventListener('change', () => {
+        if (window.itineraryBuilder) {
+          window.itineraryBuilder.syncIdaToVuelta();
+          const currentRateId = document.getElementById('transportCategory')?.value;
+          if (currentRateId) window.itineraryBuilder.handleTransportRateSelection(currentRateId);
+        }
+      });
+    }
+    const rtIdaOriginText = document.getElementById('roundTripOriginIdaText');
+    if (rtIdaOriginText) {
+      rtIdaOriginText.addEventListener('input', () => {
+        if (window.itineraryBuilder) {
+          window.itineraryBuilder.syncIdaToVuelta();
+          const currentRateId = document.getElementById('transportCategory')?.value;
+          if (currentRateId) window.itineraryBuilder.handleTransportRateSelection(currentRateId);
+        }
+      });
+    }
+
+    // Vuelta origin combo: trigger specific location check when user edits it manually
+    const rtVueltaOriginCombo = document.getElementById('roundTripOriginVueltaCombo');
+    if (rtVueltaOriginCombo) {
+      rtVueltaOriginCombo.addEventListener('input', () => {
+        checkRoundTripSpecificLocationFields();
+      });
+      rtVueltaOriginCombo.addEventListener('change', () => {
+        checkRoundTripSpecificLocationFields();
+      });
+    }
+
+    // Auto-fill Ida specific location → Vuelta specific location as user types
+    const rtIdaSpecificLocation = document.getElementById('roundTripSpecificLocationIda');
+    if (rtIdaSpecificLocation) {
+      rtIdaSpecificLocation.addEventListener('input', () => {
+        const vueltaField = document.getElementById('roundTripSpecificLocationVuelta');
+        if (vueltaField) {
+          vueltaField.value = rtIdaSpecificLocation.value;
+        }
+      });
+    }
+  }, 150);
+
+  // Global debug functions for testing
+  window.testOriginFiltering = function (origin) {
+    console.log('🧪 Testing origin filtering for:', origin);
+    updateDestinationsForOrigin(origin);
+  };
+
+  window.debugServices = function () {
+    console.log('🔍 Current services data:', window.servicesByTransportType);
+    console.log('🔍 Slug to original mapping:', window.slugToOriginalMapping);
+    console.log('🔍 Origin elements:', [
+      document.getElementById('transportOriginSelect'),
+      document.getElementById('roundTripOriginIdaSelect')
+    ]);
+    console.log('🔍 Destination datalists:', [
+      document.getElementById('transportDestinationList'),
+      document.getElementById('roundTripDestinationIdaList')
+    ]);
+  };
 
   // ==================
   // MODAL HANDLING - FIX FOR EXPERIENCE FIELDS
@@ -6745,6 +10086,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (standardPricingSection) standardPricingSection.classList.remove('d-none'); // Show standard pricing by default
       if (transportTypeSelector) transportTypeSelector.classList.add('d-none');
 
+      // Clear breakdown panel on modal state init
+      const breakdownPanel = document.getElementById('servicePriceBreakdown');
+      if (breakdownPanel) breakdownPanel.classList.add('d-none');
+
       // Clear tour schedule when switching away from tour
       if (selectedType !== 'tour' && window.quoteServicesManager) {
         window.quoteServicesManager.clearTourSchedule();
@@ -6770,6 +10115,10 @@ document.addEventListener('DOMContentLoaded', () => {
         case 'concepto':
           const conceptoContent = document.getElementById('conceptoContent');
           if (conceptoContent) conceptoContent.classList.remove('d-none');
+          break;
+        case 'a-disposicion':
+          const aDisposicionContent = document.getElementById('aDisposicionContent');
+          if (aDisposicionContent) aDisposicionContent.classList.remove('d-none');
           break;
       }
     }

@@ -1,0 +1,315 @@
+<%
+/**
+ * Experience Services Section - Simplified services builder (single-day)
+ * Based on quote-services-v2 but without multi-day management
+ * Created by Denisse Maldonado
+ */
+%>
+
+<div class="experience-services-builder p-4" data-experience-id="<%= experienceId %>">
+    <!-- Header -->
+    <div class="services-header mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <p class="text-muted mb-0">Agrega los servicios incluidos en esta experiencia</p>
+            <button type="button" class="btn btn-primary" id="addServiceBtn">
+                <i class="ti ti-plus me-1"></i>Agregar Servicio
+            </button>
+        </div>
+    </div>
+
+    <!-- Two-Column Layout: Drag Panel + Services -->
+    <div class="row g-4">
+        <!-- Left: Drag Source Panel -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm sticky-top" style="top: 20px;" id="dragSourcePanel">
+                <div class="card-body p-0">
+                    <ul class="nav nav-tabs px-3 pt-2" id="dragSourceTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tab-experiences" data-bs-toggle="tab" data-bs-target="#pane-experiences" type="button" role="tab">
+                                <i class="ti ti-beach me-1"></i>Experiencias
+                                <span class="badge bg-secondary ms-1" id="experiencesCount">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-tours" data-bs-toggle="tab" data-bs-target="#pane-tours" type="button" role="tab">
+                                <i class="ti ti-map-2 me-1"></i>Tours
+                                <span class="badge bg-secondary ms-1" id="toursCount">0</span>
+                            </button>
+                        </li>
+                    </ul>
+                    <div class="tab-content">
+                        <!-- Experiences Tab -->
+                        <div class="tab-pane fade show active" id="pane-experiences" role="tabpanel">
+                            <div class="p-3 pb-2">
+                                <input type="text" class="form-control form-control-sm" id="dragSearchExperiences" placeholder="Buscar experiencia...">
+                            </div>
+                            <div class="drag-items-list px-3 pb-3" id="dragExperiencesList" style="max-height: 400px; overflow-y: auto;">
+                                <div class="text-center text-muted py-3">
+                                    <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Tours Tab -->
+                        <div class="tab-pane fade" id="pane-tours" role="tabpanel">
+                            <div class="p-3 pb-2">
+                                <input type="text" class="form-control form-control-sm" id="dragSearchTours" placeholder="Buscar tour...">
+                            </div>
+                            <div class="drag-items-list px-3 pb-3" id="dragToursList" style="max-height: 400px; overflow-y: auto;">
+                                <div class="text-center text-muted py-3">
+                                    <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Services Drop Zone & List -->
+        <div class="col-md-8">
+            <div id="servicesDropZone" class="services-drop-zone">
+                <!-- Empty State -->
+                <div id="emptyStateContainer">
+                    <div class="text-center py-5 border border-2 border-dashed rounded">
+                        <div class="empty-state-icon mb-3">
+                            <i class="ti ti-drag-drop" style="font-size: 4rem; color: #dee2e6;"></i>
+                        </div>
+                        <h5 class="text-muted mb-2">Sin servicios aun</h5>
+                        <p class="text-muted mb-4">Arrastra experiencias o tours aqui, o usa el boton para agregar</p>
+                        <button type="button" class="btn btn-primary" id="emptyStateAddServiceBtn">
+                            <i class="ti ti-plus me-1"></i>Agregar Primer Servicio
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Services List -->
+                <div id="servicesContainer" class="services-list d-none">
+                    <!-- Services will be dynamically loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cost Summary Bar (Bottom) -->
+    <div class="cost-summary-bar p-3 rounded shadow-sm mb-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div>
+                    <span class="text-muted small">Personas</span>
+                    <input type="number" class="form-control form-control-sm text-center" id="personCount" value="1" min="1" max="100" style="width: 70px;">
+                </div>
+                <div>
+                    <span class="text-muted small">Total por persona</span>
+                    <div class="fw-bold fs-5 text-success" id="perPersonAmount">$0.00</div>
+                </div>
+                <div class="border-start ps-3">
+                    <span class="text-muted small">Pago</span>
+                    <select class="form-select form-select-sm" id="paymentTypeSelect" style="width: 150px;">
+                        <option value="efectivo" selected>Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="tarjeta">Tarjeta Crédito/Débito</option>
+                    </select>
+                </div>
+                <div>
+                    <span class="text-muted small">Moneda</span>
+                    <select class="form-select form-select-sm" id="currencySelect" style="width: 100px;">
+                        <option value="MXN" selected>MXN</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-4 flex-wrap">
+                <div class="text-end">
+                    <span class="text-muted small">Subtotal</span>
+                    <div class="fw-semibold" id="subtotalAmount">$0.00</div>
+                </div>
+                <div class="text-end">
+                    <span class="text-muted small">IVA (16%)</span>
+                    <div class="fw-semibold" id="ivaAmount">$0.00</div>
+                </div>
+                <div class="text-end">
+                    <span class="text-muted small">Total</span>
+                    <div class="fw-bold fs-5 text-primary" id="totalAmount">$0.00</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Status Indicator -->
+    <div class="save-status-bar p-3 bg-light rounded d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <div id="saveStatusIndicator" class="me-3">
+                <span class="badge bg-success">
+                    <i class="ti ti-check me-1"></i>Guardado
+                </span>
+            </div>
+            <small class="text-muted">Los cambios se guardan automaticamente</small>
+        </div>
+    </div>
+</div>
+
+<!-- Service Item Template -->
+<template id="serviceItemTemplate">
+    <div class="service-item mb-3 p-3 border rounded hover-shadow" data-service-id="">
+        <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="ti ti-point-filled text-primary me-2"></i>
+                    <h6 class="mb-0 service-title">Service Title</h6>
+                    <span class="badge bg-light text-dark ms-2 service-type">Tipo</span>
+                </div>
+                <div class="service-details">
+                    <div class="row g-2 text-muted small">
+                        <div class="col-auto">
+                            <i class="ti ti-clock me-1"></i><span class="service-time">Sin horario</span>
+                        </div>
+                        <div class="col-auto">
+                            <i class="ti ti-car me-1"></i><span class="service-vehicle">Sin vehiculo</span>
+                        </div>
+                        <div class="col-auto">
+                            <i class="ti ti-currency-dollar me-1"></i><span class="service-price">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="service-actions">
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-light edit-service-btn" title="Editar">
+                        <i class="ti ti-pencil"></i>
+                    </button>
+                    <button type="button" class="btn btn-light duplicate-service-btn" title="Duplicar">
+                        <i class="ti ti-copy"></i>
+                    </button>
+                    <button type="button" class="btn btn-light delete-service-btn" title="Eliminar">
+                        <i class="ti ti-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<style>
+    .experience-services-builder {
+        min-height: 400px;
+    }
+
+    .service-item {
+        transition: all 0.2s ease;
+        background: white;
+    }
+
+    .service-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .service-item.has-overlap {
+        border-color: #dc3545 !important;
+        background: rgba(220, 53, 69, 0.05);
+    }
+
+    .hover-shadow {
+        transition: box-shadow 0.2s ease;
+    }
+
+    .save-status-bar {
+        position: sticky;
+        bottom: 20px;
+        z-index: 10;
+        backdrop-filter: blur(10px);
+        background-color: rgba(248, 249, 250, 0.95) !important;
+    }
+
+    /* Cost Summary Bar */
+    .cost-summary-bar {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 1px solid #dee2e6;
+    }
+
+    /* Drag & Drop Styles */
+    .drag-item {
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        cursor: grab;
+        transition: all 0.15s ease;
+        user-select: none;
+    }
+
+    .drag-item:hover {
+        background: #f0f6ff;
+        border-color: #86b7fe;
+        transform: translateX(2px);
+    }
+
+    .drag-item:active {
+        cursor: grabbing;
+    }
+
+    .drag-item.dragging {
+        opacity: 0.4;
+    }
+
+    .drag-item .drag-handle {
+        color: #adb5bd;
+        margin-right: 8px;
+        font-size: 1.1rem;
+    }
+
+    .drag-item .drag-name {
+        flex: 1;
+        font-size: 0.875rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .drag-item .drag-badge {
+        font-size: 0.7rem;
+        margin-left: 8px;
+    }
+
+    .services-drop-zone.drag-over > #emptyStateContainer .border-dashed,
+    .services-drop-zone.drag-over > #servicesContainer {
+        border: 2px dashed #0d6efd !important;
+        background: rgba(13, 110, 253, 0.03);
+    }
+
+    .border-dashed {
+        border-style: dashed !important;
+    }
+
+    /* Tab styling */
+    #dragSourceTabs .nav-link {
+        font-size: 0.875rem;
+        padding: 0.5rem 1rem;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .empty-state-icon {
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+</style>
+
+<!-- Load pricing utilities and experience services JavaScript -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
+<script src="/dashboards/admin/sections/experience-services.js"></script>

@@ -31,7 +31,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 </h5>
                 <small class="text-white" style="opacity: 0.9;">Administra empleados de Amexing</small>
             </div>
-            <div class="col-auto">
+            <div class="col-auto d-flex align-items-center gap-3">
+                <!-- Toggle for including unassigned users -->
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="includeUnassignedToggle" style="background-color: rgba(255,255,255,0.3); border-color: rgba(255,255,255,0.5);">
+                    <label class="form-check-label text-white small" for="includeUnassignedToggle" style="opacity: 0.95;">
+                        Mostrar usuarios administradores
+                    </label>
+                </div>
+                
                 <% if (canCreate) { %>
                     <button type="button" class="btn btn-light btn-sm" id="createEmployeeBtn">
                         <i class="ti ti-plus me-1"></i>Nuevo Empleado
@@ -108,6 +116,26 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             helpText: 'Email del empleado para acceso al sistema',
                             maxlength: 255
                         }) %>
+
+                        <!-- Profile Photo Upload -->
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <label for="profilePhoto" class="form-label">Foto de Perfil</label>
+                                <div class="input-group">
+                                    <input type="file" class="form-control" id="profilePhoto" name="profilePhoto" accept="image/*">
+                                    <button class="btn btn-outline-secondary" type="button" id="removePhotoBtn" style="display:none;">
+                                        <i class="ti ti-trash"></i> Eliminar
+                                    </button>
+                                </div>
+                                <div class="form-text">Selecciona una imagen para el perfil del empleado</div>
+                                <div id="photoPreview" class="mt-2" style="display:none;">
+                                    <img id="previewImage" src="" alt="Vista previa" class="img-thumbnail" style="max-height: 150px;">
+                                    <div id="photoLoadError" class="alert alert-warning" style="display:none;">
+                                        <i class="fas fa-exclamation-triangle"></i> La foto de perfil no está disponible
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Sección: Asignación de Rol -->
@@ -280,6 +308,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
             if (data.search.value) {
                 params.search = data.search.value;
+            }
+
+            // Check if includeUnassigned toggle is enabled
+            const includeUnassignedToggle = document.getElementById('includeUnassignedToggle');
+            if (includeUnassignedToggle && includeUnassignedToggle.checked) {
+                params.includeUnassigned = 'true';
             }
 
             $.ajax({
@@ -474,6 +508,22 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         }
     });
     
+    // Include unassigned toggle handler
+    $('#includeUnassignedToggle').on('change', function() {
+        const isChecked = $(this).is(':checked');
+        const label = $('label[for="includeUnassignedToggle"]');
+        
+        // Update label text based on toggle state
+        if (isChecked) {
+            label.text('Mostrando los usuarios admin');
+        } else {
+            label.text('Mostrar usuarios administradores');
+        }
+        
+        // Reload the DataTable with the new filter
+        table.ajax.reload(null, false); // false = don't reset pagination
+    });
+    
     // Multiple roles checkbox handlers
     // Handle administrator role (exclusive)
     $('#role_admin').on('change', function() {
@@ -523,6 +573,54 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         $('#notesCharCount').text(`${length}/500`);
     });
 
+    // Profile photo upload preview
+    $('#profilePhoto').on('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            // Reset photo removal flag when new photo is selected
+            shouldRemovePhoto = false;
+            
+            // Show preview without any validation
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#previewImage').attr('src', e.target.result);
+                $('#photoPreview').show();
+                $('#removePhotoBtn').show();
+            };
+            reader.readAsDataURL(file);
+        } else {
+            $('#photoPreview').hide();
+            $('#removePhotoBtn').hide();
+        }
+    });
+
+    // Track photo removal intent
+    let shouldRemovePhoto = false;
+    
+    // Remove photo button
+    $('#removePhotoBtn').on('click', function() {
+        $('#profilePhoto').val('');
+        $('#photoPreview').hide();
+        $('#removePhotoBtn').hide();
+        $('#previewImage').attr('src', '').show();
+        $('#photoLoadError').hide();
+        shouldRemovePhoto = true; // Set flag to indicate photo should be removed
+    });
+
+    // Handle image load errors (CSP-compliant)
+    $('#previewImage').on('error', function() {
+        $(this).hide();
+        $('#photoLoadError').show();
+    });
+
+    // Handle successful image loads
+    $('#previewImage').on('load', function() {
+        if ($(this).attr('src')) {
+            $(this).show();
+            $('#photoLoadError').hide();
+        }
+    });
+
     $('#<%= dtTableId %>').on('click', '.edit-btn', function() {
         const id = $(this).data('id');
         $.ajax({
@@ -558,6 +656,25 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     $('#saveButtonText').text('Actualizar Empleado');
                     $('#passwordInfo').hide();
                     
+                    // Reset photo removal flag when opening edit modal
+                    shouldRemovePhoto = false;
+                    
+                    // Handle profile photo if exists
+                    if (e.profilePhotoUrl) {
+                        // Reset error state
+                        $('#previewImage').show();
+                        $('#photoLoadError').hide();
+                        // Add cache-busting timestamp to ensure latest image is loaded
+                        const photoUrlWithCacheBust = e.profilePhotoUrl + '?t=' + Date.now();
+                        $('#previewImage').attr('src', photoUrlWithCacheBust);
+                        $('#photoPreview').show();
+                        $('#removePhotoBtn').show();
+                    } else {
+                        $('#profilePhoto').val('');
+                        $('#photoPreview').hide();
+                        $('#removePhotoBtn').hide();
+                    }
+                    
                     // Trigger role descriptions update
                     updateRoleDescriptions();
 
@@ -591,11 +708,22 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         $('#notesCharCount').text('0/500');
         $('.role-description').addClass('d-none');
         $('#passwordInfo').show();
+        
+        // Reset photo removal flag when creating new employee
+        shouldRemovePhoto = false;
+        
+        // Clear photo preview
+        $('#profilePhoto').val('');
+        $('#photoPreview').hide();
+        $('#removePhotoBtn').hide();
+        $('#previewImage').attr('src', '').show();
+        $('#photoLoadError').hide();
         $('#employeeModal').modal('show');
     });
 
     $('#saveEmployeeBtn').click(function() {
         const id = $('#employeeId').val();
+        const $btn = $(this);
         
         // Collect selected roles from checkboxes
         const selectedRoles = [];
@@ -603,39 +731,111 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             selectedRoles.push($(this).val());
         });
         
-        const data = {
-            firstName: $('#firstName').val(),
-            lastName: $('#lastName').val(),
-            email: $('#email').val(),
-            roles: selectedRoles, // Send multiple roles
-            phone: $('#phone').val() || null,
-            department: $('#department').val() || null,
-            position: $('#position').val() || null,
-            notes: $('#notes').val() || null
-        };
+        // Use FormData to handle file upload
+        const formData = new FormData();
+        formData.append('firstName', $('#firstName').val());
+        formData.append('lastName', $('#lastName').val());
+        formData.append('email', $('#email').val());
+        formData.append('roles', JSON.stringify(selectedRoles)); // Send as JSON string
+        formData.append('phone', $('#phone').val() || '');
+        formData.append('department', $('#department').val() || '');
+        formData.append('position', $('#position').val() || '');
+        formData.append('notes', $('#notes').val() || '');
+        
+        // Add profile photo if selected
+        const photoFile = $('#profilePhoto')[0].files[0];
+        if (photoFile) {
+            formData.append('profilePhoto', photoFile);
+        }
+        
+        // Check if we should remove the existing photo (when remove button was clicked)
+        if (shouldRemovePhoto && !photoFile && id) {
+            formData.append('removePhoto', 'true');
+        }
 
         // Validate required fields
-        if (!data.firstName || !data.lastName || !data.email || selectedRoles.length === 0) {
+        const firstName = $('#firstName').val();
+        const lastName = $('#lastName').val();
+        const email = $('#email').val();
+        if (!firstName || !lastName || !email || selectedRoles.length === 0) {
             showModalError('Por favor completa todos los campos requeridos y selecciona al menos un rol');
             return;
         }
 
+        // Show loading state
+        const originalBtnHtml = $btn.html();
+        $btn.prop('disabled', true);
+        $btn.html('<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Guardando...');
+
         $.ajax({
             url: id ? `${API}/${id}` : API,
             type: id ? 'PUT' : 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(data),
+            data: formData,
+            processData: false,
+            contentType: false,
             success: function(result) {
                 if (result.success) {
+                    // Update the photo preview with new/updated photo URL if provided
+                    if (result.data && result.data.employee && result.data.employee.profilePhotoUrl) {
+                        // Add cache-busting timestamp to ensure new image is displayed
+                        const photoUrlWithCacheBust = result.data.employee.profilePhotoUrl + '?t=' + Date.now();
+                        $('#previewImage').attr('src', photoUrlWithCacheBust);
+                        $('#photoPreview').show();
+                        $('#removePhotoBtn').show();
+                        $('#previewImage').show();
+                        $('#photoLoadError').hide();
+                    } else if (result.data && result.data.employee && !result.data.employee.profilePhotoUrl) {
+                        // Photo was removed or no photo
+                        $('#profilePhoto').val('');
+                        $('#photoPreview').hide();
+                        $('#removePhotoBtn').hide();
+                        $('#previewImage').attr('src', '');
+                    }
+                    
+                    // Clear the file input to prevent stale file selection
+                    $('#profilePhoto').val('');
+                    
+                    // Reset photo removal flag after successful save
+                    shouldRemovePhoto = false;
+                    
                     showSuccessAlert(`Empleado ${id?'actualizado':'creado'} exitosamente`);
                     $('#employeeModal').modal('hide');
                     table.ajax.reload(null, false);
                 } else {
-                    showModalError(result.error || 'Error al guardar el empleado');
+                    let errorMessage = result.error || 'Error al guardar el empleado';
+                    
+                    // Provide specific message for duplicate email errors
+                    if (errorMessage.toLowerCase().includes('email') && 
+                        (errorMessage.toLowerCase().includes('already registered') || 
+                         errorMessage.toLowerCase().includes('duplicate') ||
+                         errorMessage.toLowerCase().includes('ya existe'))) {
+                        errorMessage = 'Este email ya está registrado. Por favor usa un email diferente.';
+                    }
+                    
+                    showModalError(errorMessage);
                 }
             },
             error: function(xhr) {
-                showModalError(xhr.responseJSON?.error || 'Error al guardar el empleado');
+                let errorMessage = 'Error al guardar el empleado';
+                
+                if (xhr.responseJSON?.error) {
+                    errorMessage = xhr.responseJSON.error;
+                    
+                    // Provide specific message for duplicate email errors
+                    if (errorMessage.toLowerCase().includes('email') && 
+                        (errorMessage.toLowerCase().includes('already registered') || 
+                         errorMessage.toLowerCase().includes('duplicate') ||
+                         errorMessage.toLowerCase().includes('ya existe'))) {
+                        errorMessage = 'Este email ya está registrado. Por favor usa un email diferente.';
+                    }
+                }
+                
+                showModalError(errorMessage);
+            },
+            complete: function() {
+                // Restore button state
+                $btn.prop('disabled', false);
+                $btn.html(originalBtnHtml);
             }
         });
     });

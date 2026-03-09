@@ -363,6 +363,26 @@ class Experience extends BaseModel {
   }
 
   /**
+   * Get service items (subconcepts with pricing).
+   * @returns {object} Service items structure.
+   * @example
+   */
+  getServiceItems() {
+    return this.get('serviceItems') || {
+      subconcepts: [], subtotal: 0, iva: 0, total: 0,
+    };
+  }
+
+  /**
+   * Set service items (subconcepts with pricing).
+   * @param {object} items - Service items { subconcepts: [], subtotal, iva, total }.
+   * @example
+   */
+  setServiceItems(items) {
+    this.set('serviceItems', items);
+  }
+
+  /**
    * Get vehicle type (optional relationship to VehicleType).
    * @returns {object|null} VehicleType Parse object or null if not set.
    * @example

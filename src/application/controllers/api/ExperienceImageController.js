@@ -175,10 +175,22 @@ class ExperienceImageController {
       experienceImage.set('optimizedVariants', optimizationResult.optimizedVariants);
       experienceImage.set('optimizationMetadata', optimizationResult.metadata);
 
-      // Get existing count and set as primary if first
+      // Get existing count and determine primary status
       const existingCount = await ExperienceImage.getImageCount(experienceId);
-      experienceImage.set('isPrimary', existingCount === 0);
-      experienceImage.set('displayOrder', existingCount);
+      const requestedPrimary = req.body && (req.body.isPrimary === 'true' || req.body.isPrimary === true);
+      const shouldBePrimary = requestedPrimary || existingCount === 0;
+
+      // If this image should be primary, unset existing primary images
+      if (shouldBePrimary && existingCount > 0) {
+        const currentPrimaries = await ExperienceImage.findPrimaryImages(experienceId);
+        for (const img of currentPrimaries) {
+          img.set('isPrimary', false);
+          await img.save(null, { useMasterKey: true });
+        }
+      }
+
+      experienceImage.set('isPrimary', shouldBePrimary);
+      experienceImage.set('displayOrder', shouldBePrimary ? 0 : existingCount);
 
       // Save image record
       await experienceImage.save(null, { useMasterKey: true });
