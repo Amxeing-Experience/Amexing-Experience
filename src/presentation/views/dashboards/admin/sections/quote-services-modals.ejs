@@ -446,40 +446,58 @@
                             
                             <!-- Round Trip Form -->
                             <div id="roundTripForm" class="transport-trip-form d-none">
-                                <!-- Arrival -->
+                                <!-- Ida (Arrival leg) -->
                                 <div class="border rounded p-3 mb-3 bg-light">
-                                    <h6 class="mb-3 text-info">
+                                    <h6 class="mb-3 text-info" id="roundTripIdaHeader">
                                         <i class="ti ti-plane-arrival me-2"></i>Arrival
                                     </h6>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Origen <span class="text-danger">*</span></label>
-                                            <!-- Arrival: Dropdown Origin -->
+                                            <label class="form-label" id="roundTripOriginIdaLabel">Origen <span class="text-danger">*</span></label>
+                                            <!-- Arrival SELECT (airports or origins) — aeropuerto/punto-a-punto -->
                                             <select class="form-select" id="roundTripOriginIdaSelect" required>
                                                 <option value="">-- Seleccionar origen --</option>
-                                                <option value="cancun">Cancún</option>
-                                                <option value="cozumel">Cozumel</option>
-                                                <option value="playa">Playa del Carmen</option>
-                                                <option value="tulum">Tulum</option>
                                             </select>
+                                            <!-- Arrival TEXT (Local Ida) -->
+                                            <input type="text" class="form-control d-none" id="roundTripOriginIdaText" placeholder="Ej: Hotel Xcaret, Airbnb Playa">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Destino <span class="text-danger">*</span></label>
-                                            <!-- Arrival: Text Destination -->
-                                            <input type="text" class="form-control" id="roundTripDestinationIda" placeholder="Ej: Hotel Xcaret, Airbnb Playa" required>
+                                            <label class="form-label" id="roundTripDestinationIdaLabel">Destino <span class="text-danger">*</span></label>
+                                            <!-- COMBO destination (aeropuerto/punto-a-punto arrival) -->
+                                            <div class="position-relative" id="roundTripDestinationIdaComboWrapper">
+                                                <input type="text" class="form-control" id="roundTripDestinationIdaCombo"
+                                                       list="roundTripDestinationIdaList"
+                                                       placeholder="Seleccionar o escribir destino..." required>
+                                                <datalist id="roundTripDestinationIdaList"></datalist>
+                                            </div>
+                                            <!-- SELECT destination (Local Ida) -->
+                                            <select class="form-select d-none" id="roundTripDestinationIdaSelect">
+                                                <option value="">-- Seleccionar destino --</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <!-- Specific Location for Ida (shown for certain destinations like San Miguel) -->
+                                    <div class="row d-none" id="roundTripSpecificLocationIdaRow">
+                                        <div class="col-md-12 mb-3">
+                                            <label class="form-label">Ubicación Específica <span class="text-info">(Hotel, Dirección, etc.)</span></label>
+                                            <input type="text" class="form-control" id="roundTripSpecificLocationIda"
+                                                   placeholder="Ej: Hotel Rosewood, Casa en Aldama 15, Centro Histórico...">
+                                            <small class="form-text text-muted">
+                                                Especifique el hotel, dirección o lugar exacto dentro del destino
+                                            </small>
                                         </div>
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripDateIda" class="form-label">Fecha de Llegada</label>
+                                            <label for="roundTripDateIda" class="form-label" id="roundTripDateIdaLabel">Fecha de Llegada</label>
                                             <input type="date" class="form-control" id="roundTripDateIda">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripTimeIda" class="form-label">Hora de Llegada</label>
-                                            <input type="time" class="form-control" id="roundTripTimeIda">
+                                            <label for="roundTripTimeIda" class="form-label" id="roundTripTimeIdaLabel">Hora de Llegada</label>
+                                            <input type="text" class="form-control time-input" id="roundTripTimeIda" placeholder="__:__" maxlength="5">
                                         </div>
                                     </div>
-                                    
+
                                     <!-- Flight Details for Ida (only show if Aeropuerto is selected) -->
                                     <div class="roundtrip-flight-details-ida d-none">
                                         <hr class="my-2">
@@ -496,42 +514,58 @@
                                     </div>
                                 </div>
 
-                                <!-- Departure -->
+                                <!-- Vuelta (Departure leg) -->
                                 <div class="border rounded p-3 bg-light">
-                                    <h6 class="mb-3 text-primary">
+                                    <h6 class="mb-3 text-primary" id="roundTripVueltaHeader">
                                         <i class="ti ti-plane-departure me-2"></i>Departure
                                     </h6>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Origen <span class="text-danger">*</span></label>
-                                            <!-- Departure: Text Origin -->
-                                            <input type="text" class="form-control" id="roundTripOriginVuelta" placeholder="Ej: Hotel Xcaret, Airbnb Playa" required>
+                                            <label class="form-label" id="roundTripOriginVueltaLabel">Origen <span class="text-danger">*</span></label>
+                                            <!-- COMBO origin (aeropuerto/punto-a-punto departure) -->
+                                            <div class="position-relative" id="roundTripOriginVueltaComboWrapper">
+                                                <input type="text" class="form-control" id="roundTripOriginVueltaCombo"
+                                                       list="roundTripOriginVueltaList"
+                                                       placeholder="Seleccionar o escribir origen...">
+                                                <datalist id="roundTripOriginVueltaList"></datalist>
+                                            </div>
+                                            <!-- SELECT origin (Local Vuelta) -->
+                                            <select class="form-select d-none" id="roundTripOriginVueltaSelect">
+                                                <option value="">-- Seleccionar origen --</option>
+                                            </select>
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Destino <span class="text-danger">*</span></label>
-                                            <!-- Combo Box: Input with datalist for autocomplete -->
-                                            <input type="text" 
-                                                   class="form-control" 
-                                                   id="roundTripDestinationCombo" 
-                                                   list="roundTripDestinationList"
-                                                   placeholder="Seleccionar o escribir destino..." 
-                                                   required>
-                                            <datalist id="roundTripDestinationList">
-                                                <!-- Options will be populated dynamically from Services table -->
-                                            </datalist>
+                                            <label class="form-label" id="roundTripDestinationVueltaLabel">Destino <span class="text-danger">*</span></label>
+                                            <!-- SELECT destination (aeropuerto/punto-a-punto departure) -->
+                                            <select class="form-select" id="roundTripDestinationVueltaSelect">
+                                                <option value="">-- Seleccionar destino --</option>
+                                            </select>
+                                            <!-- TEXT destination (Local Vuelta) -->
+                                            <input type="text" class="form-control d-none" id="roundTripDestinationVueltaText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
+                                        </div>
+                                    </div>
+                                    <!-- Specific Location for Vuelta (shown for certain origins like San Miguel) -->
+                                    <div class="row d-none" id="roundTripSpecificLocationVueltaRow">
+                                        <div class="col-md-12 mb-3">
+                                            <label class="form-label">Ubicación Específica <span class="text-info">(Hotel, Dirección, etc.)</span></label>
+                                            <input type="text" class="form-control" id="roundTripSpecificLocationVuelta"
+                                                   placeholder="Ej: Hotel Rosewood, Casa en Aldama 15, Centro Histórico...">
+                                            <small class="form-text text-muted">
+                                                Especifique el hotel, dirección o lugar exacto dentro del origen
+                                            </small>
                                         </div>
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripDateVuelta" class="form-label">Fecha de Salida</label>
+                                            <label for="roundTripDateVuelta" class="form-label" id="roundTripDateVueltaLabel">Fecha de Salida</label>
                                             <input type="date" class="form-control" id="roundTripDateVuelta">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripTimeVuelta" class="form-label">Hora de Salida</label>
-                                            <input type="time" class="form-control" id="roundTripTimeVuelta">
+                                            <label for="roundTripTimeVuelta" class="form-label" id="roundTripTimeVueltaLabel">Hora de Salida</label>
+                                            <input type="text" class="form-control time-input" id="roundTripTimeVuelta" placeholder="__:__" maxlength="5">
                                         </div>
                                     </div>
-                                    
+
                                     <!-- Flight Details for Vuelta (only show if Aeropuerto is selected) -->
                                     <div class="roundtrip-flight-details-vuelta d-none">
                                         <hr class="my-2">
@@ -766,6 +800,7 @@
                         <div class="col-md-6 mb-3">
                             <label for="serviceQuantity" class="form-label">Cantidad</label>
                             <input type="number" class="form-control" id="serviceQuantity" value="1" min="1" required>
+                            <small class="text-muted d-none" id="roundTripQuantityHint">Vehículo Ida y Regreso</small>
                         </div>
                     </div>
                     <!-- Experience pricing with adult/child/no-alcohol options -->
