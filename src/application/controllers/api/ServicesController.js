@@ -784,11 +784,13 @@ class ServicesController {
                   // Add ALL vehicle types to priceData
                   const priceDataForMultiple = pricingData.allVehicleOptions.map((option) => ({
                     vehicleType: {
+                      id: option.vehicleType?.id,
                       name: option.vehicleType?.get('name'),
                       code: option.vehicleType?.get('code'),
                       defaultCapacity: option.vehicleType?.get('defaultCapacity'),
                       trunkCapacity: option.vehicleType?.get('trunkCapacity'),
                     },
+                    serviceId: service.id,
                     price: option.finalPrice,
                     formattedPrice: `$${option.finalPrice.toLocaleString()} MXN`,
                     isClientPrice: option.isClientPrice || false,
@@ -799,11 +801,13 @@ class ServicesController {
                   const priceDataForSingle = [
                     {
                       vehicleType: {
+                        id: vehicleTypeToUse?.id,
                         name: vehicleTypeToUse?.get('name'),
                         code: vehicleTypeToUse?.get('code'),
                         defaultCapacity: vehicleTypeToUse?.get('defaultCapacity'),
                         trunkCapacity: vehicleTypeToUse?.get('trunkCapacity'),
                       },
+                      serviceId: service.id,
                       price: finalPrice, // This will now use the correct updated price
                       formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
                       isClientPrice: pricingData.isClientPrice || false,
@@ -843,11 +847,13 @@ class ServicesController {
                     const priceDataForFallback = [
                       {
                         vehicleType: {
+                          id: vehicleType?.id,
                           name: vehicleType?.get('name'),
                           code: vehicleType?.get('code'),
                           defaultCapacity: vehicleType?.get('defaultCapacity'),
                           trunkCapacity: vehicleType?.get('trunkCapacity'),
                         },
+                        serviceId: service.id,
                         price,
                         formattedPrice: `$${price.toLocaleString()} MXN`,
                       },

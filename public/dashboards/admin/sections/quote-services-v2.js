@@ -2883,6 +2883,7 @@ class ItineraryBuilder {
     const typeLabels = {
       experience: 'Experiencia',
       tour: 'Tour',
+      transport: 'Transporte',
       'a-disposicion': 'A Disposición',
       concepto: 'Concepto',
     };

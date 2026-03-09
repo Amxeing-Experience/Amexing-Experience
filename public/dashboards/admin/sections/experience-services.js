@@ -261,6 +261,7 @@ class ExperienceServicesBuilder {
         noAlcoholPrice: sub.noAlcoholPrice || 0,
         includeGuide: sub.includeGuide || false,
         includeGreeter: sub.includeGreeter || false,
+        isWalkingTour: sub.isWalkingTour || false,
         languages: sub.languages || '',
         clientNotes: sub.clientNotes || '',
       });
@@ -764,12 +765,40 @@ class ExperienceServicesBuilder {
     if (!select) return;
 
     select.innerHTML = '<option value="">-- Selecciona un tour --</option>';
+
+    const walkingTours = [];
+    const vehicleTours = [];
     this.toursCache.forEach((tour) => {
-      const option = document.createElement('option');
-      option.value = tour.id;
-      option.textContent = tour.destinationPOI?.name || tour.name || 'Sin destino';
-      select.appendChild(option);
+      if (tour.isWalkingTour) {
+        walkingTours.push(tour);
+      } else {
+        vehicleTours.push(tour);
+      }
     });
+
+    if (vehicleTours.length > 0) {
+      const vehicleGroup = document.createElement('optgroup');
+      vehicleGroup.label = 'Tours con Vehículo';
+      vehicleTours.forEach((tour) => {
+        const option = document.createElement('option');
+        option.value = tour.id;
+        option.textContent = tour.destinationPOI?.name || tour.name || 'Sin destino';
+        vehicleGroup.appendChild(option);
+      });
+      select.appendChild(vehicleGroup);
+    }
+
+    if (walkingTours.length > 0) {
+      const walkingGroup = document.createElement('optgroup');
+      walkingGroup.label = 'Tours a Pie';
+      walkingTours.forEach((tour) => {
+        const option = document.createElement('option');
+        option.value = tour.id;
+        option.textContent = tour.destinationPOI?.name || tour.name || 'Sin destino';
+        walkingGroup.appendChild(option);
+      });
+      select.appendChild(walkingGroup);
+    }
   }
 
   populateServiceFields(service) {
@@ -1033,6 +1062,7 @@ class ExperienceServicesBuilder {
       vehicleTypeName: vehicleType ? vehicleType.name : null,
       includeGuide,
       includeGreeter,
+      isWalkingTour: tour ? (tour.isWalkingTour || false) : false,
       languages: document.getElementById('tourLanguages')?.value || '',
       clientNotes: document.getElementById('tourClientNotes')?.value || '',
     };
@@ -1149,7 +1179,7 @@ class ExperienceServicesBuilder {
         <div class="d-flex justify-content-between align-items-start">
           <div class="flex-grow-1">
             <div class="d-flex align-items-center mb-2">
-              <span class="badge bg-light text-dark me-2">${typeLabels[service.type] || service.type}</span>
+              <span class="badge bg-light text-dark me-2">${service.type === 'tour' && service.isWalkingTour ? 'Walking Tour' : (typeLabels[service.type] || service.type)}</span>
               <h6 class="mb-0 service-title">${title}</h6>${overlapBadge}
             </div>
             <div class="service-details">
@@ -1338,6 +1368,7 @@ class ExperienceServicesBuilder {
         noAlcoholPrice: service.noAlcoholPrice || null,
         includeGuide: service.includeGuide || false,
         includeGreeter: service.includeGreeter || false,
+        isWalkingTour: service.isWalkingTour || false,
         languages: service.languages || '',
         clientNotes: service.clientNotes || '',
       });
@@ -1442,7 +1473,8 @@ class ExperienceServicesBuilder {
 
     this.toursCache.forEach((tour) => {
       const name = tour.destinationPOI?.name || tour.name || 'Sin destino';
-      html += this.renderDraggableItem(tour.id, name, 'tour', null);
+      const subLabel = tour.isWalkingTour ? 'Walking' : null;
+      html += this.renderDraggableItem(tour.id, name, 'tour', subLabel);
       count++;
     });
 
