@@ -77,7 +77,14 @@ const baseDashboardPath = dtUserRole === 'department_manager'
 <!-- Confirm Schedule Modal (quotes list) -->
 <div class="modal fade" id="confirmScheduleListModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content">
+        <div class="modal-content" style="position: relative;">
+            <!-- Loading overlay -->
+            <div id="scheduleListLoadingOverlay" style="display:none; position:absolute; inset:0; background:rgba(255,255,255,0.92); z-index:10; border-radius:0.5rem;">
+                <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                    <div class="spinner-border text-success mb-2" role="status"></div>
+                    <small class="text-muted">Creando reservación...</small>
+                </div>
+            </div>
             <div class="modal-header border-0 pb-0">
                 <h6 class="modal-title fw-bold">Confirmar reserva</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -640,10 +647,14 @@ const baseDashboardPath = dtUserRole === 'department_manager'
         $(document).on('click', '#confirmScheduleListBtn', function() {
             if (pendingSchedule) {
                 const { quoteId, quoteFolio, newStatus, oldStatus } = pendingSchedule;
-                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus);
+                // Show loader
+                const overlay = document.getElementById('scheduleListLoadingOverlay');
+                const btn = document.getElementById('confirmScheduleListBtn');
+                if (overlay) overlay.style.display = 'block';
+                if (btn) btn.disabled = true;
+                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, true);
                 pendingSchedule = null;
             }
-            bootstrap.Modal.getInstance(document.getElementById('confirmScheduleListModal'))?.hide();
         });
 
         // Revert on modal cancel
@@ -652,6 +663,11 @@ const baseDashboardPath = dtUserRole === 'department_manager'
                 pendingSchedule.$select.val(pendingSchedule.oldStatus);
                 pendingSchedule = null;
             }
+            // Reset loader state
+            const overlay = document.getElementById('scheduleListLoadingOverlay');
+            const btn = document.getElementById('confirmScheduleListBtn');
+            if (overlay) overlay.style.display = 'none';
+            if (btn) btn.disabled = false;
         });
 
         // Copy Quote button click
@@ -733,7 +749,7 @@ const baseDashboardPath = dtUserRole === 'department_manager'
 
         // Functions
 
-        function updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus) {
+        function updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, isScheduling) {
             $.ajax({
                 url: `${apiEndpoint}/${quoteId}`,
                 type: 'PUT',
@@ -743,15 +759,48 @@ const baseDashboardPath = dtUserRole === 'department_manager'
                     reason: `Status changed from ${oldStatus} to ${newStatus}`
                 }),
                 success: function(response) {
+                    // Hide schedule loader & close modal if scheduling
+                    if (isScheduling) {
+                        const overlay = document.getElementById('scheduleListLoadingOverlay');
+                        const btn = document.getElementById('confirmScheduleListBtn');
+                        if (overlay) overlay.style.display = 'none';
+                        if (btn) btn.disabled = false;
+                        bootstrap.Modal.getInstance(document.getElementById('confirmScheduleListModal'))?.hide();
+                    }
+
                     if (response.success) {
-                        showSuccessAlert(`Estatus de cotización ${quoteFolio} actualizado exitosamente`);
-                        dataTable.ajax.reload(null, false); // Reload without resetting page
+                        // Show reservation toast if one was created
+                        if (isScheduling && response.data?.reservation) {
+                            const resData = response.data.reservation;
+                            const toast = document.createElement('div');
+                            toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
+                            toast.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+                            toast.innerHTML = `
+                                <strong><i class="ti ti-check me-1"></i>Reservación creada</strong>
+                                <p class="mb-1 mt-1">Folio: ${resData.folio} (${resData.servicesCount} servicios)</p>
+                                <a href="/dashboard/admin/bookings/${resData.id}" class="btn btn-sm btn-success">Ver Reservación</a>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            `;
+                            document.body.appendChild(toast);
+                            setTimeout(() => toast.remove(), 10000);
+                        } else {
+                            showSuccessAlert(`Estatus de cotización ${quoteFolio} actualizado exitosamente`);
+                        }
+                        dataTable.ajax.reload(null, false);
                     } else {
                         showErrorAlert(response.error || 'Error al actualizar el estatus');
                         dataTable.ajax.reload(null, false);
                     }
                 },
                 error: function(xhr) {
+                    // Hide schedule loader if scheduling
+                    if (isScheduling) {
+                        const overlay = document.getElementById('scheduleListLoadingOverlay');
+                        const btn = document.getElementById('confirmScheduleListBtn');
+                        if (overlay) overlay.style.display = 'none';
+                        if (btn) btn.disabled = false;
+                        bootstrap.Modal.getInstance(document.getElementById('confirmScheduleListModal'))?.hide();
+                    }
                     const errorMsg = xhr.responseJSON?.error || 'Error al actualizar el estatus';
                     showErrorAlert(errorMsg);
                     dataTable.ajax.reload(null, false);

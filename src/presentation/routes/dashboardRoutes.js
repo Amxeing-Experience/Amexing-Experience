@@ -55,6 +55,7 @@ router.get('/admin/experiences', dashboardAuth.requireRole('admin'), (req, res) 
 router.get('/admin/experiences/:id', dashboardAuth.requireRole('admin'), (req, res) => adminController.experienceDetail(req, res));
 router.get('/admin/schedule', dashboardAuth.requireRole('admin'), (req, res) => adminController.schedule(req, res));
 router.get('/admin/bookings', dashboardAuth.requireRole('admin'), (req, res) => adminController.bookings(req, res));
+router.get('/admin/bookings/:id', dashboardAuth.requireRole('admin'), (req, res) => adminController.bookingDetail(req, res));
 router.get('/admin/vehicles', dashboardAuth.requireRole('admin'), (req, res) => adminController.vehicles(req, res));
 router.get('/admin/price-settings', dashboardAuth.requireRole('admin'), (req, res) => adminController.priceSettings(req, res));
 router.get('/admin/pois', dashboardAuth.requireRole('admin'), (req, res) => adminController.pois(req, res));

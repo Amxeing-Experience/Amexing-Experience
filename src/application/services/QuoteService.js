@@ -23,6 +23,8 @@ const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 const PDFReceiptService = require('./PDFReceiptService');
 const Invoice = require('../../domain/models/Invoice');
+const Reservation = require('../../domain/models/Reservation');
+const ReservationService = require('../../domain/models/ReservationService');
 
 /**
  * QuoteService class implementing Quote business logic.
@@ -96,6 +98,12 @@ class QuoteService {
       quote.set('status', newStatus);
       await quote.save(null, { useMasterKey: true });
 
+      // If scheduling, auto-create Reservation + ReservationServices
+      let reservationData = null;
+      if (newStatus === 'scheduled') {
+        reservationData = await this.createReservationFromQuote(quote, currentUser);
+      }
+
       // Audit logging
       logger.info('Quote status updated successfully', {
         quoteId: quote.id,
@@ -103,6 +111,7 @@ class QuoteService {
         previousStatus,
         newStatus,
         reason,
+        reservationCreated: !!reservationData,
         performedBy: {
           userId: currentUser.id,
           userRole: role,
@@ -111,7 +120,7 @@ class QuoteService {
         timestamp: new Date().toISOString(),
       });
 
-      return {
+      const result = {
         success: true,
         quote: {
           id: quote.id,
@@ -121,6 +130,12 @@ class QuoteService {
         previousStatus,
         newStatus,
       };
+
+      if (reservationData) {
+        result.reservation = reservationData;
+      }
+
+      return result;
     } catch (error) {
       logger.error('Error updating Quote status', {
         quoteId,
@@ -221,12 +236,19 @@ class QuoteService {
 
       await quote.save(null, { useMasterKey: true });
 
+      // If status changed to scheduled, auto-create Reservation
+      let reservationData = null;
+      if (appliedUpdates.status === 'scheduled') {
+        reservationData = await this.createReservationFromQuote(quote, currentUser);
+      }
+
       // Audit logging
       logger.info('Quote updated successfully', {
         quoteId: quote.id,
         quoteFolio: quote.get('folio'),
         updates: appliedUpdates,
         reason,
+        reservationCreated: !!reservationData,
         performedBy: {
           userId: currentUser.id,
           userRole: role,
@@ -235,14 +257,21 @@ class QuoteService {
         timestamp: new Date().toISOString(),
       });
 
-      return {
+      const result = {
         success: true,
-        quote: {
+        data: {
           id: quote.id,
           folio: quote.get('folio'),
+          status: quote.get('status'),
           ...appliedUpdates,
         },
       };
+
+      if (reservationData) {
+        result.data.reservation = reservationData;
+      }
+
+      return result;
     } catch (error) {
       logger.error('Error updating Quote', {
         quoteId,
@@ -733,6 +762,33 @@ class QuoteService {
       quote.set('status', 'rejected');
       await quote.save(null, { useMasterKey: true });
 
+      // Cascade cancel associated Reservation + ReservationServices
+      const resQuery = new Parse.Query('Reservation');
+      resQuery.equalTo('quotePtr', quote);
+      resQuery.equalTo('exists', true);
+      const reservation = await resQuery.first({ useMasterKey: true });
+      if (reservation) {
+        reservation.set('status', 'cancelled');
+        await reservation.save(null, { useMasterKey: true });
+
+        const svcQuery = new Parse.Query('ReservationService');
+        svcQuery.equalTo('reservationPtr', reservation);
+        svcQuery.equalTo('active', true);
+        svcQuery.equalTo('exists', true);
+        svcQuery.limit(1000);
+        const services = await svcQuery.find({ useMasterKey: true });
+        for (const svc of services) {
+          svc.set('status', 'cancelled');
+        }
+        if (services.length > 0) {
+          await Parse.Object.saveAll(services, { useMasterKey: true });
+        }
+        logger.info('Associated reservation cancelled', {
+          reservationId: reservation.id,
+          servicesCancelled: services.length,
+        });
+      }
+
       // Audit logging
       logger.info('Reservation cancelled for quote', {
         quoteId: quote.id,
@@ -765,6 +821,172 @@ class QuoteService {
       });
 
       throw error;
+    }
+  }
+
+  /**
+   * Create Reservation + ReservationService records from a confirmed quote.
+   * Idempotent: skips if a reservation already exists for this quote.
+   * @param {object} quote - Parse Quote object (with client included).
+   * @param {object} currentUser - User who confirmed.
+   * @returns {Promise<object|null>} Reservation data or null if already exists.
+   * @private
+   * @example
+   */
+  async createReservationFromQuote(quote, currentUser) {
+    try {
+      // Idempotency check: skip if an active reservation already exists for this quote
+      const existingQuery = new Parse.Query('Reservation');
+      existingQuery.equalTo('quotePtr', quote);
+      existingQuery.equalTo('exists', true);
+      const existing = await existingQuery.first({ useMasterKey: true });
+      if (existing) {
+        // If cancelled, reactivate it and its services
+        if (existing.get('status') === 'cancelled') {
+          existing.set('status', 'pending');
+          await existing.save(null, { useMasterKey: true });
+
+          const svcQuery = new Parse.Query('ReservationService');
+          svcQuery.equalTo('reservationPtr', existing);
+          svcQuery.equalTo('exists', true);
+          svcQuery.equalTo('status', 'cancelled');
+          svcQuery.limit(1000);
+          const services = await svcQuery.find({ useMasterKey: true });
+          for (const svc of services) {
+            svc.set('status', 'pending');
+          }
+          if (services.length > 0) {
+            await Parse.Object.saveAll(services, { useMasterKey: true });
+          }
+
+          logger.info('Reactivated cancelled reservation for quote', {
+            quoteId: quote.id,
+            reservationId: existing.id,
+            servicesReactivated: services.length,
+          });
+          return { id: existing.id, folio: existing.get('folio'), servicesCount: services.length };
+        }
+
+        logger.info('Reservation already exists for quote, skipping creation', {
+          quoteId: quote.id,
+          reservationId: existing.id,
+        });
+        return { id: existing.id, folio: existing.get('folio') };
+      }
+
+      // Generate folio: RES-YYYY-NNNN
+      const year = new Date().getFullYear();
+      const countQuery = new Parse.Query('Reservation');
+      countQuery.startsWith('folio', `RES-${year}-`);
+      const count = await countQuery.count({ useMasterKey: true });
+      const folio = `RES-${year}-${String(count + 1).padStart(4, '0')}`;
+
+      const serviceItems = quote.get('serviceItems') || {};
+      const days = serviceItems.days || [];
+
+      // Calculate start/end dates from service days
+      let startDate = null;
+      let endDate = null;
+      for (const day of days) {
+        if (day.date) {
+          const d = new Date(day.date);
+          if (!startDate || d < startDate) startDate = d;
+          if (!endDate || d > endDate) endDate = d;
+        }
+      }
+
+      // Create Reservation
+      const reservation = new Reservation();
+      reservation.set('quotePtr', quote);
+      reservation.set('folio', folio);
+      reservation.set('status', 'pending');
+      reservation.set('totalAmount', serviceItems.total || 0);
+      reservation.set('currency', serviceItems.currency || 'MXN');
+      reservation.set('paymentType', serviceItems.paymentType || 'efectivo');
+      reservation.set('numberOfPeople', quote.get('numberOfPeople') || 1);
+      reservation.set('eventType', quote.get('eventType') || '');
+      reservation.set('contactPerson', quote.get('contactPerson') || '');
+      reservation.set('contactEmail', quote.get('contactEmail') || '');
+      reservation.set('contactPhone', quote.get('contactPhone') || '');
+      reservation.set('notes', quote.get('notes') || '');
+      reservation.set('serviceItemsSnapshot', serviceItems);
+      reservation.set('active', true);
+      reservation.set('exists', true);
+
+      if (startDate) reservation.set('startDate', startDate);
+      if (endDate) reservation.set('endDate', endDate);
+
+      // Set client pointer
+      const client = quote.get('client');
+      if (client) {
+        reservation.set('clientPtr', client);
+      }
+
+      // Set created by
+      if (currentUser) {
+        const userPointer = new Parse.Object('AmexingUser');
+        userPointer.id = currentUser.id;
+        reservation.set('createdBy', userPointer);
+      }
+
+      await reservation.save(null, { useMasterKey: true });
+
+      // Create ReservationService for each subconcept in each day
+      const servicesToSave = [];
+      for (const day of days) {
+        const subconcepts = day.subconcepts || [];
+        for (const sub of subconcepts) {
+          const resSvc = new ReservationService();
+          resSvc.set('reservationPtr', reservation);
+          resSvc.set('dayNumber', day.dayNumber || 1);
+          resSvc.set('dayTitle', day.concept || day.dayTitle || `Día ${day.dayNumber || 1}`);
+          resSvc.set('type', sub.type || 'concepto');
+          resSvc.set('concept', sub.concept || sub.name || '');
+          resSvc.set('time', sub.time || '');
+          resSvc.set('status', 'pending');
+          resSvc.set('price', sub.unitPrice || sub.price || 0);
+          resSvc.set('total', sub.total || sub.unitPrice || 0);
+          resSvc.set('originName', sub.originName || sub.origin || '');
+          resSvc.set('destinationName', sub.destinationName || sub.destination || '');
+          resSvc.set('vehicleTypeName', sub.vehicleTypeName || sub.vehicleType || '');
+          resSvc.set('notes', sub.notes || '');
+          resSvc.set('subconcept', sub);
+          resSvc.set('active', true);
+          resSvc.set('exists', true);
+
+          if (day.date) {
+            resSvc.set('serviceDate', new Date(day.date));
+          }
+
+          servicesToSave.push(resSvc);
+        }
+      }
+
+      if (servicesToSave.length > 0) {
+        await Parse.Object.saveAll(servicesToSave, { useMasterKey: true });
+      }
+
+      logger.info('Reservation created from quote', {
+        quoteId: quote.id,
+        quoteFolio: quote.get('folio'),
+        reservationId: reservation.id,
+        reservationFolio: folio,
+        servicesCreated: servicesToSave.length,
+      });
+
+      return {
+        id: reservation.id,
+        folio,
+        servicesCount: servicesToSave.length,
+      };
+    } catch (error) {
+      logger.error('Error creating reservation from quote', {
+        quoteId: quote.id,
+        error: error.message,
+        stack: error.stack,
+      });
+      // Don't throw — the quote status update already succeeded
+      return null;
     }
   }
 }
