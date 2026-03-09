@@ -1,0 +1,185 @@
+<%
+/**
+ * Experience Detail Page
+ * Experience creation and editing with accordion sections
+ * Created by Denisse Maldonado
+ */
+
+const experienceTitle = isNewExperience ? 'Nueva Experiencia' : 'Experiencia';
+%>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h2 class="mb-1 fw-bold" id="experienceTitle">
+                    <%= experienceTitle %>
+                    <% if (!isNewExperience) { %>
+                        <span id="experienceNameSpan" class="text-muted" style="font-size: 0.9em;">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        </span>
+                    <% } %>
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="/dashboard/admin/experiences"><i class="ti ti-star me-1"></i>Experiencias</a></li>
+                        <li class="breadcrumb-item active" id="breadcrumbExperienceTitle"><%= experienceTitle %></li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="/dashboard/admin/experiences" class="btn btn-sm btn-outline-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>Volver
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Accordion Sections -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="accordion" id="experienceAccordion">
+            <!-- Information Section -->
+            <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden">
+                <h2 class="accordion-header" id="headingInformation">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseInformation" aria-expanded="true" aria-controls="collapseInformation">
+                        <i class="ti ti-info-circle me-2 fs-5"></i>
+                        <span class="fw-bold">Informacion</span>
+                    </button>
+                </h2>
+                <div id="collapseInformation" class="accordion-collapse collapse show" aria-labelledby="headingInformation" data-bs-parent="#experienceAccordion">
+                    <div class="accordion-body p-0">
+                        <%- include('./sections/experience-information', { experienceId: experienceId, isNewExperience: isNewExperience, userRole: userRole }) %>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Services Section -->
+            <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden" id="servicesAccordionItem">
+                <h2 class="accordion-header" id="headingServices">
+                    <button class="accordion-button collapsed <%= isNewExperience ? 'disabled-accordion' : '' %>" type="button"
+                        data-bs-toggle="<%= isNewExperience ? '' : 'collapse' %>"
+                        data-bs-target="#collapseServices"
+                        aria-expanded="false" aria-controls="collapseServices"
+                        id="servicesAccordionBtn"
+                        <%= isNewExperience ? 'disabled' : '' %>>
+                        <i class="ti ti-list me-2 fs-5"></i>
+                        <span class="fw-bold">Servicios</span>
+                        <% if (isNewExperience) { %>
+                            <span class="badge bg-secondary ms-2"><i class="ti ti-lock me-1"></i>Guarda primero la experiencia</span>
+                        <% } %>
+                    </button>
+                </h2>
+                <div id="collapseServices" class="accordion-collapse collapse" aria-labelledby="headingServices" data-bs-parent="#experienceAccordion">
+                    <div class="accordion-body p-0">
+                        <% if (!isNewExperience) { %>
+                            <%- include('./sections/experience-services', { experienceId: experienceId }) %>
+                            <%- include('./sections/experience-services-modals') %>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Accordion Styles */
+.accordion-button:not(.collapsed) {
+    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+    color: white;
+    box-shadow: none;
+}
+
+.accordion-button:not(.collapsed)::after {
+    filter: brightness(0) invert(1);
+}
+
+.accordion-button:focus {
+    box-shadow: 0 0 0 0.15rem rgba(245, 158, 11, 0.25);
+}
+
+.accordion-button.disabled-accordion {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.accordion-item {
+    border-radius: 0.5rem !important;
+}
+
+/* Breadcrumb styles */
+.breadcrumb-item a {
+    color: #5a6a85;
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    color: #f59e0b;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up global access token for services builder
+    const token = document.cookie.split('; ')
+        .find(row => row.startsWith('accessToken='))
+        ?.split('=')[1];
+
+    if (token) {
+        window.experienceAccessToken = token;
+    }
+
+    // Load experience name for title
+    // Auto-scroll to accordion section header when opened
+    document.querySelectorAll('.accordion-collapse').forEach(function(collapse) {
+        collapse.addEventListener('shown.bs.collapse', function() {
+            const header = this.previousElementSibling;
+            if (header) {
+                header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+
+    <% if (!isNewExperience) { %>
+    async function loadExperienceName() {
+        try {
+            const experienceId = '<%= experienceId %>';
+            const accessToken = document.cookie.split('; ')
+                .find(row => row.startsWith('accessToken='))
+                ?.split('=')[1];
+
+            const response = await fetch(`/api/experiences/${experienceId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const name = result.data.name || experienceId;
+
+                const nameSpan = document.getElementById('experienceNameSpan');
+                if (nameSpan) nameSpan.textContent = name;
+
+                const breadcrumbTitle = document.getElementById('breadcrumbExperienceTitle');
+                if (breadcrumbTitle) breadcrumbTitle.textContent = name;
+
+                document.title = `${name} - AmexingWeb`;
+            }
+        } catch (error) {
+            console.error('Error loading experience name:', error);
+            const nameSpan = document.getElementById('experienceNameSpan');
+            if (nameSpan) nameSpan.textContent = '<%= experienceId %>';
+        }
+    }
+    loadExperienceName();
+    <% } %>
+});
+</script>

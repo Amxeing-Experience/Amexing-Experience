@@ -19,12 +19,20 @@
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const multer = require('multer');
 const EmployeesController = require('../../../application/controllers/api/EmployeesController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 const logger = require('../../../infrastructure/logger');
 
 const router = express.Router();
 const employeesController = new EmployeesController();
+
+// Configure multer for profile photo uploads - no restrictions
+const upload = multer({
+  storage: multer.memoryStorage(),
+  // No file size limit
+  // Accept all file types
+});
 
 // Rate limiting for employee management operations
 const employeeApiLimiter = rateLimit({
@@ -263,7 +271,7 @@ router.get('/:id', async (req, res) => {
  *       409:
  *         description: Conflict - Email already exists
  */
-router.post('/', writeOperationsLimiter, async (req, res) => {
+router.post('/', writeOperationsLimiter, upload.single('profilePhoto'), async (req, res) => {
   await employeesController.createEmployee(req, res);
 });
 
@@ -320,7 +328,7 @@ router.post('/', writeOperationsLimiter, async (req, res) => {
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.put('/:id', writeOperationsLimiter, async (req, res) => {
+router.put('/:id', writeOperationsLimiter, upload.single('profilePhoto'), async (req, res) => {
   await employeesController.updateEmployee(req, res);
 });
 

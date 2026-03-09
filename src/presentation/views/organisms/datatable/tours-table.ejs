@@ -2250,6 +2250,60 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
             });
         }
 
+        // Load dropdown data for walking tours modal
+        function loadWalkingTourDropdownData() {
+            // Load Active POIs (filtered by Tours service type)
+            $.ajax({
+                url: '/api/pois/active?serviceType=Tours',
+                type: 'GET',
+                success: function(data) {
+                    if (data.success && data.data) {
+                        const selectElement = document.getElementById('walkingDestinationPOI');
+
+                        // Destroy existing Tom Select instance if it exists
+                        if (selectElement && selectElement.tomselect) {
+                            selectElement.tomselect.destroy();
+                        }
+
+                        // Clear the select element
+                        const select = $('#walkingDestinationPOI');
+                        select.empty();
+
+                        // Initialize Tom Select first (on empty select)
+                        if (typeof TomSelect !== 'undefined') {
+                            const tomSelectInstance = new TomSelect('#walkingDestinationPOI', {
+                                plugins: [],
+                                maxOptions: 1000,
+                                placeholder: 'Seleccionar destino del tour a pie',
+                                maxItems: 1,
+                                highlight: true,
+                                searchField: ['text'],
+                                valueField: 'value',
+                                labelField: 'text',
+                                sortField: 'text',
+                                closeAfterSelect: true,
+                                persist: false
+                            });
+
+                            // Store instance reference
+                            selectElement.tomselect = tomSelectInstance;
+
+                            // Load options using Tom Select API (prevents auto-selection)
+                            tomSelectInstance.clearOptions();
+                            data.data.forEach(poi => {
+                                tomSelectInstance.addOption({ value: poi.value, text: poi.label });
+                            });
+                            tomSelectInstance.refreshOptions(false);
+                            tomSelectInstance.clear(); // Clear selection to start empty
+                        }
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading POIs for Walking Tours:', error);
+                }
+            });
+        }
+
         // Event Handlers
         $('#createTourBtn').on('click', function() {
             openTourModal();
@@ -3018,6 +3072,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                                 tour.photos.forEach((photo, index) => {
                                     const photoUrl = photo.dataUrl || photo.url;
                                     const fileName = photo.fileName || photo.name || 'image';
+
 
                                     if (photoUrl) {
                                         try {
