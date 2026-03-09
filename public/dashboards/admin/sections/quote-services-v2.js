@@ -215,9 +215,10 @@ class ItineraryBuilder {
       radio.addEventListener('change', () => this.handleDirectionTypeChange());
     });
 
-    // Restore persisted currency and payment type selections
-    const savedCurrency = sessionStorage.getItem('quoteServices_currency');
-    const savedPaymentType = sessionStorage.getItem('quoteServices_paymentType');
+    // Restore persisted currency and payment type selections (scoped per quote)
+    const quoteKey = this.quoteId || 'default';
+    const savedCurrency = sessionStorage.getItem(`quoteServices_currency_${quoteKey}`);
+    const savedPaymentType = sessionStorage.getItem(`quoteServices_paymentType_${quoteKey}`);
     const currencySelect = document.getElementById('currencySelect');
     const priceTypeSelect = document.getElementById('priceTypeSelect');
 
@@ -230,7 +231,7 @@ class ItineraryBuilder {
 
     // Currency change listener
     currencySelect?.addEventListener('change', (e) => {
-      sessionStorage.setItem('quoteServices_currency', e.target.value);
+      sessionStorage.setItem(`quoteServices_currency_${quoteKey}`, e.target.value);
       this.renderDaysContent();
       this.updateTotals();
       this.updateServicePriceBreakdown();
@@ -238,7 +239,7 @@ class ItineraryBuilder {
 
     // Payment type change listener
     priceTypeSelect?.addEventListener('change', (e) => {
-      sessionStorage.setItem('quoteServices_paymentType', e.target.value);
+      sessionStorage.setItem(`quoteServices_paymentType_${quoteKey}`, e.target.value);
       this.renderDaysContent();
       this.updateTotals();
       this.updateServicePriceBreakdown();
@@ -277,6 +278,11 @@ class ItineraryBuilder {
         if (greeterCheckbox) {
           greeterCheckbox.checked = false;
         }
+        // Hide "Viaja en el vehículo" since greeter is unchecked
+        const greeterInVehicleContainer = document.getElementById('greeterInVehicleContainer');
+        if (greeterInVehicleContainer) greeterInVehicleContainer.classList.add('d-none');
+        const greeterInVehicle = document.getElementById('greeterInVehicle');
+        if (greeterInVehicle) greeterInVehicle.checked = false;
       }
       this.handleIncludeGuideChange(e.target.checked);
     });
@@ -634,6 +640,12 @@ class ItineraryBuilder {
       // Clear vehicle dropdown and transport price cache
       this.clearVehicleDropdown();
       this.transportPriceData = null;
+
+      // Clear vehicle capacity note and greeter sub-checkbox
+      const capacityNote = document.getElementById('vehicleCapacityNote');
+      if (capacityNote) capacityNote.classList.add('d-none');
+      const greeterInVehicleContainer = document.getElementById('greeterInVehicleContainer');
+      if (greeterInVehicleContainer) greeterInVehicleContainer.classList.add('d-none');
 
       // Clear price breakdown
       const breakdown = document.getElementById('servicePriceBreakdown');
@@ -1124,9 +1136,10 @@ class ItineraryBuilder {
     const flightTime = document.getElementById('flightTime');
     if (flightTime) flightTime.value = '';
 
-    // Clear price field
+    // Clear price field and cached base price
     const priceField = document.getElementById('servicePrice');
     if (priceField) priceField.value = '';
+    this._lastTransportBasePrice = null;
 
     // Hide breakdown panel
     const breakdown = document.getElementById('servicePriceBreakdown');
@@ -1772,8 +1785,6 @@ class ItineraryBuilder {
     }
     document.getElementById('serviceQuantity').value = service.quantity || 1;
     document.getElementById('serviceNotes').value = service.notes || '';
-    document.getElementById('currencySelect').value = service.currency || 'MXN';
-    document.getElementById('priceTypeSelect').value = service.priceType || 'efectivo';
 
     // Handle guide/driver checkbox
     const includeGuideCheckbox = document.getElementById('includeGuide');
@@ -4922,6 +4933,7 @@ class ItineraryBuilder {
       this.recalculateTransportPrice();
     }
     this.updateVehicleCapacityNote();
+    this.updateServicePriceBreakdown();
   }
 
   /**
@@ -4937,6 +4949,7 @@ class ItineraryBuilder {
       this.recalculateTransportPrice();
     }
     this.updateVehicleCapacityNote();
+    this.updateServicePriceBreakdown();
   }
 
   updateVehicleCapacityNote() {
