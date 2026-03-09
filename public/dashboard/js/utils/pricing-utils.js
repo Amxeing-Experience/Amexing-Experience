@@ -143,6 +143,7 @@ window.PricingUtils = (function () {
   // Public API
   return {
     applyUSDRoundingRules,
+    applyPaymentRate,
     formatPriceWithCurrency,
     loadCurrentRates,
     convertPrice,

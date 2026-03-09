@@ -97,6 +97,20 @@ router.get(
 );
 
 /**
+ * GET /api/services/prices-by-route - Get vehicle prices for a route (origin + destination + rate).
+ *
+ * Access: Authenticated users (department manager and above)
+ * Query: originPOI (name), destinationPOI (name, required), rateId (required), clientId (optional)
+ * Returns: Vehicle options with base/client prices for the matching route.
+ */
+router.get(
+  '/prices-by-route',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => ServicesController.getPricesByRoute(req, res)
+);
+
+/**
  * GET /api/services/:id/all-rate-prices - Get all rate prices for a specific service.
  *
  * Access: Authenticated users (department manager and above)
