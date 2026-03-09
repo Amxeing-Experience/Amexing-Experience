@@ -204,7 +204,7 @@ class QuoteController {
 
       // Column mapping for sorting (matches frontend columns order)
       // Columns: client, rate, eventType, numberOfPeople, createdBy, status, actions
-      const columns = ['client', 'rate', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt'];
+      const columns = ['client', 'rate', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
       const sortField = columns[sortColumnIndex] || 'createdAt';
 
       // Build base query for all existing records with role-based filtering
@@ -316,6 +316,15 @@ class QuoteController {
             validUntil: quote.get('validUntil'),
             active: quote.get('active'),
             hasPendingInvoiceRequest, // Add invoice status
+            serviceCount: (() => {
+              const si = quote.get('serviceItems');
+              if (!si || !si.days) return 0;
+              return si.days.reduce((sum, d) => sum + (d.subconcepts ? d.subconcepts.length : 0), 0);
+            })(),
+            dayCount: (() => {
+              const si = quote.get('serviceItems');
+              return (si && si.days) ? si.days.length : 0;
+            })(),
             createdAt: quote.createdAt,
             updatedAt: quote.updatedAt,
           };
