@@ -236,6 +236,7 @@
                                 </small>
                             </div>
                             
+                            <div id="vehicleTourPricingSection">
                             <!-- People Quantities for Tour -->
                             <div class="row mb-3">
                                 <div class="col-md-4">
@@ -251,7 +252,7 @@
                                     <input type="number" class="form-control tour-quantity-input" id="tourAdultsNoAlcoholQuantity" min="0" max="50" value="0">
                                 </div>
                             </div>
-                            
+
                             <!-- Tour Pricing -->
                             <div class="row">
                                 <div class="col-md-4 mb-3">
@@ -265,6 +266,47 @@
                                 <div class="col-md-4 mb-3">
                                     <label for="tourNoAlcoholPrice" class="form-label">Precio sin Alcohol</label>
                                     <input type="number" class="form-control" id="tourNoAlcoholPrice" min="0" step="0.01" placeholder="0.00">
+                                </div>
+                            </div>
+                            </div>
+
+                            <div id="walkingTourPricingSection" class="d-none">
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label for="walkingTourPeopleCount" class="form-label">Número de Personas</label>
+                                        <input type="number" class="form-control" id="walkingTourPeopleCount" min="1" max="50" value="1">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Moneda</label>
+                                        <input type="text" class="form-control bg-light" id="walkingTourCurrency" readonly value="MXN">
+                                    </div>
+                                </div>
+                                <label class="form-label mb-2">Precios por Grupo</label>
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <div class="card walking-tier-card" id="walkingTierSmall">
+                                            <div class="card-body text-center p-2">
+                                                <small class="text-muted d-block" id="walkingRangeSmallLabel">—</small>
+                                                <h5 class="mb-0" id="walkingPriceSmallLabel">$0.00</h5>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card walking-tier-card" id="walkingTierMedium">
+                                            <div class="card-body text-center p-2">
+                                                <small class="text-muted d-block" id="walkingRangeMediumLabel">—</small>
+                                                <h5 class="mb-0" id="walkingPriceMediumLabel">$0.00</h5>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card walking-tier-card" id="walkingTierLarge">
+                                            <div class="card-body text-center p-2">
+                                                <small class="text-muted d-block" id="walkingRangeLargeLabel">—</small>
+                                                <h5 class="mb-0" id="walkingPriceLargeLabel">$0.00</h5>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -519,11 +561,6 @@
 
                         <!-- A Disposición Fields -->
                         <div id="aDisposicionContent" class="service-content d-none">
-                            <div class="mb-3">
-                                <label for="aDisposicionConcept" class="form-label">Concepto <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="aDisposicionConcept" placeholder="Ej: Servicio a disposición 8 horas...">
-                            </div>
-
                             <!-- Schedule -->
                             <div class="row">
                                 <div class="col-md-6 mb-3">
@@ -542,19 +579,34 @@
                                 </div>
                             </div>
 
-                            <!-- People counts -->
+                            <!-- Rate & Vehicle Selection -->
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="aDisposicionRate" class="form-label">Segmento <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="aDisposicionRate" required>
+                                        <option value="">-- Seleccionar segmento --</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="aDisposicionVehicle" class="form-label">Vehículo <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="aDisposicionVehicle" required>
+                                        <option value="">-- Seleccionar vehículo --</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Vehicle Quantity & Hours -->
                             <div class="row">
                                 <div class="col-md-4 mb-3">
-                                    <label for="aDisposicionAdults" class="form-label">Adultos</label>
-                                    <input type="number" class="form-control" id="aDisposicionAdults" min="0" max="50" value="1">
+                                    <label for="aDisposicionVehicleCount" class="form-label">Cantidad de Vehículos</label>
+                                    <input type="number" class="form-control" id="aDisposicionVehicleCount" min="1" max="10" value="1">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="aDisposicionChildren" class="form-label">Niños</label>
-                                    <input type="number" class="form-control" id="aDisposicionChildren" min="0" max="50" value="0">
+                                    <label for="aDisposicionHours" class="form-label">Horas</label>
+                                    <input type="number" class="form-control" id="aDisposicionHours" min="1" max="24" step="0.5" value="4">
                                 </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="aDisposicionInfants" class="form-label">Infantes</label>
-                                    <input type="number" class="form-control" id="aDisposicionInfants" min="0" max="50" value="0">
+                                <div class="col-md-4 mb-3 d-flex align-items-end">
+                                    <small class="text-muted" id="aDisposicionDiscountInfo"></small>
                                 </div>
                             </div>
                         </div>

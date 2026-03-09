@@ -346,11 +346,39 @@ class ItineraryBuilder {
       this.handleConceptoScheduleToggle(e.target.checked);
     });
 
+    // Walking tour people count - update tier highlight and price
+    document.getElementById('walkingTourPeopleCount')?.addEventListener('input', () => {
+      const tourSelect = document.getElementById('tourSelect');
+      if (tourSelect?.value && this.toursCache.has('all')) {
+        const selectedTour = this.toursCache.get('all').find(
+          (t) => t.id === tourSelect.value || t.objectId === tourSelect.value,
+        );
+        if (selectedTour?.isWalkingTour) {
+          this.highlightWalkingTourTier(selectedTour);
+          this.updateServicePriceBreakdown();
+        }
+      }
+    });
+
     // Time input formatting and validation
     this.setupTimeInputs();
 
     // Delete Confirmation
     document.getElementById('confirmDeleteBtn')?.addEventListener('click', () => this.confirmDelete());
+
+    // A Disposición - rate, vehicle, hours, vehicle count
+    document.getElementById('aDisposicionRate')?.addEventListener('change', (e) => {
+      this.handleADisposicionRateChange(e.target.value);
+    });
+    document.getElementById('aDisposicionVehicle')?.addEventListener('change', () => {
+      this.calculateADisposicionPrice();
+    });
+    document.getElementById('aDisposicionHours')?.addEventListener('input', () => {
+      this.calculateADisposicionPrice();
+    });
+    document.getElementById('aDisposicionVehicleCount')?.addEventListener('input', () => {
+      this.calculateADisposicionPrice();
+    });
 
     // Preview
     document.getElementById('previewItineraryBtn')?.addEventListener('click', () => this.showPreview());
@@ -752,6 +780,9 @@ class ItineraryBuilder {
         if (priceTypeLabel) {
           priceTypeLabel.innerHTML = 'Pago <span class="text-danger">*</span>';
         }
+
+        // Populate rate dropdown for A Disposición
+        this.populateADisposicionRates();
       } else {
         // Show quantity field for Experience
         quantityField?.classList.remove('d-none');
@@ -1381,25 +1412,41 @@ class ItineraryBuilder {
       }
       case 'tour': {
         data.tourId = document.getElementById('tourSelect')?.value;
-        data.rateId = document.getElementById('transportCategory')?.value; // Store rate for vehicle pricing
 
-        // Collect includeGuide checkbox state for tours
-        const includeGuideCheckbox = document.getElementById('includeGuide');
-        data.includeGuide = includeGuideCheckbox ? includeGuideCheckbox.checked : false;
+        // Check if this is a walking tour
+        const selectedTourData = this.toursCache.has('all')
+          ? this.toursCache.get('all').find((t) => t.id === data.tourId || t.objectId === data.tourId)
+          : null;
 
-        // Collect includeGreeter checkbox state for tours
-        const includeGreeterCheckbox = document.getElementById('includeGreeter');
-        data.includeGreeter = includeGreeterCheckbox ? includeGreeterCheckbox.checked : false;
+        if (selectedTourData?.isWalkingTour) {
+          // Walking tour: collect tier-based pricing
+          data.isWalkingTour = true;
+          data.walkingTourPeopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10);
+          data.walkingTourPrice = this.getWalkingTourPrice(selectedTourData, data.walkingTourPeopleCount);
+          data.walkingTourCurrency = selectedTourData.walkingPriceCurrency || 'MXN';
+          data.persons = data.walkingTourPeopleCount;
+        } else {
+          // Vehicle tour: collect standard pricing
+          data.rateId = document.getElementById('transportCategory')?.value;
 
-        // Collect passenger quantities for tours (same as experiences)
-        data.adultsQuantity = parseInt(document.getElementById('tourAdultsQuantity')?.value || 0);
-        data.childrenQuantity = parseInt(document.getElementById('tourChildrenQuantity')?.value || 0);
-        data.adultsNoAlcoholQuantity = parseInt(document.getElementById('tourAdultsNoAlcoholQuantity')?.value || 0);
+          // Collect includeGuide checkbox state for tours
+          const includeGuideCheckbox = document.getElementById('includeGuide');
+          data.includeGuide = includeGuideCheckbox ? includeGuideCheckbox.checked : false;
 
-        // Collect tour-specific prices
-        data.adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
-        data.childPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0);
-        data.noAlcoholPrice = parseFloat(document.getElementById('tourNoAlcoholPrice')?.value || 0);
+          // Collect includeGreeter checkbox state for tours
+          const includeGreeterCheckbox = document.getElementById('includeGreeter');
+          data.includeGreeter = includeGreeterCheckbox ? includeGreeterCheckbox.checked : false;
+
+          // Collect passenger quantities for tours (same as experiences)
+          data.adultsQuantity = parseInt(document.getElementById('tourAdultsQuantity')?.value || 0);
+          data.childrenQuantity = parseInt(document.getElementById('tourChildrenQuantity')?.value || 0);
+          data.adultsNoAlcoholQuantity = parseInt(document.getElementById('tourAdultsNoAlcoholQuantity')?.value || 0);
+
+          // Collect tour-specific prices
+          data.adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
+          data.childPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0);
+          data.noAlcoholPrice = parseFloat(document.getElementById('tourNoAlcoholPrice')?.value || 0);
+        }
 
         // Collect schedule data - get the text content of selected option, not the index value
         const tourScheduleSelect = document.getElementById('tourMultipleTime');
@@ -1555,13 +1602,18 @@ class ItineraryBuilder {
         break;
       }
       case 'a-disposicion': {
-        data.concept = document.getElementById('aDisposicionConcept')?.value;
+        data.rateId = document.getElementById('aDisposicionRate')?.value;
+        data.vehicleType = document.getElementById('aDisposicionVehicle')?.value;
+        data.vehicleCount = parseInt(document.getElementById('aDisposicionVehicleCount')?.value || 1, 10);
+        data.hours = parseFloat(document.getElementById('aDisposicionHours')?.value || 4);
+        data.hourlyPrice = this._disposicionHourlyRate || 0;
+        data.discountPercent = this.getADisposicionDiscount(data.hours);
 
-        // Collect people counts
-        data.transportAdults = parseInt(document.getElementById('aDisposicionAdults')?.value || 0);
-        data.transportChildren = parseInt(document.getElementById('aDisposicionChildren')?.value || 0);
-        data.transportInfants = parseInt(document.getElementById('aDisposicionInfants')?.value || 0);
-        data.persons = data.transportAdults + data.transportChildren + data.transportInfants || 1;
+        // Store vehicle name for display
+        const adVehicleSelect = document.getElementById('aDisposicionVehicle');
+        if (adVehicleSelect?.selectedIndex > 0) {
+          data.vehicleTypeName = adVehicleSelect.options[adVehicleSelect.selectedIndex].text;
+        }
 
         // Collect schedule
         const adStartTime = document.getElementById('aDisposicionStartTime')?.value;
@@ -1671,8 +1723,12 @@ class ItineraryBuilder {
         }
         break;
       case 'a-disposicion':
-        if (!data.concept) {
-          this.showModalAlert('serviceModalAlert', 'Por favor ingresa un concepto para A Disposición', 'warning');
+        if (!data.rateId) {
+          this.showModalAlert('serviceModalAlert', 'Por favor selecciona un segmento', 'warning');
+          return false;
+        }
+        if (!data.vehicleType) {
+          this.showModalAlert('serviceModalAlert', 'Por favor selecciona un vehículo', 'warning');
           return false;
         }
         break;
@@ -1681,7 +1737,7 @@ class ItineraryBuilder {
     return true;
   }
 
-  populateServiceForm(service) {
+  async populateServiceForm(service) {
     if (!service) return;
 
     // Set service type
@@ -1838,6 +1894,24 @@ class ItineraryBuilder {
           tourSelect.value = service.tourId;
           // Trigger tour selection to show tour content
           this.handleTourSelection(service.tourId);
+        }
+
+        // Walking tour: restore people count and tier highlight
+        if (service.isWalkingTour) {
+          setTimeout(() => {
+            const peopleCountField = document.getElementById('walkingTourPeopleCount');
+            if (peopleCountField && service.walkingTourPeopleCount !== undefined) {
+              peopleCountField.value = service.walkingTourPeopleCount;
+            }
+            // Re-highlight the correct tier
+            if (this.toursCache.has('all')) {
+              const walkingTourData = this.toursCache.get('all').find(
+                (t) => (t.id === service.tourId || t.objectId === service.tourId) && t.isWalkingTour,
+              );
+              if (walkingTourData) this.highlightWalkingTourTier(walkingTourData);
+            }
+          }, 300);
+          break;
         }
 
         // Handle transport/vehicle information for tours
@@ -2059,12 +2133,27 @@ class ItineraryBuilder {
         break;
 
       case 'a-disposicion':
-        document.getElementById('aDisposicionConcept').value = service.concept || '';
-        document.getElementById('aDisposicionAdults').value = service.transportAdults || 1;
-        document.getElementById('aDisposicionChildren').value = service.transportChildren || 0;
-        document.getElementById('aDisposicionInfants').value = service.transportInfants || 0;
         if (service.startTime) document.getElementById('aDisposicionStartTime').value = service.startTime;
         if (service.endTime) document.getElementById('aDisposicionEndTime').value = service.endTime;
+
+        // Restore rate → load vehicles → set vehicle → recalculate price
+        if (service.rateId) {
+          const adRateSelect = document.getElementById('aDisposicionRate');
+          if (adRateSelect) {
+            adRateSelect.value = service.rateId;
+            await this.handleADisposicionRateChange(service.rateId);
+            if (service.vehicleType) {
+              document.getElementById('aDisposicionVehicle').value = service.vehicleType;
+            }
+          }
+        }
+        if (service.vehicleCount) {
+          document.getElementById('aDisposicionVehicleCount').value = service.vehicleCount;
+        }
+        if (service.hours) {
+          document.getElementById('aDisposicionHours').value = service.hours;
+        }
+        await this.calculateADisposicionPrice();
         break;
       case 'concepto':
         document.getElementById('conceptoConcept').value = service.concept || '';
@@ -2236,6 +2325,8 @@ class ItineraryBuilder {
       return this.renderTransportServiceItem(service);
     }
 
+    const badgeLabel = (service.type === 'tour' && service.isWalkingTour)
+      ? 'Tour a Pie' : null;
     const typeLabels = {
       experience: 'Experiencia',
       tour: 'Tour',
@@ -2250,7 +2341,7 @@ class ItineraryBuilder {
                         <div class="d-flex align-items-start mb-2">
                             <div class="flex-grow-1">
                                 <div class="d-flex align-items-center mb-1">
-                                    <span class="badge bg-light text-dark me-2">${typeLabels[service.type] || service.type}</span>
+                                    <span class="badge bg-light text-dark me-2">${badgeLabel || typeLabels[service.type] || service.type}</span>
                                     <h6 class="mb-0 service-title">${this.getServiceTitle(service)}</h6>
                                 </div>
                                 <div class="service-details">
@@ -2455,6 +2546,11 @@ class ItineraryBuilder {
 
   calculateServicePrice(service) {
     // console.log('🔍 calculateServicePrice called for service:', service.type, service.id || 'no-id');
+
+    // Walking tour: return the tier-based price directly
+    if (service.type === 'tour' && service.isWalkingTour) {
+      return service.walkingTourPrice || service.price || 0;
+    }
 
     // For experience and tour services, calculate based on people quantities and individual prices
     if (service.type === 'experience' || service.type === 'tour') {
@@ -2776,7 +2872,7 @@ class ItineraryBuilder {
         // since the badge already shows "Concepto"
         return service.concept || 'Concepto';
       case 'a-disposicion':
-        return service.concept || 'A Disposición';
+        return service.vehicleTypeName || 'A Disposición';
       default:
         return 'Servicio';
     }
@@ -5255,6 +5351,26 @@ class ItineraryBuilder {
         items.push({ label: 'Greeter', amountMXN: greeterCost });
       }
     } else if (serviceType === 'tour') {
+      // Check if it's a walking tour
+      let isWalkingTourBreakdown = false;
+      const tourSelectBreakdown = document.getElementById('tourSelect');
+      if (tourSelectBreakdown?.value && this.toursCache.has('all')) {
+        const walkingTourData = this.toursCache.get('all').find(
+          (t) => (t.id === tourSelectBreakdown.value || t.objectId === tourSelectBreakdown.value) && t.isWalkingTour,
+        );
+        if (walkingTourData) {
+          isWalkingTourBreakdown = true;
+          const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10);
+          const priceCurrency = walkingTourData.walkingPriceCurrency || 'MXN';
+          let walkingPrice = this.getWalkingTourPrice(walkingTourData, peopleCount);
+          if (priceCurrency === 'USD' && this.exchangeRate) {
+            // Already normalized in getWalkingTourPrice, just display
+          }
+          items.push({ label: `Tour a Pie (${peopleCount} personas)`, amountMXN: walkingPrice });
+        }
+      }
+
+      if (!isWalkingTourBreakdown) {
       const adultsQty = parseInt(document.getElementById('tourAdultsQuantity')?.value || 0);
       const childrenQty = parseInt(document.getElementById('tourChildrenQuantity')?.value || 0);
       const noAlcoholQty = parseInt(document.getElementById('tourAdultsNoAlcoholQuantity')?.value || 0);
@@ -5293,6 +5409,7 @@ class ItineraryBuilder {
           items.push({ label: 'Guía + Chofer', amountMXN: driverRate });
         }
       }
+      } // end if (!isWalkingTourBreakdown)
     } else if (serviceType === 'experience') {
       const adultsQty = parseInt(document.getElementById('adultsQuantity')?.value || 0);
       const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value || 0);
@@ -5312,6 +5429,28 @@ class ItineraryBuilder {
       if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
         const displayUnit = this.getDisplayPrice(noAlcoholPrice);
         items.push({ label: `Sin alcohol (${noAlcoholQty} × ${this.formatCurrency(displayUnit)})`, amountMXN: noAlcoholQty * noAlcoholPrice });
+      }
+    } else if (serviceType === 'a-disposicion') {
+      const hourlyRate = this._disposicionHourlyRate || 0;
+      const hours = parseFloat(document.getElementById('aDisposicionHours')?.value || 0);
+      const vehicleCount = parseInt(document.getElementById('aDisposicionVehicleCount')?.value || 1, 10);
+      const discount = this.getADisposicionDiscount(hours);
+
+      if (hourlyRate > 0 && hours > 0) {
+        const displayHourly = this.getDisplayPrice(hourlyRate);
+        items.push({ label: `Tarifa por hora (${this.formatCurrency(displayHourly)})`, amountMXN: hourlyRate });
+
+        const baseCost = hourlyRate * hours * vehicleCount;
+        if (vehicleCount > 1) {
+          items.push({ label: `${hours}h × ${vehicleCount} vehículos`, amountMXN: baseCost });
+        } else {
+          items.push({ label: `${hours} horas`, amountMXN: baseCost });
+        }
+
+        if (discount > 0) {
+          const discountAmount = baseCost * (discount / 100);
+          items.push({ label: `Descuento por volumen (-${discount}%)`, amountMXN: -discountAmount });
+        }
       }
     } else if (serviceType === 'concepto') {
       const price = parseFloat(document.getElementById('servicePrice')?.value || 0);
@@ -5638,8 +5777,316 @@ class ItineraryBuilder {
     this.updateServicePriceBreakdown();
   }
 
+  // =====================
+  // A Disposición Methods
+  // =====================
+
+  /**
+   * Populate the A Disposición rate dropdown with active rates.
+   */
+  async populateADisposicionRates() {
+    const rateSelect = document.getElementById('aDisposicionRate');
+    if (!rateSelect) return;
+
+    // Use cached rates if available, otherwise fetch
+    if (!this.ratesCache || this.ratesCache.length === 0) {
+      await this.loadAllRates();
+    }
+
+    rateSelect.innerHTML = '<option value="">-- Seleccionar segmento --</option>';
+    (this.ratesCache || []).forEach((rate) => {
+      const label = rate.label || rate.name;
+
+      // Filter out "Económico" for A Disposición (same as admin page)
+      if (label) {
+        const normalizedLabel = label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (normalizedLabel === 'economico' || normalizedLabel === 'economica') {
+          return;
+        }
+      }
+
+      const percentage = rate.formattedPercentage || (rate.percentage ? `${rate.percentage}%` : '');
+      const displayText = percentage ? `${label} (${percentage})` : label;
+
+      const option = document.createElement('option');
+      option.value = rate.value || rate.objectId || rate.id;
+      option.textContent = displayText;
+      rateSelect.appendChild(option);
+    });
+  }
+
+  /**
+   * Handle A Disposición rate change — load available vehicles.
+   */
+  async handleADisposicionRateChange(rateId) {
+    const vehicleSelect = document.getElementById('aDisposicionVehicle');
+    if (!vehicleSelect) return;
+
+    // Reset vehicle and price
+    vehicleSelect.innerHTML = '<option value="">-- Seleccionar vehículo --</option>';
+    this._disposicionHourlyRate = null;
+    this._disposicionPriceCacheKey = null;
+    document.getElementById('servicePrice').value = '';
+    document.getElementById('aDisposicionDiscountInfo').textContent = '';
+
+    if (!rateId) return;
+
+    try {
+      const accessToken = this.getAccessToken();
+      const response = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const vehicles = result.data || [];
+
+        vehicles.forEach((vehicle) => {
+          const option = document.createElement('option');
+          option.value = vehicle.value || vehicle.id;
+          option.textContent = `${vehicle.label} - ${vehicle.capacity} pax`;
+          vehicleSelect.appendChild(option);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading vehicles for A Disposición:', error);
+    }
+  }
+
+  /**
+   * Calculate A Disposición price based on rate, vehicle, hours, and vehicle count.
+   */
+  async calculateADisposicionPrice() {
+    const rateId = document.getElementById('aDisposicionRate')?.value;
+    const vehicleTypeId = document.getElementById('aDisposicionVehicle')?.value;
+    const hours = parseFloat(document.getElementById('aDisposicionHours')?.value || 0);
+    const vehicleCount = parseInt(document.getElementById('aDisposicionVehicleCount')?.value || 1, 10);
+    const priceField = document.getElementById('servicePrice');
+    const discountInfo = document.getElementById('aDisposicionDiscountInfo');
+
+    if (!rateId || !vehicleTypeId || hours <= 0) {
+      if (priceField) priceField.value = '';
+      if (discountInfo) discountInfo.textContent = '';
+      return;
+    }
+
+    try {
+      // Fetch hourly rate if not cached for this combination
+      const cacheKey = `${vehicleTypeId}_${rateId}`;
+      if (this._disposicionPriceCacheKey !== cacheKey) {
+        const accessToken = this.getAccessToken();
+        const response = await fetch(`/api/disposable-prices/price?vehicleTypeId=${vehicleTypeId}&rateId=${rateId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) return;
+        const result = await response.json();
+        const priceData = result.data || {};
+        this._disposicionHourlyRate = priceData.hourlyPrice || 0;
+        this._disposicionCurrency = priceData.currency || 'MXN';
+        this._disposicionPriceCacheKey = cacheKey;
+      }
+
+      const discount = this.getADisposicionDiscount(hours);
+      const totalPrice = this._disposicionHourlyRate * hours * vehicleCount * (1 - discount / 100);
+
+      if (priceField) priceField.value = Math.round(totalPrice);
+
+      // Set currency to match
+      const currencySelect = document.getElementById('currencySelect');
+      if (currencySelect) currencySelect.value = this._disposicionCurrency;
+
+      // Show discount info
+      if (discountInfo) {
+        discountInfo.textContent = discount > 0
+          ? `Descuento por volumen: -${discount}%`
+          : '';
+      }
+
+      this.updateServicePriceBreakdown();
+    } catch (error) {
+      console.error('Error calculating A Disposición price:', error);
+    }
+  }
+
+  /**
+   * Get volume discount percentage based on hours.
+   */
+  getADisposicionDiscount(hours) {
+    if (hours >= 16) return 10;
+    if (hours >= 12) return 7.5;
+    if (hours >= 10) return 5;
+    if (hours >= 8) return 2.5;
+    return 0;
+  }
+
+  // =====================
+  // Walking Tour Methods
+  // =====================
+
+  /**
+   * Handle walking tour selection — show tier pricing, hide vehicle fields.
+   */
+  handleWalkingTourSelection(tour) {
+    // Hide transport checkbox (walking tours don't need vehicles)
+    const tourTransportCheckbox = document.getElementById('tourTransportCheckboxContainer');
+    if (tourTransportCheckbox) tourTransportCheckbox.style.display = 'none';
+
+    // Populate tier cards
+    document.getElementById('walkingRangeSmallLabel').textContent = tour.walkingRangeSmall || '—';
+    document.getElementById('walkingRangeMediumLabel').textContent = tour.walkingRangeMedium || '—';
+    document.getElementById('walkingRangeLargeLabel').textContent = tour.walkingRangeLarge || '—';
+
+    const currency = tour.walkingPriceCurrency || 'MXN';
+    document.getElementById('walkingPriceSmallLabel').textContent = `$${parseFloat(tour.walkingPriceSmall || 0).toLocaleString()} ${currency}`;
+    document.getElementById('walkingPriceMediumLabel').textContent = `$${parseFloat(tour.walkingPriceMedium || 0).toLocaleString()} ${currency}`;
+    document.getElementById('walkingPriceLargeLabel').textContent = `$${parseFloat(tour.walkingPriceLarge || 0).toLocaleString()} ${currency}`;
+    document.getElementById('walkingTourCurrency').value = currency;
+
+    // Pre-fill people count from quote data
+    const peopleCountField = document.getElementById('walkingTourPeopleCount');
+    if (peopleCountField && this.numberOfPeople > 0) {
+      peopleCountField.value = this.numberOfPeople;
+    }
+
+    // Highlight matching tier
+    this.highlightWalkingTourTier(tour);
+
+    // Fill detail fields
+    const tourDescriptionField = document.getElementById('tourDescription');
+    const tourAdvanceBookingTimeField = document.getElementById('tourAdvanceBookingTime');
+    const tourLanguagesField = document.getElementById('tourLanguages');
+    const tourIncludesField = document.getElementById('tourIncludes');
+    const tourNotIncludesField = document.getElementById('tourNotIncludes');
+    const tourClientNotesField = document.getElementById('tourClientNotes');
+
+    if (tourDescriptionField) tourDescriptionField.value = tour.description || '';
+    if (tourAdvanceBookingTimeField) {
+      const bookingTime = tour.advance_booking_time;
+      tourAdvanceBookingTimeField.value = bookingTime ? this.formatMinutesToHoursAndMinutes(parseInt(bookingTime, 10)) : 'No especificado';
+    }
+    if (tourLanguagesField) tourLanguagesField.value = (tour.languages || []).join(', ') || '';
+    if (tourIncludesField) tourIncludesField.value = tour.includes || '';
+    if (tourNotIncludesField) tourNotIncludesField.value = tour.notincludes || '';
+    if (tourClientNotesField) tourClientNotesField.value = tour.client_booking_notes || '';
+
+    // Show tour details and schedule
+    this.showTourDetails(tour);
+    this.handleTourSchedule(tour);
+    this.updateServicePriceBreakdown();
+  }
+
+  /**
+   * Parse walking tour range string like "1-5 pax" or "15+".
+   */
+  parseWalkingTourRange(rangeStr) {
+    if (!rangeStr) return null;
+    const trimmed = rangeStr.trim();
+    const plusMatch = trimmed.match(/^(\d+)\+/);
+    if (plusMatch) return { min: parseInt(plusMatch[1], 10), max: Infinity };
+    const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)/);
+    if (rangeMatch) return { min: parseInt(rangeMatch[1], 10), max: parseInt(rangeMatch[2], 10) };
+    return null;
+  }
+
+  /**
+   * Highlight the matching walking tour tier based on people count.
+   */
+  highlightWalkingTourTier(tour) {
+    const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 0, 10);
+
+    const tiers = ['Small', 'Medium', 'Large'].map((tier) => ({
+      range: this.parseWalkingTourRange(tour[`walkingRange${tier}`]),
+      price: parseFloat(tour[`walkingPrice${tier}`] || 0),
+      card: document.getElementById(`walkingTier${tier}`),
+    }));
+
+    // Remove all highlights
+    tiers.forEach((tier) => {
+      if (tier.card) {
+        tier.card.style.border = '';
+        tier.card.style.backgroundColor = '';
+      }
+    });
+
+    if (peopleCount <= 0) return;
+
+    // Find matching tier
+    let matchedTier = null;
+    for (const tier of tiers) {
+      if (tier.range && peopleCount >= tier.range.min && peopleCount <= tier.range.max) {
+        matchedTier = tier;
+        break;
+      }
+    }
+
+    // If no exact match, use the largest tier
+    if (!matchedTier) {
+      matchedTier = tiers[tiers.length - 1];
+    }
+
+    // Highlight matching tier
+    if (matchedTier?.card) {
+      matchedTier.card.style.border = '2px solid #0d6efd';
+      matchedTier.card.style.backgroundColor = '#e7f1ff';
+    }
+
+    // Set service price using getWalkingTourPrice (normalizes to MXN)
+    const servicePriceField = document.getElementById('servicePrice');
+    if (servicePriceField) {
+      const mxnPrice = this.getWalkingTourPrice(tour, peopleCount);
+      servicePriceField.value = mxnPrice;
+    }
+  }
+
+  /**
+   * Get walking tour price for a given people count, normalized to MXN.
+   */
+  getWalkingTourPrice(tour, peopleCount) {
+    const tiers = [
+      { range: this.parseWalkingTourRange(tour.walkingRangeSmall), price: parseFloat(tour.walkingPriceSmall || 0) },
+      { range: this.parseWalkingTourRange(tour.walkingRangeMedium), price: parseFloat(tour.walkingPriceMedium || 0) },
+      { range: this.parseWalkingTourRange(tour.walkingRangeLarge), price: parseFloat(tour.walkingPriceLarge || 0) },
+    ];
+
+    const priceCurrency = tour.walkingPriceCurrency || 'MXN';
+
+    // Find matching tier
+    let matchedPrice = 0;
+    for (const tier of tiers) {
+      if (tier.range && peopleCount >= tier.range.min && peopleCount <= tier.range.max) {
+        matchedPrice = tier.price;
+        break;
+      }
+    }
+
+    // If no match, use largest tier
+    if (matchedPrice === 0 && tiers.length > 0) {
+      matchedPrice = tiers[tiers.length - 1].price;
+    }
+
+    // Normalize to MXN if needed
+    if (priceCurrency === 'USD' && this.exchangeRate) {
+      matchedPrice = Math.round(matchedPrice * this.exchangeRate);
+    }
+
+    return matchedPrice;
+  }
+
   handleTourSelection(tourId) {
     if (!tourId) {
+      // Reset both pricing sections to default
+      const vehiclePricingSection = document.getElementById('vehicleTourPricingSection');
+      const walkingPricingSection = document.getElementById('walkingTourPricingSection');
+      if (vehiclePricingSection) vehiclePricingSection.classList.remove('d-none');
+      if (walkingPricingSection) walkingPricingSection.classList.add('d-none');
+
       // Clear all price fields and details when no tour is selected
       const servicePriceField = document.getElementById('servicePrice');
       const adultPriceField = document.getElementById('tourAdultPrice');
@@ -5709,6 +6156,22 @@ class ItineraryBuilder {
       }
 
       if (selectedTour) {
+        // Reset pricing sections
+        const vehiclePricingSection = document.getElementById('vehicleTourPricingSection');
+        const walkingPricingSection = document.getElementById('walkingTourPricingSection');
+
+        // Walking tour: use tier-based pricing
+        if (selectedTour.isWalkingTour) {
+          if (vehiclePricingSection) vehiclePricingSection.classList.add('d-none');
+          if (walkingPricingSection) walkingPricingSection.classList.remove('d-none');
+          this.handleWalkingTourSelection(selectedTour);
+          return;
+        }
+
+        // Vehicle tour: show standard pricing
+        if (vehiclePricingSection) vehiclePricingSection.classList.remove('d-none');
+        if (walkingPricingSection) walkingPricingSection.classList.add('d-none');
+
         // Get client-specific tour price or use base price
         const price = this.getPriceForTour(tourId, null) || selectedTour.price || 0;
 
@@ -6954,12 +7417,32 @@ class ItineraryBuilder {
           return nameA.localeCompare(nameB);
         });
 
-        validTours.forEach((tour) => {
+        // Split into vehicle tours and walking tours
+        const vehicleTours = validTours.filter((t) => !t.isWalkingTour);
+        const walkingTours = validTours.filter((t) => t.isWalkingTour === true);
+
+        const addTourOption = (tour, parent) => {
           const option = document.createElement('option');
           option.value = tour.objectId || tour.id;
           option.textContent = tour.destinationPOI?.name || tour.description || 'Tour sin nombre';
-          tourSelect.appendChild(option);
-        });
+          parent.appendChild(option);
+        };
+
+        if (vehicleTours.length > 0 && walkingTours.length > 0) {
+          // Use optgroups when both types exist
+          const vehicleGroup = document.createElement('optgroup');
+          vehicleGroup.label = 'Tours en Vehículo';
+          vehicleTours.forEach((tour) => addTourOption(tour, vehicleGroup));
+          tourSelect.appendChild(vehicleGroup);
+
+          const walkingGroup = document.createElement('optgroup');
+          walkingGroup.label = 'Tours a Pie';
+          walkingTours.forEach((tour) => addTourOption(tour, walkingGroup));
+          tourSelect.appendChild(walkingGroup);
+        } else {
+          // Single type — flat list
+          validTours.forEach((tour) => addTourOption(tour, tourSelect));
+        }
       } else {
         console.warn('⚠️ No tours in cache after loading attempt');
       }
@@ -6999,7 +7482,7 @@ class ItineraryBuilder {
             unitPrice: servicePrice,
             quantity: service.quantity || 1,
             notes: service.notes || '',
-            hours: null, // Add if needed
+            hours: service.hours || null,
             total: serviceTotal,
             // Type-specific fields
             experienceId: service.experienceId || null,
@@ -7041,6 +7524,15 @@ class ItineraryBuilder {
             airline: service.airline || null,
             routeDuration: service.routeDuration || null,
             baseVehiclePrice: service.baseVehiclePrice || null,
+            // A Disposición fields
+            vehicleCount: service.vehicleCount || null,
+            hourlyPrice: service.hourlyPrice || null,
+            discountPercent: service.discountPercent || null,
+            // Walking tour fields
+            isWalkingTour: service.isWalkingTour || false,
+            walkingTourPeopleCount: service.walkingTourPeopleCount || null,
+            walkingTourPrice: service.walkingTourPrice || null,
+            walkingTourCurrency: service.walkingTourCurrency || null,
           };
 
           // Debug logging for includeGuide

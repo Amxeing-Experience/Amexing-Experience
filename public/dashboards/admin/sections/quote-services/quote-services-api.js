@@ -198,6 +198,39 @@ function createQuoteServicesAPI(options = {}) {
   }
 
   /**
+   * Get vehicles available for a disposable price rate
+   * @param {string} rateId - Rate ID
+   * @returns {Promise<Array>} Array of vehicle objects with capacity info
+   */
+  async function getDisposableVehiclesForRate(rateId) {
+    if (!rateId) return [];
+
+    const cacheKey = `disposable_vehicles_rate_${rateId}`;
+
+    return cache.getOrSet(cacheKey, async () => {
+      const url = `/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`;
+      return fetchJSONWithDedup(url, createAuthOptions());
+    });
+  }
+
+  /**
+   * Get disposable hourly price for a vehicle type and rate
+   * @param {string} vehicleTypeId - Vehicle Type ID
+   * @param {string} rateId - Rate ID
+   * @returns {Promise<Object>} Price object with hourlyPrice, currency
+   */
+  async function getDisposablePrice(vehicleTypeId, rateId) {
+    if (!vehicleTypeId || !rateId) return null;
+
+    const cacheKey = `disposable_price_${vehicleTypeId}_${rateId}`;
+
+    return cache.getOrSet(cacheKey, async () => {
+      const url = `/api/disposable-prices/price?vehicleTypeId=${vehicleTypeId}&rateId=${rateId}`;
+      return fetchJSONWithDedup(url, createAuthOptions());
+    });
+  }
+
+  /**
    * Prefetch common data in background
    * Loads rates, services, and tour destinations to populate cache
    * @param {string} quoteId - Quote ID
@@ -285,6 +318,8 @@ function createQuoteServicesAPI(options = {}) {
     getExperiences,
     getTourDestinations,
     getTourVehicles,
+    getDisposableVehiclesForRate,
+    getDisposablePrice,
     updateServiceItems,
 
     // Optimization
