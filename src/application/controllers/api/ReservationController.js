@@ -11,12 +11,98 @@
 
 const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
+const FileStorageService = require('../../services/FileStorageService');
 // Models used via Parse.Query string references
+
+// Module-level FileStorageService for presigned S3 URLs (static class needs this)
+const fileStorageService = new FileStorageService({
+  baseFolder: 'vehicles',
+  isPublic: false,
+  presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+});
 
 /**
  * ReservationController - API controller for reservation management.
  */
 class ReservationController {
+  /**
+   * Get role-based user pointers for filtering reservations by clientPtr.
+   * Filters by clientPtr (the client the reservation is FOR), not createdBy,
+   * so reservations created by admins on behalf of a client still appear.
+   * Returns null if no filtering needed (admin/superadmin), or an array of user pointers.
+   * @param {object} req - Express request with user info from JWT middleware.
+   * @returns {Array|null} Array of AmexingUser pointers for containedIn on clientPtr, or null.
+   * @example
+   */
+  static async getRoleFilterPointers(req) {
+    const { userRole } = req;
+    const currentUser = req.user;
+
+    // Admins and superadmins see all reservations
+    if (userRole === 'superadmin' || userRole === 'admin') {
+      return null;
+    }
+
+    // Department managers see reservations for clients in their department
+    if (userRole === 'department_manager') {
+      const userDepartmentId = currentUser.departmentId || currentUser.get('departmentId');
+
+      if (userDepartmentId) {
+        const departmentUsersQuery = new Parse.Query('AmexingUser');
+        departmentUsersQuery.equalTo('departmentId', userDepartmentId);
+        departmentUsersQuery.equalTo('exists', true);
+        departmentUsersQuery.equalTo('active', true);
+        const departmentUsers = await departmentUsersQuery.find({ useMasterKey: true });
+
+        if (departmentUsers.length > 0) {
+          logger.info('Applied department filter to reservations query (clientPtr)', {
+            userId: currentUser.id,
+            departmentId: userDepartmentId,
+            departmentUsersCount: departmentUsers.length,
+          });
+          return departmentUsers.map((user) => ({
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: user.id,
+          }));
+        }
+      }
+
+      // Fallback: only reservations where they are the client
+      logger.warn('Department manager missing departmentId, restricting to own reservations', {
+        userId: currentUser.id,
+      });
+      return [{ __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id }];
+    }
+
+    // Clients see reservations for users in their client organization
+    if (userRole === 'client') {
+      const userClientId = currentUser.clientId || currentUser.get('clientId') || currentUser.id;
+
+      const clientUsersQuery = new Parse.Query('AmexingUser');
+      clientUsersQuery.equalTo('clientId', userClientId);
+      clientUsersQuery.equalTo('exists', true);
+      clientUsersQuery.equalTo('active', true);
+      const clientUsers = await clientUsersQuery.find({ useMasterKey: true });
+
+      if (clientUsers.length > 0) {
+        logger.info('Applied client filter to reservations query (clientPtr)', {
+          userId: currentUser.id,
+          clientId: userClientId,
+          clientUsersCount: clientUsers.length,
+        });
+        return clientUsers.map((user) => ({
+          __type: 'Pointer',
+          className: 'AmexingUser',
+          objectId: user.id,
+        }));
+      }
+    }
+
+    // Default: only reservations where they are the client
+    return [{ __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id }];
+  }
+
   /**
    * GET /api/reservations — DataTables server-side processing.
    * @param req
@@ -39,6 +125,9 @@ class ReservationController {
       // Status filter
       const statusFilter = req.query.statusFilter || '';
 
+      // Get role-based filter pointers (null = no filter for admins)
+      const roleFilterPointers = await ReservationController.getRoleFilterPointers(req);
+
       // Build query
       const query = new Parse.Query('Reservation');
       query.equalTo('active', true);
@@ -46,11 +135,17 @@ class ReservationController {
       query.include('quotePtr');
       query.include('clientPtr');
       query.include('createdBy');
+      if (roleFilterPointers) {
+        query.containedIn('clientPtr', roleFilterPointers);
+      }
 
-      // Total count (without filters)
+      // Total count (without search/status filters, but with role filter)
       const totalQuery = new Parse.Query('Reservation');
       totalQuery.equalTo('active', true);
       totalQuery.equalTo('exists', true);
+      if (roleFilterPointers) {
+        totalQuery.containedIn('clientPtr', roleFilterPointers);
+      }
       const recordsTotal = await totalQuery.count({ useMasterKey: true });
 
       // Apply search filter
@@ -74,6 +169,14 @@ class ReservationController {
         emailQuery.equalTo('active', true);
         emailQuery.equalTo('exists', true);
         emailQuery.matches('contactEmail', searchValue, 'i');
+
+        // Apply role filter to each sub-query
+        if (roleFilterPointers) {
+          folioQuery.containedIn('clientPtr', roleFilterPointers);
+          contactQuery.containedIn('clientPtr', roleFilterPointers);
+          eventQuery.containedIn('clientPtr', roleFilterPointers);
+          emailQuery.containedIn('clientPtr', roleFilterPointers);
+        }
 
         const compoundQuery = Parse.Query.or(folioQuery, contactQuery, eventQuery, emailQuery);
         compoundQuery.include('quotePtr');
@@ -114,10 +217,12 @@ class ReservationController {
       }
 
       // Count filtered
-      // Re-build for count
       const countQuery = new Parse.Query('Reservation');
       countQuery.equalTo('active', true);
       countQuery.equalTo('exists', true);
+      if (roleFilterPointers) {
+        countQuery.containedIn('clientPtr', roleFilterPointers);
+      }
       if (statusFilter) {
         countQuery.equalTo('status', statusFilter);
       }
@@ -202,6 +307,113 @@ class ReservationController {
 
       const serviceCustomerObj = reservation.get('serviceCustomer');
 
+      // Batch fetch primary images for assigned vehicles (including extra assignments)
+      const vehicleIds = services
+        .map((svc) => svc.get('assignedVehicle')?.id)
+        .filter(Boolean);
+      // Also collect vehicle IDs from extra assignments
+      services.forEach((svc) => {
+        const extras = svc.get('extraAssignments') || [];
+        extras.forEach((ea) => {
+          if (ea.vehicleId) vehicleIds.push(ea.vehicleId);
+        });
+      });
+      const uniqueVehicleIds = [...new Set(vehicleIds)];
+      const vehicleImageMap = {};
+      if (uniqueVehicleIds.length > 0) {
+        try {
+          // First try: query with isPrimary
+          const imgQuery = new Parse.Query('VehicleImage');
+          const Vehicle = Parse.Object.extend('Vehicle');
+          const vehiclePointers = uniqueVehicleIds.map((vid) => Vehicle.createWithoutData(vid));
+          imgQuery.containedIn('vehicleId', vehiclePointers);
+          imgQuery.equalTo('isPrimary', true);
+          imgQuery.equalTo('exists', true);
+          let images = await imgQuery.find({ useMasterKey: true });
+
+          // Fallback: if no primary images, get first image per vehicle
+          if (images.length === 0) {
+            const fallbackQuery = new Parse.Query('VehicleImage');
+            fallbackQuery.containedIn('vehicleId', vehiclePointers);
+            fallbackQuery.equalTo('exists', true);
+            fallbackQuery.ascending('displayOrder');
+            images = await fallbackQuery.find({ useMasterKey: true });
+          }
+
+          // Deduplicate: keep first image per vehicle, generate presigned URLs
+          const formatPriority = ['avif', 'webp', 'jpeg'];
+          await Promise.all(images.map(async (img) => {
+            const vid = img.get('vehicleId')?.id;
+            if (!vid || vehicleImageMap[vid]) return;
+
+            let imageUrl = '';
+            const optimizedVariants = img.get('optimizedVariants');
+            const optimizationMetadata = img.get('optimizationMetadata');
+            const s3Key = img.get('s3Key');
+            const imageFile = img.get('imageFile');
+
+            // Prefer optimized variants (avif → webp → jpeg)
+            if (optimizedVariants && typeof optimizedVariants === 'object') {
+              for (const format of formatPriority) {
+                const variant = optimizedVariants[format];
+                if (variant?.s3Key) {
+                  try {
+                    imageUrl = await fileStorageService.getPresignedUrl(variant.s3Key);
+                    break;
+                  } catch (e) {
+                    // Continue to next format
+                  }
+                }
+              }
+            }
+
+            // Fallback: optimizationMetadata.formats (older uploads)
+            if (!imageUrl && optimizationMetadata?.formats && typeof optimizationMetadata.formats === 'object') {
+              for (const format of formatPriority) {
+                const formatData = optimizationMetadata.formats[format];
+                if (formatData?.s3Key) {
+                  try {
+                    imageUrl = await fileStorageService.getPresignedUrl(formatData.s3Key);
+                    break;
+                  } catch (e) {
+                    // Continue to next format
+                  }
+                }
+              }
+            }
+
+            // Fallback: original s3Key
+            if (!imageUrl && s3Key) {
+              try {
+                imageUrl = await fileStorageService.getPresignedUrl(s3Key);
+              } catch (e) {
+                // Fall through to legacy
+              }
+            }
+
+            // Fallback: construct direct S3 URL from metadata
+            if (!imageUrl && s3Key) {
+              const s3Bucket = img.get('s3Bucket');
+              const s3Region = img.get('s3Region');
+              if (s3Bucket && s3Region) {
+                imageUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${s3Key}`;
+              }
+            }
+
+            // Fallback: legacy Parse.File or url field
+            if (!imageUrl && imageFile) {
+              imageUrl = imageFile.url();
+            } else if (!imageUrl) {
+              imageUrl = img.get('url') || '';
+            }
+
+            vehicleImageMap[vid] = imageUrl;
+          }));
+        } catch (imgErr) {
+          logger.warn('Failed to fetch vehicle images', { error: imgErr.message });
+        }
+      }
+
       return res.json({
         success: true,
         data: {
@@ -230,6 +442,8 @@ class ReservationController {
           serviceCustomer: serviceCustomerObj ? {
             id: serviceCustomerObj.id,
             fullName: serviceCustomerObj.get('fullName') || `${serviceCustomerObj.get('firstName') || ''} ${serviceCustomerObj.get('lastName') || ''}`.trim() || serviceCustomerObj.get('username'),
+            phone: serviceCustomerObj.get('phone') || '',
+            profilePhotoUrl: serviceCustomerObj.get('profilePhotoUrl') || '',
           } : null,
           createdBy: reservation.get('createdBy')?.get('username') || '',
           createdAt: reservation.createdAt,
@@ -258,24 +472,36 @@ class ReservationController {
               assignedDriver: svc.get('assignedDriver') ? {
                 id: svc.get('assignedDriver').id,
                 fullName: svc.get('assignedDriver').get('fullName') || `${svc.get('assignedDriver').get('firstName') || ''} ${svc.get('assignedDriver').get('lastName') || ''}`.trim() || svc.get('assignedDriver').get('username'),
+                phone: svc.get('assignedDriver').get('phone') || '',
+                profilePhotoUrl: svc.get('assignedDriver').get('profilePhotoUrl') || '',
               } : null,
               assignedGuide: svc.get('assignedGuide') ? {
                 id: svc.get('assignedGuide').id,
                 fullName: svc.get('assignedGuide').get('fullName') || `${svc.get('assignedGuide').get('firstName') || ''} ${svc.get('assignedGuide').get('lastName') || ''}`.trim() || svc.get('assignedGuide').get('username'),
+                phone: svc.get('assignedGuide').get('phone') || '',
+                profilePhotoUrl: svc.get('assignedGuide').get('profilePhotoUrl') || '',
               } : null,
               assignedGreeter: svc.get('assignedGreeter') ? {
                 id: svc.get('assignedGreeter').id,
                 fullName: svc.get('assignedGreeter').get('fullName') || `${svc.get('assignedGreeter').get('firstName') || ''} ${svc.get('assignedGreeter').get('lastName') || ''}`.trim() || svc.get('assignedGreeter').get('username'),
+                phone: svc.get('assignedGreeter').get('phone') || '',
+                profilePhotoUrl: svc.get('assignedGreeter').get('profilePhotoUrl') || '',
               } : null,
               assignedVehicle: svc.get('assignedVehicle') ? {
                 id: svc.get('assignedVehicle').id,
                 name: `${svc.get('assignedVehicle').get('brand') || ''} ${svc.get('assignedVehicle').get('model') || ''}`.trim() || svc.get('assignedVehicle').get('licensePlate') || 'Vehiculo',
+                imageUrl: vehicleImageMap[svc.get('assignedVehicle').id] || '',
               } : null,
               assignedServiceCustomer: svc.get('assignedServiceCustomer') ? {
                 id: svc.get('assignedServiceCustomer').id,
                 fullName: svc.get('assignedServiceCustomer').get('fullName') || `${svc.get('assignedServiceCustomer').get('firstName') || ''} ${svc.get('assignedServiceCustomer').get('lastName') || ''}`.trim() || svc.get('assignedServiceCustomer').get('username'),
+                phone: svc.get('assignedServiceCustomer').get('phone') || '',
+                profilePhotoUrl: svc.get('assignedServiceCustomer').get('profilePhotoUrl') || '',
               } : null,
-              extraAssignments: svc.get('extraAssignments') || [],
+              extraAssignments: (svc.get('extraAssignments') || []).map((ea) => ({
+                ...ea,
+                vehicleImageUrl: ea.vehicleId ? (vehicleImageMap[ea.vehicleId] || '') : '',
+              })),
             };
           }),
         },
@@ -698,8 +924,7 @@ class ReservationController {
     assignedQuery.equalTo('reservationPtr', resPointer);
     assignedQuery.equalTo('active', true);
     assignedQuery.equalTo('exists', true);
-    assignedQuery.exists('assignedDriver');
-    // Count services that have at least a driver assigned
+    assignedQuery.equalTo('status', 'assigned');
     const assignedCount = await assignedQuery.count({ useMasterKey: true });
 
     return { totalCount, assignedCount };

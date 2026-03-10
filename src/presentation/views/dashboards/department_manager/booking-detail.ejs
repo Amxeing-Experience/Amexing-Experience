@@ -187,7 +187,7 @@
     padding: 0.2rem 0.5rem;
 }
 .detail-tag {
-    font-size: 0.7rem;
+    font-size: 0.9rem;
     padding: 0.15rem 0.4rem;
     font-weight: 500;
 }
@@ -200,6 +200,53 @@ document.addEventListener('DOMContentLoaded', async function() {
     let reservationData = null;
     let employeesCache = null;
     let vehiclesCache = null;
+
+    function getInitials(name) {
+        if (!name) return '?';
+        return name.split(' ').map(w => w[0]).filter(Boolean).join('').substring(0, 2).toUpperCase();
+    }
+
+    function buildPersonCard(person, roleLabel, roleIcon, colorClass) {
+        if (!person) return '';
+        const name = person.fullName || 'Sin nombre';
+        const phone = person.phone || '';
+        const photo = person.profilePhotoUrl || '';
+        const initials = getInitials(name);
+        const photoHtml = photo
+            ? `<img src="${photo}" class="rounded-circle photo-preview-trigger" width="36" height="36" style="object-fit:cover;cursor:pointer" data-photo="${photo}" data-name="${name.replace(/"/g, '&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+            : '';
+        const initialsDisplay = photo ? 'display:none' : 'display:flex';
+        return `
+            <div class="d-flex align-items-center gap-2 mb-2">
+                ${photoHtml}
+                <span class="rounded-circle bg-${colorClass}-subtle text-${colorClass} align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;${initialsDisplay};font-size:0.8rem;font-weight:600">${initials}</span>
+                <div>
+                    <div class="fw-semibold small">${name}</div>
+                    <small class="text-${colorClass}"><i class="ti ${roleIcon} me-1"></i>${roleLabel}</small>
+                    ${phone ? `<a href="tel:${phone}" class="text-muted small d-block"><i class="ti ti-phone me-1"></i>${phone}</a>` : ''}
+                </div>
+            </div>`;
+    }
+
+    function buildVehicleCard(vehicle) {
+        if (!vehicle) return '';
+        const name = vehicle.name || 'Vehiculo';
+        const photo = vehicle.imageUrl || '';
+        const initials = name.substring(0, 2).toUpperCase();
+        const photoHtml = photo
+            ? `<img src="${photo}" class="rounded-circle photo-preview-trigger" width="36" height="36" style="object-fit:cover;cursor:pointer" data-photo="${photo}" data-name="${name.replace(/"/g, '&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+            : '';
+        const initialsDisplay = photo ? 'display:none' : 'display:flex';
+        return `
+            <div class="d-flex align-items-center gap-2 mb-2">
+                ${photoHtml}
+                <span class="rounded-circle bg-secondary-subtle text-secondary align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;${initialsDisplay};font-size:0.8rem;font-weight:600">${initials}</span>
+                <div>
+                    <div class="fw-semibold small">${name}</div>
+                    <small class="text-secondary"><i class="ti ti-car me-1"></i>Vehiculo</small>
+                </div>
+            </div>`;
+    }
 
     function getStatusBadge(status) {
         const map = {
@@ -278,7 +325,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('infoTotal').textContent = formatCurrency(d.totalAmount, d.currency);
 
         // Service Customer
-        document.getElementById('infoServiceCustomer').textContent = d.serviceCustomer?.fullName || 'Sin asignar';
+        const scEl = document.getElementById('infoServiceCustomer');
+        if (d.serviceCustomer) {
+            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Seguidor', 'ti-user-star', 'primary');
+        } else {
+            scEl.innerHTML = '<span class="text-muted">Sin asignar</span>';
+        }
 
         // Header actions
         const actions = document.getElementById('headerActions');
@@ -386,19 +438,25 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             day.services.forEach(svc => {
                 const icon = getServiceTypeIcon(svc.type);
-                const assignments = [];
-                if (svc.assignedDriver) assignments.push(`<span class="badge assignment-badge bg-info-subtle text-info"><i class="ti ti-steering-wheel me-1"></i>${svc.assignedDriver.fullName}</span>`);
-                if (svc.assignedGuide) assignments.push(`<span class="badge assignment-badge bg-success-subtle text-success"><i class="ti ti-map-pin me-1"></i>${svc.assignedGuide.fullName}</span>`);
-                if (svc.assignedGreeter) assignments.push(`<span class="badge assignment-badge bg-warning-subtle text-warning"><i class="ti ti-hand-stop me-1"></i>${svc.assignedGreeter.fullName}</span>`);
-                if (svc.assignedVehicle) assignments.push(`<span class="badge assignment-badge bg-secondary-subtle text-secondary"><i class="ti ti-car me-1"></i>${svc.assignedVehicle.name}</span>`);
-                if (svc.assignedServiceCustomer) assignments.push(`<span class="badge assignment-badge bg-primary-subtle text-primary"><i class="ti ti-user-star me-1"></i>${svc.assignedServiceCustomer.fullName}</span>`);
+                // Build person cards for assigned employees
+                let peopleHtml = '';
+                let vehiclesHtml = '';
+                peopleHtml += buildPersonCard(svc.assignedDriver, 'Conductor', 'ti-steering-wheel', 'info');
+                peopleHtml += buildPersonCard(svc.assignedGuide, 'Guía', 'ti-map-pin', 'success');
+                peopleHtml += buildPersonCard(svc.assignedGreeter, 'Greeter', 'ti-hand-stop', 'warning');
+                peopleHtml += buildPersonCard(svc.assignedServiceCustomer, 'Seguidor', 'ti-user-star', 'primary');
+
+                // Vehicle card
+                if (svc.assignedVehicle) vehiclesHtml += buildVehicleCard(svc.assignedVehicle);
 
                 // Extra assignments (additional vehicles/drivers)
                 const extras = svc.extraAssignments || [];
                 extras.forEach(ea => {
-                    if (ea.driverName) assignments.push(`<span class="badge assignment-badge bg-info-subtle text-info"><i class="ti ti-steering-wheel me-1"></i>${ea.driverName}</span>`);
-                    if (ea.vehicleName) assignments.push(`<span class="badge assignment-badge bg-secondary-subtle text-secondary"><i class="ti ti-car me-1"></i>${ea.vehicleName}</span>`);
+                    if (ea.driverName) peopleHtml += buildPersonCard({ fullName: ea.driverName, phone: '', profilePhotoUrl: '' }, 'Conductor', 'ti-steering-wheel', 'info');
+                    if (ea.vehicleName) vehiclesHtml += buildVehicleCard({ name: ea.vehicleName, imageUrl: ea.vehicleImageUrl || '' });
                 });
+
+                const hasAssignments = peopleHtml || vehiclesHtml;
 
                 const route = svc.originName || svc.destinationName
                     ? `<small class="text-muted">${svc.originName || ''}${svc.originName && svc.destinationName ? ' → ' : ''}${svc.destinationName || ''}</small>`
@@ -409,13 +467,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                 html += `
                 <div class="service-row d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center flex-grow-1">
-                        <i class="ti ${icon} me-2 text-muted"></i>
                         <div>
                             <div class="fw-semibold">${svc.concept || '—'}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
                             ${route}
                             ${svc.vehicleTypeName ? `<small class="text-muted d-block">${svc.vehicleTypeName}</small>` : ''}
                             ${getSubconceptDetails(svc)}
-                            <div class="mt-1">${assignments.join(' ') || '<small class="text-muted">Sin asignar</small>'}</div>
+                            ${hasAssignments ? `<div class="row mt-2"><div class="col-md-7">${peopleHtml}</div><div class="col-md-5">${vehiclesHtml}</div></div>` : '<div class="mt-2"><small class="text-muted">Sin asignar</small></div>'}
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
@@ -553,4 +610,27 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     await loadReservation();
 });
+
+document.addEventListener('click', function(e) {
+    const trigger = e.target.closest('.photo-preview-trigger');
+    if (!trigger) return;
+    document.getElementById('photoPreviewImg').src = trigger.dataset.photo;
+    document.getElementById('photoPreviewName').textContent = trigger.dataset.name;
+    new bootstrap.Modal(document.getElementById('photoPreviewModal')).show();
+});
 </script>
+
+<!-- Photo Preview Modal -->
+<div class="modal fade" id="photoPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title" id="photoPreviewName"></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="photoPreviewImg" src="" class="rounded-circle img-fluid" style="max-width:200px;max-height:200px;object-fit:cover">
+            </div>
+        </div>
+    </div>
+</div>

@@ -21,6 +21,7 @@ const canEdit = ['superadmin', 'admin', 'department_manager', 'client'].includes
 const canDelete = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
 const canViewSummary = ['department_manager', 'client'].includes(dtUserRole);
+const showClientColumn = ['superadmin', 'admin'].includes(dtUserRole);
 
 // Dynamic base path based on user role
 const rolePaths = {
@@ -57,7 +58,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 <thead class="table-light">
                     <tr>
                         <th>Folio</th>
-                        <th>Cliente</th>
+                        <% if (showClientColumn) { %><th>Cliente</th><% } %>
                         <th>Tipo de Evento</th>
                         <th class="text-center">No. Personas</th>
                         <th>Creado Por</th>
@@ -370,6 +371,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         return `<span class="fw-semibold text-primary">${data || 'N/A'}</span>`;
                     }
                 },
+                <% if (showClientColumn) { %>
                 {
                     data: 'client',
                     render: function(data) {
@@ -381,6 +383,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                             : fullName;
                     }
                 },
+                <% } %>
                 {
                     data: 'eventType',
                     render: function(data) {
@@ -594,7 +597,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando Cotizaciones...'
             },
-            order: [[8, 'desc']], // Sort by updatedAt column by default (most recent first)
+            order: [[<%= showClientColumn ? 8 : 7 %>, 'desc']], // Sort by updatedAt column by default (most recent first)
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
