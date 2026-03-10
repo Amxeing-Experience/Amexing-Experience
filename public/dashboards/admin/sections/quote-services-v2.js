@@ -7718,6 +7718,837 @@ class ItineraryBuilder {
             // Only include experiences (exclude providers)
             const isExperience = exp.type === 'Experience';
 
+        // Get client-specific tour price or use base price
+        const price = this.getPriceForTour(tourId, null) || selectedTour.price || 0;
+
+        // Auto-fill form fields
+        const servicePriceField = document.getElementById('servicePrice');
+        const serviceDescriptionField = document.getElementById('serviceDescription');
+        const internalNotesField = document.getElementById('internalNotes');
+        const clientNotesField = document.getElementById('clientNotes');
+        const providerNotesField = document.getElementById('providerNotes');
+        const teamNotesField = document.getElementById('teamNotes');
+
+        // Tour-specific readonly fields
+        const tourDescriptionField = document.getElementById('tourDescription');
+        const tourAdvanceBookingTimeField = document.getElementById('tourAdvanceBookingTime');
+        const tourLanguagesField = document.getElementById('tourLanguages');
+        const tourIncludesField = document.getElementById('tourIncludes');
+        const tourNotIncludesField = document.getElementById('tourNotIncludes');
+        const tourClientNotesField = document.getElementById('tourClientNotes');
+
+        // Fill price fields - for tours, set to 0 initially (vehicle cost will be added when vehicle is selected)
+        if (servicePriceField) {
+          servicePriceField.value = 0; // Tours should show 0 until a vehicle is selected
+        }
+
+        // Fill adult, child, and no-alcohol prices - use TOUR-specific fields
+        const tourAdultPriceField = document.getElementById('tourAdultPrice');
+        const tourChildPriceField = document.getElementById('tourChildPrice');
+        const tourNoAlcoholPriceField = document.getElementById('tourNoAlcoholPrice');
+
+        // Get quantity fields as well
+        const tourAdultsQuantityField = document.getElementById('tourAdultsQuantity');
+        const tourChildrenQuantityField = document.getElementById('tourChildrenQuantity');
+        const tourAdultsNoAlcoholQuantityField = document.getElementById('tourAdultsNoAlcoholQuantity');
+
+        // Adult Price Field and Quantity
+        if (tourAdultPriceField) {
+          const adultPriceValue = selectedTour.price || price || 0;
+          const adultPriceContainer = tourAdultPriceField.closest('.col-md-4');
+          const adultQuantityContainer = tourAdultsQuantityField?.closest('.col-md-4');
+
+          if (adultPriceValue && adultPriceValue > 0) {
+            tourAdultPriceField.value = adultPriceValue;
+            if (adultPriceContainer) adultPriceContainer.style.display = 'block';
+            if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
+          } else {
+            tourAdultPriceField.value = '';
+            if (adultPriceContainer) adultPriceContainer.style.display = 'none';
+            if (adultQuantityContainer) adultQuantityContainer.style.display = 'none';
+            if (tourAdultsQuantityField) tourAdultsQuantityField.value = 0;
+          }
+        }
+
+        // Child Price Field and Quantity
+        if (tourChildPriceField) {
+          const childPriceValue = selectedTour.price_child || 0;
+          const childPriceContainer = tourChildPriceField.closest('.col-md-4');
+          const childQuantityContainer = tourChildrenQuantityField?.closest('.col-md-4');
+
+          if (childPriceValue && childPriceValue > 0) {
+            tourChildPriceField.value = childPriceValue;
+            if (childPriceContainer) childPriceContainer.style.display = 'block';
+            if (childQuantityContainer) childQuantityContainer.style.display = 'block';
+          } else {
+            tourChildPriceField.value = '';
+            if (childPriceContainer) childPriceContainer.style.display = 'none';
+            if (childQuantityContainer) childQuantityContainer.style.display = 'none';
+            if (tourChildrenQuantityField) tourChildrenQuantityField.value = 0;
+          }
+        }
+
+        // No Alcohol Price Field and Quantity
+        if (tourNoAlcoholPriceField) {
+          const noAlcoholPriceValue = selectedTour.price_no_alcohol || 0;
+          const noAlcoholPriceContainer = tourNoAlcoholPriceField.closest('.col-md-4');
+          const noAlcoholQuantityContainer = tourAdultsNoAlcoholQuantityField?.closest('.col-md-4');
+
+          if (noAlcoholPriceValue && noAlcoholPriceValue > 0) {
+            tourNoAlcoholPriceField.value = noAlcoholPriceValue;
+            if (noAlcoholPriceContainer) noAlcoholPriceContainer.style.display = 'block';
+            if (noAlcoholQuantityContainer) noAlcoholQuantityContainer.style.display = 'block';
+          } else {
+            tourNoAlcoholPriceField.value = '';
+            if (noAlcoholPriceContainer) noAlcoholPriceContainer.style.display = 'none';
+            if (noAlcoholQuantityContainer) noAlcoholQuantityContainer.style.display = 'none';
+            if (tourAdultsNoAlcoholQuantityField) tourAdultsNoAlcoholQuantityField.value = 0;
+          }
+        }
+
+        // Fill passenger quantity fields with default values (only for new services)
+        if (!this.currentServiceId) {
+          // Only set default for adults if the field is visible
+          if (tourAdultsQuantityField && tourAdultsQuantityField.closest('.col-md-4').style.display !== 'none') {
+            tourAdultsQuantityField.value = 0; // Default 0 adults
+          }
+          // Children and no alcohol fields are already set to 0 when hidden
+        } else {
+          // When editing existing service, override with saved price values if they exist
+          const existingService = this.services.get(this.currentServiceId);
+          if (existingService) {
+            // Override adult price with saved value
+            if (tourAdultPriceField && existingService.adultPrice !== undefined) {
+              const savedAdultPrice = existingService.adultPrice;
+              const adultPriceContainer = tourAdultPriceField.closest('.col-md-4');
+              const adultQuantityContainer = tourAdultsQuantityField?.closest('.col-md-4');
+
+              if (savedAdultPrice && savedAdultPrice > 0) {
+                tourAdultPriceField.value = savedAdultPrice;
+                if (adultPriceContainer) adultPriceContainer.style.display = 'block';
+                if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
+              } else {
+                tourAdultPriceField.value = '';
+                if (adultPriceContainer) adultPriceContainer.style.display = 'none';
+                if (adultQuantityContainer) adultQuantityContainer.style.display = 'none';
+              }
+            }
+
+            // Override child price with saved value
+            if (tourChildPriceField && existingService.childPrice !== undefined) {
+              const savedChildPrice = existingService.childPrice;
+              const childPriceContainer = tourChildPriceField.closest('.col-md-4');
+              const childQuantityContainer = tourChildrenQuantityField?.closest('.col-md-4');
+
+              if (savedChildPrice && savedChildPrice > 0) {
+                tourChildPriceField.value = savedChildPrice;
+                if (childPriceContainer) childPriceContainer.style.display = 'block';
+                if (childQuantityContainer) childQuantityContainer.style.display = 'block';
+              } else {
+                tourChildPriceField.value = '';
+                if (childPriceContainer) childPriceContainer.style.display = 'none';
+                if (childQuantityContainer) childQuantityContainer.style.display = 'none';
+              }
+            }
+
+            // Override no alcohol price with saved value
+            if (tourNoAlcoholPriceField && existingService.noAlcoholPrice !== undefined) {
+              const savedNoAlcoholPrice = existingService.noAlcoholPrice;
+              const noAlcoholPriceContainer = tourNoAlcoholPriceField.closest('.col-md-4');
+              const noAlcoholQuantityContainer = tourAdultsNoAlcoholQuantityField?.closest('.col-md-4');
+
+              if (savedNoAlcoholPrice && savedNoAlcoholPrice > 0) {
+                tourNoAlcoholPriceField.value = savedNoAlcoholPrice;
+                if (noAlcoholPriceContainer) noAlcoholPriceContainer.style.display = 'block';
+                if (noAlcoholQuantityContainer) noAlcoholQuantityContainer.style.display = 'block';
+              } else {
+                tourNoAlcoholPriceField.value = '';
+                if (noAlcoholPriceContainer) noAlcoholPriceContainer.style.display = 'none';
+                if (noAlcoholQuantityContainer) noAlcoholQuantityContainer.style.display = 'none';
+              }
+            }
+          }
+        }
+
+        // Fill main description from tour (editable field)
+        if (serviceDescriptionField && selectedTour.description) {
+          serviceDescriptionField.value = selectedTour.description;
+        }
+
+        // Fill tour-specific readonly fields
+        if (tourDescriptionField) {
+          tourDescriptionField.value = selectedTour.description || '';
+        }
+
+        if (tourAdvanceBookingTimeField) {
+          const bookingTime = selectedTour.advance_booking_time || '';
+          tourAdvanceBookingTimeField.value = bookingTime ? `${bookingTime} horas` : 'No especificado';
+        }
+
+        if (tourLanguagesField) {
+          const { languages } = selectedTour;
+          if (Array.isArray(languages)) {
+            tourLanguagesField.value = languages.join(', ');
+          } else {
+            tourLanguagesField.value = languages || 'No especificado';
+          }
+        }
+
+        if (tourIncludesField) {
+          tourIncludesField.value = selectedTour.includes || '';
+        }
+
+        if (tourNotIncludesField) {
+          tourNotIncludesField.value = selectedTour.notincludes || '';
+        }
+
+        if (tourClientNotesField) {
+          tourClientNotesField.value = selectedTour.client_booking_notes || '';
+        }
+
+        // Fill editable notes fields
+        if (internalNotesField && selectedTour.internal_notes) {
+          internalNotesField.value = selectedTour.internal_notes;
+        }
+
+        if (clientNotesField && selectedTour.client_booking_notes) {
+          clientNotesField.value = selectedTour.client_booking_notes;
+        }
+
+        if (providerNotesField && selectedTour.provider_notes) {
+          providerNotesField.value = selectedTour.provider_notes;
+        }
+
+        if (teamNotesField && selectedTour.team_notes) {
+          teamNotesField.value = selectedTour.team_notes;
+        }
+
+        // Show tour details
+        this.showTourDetails(selectedTour);
+
+        // Handle tour schedule/availability
+        this.handleTourSchedule(selectedTour);
+
+        // Update breakdown after all tour fields are populated
+        this.updateServicePriceBreakdown();
+      } else {
+        console.warn('Tour not found in cache:', tourId);
+        document.getElementById('servicePrice').value = 0;
+        this.clearTourDetails();
+        this.clearTourSchedule();
+      }
+    } catch (error) {
+      console.error('Error handling tour selection:', error);
+      document.getElementById('servicePrice').value = 0;
+      this.clearTourDetails();
+      this.clearTourSchedule();
+    }
+  }
+
+  showExperienceDetails(experience) {
+    // Show COMPREHENSIVE experience details including ALL pricing, languages, includes/excludes for review
+    const detailsContainer = document.getElementById('experienceDetails');
+    if (detailsContainer) {
+      const devIndicator = (window.location.hostname === 'localhost' || window.location.hostname.includes('dev'))
+        ? `<span class="badge bg-secondary ms-2">${experience.type === 'provider_experience' ? 'ProvExp' : 'Exp'}</span>`
+        : '';
+
+      // Iterate through ALL object properties to capture EVERYTHING
+      const allFields = [];
+
+      Object.keys(experience).forEach((key) => {
+        const value = experience[key];
+
+        // Show EVERYTHING including empty/null fields (except Parse internals)
+        if (!['__type', 'className'].includes(key)) {
+          // Format field name for display
+          const displayKey = key
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/^./, (str) => str.toUpperCase())
+            .replace(/Id$/, ' ID')
+            .replace(/Url$/, ' URL')
+            .replace(/Api$/, ' API');
+
+          // Handle ALL value types including empty/null
+          let displayValue = value;
+          let fieldClass = '';
+
+          if (value === null) {
+            displayValue = '<span class="text-muted">🔴 NULL</span>';
+            fieldClass = 'text-muted';
+          } else if (value === undefined) {
+            displayValue = '<span class="text-muted">🟡 UNDEFINED</span>';
+            fieldClass = 'text-muted';
+          } else if (value === '') {
+            displayValue = '<span class="text-muted">⚪ EMPTY STRING</span>';
+            fieldClass = 'text-muted';
+          } else if (typeof value === 'object' && value !== null) {
+            if (value.objectId) {
+              // Parse Pointer object
+              displayValue = `🔗 ${value.objectId}`;
+              if (value.name) displayValue += ` (${value.name})`;
+              if (value.title) displayValue += ` (${value.title})`;
+              fieldClass = 'text-info';
+            } else if (value.iso) {
+              // Parse Date object
+              displayValue = `📅 ${new Date(value.iso).toLocaleString()}`;
+              fieldClass = 'text-primary';
+            } else if (Array.isArray(value)) {
+              if (value.length === 0) {
+                displayValue = '<span class="text-muted">📝 EMPTY ARRAY []</span>';
+                fieldClass = 'text-muted';
+              } else {
+                // Handle array of objects properly
+                const arrayItems = value.map((item) => {
+                  if (typeof item === 'object' && item !== null) {
+                    if (item.objectId) {
+                      // Parse Pointer in array
+                      return `${item.objectId}${item.name ? ` (${item.name})` : ''}`;
+                    }
+                    // Generic object in array - show key properties
+                    const keys = Object.keys(item);
+                    if (keys.length <= 3) {
+                      return JSON.stringify(item);
+                    }
+                    // Show first few properties for readability
+                    const preview = {};
+                    keys.slice(0, 3).forEach((k) => preview[k] = item[k]);
+                    return `${JSON.stringify(preview)}...`;
+                  }
+                  return String(item);
+                });
+                displayValue = `📋 [${arrayItems.join(', ')}]`;
+                fieldClass = 'text-success';
+              }
+            } else {
+              // Generic object - show as formatted JSON for complete visibility
+              displayValue = `<pre class="mb-0" style="font-size: 0.8em; max-height: 100px; overflow-y: auto; background-color: #f1f3f4;">${JSON.stringify(value, null, 2)}</pre>`;
+            }
+          } else if (typeof value === 'boolean') {
+            displayValue = value ? '✅ TRUE' : '❌ FALSE';
+            fieldClass = value ? 'text-success' : 'text-danger';
+          } else if (typeof value === 'number') {
+            // Format ALL potential price/currency fields
+            if (key.toLowerCase().includes('price')
+              || key.toLowerCase().includes('cost')
+              || key.toLowerCase().includes('rate')
+              || key.toLowerCase().includes('tarifa')
+              || key.toLowerCase().includes('precio')
+              || key.toLowerCase().includes('fee')
+              || key.toLowerCase().includes('commission')) {
+              displayValue = `💰 $${value.toLocaleString()}`;
+              fieldClass = 'text-success fw-bold';
+            } else {
+              displayValue = `🔢 ${value.toLocaleString()}`;
+              fieldClass = 'text-info';
+            }
+          } else if (typeof value === 'string') {
+            if (value.trim() === '') {
+              displayValue = '<span class="text-muted">⚪ EMPTY STRING (whitespace only)</span>';
+              fieldClass = 'text-muted';
+            } else if (value.length > 150) {
+              // Handle long text fields with expansion capability
+              displayValue = `📄 <span class="expandable-text">${value.substring(0, 150)}... <button class="btn btn-sm btn-link p-0" onclick="this.previousElementSibling.textContent='${value.replace(/'/g, "\\'")}'; this.remove();">show more</button></span>`;
+            } else {
+              displayValue = `📝 ${value}`;
+            }
+          }
+
+          allFields.push({
+            key,
+            display: `<div class="${fieldClass}"><strong>${displayKey}:</strong> ${displayValue}</div>`,
+            priority: this.getFieldPriority(key),
+            isEmpty: value === null || value === undefined || value === '',
+          });
+        }
+      });
+
+      // Sort fields by priority for better organization
+      allFields.sort((a, b) => a.priority - b.priority);
+
+      if (allFields.length === 0) {
+        allFields.push({ display: '<small class="text-muted">No details available</small>', priority: 999 });
+      }
+
+      // Count field types for comprehensive analysis
+      const fieldStats = {
+        total: allFields.length,
+        withData: allFields.filter((f) => !f.isEmpty).length,
+        empty: allFields.filter((f) => f.isEmpty).length,
+        pricing: allFields.filter((f) => f.key.toLowerCase().includes('price') || f.key.toLowerCase().includes('precio') || f.key.toLowerCase().includes('cost')).length,
+      };
+
+      detailsContainer.innerHTML = `
+                <div class="alert alert-warning border-warning">
+                    <h6><i class="ti ti-database"></i> ${experience.title || experience.name || 'Experience'} ${devIndicator}</h6>
+                    <div class="text-warning-emphasis mb-2">
+                        <small><strong>Experience Details</strong> (${fieldStats.total} fields)</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-12" style="max-height: 500px; overflow-y: auto; border: 2px solid #ffc107; border-radius: 0.375rem; padding: 0.75rem; background-color: #fffbf0;">
+                            ${allFields.map((field) => `<div class="mb-1"><small>${field.display}</small></div>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+    }
+  }
+
+  getFieldPriority(key) {
+    // Priority order for field display
+    const priorityMap = {
+      // Core identification
+      title: 1,
+      name: 2,
+      id: 3,
+      objectId: 4,
+      type: 5,
+
+      // Pricing fields (high priority) - using CORRECT database field names
+      price: 10,
+      precio: 11,
+      cost: 12,
+      rate: 13,
+      tarifa: 14,
+      fee: 15,
+      basePrice: 16,
+      unitPrice: 17,
+      totalPrice: 18,
+      commission: 19,
+      price_child: 7,
+      price_no_alcohol: 8,
+      adultPrice: 9,
+      seniorPrice: 9,
+      precioAdulto: 9,
+      precioSenior: 9,
+
+      // Core info
+      description: 20,
+      duration: 21,
+      location: 22,
+      category: 23,
+
+      // Languages and communication
+      languages: 30,
+      idiomas: 31,
+      language: 32,
+
+      // Includes/Excludes - using CORRECT database field names
+      includes: 35,
+      notincludes: 40,
+      incluye: 36,
+      include: 37,
+      incluido: 38,
+      excludes: 41,
+      excluye: 42,
+      exclude: 43,
+      noIncluye: 44,
+      noincluye: 45,
+      excluido: 46,
+
+      // Capacity and participants
+      capacity: 50,
+      minParticipants: 51,
+      maxParticipants: 52,
+      minPeople: 53,
+      maxPeople: 54,
+      participants: 55,
+
+      // Operational details - adding database field names
+      meetingPoint: 60,
+      schedule: 61,
+      difficulty: 62,
+      requirements: 63,
+      ageRestrictions: 64,
+      cancellationPolicy: 65,
+      travel_duration: 25,
+      advance_booking_time: 26,
+
+      // Notes fields
+      client_booking_notes: 27,
+      provider_notes: 28,
+      team_notes: 29,
+      internal_notes: 29,
+
+      // Status fields
+      active: 70,
+      featured: 71,
+      seasonal: 72,
+      available: 73,
+
+      // Provider info
+      provider: 80,
+      proveedor: 81,
+
+      // Dates
+      createdAt: 90,
+      updatedAt: 91,
+      availableFrom: 92,
+      availableTo: 93,
+
+      // Ratings and reviews
+      rating: 100,
+      reviews: 101,
+      reviewCount: 102,
+    };
+
+    const lowerKey = key.toLowerCase();
+    for (const [fieldName, priority] of Object.entries(priorityMap)) {
+      if (lowerKey.includes(fieldName.toLowerCase())) {
+        return priority;
+      }
+    }
+
+    return 999; // Default priority for unlisted fields
+  }
+
+  showTourDetails(tour) {
+    // Only show the info card in development mode
+    const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname.includes('dev');
+
+    const detailsContainer = document.getElementById('tourDetails');
+    if (detailsContainer) {
+      if (isDevelopment) {
+        // Show detailed info card only in development
+        const tourName = tour.destinationPOI?.name || 'Tour sin nombre';
+        const tourDescription = tour.description || '';
+        const duration = tour.time ? `${tour.time} minutos` : (tour.travel_duration || '');
+        const minPeople = tour.min_people || 'N/A';
+        const maxPeople = tour.max_people || 'N/A';
+        const includes = tour.includes || '';
+        const notIncludes = tour.notincludes || '';
+        const languages = tour.languages ? (Array.isArray(tour.languages) ? tour.languages.join(', ') : tour.languages) : '';
+
+        detailsContainer.innerHTML = `
+                    <div class="alert alert-info">
+                        <small class="badge bg-warning text-dark mb-2">Development Only</small>
+                        <h6><i class="ti ti-map-pin"></i> ${tourName}</h6>
+                        ${tourDescription ? `<p class="mb-2">${tourDescription}</p>` : ''}
+                        <div class="row">
+                            ${duration ? `
+                            <div class="col-md-6">
+                                <small class="text-muted d-block"><i class="ti ti-clock"></i> Duración: ${duration}</small>
+                            </div>
+                            ` : ''}
+                            <div class="col-md-6">
+                                <small class="text-muted d-block"><i class="ti ti-users"></i> Personas: ${minPeople} - ${maxPeople}</small>
+                            </div>
+                        </div>
+                        ${includes ? `
+                        <div class="mt-2">
+                            <small class="text-muted d-block"><strong>Incluye:</strong> ${includes}</small>
+                        </div>
+                        ` : ''}
+                        ${notIncludes ? `
+                        <div class="mt-1">
+                            <small class="text-muted d-block"><strong>No incluye:</strong> ${notIncludes}</small>
+                        </div>
+                        ` : ''}
+                        ${languages ? `
+                        <div class="mt-1">
+                            <small class="text-muted d-block"><i class="ti ti-language"></i> Idiomas: ${languages}</small>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+      } else {
+        // In production, clear the container
+        detailsContainer.innerHTML = '';
+      }
+    }
+  }
+
+  clearExperienceDetails() {
+    const detailsContainer = document.getElementById('experienceDetails');
+    if (detailsContainer) {
+      detailsContainer.innerHTML = '';
+    }
+  }
+
+  handleTourSchedule(tour) {
+    // Get the current day context using existing method
+    const dayContext = this.getCurrentDayContext();
+
+    // Deep inspection for Atotonilco tour
+    if (tour.destinationPOI?.name === 'Atotonilco') {
+    }
+
+    const singleTimeField = document.getElementById('tourSingleTime');
+    const multipleTimeField = document.getElementById('tourMultipleTime');
+    const availabilityStatusDiv = document.getElementById('tourAvailabilityStatus');
+    const availabilityMessageSpan = document.getElementById('tourAvailabilityMessage');
+
+    // Hide all schedule elements initially (use setProperty to override !important)
+    if (singleTimeField) singleTimeField.style.setProperty('display', 'none', 'important');
+    if (multipleTimeField) multipleTimeField.style.display = 'none';
+    if (availabilityStatusDiv) availabilityStatusDiv.style.display = 'none';
+
+    const currentDayOfWeek = dayContext?.dayOfWeek;
+
+    // Always show the availability status div since we always have something to display
+    let scheduleDisplayed = false;
+
+    // Check if tour has specific times
+    if (tour.startTime && tour.endTime) {
+      // Single fixed time
+      const startTime = this.formatTime(tour.startTime);
+      const endTime = this.formatTime(tour.endTime);
+      const timeRange = `${startTime} - ${endTime}`;
+
+      if (singleTimeField) {
+        singleTimeField.value = timeRange;
+        // Remove !important by setting via setAttribute
+        singleTimeField.style.setProperty('display', 'block', 'important');
+
+        scheduleDisplayed = true;
+      }
+    } else if (tour.availability && typeof tour.availability === 'object') {
+      // Handle availability array - extract schedules for current day
+
+      if (Array.isArray(tour.availability) && currentDayOfWeek !== null) {
+        const timeOptions = this.extractTimeOptionsForDay(tour.availability, currentDayOfWeek);
+
+        if (timeOptions.length > 0 && multipleTimeField) {
+          // Clear existing options
+          multipleTimeField.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+
+          // Add time options
+          timeOptions.forEach((timeOption, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = timeOption.label;
+            option.dataset.timeData = JSON.stringify(timeOption.data);
+            multipleTimeField.appendChild(option);
+          });
+
+          multipleTimeField.style.display = 'block';
+
+          scheduleDisplayed = true;
+        } else {
+          // No specific times found, show generic availability message
+          if (availabilityStatusDiv && availabilityMessageSpan) {
+            availabilityMessageSpan.textContent = 'Horario según disponibilidad';
+            availabilityStatusDiv.style.display = 'block';
+            scheduleDisplayed = true;
+          }
+        }
+      } else if (tour.availability.times && Array.isArray(tour.availability.times)) {
+        // Availability object with times array
+        if (multipleTimeField) {
+          multipleTimeField.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+          tour.availability.times.forEach((time, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = time;
+            multipleTimeField.appendChild(option);
+          });
+          multipleTimeField.style.display = 'block';
+
+          scheduleDisplayed = true;
+        }
+      } else {
+        // Show availability status message
+        if (availabilityStatusDiv && availabilityMessageSpan) {
+          availabilityMessageSpan.textContent = 'Horario según disponibilidad';
+          availabilityStatusDiv.style.display = 'block';
+          scheduleDisplayed = true;
+        }
+      }
+    } else if (tour.time) {
+      // If tour has duration but no specific schedule, just show availability message
+      if (availabilityStatusDiv && availabilityMessageSpan) {
+        availabilityMessageSpan.textContent = 'Horario según disponibilidad';
+        availabilityStatusDiv.style.display = 'block';
+        scheduleDisplayed = true;
+      }
+    }
+
+    // Always show at least a default message if nothing else was shown
+    if (!scheduleDisplayed) {
+      // Default availability message
+      if (availabilityStatusDiv && availabilityMessageSpan) {
+        availabilityMessageSpan.textContent = 'Horario flexible - coordinar con el proveedor';
+        availabilityStatusDiv.style.display = 'block';
+      }
+    }
+  }
+
+  clearTourSchedule() {
+    // Clear tour-specific schedule fields
+    const tourSingleTime = document.getElementById('tourSingleTime');
+    const tourMultipleTime = document.getElementById('tourMultipleTime');
+    const tourAvailabilityStatus = document.getElementById('tourAvailabilityStatus');
+
+    if (tourSingleTime) {
+      tourSingleTime.value = '';
+      tourSingleTime.style.setProperty('display', 'none', 'important');
+    }
+
+    if (tourMultipleTime) {
+      tourMultipleTime.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+      tourMultipleTime.style.display = 'none';
+    }
+
+    if (tourAvailabilityStatus) {
+      tourAvailabilityStatus.style.display = 'none';
+    }
+
+    // Also clear shared schedule fields if they exist
+    const scheduleSelect = document.getElementById('scheduleSelect');
+    if (scheduleSelect) {
+      scheduleSelect.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+      scheduleSelect.disabled = true;
+    }
+
+    // Clear time input fields
+    const startTimeInput = document.getElementById('startTime');
+    const endTimeInput = document.getElementById('endTime');
+
+    if (startTimeInput) {
+      startTimeInput.value = '';
+      startTimeInput.disabled = false;
+    }
+
+    if (endTimeInput) {
+      endTimeInput.value = '';
+      endTimeInput.disabled = false;
+    }
+  }
+
+  clearExperienceSchedule() {
+    // Clear experience-specific schedule fields
+    const experienceSingleTime = document.getElementById('experienceSingleTime');
+    const experienceMultipleTime = document.getElementById('experienceMultipleTime');
+    const experienceAvailabilityStatus = document.getElementById('experienceAvailabilityStatus');
+
+    if (experienceSingleTime) {
+      experienceSingleTime.value = '';
+      experienceSingleTime.style.display = 'none';
+    }
+
+    if (experienceMultipleTime) {
+      experienceMultipleTime.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+      experienceMultipleTime.style.display = 'none';
+    }
+
+    if (experienceAvailabilityStatus) {
+      experienceAvailabilityStatus.style.display = 'none';
+    }
+
+    // Clear shared schedule/time fields
+    const scheduleSelect = document.getElementById('scheduleSelect');
+    if (scheduleSelect) {
+      scheduleSelect.innerHTML = '<option value="">-- Selecciona un horario --</option>';
+      scheduleSelect.disabled = true;
+    }
+
+    const startTime = document.getElementById('startTime');
+    const endTime = document.getElementById('endTime');
+
+    if (startTime) {
+      startTime.value = '';
+      startTime.disabled = false;
+    }
+
+    if (endTime) {
+      endTime.value = '';
+      endTime.disabled = false;
+    }
+  }
+
+  clearTourDetails() {
+    const detailsContainer = document.getElementById('tourDetails');
+    if (detailsContainer) {
+      detailsContainer.innerHTML = '';
+    }
+
+    // Clear tour-specific readonly fields
+    const tourFieldIds = [
+      'tourDescription',
+      'tourAdvanceBookingTime',
+      'tourLanguages',
+      'tourIncludes',
+      'tourNotIncludes',
+      'tourClientNotes',
+    ];
+
+    tourFieldIds.forEach((fieldId) => {
+      const field = document.getElementById(fieldId);
+      if (field) {
+        field.value = '';
+      }
+    });
+  }
+
+  getPriceForService(serviceId, rateId) {
+    // Check if client-specific price exists first
+    if (this.clientPricesCache.has(serviceId)) {
+      const clientPrices = this.clientPricesCache.get(serviceId);
+      const clientPrice = clientPrices.find((price) => price.rate.id === rateId);
+      if (clientPrice) {
+        return clientPrice.finalPrice;
+      }
+    }
+
+    // Fallback to base RatePrice
+    // This would need to be implemented based on your RatePrices structure
+
+    return 0; // TODO: Implement base rate price lookup
+  }
+
+  getPriceForTour(tourId, rateId) {
+    // Check if client-specific tour price exists first
+    if (this.clientTourPricesCache.has(tourId)) {
+      const clientTourPrices = this.clientTourPricesCache.get(tourId);
+      const clientPrice = clientTourPrices.find((price) => price.rate.id === rateId);
+      if (clientPrice) {
+        return clientPrice.finalPrice;
+      }
+    }
+
+    // Fallback to base TourPrice
+    // This would need to be implemented based on your TourPrices structure
+
+    return 0; // TODO: Implement base tour price lookup
+  }
+
+  async loadDayExperiences(dayId) {
+    const experienceSelect = document.getElementById('experienceSelect');
+    if (!experienceSelect) {
+      return;
+    }
+
+    // Clear existing options except the first placeholder
+    experienceSelect.innerHTML = '<option value="">-- Selecciona una experiencia --</option>';
+
+    try {
+      // Get the day information to check availability
+      const dayInfo = this.days.find((d) => d.id === dayId);
+      let dayOfWeek = null;
+      let dayDate = null;
+
+      if (dayInfo && dayInfo.date) {
+        dayDate = new Date(dayInfo.date);
+        dayOfWeek = dayDate.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      } else {
+
+      }
+
+      const allExperiences = [];
+
+      // Add experiences from Experience table (only type === "Experience", not "Provider")
+      if (this.experiencesCache.has('all')) {
+        const experiences = this.experiencesCache.get('all');
+
+        if (Array.isArray(experiences)) {
+          experiences.forEach((exp, index) => {
+            // Try different property names that might exist
+            const id = exp.id || exp.objectId || exp._id;
+            const title = exp.title || exp.name || exp.experienceName;
+
+            // Only include experiences (exclude providers)
+            const isExperience = exp.type === 'Experience';
+
             // Check availability for the selected day
             const isAvailableOnDay = this.isExperienceAvailableOnDay(exp, dayOfWeek, dayDate);
 
@@ -8420,6 +9251,11 @@ class ItineraryBuilder {
           return;
         }
       }
+    } catch (e) {
+      console.error('Error parsing success response:', e);
+      // If parsing fails but status is ok, consider it successful
+      result = { success: true };
+    }
 
       // Format percentage display (e.g., "Standard (15%)")
       const percentage = rate.formattedPercentage || (rate.percentage ? `${rate.percentage}%` : '');
@@ -9322,7 +10158,6 @@ class ItineraryBuilder {
       this.saveToBackend();
     } else {
     }
-  }
 
   showDropIndicator(targetElement, event) {
     // Skip if this is a drop indicator itself
