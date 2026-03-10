@@ -311,7 +311,8 @@ class CancellationRequest extends BaseModel {
     }
 
     // RequestedBy is required
-    if (!attrs.requestedBy && !this.get('requestedBy')) {
+    const requestedBy = attrs.requestedBy || this.get('requestedBy');
+    if (!requestedBy) {
       return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'RequestedBy user is required');
     }
 

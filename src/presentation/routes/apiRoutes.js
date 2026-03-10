@@ -465,6 +465,7 @@ router.use('/driver-tour-rate', driverTourRateRoutes); // Driver tour rate manag
 router.use('/guide-transport-rate', guideTransportRateRoutes); // Guide transport rate management endpoints
 router.use('/vehicle-rate-prices', vehicleRatePricesRoutes); // Vehicle rate prices management endpoints
 router.use('/disposable-prices', disposablePricesRoutes); // Disposable prices (A Disposición) management endpoints
+router.use('/reservations', require('./api/reservationRoutes')); // Reservation management endpoints
 
 /**
  * Email Test Endpoint - SuperAdmin Only

@@ -14,6 +14,9 @@ const sharp = require('sharp');
 const FileStorageService = require('./FileStorageService');
 const logger = require('../../infrastructure/logger');
 
+/**
+ * ServerImageOptimizationService - Server-side image optimization using sharp.
+ */
 class ServerImageOptimizationService extends FileStorageService {
   constructor(config = {}) {
     super(config);

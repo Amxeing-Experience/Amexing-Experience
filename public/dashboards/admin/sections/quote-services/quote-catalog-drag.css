@@ -1,0 +1,219 @@
+/**
+ * Quote Services Catalog - Drag and Drop Styles
+ * Created by Denisse Maldonado
+ */
+
+/* Offcanvas Customization */
+#catalogOffcanvas {
+    width: 300px;
+    z-index: 1040;
+    border-right: 1px solid #dee2e6;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08);
+}
+
+#catalogOffcanvas .offcanvas-header {
+    background: #f8f9fa;
+}
+
+#catalogOffcanvas .offcanvas-body {
+    background: #fff;
+}
+
+/* Tab Styling */
+#catalogTabs .nav-link {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.6rem;
+    color: #6c757d;
+}
+
+#catalogTabs .nav-link.active {
+    font-weight: 600;
+}
+
+#catalogTabs .badge {
+    font-size: 0.65rem;
+    padding: 0.15em 0.4em;
+}
+
+/* Drag Items */
+.catalog-drag-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    cursor: grab;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.catalog-drag-item:hover {
+    background: #f0f6ff;
+    border-color: #86b7fe;
+    transform: translateX(2px);
+}
+
+.catalog-drag-item:active {
+    cursor: grabbing;
+}
+
+.catalog-drag-item.dragging {
+    opacity: 0.4;
+}
+
+.catalog-drag-item .catalog-drag-handle {
+    color: #adb5bd;
+    margin-right: 8px;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.catalog-drag-item .catalog-drag-icon {
+    margin-right: 6px;
+    font-size: 0.9rem;
+    color: #6c757d;
+    flex-shrink: 0;
+}
+
+.catalog-drag-item .catalog-drag-name {
+    flex: 1;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.catalog-drag-item .catalog-drag-badge {
+    font-size: 0.65rem;
+    margin-left: 6px;
+    flex-shrink: 0;
+}
+
+/* Transport sub-headers */
+.catalog-transport-group-header {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+    padding: 8px 4px 4px;
+    margin-top: 8px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.catalog-transport-group-header:first-child {
+    margin-top: 0;
+}
+
+/* Transport route item layout */
+.catalog-transport-info {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.3;
+}
+
+.catalog-transport-route {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.catalog-transport-origin {
+    font-size: 0.8rem;
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.catalog-transport-destination {
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.catalog-drag-item-tall {
+    align-items: flex-start;
+    padding: 6px 12px;
+}
+
+.catalog-drag-item-tall .catalog-drag-handle {
+    margin-top: 4px;
+}
+
+/* Drop Target Feedback on Day Cards */
+.day-card.catalog-drag-over > .card {
+    border: 2px dashed #0d6efd !important;
+    background: rgba(13, 110, 253, 0.03);
+    transition: all 0.2s ease;
+}
+
+.day-card.catalog-drop-available > .card {
+    border: 1px dashed #86b7fe !important;
+    transition: all 0.2s ease;
+}
+
+/* Drop label overlay */
+.catalog-drop-label {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0d6efd;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    z-index: 5;
+    pointer-events: none;
+    animation: catalogDropLabelFade 0.2s ease;
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);
+}
+
+@keyframes catalogDropLabelFade {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Catalog toggle button active state */
+#toggleCatalogBtn.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+/* Empty state in catalog tabs */
+.catalog-empty-state {
+    text-align: center;
+    color: #adb5bd;
+    padding: 2rem 1rem;
+    font-size: 0.85rem;
+}
+
+/* Ensure day cards have relative positioning for drop label */
+.day-card {
+    position: relative;
+}
+
+/* During active catalog drag, add subtle available indicators */
+body.catalog-dragging .day-card > .card {
+    border: 1px dashed #86b7fe !important;
+}
+
+body.catalog-dragging .day-card.catalog-drag-over > .card {
+    border: 2px dashed #0d6efd !important;
+    background: rgba(13, 110, 253, 0.03);
+}

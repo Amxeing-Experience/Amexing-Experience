@@ -2658,6 +2658,13 @@ class ToursController {
     }
   }
 
+  /**
+   * Send a standardized error response.
+   * @param {object} res - Express response object.
+   * @param {string} message - Error message.
+   * @param {number} statusCode - HTTP status code.
+   * @example
+   */
   sendError(res, message, statusCode = 500) {
     return res.status(statusCode).json({
       success: false,

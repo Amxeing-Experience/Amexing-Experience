@@ -153,30 +153,7 @@
                 </div>
             </div>
 
-            <!-- Sección: Estado de la Cotización (solo visible en modo edición) -->
-            <% if (typeof quoteId !== 'undefined' && quoteId !== '' && quoteId !== 'new') { %>
-            <div class="mb-4">
-                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                    <i class="ti ti-flag me-1"></i>
-                    Estado de la Cotización
-                </h6>
-
-                <div class="mb-3">
-                    <label for="status" class="form-label">Estado</label>
-                    <select class="form-select" id="status" name="status">
-                        <option value="requested">Solicitado</option>
-                        <option value="hold">Bloqueado</option>
-                        <% 
-                        // Show different text based on user role
-                        const scheduledText = (typeof userRole !== 'undefined' && userRole === 'admin') ? 'Aprobado' : 'Agendado';
-                        %>
-                        <option value="scheduled"><%= scheduledText %></option>
-                        <option value="rejected">Rechazado</option>
-                    </select>
-                    <div class="form-text">El estado actual de la cotización</div>
-                </div>
-            </div>
-            <% } %>
+            <!-- Status is now managed via the global dropdown in the page header -->
 
             <!-- Alert informativo -->
             <div class="alert alert-success d-flex align-items-start" role="alert">
@@ -622,12 +599,6 @@
                     document.getElementById('notes').value = quote.notes;
                 }
 
-                // Populate status if exists
-                const statusSelect = document.getElementById('status');
-                if (statusSelect && quote.status) {
-                    statusSelect.value = quote.status;
-                }
-
                 // Change button text to "Actualizar"
                 const submitBtn = document.getElementById('createQuoteBtn');
                 submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Actualizar Cotización';
@@ -680,10 +651,10 @@
             notes: document.getElementById('notes').value.trim() || undefined
         };
 
-        // Include status if exists
-        const statusSelect = document.getElementById('status');
-        if (statusSelect) {
-            formData.status = statusSelect.value;
+        // Include status from global header segmented control if exists
+        const checkedStatus = document.querySelector('input[name="quoteStatus"]:checked');
+        if (checkedStatus) {
+            formData.status = checkedStatus.value;
         }
 
         // Disable submit button
