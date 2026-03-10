@@ -2349,6 +2349,68 @@ class QuoteController {
   }
 
   /**
+   * Send quote confirmation email with PDF attachment.
+   * POST /api/quotes/:id/send-email.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async sendQuoteEmail(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      const quoteId = req.params.id;
+
+      // Fetch quote with includes
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      query.include('client');
+      const quote = await query.get(quoteId, { useMasterKey: true });
+
+      if (!quote) {
+        return this.sendError(res, 'Cotización no encontrada', 404);
+      }
+
+      // Determine recipient email
+      const recipientEmail = quote.get('contactEmail')
+        || currentUser.get('email');
+      if (!recipientEmail) {
+        return this.sendError(res, 'No se encontró un email de destinatario', 400);
+      }
+
+      // Send email using QuoteService helper
+      await this.quoteService.sendScheduledConfirmationEmail(quote, currentUser, null);
+
+      // Mask email for response
+      const emailService = require('../../services/EmailService');
+      const maskedEmail = emailService.maskEmail(recipientEmail);
+
+      return res.json({
+        success: true,
+        message: `Correo enviado a ${maskedEmail}`,
+        data: { recipientEmail: maskedEmail },
+      });
+    } catch (error) {
+      logger.error('Error sending quote email', {
+        error: error.message,
+        stack: error.stack,
+        quoteId: req.params.id,
+      });
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}` : 'Error al enviar correo',
+        500
+      );
+    }
+  }
+
+  /**
    * Request invoice for reserved quote.
    * POST /api/quotes/:id/request-invoice.
    * @param {object} req - Express request object.

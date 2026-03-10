@@ -556,6 +556,9 @@
                 <button id="shareLinkBtn" class="btn btn-success" style="display: none;">
                     <i class="ti ti-share me-2"></i>Compartir
                 </button>
+                <button id="sendEmailBtn" class="btn btn-outline-primary" style="display: none;">
+                    <i class="ti ti-mail me-2"></i>Enviar por correo
+                </button>
                 <button id="exportPdfBtn" class="btn btn-primary" style="display: none;">
                     <i class="ti ti-download me-2"></i>Exportar a PDF
                 </button>
@@ -791,6 +794,13 @@
             const newShareBtn = shareBtn.cloneNode(true);
             shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
             newShareBtn.addEventListener('click', () => generateShareLink(quote.id));
+
+            // Show and attach send email button
+            const emailBtn = document.getElementById('sendEmailBtn');
+            emailBtn.style.display = 'inline-block';
+            const newEmailBtn = emailBtn.cloneNode(true);
+            emailBtn.parentNode.replaceChild(newEmailBtn, emailBtn);
+            newEmailBtn.addEventListener('click', () => sendQuoteEmail(quote));
 
             // Show cancel reservation button only for scheduled quotes
             const cancelBtn = document.getElementById('cancelReservationBtn');
@@ -1400,6 +1410,40 @@
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             });
+    }
+
+    // Send quote email function
+    async function sendQuoteEmail(quoteObj) {
+        const recipientEmail = quoteObj.contactEmail || 'el correo del usuario';
+        if (!confirm(`Se enviará la cotización por correo a: ${recipientEmail}\n¿Continuar?`)) return;
+
+        const btn = document.getElementById('sendEmailBtn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+        btn.disabled = true;
+
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const response = await fetch(`/api/quotes/${quoteObj.id}/send-email`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert(result.message || 'Correo enviado exitosamente');
+            } else {
+                alert(result.error || 'Error al enviar correo');
+            }
+        } catch (err) {
+            console.error('Send email error:', err);
+            alert('Error al enviar correo');
+        }
+
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
     }
 
     // Generate share link function

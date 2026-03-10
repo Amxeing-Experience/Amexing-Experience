@@ -240,6 +240,13 @@ class QuoteService {
       let reservationData = null;
       if (appliedUpdates.status === 'scheduled') {
         reservationData = await this.createReservationFromQuote(quote, currentUser);
+
+        // Send confirmation email with PDF (non-blocking)
+        this.sendScheduledConfirmationEmail(quote, currentUser, reservationData)
+          .catch((err) => logger.warn('Failed to send scheduled confirmation email', {
+            error: err.message,
+            quoteId: quote.id,
+          }));
       }
 
       // Audit logging
@@ -990,6 +997,102 @@ class QuoteService {
       // Don't throw — the quote status update already succeeded
       return null;
     }
+  }
+
+  /**
+   * Send confirmation email with PDF when quote is scheduled.
+   * @param {object} quote - Parse Quote object.
+   * @param {object} currentUser - Parse AmexingUser performing the action.
+   * @param {object} reservationData - Created reservation data (optional).
+   * @returns {Promise<void>}
+   * @example
+   */
+  async sendScheduledConfirmationEmail(quote, currentUser, reservationData) {
+    // eslint-disable-next-line global-require
+    const emailService = require('./EmailService');
+
+    if (!emailService.isAvailable()) {
+      logger.info('Email service not available, skipping confirmation email', {
+        quoteId: quote.id,
+      });
+      return;
+    }
+
+    const recipientEmail = quote.get('contactEmail')
+      || currentUser.get('email');
+    if (!recipientEmail) {
+      logger.warn('No recipient email for quote confirmation', { quoteId: quote.id });
+      return;
+    }
+
+    const recipientName = quote.get('contactPerson')
+      || currentUser.get('fullName')
+      || `${currentUser.get('firstName') || ''} ${currentUser.get('lastName') || ''}`.trim()
+      || currentUser.get('username');
+
+    // Generate PDF
+    let pdfBuffer = null;
+    let pdfFilename = null;
+    try {
+      const receiptResult = await this.generateReceipt(currentUser, quote.id, currentUser.get('role'));
+      if (receiptResult?.success && receiptResult.data?.pdfBuffer) {
+        ({ pdfBuffer } = receiptResult.data);
+        pdfFilename = receiptResult.data.filename;
+      }
+    } catch (pdfErr) {
+      logger.warn('Failed to generate PDF for email attachment', {
+        quoteId: quote.id,
+        error: pdfErr.message,
+      });
+    }
+
+    // Build share URL
+    const baseUrl = process.env.APP_BASE_URL
+      || process.env.EMAIL_BASE_URL
+      || `http://localhost:${process.env.PORT || 1337}`;
+    const shareUrl = `${baseUrl}/quotes/${quote.get('folio')}`;
+
+    // Format dates
+    const formatDate = (d) => {
+      if (!d) return null;
+      const dateObj = d instanceof Date ? d : new Date(d);
+      return dateObj.toLocaleDateString('es-MX', {
+        day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC',
+      });
+    };
+
+    const serviceItems = quote.get('serviceItems') || {};
+    const days = serviceItems.days || [];
+    let startDate = null;
+    let endDate = null;
+    for (const day of days) {
+      if (day.date) {
+        const d = new Date(`${day.date}T12:00:00`);
+        if (!startDate || d < new Date(`${startDate}T12:00:00`)) startDate = day.date;
+        if (!endDate || d > new Date(`${endDate}T12:00:00`)) endDate = day.date;
+      }
+    }
+
+    const result = await emailService.sendQuoteConfirmation({
+      recipientEmail,
+      recipientName,
+      folio: quote.get('folio'),
+      reservationFolio: reservationData?.folio || null,
+      eventType: quote.get('eventType') || '',
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate),
+      numberOfPeople: quote.get('numberOfPeople') || 1,
+      shareUrl,
+      pdfBuffer,
+      pdfFilename,
+    });
+
+    logger.info('Quote confirmation email sent', {
+      quoteId: quote.id,
+      folio: quote.get('folio'),
+      success: result?.success,
+      recipientEmail: emailService.maskEmail(recipientEmail),
+    });
   }
 }
 
