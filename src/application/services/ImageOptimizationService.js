@@ -17,6 +17,9 @@ const FileStorageService = require('./FileStorageService');
 const logger = require('../../infrastructure/logger');
 const { getEnvironmentRegion } = require('../../infrastructure/aws/awsRegionValidator');
 
+/**
+ * ImageOptimizationService - Handles image optimization and CDN delivery.
+ */
 class ImageOptimizationService extends FileStorageService {
   constructor(config = {}) {
     super(config);

@@ -470,6 +470,18 @@ router.post(
 );
 
 /**
+ * POST /api/quotes/:id/send-email - Send quote confirmation email with PDF.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ */
+router.post(
+  '/:id/send-email',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.sendQuoteEmail(req, res)
+);
+
+/**
  * POST /api/quotes/:id/request-invoice - Request invoice for scheduled quote.
  * Private access (Department Manager, Admin and SuperAdmin).
  *

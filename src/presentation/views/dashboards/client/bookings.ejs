@@ -1,7 +1,7 @@
 <%
 /**
  * Bookings Management Page
- * Admin dashboard page for managing reservations
+ * Client dashboard page for viewing reservations
  *
  * @author Denisse Maldonado
  * @version 1.0.0
@@ -15,10 +15,10 @@
             <div>
                 <h2 class="mb-1 fw-bold">
                     <i class="ti ti-clipboard-list me-2 text-primary"></i>
-                    Gestión de Reservaciones
+                    Mis Reservaciones
                 </h2>
                 <p class="text-muted mb-0">
-                    Administra y gestiona todas las reservaciones del sistema
+                    Consulta y gestiona tus reservaciones
                 </p>
             </div>
             <div>
@@ -57,7 +57,6 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>Folio</th>
-                                    <th>Cliente</th>
                                     <th>Tipo de Evento</th>
                                     <th class="text-center">Fecha Inicio</th>
                                     <th class="text-center">Personas</th>
@@ -146,10 +145,9 @@ document.addEventListener('DOMContentLoaded', function() {
             {
                 data: 'folio',
                 render: function(data, type, row) {
-                    return `<a href="/dashboard/admin/bookings/${row.id}" class="fw-semibold text-decoration-none">${data}</a>`;
+                    return `<a href="/dashboard/client/bookings/${row.id}" class="fw-semibold text-decoration-none">${data}</a>`;
                 }
             },
-            { data: 'clientName' },
             { data: 'eventType', defaultContent: '—' },
             {
                 data: 'startDate',
@@ -184,9 +182,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 className: 'text-center',
                 orderable: false,
                 render: function(data, type, row) {
-                    let actions = `<a href="/dashboard/admin/bookings/${row.id}" class="btn btn-sm btn-outline-primary me-1" title="Ver detalle"><i class="ti ti-eye"></i></a>`;
+                    let actions = `<a href="/dashboard/client/bookings/${row.id}" class="btn btn-sm btn-outline-primary me-1" title="Ver detalle"><i class="ti ti-eye"></i></a>`;
                     if (row.quoteFolio) {
-                        actions += `<a href="/dashboard/admin/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-invoice"></i></a>`;
+                        actions += `<a href="/dashboard/client/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-invoice"></i></a>`;
                     }
                     if (row.status !== 'cancelled' && row.status !== 'completed') {
                         actions += `<button class="btn btn-sm btn-outline-danger cancel-res-btn" data-id="${row.id}" title="Cancelar"><i class="ti ti-x"></i></button>`;
@@ -195,7 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         ],
-        order: [[8, 'desc']],
+        order: [[7, 'desc']],
         language: {
             processing: 'Cargando...',
             search: 'Buscar:',

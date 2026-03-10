@@ -356,6 +356,126 @@ class ClientController extends RoleBasedController {
   }
 
   /**
+   * Renders the client quotes list page.
+   * Shows quotes associated with the client's account.
+   * @function quotes
+   * @param {object} req - Express request object containing user session and authentication data.
+   * @param {object} res - Express response object for rendering the quotes view.
+   * @returns {Promise<void>} - Renders the client quotes view or handles errors.
+   * @example
+   * // GET /dashboard/client/quotes
+   * await clientController.quotes(req, res);
+   */
+  async quotes(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'quotes', {
+        title: 'Mis Cotizaciones',
+        breadcrumb: null,
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Renders the client quote detail page with sections (information, services, summary).
+   * @function quoteDetail
+   * @param {object} req - Express request object containing user session and authentication data.
+   * @param {object} res - Express response object for rendering the quote detail view.
+   * @returns {Promise<void>} - Renders the client quote detail view or handles errors.
+   * @example
+   * // GET /dashboard/client/quotes/:id
+   * // GET /dashboard/client/quotes/new
+   * await clientController.quoteDetail(req, res);
+   */
+  async quoteDetail(req, res) {
+    try {
+      const quoteId = req.params.id;
+      const section = req.query.section || 'information';
+
+      const isNewQuote = quoteId === 'new';
+
+      await this.renderRoleView(req, res, 'quote-detail', {
+        title: isNewQuote ? 'Nueva Cotización' : `Cotización ${quoteId}`,
+        breadcrumb: null,
+        quoteId,
+        isNewQuote,
+        currentSection: section,
+        pageStyles: ['https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css'],
+        footerScripts: `
+          <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Renders the client bookings/reservations list page.
+   * @function bookings
+   * @param {object} req - Express request object containing user session and authentication data.
+   * @param {object} res - Express response object for rendering the bookings view.
+   * @returns {Promise<void>} - Renders the client bookings view or handles errors.
+   * @example
+   * // GET /dashboard/client/bookings
+   * await clientController.bookings(req, res);
+   */
+  async bookings(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'bookings', {
+        title: 'Mis Reservaciones',
+        breadcrumb: null,
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Renders the client booking detail page.
+   * @function bookingDetail
+   * @param {object} req - Express request object containing user session and authentication data.
+   * @param {object} res - Express response object for rendering the booking detail view.
+   * @returns {Promise<void>} - Renders the client booking detail view or handles errors.
+   * @example
+   * // GET /dashboard/client/bookings/:id
+   * await clientController.bookingDetail(req, res);
+   */
+  async bookingDetail(req, res) {
+    try {
+      const reservationId = req.params.id;
+      await this.renderRoleView(req, res, 'booking-detail', {
+        title: `Reservación ${reservationId}`,
+        breadcrumb: null,
+        reservationId,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Renders the client vehicles page for viewing vehicle fleet.
    * Clients can view vehicle types available for their services.
    * Supports sections: 'vehicles' and 'types' for vehicle type management.

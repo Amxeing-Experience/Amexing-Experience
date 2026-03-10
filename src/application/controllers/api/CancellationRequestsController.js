@@ -16,6 +16,7 @@
  * @since 1.0.0
  */
 
+const Parse = require('parse/node');
 const CancellationRequest = require('../../../domain/models/CancellationRequest');
 const Quote = require('../../../domain/models/Quote');
 const logger = require('../../../infrastructure/logger');
@@ -510,9 +511,13 @@ class CancellationRequestsController {
 
     await quote.save(null, { useMasterKey: true });
 
+    // Cascade cancel associated Reservation + ReservationServices
+    await this.cascadeCancelReservation(quote);
+
     return {
       quote,
       cancellationType: 'direct',
+      directCancellation: true,
       message: 'Quote cancelled successfully (24+ hours before event)',
     };
   }
@@ -529,15 +534,18 @@ class CancellationRequestsController {
    */
   async createCancellationRequestForApproval(quote, currentUser, requestData, hoursBeforeEvent, eventDate) {
     const request = new CancellationRequest();
-    request.set('quote', quote);
-    request.set('requestedBy', currentUser);
-    request.set('reason', requestData.reason.trim());
-    request.set('status', 'pending');
-    request.set('priority', requestData.priority || 'normal');
-    request.set('hoursBeforeEvent', hoursBeforeEvent);
-    request.set('eventDate', eventDate);
-    request.set('active', true);
-    request.set('exists', true);
+    // Set all required fields at once to avoid validate firing before all fields are present
+    request.set({
+      quote,
+      requestedBy: currentUser,
+      reason: requestData.reason.trim(),
+      status: 'pending',
+      priority: requestData.priority || 'normal',
+      hoursBeforeEvent,
+      eventDate,
+      active: true,
+      exists: true,
+    });
 
     await request.save(null, { useMasterKey: true });
 
@@ -572,7 +580,7 @@ class CancellationRequestsController {
 
     await request.save(null, { useMasterKey: true });
 
-    // If approved, cancel the quote
+    // If approved, cancel the quote and cascade to reservation
     if (decision === 'approved') {
       const quote = request.getQuote();
       if (quote) {
@@ -584,6 +592,9 @@ class CancellationRequestsController {
         quote.set('cancellationRequestId', request.id);
 
         await quote.save(null, { useMasterKey: true });
+
+        // Cascade cancel associated Reservation + ReservationServices
+        await this.cascadeCancelReservation(quote);
       }
     }
 
@@ -624,6 +635,50 @@ class CancellationRequestsController {
       error: message,
       timestamp: new Date().toISOString(),
     });
+  }
+
+  /**
+   * Cascade cancel Reservation + ReservationServices linked to a quote.
+   * @param {object} quote - Quote Parse object.
+   * @private
+   * @example
+   */
+  async cascadeCancelReservation(quote) {
+    try {
+      const resQuery = new Parse.Query('Reservation');
+      resQuery.equalTo('quotePtr', quote);
+      resQuery.equalTo('exists', true);
+      resQuery.notEqualTo('status', 'cancelled');
+      const reservation = await resQuery.first({ useMasterKey: true });
+      if (!reservation) return;
+
+      reservation.set('status', 'cancelled');
+      await reservation.save(null, { useMasterKey: true });
+
+      const svcQuery = new Parse.Query('ReservationService');
+      svcQuery.equalTo('reservationPtr', reservation);
+      svcQuery.equalTo('active', true);
+      svcQuery.equalTo('exists', true);
+      svcQuery.limit(1000);
+      const services = await svcQuery.find({ useMasterKey: true });
+      for (const svc of services) {
+        svc.set('status', 'cancelled');
+      }
+      if (services.length > 0) {
+        await Parse.Object.saveAll(services, { useMasterKey: true });
+      }
+
+      logger.info('Cascade cancelled reservation from quote cancellation', {
+        quoteId: quote.id,
+        reservationId: reservation.id,
+        servicesCancelled: services.length,
+      });
+    } catch (error) {
+      logger.error('Error cascading reservation cancellation', {
+        quoteId: quote.id,
+        error: error.message,
+      });
+    }
   }
 }
 
