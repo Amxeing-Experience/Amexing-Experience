@@ -12,8 +12,16 @@
  * @version 1.0.0
  */
 
+const Parse = require('parse/node');
 const Quote = require('../../domain/models/Quote');
 const logger = require('../../infrastructure/logger');
+const FileStorageService = require('../services/FileStorageService');
+
+const fileStorageService = new FileStorageService({
+  baseFolder: 'general',
+  isPublic: false,
+  presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+});
 
 /**
  * PublicQuoteController class for public quote viewing.
@@ -49,7 +57,10 @@ class PublicQuoteController {
       this.logPublicAccess(quote, req);
       const quoteData = this.preparePublicQuoteData(quote);
 
-      return res.render('dashboards/admin/quote-public-simple', {
+      // Fetch primary images for tours and experiences
+      await this.injectServiceImages(quoteData);
+
+      return res.render('dashboards/admin/quote-public', {
         quote: quoteData,
         isPublicView: true,
         pageTitle: `Cotización ${folio}`,
@@ -301,8 +312,95 @@ class PublicQuoteController {
       destinationPOI: sub.destinationPOI || '',
       destination: sub.destination || '',
       isCashPayment: sub.isCashPayment || false,
+      tourId: sub.tourId || '',
+      experienceId: sub.experienceId || '',
+      imageUrl: sub.imageUrl || '',
       // EXCLUDE: notes (business decision)
     };
+  }
+
+  /**
+   * Inject primary image URLs for tours and experiences into quote data.
+   * @param {object} quoteData - Prepared quote data with serviceItems.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async injectServiceImages(quoteData) {
+    try {
+      const tourIds = [];
+      const experienceIds = [];
+      (quoteData.serviceItems?.days || []).forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          if (sc.tourId) tourIds.push(sc.tourId);
+          if (sc.experienceId) experienceIds.push(sc.experienceId);
+        });
+      });
+
+      const uniqueTourIds = [...new Set(tourIds.filter(Boolean))];
+      const uniqueExpIds = [...new Set(experienceIds.filter(Boolean))];
+
+      const formatPriority = ['avif', 'webp', 'jpeg'];
+
+      const fetchImages = async (className, pointerField, parentClass, ids) => {
+        const map = {};
+        if (ids.length === 0) return map;
+        const Parent = Parse.Object.extend(parentClass);
+        const pointers = ids.map((id) => Parent.createWithoutData(id));
+        const q = new Parse.Query(className);
+        q.containedIn(pointerField, pointers);
+        q.equalTo('isPrimary', true);
+        q.equalTo('exists', true);
+        let images = await q.find({ useMasterKey: true });
+        if (images.length === 0) {
+          const fb = new Parse.Query(className);
+          fb.containedIn(pointerField, pointers);
+          fb.equalTo('exists', true);
+          fb.ascending('displayOrder');
+          images = await fb.find({ useMasterKey: true });
+        }
+        await Promise.all(images.map(async (img) => {
+          const pid = img.get(pointerField)?.id;
+          if (!pid || map[pid]) return;
+          let url = '';
+          const variants = img.get('optimizedVariants');
+          const s3Key = img.get('s3Key');
+          if (variants && typeof variants === 'object') {
+            for (const fmt of formatPriority) {
+              if (variants[fmt]?.s3Key) {
+                try {
+                  url = await fileStorageService.getPresignedUrl(variants[fmt].s3Key);
+                  break;
+                } catch (e) { /* continue */ }
+              }
+            }
+          }
+          if (!url && s3Key) {
+            try { url = await fileStorageService.getPresignedUrl(s3Key); } catch (e) { /* continue */ }
+          }
+          if (!url && s3Key) {
+            const bucket = img.get('s3Bucket');
+            const region = img.get('s3Region');
+            if (bucket && region) url = `https://${bucket}.s3.${region}.amazonaws.com/${s3Key}`;
+          }
+          if (url) map[pid] = url;
+        }));
+        return map;
+      };
+
+      const [tourMap, expMap] = await Promise.all([
+        fetchImages('TourImage', 'tourId', 'Tour', uniqueTourIds),
+        fetchImages('ExperienceImage', 'experienceId', 'Experience', uniqueExpIds),
+      ]);
+
+      quoteData.serviceItems.days.forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          if (sc.tourId && tourMap[sc.tourId]) Object.assign(sc, { imageUrl: tourMap[sc.tourId] });
+          else if (sc.experienceId && expMap[sc.experienceId]) Object.assign(sc, { imageUrl: expMap[sc.experienceId] });
+        });
+      });
+    } catch (err) {
+      logger.warn('Failed to inject service images for public quote', { error: err.message });
+    }
   }
 }
 

@@ -8,7 +8,7 @@
  */
 
 const {
-  MailerSend, EmailParams, Sender, Recipient,
+  MailerSend, EmailParams, Sender, Recipient, Attachment,
 } = require('mailersend');
 const logger = require('../../infrastructure/logger');
 const TemplateService = require('../../infrastructure/email/TemplateService');
@@ -104,7 +104,8 @@ class EmailService {
       }
 
       const {
-        to, toName, subject, text, html, from, fromName, tags, notificationType, recipientUser, metadata,
+        to, toName, subject, text, html, from, fromName, tags,
+        notificationType, recipientUser, metadata, attachments,
       } = emailData;
 
       // Validate required fields
@@ -134,6 +135,14 @@ class EmailService {
       // Add tags if provided
       if (tags && Array.isArray(tags)) {
         emailParams.setTags(tags);
+      }
+
+      // Add attachments if provided
+      if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+        const mailAttachments = attachments.map(
+          (att) => new Attachment(att.content, att.filename, att.disposition || 'attachment')
+        );
+        emailParams.setAttachments(mailAttachments);
       }
 
       // Send email
@@ -768,6 +777,92 @@ This is an automated message from Amexing Experience. Please do not reply to thi
         error: error.message,
         recipientEmail: this.maskEmail(bookingData.recipientEmail),
         bookingNumber: bookingData.bookingNumber,
+      });
+
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Send quote confirmation email with PDF attachment.
+   * @param {object} quoteEmailData - Quote confirmation data.
+   * @param {string} quoteEmailData.recipientEmail - Recipient email address.
+   * @param {string} quoteEmailData.recipientName - Recipient display name.
+   * @param {string} quoteEmailData.folio - Quote folio (e.g. QTE-2025-0001).
+   * @param {string} quoteEmailData.reservationFolio - Reservation folio (optional).
+   * @param {string} quoteEmailData.eventType - Event type.
+   * @param {string} quoteEmailData.startDate - Start date formatted string.
+   * @param {string} quoteEmailData.endDate - End date formatted string.
+   * @param {number} quoteEmailData.numberOfPeople - Number of people.
+   * @param {string} quoteEmailData.shareUrl - Public quote share URL.
+   * @param {Buffer} quoteEmailData.pdfBuffer - PDF file buffer.
+   * @param {string} quoteEmailData.pdfFilename - PDF filename.
+   * @param {object} quoteEmailData.recipientUser - Parse AmexingUser pointer (optional).
+   * @returns {Promise<object>} Send result.
+   * @example
+   */
+  async sendQuoteConfirmation(quoteEmailData) {
+    try {
+      const {
+        recipientEmail, recipientName, folio, reservationFolio,
+        eventType, startDate, endDate, numberOfPeople,
+        shareUrl, pdfBuffer, pdfFilename, recipientUser,
+      } = quoteEmailData;
+
+      const templateVariables = {
+        ...TemplateService.getCommonVariables(),
+        ASUNTO: `Confirmación de Cotización ${folio}`,
+        TITULO_PRINCIPAL: 'Cotización Confirmada',
+        NOMBRE_CLIENTE: recipientName || 'Cliente',
+        CONTENIDO_MENSAJE: `
+          <p>Nos complace confirmar su cotización con Amexing Experience.</p>
+          <p>Adjunto encontrará el PDF con el detalle completo de los servicios cotizados.</p>
+        `,
+        NUMERO_RESERVA: reservationFolio || folio,
+        TIPO_SERVICIO: eventType || 'Servicios de viaje',
+        FECHA: startDate && endDate ? `${startDate} — ${endDate}` : (startDate || 'Por confirmar'),
+        HORA: numberOfPeople ? `${numberOfPeople} persona(s)` : '',
+        LUGAR: 'San Miguel de Allende',
+        URL_BOTON: shareUrl || '#',
+        TEXTO_BOTON: 'Ver Cotización',
+        MENSAJE_ADICIONAL: 'Puede consultar su cotización en línea o revisar el PDF adjunto.',
+      };
+
+      const { html, text } = TemplateService.render('booking_confirmation', templateVariables, { includeText: true });
+
+      // Prepare PDF attachment
+      const emailAttachments = [];
+      if (pdfBuffer) {
+        emailAttachments.push({
+          content: pdfBuffer.toString('base64'),
+          filename: pdfFilename || `Cotizacion-${folio}.pdf`,
+        });
+      }
+
+      return await this.sendEmail({
+        to: recipientEmail,
+        toName: recipientName,
+        subject: `Confirmación de Cotización ${folio} - Amexing Experience`,
+        html,
+        text,
+        attachments: emailAttachments,
+        tags: ['quote_confirmation', 'scheduled', 'transactional'],
+        notificationType: 'quote_confirmation',
+        recipientUser,
+        metadata: {
+          folio,
+          reservationFolio: reservationFolio || null,
+          eventType,
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to send quote confirmation email', {
+        error: error.message,
+        recipientEmail: this.maskEmail(quoteEmailData.recipientEmail),
+        folio: quoteEmailData.folio,
       });
 
       return {

@@ -1,0 +1,78 @@
+<%
+/**
+ * Quote Services Catalog - Offcanvas drag-and-drop panel
+ * Provides draggable Experiences, Tours, and Transport items for quotes
+ * Created by Denisse Maldonado
+ */
+%>
+
+<!-- Catalog Offcanvas Panel -->
+<div class="offcanvas offcanvas-start" data-bs-backdrop="false" data-bs-scroll="true" tabindex="-1" id="catalogOffcanvas" aria-labelledby="catalogOffcanvasLabel">
+    <div class="offcanvas-header border-bottom py-2">
+        <h6 class="offcanvas-title mb-0" id="catalogOffcanvasLabel">
+            <i class="ti ti-layout-grid me-1"></i>Catálogo de Servicios
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+    <div class="offcanvas-body p-0" id="catalogDragSourcePanel">
+        <!-- Tabs -->
+        <ul class="nav nav-tabs px-3 pt-2" id="catalogTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="catalogTabExperiences" data-bs-toggle="tab" data-bs-target="#catalogPaneExperiences" type="button" role="tab">
+                    <i class="ti ti-beach me-1"></i>Exp
+                    <span class="badge bg-secondary ms-1" id="catalogExpCount">0</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="catalogTabTours" data-bs-toggle="tab" data-bs-target="#catalogPaneTours" type="button" role="tab">
+                    <i class="ti ti-map-2 me-1"></i>Tours
+                    <span class="badge bg-secondary ms-1" id="catalogToursCount">0</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="catalogTabTransport" data-bs-toggle="tab" data-bs-target="#catalogPaneTransport" type="button" role="tab">
+                    <i class="ti ti-car me-1"></i>Trans
+                    <span class="badge bg-secondary ms-1" id="catalogTransportCount">0</span>
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- Experiences Tab -->
+            <div class="tab-pane fade show active" id="catalogPaneExperiences" role="tabpanel">
+                <div class="p-3 pb-2">
+                    <input type="text" class="form-control form-control-sm" id="catalogSearchExperiences" placeholder="Buscar experiencia...">
+                </div>
+                <div class="catalog-drag-items-list px-3 pb-3" id="catalogExperiencesList" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+                    <div class="text-center text-muted py-3">
+                        <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tours Tab -->
+            <div class="tab-pane fade" id="catalogPaneTours" role="tabpanel">
+                <div class="p-3 pb-2">
+                    <input type="text" class="form-control form-control-sm" id="catalogSearchTours" placeholder="Buscar tour...">
+                </div>
+                <div class="catalog-drag-items-list px-3 pb-3" id="catalogToursList" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+                    <div class="text-center text-muted py-3">
+                        <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transport Tab -->
+            <div class="tab-pane fade" id="catalogPaneTransport" role="tabpanel">
+                <div class="p-3 pb-2">
+                    <input type="text" class="form-control form-control-sm" id="catalogSearchTransport" placeholder="Buscar transporte...">
+                </div>
+                <div class="catalog-drag-items-list px-3 pb-3" id="catalogTransportList" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+                    <div class="text-center text-muted py-3">
+                        <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

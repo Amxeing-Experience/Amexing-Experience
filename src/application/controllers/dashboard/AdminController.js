@@ -335,7 +335,36 @@ class AdminController extends RoleBasedController {
     try {
       await this.renderRoleView(req, res, 'bookings', {
         title: 'Gestión de Reservaciones',
-        breadcrumb: null, // Disable automatic breadcrumb
+        breadcrumb: null,
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Render booking detail page for a reservation.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   */
+  async bookingDetail(req, res) {
+    try {
+      const reservationId = req.params.id;
+      await this.renderRoleView(req, res, 'booking-detail', {
+        title: `Reservación ${reservationId}`,
+        breadcrumb: null,
+        reservationId,
       });
     } catch (error) {
       this.handleError(res, error);
@@ -628,6 +657,12 @@ class AdminController extends RoleBasedController {
     }
   }
 
+  /**
+   * Render greeter management page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   */
   async greeter(req, res) {
     try {
       await this.renderRoleView(req, res, 'greeter', {

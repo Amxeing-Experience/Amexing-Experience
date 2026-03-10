@@ -88,9 +88,25 @@ class EmployeesController {
         });
         result = await this.userService.getAmexingUsers(currentUser, options, req.userRole);
       } else {
-        // Default behavior - only show designated employee roles
+        // Default behavior - show employee roles + all Amexing internal users (admins have futureRoles too)
         options.filters.roleNames = ['employee_amexing', 'driver'];
-        result = await this.userService.getUsers(currentUser, options);
+        const amexingOptions = { ...options, filters: {} };
+        const [employeeResult, amexingResult] = await Promise.all([
+          this.userService.getUsers(currentUser, options),
+          this.userService.getAmexingUsers(currentUser, amexingOptions, req.userRole),
+        ]);
+        // Merge and deduplicate by user id
+        const seen = new Set();
+        const allUsers = [...(employeeResult.users || []), ...(amexingResult.users || [])].filter((u) => {
+          const id = u.id || u.objectId;
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+        result = {
+          users: allUsers,
+          total: allUsers.length,
+        };
       }
 
       // Add metadata for frontend consumption
