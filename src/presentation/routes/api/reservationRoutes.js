@@ -57,6 +57,17 @@ router.get(
 );
 
 /**
+ * PUT /api/reservations/:id/services/batch-assign — Batch assign employees/vehicle to multiple services.
+ */
+router.put(
+  '/:id/services/batch-assign',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => ReservationController.batchAssignEmployees(req, res)
+);
+
+/**
  * PUT /api/reservations/:id/services/:serviceId/assign — Assign employees/vehicle.
  */
 router.put(
@@ -65,6 +76,17 @@ router.put(
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(4),
   (req, res) => ReservationController.assignEmployee(req, res)
+);
+
+/**
+ * PUT /api/reservations/:id/service-customer — Assign service customer at reservation level.
+ */
+router.put(
+  '/:id/service-customer',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => ReservationController.assignServiceCustomer(req, res)
 );
 
 /**

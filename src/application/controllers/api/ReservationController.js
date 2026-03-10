@@ -165,6 +165,7 @@ class ReservationController {
       query.include('quotePtr');
       query.include('clientPtr');
       query.include('createdBy');
+      query.include('serviceCustomer');
       const reservation = await query.get(id, { useMasterKey: true });
 
       if (!reservation) {
@@ -180,12 +181,26 @@ class ReservationController {
       servicesQuery.include('assignedGuide');
       servicesQuery.include('assignedGreeter');
       servicesQuery.include('assignedVehicle');
+      servicesQuery.include('assignedServiceCustomer');
       servicesQuery.ascending('dayNumber');
       servicesQuery.addAscending('time');
       servicesQuery.limit(1000);
       const services = await servicesQuery.find({ useMasterKey: true });
 
       const client = reservation.get('clientPtr');
+
+      // Build a lookup from serviceItemsSnapshot for fallback when subconcept is null
+      const snapshot = reservation.get('serviceItemsSnapshot') || {};
+      const snapshotDays = snapshot.days || [];
+      const snapshotLookup = {};
+      for (const day of snapshotDays) {
+        for (const sub of (day.subconcepts || [])) {
+          const key = `${day.dayNumber || 1}_${sub.concept || sub.name || ''}_${sub.time || ''}`;
+          snapshotLookup[key] = sub;
+        }
+      }
+
+      const serviceCustomerObj = reservation.get('serviceCustomer');
 
       return res.json({
         success: true,
@@ -212,40 +227,57 @@ class ReservationController {
             email: client.get('email'),
             phone: client.get('phone'),
           } : null,
+          serviceCustomer: serviceCustomerObj ? {
+            id: serviceCustomerObj.id,
+            fullName: serviceCustomerObj.get('fullName') || `${serviceCustomerObj.get('firstName') || ''} ${serviceCustomerObj.get('lastName') || ''}`.trim() || serviceCustomerObj.get('username'),
+          } : null,
           createdBy: reservation.get('createdBy')?.get('username') || '',
           createdAt: reservation.createdAt,
-          services: services.map((svc) => ({
-            id: svc.id,
-            dayNumber: svc.get('dayNumber'),
-            dayTitle: svc.get('dayTitle'),
-            serviceDate: svc.get('serviceDate'),
-            type: svc.get('type'),
-            concept: svc.get('concept'),
-            time: svc.get('time'),
-            status: svc.get('status'),
-            price: svc.get('price'),
-            total: svc.get('total'),
-            originName: svc.get('originName'),
-            destinationName: svc.get('destinationName'),
-            vehicleTypeName: svc.get('vehicleTypeName'),
-            notes: svc.get('notes'),
-            assignedDriver: svc.get('assignedDriver') ? {
-              id: svc.get('assignedDriver').id,
-              fullName: svc.get('assignedDriver').get('fullName') || svc.get('assignedDriver').get('username'),
-            } : null,
-            assignedGuide: svc.get('assignedGuide') ? {
-              id: svc.get('assignedGuide').id,
-              fullName: svc.get('assignedGuide').get('fullName') || svc.get('assignedGuide').get('username'),
-            } : null,
-            assignedGreeter: svc.get('assignedGreeter') ? {
-              id: svc.get('assignedGreeter').id,
-              fullName: svc.get('assignedGreeter').get('fullName') || svc.get('assignedGreeter').get('username'),
-            } : null,
-            assignedVehicle: svc.get('assignedVehicle') ? {
-              id: svc.get('assignedVehicle').id,
-              name: svc.get('assignedVehicle').get('name') || svc.get('assignedVehicle').get('plateNumber'),
-            } : null,
-          })),
+          services: services.map((svc) => {
+            // Use stored subconcept, or fallback to snapshot match
+            const storedSub = svc.get('subconcept');
+            const fallbackKey = `${svc.get('dayNumber') || 1}_${svc.get('concept') || ''}_${svc.get('time') || ''}`;
+            const subconcept = storedSub || snapshotLookup[fallbackKey] || null;
+
+            return {
+              id: svc.id,
+              dayNumber: svc.get('dayNumber'),
+              dayTitle: svc.get('dayTitle'),
+              serviceDate: svc.get('serviceDate'),
+              type: svc.get('type'),
+              concept: svc.get('concept'),
+              time: svc.get('time'),
+              status: svc.get('status'),
+              price: svc.get('price'),
+              total: svc.get('total'),
+              originName: svc.get('originName'),
+              destinationName: svc.get('destinationName'),
+              vehicleTypeName: svc.get('vehicleTypeName'),
+              notes: svc.get('notes'),
+              subconcept,
+              assignedDriver: svc.get('assignedDriver') ? {
+                id: svc.get('assignedDriver').id,
+                fullName: svc.get('assignedDriver').get('fullName') || `${svc.get('assignedDriver').get('firstName') || ''} ${svc.get('assignedDriver').get('lastName') || ''}`.trim() || svc.get('assignedDriver').get('username'),
+              } : null,
+              assignedGuide: svc.get('assignedGuide') ? {
+                id: svc.get('assignedGuide').id,
+                fullName: svc.get('assignedGuide').get('fullName') || `${svc.get('assignedGuide').get('firstName') || ''} ${svc.get('assignedGuide').get('lastName') || ''}`.trim() || svc.get('assignedGuide').get('username'),
+              } : null,
+              assignedGreeter: svc.get('assignedGreeter') ? {
+                id: svc.get('assignedGreeter').id,
+                fullName: svc.get('assignedGreeter').get('fullName') || `${svc.get('assignedGreeter').get('firstName') || ''} ${svc.get('assignedGreeter').get('lastName') || ''}`.trim() || svc.get('assignedGreeter').get('username'),
+              } : null,
+              assignedVehicle: svc.get('assignedVehicle') ? {
+                id: svc.get('assignedVehicle').id,
+                name: `${svc.get('assignedVehicle').get('brand') || ''} ${svc.get('assignedVehicle').get('model') || ''}`.trim() || svc.get('assignedVehicle').get('licensePlate') || 'Vehiculo',
+              } : null,
+              assignedServiceCustomer: svc.get('assignedServiceCustomer') ? {
+                id: svc.get('assignedServiceCustomer').id,
+                fullName: svc.get('assignedServiceCustomer').get('fullName') || `${svc.get('assignedServiceCustomer').get('firstName') || ''} ${svc.get('assignedServiceCustomer').get('lastName') || ''}`.trim() || svc.get('assignedServiceCustomer').get('username'),
+              } : null,
+              extraAssignments: svc.get('extraAssignments') || [],
+            };
+          }),
         },
       });
     } catch (error) {
@@ -264,7 +296,7 @@ class ReservationController {
     try {
       const { id, serviceId } = req.params;
       const {
-        driverId, guideId, greeterId, vehicleId,
+        driverId, guideId, greeterId, vehicleId, serviceCustomerId, extraAssignments,
       } = req.body;
 
       // Verify reservation exists
@@ -327,6 +359,30 @@ class ReservationController {
         }
       }
 
+      if (serviceCustomerId !== undefined) {
+        if (serviceCustomerId) {
+          const sc = new Parse.Object('AmexingUser');
+          sc.id = serviceCustomerId;
+          service.set('assignedServiceCustomer', sc);
+        } else {
+          service.unset('assignedServiceCustomer');
+        }
+      }
+
+      if (extraAssignments !== undefined) {
+        service.set('extraAssignments', extraAssignments || []);
+      }
+
+      // Auto-update service status: pending → assigned when a driver is assigned
+      const hasDriver = driverId || service.get('assignedDriver');
+      if (hasDriver && service.get('status') === 'pending') {
+        service.set('status', 'assigned');
+      }
+      // If all assignments are removed, revert to pending
+      if (!driverId && driverId !== undefined && !service.get('assignedDriver') && service.get('status') === 'assigned') {
+        service.set('status', 'pending');
+      }
+
       await service.save(null, { useMasterKey: true });
 
       // Check if all services in the reservation now have at least one assignment
@@ -339,6 +395,7 @@ class ReservationController {
         guideId,
         greeterId,
         vehicleId,
+        serviceCustomerId,
         performedBy: req.user?.id,
       });
 
@@ -467,6 +524,157 @@ class ReservationController {
     }
   }
 
+  /**
+   * PUT /api/reservations/:id/services/batch-assign — Batch assign employees/vehicle to multiple services.
+   * @param req
+   * @param res
+   * @example
+   */
+  static async batchAssignEmployees(req, res) {
+    try {
+      const { id } = req.params;
+      const {
+        serviceIds, driverId, guideId, greeterId, vehicleId, serviceCustomerId,
+      } = req.body;
+
+      if (!serviceIds || !Array.isArray(serviceIds) || serviceIds.length === 0) {
+        return res.status(400).json({ success: false, error: 'Se requiere al menos un servicio' });
+      }
+
+      // Verify reservation exists
+      const resQuery = new Parse.Query('Reservation');
+      resQuery.equalTo('active', true);
+      resQuery.equalTo('exists', true);
+      const reservation = await resQuery.get(id, { useMasterKey: true });
+      if (!reservation) {
+        return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      }
+
+      // Fetch all target services
+      const svcQuery = new Parse.Query('ReservationService');
+      svcQuery.equalTo('reservationPtr', reservation);
+      svcQuery.equalTo('active', true);
+      svcQuery.equalTo('exists', true);
+      svcQuery.containedIn('objectId', serviceIds);
+      svcQuery.limit(1000);
+      const services = await svcQuery.find({ useMasterKey: true });
+
+      if (services.length === 0) {
+        return res.status(404).json({ success: false, error: 'No se encontraron servicios' });
+      }
+
+      // Apply assignments to all services
+      for (const service of services) {
+        if (driverId !== undefined) {
+          if (driverId) {
+            const driver = new Parse.Object('AmexingUser');
+            driver.id = driverId;
+            service.set('assignedDriver', driver);
+          } else {
+            service.unset('assignedDriver');
+          }
+        }
+        if (guideId !== undefined) {
+          if (guideId) {
+            const guide = new Parse.Object('AmexingUser');
+            guide.id = guideId;
+            service.set('assignedGuide', guide);
+          } else {
+            service.unset('assignedGuide');
+          }
+        }
+        if (greeterId !== undefined) {
+          if (greeterId) {
+            const greeter = new Parse.Object('AmexingUser');
+            greeter.id = greeterId;
+            service.set('assignedGreeter', greeter);
+          } else {
+            service.unset('assignedGreeter');
+          }
+        }
+        if (vehicleId !== undefined) {
+          if (vehicleId) {
+            const vehicle = new Parse.Object('Vehicle');
+            vehicle.id = vehicleId;
+            service.set('assignedVehicle', vehicle);
+          } else {
+            service.unset('assignedVehicle');
+          }
+        }
+        if (serviceCustomerId !== undefined) {
+          if (serviceCustomerId) {
+            const sc = new Parse.Object('AmexingUser');
+            sc.id = serviceCustomerId;
+            service.set('assignedServiceCustomer', sc);
+          } else {
+            service.unset('assignedServiceCustomer');
+          }
+        }
+      }
+
+      await Parse.Object.saveAll(services, { useMasterKey: true });
+      await ReservationController.updateReservationStatus(reservation);
+
+      logger.info('Batch assignment updated', {
+        reservationId: id,
+        serviceCount: services.length,
+        driverId,
+        guideId,
+        greeterId,
+        vehicleId,
+        serviceCustomerId,
+        performedBy: req.user?.id,
+      });
+
+      return res.json({ success: true, message: `Asignación actualizada en ${services.length} servicio(s)` });
+    } catch (error) {
+      logger.error('Error batch assigning', { error: error.message, stack: error.stack });
+      return res.status(500).json({ success: false, error: 'Error al asignar en lote' });
+    }
+  }
+
+  /**
+   * PUT /api/reservations/:id/service-customer — Assign service customer at reservation level.
+   * @param req
+   * @param res
+   * @example
+   */
+  static async assignServiceCustomer(req, res) {
+    try {
+      const { id } = req.params;
+      const { serviceCustomerId } = req.body;
+
+      const resQuery = new Parse.Query('Reservation');
+      resQuery.equalTo('active', true);
+      resQuery.equalTo('exists', true);
+      const reservation = await resQuery.get(id, { useMasterKey: true });
+      if (!reservation) {
+        return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      }
+
+      if (serviceCustomerId) {
+        const sc = new Parse.Object('AmexingUser');
+        sc.id = serviceCustomerId;
+        reservation.set('serviceCustomer', sc);
+      } else {
+        reservation.unset('serviceCustomer');
+      }
+
+      await reservation.save(null, { useMasterKey: true });
+
+      logger.info('Reservation service customer updated', {
+        reservationId: id,
+        serviceCustomerId,
+        performedBy: req.user?.id,
+      });
+
+      return res.json({ success: true, message: 'Seguidor de servicio actualizado' });
+    } catch (error) {
+      logger.error('Error assigning service customer', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Error al asignar seguidor' });
+    }
+  }
+
   // =================
   // PRIVATE HELPERS
   // =================
@@ -544,7 +752,7 @@ class ReservationController {
 
     const statuses = services.map((s) => s.get('status'));
     const allCompleted = statuses.every((s) => s === 'completed' || s === 'cancelled');
-    const someAssigned = statuses.some((s) => s === 'assigned' || s === 'completed');
+    const allAssigned = statuses.every((s) => s === 'assigned' || s === 'completed' || s === 'cancelled');
     const someInProgress = statuses.some((s) => s === 'in_progress');
 
     let newStatus = reservation.get('status');
@@ -553,8 +761,10 @@ class ReservationController {
       newStatus = 'completed';
     } else if (someInProgress) {
       newStatus = 'in_progress';
-    } else if (someAssigned) {
+    } else if (allAssigned) {
       newStatus = 'assigned';
+    } else {
+      newStatus = 'pending';
     }
 
     if (newStatus !== reservation.get('status')) {

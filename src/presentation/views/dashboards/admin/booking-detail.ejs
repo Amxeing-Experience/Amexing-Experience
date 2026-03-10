@@ -21,7 +21,7 @@
                 </nav>
                 <h2 class="mb-0 fw-bold" id="pageTitle">
                     <i class="ti ti-clipboard-list me-2 text-primary"></i>
-                    Reservación
+                    Reservacion
                 </h2>
             </div>
             <div id="headerActions"></div>
@@ -34,7 +34,7 @@
     <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Cargando...</span>
     </div>
-    <p class="text-muted mt-2">Cargando reservación...</p>
+    <p class="text-muted mt-2">Cargando reservacion...</p>
 </div>
 
 <!-- Reservation Content -->
@@ -45,57 +45,73 @@
             <div class="row g-3">
                 <div class="col-md-3">
                     <small class="text-muted d-block">Folio</small>
-                    <strong id="infoFolio">—</strong>
+                    <strong id="infoFolio">&mdash;</strong>
                 </div>
                 <div class="col-md-3">
-                    <small class="text-muted d-block">Cotización</small>
-                    <a href="#" id="infoQuoteLink" class="fw-semibold text-decoration-none">—</a>
+                    <small class="text-muted d-block">Cotizacion</small>
+                    <a href="#" id="infoQuoteLink" class="fw-semibold text-decoration-none">&mdash;</a>
                 </div>
                 <div class="col-md-3">
                     <small class="text-muted d-block">Estado</small>
-                    <span id="infoStatus">—</span>
+                    <span id="infoStatus">&mdash;</span>
                 </div>
                 <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Creación</small>
-                    <span id="infoCreatedAt">—</span>
+                    <small class="text-muted d-block">Fecha Creacion</small>
+                    <span id="infoCreatedAt">&mdash;</span>
                 </div>
             </div>
             <hr>
             <div class="row g-3">
                 <div class="col-md-3">
                     <small class="text-muted d-block">Cliente</small>
-                    <strong id="infoClient">—</strong>
+                    <strong id="infoClient">&mdash;</strong>
                 </div>
                 <div class="col-md-3">
                     <small class="text-muted d-block">Contacto</small>
-                    <span id="infoContact">—</span>
+                    <span id="infoContact">&mdash;</span>
                 </div>
                 <div class="col-md-3">
                     <small class="text-muted d-block">Tipo de Evento</small>
-                    <span id="infoEventType">—</span>
+                    <span id="infoEventType">&mdash;</span>
                 </div>
                 <div class="col-md-3">
                     <small class="text-muted d-block">Personas</small>
-                    <span id="infoPeople">—</span>
+                    <span id="infoPeople">&mdash;</span>
                 </div>
             </div>
             <hr>
             <div class="row g-3">
                 <div class="col-md-3">
                     <small class="text-muted d-block">Fecha Inicio</small>
-                    <span id="infoStartDate">—</span>
+                    <span id="infoStartDate">&mdash;</span>
                 </div>
                 <div class="col-md-3">
                     <small class="text-muted d-block">Fecha Fin</small>
-                    <span id="infoEndDate">—</span>
+                    <span id="infoEndDate">&mdash;</span>
                 </div>
                 <div class="col-md-3">
                     <small class="text-muted d-block">Tipo de Pago</small>
-                    <span id="infoPaymentType">—</span>
+                    <span id="infoPaymentType">&mdash;</span>
                 </div>
                 <div class="col-md-3">
                     <small class="text-muted d-block">Total</small>
-                    <strong id="infoTotal" class="text-success fs-5">—</strong>
+                    <strong id="infoTotal" class="text-success fs-5">&mdash;</strong>
+                </div>
+            </div>
+            <hr>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <small class="text-muted d-block"><i class="ti ti-list-check me-1"></i>Servicios Asignados</small>
+                    <span id="infoAssignmentCounter" class="fw-semibold">&mdash;</span>
+                </div>
+                <div class="col-md-6">
+                    <small class="text-muted d-block"><i class="ti ti-user-star me-1"></i>Seguidor de Servicio (Amexing)</small>
+                    <div class="d-flex align-items-center gap-2" id="serviceCustomerRow">
+                        <span id="infoServiceCustomer" class="fw-semibold">&mdash;</span>
+                        <button class="btn btn-sm btn-outline-primary d-none" id="changeServiceCustomerBtn" title="Cambiar seguidor">
+                            <i class="ti ti-edit"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -116,42 +132,51 @@
 
 <!-- Assign Employee Modal -->
 <div class="modal fade" id="assignModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h6 class="modal-title fw-bold">Asignar Personal</h6>
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <div>
+                    <h6 class="modal-title fw-bold mb-0" id="assignModalTitle">Asignar Personal</h6>
+                    <small class="text-muted" id="assignModalSubtitle"></small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="assignModalBody">
+                <input type="hidden" id="assignServiceId">
+                <!-- Dynamic content rendered by JS -->
+            </div>
+            <div class="modal-footer border-top">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-sm btn-primary px-4" id="saveAssignmentBtn">
+                    <i class="ti ti-check me-1"></i>Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Service Customer Modal -->
+<div class="modal fade" id="serviceCustomerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h6 class="modal-title fw-bold mb-0">Seguidor de Servicio</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="assignServiceId">
-                <div class="mb-3">
-                    <label class="form-label">Conductor</label>
-                    <select id="assignDriver" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="assign-icon bg-primary-subtle text-primary"><i class="ti ti-user-star"></i></span>
+                    <label class="form-label mb-0 fw-semibold">Empleado Amexing</label>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Guía</label>
-                    <select id="assignGuide" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Greeter</label>
-                    <select id="assignGreeter" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Vehículo</label>
-                    <select id="assignVehicle" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
-                </div>
+                <select id="resServiceCustomerSelect" class="form-select form-select-sm">
+                    <option value="">Sin asignar</option>
+                </select>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer border-top">
                 <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn btn-sm btn-primary" id="saveAssignmentBtn">Guardar</button>
+                <button class="btn btn-sm btn-primary px-4" id="saveResServiceCustomerBtn">
+                    <i class="ti ti-check me-1"></i>Guardar
+                </button>
             </div>
         </div>
     </div>
@@ -179,6 +204,42 @@
     font-size: 0.75rem;
     padding: 0.2rem 0.5rem;
 }
+.detail-tag {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    font-weight: 500;
+}
+.assign-field-group {
+    margin-bottom: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+}
+.assign-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+.vehicle-pair-group {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.vehicle-pair-group .pair-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+}
 </style>
 
 <script>
@@ -203,7 +264,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     function formatDate(dateStr) {
         if (!dateStr) return '—';
-        return new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+        return new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
     }
 
     function formatCurrency(amount, currency) {
@@ -222,6 +283,31 @@ document.addEventListener('DOMContentLoaded', async function() {
         return icons[type] || 'ti-point';
     }
 
+    function getServiceTypeLabel(type) {
+        const labels = {
+            transport: 'Transporte',
+            tour: 'Tour',
+            experience: 'Experiencia',
+            concepto: 'Concepto',
+            'a-disposicion': 'A Disposicion',
+        };
+        return labels[type] || type || '';
+    }
+
+    function getRoleBadge(role, displayRole) {
+        const r = displayRole || role || '';
+        const map = {
+            driver: { label: 'Conductor', cls: 'bg-info-subtle text-info' },
+            guia: { label: 'Guia', cls: 'bg-success-subtle text-success' },
+            greeter: { label: 'Greeter', cls: 'bg-warning-subtle text-warning' },
+            employee_amexing: { label: 'Amexing', cls: 'bg-primary-subtle text-primary' },
+            limpieza: { label: 'Limpieza', cls: 'bg-secondary-subtle text-secondary' },
+            admin: { label: 'Admin', cls: 'bg-danger-subtle text-danger' },
+        };
+        const s = map[r] || map[role] || { label: r || 'N/A', cls: 'bg-secondary-subtle text-secondary' };
+        return `<span class="badge ${s.cls}" style="font-size:0.65rem;">${s.label}</span>`;
+    }
+
     async function loadReservation() {
         try {
             const response = await fetch(`/api/reservations/${reservationId}`, {
@@ -229,7 +315,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
             const result = await response.json();
             if (!result.success) {
-                document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservación</p>';
+                document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservacion</p>';
                 return;
             }
 
@@ -237,7 +323,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             renderReservation();
         } catch (error) {
             console.error('Error loading reservation:', error);
-            document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservación</p>';
+            document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservacion</p>';
         }
     }
 
@@ -257,7 +343,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('infoStatus').innerHTML = getStatusBadge(d.status);
         document.getElementById('infoCreatedAt').textContent = formatDate(d.createdAt);
         document.getElementById('infoClient').textContent = d.client?.fullName || d.contactPerson || '—';
-        document.getElementById('infoContact').innerHTML = `${d.contactEmail || ''}${d.contactPhone ? '<br>' + d.contactPhone : ''}`;
+        document.getElementById('infoContact').innerHTML = `${d.contactEmail || ''}${d.contactPhone ? `<br>${d.contactPhone}` : ''}`;
         document.getElementById('infoEventType').textContent = d.eventType || '—';
         document.getElementById('infoPeople').textContent = d.numberOfPeople || '—';
         document.getElementById('infoStartDate').textContent = formatDate(d.startDate);
@@ -265,40 +351,127 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('infoPaymentType').textContent = d.paymentType || '—';
         document.getElementById('infoTotal').textContent = formatCurrency(d.totalAmount, d.currency);
 
-        // Header actions
-        const actions = document.getElementById('headerActions');
-        if (d.status !== 'cancelled' && d.status !== 'completed') {
-            actions.innerHTML = `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservación</button>`;
-            document.getElementById('cancelResBtn')?.addEventListener('click', cancelReservation);
+        // Assignment counter
+        const totalSvc = (d.services || []).length;
+        const assignedSvc = (d.services || []).filter(s => s.status === 'assigned' || s.status === 'completed').length;
+        const completedSvc = (d.services || []).filter(s => s.status === 'completed').length;
+        const counterEl = document.getElementById('infoAssignmentCounter');
+        if (totalSvc > 0) {
+            const counterColor = completedSvc === totalSvc ? 'success' : (assignedSvc === totalSvc ? 'info' : (assignedSvc > 0 ? 'warning' : 'secondary'));
+            counterEl.innerHTML = `<span class="badge bg-${counterColor}-subtle text-${counterColor} fs-6">${assignedSvc}/${totalSvc} asignados</span>` +
+                (completedSvc > 0 ? ` <span class="badge bg-success-subtle text-success fs-6">${completedSvc}/${totalSvc} completados</span>` : '');
+        } else {
+            counterEl.textContent = 'Sin servicios';
         }
 
-        // Render services grouped by day
+        const scName = d.serviceCustomer?.fullName || 'Sin asignar';
+        document.getElementById('infoServiceCustomer').textContent = scName;
+
+        const canAssign = d.status !== 'cancelled' && d.status !== 'completed';
+        const changeScBtn = document.getElementById('changeServiceCustomerBtn');
+        if (canAssign) {
+            changeScBtn.classList.remove('d-none');
+        } else {
+            changeScBtn.classList.add('d-none');
+        }
+
+        const actions = document.getElementById('headerActions');
+        if (canAssign) {
+            actions.innerHTML = `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservacion</button>`;
+            document.getElementById('cancelResBtn')?.addEventListener('click', cancelReservation);
+        } else {
+            actions.innerHTML = '';
+        }
+
         renderServices(d.services);
 
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('reservationContent').style.display = '';
     }
 
+    function getSubconceptDetails(svc) {
+        const sub = svc.subconcept;
+        if (!sub) return '';
+        const tags = [];
+        const tag = (icon, text, color) => `<span class="badge detail-tag bg-${color}-subtle text-${color}"><i class="ti ti-${icon} me-1"></i>${text}</span>`;
+
+        if (sub.quantity && sub.quantity > 1) tags.push(tag('car', `${sub.quantity} vehiculos`, 'primary'));
+
+        if (sub.includeGuide === true) {
+            tags.push(tag('map-pin', 'Guia: Si', 'success'));
+        } else if (sub.includeGuide === false && (svc.type === 'transport' || svc.type === 'tour')) {
+            tags.push(tag('map-pin', 'Guia: No', 'secondary'));
+        }
+        if (sub.includeGreeter === true) {
+            const inVehicle = sub.greeterInVehicle ? ' (en vehiculo)' : ' (en punto)';
+            tags.push(tag('hand-stop', `Greeter: Si${inVehicle}`, 'warning'));
+        } else if (sub.includeGreeter === false && (svc.type === 'transport' || svc.type === 'tour')) {
+            tags.push(tag('hand-stop', 'Greeter: No', 'secondary'));
+        }
+
+        if (svc.type === 'transport') {
+            if (sub.tripType) {
+                const tripLabel = sub.tripType === 'round-trip' ? 'Redondo' : 'Sencillo';
+                const dirLabel = sub.directionType === 'arrival' ? 'Llegada' : 'Salida';
+                tags.push(tag('arrows-exchange', `${tripLabel} — ${dirLabel}`, 'info'));
+            }
+            const pax = [];
+            if (sub.transportAdults) pax.push(`${sub.transportAdults} adulto${sub.transportAdults > 1 ? 's' : ''}`);
+            if (sub.transportChildren) pax.push(`${sub.transportChildren} nino${sub.transportChildren > 1 ? 's' : ''}`);
+            if (sub.transportInfants) pax.push(`${sub.transportInfants} infante${sub.transportInfants > 1 ? 's' : ''}`);
+            if (sub.persons && !pax.length) pax.push(`${sub.persons} persona${sub.persons > 1 ? 's' : ''}`);
+            if (pax.length) tags.push(tag('users', pax.join(', '), 'primary'));
+            if (sub.airline || sub.flightNumber) tags.push(tag('plane', `${sub.airline || ''} ${sub.flightNumber || ''}`.trim(), 'info'));
+            if (sub.waitingTimeHours) tags.push(tag('clock-pause', `Espera: ${sub.waitingTimeHours}h`, 'warning'));
+            if (sub.routeDuration) tags.push(tag('route', `Duracion: ${sub.routeDuration} min`, 'secondary'));
+        }
+
+        if (svc.type === 'tour') {
+            if (sub.hotelName) tags.push(tag('building', sub.hotelName, 'secondary'));
+            if (sub.isWalkingTour) tags.push(tag('walk', `Walking tour (${sub.walkingTourPeopleCount || 0} pax)`, 'info'));
+            if (sub.persons) tags.push(tag('users', `${sub.persons} persona${sub.persons > 1 ? 's' : ''}`, 'primary'));
+        }
+
+        if (svc.type === 'experience') {
+            const tickets = [];
+            if (sub.adultsQuantity) tickets.push(`${sub.adultsQuantity} adulto${sub.adultsQuantity > 1 ? 's' : ''}`);
+            if (sub.childrenQuantity) tickets.push(`${sub.childrenQuantity} nino${sub.childrenQuantity > 1 ? 's' : ''}`);
+            if (sub.adultsNoAlcoholQuantity) tickets.push(`${sub.adultsNoAlcoholQuantity} sin alcohol`);
+            if (tickets.length) tags.push(tag('ticket', tickets.join(', '), 'primary'));
+            if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
+        }
+
+        if (svc.type === 'a-disposicion') {
+            if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
+            if (sub.discountPercent) tags.push(tag('discount-2', `${sub.discountPercent}% desc.`, 'success'));
+        }
+
+        if (sub.notes) tags.push(tag('note', sub.notes, 'secondary'));
+
+        return tags.length ? `<div class="mt-1 d-flex flex-wrap gap-1">${tags.join('')}</div>` : '';
+    }
+
     function renderServices(services) {
         const container = document.getElementById('servicesContainer');
 
-        // Group by dayNumber
         const days = {};
         services.forEach(svc => {
             const key = svc.dayNumber || 1;
-            if (!days[key]) days[key] = { title: svc.dayTitle || `Día ${key}`, date: svc.serviceDate, services: [] };
+            if (!days[key]) days[key] = { title: svc.dayTitle || `Dia ${key}`, date: svc.serviceDate, services: [] };
             days[key].services.push(svc);
         });
 
         if (Object.keys(days).length === 0) {
-            container.innerHTML = '<div class="text-center py-4 text-muted">No hay servicios en esta reservación</div>';
+            container.innerHTML = '<div class="text-center py-4 text-muted">No hay servicios en esta reservacion</div>';
             return;
         }
+
+        const canAssign = reservationData.status !== 'cancelled' && reservationData.status !== 'completed';
 
         let html = '';
         Object.keys(days).sort((a, b) => a - b).forEach(dayNum => {
             const day = days[dayNum];
-            html += `<div class="day-header"><i class="ti ti-calendar-event me-1"></i>Día ${dayNum} — ${day.title}${day.date ? ' (' + formatDate(day.date) + ')' : ''}</div>`;
+            html += `<div class="day-header"><i class="ti ti-calendar-event me-1"></i>Dia ${dayNum} — ${day.title}${day.date ? ` (${formatDate(day.date)})` : ''}</div>`;
 
             day.services.forEach(svc => {
                 const icon = getServiceTypeIcon(svc.type);
@@ -307,12 +480,22 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (svc.assignedGuide) assignments.push(`<span class="badge assignment-badge bg-success-subtle text-success"><i class="ti ti-map-pin me-1"></i>${svc.assignedGuide.fullName}</span>`);
                 if (svc.assignedGreeter) assignments.push(`<span class="badge assignment-badge bg-warning-subtle text-warning"><i class="ti ti-hand-stop me-1"></i>${svc.assignedGreeter.fullName}</span>`);
                 if (svc.assignedVehicle) assignments.push(`<span class="badge assignment-badge bg-secondary-subtle text-secondary"><i class="ti ti-car me-1"></i>${svc.assignedVehicle.name}</span>`);
+                if (svc.assignedServiceCustomer) assignments.push(`<span class="badge assignment-badge bg-primary-subtle text-primary"><i class="ti ti-user-star me-1"></i>${svc.assignedServiceCustomer.fullName}</span>`);
+
+                // Extra assignments (additional vehicles/drivers)
+                const extras = svc.extraAssignments || [];
+                extras.forEach((ea, idx) => {
+                    if (ea.driverName) assignments.push(`<span class="badge assignment-badge bg-info-subtle text-info"><i class="ti ti-steering-wheel me-1"></i>${ea.driverName}</span>`);
+                    if (ea.vehicleName) assignments.push(`<span class="badge assignment-badge bg-secondary-subtle text-secondary"><i class="ti ti-car me-1"></i>${ea.vehicleName}</span>`);
+                });
 
                 const route = svc.originName || svc.destinationName
-                    ? `<small class="text-muted">${svc.originName || ''}${svc.originName && svc.destinationName ? ' → ' : ''}${svc.destinationName || ''}</small>`
+                    ? `<small class="text-muted">${svc.originName || ''}${svc.originName && svc.destinationName ? ' &rarr; ' : ''}${svc.destinationName || ''}</small>`
                     : '';
 
-                const canAssign = reservationData.status !== 'cancelled' && reservationData.status !== 'completed';
+                const includeGuide = svc.subconcept?.includeGuide;
+                const includeGreeter = svc.subconcept?.includeGreeter;
+                const vehicleQty = svc.subconcept?.quantity || 1;
 
                 html += `
                 <div class="service-row d-flex align-items-center justify-content-between">
@@ -322,13 +505,15 @@ document.addEventListener('DOMContentLoaded', async function() {
                             <div class="fw-semibold">${svc.concept || '—'}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
                             ${route}
                             ${svc.vehicleTypeName ? `<small class="text-muted d-block">${svc.vehicleTypeName}</small>` : ''}
+                            ${getSubconceptDetails(svc)}
                             <div class="mt-1">${assignments.join(' ') || '<small class="text-muted">Sin asignar</small>'}</div>
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         ${getStatusBadge(svc.status)}
                         <span class="text-end" style="min-width: 80px;">${formatCurrency(svc.total, reservationData.currency)}</span>
-                        ${canAssign ? `<button class="btn btn-sm btn-outline-primary assign-btn" data-service-id="${svc.id}" data-driver-id="${svc.assignedDriver?.id || ''}" data-guide-id="${svc.assignedGuide?.id || ''}" data-greeter-id="${svc.assignedGreeter?.id || ''}" data-vehicle-id="${svc.assignedVehicle?.id || ''}"><i class="ti ti-user-plus"></i></button>` : ''}
+                        ${canAssign && svc.status !== 'cancelled' ? `<button class="btn btn-sm ${svc.status === 'completed' ? 'btn-success' : (svc.status === 'assigned' ? 'btn-outline-success' : 'btn-outline-secondary')} status-toggle-btn" data-service-id="${svc.id}" data-current-status="${svc.status}" title="${svc.status === 'completed' ? 'Revertir a asignada' : (svc.status === 'assigned' ? 'Marcar completada' : 'Marcar asignada')}"><i class="ti ${svc.status === 'completed' ? 'ti-circle-check-filled' : (svc.status === 'assigned' ? 'ti-circle-check' : 'ti-circle')}"></i></button>` : ''}
+                        ${canAssign ? `<button class="btn btn-sm btn-outline-primary assign-btn" data-service-id="${svc.id}" data-service-type="${svc.type || ''}" data-service-concept="${svc.concept || ''}" data-service-route="${svc.originName && svc.destinationName ? `${svc.originName} → ${svc.destinationName}` : (svc.originName || svc.destinationName || '')}" data-include-guide="${includeGuide}" data-include-greeter="${includeGreeter}" data-vehicle-qty="${vehicleQty}" data-driver-id="${svc.assignedDriver?.id || ''}" data-guide-id="${svc.assignedGuide?.id || ''}" data-greeter-id="${svc.assignedGreeter?.id || ''}" data-vehicle-id="${svc.assignedVehicle?.id || ''}" data-service-customer-id="${svc.assignedServiceCustomer?.id || ''}" data-vehicle-type-name="${svc.vehicleTypeName || ''}" data-extra='${JSON.stringify(svc.extraAssignments || [])}'><i class="ti ti-user-plus"></i></button>` : ''}
                     </div>
                 </div>`;
             });
@@ -336,10 +521,40 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         container.innerHTML = html;
 
-        // Bind assign buttons
         container.querySelectorAll('.assign-btn').forEach(btn => {
             btn.addEventListener('click', () => openAssignModal(btn));
         });
+
+        container.querySelectorAll('.status-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', () => toggleServiceStatus(btn));
+        });
+    }
+
+    async function toggleServiceStatus(btn) {
+        const serviceId = btn.dataset.serviceId;
+        const current = btn.dataset.currentStatus;
+        const nextMap = { pending: 'assigned', assigned: 'completed', completed: 'assigned' };
+        const newStatus = nextMap[current];
+        if (!newStatus) return;
+
+        btn.disabled = true;
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/services/${serviceId}/status`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            const result = await response.json();
+            if (result.success) {
+                await loadReservation();
+            } else {
+                alert(result.error || 'Error al actualizar estado');
+            }
+        } catch (err) {
+            console.error('Status toggle error:', err);
+            alert('Error al actualizar estado');
+        }
+        btn.disabled = false;
     }
 
     async function loadEmployees() {
@@ -349,7 +564,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const result = await response.json();
-            employeesCache = result.data || result.results || [];
+            employeesCache = result.data?.users || result.data || result.results || [];
             return employeesCache;
         } catch { return []; }
     }
@@ -366,53 +581,218 @@ document.addEventListener('DOMContentLoaded', async function() {
         } catch { return []; }
     }
 
+    const roleTranslations = {
+        'driver': 'Conductor',
+        'conductor': 'Conductor',
+        'guia': 'Guía',
+        'guide': 'Guía',
+        'greeter': 'Greeter',
+        'employee_amexing': 'Amexing',
+        'limpieza': 'Limpieza',
+        'admin': 'Admin'
+    };
+
+    function translateRole(role) {
+        if (!role) return '';
+        return roleTranslations[role.toLowerCase()] || role;
+    }
+
+    function buildOptionHtml(items, selectedId, nameField, showRole) {
+        let html = '<option value="">— Sin asignar —</option>';
+        items.forEach(item => {
+            const firstName = item.firstName || '';
+            const lastName = item.lastName || '';
+            const name = (firstName && lastName) ? `${firstName} ${lastName}` : (item[nameField] || item.fullName || item.username || item.name || 'Sin nombre');
+            const id = item.id || item.objectId;
+            let roleLabel = '';
+            if (showRole) {
+                let rolesText = '';
+                if (Array.isArray(item.futureRoles) && item.futureRoles.length > 0) {
+                    rolesText = item.futureRoles.map(r => translateRole(r)).join(', ');
+                } else {
+                    rolesText = translateRole(item.displayRole || item.role || '');
+                }
+                if (rolesText) roleLabel = ` · ${rolesText}`;
+            }
+            html += `<option value="${id}" ${id === selectedId ? 'selected' : ''}>${name}${roleLabel}</option>`;
+        });
+        return html;
+    }
+
+    function buildVehicleOptionHtml(vehicles, selectedId) {
+        let html = '<option value="">— Sin asignar —</option>';
+        vehicles.forEach(v => {
+            const id = v.id || v.objectId;
+            const typeName = v.vehicleTypeId?.name || '';
+            const label = `${v.brand || ''} ${v.model || ''}`.trim();
+            const plate = v.licensePlate ? ` (${v.licensePlate})` : '';
+            const cap = v.capacity ? ` · ${v.capacity} pax` : '';
+            const typePrefix = typeName ? `[${typeName}] ` : '';
+            const display = `${typePrefix}${label}${plate}${cap}`;
+            html += `<option value="${id}" data-name="${label}${plate}" ${id === selectedId ? 'selected' : ''}>${display}</option>`;
+        });
+        return html;
+    }
+
     async function openAssignModal(btn) {
         const serviceId = btn.dataset.serviceId;
+        const serviceType = btn.dataset.serviceType;
+        const serviceConcept = btn.dataset.serviceConcept;
+        const serviceRoute = btn.dataset.serviceRoute;
+        const includeGuide = btn.dataset.includeGuide;
+        const includeGreeter = btn.dataset.includeGreeter;
+        const vehicleQty = parseInt(btn.dataset.vehicleQty) || 1;
         const driverId = btn.dataset.driverId;
         const guideId = btn.dataset.guideId;
         const greeterId = btn.dataset.greeterId;
         const vehicleId = btn.dataset.vehicleId;
+        const serviceCustomerId = btn.dataset.serviceCustomerId;
+        const vehicleTypeName = btn.dataset.vehicleTypeName || '';
+        let extraAssignments = [];
+        try { extraAssignments = JSON.parse(btn.dataset.extra || '[]'); } catch { extraAssignments = []; }
 
         document.getElementById('assignServiceId').value = serviceId;
 
-        // Load employees and vehicles
+        // Modal header
+        const typeLabel = getServiceTypeLabel(serviceType);
+        const typeIcon = getServiceTypeIcon(serviceType);
+        document.getElementById('assignModalTitle').innerHTML = `<i class="ti ${typeIcon} me-2"></i>${serviceConcept || typeLabel}`;
+        const subtitleParts = [typeLabel];
+        if (serviceRoute) subtitleParts.push(serviceRoute);
+        document.getElementById('assignModalSubtitle').textContent = subtitleParts.join(' — ');
+
         const [employees, vehicles] = await Promise.all([loadEmployees(), loadVehicles()]);
 
-        // Populate dropdowns
-        const driverSelect = document.getElementById('assignDriver');
-        const guideSelect = document.getElementById('assignGuide');
-        const greeterSelect = document.getElementById('assignGreeter');
-        const vehicleSelect = document.getElementById('assignVehicle');
+        const hasFutureRole = (e, role) => Array.isArray(e.futureRoles) && e.futureRoles.some(r => r.toLowerCase() === role);
+        const drivers = employees.filter(e => e.role === 'driver' || e.role === 'employee_amexing' || e.role === 'admin' || hasFutureRole(e, 'driver') || hasFutureRole(e, 'conductor'));
+        const guides = employees.filter(e => e.role === 'guia' || e.role === 'employee_amexing' || e.role === 'admin' || e.displayRole === 'guia' || hasFutureRole(e, 'guia') || hasFutureRole(e, 'guide'));
+        const greeters = employees.filter(e => e.role === 'greeter' || e.role === 'employee_amexing' || e.role === 'admin' || e.displayRole === 'greeter' || hasFutureRole(e, 'greeter'));
+        const amexingEmployees = employees;
 
-        // Filter employees by role
-        const drivers = employees.filter(e => e.role === 'driver' || e.role === 'employee_amexing');
-        const guides = employees.filter(e => e.role === 'guia' || e.role === 'employee_amexing');
-        const greeters = employees.filter(e => e.role === 'greeter' || e.role === 'employee_amexing');
+        // Build modal body dynamically
+        const body = document.getElementById('assignModalBody');
+        let html = '<input type="hidden" id="assignServiceId" value="' + serviceId + '">';
 
-        function populateSelect(select, items, selectedId, nameField) {
-            select.innerHTML = '<option value="">Sin asignar</option>';
-            items.forEach(item => {
-                const name = item[nameField] || item.fullName || item.username || item.name || 'Sin nombre';
-                const id = item.id || item.objectId;
-                select.innerHTML += `<option value="${id}" ${id === selectedId ? 'selected' : ''}>${name}</option>`;
-            });
+        // Vehicle/Driver pairs section
+        const vehicleHint = vehicleTypeName ? `<span class="badge bg-secondary-subtle text-secondary ms-2"><i class="ti ti-car me-1"></i>${vehicleTypeName}</span>` : '';
+        if (vehicleQty > 1) {
+            html += `<div class="mb-2"><small class="text-muted fw-semibold"><i class="ti ti-car me-1"></i>${vehicleQty} vehiculos requeridos</small>${vehicleHint}</div>`;
+        } else if (vehicleTypeName) {
+            html += `<div class="mb-2"><small class="text-muted fw-semibold">Vehiculo solicitado:</small>${vehicleHint}</div>`;
         }
 
-        populateSelect(driverSelect, drivers, driverId, 'fullName');
-        populateSelect(guideSelect, guides, guideId, 'fullName');
-        populateSelect(greeterSelect, greeters, greeterId, 'fullName');
-        populateSelect(vehicleSelect, vehicles, vehicleId, 'name');
+        for (let i = 0; i < vehicleQty; i++) {
+            const pairDriverId = i === 0 ? driverId : (extraAssignments[i - 1]?.driverId || '');
+            const pairVehicleId = i === 0 ? vehicleId : (extraAssignments[i - 1]?.vehicleId || '');
+            const pairLabel = vehicleQty > 1 ? `Vehiculo ${i + 1}` : '';
+
+            html += `<div class="${vehicleQty > 1 ? 'vehicle-pair-group' : ''}">`;
+            if (pairLabel) {
+                html += `<div class="pair-label">${pairLabel}</div>`;
+            }
+            html += `
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="assign-field-group mb-0">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="assign-icon bg-info-subtle text-info"><i class="ti ti-steering-wheel"></i></span>
+                                <label class="form-label mb-0 fw-semibold small">Conductor</label>
+                            </div>
+                            <select class="form-select form-select-sm assign-driver-select" data-pair-index="${i}">
+                                ${buildOptionHtml(drivers, pairDriverId, 'fullName', true)}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="assign-field-group mb-0">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="assign-icon bg-secondary-subtle text-secondary"><i class="ti ti-car"></i></span>
+                                <label class="form-label mb-0 fw-semibold small">Vehiculo</label>
+                            </div>
+                            <select class="form-select form-select-sm assign-vehicle-select" data-pair-index="${i}">
+                                ${buildVehicleOptionHtml(vehicles, pairVehicleId)}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // Guide (conditionally shown)
+        if (includeGuide !== 'false') {
+            html += `
+            <div class="assign-field-group" id="guideGroup">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="assign-icon bg-success-subtle text-success"><i class="ti ti-map-pin"></i></span>
+                    <label class="form-label mb-0 fw-semibold small">Guia</label>
+                </div>
+                <select class="form-select form-select-sm" id="assignGuide">
+                    ${buildOptionHtml(guides, guideId, 'fullName', true)}
+                </select>
+            </div>`;
+        }
+
+        // Greeter (conditionally shown)
+        if (includeGreeter !== 'false') {
+            html += `
+            <div class="assign-field-group" id="greeterGroup">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="assign-icon bg-warning-subtle text-warning"><i class="ti ti-hand-stop"></i></span>
+                    <label class="form-label mb-0 fw-semibold small">Greeter</label>
+                </div>
+                <select class="form-select form-select-sm" id="assignGreeter">
+                    ${buildOptionHtml(greeters, greeterId, 'fullName', true)}
+                </select>
+            </div>`;
+        }
+
+        // Service Customer
+        html += `
+        <div class="assign-field-group mb-0" id="serviceCustomerGroup">
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="assign-icon bg-primary-subtle text-primary"><i class="ti ti-user-star"></i></span>
+                <label class="form-label mb-0 fw-semibold small">Seguidor de Servicio</label>
+            </div>
+            <select class="form-select form-select-sm" id="assignServiceCustomer">
+                ${buildOptionHtml(amexingEmployees, serviceCustomerId, 'fullName', true)}
+            </select>
+        </div>`;
+
+        body.innerHTML = html;
 
         const modal = new bootstrap.Modal(document.getElementById('assignModal'));
         modal.show();
     }
 
     document.getElementById('saveAssignmentBtn')?.addEventListener('click', async function() {
-        const serviceId = document.getElementById('assignServiceId').value;
-        const driverId = document.getElementById('assignDriver').value;
-        const guideId = document.getElementById('assignGuide').value;
-        const greeterId = document.getElementById('assignGreeter').value;
-        const vehicleId = document.getElementById('assignVehicle').value;
+        const serviceId = document.getElementById('assignServiceId')?.value
+            || document.querySelector('#assignModalBody input[type="hidden"]')?.value;
+        if (!serviceId) return;
+
+        const driverSelects = document.querySelectorAll('.assign-driver-select');
+        const vehicleSelects = document.querySelectorAll('.assign-vehicle-select');
+
+        // Primary assignment (index 0)
+        const driverId = driverSelects[0]?.value || '';
+        const vehicleId = vehicleSelects[0]?.value || '';
+        const guideId = document.getElementById('assignGuide')?.value || '';
+        const greeterId = document.getElementById('assignGreeter')?.value || '';
+        const serviceCustomerId = document.getElementById('assignServiceCustomer')?.value || '';
+
+        // Extra assignments (index 1+)
+        const extraAssignments = [];
+        for (let i = 1; i < driverSelects.length; i++) {
+            const eDriverId = driverSelects[i]?.value || '';
+            const eVehicleId = vehicleSelects[i]?.value || '';
+            const driverOpt = driverSelects[i]?.selectedOptions[0];
+            const vehicleOpt = vehicleSelects[i]?.selectedOptions[0];
+            extraAssignments.push({
+                driverId: eDriverId,
+                vehicleId: eVehicleId,
+                driverName: eDriverId ? (driverOpt?.textContent?.split(' · ')[0]?.trim() || '') : '',
+                vehicleName: eVehicleId ? (vehicleOpt?.dataset?.name || vehicleOpt?.textContent?.trim() || '') : '',
+            });
+        }
 
         try {
             const response = await fetch(`/api/reservations/${reservationId}/services/${serviceId}/assign`, {
@@ -421,23 +801,59 @@ document.addEventListener('DOMContentLoaded', async function() {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ driverId, guideId, greeterId, vehicleId }),
+                body: JSON.stringify({ driverId, guideId, greeterId, vehicleId, serviceCustomerId, extraAssignments }),
             });
+
             const result = await response.json();
             if (result.success) {
                 bootstrap.Modal.getInstance(document.getElementById('assignModal'))?.hide();
-                await loadReservation(); // Reload to show updated assignments
+                await loadReservation();
             } else {
-                alert(result.error || 'Error al guardar asignación');
+                alert(result.error || 'Error al guardar asignacion');
             }
         } catch (err) {
             console.error('Assignment error:', err);
-            alert('Error al guardar asignación');
+            alert('Error al guardar asignacion');
+        }
+    });
+
+    // Service Customer at reservation level
+    document.getElementById('changeServiceCustomerBtn')?.addEventListener('click', async function() {
+        const employees = await loadEmployees();
+        const currentId = reservationData.serviceCustomer?.id || '';
+        const select = document.getElementById('resServiceCustomerSelect');
+        select.innerHTML = buildOptionHtml(employees, currentId, 'fullName', true);
+
+        const modal = new bootstrap.Modal(document.getElementById('serviceCustomerModal'));
+        modal.show();
+    });
+
+    document.getElementById('saveResServiceCustomerBtn')?.addEventListener('click', async function() {
+        const serviceCustomerId = document.getElementById('resServiceCustomerSelect').value;
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/service-customer`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ serviceCustomerId }),
+            });
+            const result = await response.json();
+            if (result.success) {
+                bootstrap.Modal.getInstance(document.getElementById('serviceCustomerModal'))?.hide();
+                await loadReservation();
+            } else {
+                alert(result.error || 'Error al asignar seguidor');
+            }
+        } catch (err) {
+            console.error('Service customer error:', err);
+            alert('Error al asignar seguidor');
         }
     });
 
     async function cancelReservation() {
-        if (!confirm('¿Estás seguro de cancelar esta reservación? Se cancelarán todos los servicios.')) return;
+        if (!confirm('Estas seguro de cancelar esta reservacion? Se cancelaran todos los servicios.')) return;
         try {
             const response = await fetch(`/api/reservations/${reservationId}/cancel`, {
                 method: 'POST',
@@ -454,7 +870,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         } catch (err) {
             console.error('Cancel error:', err);
-            alert('Error al cancelar reservación');
+            alert('Error al cancelar reservacion');
         }
     }
 

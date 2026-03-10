@@ -167,6 +167,14 @@ class Reservation extends BaseModel {
   setCreatedBy(user) {
     this.set('createdBy', user);
   }
+
+  getServiceCustomer() {
+    return this.get('serviceCustomer');
+  }
+
+  setServiceCustomer(serviceCustomer) {
+    this.set('serviceCustomer', serviceCustomer);
+  }
 }
 
 // Register the subclass with Parse

@@ -889,7 +889,7 @@ class QuoteService {
       let endDate = null;
       for (const day of days) {
         if (day.date) {
-          const d = new Date(day.date);
+          const d = new Date(`${day.date}T12:00:00`);
           if (!startDate || d < startDate) startDate = d;
           if (!endDate || d > endDate) endDate = d;
         }
@@ -955,7 +955,7 @@ class QuoteService {
           resSvc.set('exists', true);
 
           if (day.date) {
-            resSvc.set('serviceDate', new Date(day.date));
+            resSvc.set('serviceDate', new Date(`${day.date}T12:00:00`));
           }
 
           servicesToSave.push(resSvc);

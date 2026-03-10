@@ -183,6 +183,22 @@ class ReservationService extends BaseModel {
   setSubconcept(subconcept) {
     this.set('subconcept', subconcept);
   }
+
+  getAssignedServiceCustomer() {
+    return this.get('assignedServiceCustomer');
+  }
+
+  setAssignedServiceCustomer(serviceCustomer) {
+    this.set('assignedServiceCustomer', serviceCustomer);
+  }
+
+  getExtraAssignments() {
+    return this.get('extraAssignments');
+  }
+
+  setExtraAssignments(extraAssignments) {
+    this.set('extraAssignments', extraAssignments);
+  }
 }
 
 // Register the subclass with Parse
