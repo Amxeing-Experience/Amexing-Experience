@@ -117,6 +117,23 @@
         </div>
     </div>
 
+    <!-- Financial Summary Card -->
+    <div class="card border-0 shadow-sm mb-4" id="financialSummaryCard" style="display:none;">
+        <div class="card-header" style="background: linear-gradient(135deg, #0d9488 0%, #5eead4 100%); border: none;">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-calculator me-2"></i>Resumen Financiero
+                </h5>
+                <button class="btn btn-sm btn-light d-none" id="addAdjustmentBtn">
+                    <i class="ti ti-plus me-1"></i>Agregar
+                </button>
+            </div>
+        </div>
+        <div class="card-body" id="financialSummaryBody">
+            <!-- Rendered by JS -->
+        </div>
+    </div>
+
     <!-- Services by Day -->
     <div class="card border-0 shadow-sm">
         <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
@@ -435,6 +452,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         renderServices(d.services);
+        renderFinancialSummary();
 
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('reservationContent').style.display = '';
@@ -908,6 +926,174 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     });
 
+    // ===== FINANCIAL SUMMARY =====
+
+    function renderFinancialSummary() {
+        const d = reservationData;
+        const card = document.getElementById('financialSummaryCard');
+        const body = document.getElementById('financialSummaryBody');
+        const addBtn = document.getElementById('addAdjustmentBtn');
+        const adjustments = d.adjustments || [];
+        const servicesSubtotal = d.servicesSubtotal || d.totalAmount || 0;
+        const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
+
+        card.style.display = '';
+        if (canEdit) addBtn.classList.remove('d-none');
+        else addBtn.classList.add('d-none');
+
+        const charges = adjustments.filter(a => a.type === 'charge');
+        const discounts = adjustments.filter(a => a.type === 'discount');
+        const chargesTotal = charges.reduce((s, a) => s + (a.amount || 0), 0);
+        const discountsTotal = discounts.reduce((s, a) => s + (a.amount || 0), 0);
+        const finalTotal = d.totalAmount || 0;
+        const curr = d.currency || 'MXN';
+
+        let html = '';
+        // Subtotal line
+        html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+            <span class="text-muted"><i class="ti ti-list-details me-2"></i>Subtotal Servicios</span>
+            <span class="fw-semibold">${formatCurrency(servicesSubtotal, curr)}</span>
+        </div>`;
+
+        // Charges
+        charges.forEach(adj => {
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div>
+                    <i class="ti ti-plus text-danger me-1"></i>
+                    <span class="small">${adj.description}</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
+                    ${canEdit ? `<button class="btn btn-sm btn-outline-danger py-0 px-1 remove-adj-btn" data-adj-id="${adj.id}" title="Eliminar"><i class="ti ti-x" style="font-size:0.75rem"></i></button>` : ''}
+                </div>
+            </div>`;
+        });
+
+        // Discounts
+        discounts.forEach(adj => {
+            const pctLabel = adj.percentage ? ` (${adj.percentage}%)` : '';
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div>
+                    <i class="ti ti-discount-2 text-success me-1"></i>
+                    <span class="small">${adj.description}${pctLabel}</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>
+                    ${canEdit ? `<button class="btn btn-sm btn-outline-danger py-0 px-1 remove-adj-btn" data-adj-id="${adj.id}" title="Eliminar"><i class="ti ti-x" style="font-size:0.75rem"></i></button>` : ''}
+                </div>
+            </div>`;
+        });
+
+        // Final total
+        html += `<div class="d-flex justify-content-between align-items-center py-2 mt-1">
+            <span class="fw-bold"><i class="ti ti-receipt me-2"></i>Total Final</span>
+            <span class="fw-bold fs-5 text-success">${formatCurrency(finalTotal, curr)}</span>
+        </div>`;
+
+        body.innerHTML = html;
+
+        // Bind remove buttons
+        body.querySelectorAll('.remove-adj-btn').forEach(btn => {
+            btn.addEventListener('click', () => removeAdjustment(btn.dataset.adjId));
+        });
+    }
+
+    async function removeAdjustment(adjId) {
+        if (!confirm('Eliminar este ajuste?')) return;
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/adjustments/${adjId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const result = await response.json();
+            if (result.success) {
+                await loadReservation();
+            } else {
+                alert(result.error || 'Error al eliminar ajuste');
+            }
+        } catch (err) {
+            console.error('Remove adjustment error:', err);
+            alert('Error al eliminar ajuste');
+        }
+    }
+
+    // Add Adjustment Modal logic
+    document.getElementById('addAdjustmentBtn')?.addEventListener('click', () => {
+        // Reset form
+        document.getElementById('adjTypeCharge').checked = true;
+        document.getElementById('adjDescription').value = '';
+        document.getElementById('adjAmount').value = '';
+        document.getElementById('adjModeFixed').checked = true;
+        document.getElementById('adjAmountModeGroup').style.display = 'none';
+        document.getElementById('adjAmountPrefix').textContent = '$';
+        document.getElementById('adjAmountLabel').textContent = 'Monto';
+        new bootstrap.Modal(document.getElementById('addAdjustmentModal')).show();
+    });
+
+    // Toggle amount mode group when discount selected
+    document.querySelectorAll('input[name="adjType"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            const isDiscount = document.getElementById('adjTypeDiscount').checked;
+            document.getElementById('adjAmountModeGroup').style.display = isDiscount ? '' : 'none';
+            if (!isDiscount) {
+                document.getElementById('adjModeFixed').checked = true;
+                document.getElementById('adjAmountPrefix').textContent = '$';
+                document.getElementById('adjAmountLabel').textContent = 'Monto';
+            }
+        });
+    });
+
+    // Toggle amount prefix when percentage mode selected
+    document.querySelectorAll('input[name="adjAmountMode"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            const isPercent = document.getElementById('adjModePercent').checked;
+            document.getElementById('adjAmountPrefix').textContent = isPercent ? '%' : '$';
+            document.getElementById('adjAmountLabel').textContent = isPercent ? 'Porcentaje' : 'Monto';
+        });
+    });
+
+    document.getElementById('saveAdjustmentBtn')?.addEventListener('click', async () => {
+        const type = document.querySelector('input[name="adjType"]:checked').value;
+        const description = document.getElementById('adjDescription').value.trim();
+        const rawValue = parseFloat(document.getElementById('adjAmount').value);
+        const isPercent = type === 'discount' && document.getElementById('adjModePercent').checked;
+
+        if (!description) { alert('La descripcion es requerida'); return; }
+        if (!rawValue || rawValue <= 0) { alert('El valor debe ser mayor a 0'); return; }
+        if (isPercent && rawValue > 100) { alert('El porcentaje no puede ser mayor a 100'); return; }
+
+        const payload = { type, description };
+        if (isPercent) {
+            payload.percentage = rawValue;
+        } else {
+            payload.amount = rawValue;
+        }
+
+        const btn = document.getElementById('saveAdjustmentBtn');
+        btn.disabled = true;
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/adjustments`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            const result = await response.json();
+            if (result.success) {
+                bootstrap.Modal.getInstance(document.getElementById('addAdjustmentModal'))?.hide();
+                await loadReservation();
+            } else {
+                alert(result.error || 'Error al agregar ajuste');
+            }
+        } catch (err) {
+            console.error('Add adjustment error:', err);
+            alert('Error al agregar ajuste');
+        }
+        btn.disabled = false;
+    });
+
     async function cancelReservation() {
         if (!confirm('Estas seguro de cancelar esta reservacion? Se cancelaran todos los servicios.')) return;
         try {
@@ -952,6 +1138,69 @@ document.addEventListener('click', function(e) {
             </div>
             <div class="modal-body text-center">
                 <img id="photoPreviewImg" src="" class="rounded-circle img-fluid" style="max-width:200px;max-height:200px;object-fit:cover">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Adjustment Modal -->
+<div class="modal fade" id="addAdjustmentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h6 class="modal-title fw-bold mb-0">
+                    <i class="ti ti-calculator me-2"></i>Agregar Ajuste
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Tipo</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="adjType" id="adjTypeCharge" value="charge" checked>
+                            <label class="form-check-label small" for="adjTypeCharge">
+                                <i class="ti ti-plus text-danger me-1"></i>Cargo Extra
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="adjType" id="adjTypeDiscount" value="discount">
+                            <label class="form-check-label small" for="adjTypeDiscount">
+                                <i class="ti ti-discount-2 text-success me-1"></i>Descuento
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small" for="adjDescription">Descripcion</label>
+                    <input type="text" class="form-control form-control-sm" id="adjDescription" placeholder="Ej: Estacionamiento aeropuerto" required>
+                </div>
+                <div class="mb-3" id="adjAmountModeGroup" style="display:none;">
+                    <label class="form-label fw-semibold small">Modo</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="adjAmountMode" id="adjModeFixed" value="fixed" checked>
+                            <label class="form-check-label small" for="adjModeFixed">Monto fijo</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="adjAmountMode" id="adjModePercent" value="percentage">
+                            <label class="form-check-label small" for="adjModePercent">Porcentaje</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-0" id="adjAmountGroup">
+                    <label class="form-label fw-semibold small" for="adjAmount" id="adjAmountLabel">Monto</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text" id="adjAmountPrefix">$</span>
+                        <input type="number" class="form-control form-control-sm" id="adjAmount" min="0.01" step="0.01" placeholder="0.00" required>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-sm btn-primary px-4" id="saveAdjustmentBtn">
+                    <i class="ti ti-check me-1"></i>Guardar
+                </button>
             </div>
         </div>
     </div>

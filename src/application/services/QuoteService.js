@@ -901,6 +901,8 @@ class QuoteService {
       reservation.set('folio', folio);
       reservation.set('status', 'pending');
       reservation.set('totalAmount', serviceItems.total || 0);
+      reservation.set('servicesSubtotal', serviceItems.total || 0);
+      reservation.set('adjustments', []);
       reservation.set('currency', serviceItems.currency || 'MXN');
       reservation.set('paymentType', serviceItems.paymentType || 'efectivo');
       reservation.set('numberOfPeople', quote.get('numberOfPeople') || 1);

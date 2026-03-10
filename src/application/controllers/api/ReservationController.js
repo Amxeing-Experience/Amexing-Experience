@@ -425,6 +425,8 @@ class ReservationController {
           startDate: reservation.get('startDate'),
           endDate: reservation.get('endDate'),
           totalAmount: reservation.get('totalAmount'),
+          servicesSubtotal: reservation.get('servicesSubtotal') || reservation.get('totalAmount'),
+          adjustments: reservation.get('adjustments') || [],
           currency: reservation.get('currency'),
           paymentType: reservation.get('paymentType'),
           numberOfPeople: reservation.get('numberOfPeople'),
@@ -899,6 +901,209 @@ class ReservationController {
       logger.error('Error assigning service customer', { error: error.message });
       return res.status(500).json({ success: false, error: 'Error al asignar seguidor' });
     }
+  }
+
+  // =========================
+  // FINANCIAL ADJUSTMENTS
+  // =========================
+
+  /**
+   * POST /api/reservations/:id/adjustments — Add extra charge or discount.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<object>} JSON response with updated adjustments.
+   * @example
+   */
+  static async addAdjustment(req, res) {
+    try {
+      const { id } = req.params;
+      const {
+        type, description, amount, percentage,
+      } = req.body;
+
+      // Validate type
+      if (!type || !['charge', 'discount'].includes(type)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Tipo inválido. Debe ser "charge" o "discount"',
+        });
+      }
+
+      // Validate description
+      if (!description || typeof description !== 'string' || !description.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: 'La descripción es requerida',
+        });
+      }
+
+      // Validate amount or percentage
+      if (type === 'charge') {
+        if (!amount || typeof amount !== 'number' || amount <= 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'El monto debe ser un número mayor a 0',
+          });
+        }
+      } else if (!percentage && (!amount || typeof amount !== 'number' || amount <= 0)) {
+        // Discount requires either amount or percentage
+        if (percentage !== undefined && (typeof percentage !== 'number' || percentage <= 0 || percentage > 100)) {
+          return res.status(400).json({
+            success: false,
+            error: 'El porcentaje debe ser un número entre 0 y 100',
+          });
+        }
+        if (!percentage) {
+          return res.status(400).json({
+            success: false,
+            error: 'Se requiere un monto o porcentaje para el descuento',
+          });
+        }
+      }
+
+      // Fetch reservation
+      const query = new Parse.Query('Reservation');
+      query.equalTo('active', true);
+      query.equalTo('exists', true);
+      const reservation = await query.get(id, { useMasterKey: true });
+      if (!reservation) {
+        return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      }
+
+      // Initialize servicesSubtotal if not set
+      const servicesSubtotal = reservation.get('servicesSubtotal')
+        || reservation.get('totalAmount') || 0;
+      if (!reservation.get('servicesSubtotal')) {
+        reservation.set('servicesSubtotal', servicesSubtotal);
+      }
+
+      // Calculate final amount for percentage discounts
+      let finalAmount = amount;
+      if (type === 'discount' && percentage) {
+        finalAmount = Math.round(((servicesSubtotal * percentage) / 100) * 100) / 100;
+      }
+
+      // Create adjustment entry
+      const adjustment = {
+        id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        type,
+        description: description.trim(),
+        amount: finalAmount,
+        percentage: type === 'discount' && percentage ? percentage : null,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Append to adjustments array
+      const adjustments = reservation.get('adjustments') || [];
+      adjustments.push(adjustment);
+      reservation.set('adjustments', adjustments);
+
+      // Recalculate total
+      ReservationController.recalculateTotal(reservation);
+
+      await reservation.save(null, { useMasterKey: true });
+
+      logger.info('Reservation adjustment added', {
+        reservationId: id,
+        adjustmentId: adjustment.id,
+        type,
+        amount: finalAmount,
+        description: description.trim(),
+        performedBy: req.user?.id,
+      });
+
+      return res.json({
+        success: true,
+        message: type === 'charge' ? 'Cargo agregado' : 'Descuento agregado',
+        data: {
+          adjustment,
+          totalAmount: reservation.get('totalAmount'),
+          servicesSubtotal,
+          adjustments,
+        },
+      });
+    } catch (error) {
+      logger.error('Error adding adjustment', { error: error.message, stack: error.stack });
+      return res.status(500).json({ success: false, error: 'Error al agregar ajuste' });
+    }
+  }
+
+  /**
+   * DELETE /api/reservations/:id/adjustments/:adjustmentId — Remove an adjustment.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<object>} JSON response with updated adjustments.
+   * @example
+   */
+  static async removeAdjustment(req, res) {
+    try {
+      const { id, adjustmentId } = req.params;
+
+      const query = new Parse.Query('Reservation');
+      query.equalTo('active', true);
+      query.equalTo('exists', true);
+      const reservation = await query.get(id, { useMasterKey: true });
+      if (!reservation) {
+        return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      }
+
+      const adjustments = reservation.get('adjustments') || [];
+      const idx = adjustments.findIndex((a) => a.id === adjustmentId);
+      if (idx === -1) {
+        return res.status(404).json({ success: false, error: 'Ajuste no encontrado' });
+      }
+
+      const removed = adjustments.splice(idx, 1)[0];
+      reservation.set('adjustments', adjustments);
+
+      // Recalculate total
+      ReservationController.recalculateTotal(reservation);
+
+      await reservation.save(null, { useMasterKey: true });
+
+      logger.info('Reservation adjustment removed', {
+        reservationId: id,
+        adjustmentId,
+        type: removed.type,
+        amount: removed.amount,
+        performedBy: req.user?.id,
+      });
+
+      return res.json({
+        success: true,
+        message: 'Ajuste eliminado',
+        data: {
+          totalAmount: reservation.get('totalAmount'),
+          servicesSubtotal: reservation.get('servicesSubtotal') || reservation.get('totalAmount'),
+          adjustments,
+        },
+      });
+    } catch (error) {
+      logger.error('Error removing adjustment', { error: error.message, stack: error.stack });
+      return res.status(500).json({ success: false, error: 'Error al eliminar ajuste' });
+    }
+  }
+
+  /**
+   * Recalculate totalAmount from servicesSubtotal and adjustments.
+   * @param {object} reservation - Parse Reservation object.
+   * @example
+   */
+  static recalculateTotal(reservation) {
+    const servicesSubtotal = reservation.get('servicesSubtotal')
+      || reservation.get('totalAmount') || 0;
+    const adjustments = reservation.get('adjustments') || [];
+
+    const charges = adjustments
+      .filter((a) => a.type === 'charge')
+      .reduce((sum, a) => sum + (a.amount || 0), 0);
+
+    const discounts = adjustments
+      .filter((a) => a.type === 'discount')
+      .reduce((sum, a) => sum + (a.amount || 0), 0);
+
+    const finalTotal = Math.max(0, servicesSubtotal + charges - discounts);
+    reservation.set('totalAmount', Math.round(finalTotal * 100) / 100);
   }
 
   // =================

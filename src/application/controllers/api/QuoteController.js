@@ -8,6 +8,96 @@ const Quote = require('../../../domain/models/Quote');
 const QuoteService = require('../../services/QuoteService');
 const pricingHelper = require('../../utils/pricingHelper');
 const logger = require('../../../infrastructure/logger');
+const FileStorageService = require('../../services/FileStorageService');
+
+// Module-level FileStorageService for presigned S3 URLs
+const fileStorageService = new FileStorageService({
+  baseFolder: 'general',
+  isPublic: false,
+  presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+});
+
+/**
+ * Batch fetch primary images for a list of item IDs.
+ * Works with TourImage, ExperienceImage, VehicleImage, etc.
+ * @param {string} imageClass - Parse class name (e.g. 'TourImage').
+ * @param {string} pointerField - Field name for the parent pointer (e.g. 'tourId').
+ * @param {string} parentClass - Parent class name (e.g. 'Tour').
+ * @param {Array<string>} ids - Array of parent object IDs.
+ * @returns {Promise<object>} Map of parentId to presigned image URL.
+ * @example
+ */
+async function batchFetchPrimaryImages(imageClass, pointerField, parentClass, ids) {
+  const imageMap = {};
+  if (!ids || ids.length === 0) return imageMap;
+
+  try {
+    const ParentClass = Parse.Object.extend(parentClass);
+    const pointers = ids.map((id) => ParentClass.createWithoutData(id));
+
+    const imgQuery = new Parse.Query(imageClass);
+    imgQuery.containedIn(pointerField, pointers);
+    imgQuery.equalTo('isPrimary', true);
+    imgQuery.equalTo('exists', true);
+    let images = await imgQuery.find({ useMasterKey: true });
+
+    // Fallback: if no primary images, get first image per item
+    if (images.length === 0) {
+      const fallbackQuery = new Parse.Query(imageClass);
+      fallbackQuery.containedIn(pointerField, pointers);
+      fallbackQuery.equalTo('exists', true);
+      fallbackQuery.ascending('displayOrder');
+      images = await fallbackQuery.find({ useMasterKey: true });
+    }
+
+    const formatPriority = ['avif', 'webp', 'jpeg'];
+    await Promise.all(images.map(async (img) => {
+      const pid = img.get(pointerField)?.id;
+      if (!pid || imageMap[pid]) return;
+
+      let imageUrl = '';
+      const optimizedVariants = img.get('optimizedVariants');
+      const s3Key = img.get('s3Key');
+      const imageFile = img.get('imageFile');
+
+      if (optimizedVariants && typeof optimizedVariants === 'object') {
+        for (const format of formatPriority) {
+          const variant = optimizedVariants[format];
+          if (variant?.s3Key) {
+            try {
+              imageUrl = await fileStorageService.getPresignedUrl(variant.s3Key);
+              break;
+            } catch (e) { /* continue */ }
+          }
+        }
+      }
+
+      if (!imageUrl && s3Key) {
+        try {
+          imageUrl = await fileStorageService.getPresignedUrl(s3Key);
+        } catch (e) { /* continue */ }
+      }
+
+      if (!imageUrl && s3Key) {
+        const s3Bucket = img.get('s3Bucket');
+        const s3Region = img.get('s3Region');
+        if (s3Bucket && s3Region) {
+          imageUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${s3Key}`;
+        }
+      }
+
+      if (!imageUrl && imageFile) {
+        imageUrl = imageFile.url();
+      }
+
+      if (imageUrl) imageMap[pid] = imageUrl;
+    }));
+  } catch (err) {
+    logger.warn('Failed to batch fetch images', { imageClass, error: err.message });
+  }
+
+  return imageMap;
+}
 
 /**
  * Quote Controller - Manages quote/cotización CRUD operations
@@ -207,8 +297,9 @@ class QuoteController {
       const columns = ['client', 'rate', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
       const sortField = columns[sortColumnIndex] || 'createdAt';
 
-      // Build base query for all existing records with role-based filtering
+      // Build base query for all active, existing records with role-based filtering
       const baseQuery = new Parse.Query('Quote');
+      baseQuery.equalTo('active', true);
       baseQuery.equalTo('exists', true);
       baseQuery.include('client');
       baseQuery.include('rate');
@@ -219,6 +310,7 @@ class QuoteController {
 
       // Get total records count (without search filter but with role filters)
       const totalRecordsQuery = new Parse.Query('Quote');
+      totalRecordsQuery.equalTo('active', true);
       totalRecordsQuery.equalTo('exists', true);
       await this.applyRoleBasedQuoteFilters(totalRecordsQuery, currentUser, req.userRole);
       const recordsTotal = await totalRecordsQuery.count({
@@ -230,11 +322,13 @@ class QuoteController {
       if (searchValue) {
         // Search in folio, client name, or contact person
         const folioQuery = new Parse.Query('Quote');
+        folioQuery.equalTo('active', true);
         folioQuery.equalTo('exists', true);
         folioQuery.matches('folio', searchValue, 'i');
         await this.applyRoleBasedQuoteFilters(folioQuery, currentUser, req.userRole);
 
         const contactQuery = new Parse.Query('Quote');
+        contactQuery.equalTo('active', true);
         contactQuery.equalTo('exists', true);
         contactQuery.matches('contactPerson', searchValue, 'i');
         await this.applyRoleBasedQuoteFilters(contactQuery, currentUser, req.userRole);
@@ -446,6 +540,32 @@ class QuoteController {
         createdAt: quote.createdAt,
         updatedAt: quote.updatedAt,
       };
+
+      // Batch fetch primary images for tours and experiences in serviceItems
+      const tourIds = [];
+      const experienceIds = [];
+      (data.serviceItems.days || []).forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          if (sc.tourId) tourIds.push(sc.tourId);
+          if (sc.experienceId) experienceIds.push(sc.experienceId);
+        });
+      });
+
+      const [tourImageMap, expImageMap] = await Promise.all([
+        batchFetchPrimaryImages('TourImage', 'tourId', 'Tour', [...new Set(tourIds)]),
+        batchFetchPrimaryImages('ExperienceImage', 'experienceId', 'Experience', [...new Set(experienceIds)]),
+      ]);
+
+      // Inject imageUrl into each subconcept
+      data.serviceItems.days.forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          if (sc.tourId && tourImageMap[sc.tourId]) {
+            Object.assign(sc, { imageUrl: tourImageMap[sc.tourId] });
+          } else if (sc.experienceId && expImageMap[sc.experienceId]) {
+            Object.assign(sc, { imageUrl: expImageMap[sc.experienceId] });
+          }
+        });
+      });
 
       return res.json({
         success: true,
@@ -2054,7 +2174,7 @@ class QuoteController {
         return; // No additional filters needed
       }
 
-      // Department managers can only see quotes created by users in their department
+      // Department managers see quotes FOR clients in their department
       if (userRole === 'department_manager') {
         const userDepartmentId = currentUser.departmentId || currentUser.get('departmentId');
 
@@ -2063,8 +2183,7 @@ class QuoteController {
             userId: currentUser.id,
             role: userRole,
           });
-          // If no department ID, only show quotes they created themselves
-          query.equalTo('createdBy', {
+          query.equalTo('client', {
             __type: 'Pointer',
             className: 'AmexingUser',
             objectId: currentUser.id,
@@ -2081,8 +2200,7 @@ class QuoteController {
         const departmentUsers = await departmentUsersQuery.find({ useMasterKey: true });
 
         if (departmentUsers.length === 0) {
-          // No users in department, restrict to own quotes only
-          query.equalTo('createdBy', {
+          query.equalTo('client', {
             __type: 'Pointer',
             className: 'AmexingUser',
             objectId: currentUser.id,
@@ -2097,10 +2215,10 @@ class QuoteController {
           objectId: user.id,
         }));
 
-        // Filter quotes to only those created by users in this department
-        query.containedIn('createdBy', departmentUserPointers);
+        // Filter quotes to those FOR clients in this department
+        query.containedIn('client', departmentUserPointers);
 
-        logger.info('Applied department filter to quotes query', {
+        logger.info('Applied department filter to quotes query (client)', {
           userId: currentUser.id,
           departmentId: userDepartmentId,
           departmentUsersCount: departmentUsers.length,
@@ -2109,7 +2227,7 @@ class QuoteController {
         return;
       }
 
-      // Clients can only see quotes created by users in their organization
+      // Clients see quotes FOR users in their organization
       if (userRole === 'client') {
         const userClientId = currentUser.clientId || currentUser.get('clientId') || currentUser.id;
 
@@ -2122,8 +2240,7 @@ class QuoteController {
         const clientUsers = await clientUsersQuery.find({ useMasterKey: true });
 
         if (clientUsers.length === 0) {
-          // No users in organization, restrict to own quotes only
-          query.equalTo('createdBy', {
+          query.equalTo('client', {
             __type: 'Pointer',
             className: 'AmexingUser',
             objectId: currentUser.id,
@@ -2137,9 +2254,9 @@ class QuoteController {
           objectId: user.id,
         }));
 
-        query.containedIn('createdBy', clientUserPointers);
+        query.containedIn('client', clientUserPointers);
 
-        logger.info('Applied client filter to quotes query', {
+        logger.info('Applied client filter to quotes query (client)', {
           userId: currentUser.id,
           clientId: userClientId,
           clientUsersCount: clientUsers.length,

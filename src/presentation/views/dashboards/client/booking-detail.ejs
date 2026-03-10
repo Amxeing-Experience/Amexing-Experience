@@ -108,6 +108,16 @@
         </div>
     </div>
 
+    <!-- Financial Summary Card (read-only) -->
+    <div class="card border-0 shadow-sm mb-4" id="financialSummaryCard" style="display:none;">
+        <div class="card-header" style="background: linear-gradient(135deg, #0d9488 0%, #5eead4 100%); border: none;">
+            <h5 class="card-title mb-0 text-white">
+                <i class="ti ti-calculator me-2"></i>Resumen Financiero
+            </h5>
+        </div>
+        <div class="card-body" id="financialSummaryBody"></div>
+    </div>
+
     <!-- Services by Day -->
     <div class="card border-0 shadow-sm">
         <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
@@ -341,9 +351,49 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Render services grouped by day
         renderServices(d.services);
+        renderFinancialSummary();
 
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('reservationContent').style.display = '';
+    }
+
+    function renderFinancialSummary() {
+        const d = reservationData;
+        const adjustments = d.adjustments || [];
+        if (adjustments.length === 0) return;
+
+        const card = document.getElementById('financialSummaryCard');
+        const body = document.getElementById('financialSummaryBody');
+        const servicesSubtotal = d.servicesSubtotal || d.totalAmount || 0;
+        const curr = d.currency || 'MXN';
+
+        card.style.display = '';
+        let html = '';
+        html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+            <span class="text-muted"><i class="ti ti-list-details me-2"></i>Subtotal Servicios</span>
+            <span class="fw-semibold">${formatCurrency(servicesSubtotal, curr)}</span>
+        </div>`;
+
+        adjustments.filter(a => a.type === 'charge').forEach(adj => {
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-plus text-danger me-1"></i><span class="small">${adj.description}</span></div>
+                <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
+            </div>`;
+        });
+
+        adjustments.filter(a => a.type === 'discount').forEach(adj => {
+            const pctLabel = adj.percentage ? ` (${adj.percentage}%)` : '';
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-discount-2 text-success me-1"></i><span class="small">${adj.description}${pctLabel}</span></div>
+                <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>
+            </div>`;
+        });
+
+        html += `<div class="d-flex justify-content-between align-items-center py-2 mt-1">
+            <span class="fw-bold"><i class="ti ti-receipt me-2"></i>Total Final</span>
+            <span class="fw-bold fs-5 text-success">${formatCurrency(d.totalAmount || 0, curr)}</span>
+        </div>`;
+        body.innerHTML = html;
     }
 
     function getSubconceptDetails(svc) {

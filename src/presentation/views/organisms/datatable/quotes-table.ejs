@@ -427,7 +427,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                             return `<span class="badge bg-success px-3 py-2" style="font-size: 0.75rem;">${scheduledText}</span>`;
                         }
 
-                        let select = `<select class="form-select form-select-sm status-selector" data-id="${row.id}" data-folio="${row.folio}" data-email="${row.contactEmail || ''}" style="font-size: 0.75rem; cursor: pointer;">`;
+                        let select = `<select class="form-select form-select-sm status-selector" data-id="${row.id}" data-folio="${row.folio}" data-email="${row.contactEmail || (row.createdBy && row.createdBy.email) || ''}" style="font-size: 0.75rem; cursor: pointer;">`;
                         statuses.forEach(status => {
                             const selected = status.value === data ? 'selected' : '';
                             select += `<option value="${status.value}" ${selected}>${status.text}</option>`;

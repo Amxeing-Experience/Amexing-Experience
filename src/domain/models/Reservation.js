@@ -175,6 +175,22 @@ class Reservation extends BaseModel {
   setServiceCustomer(serviceCustomer) {
     this.set('serviceCustomer', serviceCustomer);
   }
+
+  getAdjustments() {
+    return this.get('adjustments') || [];
+  }
+
+  setAdjustments(adjustments) {
+    this.set('adjustments', adjustments);
+  }
+
+  getServicesSubtotal() {
+    return this.get('servicesSubtotal');
+  }
+
+  setServicesSubtotal(amount) {
+    this.set('servicesSubtotal', amount);
+  }
 }
 
 // Register the subclass with Parse

@@ -90,6 +90,28 @@ router.put(
 );
 
 /**
+ * POST /api/reservations/:id/adjustments — Add extra charge or discount (admin only).
+ */
+router.post(
+  '/:id/adjustments',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRole(['admin', 'superadmin']),
+  (req, res) => ReservationController.addAdjustment(req, res)
+);
+
+/**
+ * DELETE /api/reservations/:id/adjustments/:adjustmentId — Remove adjustment (admin only).
+ */
+router.delete(
+  '/:id/adjustments/:adjustmentId',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRole(['admin', 'superadmin']),
+  (req, res) => ReservationController.removeAdjustment(req, res)
+);
+
+/**
  * PATCH /api/reservations/:id/services/:serviceId/status — Update service status.
  */
 router.patch(

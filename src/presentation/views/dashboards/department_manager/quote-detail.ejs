@@ -425,6 +425,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (seg.dataset.status !== 'scheduled') seg.classList.add('disabled');
                     });
                 }
+                // Store createdBy email for fallback in Agendado confirmation
+                window._quoteCreatedByEmail = result.data.createdBy?.email || '';
             }
         } catch (error) {
             console.error('Error loading quote folio:', error);
@@ -509,7 +511,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (newStatus === 'scheduled') {
                 // Update email in modal from current form value
-                const email = document.getElementById('contactEmail')?.value?.trim() || '';
+                const email = document.getElementById('contactEmail')?.value?.trim() || window._quoteCreatedByEmail || '';
                 const emailNote = document.getElementById('scheduleEmailNote');
                 const emailAddr = document.getElementById('scheduleEmailAddress');
                 if (email && emailNote && emailAddr) {
