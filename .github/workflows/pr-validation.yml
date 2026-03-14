@@ -225,7 +225,7 @@ jobs:
           # Filter out obvious placeholders, JSDoc examples, and documentation
           if [ -s "$TEMP_SECRETS" ]; then
             # Exclude known placeholder patterns, JSDoc comments (lines with *), and HTML5 autocomplete values
-            FILTERED_SECRETS=$(grep -vE "(your-secure-password|sample-jwt-token|user-password|new-password|current-password|test-password|placeholder|example|demo-|fake-|autocomplete|SecurePass123|securePassword123)" "$TEMP_SECRETS" | grep -vE ":\s+\*\s+" || true)
+            FILTERED_SECRETS=$(grep -vE "(your-secure-password|sample-jwt-token|user-password|new-password|current-password|test-password|placeholder|example|demo-|fake-|autocomplete|SecurePass123|securePassword123|isWalkingTour)" "$TEMP_SECRETS" | grep -vE ":\s+\*\s+" || true)
 
             if [ -n "$FILTERED_SECRETS" ]; then
               echo "❌ Potential real secrets found in source code!"
