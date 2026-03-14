@@ -501,14 +501,23 @@ function initWalkingToursFilters() {
     // Test that selectors work
 }
 
-// Get JWT token from localStorage or cookies
-function getAccessToken() {
+// Get JWT token from localStorage, waiting for initialization if needed
+async function getAccessToken() {
     // First try localStorage (used by other parts of the app)
     const tokenFromStorage = localStorage.getItem('accessToken');
     if (tokenFromStorage) {
         return tokenFromStorage;
     }
-    
+
+    // Wait for token initialization if still in progress
+    if (window.accessTokenPromise) {
+        await window.accessTokenPromise;
+        const tokenAfterWait = localStorage.getItem('accessToken');
+        if (tokenAfterWait) {
+            return tokenAfterWait;
+        }
+    }
+
     // Fallback to cookies (httpOnly cookies won't work, but try anyway)
     const cookies = document.cookie.split(';');
     for (let cookie of cookies) {
@@ -521,12 +530,12 @@ function getAccessToken() {
 }
 
 // Load current exchange rate for USD conversion
-function loadWalkingExchangeRate() {
+async function loadWalkingExchangeRate() {
+    const token = await getAccessToken();
     return $.ajax({
         url: '/api/exchange-rate/current',
         type: 'GET',
         beforeSend: function(xhr) {
-            const token = getAccessToken();
             if (token) {
                 xhr.setRequestHeader('Authorization', 'Bearer ' + token);
             }
@@ -548,12 +557,12 @@ function loadWalkingExchangeRate() {
 }
 
 // Load current transfer rate for payment calculations
-function loadWalkingTransferRate() {
+async function loadWalkingTransferRate() {
+    const token = await getAccessToken();
     return $.ajax({
         url: '/api/transfer-rate/current',
         type: 'GET',
         beforeSend: function(xhr) {
-            const token = getAccessToken();
             if (token) {
                 xhr.setRequestHeader('Authorization', 'Bearer ' + token);
             }
@@ -572,12 +581,12 @@ function loadWalkingTransferRate() {
 }
 
 // Load current agency rate for credit card payments
-function loadWalkingAgencyRate() {
+async function loadWalkingAgencyRate() {
+    const token = await getAccessToken();
     return $.ajax({
         url: '/api/agency-rate/current',
         type: 'GET',
         beforeSend: function(xhr) {
-            const token = getAccessToken();
             if (token) {
                 xhr.setRequestHeader('Authorization', 'Bearer ' + token);
             }
@@ -600,13 +609,17 @@ function loadWalkingAgencyRate() {
 
 // Format price with currency symbol
 function formatWalkingTourPrice(price, currency) {
+    const numPrice = parseFloat(price) || 0;
     if (currency === 'USD') {
-        return `$${parseFloat(price).toLocaleString('en-US', { 
-            minimumFractionDigits: 0, 
-            maximumFractionDigits: 2 
+        return `$${numPrice.toLocaleString('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
         })} USD`;
     } else {
-        return `$${parseFloat(price).toLocaleString('es-MX')} MXN`;
+        return `$${numPrice.toLocaleString('es-MX', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        })} MXN`;
     }
 }
 
@@ -690,13 +703,13 @@ function addWalkingTourEventHandlers() {
 async function loadWalkingTourForEdit(tourId) {
     try {
 
-        // Get access token
-        const token = getAccessToken();
+        // Get access token (await in case initialization is still in progress)
+        const token = await getAccessToken();
         if (!token) {
             alert('Error de autenticación. Por favor vuelva a iniciar sesión.');
             return;
         }
-        
+
         // Fetch tour data
         const response = await fetch(`/api/tours/${tourId}`, {
             headers: {

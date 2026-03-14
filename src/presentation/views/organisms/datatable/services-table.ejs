@@ -1761,8 +1761,8 @@ table.dataTable thead th:nth-child(2) select {
                     maximumFractionDigits: 0
                 }).format(value);
             } else {
-                // MXN formatting - match backend format: "$1,234 MXN"
-                return `$${value.toLocaleString()} MXN`;
+                // MXN formatting: "$1,234.56 MXN" - always 2 decimals
+                return `$${parseFloat(value).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`;
             }
         }
         

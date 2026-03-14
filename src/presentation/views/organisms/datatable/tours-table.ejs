@@ -1111,7 +1111,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                                                         </div>
                                                     </div>
                                                     <div class="text-end">
-                                                        <div class="fw-bold text-success small">${p.formattedPrice}</div>
+                                                        <div class="fw-bold text-success small" data-original-price="${p.formattedPrice}">${p.formattedPrice}</div>
                                                         <div class="text-muted" style="font-size: 0.65rem;">por hora</div>
                                                     </div>
                                                 </div>
@@ -1496,8 +1496,8 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                     maximumFractionDigits: 0
                 }).format(value);
             } else {
-                // MXN formatting - match backend format: "$1,234 MXN"
-                return `$${value.toLocaleString()} MXN`;
+                // MXN formatting: "$1,234.56 MXN" - always 2 decimals
+                return `$${parseFloat(value).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`;
             }
         }
         
