@@ -252,11 +252,6 @@
             paymentSurchargePercentage: <%= typeof settings !== 'undefined' && settings.paymentSurchargePercentage ? settings.paymentSurchargePercentage : 21.09 %>
         };
 
-        // Inject access token from server to avoid race conditions with async fetch
-        <% if (typeof accessToken !== 'undefined' && accessToken) { %>
-        window.__SERVER_ACCESS_TOKEN__ = '<%= accessToken %>';
-        localStorage.setItem('accessToken', window.__SERVER_ACCESS_TOKEN__);
-        <% } %>
     </script>
 </head>
 

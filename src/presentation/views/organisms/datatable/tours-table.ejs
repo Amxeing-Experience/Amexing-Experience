@@ -755,30 +755,27 @@ table.dataTable tbody tr.hover {
 // Global variables for walking tour functionality
 const globalApiEndpoint = '<%= dtApiEndpoint %>';
 
+// Server-injected access token (same pattern as services-table.ejs)
+const serverAccessToken = '<%= typeof accessToken !== "undefined" ? accessToken : "" %>';
+console.log('DEBUG tours-table token:', { hasServerToken: !!serverAccessToken, len: serverAccessToken.length });
+
 // Global token getters - accessible from both IIFE and standalone functions
 function getAccessTokenSync() {
+    if (serverAccessToken) return serverAccessToken;
     const tokenFromStorage = localStorage.getItem('accessToken');
     if (tokenFromStorage) return tokenFromStorage;
-    if (window.__SERVER_ACCESS_TOKEN__) return window.__SERVER_ACCESS_TOKEN__;
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-        const [name, value] = cookie.trim().split('=');
-        if (name === 'accessToken') return value;
-    }
     return null;
 }
 
 async function getAccessToken() {
+    if (serverAccessToken) return serverAccessToken;
     const tokenFromStorage = localStorage.getItem('accessToken');
     if (tokenFromStorage) return tokenFromStorage;
-    if (window.__SERVER_ACCESS_TOKEN__) return window.__SERVER_ACCESS_TOKEN__;
     if (window.accessTokenPromise) {
         const tokenFromPromise = await window.accessTokenPromise;
         if (tokenFromPromise) return tokenFromPromise;
-        const tokenAfterWait = localStorage.getItem('accessToken');
-        if (tokenAfterWait) return tokenAfterWait;
     }
-    return getAccessTokenSync();
+    return null;
 }
 
 (function() {
