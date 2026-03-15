@@ -771,7 +771,9 @@ async function getAccessToken() {
     const tokenFromStorage = localStorage.getItem('accessToken');
     if (tokenFromStorage) return tokenFromStorage;
     if (window.accessTokenPromise) {
-        await window.accessTokenPromise;
+        const tokenFromPromise = await window.accessTokenPromise;
+        if (tokenFromPromise) return tokenFromPromise;
+        // Fallback: check localStorage in case another caller stored it
         const tokenAfterWait = localStorage.getItem('accessToken');
         if (tokenAfterWait) return tokenAfterWait;
     }

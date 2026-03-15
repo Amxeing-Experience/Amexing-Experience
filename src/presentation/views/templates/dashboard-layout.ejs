@@ -458,8 +458,9 @@
 
         function initializeAccessToken() {
             // Check if token already exists in localStorage
-            if (localStorage.getItem('accessToken')) {
-                window.accessTokenPromise = Promise.resolve();
+            var existingToken = localStorage.getItem('accessToken');
+            if (existingToken) {
+                window.accessTokenPromise = Promise.resolve(existingToken);
                 return;
             }
 
@@ -472,12 +473,14 @@
             .then(data => {
                 if (data.success && data.token) {
                     localStorage.setItem('accessToken', data.token);
-                } else {
-                    console.warn('Failed to get authentication credentials:', data.error || 'Unknown error');
+                    return data.token;
                 }
+                console.warn('Failed to get authentication credentials:', data.error || 'Unknown error');
+                return null;
             })
             .catch(error => {
                 console.error('Error initializing access token:', error);
+                return null;
             });
         }
 
