@@ -127,15 +127,6 @@ class DashboardController extends BaseController {
         accessToken = cookieToken;
       }
 
-      // DEBUG: temporary log to diagnose token availability
-      logger.info('DashboardController.renderDashboard token debug', {
-        hasLocalsToken: !!localsToken,
-        hasReqToken: !!reqToken,
-        hasCookieToken: !!cookieToken,
-        accessTokenLength: accessToken ? accessToken.length : 0,
-        view,
-      });
-
       const dashboardData = {
         stats,
         user: req.user || {

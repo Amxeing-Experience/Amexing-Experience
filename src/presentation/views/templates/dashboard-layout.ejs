@@ -254,12 +254,8 @@
 
         // Inject access token from server to avoid race conditions with async fetch
         <% if (typeof accessToken !== 'undefined' && accessToken) { %>
-        (function() {
-            var serverToken = '<%= accessToken %>';
-            if (serverToken && !localStorage.getItem('accessToken')) {
-                localStorage.setItem('accessToken', serverToken);
-            }
-        })();
+        window.__SERVER_ACCESS_TOKEN__ = '<%= accessToken %>';
+        localStorage.setItem('accessToken', window.__SERVER_ACCESS_TOKEN__);
         <% } %>
     </script>
 </head>
