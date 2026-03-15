@@ -757,7 +757,6 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
 
 // Server-injected access token (same pattern as services-table.ejs)
 const serverAccessToken = '<%= typeof accessToken !== "undefined" ? accessToken : "" %>';
-console.log('DEBUG tours-table token:', { hasServerToken: !!serverAccessToken, len: serverAccessToken.length });
 
 // Global token getters - accessible from both IIFE and standalone functions
 function getAccessTokenSync() {
