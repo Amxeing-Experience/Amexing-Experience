@@ -2375,18 +2375,46 @@ class QuoteController {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
 
-      // Determine recipient email
+      const emailService = require('../../services/EmailService');
+
+      // Check if multiple recipients were provided
+      const { recipients } = req.body || {};
+      if (Array.isArray(recipients) && recipients.length > 0) {
+        // Validate email format and cap at 10
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const uniqueEmails = [...new Set(recipients.map((e) => e.trim().toLowerCase()))];
+
+        if (uniqueEmails.length > 10) {
+          return this.sendError(res, 'Máximo 10 destinatarios permitidos', 400);
+        }
+
+        const invalidEmails = uniqueEmails.filter((e) => !emailRegex.test(e));
+        if (invalidEmails.length > 0) {
+          return this.sendError(res, `Email(s) inválido(s): ${invalidEmails.join(', ')}`, 400);
+        }
+
+        const results = await this.quoteService.sendQuoteEmailToMultiple(quote, currentUser, uniqueEmails);
+        const totalSent = results.filter((r) => r.success).length;
+        const totalFailed = results.filter((r) => !r.success).length;
+
+        return res.json({
+          success: totalSent > 0,
+          message: totalFailed === 0
+            ? `Correo enviado a ${totalSent} destinatario(s)`
+            : `Correos enviados: ${totalSent} de ${uniqueEmails.length} exitoso(s)`,
+          data: { results, totalSent, totalFailed },
+        });
+      }
+
+      // Fallback: single-email behavior (backward compatible)
       const recipientEmail = quote.get('contactEmail')
         || currentUser.get('email');
       if (!recipientEmail) {
         return this.sendError(res, 'No se encontró un email de destinatario', 400);
       }
 
-      // Send email using QuoteService helper
       await this.quoteService.sendScheduledConfirmationEmail(quote, currentUser, null);
 
-      // Mask email for response
-      const emailService = require('../../services/EmailService');
       const maskedEmail = emailService.maskEmail(recipientEmail);
 
       return res.json({
