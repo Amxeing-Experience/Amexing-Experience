@@ -755,6 +755,29 @@ table.dataTable tbody tr.hover {
 // Global variables for walking tour functionality
 const globalApiEndpoint = '<%= dtApiEndpoint %>';
 
+// Global token getters - accessible from both IIFE and standalone functions
+function getAccessTokenSync() {
+    const tokenFromStorage = localStorage.getItem('accessToken');
+    if (tokenFromStorage) return tokenFromStorage;
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'accessToken') return value;
+    }
+    return null;
+}
+
+async function getAccessToken() {
+    const tokenFromStorage = localStorage.getItem('accessToken');
+    if (tokenFromStorage) return tokenFromStorage;
+    if (window.accessTokenPromise) {
+        await window.accessTokenPromise;
+        const tokenAfterWait = localStorage.getItem('accessToken');
+        if (tokenAfterWait) return tokenAfterWait;
+    }
+    return getAccessTokenSync();
+}
+
 (function() {
     // Wait for DOM and all dependencies to be ready
     function initWhenReady() {
@@ -789,41 +812,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
         // Debug: Log the number of columns in HTML table
         const htmlColumnCount = $(`#${tableId} thead tr th`).length;
 
-        // Get JWT token from localStorage or cookies
-        // Synchronous token getter for jQuery beforeSend callbacks
-        function getAccessTokenSync() {
-            const tokenFromStorage = localStorage.getItem('accessToken');
-            if (tokenFromStorage) {
-                return tokenFromStorage;
-            }
-            const cookies = document.cookie.split(';');
-            for (let cookie of cookies) {
-                const [name, value] = cookie.trim().split('=');
-                if (name === 'accessToken') {
-                    return value;
-                }
-            }
-            return null;
-        }
-
-        // Async token getter - waits for token initialization if needed
-        async function getAccessToken() {
-            const tokenFromStorage = localStorage.getItem('accessToken');
-            if (tokenFromStorage) {
-                return tokenFromStorage;
-            }
-
-            // Wait for token initialization if still in progress
-            if (window.accessTokenPromise) {
-                await window.accessTokenPromise;
-                const tokenAfterWait = localStorage.getItem('accessToken');
-                if (tokenAfterWait) {
-                    return tokenAfterWait;
-                }
-            }
-
-            return getAccessTokenSync();
-        }
+        // getAccessToken() and getAccessTokenSync() are defined in global scope above the IIFE
 
         // Setup global AJAX configuration to include JWT token
         $.ajaxSetup({
