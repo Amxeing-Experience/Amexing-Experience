@@ -1,0 +1,102 @@
+<%
+/**
+ * Export Tarifario Button - Reusable atom component.
+ *
+ * Drop-in button that triggers a tarifario export download with loading spinner.
+ * Uses fetch + blob to track download progress and show loading state.
+ *
+ * @param {string} sections - Comma-separated section names or 'all' (default: 'all')
+ *   Valid: vehiculos, traslados, a-disposicion, experiencias, tours
+ * @param {string} label - Button text (default: 'Exportar Tarifario')
+ * @param {string} btnClass - Additional CSS classes (default: 'btn-outline-primary')
+ * @param {string} btnSize - Button size: 'btn-sm', 'btn-lg', or '' (default: '')
+ * @param {boolean} showFormatPicker - Show format dropdown (default: true)
+ *
+ * @example
+ * <%- include('../../atoms/dashboard/export-tarifario-btn', { sections: 'all' }) %>
+ * <%- include('../../atoms/dashboard/export-tarifario-btn', { sections: 'vehiculos', label: 'Exportar Vehiculos', btnSize: 'btn-sm' }) %>
+ *
+ * @author Denisse Maldonado
+ * @version 1.2.0
+ */
+
+const _sections = typeof sections !== 'undefined' ? sections : 'all';
+const _label = typeof label !== 'undefined' ? label : 'Exportar Tarifario';
+const _btnClass = typeof btnClass !== 'undefined' ? btnClass : 'btn-outline-primary';
+const _btnSize = typeof btnSize !== 'undefined' ? btnSize : '';
+const _showFormatPicker = typeof showFormatPicker !== 'undefined' ? showFormatPicker : true;
+const _btnId = 'exportTarifarioBtn_' + Math.random().toString(36).substring(2, 8);
+%>
+
+<% if (_showFormatPicker) { %>
+  <div class="btn-group" role="group">
+    <button type="button" class="btn <%= _btnClass %> <%= _btnSize %> tarifario-export-trigger"
+      id="<%= _btnId %>_excel"
+      data-sections="<%= _sections %>"
+      data-format="excel"
+      title="Exportar como Excel">
+      <i class="ti ti-file-spreadsheet me-1"></i> <%= _label %> (Excel)
+    </button>
+    <button type="button" class="btn <%= _btnClass %> <%= _btnSize %> tarifario-export-trigger"
+      id="<%= _btnId %>_pdf"
+      data-sections="<%= _sections %>"
+      data-format="pdf"
+      title="Exportar como PDF">
+      <i class="ti ti-file-type-pdf me-1"></i> PDF
+    </button>
+  </div>
+<% } else { %>
+  <button type="button" class="btn <%= _btnClass %> <%= _btnSize %> tarifario-export-trigger"
+    id="<%= _btnId %>"
+    data-sections="<%= _sections %>"
+    data-format="excel"
+    title="<%= _label %>">
+    <i class="ti ti-download me-1"></i> <%= _label %>
+  </button>
+<% } %>
+
+<script>
+(function() {
+  function downloadTarifarioAtom(url, btn) {
+    var originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Generando...';
+
+    fetch(url, { credentials: 'same-origin' })
+      .then(function(response) {
+        if (!response.ok) {
+          return response.json().then(function(data) { throw new Error(data.error || 'Error al exportar'); });
+        }
+        var disposition = response.headers.get('Content-Disposition') || '';
+        var match = disposition.match(/filename="?([^"]+)"?/);
+        var filename = match ? match[1] : 'tarifario-amexing.xlsx';
+        return response.blob().then(function(blob) { return { blob: blob, filename: filename }; });
+      })
+      .then(function(result) {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(result.blob);
+        a.download = result.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+      })
+      .catch(function(err) { alert(err.message || 'Error al generar la exportacion.'); })
+      .finally(function() {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      });
+  }
+
+  document.querySelectorAll('.tarifario-export-trigger').forEach(function(btn) {
+    if (btn.dataset.tarifarioBound) return;
+    btn.dataset.tarifarioBound = 'true';
+    btn.addEventListener('click', function() {
+      var sects = this.getAttribute('data-sections');
+      var fmt = this.getAttribute('data-format');
+      var url = '/api/tarifario/export?sections=' + sects + '&format=' + fmt;
+      downloadTarifarioAtom(url, this);
+    });
+  });
+})();
+</script>

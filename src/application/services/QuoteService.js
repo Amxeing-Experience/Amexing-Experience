@@ -1094,6 +1094,116 @@ class QuoteService {
       recipientEmail: emailService.maskEmail(recipientEmail),
     });
   }
+
+  /**
+   * Send quote confirmation email to multiple recipients.
+   * Generates PDF once and sends in parallel.
+   * @param {Parse.Object} quote
+   * @param {Parse.Object} currentUser
+   * @param {string[]} recipientEmails
+   * @returns {Promise<Array<{email: string, success: boolean, error?: string}>>}
+   * @example
+   */
+  async sendQuoteEmailToMultiple(quote, currentUser, recipientEmails) {
+    // eslint-disable-next-line global-require
+    const emailService = require('./EmailService');
+
+    if (!emailService.isAvailable()) {
+      logger.info('Email service not available, skipping multi-recipient email', {
+        quoteId: quote.id,
+      });
+      return recipientEmails.map((email) => ({
+        email: emailService.maskEmail(email),
+        success: false,
+        error: 'Servicio de correo no disponible',
+      }));
+    }
+
+    // Generate PDF once
+    let pdfBuffer = null;
+    let pdfFilename = null;
+    try {
+      const receiptResult = await this.generateReceipt(currentUser, quote.id, currentUser.get('role'));
+      if (receiptResult?.success && receiptResult.data?.pdfBuffer) {
+        ({ pdfBuffer } = receiptResult.data);
+        pdfFilename = receiptResult.data.filename;
+      }
+    } catch (pdfErr) {
+      logger.warn('Failed to generate PDF for multi-recipient email', {
+        quoteId: quote.id,
+        error: pdfErr.message,
+      });
+    }
+
+    // Build share URL
+    const baseUrl = process.env.APP_BASE_URL
+      || process.env.EMAIL_BASE_URL
+      || `http://localhost:${process.env.PORT || 1337}`;
+    const shareUrl = `${baseUrl}/quotes/${quote.get('folio')}`;
+
+    // Format dates
+    const formatDate = (d) => {
+      if (!d) return null;
+      const dateObj = d instanceof Date ? d : new Date(d);
+      return dateObj.toLocaleDateString('es-MX', {
+        day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC',
+      });
+    };
+
+    const serviceItems = quote.get('serviceItems') || {};
+    const days = serviceItems.days || [];
+    let startDate = null;
+    let endDate = null;
+    for (const day of days) {
+      if (day.date) {
+        const d = new Date(`${day.date}T12:00:00`);
+        if (!startDate || d < new Date(`${startDate}T12:00:00`)) startDate = day.date;
+        if (!endDate || d > new Date(`${endDate}T12:00:00`)) endDate = day.date;
+      }
+    }
+
+    const recipientName = quote.get('contactPerson')
+      || currentUser.get('fullName')
+      || `${currentUser.get('firstName') || ''} ${currentUser.get('lastName') || ''}`.trim()
+      || currentUser.get('username');
+
+    // Send to all recipients in parallel
+    const settled = await Promise.allSettled(
+      recipientEmails.map((email) => emailService.sendQuoteConfirmation({
+        recipientEmail: email,
+        recipientName,
+        folio: quote.get('folio'),
+        reservationFolio: null,
+        eventType: quote.get('eventType') || '',
+        startDate: formatDate(startDate),
+        endDate: formatDate(endDate),
+        numberOfPeople: quote.get('numberOfPeople') || 1,
+        shareUrl,
+        pdfBuffer,
+        pdfFilename,
+      }))
+    );
+
+    const results = settled.map((result, i) => {
+      const masked = emailService.maskEmail(recipientEmails[i]);
+      if (result.status === 'fulfilled' && result.value?.success) {
+        return { email: masked, success: true };
+      }
+      const error = result.status === 'rejected'
+        ? result.reason?.message
+        : result.value?.error || 'Error desconocido';
+      return { email: masked, success: false, error };
+    });
+
+    logger.info('Quote multi-recipient email results', {
+      quoteId: quote.id,
+      folio: quote.get('folio'),
+      totalSent: results.filter((r) => r.success).length,
+      totalFailed: results.filter((r) => !r.success).length,
+    });
+
+    return results;
+  }
 }
 
 module.exports = QuoteService;

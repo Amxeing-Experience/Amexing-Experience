@@ -881,9 +881,9 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'department
         // Format currency based on selection
         function formatPrice(amount, currency) {
             if (currency === 'USD') {
-                return `$${amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} USD`;
+                return `$${amount.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})} USD`;
             } else {
-                return `$${amount.toLocaleString('es-MX', {minimumFractionDigits: 0, maximumFractionDigits: 0})} MXN`;
+                return `$${amount.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})} MXN`;
             }
         }
         

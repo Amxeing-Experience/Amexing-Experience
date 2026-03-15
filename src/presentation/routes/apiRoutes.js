@@ -467,6 +467,12 @@ router.use('/vehicle-rate-prices', vehicleRatePricesRoutes); // Vehicle rate pri
 router.use('/disposable-prices', disposablePricesRoutes); // Disposable prices (A Disposición) management endpoints
 router.use('/reservations', require('./api/reservationRoutes')); // Reservation management endpoints
 
+// Tarifario Export - Admin and SuperAdmin only
+const TarifarioExportController = require('../../application/controllers/api/TarifarioExportController');
+
+const tarifarioExportController = new TarifarioExportController();
+router.get('/tarifario/export', jwtMiddleware.requireRoleLevel(6), (req, res) => tarifarioExportController.exportTarifario(req, res));
+
 /**
  * Email Test Endpoint - SuperAdmin Only
  * Sends a test email to verify MailerSend configuration.

@@ -752,6 +752,20 @@ class ItineraryBuilder {
       }
     }
 
+    // Show/hide Greeter checkbox (only for Transport)
+    const greeterCheckboxContainer = document.getElementById('greeterCheckboxContainer');
+    const greeterInVehicleContainer = document.getElementById('greeterInVehicleContainer');
+    const includeGreeter = document.getElementById('includeGreeter');
+    const greeterInVehicle = document.getElementById('greeterInVehicle');
+    if (type === 'transport') {
+      if (greeterCheckboxContainer) greeterCheckboxContainer.classList.remove('d-none');
+    } else {
+      if (greeterCheckboxContainer) greeterCheckboxContainer.classList.add('d-none');
+      if (greeterInVehicleContainer) greeterInVehicleContainer.classList.add('d-none');
+      if (includeGreeter) includeGreeter.checked = false;
+      if (greeterInVehicle) greeterInVehicle.checked = false;
+    }
+
     // Show/hide category, vehicle, guide and quantity fields based on service type
     const categoryField = document.getElementById('transportCategory')?.closest('.col-md-6');
     const vehicleField = document.getElementById('vehicleSelect')?.closest('.col-md-4');
