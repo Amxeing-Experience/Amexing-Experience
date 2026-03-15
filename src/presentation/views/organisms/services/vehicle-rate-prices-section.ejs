@@ -488,13 +488,17 @@ function loadVehicleRatesAgencyRate() {
 
 // Format price with currency symbol (reuse existing pattern)
 function formatVehicleRatePrice(price, currency) {
+    const numPrice = parseFloat(price) || 0;
     if (currency === 'USD') {
-        return `$${parseFloat(price).toLocaleString('en-US', { 
-            minimumFractionDigits: 0, 
-            maximumFractionDigits: 2 
+        return `$${numPrice.toLocaleString('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
         })} USD`;
     } else {
-        return `$${parseFloat(price).toLocaleString('es-MX')} MXN`;
+        return `$${numPrice.toLocaleString('es-MX', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        })} MXN`;
     }
 }
 
