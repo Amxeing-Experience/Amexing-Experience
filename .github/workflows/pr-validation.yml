@@ -78,21 +78,22 @@ jobs:
           # DevDependencies (eslint, jest, depcheck) don't affect deployed code
           echo "Running smart dependency security audit..."
 
-          # Get full audit output
+          # Get full audit output and strip ANSI color codes for reliable parsing
           audit_output=$(yarn audit 2>&1) || true
+          audit_clean=$(echo "$audit_output" | sed 's/\x1b\[[0-9;]*m//g')
 
-          # Extract unique vulnerable package names from audit output
           # Known accepted packages with no stable patch available:
           # - parse-server: critical+high vulns patched only in alpha (>=9.6.0-alpha.11)
           # - express-rate-limit: transitive dep of parse-server, IPv4-mapped IPv6 bypass is low-risk
           KNOWN_ACCEPTED="parse-server|express-rate-limit"
 
           # Check for Critical vulnerabilities
-          if echo "$audit_output" | grep -E "│ critical" >/dev/null 2>&1; then
-            dangerous_critical=$(echo "$audit_output" | grep -B5 "│ critical" | grep "│" | grep -v "│ critical" | grep -v "$KNOWN_ACCEPTED" | grep -c "│" || true)
-            dangerous_critical=${dangerous_critical:-0}
+          if echo "$audit_clean" | grep -q "│ critical"; then
+            # Extract package names from critical advisory blocks (Package is on same line as name)
+            critical_packages=$(echo "$audit_clean" | grep -A15 "│ critical" | grep "│ Package" | awk -F'│' '{print $3}' | xargs | sort -u)
+            unknown_critical=$(echo "$critical_packages" | grep -cvE "^$|$KNOWN_ACCEPTED" || true)
 
-            if [ "$dangerous_critical" -gt 0 ] 2>/dev/null; then
+            if [ "${unknown_critical:-0}" -gt 0 ] 2>/dev/null; then
               echo "❌ Critical severity vulnerabilities found!"
               echo "$audit_output"
               exit 1
@@ -103,11 +104,11 @@ jobs:
           fi
 
           # Check for High vulnerabilities
-          if echo "$audit_output" | grep -E "│ high" >/dev/null 2>&1; then
-            dangerous_high=$(echo "$audit_output" | grep -B5 "│ high" | grep "│" | grep -v "│ high" | grep -v "$KNOWN_ACCEPTED" | grep -c "│" || true)
-            dangerous_high=${dangerous_high:-0}
+          if echo "$audit_clean" | grep -q "│ high"; then
+            high_packages=$(echo "$audit_clean" | grep -A15 "│ high" | grep "│ Package" | awk -F'│' '{print $3}' | xargs | sort -u)
+            unknown_high=$(echo "$high_packages" | grep -cvE "^$|$KNOWN_ACCEPTED" || true)
 
-            if [ "$dangerous_high" -gt 0 ] 2>/dev/null; then
+            if [ "${unknown_high:-0}" -gt 0 ] 2>/dev/null; then
               echo "❌ Dangerous High severity vulnerabilities found!"
               echo "$audit_output"
               exit 1
