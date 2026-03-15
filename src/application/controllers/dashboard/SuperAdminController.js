@@ -665,6 +665,26 @@ class SuperAdminController extends RoleBasedController {
       systemPerformance: [],
     };
   }
+
+  /**
+   * Tarifario export page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   * @example
+   */
+  async tarifarioExport(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'tarifario-export', {
+        title: 'Exportar Tarifario',
+        breadcrumb: null,
+        pageStyles: [],
+        footerScripts: '',
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
 }
 
 module.exports = new SuperAdminController();

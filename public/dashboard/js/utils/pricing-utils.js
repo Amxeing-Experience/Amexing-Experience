@@ -46,10 +46,11 @@ window.PricingUtils = (function () {
    * formatPriceWithCurrency(100, 'USD'); // Returns: "$100.00 USD"
    */
   function formatPriceWithCurrency(price, currency) {
+    const numPrice = parseFloat(price) || 0;
     if (currency === 'USD') {
-      return `$${parseFloat(price).toFixed(2)} USD`;
+      return `$${numPrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} USD`;
     }
-    return `$${parseFloat(price).toLocaleString('es-MX')} MXN`;
+    return `$${numPrice.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`;
   }
 
   /**
@@ -122,7 +123,7 @@ window.PricingUtils = (function () {
     }
 
     if (Number.isNaN(numericValue) || numericValue <= 0) {
-      return currency === 'USD' ? '$0.00 USD' : '$0 MXN';
+      return currency === 'USD' ? '$0 USD' : '$0.00 MXN';
     }
 
     // For now, use default rates - can be extended later
