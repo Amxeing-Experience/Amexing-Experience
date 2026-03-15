@@ -12,7 +12,13 @@
 const TarifarioExportService = require('../../services/TarifarioExportService');
 const logger = require('../../../infrastructure/logger');
 
+/**
+ * Controller for tarifario export operations.
+ */
 class TarifarioExportController {
+  /**
+   * Create a TarifarioExportController instance.
+   */
   constructor() {
     this.exportService = new TarifarioExportService();
   }
