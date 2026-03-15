@@ -81,13 +81,18 @@ jobs:
           # Get full audit output
           audit_output=$(yarn audit 2>&1) || true
 
+          # Extract unique vulnerable package names from audit output
+          # Known accepted packages with no stable patch available:
+          # - parse-server: critical+high vulns patched only in alpha (>=9.6.0-alpha.11)
+          # - express-rate-limit: transitive dep of parse-server, IPv4-mapped IPv6 bypass is low-risk
+          KNOWN_ACCEPTED="parse-server|express-rate-limit"
+
           # Check for Critical vulnerabilities
           if echo "$audit_output" | grep -E "│ critical" >/dev/null 2>&1; then
-            # Filter out known accepted packages:
-            # - parse-server: patched only in alpha (>=9.6.0-alpha.11), no stable release available
-            dangerous_critical=$(echo "$audit_output" | grep -B10 "│ critical" | grep "│ Package" -A1 | grep -v "parse-server" | grep -vE "^--|│ Package" | grep -c "[a-z]" || echo "0")
+            dangerous_critical=$(echo "$audit_output" | grep -B5 "│ critical" | grep "│" | grep -v "│ critical" | grep -v "$KNOWN_ACCEPTED" | grep -c "│" || true)
+            dangerous_critical=${dangerous_critical:-0}
 
-            if [ "$dangerous_critical" -gt 0 ]; then
+            if [ "$dangerous_critical" -gt 0 ] 2>/dev/null; then
               echo "❌ Critical severity vulnerabilities found!"
               echo "$audit_output"
               exit 1
@@ -98,30 +103,18 @@ jobs:
           fi
 
           # Check for High vulnerabilities
-          high_count=$(echo "$audit_output" | grep -c "│ high" || echo "0")
-          if [ "$high_count" -gt 0 ]; then
-            # Check vulnerability packages - minimatch ReDoS is low-risk in server context
-            # Known acceptable packages:
-            # - eslint, jest, depcheck, @redocly/cli: devDependencies only
-            # - bcrypt: build-time dependency (node-pre-gyp)
-            # - ejs, exceljs: minimatch ReDoS requires attacker-controlled glob patterns (not applicable)
-            # - aws-sdk: advisory recommends v3 migration (low priority, no patch)
+          if echo "$audit_output" | grep -E "│ high" >/dev/null 2>&1; then
+            dangerous_high=$(echo "$audit_output" | grep -B5 "│ high" | grep "│" | grep -v "│ high" | grep -v "$KNOWN_ACCEPTED" | grep -c "│" || true)
+            dangerous_high=${dangerous_high:-0}
 
-            # Check for truly dangerous High vulnerabilities (SQL injection, RCE, auth bypass)
-            # Filter out known accepted packages before checking:
-            # - parse-server: patched only in alpha (>=9.5.0-alpha), loginAs/readOnlyMasterKey not used
-            # - express-rate-limit: transitive dep of parse-server, IPv4-mapped IPv6 bypass is low-risk
-            dangerous_high=$(echo "$audit_output" | grep -B10 "│ high" | grep -v "parse-server" | grep -v "express-rate-limit" | grep -iE "(injection|remote code|authentication|authorization|bypass)" | wc -l || echo "0")
-
-            if [ "$dangerous_high" -gt 0 ]; then
+            if [ "$dangerous_high" -gt 0 ] 2>/dev/null; then
               echo "❌ Dangerous High severity vulnerabilities found!"
               echo "$audit_output"
               exit 1
             else
               echo "⚠️ High vulnerabilities found in known accepted packages:"
-              echo "   - parse-server: loginAs/readOnlyMasterKey advisory (not used, patched in alpha only)"
+              echo "   - parse-server: patched only in alpha, loginAs/readOnlyMasterKey not used"
               echo "   - express-rate-limit: IPv4-mapped IPv6 bypass (transitive dep of parse-server)"
-              echo "   - devDependencies don't affect production"
             fi
           fi
 
