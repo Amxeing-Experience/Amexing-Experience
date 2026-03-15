@@ -285,7 +285,7 @@ async function getToursData() {
     if (isWalking) {
       const priceMap = priceLookup[`${tour.id}|none`] || {};
       const row = {
-        destination: destName, duration, isWalkingTour: 'Si', vehicleType: 'A Pie',
+        destination: destName, duration, walkingTour: 'Si', vehicleType: 'A Pie',
       };
       rateNames.forEach((name) => { row[`rate_${name}`] = priceMap[name] || 0; });
       rows.push(row);
@@ -298,7 +298,7 @@ async function getToursData() {
 
     if (vehicleTypeIds.length === 0) {
       const row = {
-        destination: destName, duration, isWalkingTour: 'No', vehicleType: 'N/A',
+        destination: destName, duration, walkingTour: 'No', vehicleType: 'N/A',
       };
       rateNames.forEach((name) => { row[`rate_${name}`] = 0; });
       rows.push(row);
@@ -310,7 +310,7 @@ async function getToursData() {
       const row = {
         destination: destName,
         duration,
-        isWalkingTour: 'No',
+        walkingTour: 'No',
         vehicleType: vtNames[vtId] || 'N/A',
       };
       rateNames.forEach((name) => { row[`rate_${name}`] = priceMap[name] || 0; });
@@ -528,7 +528,7 @@ async function addToursSheet(workbook) {
   const columns = [
     { header: 'Destino', key: 'destination', width: 25 },
     { header: 'Duracion (min)', key: 'duration', width: 16 },
-    { header: 'Walking Tour', key: 'isWalkingTour', width: 14 },
+    { header: 'Walking Tour', key: 'walkingTour', width: 14 },
     { header: 'Tipo Vehiculo', key: 'vehicleType', width: 18 },
   ];
   rateNames.forEach((rateName) => {
@@ -609,7 +609,7 @@ async function buildPDFSection(doc, section) {
       const remainW = doc.page.width - 100 - fixedW;
       const rateW = rateNames.length > 0 ? remainW / rateNames.length : 80;
       const tableRows = rows.map((r) => {
-        const base = [r.destination, r.duration, r.isWalkingTour, r.vehicleType];
+        const base = [r.destination, r.duration, r.walkingTour, r.vehicleType];
         rateNames.forEach((name) => { base.push(formatCurrency(r[`rate_${name}`])); });
         return base;
       });
