@@ -81,11 +81,20 @@ jobs:
           # Get full audit output
           audit_output=$(yarn audit 2>&1) || true
 
-          # Check for Critical vulnerabilities (always block)
+          # Check for Critical vulnerabilities
           if echo "$audit_output" | grep -E "│ critical" >/dev/null 2>&1; then
-            echo "❌ Critical severity vulnerabilities found!"
-            echo "$audit_output"
-            exit 1
+            # Filter out known accepted packages:
+            # - parse-server: patched only in alpha (>=9.6.0-alpha.11), no stable release available
+            dangerous_critical=$(echo "$audit_output" | grep -B10 "│ critical" | grep "│ Package" -A1 | grep -v "parse-server" | grep -vE "^--|│ Package" | grep -c "[a-z]" || echo "0")
+
+            if [ "$dangerous_critical" -gt 0 ]; then
+              echo "❌ Critical severity vulnerabilities found!"
+              echo "$audit_output"
+              exit 1
+            else
+              echo "⚠️ Critical vulnerabilities found in known accepted packages:"
+              echo "   - parse-server: patched only in alpha (>=9.6.0-alpha.11), no stable release available"
+            fi
           fi
 
           # Check for High vulnerabilities
