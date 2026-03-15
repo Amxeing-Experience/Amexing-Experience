@@ -481,12 +481,10 @@
             });
         }
 
-        // Initialize token on page load
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeAccessToken);
-        } else {
-            initializeAccessToken();
-        }
+        // Initialize token immediately - fetch() doesn't need DOM ready
+        // Must run before DOMContentLoaded so window.accessTokenPromise is available
+        // for components that await it during their initialization
+        initializeAccessToken();
     </script>
 
     <!-- Additional scripts -->
