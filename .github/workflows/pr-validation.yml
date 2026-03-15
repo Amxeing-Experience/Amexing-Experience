@@ -78,41 +78,44 @@ jobs:
           # DevDependencies (eslint, jest, depcheck) don't affect deployed code
           echo "Running smart dependency security audit..."
 
-          # Get full audit output
+          # Get full audit output and strip ANSI color codes for reliable parsing
           audit_output=$(yarn audit 2>&1) || true
+          audit_clean=$(echo "$audit_output" | sed 's/\x1b\[[0-9;]*m//g')
 
-          # Check for Critical vulnerabilities (always block)
-          if echo "$audit_output" | grep -E "│ critical" >/dev/null 2>&1; then
-            echo "❌ Critical severity vulnerabilities found!"
-            echo "$audit_output"
-            exit 1
+          # Known accepted packages with no stable patch available:
+          # - parse-server: critical+high vulns patched only in alpha (>=9.6.0-alpha.11)
+          # - express-rate-limit: transitive dep of parse-server, IPv4-mapped IPv6 bypass is low-risk
+          KNOWN_ACCEPTED="parse-server|express-rate-limit"
+
+          # Check for Critical vulnerabilities
+          if echo "$audit_clean" | grep -q "│ critical"; then
+            # Extract package names from critical advisory blocks (Package is on same line as name)
+            critical_packages=$(echo "$audit_clean" | grep -A15 "│ critical" | grep "│ Package" | awk -F'│' '{print $3}' | xargs | sort -u)
+            unknown_critical=$(echo "$critical_packages" | grep -cvE "^$|$KNOWN_ACCEPTED" || true)
+
+            if [ "${unknown_critical:-0}" -gt 0 ] 2>/dev/null; then
+              echo "❌ Critical severity vulnerabilities found!"
+              echo "$audit_output"
+              exit 1
+            else
+              echo "⚠️ Critical vulnerabilities found in known accepted packages:"
+              echo "   - parse-server: patched only in alpha (>=9.6.0-alpha.11), no stable release available"
+            fi
           fi
 
           # Check for High vulnerabilities
-          high_count=$(echo "$audit_output" | grep -c "│ high" || echo "0")
-          if [ "$high_count" -gt 0 ]; then
-            # Check vulnerability packages - minimatch ReDoS is low-risk in server context
-            # Known acceptable packages:
-            # - eslint, jest, depcheck, @redocly/cli: devDependencies only
-            # - bcrypt: build-time dependency (node-pre-gyp)
-            # - ejs, exceljs: minimatch ReDoS requires attacker-controlled glob patterns (not applicable)
-            # - aws-sdk: advisory recommends v3 migration (low priority, no patch)
+          if echo "$audit_clean" | grep -q "│ high"; then
+            high_packages=$(echo "$audit_clean" | grep -A15 "│ high" | grep "│ Package" | awk -F'│' '{print $3}' | xargs | sort -u)
+            unknown_high=$(echo "$high_packages" | grep -cvE "^$|$KNOWN_ACCEPTED" || true)
 
-            # Check for truly dangerous High vulnerabilities (SQL injection, RCE, auth bypass)
-            # Filter out known accepted packages before checking:
-            # - parse-server: patched only in alpha (>=9.5.0-alpha), loginAs/readOnlyMasterKey not used
-            # - express-rate-limit: transitive dep of parse-server, IPv4-mapped IPv6 bypass is low-risk
-            dangerous_high=$(echo "$audit_output" | grep -B10 "│ high" | grep -v "parse-server" | grep -v "express-rate-limit" | grep -iE "(injection|remote code|authentication|authorization|bypass)" | wc -l || echo "0")
-
-            if [ "$dangerous_high" -gt 0 ]; then
+            if [ "${unknown_high:-0}" -gt 0 ] 2>/dev/null; then
               echo "❌ Dangerous High severity vulnerabilities found!"
               echo "$audit_output"
               exit 1
             else
               echo "⚠️ High vulnerabilities found in known accepted packages:"
-              echo "   - parse-server: loginAs/readOnlyMasterKey advisory (not used, patched in alpha only)"
+              echo "   - parse-server: patched only in alpha, loginAs/readOnlyMasterKey not used"
               echo "   - express-rate-limit: IPv4-mapped IPv6 bypass (transitive dep of parse-server)"
-              echo "   - devDependencies don't affect production"
             fi
           fi
 
@@ -175,22 +178,34 @@ jobs:
           echo "   Critical: $critical_vulns"
           echo "   High: $high_vulns"
 
-          # Critical vulnerabilities always block
+          # Known accepted packages with no stable patch available
+          KNOWN_ACCEPTED_AUDIT="parse-server|express-rate-limit"
+
+          # Strip ANSI codes for reliable parsing
+          audit_clean=$(echo "$audit_output" | sed 's/\x1b\[[0-9;]*m//g')
+
+          # Check critical: only block if non-accepted packages have critical vulns
           if [ "$critical_vulns" -gt 0 ]; then
-            echo "❌ Critical vulnerabilities require immediate attention!"
-            exit 1
+            critical_packages=$(echo "$audit_clean" | grep -A15 "│ critical" | grep "│ Package" | awk -F'│' '{print $3}' | xargs | sort -u)
+            unknown_critical=$(echo "$critical_packages" | grep -cvE "^$|$KNOWN_ACCEPTED_AUDIT" || true)
+
+            if [ "${unknown_critical:-0}" -gt 0 ] 2>/dev/null; then
+              echo "❌ Critical vulnerabilities require immediate attention!"
+              exit 1
+            else
+              echo "⚠️ Critical vulnerabilities found in known accepted packages only (parse-server, no stable patch)"
+            fi
           fi
 
-          # High vulnerabilities in devDependencies or known accepted packages are acceptable
+          # High vulnerabilities in known accepted packages are acceptable
           if [ "$high_vulns" -gt 0 ]; then
             echo ""
             echo "ℹ️  High vulnerabilities detected in known accepted packages:"
-            echo "   - parse-server: loginAs/readOnlyMasterKey advisory (patched in alpha only)"
+            echo "   - parse-server: patched only in alpha (>=9.6.0-alpha.11)"
             echo "   - express-rate-limit: IPv4-mapped IPv6 bypass (transitive dep of parse-server)"
             echo "   - minimatch (used by eslint, jest, depcheck - devDependencies)"
             echo ""
             echo "   These don't affect production security in current configuration."
-            echo "   PCI DSS Req 6.2.4 focuses on production dependency security."
           fi
 
           echo ""

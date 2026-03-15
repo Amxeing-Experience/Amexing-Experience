@@ -800,7 +800,7 @@
             emailBtn.style.display = 'inline-block';
             const newEmailBtn = emailBtn.cloneNode(true);
             emailBtn.parentNode.replaceChild(newEmailBtn, emailBtn);
-            newEmailBtn.addEventListener('click', () => sendQuoteEmail(quote));
+            newEmailBtn.addEventListener('click', () => showSendEmailModal(quote));
 
             // Show cancel reservation button only for scheduled quotes
             const cancelBtn = document.getElementById('cancelReservationBtn');
@@ -1412,15 +1412,122 @@
             });
     }
 
-    // Send quote email function
-    async function sendQuoteEmail(quoteObj) {
-        const recipientEmail = quoteObj.contactEmail || 'el correo del usuario';
-        if (!confirm(`Se enviará la cotización por correo a: ${recipientEmail}\n¿Continuar?`)) return;
+    // Send quote email - modal with multiple recipients
+    function showSendEmailModal(quoteObj) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emails = [];
 
-        const btn = document.getElementById('sendEmailBtn');
-        const originalHtml = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
-        btn.disabled = true;
+        // Remove existing modal if any
+        document.getElementById('sendEmailModal')?.remove();
+
+        const modalHtml = `
+        <div class="modal fade" id="sendEmailModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="ti ti-mail me-2"></i>Enviar cotización por correo</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label">Destinatarios <span class="text-muted small">(máx. 10)</span></label>
+                        <div class="input-group mb-2">
+                            <input type="email" class="form-control" id="emailRecipientInput" placeholder="correo@ejemplo.com">
+                            <button class="btn btn-outline-primary" type="button" id="addEmailBtn">Agregar</button>
+                        </div>
+                        <div id="emailValidationMsg" class="text-danger small mb-2 d-none"></div>
+                        <div id="emailChipsContainer" class="d-flex flex-wrap gap-2 mb-3"></div>
+                        <div id="emailCount" class="text-muted small">0 destinatario(s)</div>
+                        <div id="sendEmailResults" class="mt-3 d-none"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="confirmSendEmailBtn" disabled>
+                            <i class="ti ti-send me-1"></i>Enviar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modal = new bootstrap.Modal(document.getElementById('sendEmailModal'));
+
+        const input = document.getElementById('emailRecipientInput');
+        const addBtn = document.getElementById('addEmailBtn');
+        const chipsContainer = document.getElementById('emailChipsContainer');
+        const countEl = document.getElementById('emailCount');
+        const validationMsg = document.getElementById('emailValidationMsg');
+        const confirmBtn = document.getElementById('confirmSendEmailBtn');
+
+        function updateCount() {
+            countEl.textContent = `${emails.length} destinatario(s)`;
+            confirmBtn.disabled = emails.length === 0;
+        }
+
+        function addEmail(email) {
+            const trimmed = email.trim().toLowerCase();
+            validationMsg.classList.add('d-none');
+
+            if (!trimmed) return;
+            if (!emailRegex.test(trimmed)) {
+                validationMsg.textContent = 'Formato de correo inválido';
+                validationMsg.classList.remove('d-none');
+                return;
+            }
+            if (emails.includes(trimmed)) {
+                validationMsg.textContent = 'Este correo ya fue agregado';
+                validationMsg.classList.remove('d-none');
+                return;
+            }
+            if (emails.length >= 10) {
+                validationMsg.textContent = 'Máximo 10 destinatarios';
+                validationMsg.classList.remove('d-none');
+                return;
+            }
+
+            emails.push(trimmed);
+            const chip = document.createElement('span');
+            chip.className = 'badge bg-primary d-flex align-items-center gap-1';
+            chip.style.fontSize = '0.85rem';
+            chip.innerHTML = `${trimmed} <button type="button" class="btn-close btn-close-white" style="font-size: 0.5rem;" aria-label="Quitar"></button>`;
+            chip.querySelector('.btn-close').addEventListener('click', () => {
+                const idx = emails.indexOf(trimmed);
+                if (idx > -1) emails.splice(idx, 1);
+                chip.remove();
+                updateCount();
+            });
+            chipsContainer.appendChild(chip);
+            input.value = '';
+            updateCount();
+        }
+
+        addBtn.addEventListener('click', () => addEmail(input.value));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); addEmail(input.value); }
+        });
+
+        // Pre-populate contactEmail
+        if (quoteObj.contactEmail) {
+            addEmail(quoteObj.contactEmail);
+        }
+
+        confirmBtn.addEventListener('click', () => sendQuoteEmailToRecipients(quoteObj, emails, modal));
+
+        // Cleanup on close
+        document.getElementById('sendEmailModal').addEventListener('hidden.bs.modal', () => {
+            document.getElementById('sendEmailModal')?.remove();
+        });
+
+        modal.show();
+        input.focus();
+    }
+
+    async function sendQuoteEmailToRecipients(quoteObj, emailsArray, modal) {
+        const confirmBtn = document.getElementById('confirmSendEmailBtn');
+        const resultsDiv = document.getElementById('sendEmailResults');
+        const originalHtml = confirmBtn.innerHTML;
+        confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Enviando...';
+        confirmBtn.disabled = true;
 
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -1430,20 +1537,38 @@
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
+                body: JSON.stringify({ recipients: emailsArray }),
             });
             const result = await response.json();
-            if (result.success) {
-                alert(result.message || 'Correo enviado exitosamente');
+
+            if (result.data?.results) {
+                const items = result.data.results.map((r) =>
+                    `<div class="${r.success ? 'text-success' : 'text-danger'} small">
+                        <i class="ti ti-${r.success ? 'check' : 'x'} me-1"></i>${r.email}${r.error ? ` - ${r.error}` : ''}
+                    </div>`
+                ).join('');
+                resultsDiv.innerHTML = `<strong class="small">${result.message}</strong>${items}`;
+                resultsDiv.classList.remove('d-none');
+
+                if (result.success && result.data.totalFailed === 0) {
+                    setTimeout(() => modal.hide(), 2000);
+                }
+            } else if (result.success) {
+                resultsDiv.innerHTML = `<div class="text-success small">${result.message || 'Correo enviado exitosamente'}</div>`;
+                resultsDiv.classList.remove('d-none');
+                setTimeout(() => modal.hide(), 2000);
             } else {
-                alert(result.error || 'Error al enviar correo');
+                resultsDiv.innerHTML = `<div class="text-danger small">${result.error || 'Error al enviar correo'}</div>`;
+                resultsDiv.classList.remove('d-none');
             }
         } catch (err) {
             console.error('Send email error:', err);
-            alert('Error al enviar correo');
+            resultsDiv.innerHTML = '<div class="text-danger small">Error al enviar correo</div>';
+            resultsDiv.classList.remove('d-none');
         }
 
-        btn.innerHTML = originalHtml;
-        btn.disabled = false;
+        confirmBtn.innerHTML = originalHtml;
+        confirmBtn.disabled = false;
     }
 
     // Generate share link function
