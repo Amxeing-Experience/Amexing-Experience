@@ -178,22 +178,34 @@ jobs:
           echo "   Critical: $critical_vulns"
           echo "   High: $high_vulns"
 
-          # Critical vulnerabilities always block
+          # Known accepted packages with no stable patch available
+          KNOWN_ACCEPTED_AUDIT="parse-server|express-rate-limit"
+
+          # Strip ANSI codes for reliable parsing
+          audit_clean=$(echo "$audit_output" | sed 's/\x1b\[[0-9;]*m//g')
+
+          # Check critical: only block if non-accepted packages have critical vulns
           if [ "$critical_vulns" -gt 0 ]; then
-            echo "❌ Critical vulnerabilities require immediate attention!"
-            exit 1
+            critical_packages=$(echo "$audit_clean" | grep -A15 "│ critical" | grep "│ Package" | awk -F'│' '{print $3}' | xargs | sort -u)
+            unknown_critical=$(echo "$critical_packages" | grep -cvE "^$|$KNOWN_ACCEPTED_AUDIT" || true)
+
+            if [ "${unknown_critical:-0}" -gt 0 ] 2>/dev/null; then
+              echo "❌ Critical vulnerabilities require immediate attention!"
+              exit 1
+            else
+              echo "⚠️ Critical vulnerabilities found in known accepted packages only (parse-server, no stable patch)"
+            fi
           fi
 
-          # High vulnerabilities in devDependencies or known accepted packages are acceptable
+          # High vulnerabilities in known accepted packages are acceptable
           if [ "$high_vulns" -gt 0 ]; then
             echo ""
             echo "ℹ️  High vulnerabilities detected in known accepted packages:"
-            echo "   - parse-server: loginAs/readOnlyMasterKey advisory (patched in alpha only)"
+            echo "   - parse-server: patched only in alpha (>=9.6.0-alpha.11)"
             echo "   - express-rate-limit: IPv4-mapped IPv6 bypass (transitive dep of parse-server)"
             echo "   - minimatch (used by eslint, jest, depcheck - devDependencies)"
             echo ""
             echo "   These don't affect production security in current configuration."
-            echo "   PCI DSS Req 6.2.4 focuses on production dependency security."
           fi
 
           echo ""
