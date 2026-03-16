@@ -345,6 +345,7 @@ async function getTrasladosData(clientId, priceOptions) {
   query.equalTo('exists', true);
   query.equalTo('active', true);
   query.include('originPOI');
+  query.include('originPOI.serviceType');
   query.include('destinationPOI');
   query.include('destinationPOI.serviceType');
   query.include('vehicleType');
@@ -390,8 +391,13 @@ async function getTrasladosData(clientId, priceOptions) {
     const originName = origin ? origin.get('name') : 'N/A';
     const destName = destination.get('name') || 'N/A';
     const vtName = vehicleType.get('name') || 'N/A';
-    const serviceTypeObj = destination.get('serviceType');
-    const serviceTypeName = serviceTypeObj ? serviceTypeObj.get('name') : 'N/A';
+    const originST = origin && origin.get('serviceType') ? origin.get('serviceType').get('name') : null;
+    const destST = destination.get('serviceType') ? destination.get('serviceType').get('name') : null;
+    let serviceTypeName = 'Local';
+    if (originST === 'Aeropuerto' || destST === 'Aeropuerto') serviceTypeName = 'Aeropuerto';
+    else if (originST === 'Punto a Punto' || destST === 'Punto a Punto'
+      || originST === 'Tours' || destST === 'Tours') serviceTypeName = 'Punto a Punto';
+    else if (originST === 'Local' || destST === 'Local') serviceTypeName = 'Local';
     const key = `${originName}|${destName}|${vtName}`;
 
     if (!grouped[key]) {
