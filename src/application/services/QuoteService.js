@@ -1052,7 +1052,12 @@ class QuoteService {
       || `http://localhost:${process.env.PORT || 1337}`;
     const shareUrl = `${baseUrl}/quotes/${quote.get('folio')}`;
 
-    // Format dates
+    /**
+     * Format a date value to es-MX locale string.
+     * @param {Date|string|null} d - Date to format.
+     * @returns {string|null} Formatted date string or null.
+     * @example
+     */
     const formatDate = (d) => {
       if (!d) return null;
       const dateObj = d instanceof Date ? d : new Date(d);
@@ -1141,7 +1146,12 @@ class QuoteService {
       || `http://localhost:${process.env.PORT || 1337}`;
     const shareUrl = `${baseUrl}/quotes/${quote.get('folio')}`;
 
-    // Format dates
+    /**
+     * Format a date value to es-MX locale string.
+     * @param {Date|string|null} d - Date to format.
+     * @returns {string|null} Formatted date string or null.
+     * @example
+     */
     const formatDate = (d) => {
       if (!d) return null;
       const dateObj = d instanceof Date ? d : new Date(d);

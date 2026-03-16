@@ -755,6 +755,28 @@ table.dataTable tbody tr.hover {
 // Global variables for walking tour functionality
 const globalApiEndpoint = '<%= dtApiEndpoint %>';
 
+// Server-injected access token (same pattern as services-table.ejs)
+const serverAccessToken = '<%= typeof accessToken !== "undefined" ? accessToken : "" %>';
+
+// Global token getters - accessible from both IIFE and standalone functions
+function getAccessTokenSync() {
+    if (serverAccessToken) return serverAccessToken;
+    const tokenFromStorage = localStorage.getItem('accessToken');
+    if (tokenFromStorage) return tokenFromStorage;
+    return null;
+}
+
+async function getAccessToken() {
+    if (serverAccessToken) return serverAccessToken;
+    const tokenFromStorage = localStorage.getItem('accessToken');
+    if (tokenFromStorage) return tokenFromStorage;
+    if (window.accessTokenPromise) {
+        const tokenFromPromise = await window.accessTokenPromise;
+        if (tokenFromPromise) return tokenFromPromise;
+    }
+    return null;
+}
+
 (function() {
     // Wait for DOM and all dependencies to be ready
     function initWhenReady() {
@@ -789,29 +811,12 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
         // Debug: Log the number of columns in HTML table
         const htmlColumnCount = $(`#${tableId} thead tr th`).length;
 
-        // Get JWT token from localStorage or cookies
-        function getAccessToken() {
-            // First try localStorage (used by other parts of the app)
-            const tokenFromStorage = localStorage.getItem('accessToken');
-            if (tokenFromStorage) {
-                return tokenFromStorage;
-            }
-            
-            // Fallback to cookies (httpOnly cookies won't work, but try anyway)
-            const cookies = document.cookie.split(';');
-            for (let cookie of cookies) {
-                const [name, value] = cookie.trim().split('=');
-                if (name === 'accessToken') {
-                    return value;
-                }
-            }
-            return null;
-        }
+        // getAccessToken() and getAccessTokenSync() are defined in global scope above the IIFE
 
         // Setup global AJAX configuration to include JWT token
         $.ajaxSetup({
             beforeSend: function(xhr) {
-                const token = getAccessToken();
+                const token = getAccessTokenSync();
                 if (token) {
                     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                 }
@@ -1417,7 +1422,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                 url: '/api/transfer-rate/current',
                 type: 'GET',
                 beforeSend: function(xhr) {
-                    const token = getAccessToken();
+                    const token = getAccessTokenSync();
                     if (token) {
                         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                     }
@@ -1546,7 +1551,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                 url: '/api/agency-rate/current',
                 type: 'GET',
                 beforeSend: function(xhr) {
-                    const token = getAccessToken();
+                    const token = getAccessTokenSync();
                     if (token) {
                         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                     }
@@ -1573,7 +1578,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                 url: '/api/exchange-rate/current',
                 type: 'GET',
                 beforeSend: function(xhr) {
-                    const token = getAccessToken();
+                    const token = getAccessTokenSync();
                     if (token) {
                         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                     }
@@ -1734,7 +1739,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                         type: 'GET',
                         data: requestData,
                         beforeSend: function(xhr) {
-                            const token = getAccessToken();
+                            const token = getAccessTokenSync();
                             if (token) {
                                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                             }
@@ -1876,7 +1881,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                     url: endpoint,
                     type: 'GET',
                     beforeSend: function(xhr) {
-                        const token = getAccessToken();
+                        const token = getAccessTokenSync();
                         if (token) {
                             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                         }
@@ -2398,7 +2403,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
                 $('#basePricingSection').show();
                 
                 // Get tour base prices from API
-                const token = getAccessToken();
+                const token = await getAccessToken();
                 const response = await fetch(`${apiEndpoint}/${tourId}/all-prices`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -2829,7 +2834,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
             }
             
             try {
-                const token = getAccessToken();
+                const token = await getAccessToken();
                 const url = `${apiEndpoint}/${tourId}/update-base-prices`;
                 const requestBody = {
                     prices: basePrices
@@ -2921,7 +2926,7 @@ const globalApiEndpoint = '<%= dtApiEndpoint %>';
 
                 // Get the current rate filter to ensure we fetch pricing data
                 const selectedRate = $(`#headerRateFilter-${tableId}`).val();
-                const token = getAccessToken();
+                const token = await getAccessToken();
                 
                 // Use the main tours endpoint with filtering to get full price data
                 let apiUrl = apiEndpoint; // Use main tours endpoint
@@ -4419,12 +4424,7 @@ let agencyRateLoaded = false;
  */
 async function fetchCurrentDriverRate() {
     try {
-        let token = localStorage.getItem('accessToken') || null;
-        if (!token) {
-            // Wait briefly for token initialization
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            token = localStorage.getItem('accessToken') || null;
-        }
+        const token = await getAccessToken();
         if (!token) {
             console.warn('No access token found, skipping driver rate fetch');
             return 0;
@@ -4464,7 +4464,7 @@ async function fetchCurrentDriverRate() {
  */
 async function createDefaultDriverRate() {
     try {
-        const token = getAccessToken();
+        const token = await getAccessToken();
         const response = await fetch('/api/driver-tour-rate', {
             method: 'POST',
             headers: {
@@ -4510,7 +4510,7 @@ async function createDefaultDriverRate() {
  */
 async function fetchExchangeRateVanilla() {
     try {
-        const token = getAccessToken();
+        const token = await getAccessToken();
         const response = await fetch('/api/exchange-rate/current', {
             method: 'GET',
             headers: {
@@ -4545,7 +4545,7 @@ async function fetchExchangeRateVanilla() {
  */
 async function fetchTransferRate() {
     try {
-        const token = getAccessToken();
+        const token = await getAccessToken();
         const response = await fetch('/api/transfer-rate/current', {
             method: 'GET',
             headers: {
@@ -4579,7 +4579,7 @@ async function fetchTransferRate() {
  */
 async function fetchAgencyRate() {
     try {
-        const token = getAccessToken();
+        const token = await getAccessToken();
         const response = await fetch('/api/agency-rate/current', {
             method: 'GET',
             headers: {
@@ -5401,7 +5401,7 @@ async function saveWalkingTour() {
         const isEdit = tourId && tourId.trim() !== '';
         
         // Get access token
-        const token = getAccessToken();
+        const token = await getAccessToken();
         if (!token) {
             showWalkingTourAlert('Error de autenticación. Por favor vuelva a iniciar sesión.', 'danger');
             $('#saveWalkingTourBtn').prop('disabled', false);

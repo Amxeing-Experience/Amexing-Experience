@@ -444,7 +444,12 @@ class ImageOptimizationService extends FileStorageService {
         let bestUrl = null;
         let bestS3Key = null;
 
-        // Helper function to get S3 key from variant (handles both structures)
+        /**
+         * Get S3 key from an optimized variant, handling both structures.
+         * @param {object} variant - Optimized image variant.
+         * @returns {string|null} S3 key or null.
+         * @example
+         */
         const getS3KeyFromVariant = (variant) => {
           if (!variant) return null;
 

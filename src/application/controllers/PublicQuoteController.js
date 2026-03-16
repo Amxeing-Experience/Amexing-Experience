@@ -341,6 +341,15 @@ class PublicQuoteController {
 
       const formatPriority = ['avif', 'webp', 'jpeg'];
 
+      /**
+       * Fetch primary images for a set of parent object IDs.
+       * @param {string} className - Image class name.
+       * @param {string} pointerField - Pointer field name on the image class.
+       * @param {string} parentClass - Parent class name.
+       * @param {string[]} ids - Array of parent object IDs.
+       * @returns {Promise<object>} Map of parent ID to image URL.
+       * @example
+       */
       const fetchImages = async (className, pointerField, parentClass, ids) => {
         const map = {};
         if (ids.length === 0) return map;

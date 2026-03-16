@@ -198,6 +198,107 @@ const tarifarioTabs = [
                 </div>
             </div>
         </div>
+
+        <!-- Export Tarifario Panel -->
+        <div class="card border-0 shadow-sm mt-3" id="export-tarifario-panel">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="ti ti-download me-2"></i>Exportar Tarifario
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="form-check mb-1">
+                    <input class="form-check-input export-section-check" type="checkbox" value="vehiculos" id="expVehiculos" checked>
+                    <label class="form-check-label small" for="expVehiculos"><i class="ti ti-car me-1"></i>Vehiculos</label>
+                </div>
+                <div class="form-check mb-1">
+                    <input class="form-check-input export-section-check" type="checkbox" value="traslados" id="expTraslados" checked>
+                    <label class="form-check-label small" for="expTraslados"><i class="ti ti-briefcase me-1"></i>Traslados</label>
+                </div>
+                <div class="form-check mb-1">
+                    <input class="form-check-input export-section-check" type="checkbox" value="a-disposicion" id="expDisposicion" checked>
+                    <label class="form-check-label small" for="expDisposicion"><i class="ti ti-calculator me-1"></i>A Disposicion</label>
+                </div>
+                <div class="form-check mb-1">
+                    <input class="form-check-input export-section-check" type="checkbox" value="experiencias" id="expExperiencias" checked>
+                    <label class="form-check-label small" for="expExperiencias"><i class="ti ti-star me-1"></i>Experiencias</label>
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input export-section-check" type="checkbox" value="tours" id="expTours" checked>
+                    <label class="form-check-label small" for="expTours"><i class="ti ti-map me-1"></i>Tours</label>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label small text-muted mb-1">Formato</label>
+                    <select class="form-select form-select-sm" id="exportFormat">
+                        <option value="excel">Excel (.xlsx)</option>
+                        <option value="pdf">PDF</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small text-muted mb-1">Tipo de Pago</label>
+                    <select class="form-select form-select-sm" id="exportPaymentType">
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia" selected>Transferencia</option>
+                        <option value="tarjeta">Tarjeta</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-muted mb-1">Moneda</label>
+                    <select class="form-select form-select-sm" id="exportCurrency">
+                        <option value="MXN" selected>MXN</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-primary btn-sm w-100" id="exportTarifarioBtn">
+                    <i class="ti ti-download me-2"></i>Exportar
+                </button>
+            </div>
+        </div>
+
+        <script>
+        document.getElementById('exportTarifarioBtn').addEventListener('click', function() {
+            var checks = document.querySelectorAll('.export-section-check:checked');
+            var sections = Array.from(checks).map(function(c) { return c.value; });
+            if (sections.length === 0) {
+                alert('Selecciona al menos una seccion.');
+                return;
+            }
+            var format = document.getElementById('exportFormat').value;
+            var paymentType = document.getElementById('exportPaymentType').value;
+            var currency = document.getElementById('exportCurrency').value;
+            var clientId = '<%= clientId %>';
+            var url = '/api/tarifario/export?sections=' + sections.join(',') + '&format=' + format + '&paymentType=' + paymentType + '&currency=' + currency + '&clientId=' + clientId;
+
+            var btn = this;
+            var originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando...';
+
+            fetch(url, { credentials: 'same-origin' })
+                .then(function(response) {
+                    if (!response.ok) {
+                        return response.json().then(function(data) { throw new Error(data.error || 'Error al exportar'); });
+                    }
+                    var disposition = response.headers.get('Content-Disposition') || '';
+                    var match = disposition.match(/filename="?([^"]+)"?/);
+                    var filename = match ? match[1] : 'tarifario-cliente.xlsx';
+                    return response.blob().then(function(blob) { return { blob: blob, filename: filename }; });
+                })
+                .then(function(result) {
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(result.blob);
+                    a.download = result.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(a.href);
+                })
+                .catch(function(err) { alert(err.message || 'Error al generar la exportacion.'); })
+                .finally(function() { btn.disabled = false; btn.innerHTML = originalHtml; });
+        });
+        </script>
         <% } %>
     </div>
 

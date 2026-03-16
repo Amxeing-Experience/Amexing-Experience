@@ -9,10 +9,18 @@
  * @since 1.0.0
  */
 
+const Parse = require('parse/node');
 const TarifarioExportService = require('../../services/TarifarioExportService');
 const logger = require('../../../infrastructure/logger');
 
+/**
+ * Controller for tarifario export operations.
+ */
 class TarifarioExportController {
+  /**
+   * Create a TarifarioExportController instance.
+   * @example
+   */
   constructor() {
     this.exportService = new TarifarioExportService();
   }
@@ -64,9 +72,68 @@ class TarifarioExportController {
         userId: currentUser.id,
         sections: requestedSections,
         format,
+        queryClientId: req.query.clientId || null,
       });
 
-      const result = await this.exportService.exportSections(requestedSections, format);
+      // Pass clientId for client-specific prices
+      // admin/superadmin: can pass explicit clientId query param (from client detail page)
+      // dept_manager: their own user IS the clientPtr in ClientPrices
+      // client: their clientId field points to the parent user (dept_manager) who owns the prices
+      const userRole = req.userRole || currentUser.get('role');
+      const { clientId: queryClientId } = req.query;
+      let clientId = null;
+      if ((userRole === 'admin' || userRole === 'superadmin') && queryClientId) {
+        clientId = queryClientId;
+      } else if (userRole === 'department_manager') {
+        clientId = currentUser.id;
+      } else if (userRole === 'client') {
+        clientId = currentUser.get('clientId') || null;
+      }
+
+      logger.info('Tarifario export clientId resolved', {
+        userRole,
+        clientId,
+        queryClientId: req.query.clientId || null,
+      });
+
+      // Parse payment type and currency options
+      const paymentType = (req.query.paymentType || 'efectivo').toLowerCase();
+      const currency = (req.query.currency || 'MXN').toUpperCase();
+
+      // Build price options - fetch rates from DB as needed
+      const priceOptions = { paymentType, currency };
+      const rateQueries = [];
+
+      if (paymentType === 'transferencia') {
+        const tQuery = new Parse.Query('TransferRate');
+        tQuery.equalTo('active', true);
+        tQuery.descending('createdAt');
+        rateQueries.push(tQuery.first({ useMasterKey: true }).then((r) => {
+          priceOptions.transferRate = r ? r.get('value') : 0;
+        }));
+      } else if (paymentType === 'tarjeta') {
+        const aQuery = new Parse.Query('AgencyRate');
+        aQuery.equalTo('active', true);
+        aQuery.descending('createdAt');
+        rateQueries.push(aQuery.first({ useMasterKey: true }).then((r) => {
+          priceOptions.agencyRate = r ? r.get('value') : 0;
+        }));
+      }
+
+      if (currency === 'USD') {
+        const eQuery = new Parse.Query('ExchangeRate');
+        eQuery.equalTo('active', true);
+        eQuery.descending('createdAt');
+        rateQueries.push(eQuery.first({ useMasterKey: true }).then((r) => {
+          priceOptions.exchangeRate = r ? r.get('value') : 18.5;
+        }));
+      }
+
+      if (rateQueries.length > 0) {
+        await Promise.all(rateQueries);
+      }
+
+      const result = await this.exportService.exportSections(requestedSections, format, clientId, priceOptions);
 
       res.setHeader('Content-Type', result.contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);

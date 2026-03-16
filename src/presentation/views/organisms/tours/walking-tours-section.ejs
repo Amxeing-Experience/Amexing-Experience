@@ -501,30 +501,17 @@ function initWalkingToursFilters() {
     // Test that selectors work
 }
 
-// Get JWT token from localStorage, waiting for initialization if needed
+// Server-injected access token (same pattern as services-table.ejs)
+const walkingServerAccessToken = '<%= typeof accessToken !== "undefined" ? accessToken : "" %>';
+
+// Get JWT token - prioritizes server-injected token
 async function getAccessToken() {
-    // First try localStorage (used by other parts of the app)
+    if (walkingServerAccessToken) return walkingServerAccessToken;
     const tokenFromStorage = localStorage.getItem('accessToken');
-    if (tokenFromStorage) {
-        return tokenFromStorage;
-    }
-
-    // Wait for token initialization if still in progress
+    if (tokenFromStorage) return tokenFromStorage;
     if (window.accessTokenPromise) {
-        await window.accessTokenPromise;
-        const tokenAfterWait = localStorage.getItem('accessToken');
-        if (tokenAfterWait) {
-            return tokenAfterWait;
-        }
-    }
-
-    // Fallback to cookies (httpOnly cookies won't work, but try anyway)
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-        const [name, value] = cookie.trim().split('=');
-        if (name === 'accessToken') {
-            return value;
-        }
+        const tokenFromPromise = await window.accessTokenPromise;
+        if (tokenFromPromise) return tokenFromPromise;
     }
     return null;
 }

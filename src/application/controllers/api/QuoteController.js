@@ -2887,7 +2887,12 @@ class QuoteController {
       if (!timeA) return 1;
       if (!timeB) return -1;
 
-      // Parse times in HH:MM format or HH:MM - HH:MM ranges
+      /**
+       * Parse a time string into minutes since midnight for sorting.
+       * @param {string} timeStr - Time in HH:MM or HH:MM - HH:MM format.
+       * @returns {number} Minutes since midnight.
+       * @example
+       */
       const parseTime = (timeStr) => {
         // First try to match a time range (e.g., "13:00 - 15:00")
         const rangeMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
