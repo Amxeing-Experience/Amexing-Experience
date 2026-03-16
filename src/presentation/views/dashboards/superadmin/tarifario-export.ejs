@@ -9,7 +9,13 @@
  */
 
 const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
-const basePath = currentUserRole === 'superadmin' ? '/dashboard/superadmin' : '/dashboard/admin';
+const rolePathMap = {
+  superadmin: '/dashboard/superadmin',
+  admin: '/dashboard/admin',
+  client: '/dashboard/client',
+  department_manager: '/dashboard/department_manager',
+};
+const basePath = rolePathMap[currentUserRole] || '/dashboard/admin';
 %>
 
 <!-- Page Header -->
@@ -112,10 +118,10 @@ const basePath = currentUserRole === 'superadmin' ? '/dashboard/superadmin' : '/
                     </div>
                 </div>
 
-                <!-- Format Selection & Export Button -->
+                <!-- Format, Payment & Currency Selection -->
                 <div class="mt-4 pt-3 border-top">
-                    <div class="row align-items-end">
-                        <div class="col-md-4">
+                    <div class="row align-items-end g-3">
+                        <div class="col-md-3">
                             <label for="formatSelect" class="form-label fw-semibold">
                                 <i class="ti ti-file me-1"></i>Formato
                             </label>
@@ -124,9 +130,28 @@ const basePath = currentUserRole === 'superadmin' ? '/dashboard/superadmin' : '/
                                 <option value="pdf">PDF</option>
                             </select>
                         </div>
-                        <div class="col-md-8 text-end mt-3 mt-md-0">
-                            <button type="button" class="btn btn-primary btn-lg" id="exportBtn">
-                                <i class="ti ti-download me-2"></i>Exportar Tarifario
+                        <div class="col-md-3">
+                            <label for="paymentTypeSelect" class="form-label fw-semibold">
+                                <i class="ti ti-credit-card me-1"></i>Tipo de Pago
+                            </label>
+                            <select class="form-select" id="paymentTypeSelect">
+                                <option value="efectivo" <%= (currentUserRole === 'admin' || currentUserRole === 'superadmin') ? 'selected' : '' %>>Efectivo</option>
+                                <option value="transferencia" <%= (currentUserRole === 'client' || currentUserRole === 'department_manager') ? 'selected' : '' %>>Transferencia</option>
+                                <option value="tarjeta">Tarjeta</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="currencySelect" class="form-label fw-semibold">
+                                <i class="ti ti-coin me-1"></i>Moneda
+                            </label>
+                            <select class="form-select" id="currencySelect">
+                                <option value="MXN" selected>MXN</option>
+                                <option value="USD">USD</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 text-end">
+                            <button type="button" class="btn btn-primary btn-lg w-100" id="exportBtn">
+                                <i class="ti ti-download me-2"></i>Exportar
                             </button>
                         </div>
                     </div>
@@ -257,7 +282,9 @@ document.getElementById('exportBtn').addEventListener('click', function() {
     }
 
     var format = document.getElementById('formatSelect').value;
-    var url = '/api/tarifario/export?sections=' + sections.join(',') + '&format=' + format;
+    var paymentType = document.getElementById('paymentTypeSelect').value;
+    var currency = document.getElementById('currencySelect').value;
+    var url = '/api/tarifario/export?sections=' + sections.join(',') + '&format=' + format + '&paymentType=' + paymentType + '&currency=' + currency;
     downloadTarifario(url, this);
 });
 
@@ -266,7 +293,9 @@ document.querySelectorAll('.quick-export-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
         var section = this.getAttribute('data-section');
         var format = this.getAttribute('data-format');
-        var url = '/api/tarifario/export?sections=' + section + '&format=' + format;
+        var paymentType = document.getElementById('paymentTypeSelect').value;
+        var currency = document.getElementById('currencySelect').value;
+        var url = '/api/tarifario/export?sections=' + section + '&format=' + format + '&paymentType=' + paymentType + '&currency=' + currency;
         downloadTarifario(url, this);
     });
 });

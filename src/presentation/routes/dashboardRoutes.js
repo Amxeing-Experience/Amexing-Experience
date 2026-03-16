@@ -105,6 +105,7 @@ router.get('/client/a-disposicion', dashboardAuth.requireRole('client'), (req, r
 router.get('/client/greeter', dashboardAuth.requireRole('client'), (req, res) => clientController.greeter(req, res));
 router.get('/client/quotes', dashboardAuth.requireRole('client'), (req, res) => clientController.quotes(req, res));
 router.get('/client/quotes/:id', dashboardAuth.requireRole('client'), (req, res) => clientController.quoteDetail(req, res));
+router.get('/client/tarifario-export', dashboardAuth.requireRole('client'), (req, res) => clientController.tarifarioExport(req, res));
 
 // Department Manager Routes
 router.get('/department_manager', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.index(req, res));
@@ -131,6 +132,7 @@ router.get('/department_manager/reports', dashboardAuth.requireRole('department_
 router.get('/department_manager/policies', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.team(req, res));
 router.get('/department_manager/permissions', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.team(req, res));
 router.get('/department_manager/settings', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.team(req, res));
+router.get('/department_manager/tarifario-export', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.tarifarioExport(req, res));
 
 // Employee Routes
 router.get('/employee', dashboardAuth.requireRole('employee'), (req, res) => employeeController.index(req, res));

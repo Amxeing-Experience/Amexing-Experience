@@ -599,6 +599,28 @@ class DepartmentManagerController extends RoleBasedController {
       activeBookings: 12,
     };
   }
+
+  /**
+   * Tarifario export page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Renders the tarifario export page.
+   * @example
+   * // GET /dashboard/department_manager/tarifario-export
+   * await departmentManagerController.tarifarioExport(req, res);
+   */
+  async tarifarioExport(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'tarifario-export', {
+        title: 'Exportar Tarifario',
+        breadcrumb: null,
+        pageStyles: [],
+        footerScripts: '',
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
 }
 
 module.exports = new DepartmentManagerController();

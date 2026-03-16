@@ -748,6 +748,28 @@ class ClientController extends RoleBasedController {
       completedTrips: 1250,
     };
   }
+
+  /**
+   * Tarifario export page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Renders the tarifario export page.
+   * @example
+   * // GET /dashboard/client/tarifario-export
+   * await clientController.tarifarioExport(req, res);
+   */
+  async tarifarioExport(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'tarifario-export', {
+        title: 'Exportar Tarifario',
+        breadcrumb: null,
+        pageStyles: [],
+        footerScripts: '',
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
 }
 
 module.exports = new ClientController();
