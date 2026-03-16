@@ -393,9 +393,11 @@ async function getTrasladosData(clientId, priceOptions) {
     const vtName = vehicleType.get('name') || 'N/A';
     const originST = origin && origin.get('serviceType') ? origin.get('serviceType').get('name') : null;
     const destST = destination.get('serviceType') ? destination.get('serviceType').get('name') : null;
-    let serviceTypeName = destST || originST || 'N/A';
+    let serviceTypeName = 'Local';
     if (originST === 'Aeropuerto' || destST === 'Aeropuerto') serviceTypeName = 'Aeropuerto';
-    else if (originST === 'Punto a Punto' || destST === 'Punto a Punto') serviceTypeName = 'Punto a Punto';
+    else if (originST === 'Punto a Punto' || destST === 'Punto a Punto'
+      || originST === 'Tours' || destST === 'Tours') serviceTypeName = 'Punto a Punto';
+    else if (originST === 'Local' || destST === 'Local') serviceTypeName = 'Local';
     const key = `${originName}|${destName}|${vtName}`;
 
     if (!grouped[key]) {
