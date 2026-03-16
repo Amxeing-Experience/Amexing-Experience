@@ -72,18 +72,29 @@ class TarifarioExportController {
         userId: currentUser.id,
         sections: requestedSections,
         format,
+        queryClientId: req.query.clientId || null,
       });
 
-      // Pass clientId for client/department_manager roles to get client-specific prices
+      // Pass clientId for client-specific prices
+      // admin/superadmin: can pass explicit clientId query param (from client detail page)
       // dept_manager: their own user IS the clientPtr in ClientPrices
       // client: their clientId field points to the parent user (dept_manager) who owns the prices
-      const userRole = currentUser.get('role');
+      const userRole = req.userRole || currentUser.get('role');
+      const { clientId: queryClientId } = req.query;
       let clientId = null;
-      if (userRole === 'department_manager') {
+      if ((userRole === 'admin' || userRole === 'superadmin') && queryClientId) {
+        clientId = queryClientId;
+      } else if (userRole === 'department_manager') {
         clientId = currentUser.id;
       } else if (userRole === 'client') {
         clientId = currentUser.get('clientId') || null;
       }
+
+      logger.info('Tarifario export clientId resolved', {
+        userRole,
+        clientId,
+        queryClientId: req.query.clientId || null,
+      });
 
       // Parse payment type and currency options
       const paymentType = (req.query.paymentType || 'efectivo').toLowerCase();
