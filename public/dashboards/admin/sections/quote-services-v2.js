@@ -211,6 +211,7 @@ class ItineraryBuilder {
     document.getElementById('additionalVehicleCheckbox')?.addEventListener('change', (e) => {
       const qty = document.getElementById('serviceQuantity');
       if (qty) qty.value = e.target.checked ? 2 : 1;
+      this.updateServicePriceBreakdown();
     });
 
     // Walking tour quantity inputs → update total people count for tier pricing
@@ -231,6 +232,66 @@ class ItineraryBuilder {
     // Transport Type Toggle
     document.querySelectorAll('input[name="transportType"]').forEach((radio) => {
       radio.addEventListener('change', () => this.handleTransportTypeChange());
+    });
+
+    // Show specific location when destination is selected (arrival only — destination is city/hotel)
+    document.getElementById('transportDestinationSelect')?.addEventListener('change', (e) => {
+      const arrivalRadio = document.getElementById('typeArrival');
+      if (!arrivalRadio?.checked) return; // Only for arrival — destination is city
+      const specificLocationRow = document.getElementById('specificLocationRow');
+      const selectedNames = document.querySelectorAll('.selectedDestinationName');
+      if (specificLocationRow) {
+        if (e.target.value) {
+          selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
+          specificLocationRow.classList.remove('d-none');
+        } else {
+          specificLocationRow.classList.add('d-none');
+        }
+      }
+    });
+
+    // Show specific location when origin is selected (departure only — origin is city/hotel)
+    document.getElementById('transportOriginSelect')?.addEventListener('change', (e) => {
+      const arrivalRadio = document.getElementById('typeArrival');
+      if (arrivalRadio?.checked) return; // Skip for arrival — origin is airport
+      const specificLocationRow = document.getElementById('specificLocationRow');
+      const selectedNames = document.querySelectorAll('.selectedDestinationName');
+      if (specificLocationRow) {
+        if (e.target.value) {
+          selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
+          specificLocationRow.classList.remove('d-none');
+        } else {
+          specificLocationRow.classList.add('d-none');
+        }
+      }
+    });
+
+    // Show specific location for round trip Ida destination select (arrival)
+    document.getElementById('roundTripDestinationIdaSelect')?.addEventListener('change', (e) => {
+      const row = document.getElementById('roundTripSpecificLocationIdaRow');
+      const selectedNames = document.querySelectorAll('.selectedDestinationName');
+      if (row) {
+        if (e.target.value) {
+          selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
+          row.classList.remove('d-none');
+        } else {
+          row.classList.add('d-none');
+        }
+      }
+    });
+
+    // Show specific location for round trip Vuelta origin select (departure)
+    document.getElementById('roundTripOriginVueltaSelect')?.addEventListener('change', (e) => {
+      const row = document.getElementById('roundTripSpecificLocationVueltaRow');
+      const selectedNames = document.querySelectorAll('.selectedDestinationName');
+      if (row) {
+        if (e.target.value) {
+          selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
+          row.classList.remove('d-none');
+        } else {
+          row.classList.add('d-none');
+        }
+      }
     });
 
     // Trip Type Toggle
@@ -290,6 +351,7 @@ class ItineraryBuilder {
     // Tour requires transport checkbox handler
     document.getElementById('tourRequiresTransport')?.addEventListener('change', (e) => {
       this.handleTourTransportToggle(e.target.checked);
+      this.updateVehicleCapacityNote();
     });
 
     // Rate selection handler for tour vehicles
@@ -680,6 +742,10 @@ class ItineraryBuilder {
       // Also clear experience schedule
       this.clearExperienceSchedule();
 
+      // Hide details cards
+      this.hideDetailsCard('experience');
+      this.hideDetailsCard('tour');
+
       // Clear tour transport checkbox
       const tourRequiresTransport = document.getElementById('tourRequiresTransport');
       if (tourRequiresTransport) {
@@ -713,6 +779,16 @@ class ItineraryBuilder {
 
     // Hide additional vehicle checkbox (shown only for transport)
     document.getElementById('additionalVehicleContainer')?.classList.add('d-none');
+
+    // Clear guide/greeter checkboxes and re-enable when switching service types
+    const includeGuideEl = document.getElementById('includeGuide');
+    const includeGreeterEl = document.getElementById('includeGreeter');
+    const greeterInVehicleEl = document.getElementById('greeterInVehicle');
+    if (includeGuideEl) { includeGuideEl.checked = false; includeGuideEl.disabled = false; }
+    if (includeGreeterEl) includeGreeterEl.checked = false;
+    if (greeterInVehicleEl) greeterInVehicleEl.checked = false;
+    document.getElementById('greeterInVehicleContainer')?.classList.add('d-none');
+    document.getElementById('vehicleCapacityNote')?.classList.add('d-none');
 
     // Save current service type fields before switching
     this.saveCurrentServiceTypeFields();
@@ -911,9 +987,12 @@ class ItineraryBuilder {
         guideField?.classList.remove('d-none');
         document.getElementById('transportCategory')?.setAttribute('required', 'required');
 
-        // Show quantity field for Tour
-        quantityField?.classList.remove('d-none');
-        document.getElementById('serviceQuantity')?.setAttribute('required', 'required');
+        // Hide quantity input, show additional vehicle checkbox (same as transport)
+        quantityField?.classList.add('d-none');
+        document.getElementById('serviceQuantity')?.removeAttribute('required');
+        document.getElementById('serviceQuantity').value = 1;
+        document.getElementById('additionalVehicleContainer')?.classList.remove('d-none');
+        document.getElementById('additionalVehicleCheckbox').checked = false;
 
         // Show pricing fields
         if (standardPricingSection) {
@@ -1317,6 +1396,17 @@ class ItineraryBuilder {
   }
 
   handleTripTypeChange() {
+    // Save current one-way values before clearing to transfer to round-trip
+    const prevOriginEl = document.getElementById('transportOriginSelect');
+    const prevDestEl = document.getElementById('transportDestinationSelect');
+    const prevOriginText = prevOriginEl?.selectedIndex > 0 ? prevOriginEl.options[prevOriginEl.selectedIndex].text : '';
+    const prevDestText = prevDestEl?.selectedIndex > 0 ? prevDestEl.options[prevDestEl.selectedIndex].text : '';
+    // Also save round-trip values for transferring back to one-way
+    const prevIdaOriginEl = document.getElementById('roundTripOriginIdaSelect');
+    const prevIdaDestEl = document.getElementById('roundTripDestinationIdaSelect');
+    const prevIdaOriginText = prevIdaOriginEl?.selectedIndex > 0 ? prevIdaOriginEl.options[prevIdaOriginEl.selectedIndex].text : '';
+    const prevIdaDestText = prevIdaDestEl?.selectedIndex > 0 ? prevIdaDestEl.options[prevIdaDestEl.selectedIndex].text : '';
+
     this.clearTransportFormFields();
     const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
     const oneWayForm = document.getElementById('oneWayForm');
@@ -1337,6 +1427,24 @@ class ItineraryBuilder {
       roundTripHint?.classList.add('d-none');
       // Initialize direction type fields
       this.handleDirectionTypeChange();
+
+      // Transfer round-trip Ida values → one-way
+      if (prevIdaOriginText || prevIdaDestText) {
+        setTimeout(() => {
+          const originSel = document.getElementById('transportOriginSelect');
+          const destSel = document.getElementById('transportDestinationSelect');
+          if (originSel && prevIdaOriginText) {
+            for (const opt of originSel.options) {
+              if (opt.textContent.trim() === prevIdaOriginText) { originSel.value = opt.value; break; }
+            }
+          }
+          if (destSel && prevIdaDestText) {
+            for (const opt of destSel.options) {
+              if (opt.textContent.trim() === prevIdaDestText) { destSel.value = opt.value; break; }
+            }
+          }
+        }, 100);
+      }
     } else {
       oneWayForm?.classList.add('d-none');
       roundTripForm?.classList.remove('d-none');
@@ -1354,6 +1462,26 @@ class ItineraryBuilder {
       if (dateVuelta && !dateVuelta.value) dateVuelta.value = defaultDate;
       // Set correct field types for round trip based on transport type
       this.updateRoundTripFieldVisibility();
+
+      // Transfer one-way origin/dest → round-trip Ida origin/dest (swapped for Vuelta via syncIdaToVuelta)
+      if (prevOriginText || prevDestText) {
+        setTimeout(() => {
+          const idaOrigin = document.getElementById('roundTripOriginIdaSelect');
+          const idaDest = document.getElementById('roundTripDestinationIdaSelect');
+          if (idaOrigin && prevOriginText) {
+            for (const opt of idaOrigin.options) {
+              if (opt.textContent.trim() === prevOriginText) { idaOrigin.value = opt.value; break; }
+            }
+          }
+          if (idaDest && prevDestText) {
+            for (const opt of idaDest.options) {
+              if (opt.textContent.trim() === prevDestText) { idaDest.value = opt.value; break; }
+            }
+          }
+          // Auto-fill Vuelta from Ida (swapped)
+          this.syncIdaToVuelta();
+        }, 100);
+      }
     }
 
     // Re-check transport type to show/hide flight details correctly
@@ -1361,6 +1489,12 @@ class ItineraryBuilder {
   }
 
   handleDirectionTypeChange() {
+    // Save current origin/destination values before clearing to swap them
+    const prevOriginEl = document.getElementById('transportOriginSelect');
+    const prevDestEl = document.getElementById('transportDestinationSelect');
+    const prevOriginText = prevOriginEl?.selectedIndex > 0 ? prevOriginEl.options[prevOriginEl.selectedIndex].text : '';
+    const prevDestText = prevDestEl?.selectedIndex > 0 ? prevDestEl.options[prevDestEl.selectedIndex].text : '';
+
     this.clearTransportFormFields();
     const directionType = document.querySelector('input[name="directionType"]:checked')?.value;
     const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
@@ -1403,13 +1537,13 @@ class ItineraryBuilder {
       if (originLabel) originLabel.innerHTML = 'Origen (San Miguel de Allende) <span class="text-danger">*</span>';
       if (destinationLabel) destinationLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
     } else if (directionType === 'arrival') {
-      // Arrival: Origin = SELECT (airports), Destination = COMBO (hotels/cities)
+      // Arrival: Origin = SELECT (airports), Destination = SELECT dropdown
       originSelect?.classList.remove('d-none');
       originSelect?.setAttribute('required', 'required');
       if (originLabel) originLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
       if (destinationLabel) destinationLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
-      destinationComboWrapper?.classList.remove('d-none');
-      document.getElementById('transportDestinationCombo')?.setAttribute('required', 'required');
+      destinationSelect?.classList.remove('d-none');
+      destinationSelect?.setAttribute('required', 'required');
 
       if (timeLabel) {
         timeLabel.textContent = 'Hora de Llegada';
@@ -1423,9 +1557,9 @@ class ItineraryBuilder {
       destinationText?.setAttribute('required', 'required');
       if (destinationLabel) destinationLabel.innerHTML = 'Destino (San Miguel de Allende) <span class="text-danger">*</span>';
     } else if (directionType === 'departure') {
-      // Departure + Aeropuerto / Punto a Punto: Origin = COMBO, Destination = SELECT
-      originComboWrapper?.classList.remove('d-none');
-      document.getElementById('transportOriginCombo')?.setAttribute('required', 'required');
+      // Departure + Aeropuerto / Punto a Punto: Origin = SELECT dropdown, Destination = SELECT
+      originSelect?.classList.remove('d-none');
+      originSelect?.setAttribute('required', 'required');
       if (originLabel) originLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
       if (destinationLabel) destinationLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
       destinationSelect?.classList.remove('d-none');
@@ -1439,6 +1573,23 @@ class ItineraryBuilder {
     // Re-populate dropdowns considering direction
     if (transportType) {
       populateDropdownsForTransportType(transportType, directionType);
+    }
+
+    // Swap origin ↔ destination from previous direction (arrival→departure or vice versa)
+    if (prevOriginText || prevDestText) {
+      const newOriginSelect = document.getElementById('transportOriginSelect');
+      const newDestSelect = document.getElementById('transportDestinationSelect');
+      // Previous destination → new origin, previous origin → new destination
+      if (newOriginSelect && prevDestText) {
+        for (const opt of newOriginSelect.options) {
+          if (opt.textContent.trim() === prevDestText) { newOriginSelect.value = opt.value; break; }
+        }
+      }
+      if (newDestSelect && prevOriginText) {
+        for (const opt of newDestSelect.options) {
+          if (opt.textContent.trim() === prevOriginText) { newDestSelect.value = opt.value; break; }
+        }
+      }
     }
   }
 
@@ -1469,9 +1620,9 @@ class ItineraryBuilder {
       idaDestSelect?.classList.remove('d-none');
       if (idaOriginLabel) idaOriginLabel.innerHTML = 'Origen (San Miguel de Allende) <span class="text-danger">*</span>';
     } else {
-      // Aeropuerto / Punto a Punto: Origin = SELECT, Destination = COMBO
+      // Aeropuerto / Punto a Punto: Origin = SELECT, Destination = SELECT dropdown
       idaOriginSelect?.classList.remove('d-none');
-      idaDestComboWrapper?.classList.remove('d-none');
+      idaDestSelect?.classList.remove('d-none');
       if (idaOriginLabel) idaOriginLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
     }
 
@@ -1494,8 +1645,8 @@ class ItineraryBuilder {
       vueltaDestText?.classList.remove('d-none');
       if (vueltaDestLabel) vueltaDestLabel.innerHTML = 'Destino (San Miguel de Allende) <span class="text-danger">*</span>';
     } else {
-      // Aeropuerto / Punto a Punto: Origin = COMBO, Destination = SELECT
-      vueltaOriginComboWrapper?.classList.remove('d-none');
+      // Aeropuerto / Punto a Punto: Origin = SELECT dropdown, Destination = SELECT
+      vueltaOriginSelect?.classList.remove('d-none');
       vueltaDestSelect?.classList.remove('d-none');
       if (vueltaDestLabel) vueltaDestLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
     }
@@ -1558,15 +1709,20 @@ class ItineraryBuilder {
       const vueltaDestSelect = document.getElementById('roundTripDestinationVueltaSelect');
       if (vueltaDestSelect && !vueltaDestSelect.value) vueltaDestSelect.value = idaOriginSlug;
 
-      // Ida destination (COMBO text) → Vuelta origin (COMBO text)
-      const idaDestText = document.getElementById('roundTripDestinationIdaCombo')?.value || '';
-      const vueltaOriginCombo = document.getElementById('roundTripOriginVueltaCombo');
-      if (vueltaOriginCombo && !vueltaOriginCombo.value) vueltaOriginCombo.value = idaDestText;
+      // Ida destination (SELECT slug) → Vuelta origin (SELECT slug)
+      const idaDestSlug = document.getElementById('roundTripDestinationIdaSelect')?.value || '';
+      const vueltaOriginSelect = document.getElementById('roundTripOriginVueltaSelect');
+      if (vueltaOriginSelect && !vueltaOriginSelect.value) vueltaOriginSelect.value = idaDestSlug;
 
       // Auto-fill Ida specific location → Vuelta specific location
       const idaSpecific = document.getElementById('roundTripSpecificLocationIda')?.value || '';
       const vueltaSpecific = document.getElementById('roundTripSpecificLocationVuelta');
       if (vueltaSpecific && !vueltaSpecific.value && idaSpecific) vueltaSpecific.value = idaSpecific;
+
+      // Show Vuelta specific location row if origin was auto-filled
+      const vueltaOriginVal = document.getElementById('roundTripOriginVueltaSelect')?.value;
+      const vueltaLocRow = document.getElementById('roundTripSpecificLocationVueltaRow');
+      if (vueltaLocRow && vueltaOriginVal) vueltaLocRow.classList.remove('d-none');
     }
 
     // Show/hide specific location fields after sync
@@ -1816,7 +1972,8 @@ class ItineraryBuilder {
       type,
       price: parseFloat(document.getElementById('servicePrice')?.value || 0),
       quantity: type === 'concepto' ? 1
-        : type === 'transport' ? (document.getElementById('additionalVehicleCheckbox')?.checked ? 2 : 1)
+        : (type === 'transport' || (type === 'tour' && document.getElementById('tourRequiresTransport')?.checked))
+          ? (document.getElementById('additionalVehicleCheckbox')?.checked ? 2 : 1)
         : parseInt(document.getElementById('serviceQuantity')?.value || 1),
       notes: document.getElementById('serviceNotes')?.value,
       includeInTotal: document.getElementById('includeInTotal')?.checked !== false,
@@ -1930,12 +2087,8 @@ class ItineraryBuilder {
             data.origin = resolveSelectText(document.getElementById('roundTripOriginIdaSelect'));
           }
 
-          // Ida destination (arrival pattern)
-          if (tType === 'local') {
-            data.destination = resolveSelectText(document.getElementById('roundTripDestinationIdaSelect'));
-          } else {
-            data.destination = document.getElementById('roundTripDestinationIdaCombo')?.value || '';
-          }
+          // Ida destination (arrival pattern) — always SELECT now
+          data.destination = resolveSelectText(document.getElementById('roundTripDestinationIdaSelect'));
 
           // Append specific location to Ida destination if filled
           const idaSpecific = document.getElementById('roundTripSpecificLocationIda')?.value?.trim();
@@ -1946,12 +2099,8 @@ class ItineraryBuilder {
           data.startDate = document.getElementById('roundTripDateIda')?.value || '';
           data.startTime = document.getElementById('roundTripTimeIda')?.value || '';
 
-          // Vuelta origin (departure pattern)
-          if (tType === 'local') {
-            data.returnOrigin = resolveSelectText(document.getElementById('roundTripOriginVueltaSelect'));
-          } else {
-            data.returnOrigin = document.getElementById('roundTripOriginVueltaCombo')?.value || '';
-          }
+          // Vuelta origin (departure pattern) — always SELECT now
+          data.returnOrigin = resolveSelectText(document.getElementById('roundTripOriginVueltaSelect'));
 
           // Append specific location to Vuelta origin if filled
           const vueltaSpecific = document.getElementById('roundTripSpecificLocationVuelta')?.value?.trim();
@@ -2007,10 +2156,6 @@ class ItineraryBuilder {
           // Local Ida: origin = TEXT (ubicación específica), destination = SELECT
           data.origin = document.getElementById('transportOriginText')?.value || '';
           data.destination = resolveDestinationSelect();
-        } else if (isDepartureWithSelect) {
-          // Departure + Aeropuerto / Punto a Punto: origin = COMBO, destination = SELECT
-          data.origin = document.getElementById('transportOriginCombo')?.value || '';
-          data.destination = resolveDestinationSelect();
         } else if (directionType === 'departure' && data.transportType === 'local') {
           // Local Vuelta: origin = SELECT, destination = TEXT
           const originSelect = document.getElementById('transportOriginSelect');
@@ -2021,13 +2166,14 @@ class ItineraryBuilder {
           }
           data.destination = document.getElementById('transportDestinationText')?.value || '';
         } else if (directionType === 'departure') {
-          // Departure + other: origin = COMBO, destination = COMBO
-          data.origin = document.getElementById('transportOriginCombo')?.value || '';
-          data.destination = document.getElementById('transportDestinationCombo')?.value || '';
+          // Departure: origin = SELECT (city), destination = SELECT (airport)
+          const originSelect = document.getElementById('transportOriginSelect');
+          data.origin = originSelect?.selectedIndex > 0 ? originSelect.options[originSelect.selectedIndex].textContent : (originSelect?.value || '');
+          data.destination = resolveDestinationSelect();
         } else {
-          // Arrival: origin = SELECT (airport slug), destination = COMBO (text)
+          // Arrival: origin = SELECT (airport), destination = SELECT (city)
           data.origin = document.getElementById('transportOriginSelect')?.value || '';
-          data.destination = document.getElementById('transportDestinationCombo')?.value || '';
+          data.destination = resolveDestinationSelect();
         }
 
         // If specific location is filled, append it to origin (departure) or destination (arrival)
@@ -2063,12 +2209,8 @@ class ItineraryBuilder {
             // Local Ida: origin is TEXT field
             const originText = document.getElementById('transportOriginText')?.value;
             if (originText) return originText;
-          } else if (directionType === 'departure') {
-            // All departure: origin is COMBO text field
-            const originCombo = document.getElementById('transportOriginCombo')?.value;
-            if (originCombo) return originCombo;
           } else {
-            // Arrival: origin is SELECT
+            // Both arrival and departure: origin is SELECT
             const originSelect = document.getElementById('transportOriginSelect');
             if (originSelect && originSelect.selectedIndex > 0) {
               return originSelect.options[originSelect.selectedIndex].textContent;
@@ -2306,9 +2448,10 @@ class ItineraryBuilder {
     document.getElementById('serviceQuantity').value = service.quantity || 1;
 
     // Restore additional vehicle checkbox for transport
-    if (service.type === 'transport') {
-      const addVehicleCheckbox = document.getElementById('additionalVehicleCheckbox');
-      if (addVehicleCheckbox) addVehicleCheckbox.checked = (service.quantity || 1) >= 2;
+    // Restore additional vehicle checkbox for transport and tours with transport
+    const addVehicleCheckbox = document.getElementById('additionalVehicleCheckbox');
+    if (addVehicleCheckbox && (service.quantity || 1) >= 2) {
+      addVehicleCheckbox.checked = true;
     }
 
     document.getElementById('serviceNotes').value = service.notes || '';
@@ -2451,6 +2594,12 @@ class ItineraryBuilder {
             // Trigger the transport toggle to show transport fields
             if (this.handleTourTransportToggle) {
               this.handleTourTransportToggle(true);
+            }
+            // Restore additional vehicle checkbox AFTER toggle (which resets it)
+            if ((service.quantity || 1) >= 2) {
+              const addVehicleCb = document.getElementById('additionalVehicleCheckbox');
+              if (addVehicleCb) addVehicleCb.checked = true;
+              document.getElementById('serviceQuantity').value = service.quantity;
             }
           }
 
@@ -2649,25 +2798,20 @@ class ItineraryBuilder {
             // Local Ida: origin = TEXT, destination = SELECT
             document.getElementById('transportOriginText').value = originSplit.baseName;
             setSelectByValueOrText(document.getElementById('transportDestinationSelect'), destSplit.baseName);
-          } else if (isDepartureWithSelect) {
-            // Departure + Aeropuerto / Punto a Punto: origin = COMBO, destination = SELECT
-            document.getElementById('transportOriginCombo').value = originSplit.baseName;
-            setSelectByValueOrText(document.getElementById('transportDestinationSelect'), destSplit.baseName);
-            extractedSpecificLocation = originSplit.specificLocation; // departure: specific is on origin
           } else if (isDeparture && service.transportType === 'local') {
             // Local Vuelta: origin = SELECT, destination = TEXT
             setSelectByValueOrText(document.getElementById('transportOriginSelect'), originSplit.baseName);
             document.getElementById('transportDestinationText').value = destSplit.baseName;
           } else if (isDeparture) {
-            // Departure + other: origin = COMBO, destination = COMBO
-            document.getElementById('transportOriginCombo').value = originSplit.baseName;
-            document.getElementById('transportDestinationCombo').value = destSplit.baseName;
+            // Departure: origin = SELECT (city), destination = SELECT (airport)
+            setSelectByValueOrText(document.getElementById('transportOriginSelect'), originSplit.baseName);
+            setSelectByValueOrText(document.getElementById('transportDestinationSelect'), destSplit.baseName);
             extractedSpecificLocation = originSplit.specificLocation;
           } else {
-            // Arrival: origin = SELECT, destination = COMBO
+            // Arrival: origin = SELECT (airport), destination = SELECT (city)
             setSelectByValueOrText(document.getElementById('transportOriginSelect'), originSplit.baseName);
-            document.getElementById('transportDestinationCombo').value = destSplit.baseName;
-            extractedSpecificLocation = destSplit.specificLocation; // arrival: specific is on destination
+            setSelectByValueOrText(document.getElementById('transportDestinationSelect'), destSplit.baseName);
+            extractedSpecificLocation = destSplit.specificLocation;
           }
           document.getElementById('transportOriginText').value = originSplit.baseName;
 
@@ -4027,6 +4171,7 @@ class ItineraryBuilder {
             includeGuide: subconcept.includeGuide || false,
             includeGreeter: subconcept.includeGreeter || false,
             greeterInVehicle: subconcept.greeterInVehicle || false,
+            availabilityPending: subconcept.availabilityPending || false,
             includeInTotal: subconcept.includeInTotal !== undefined ? subconcept.includeInTotal : true,
             // Transport-specific fields (from backend)
             transportType: subconcept.transportType || null,
@@ -5398,16 +5543,33 @@ class ItineraryBuilder {
       guideField?.classList.remove('d-none');
       document.getElementById('transportCategory')?.setAttribute('required', 'required');
 
+      // For tours, guide is always included. The checkbox controls adding a chofer too.
+      const guideLabel = guideField?.querySelector('.form-check-label[for="includeGuide"]');
+      if (guideLabel) guideLabel.textContent = 'Guía + Chofer';
+
+      // Hide quantity, show additional vehicle checkbox
+      const quantityField = document.getElementById('serviceQuantity')?.closest('.col-md-6');
+      quantityField?.classList.add('d-none');
+      document.getElementById('serviceQuantity').value = 1;
+      document.getElementById('additionalVehicleContainer')?.classList.remove('d-none');
+      document.getElementById('additionalVehicleCheckbox').checked = false;
+
       // Show pricing fields
       if (standardPricingSection) {
         standardPricingSection.classList.remove('d-none');
       }
+
+      this.updateVehicleCapacityNote();
     } else {
       // Hide transport fields
       categoryField?.classList.add('d-none');
       vehicleField?.classList.add('d-none');
       guideField?.classList.add('d-none');
       document.getElementById('transportCategory')?.removeAttribute('required');
+
+      // Hide additional vehicle checkbox, show quantity field
+      document.getElementById('additionalVehicleContainer')?.classList.add('d-none');
+      document.getElementById('vehicleCapacityNote')?.classList.add('d-none');
 
       // Hide pricing fields
       if (standardPricingSection) {
@@ -5677,37 +5839,59 @@ class ItineraryBuilder {
     const includeGuide = document.getElementById('includeGuide')?.checked;
     const includeGreeter = document.getElementById('includeGreeter')?.checked;
     const greeterInVehicle = document.getElementById('greeterInVehicle')?.checked;
+    const tourRequiresTransport = document.getElementById('tourRequiresTransport')?.checked;
     const vehicleSelect = document.getElementById('vehicleSelect');
     const selectedVehicleId = vehicleSelect?.value;
 
-    const reducesCapacity = includeGuide || (includeGreeter && greeterInVehicle);
+    // For tours: guide always occupies 1 seat when transport is required
+    // For tours with Guía + Chofer: 2 seats occupied
+    let seatsOccupied = 0;
+    let occupantLabel = '';
 
-    if (serviceType !== 'transport' || !reducesCapacity || !selectedVehicleId) {
+    if (serviceType === 'tour' && tourRequiresTransport) {
+      // Tours always include a guide who occupies 1 seat
+      seatsOccupied = 1;
+      occupantLabel = 'El guía ocupa 1 lugar';
+      if (includeGuide) {
+        // Guía + Chofer checked → 2 seats
+        seatsOccupied = 2;
+        occupantLabel = 'El guía y chofer ocupan 2 lugares';
+      }
+    } else if (serviceType === 'transport') {
+      if (includeGuide) {
+        seatsOccupied = 1;
+        occupantLabel = 'El guía ocupa 1 lugar';
+      } else if (includeGreeter && greeterInVehicle) {
+        seatsOccupied = 1;
+        occupantLabel = 'El greeter ocupa 1 lugar';
+      }
+    }
+
+    if (seatsOccupied === 0) {
       noteEl.classList.add('d-none');
       return;
     }
 
-    // Get vehicle capacity from transport price data or global vehicle types map
+    // Get vehicle capacity if a vehicle is selected
     let capacity = 0;
-    if (this.transportPriceData?.vehicles) {
-      const vehicle = this.transportPriceData.vehicles.find((v) => v.vehicleTypeId === selectedVehicleId);
-      if (vehicle) capacity = vehicle.capacity || 0;
+    if (selectedVehicleId) {
+      if (this.transportPriceData?.vehicles) {
+        const vehicle = this.transportPriceData.vehicles.find((v) => v.vehicleTypeId === selectedVehicleId);
+        if (vehicle) capacity = vehicle.capacity || 0;
+      }
+      if (!capacity) {
+        const vehicleInfo = this.getVehicleTypeInfo(selectedVehicleId);
+        if (vehicleInfo) capacity = vehicleInfo.capacity || vehicleInfo.defaultCapacity || 0;
+      }
     }
-    if (!capacity) {
-      const vehicleInfo = this.getVehicleTypeInfo(selectedVehicleId);
-      if (vehicleInfo) capacity = vehicleInfo.capacity || vehicleInfo.defaultCapacity || 0;
-    }
-
-    const occupant = includeGuide ? 'El guía' : 'El greeter';
 
     if (capacity > 0) {
-      const effectiveCapacity = capacity - 1;
-      noteTextEl.textContent = `${occupant} ocupa 1 lugar. Capacidad disponible: ${effectiveCapacity} de ${capacity} pax`;
-      noteEl.classList.remove('d-none');
+      const effectiveCapacity = capacity - seatsOccupied;
+      noteTextEl.textContent = `${occupantLabel}. Capacidad disponible: ${effectiveCapacity} de ${capacity} pax`;
     } else {
-      noteTextEl.textContent = `${occupant} ocupa 1 lugar del vehículo`;
-      noteEl.classList.remove('d-none');
+      noteTextEl.textContent = `${occupantLabel} del vehículo`;
     }
+    noteEl.classList.remove('d-none');
   }
 
   /**
@@ -5949,7 +6133,7 @@ class ItineraryBuilder {
       if (vehicleInfo) {
         const pax = vehicleInfo.capacity || 0;
         const trunk = vehicleInfo.trunkCapacity || 0;
-        capacityDisplay = `${pax} pax, ${trunk} carry-on`;
+        capacityDisplay = `${pax} pax`;
       } else {
         capacityDisplay = 'Capacidad no disponible';
       }
@@ -6290,11 +6474,13 @@ class ItineraryBuilder {
         const destSlug = destSelect?.value;
         destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
       } else {
-        // Aeropuerto / Punto a Punto: Ida origin = SELECT (slug), Ida destination = COMBO (text)
+        // Aeropuerto / Punto a Punto: Ida origin = SELECT (slug), Ida destination = SELECT (slug)
         const originSelect = document.getElementById('roundTripOriginIdaSelect');
-        const slug = originSelect?.value;
-        originName = window.slugToOriginalMapping?.get(slug) || slug || '';
-        destinationName = document.getElementById('roundTripDestinationIdaCombo')?.value || '';
+        const originSlug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
+        const destSelect = document.getElementById('roundTripDestinationIdaSelect');
+        const destSlug = destSelect?.value;
+        destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
       }
     } else {
       // One-way: read from one-way fields based on direction
@@ -6313,10 +6499,6 @@ class ItineraryBuilder {
         // Local Ida: origin TEXT, destination SELECT
         originName = document.getElementById('transportOriginText')?.value || '';
         destinationName = resolveDestSelect();
-      } else if (isDepartureWithSelect) {
-        // Departure + Aeropuerto / Punto a Punto: origin COMBO, destination SELECT
-        originName = document.getElementById('transportOriginCombo')?.value || '';
-        destinationName = resolveDestSelect();
       } else if (direction === 'departure' && transportType === 'local') {
         // Local Vuelta: origin SELECT, destination TEXT
         const originSelect = document.getElementById('transportOriginSelect');
@@ -6324,17 +6506,17 @@ class ItineraryBuilder {
         originName = window.slugToOriginalMapping?.get(slug) || slug || '';
         destinationName = document.getElementById('transportDestinationText')?.value || '';
       } else if (direction === 'departure') {
-        // Departure + other: origin COMBO, destination COMBO
-        originName = document.getElementById('transportOriginCombo')?.value || '';
-        destinationName = document.getElementById('transportDestinationCombo')?.value || '';
-      } else if (direction === 'arrival') {
+        // Departure: origin SELECT (city), destination SELECT (airport)
         const originSelect = document.getElementById('transportOriginSelect');
-        const slug = originSelect?.value;
-        originName = window.slugToOriginalMapping?.get(slug) || slug || '';
-        destinationName = document.getElementById('transportDestinationCombo')?.value || '';
+        const originSlug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
+        destinationName = resolveDestSelect();
       } else {
-        originName = document.getElementById('transportOriginText')?.value || '';
-        destinationName = document.getElementById('transportDestinationCombo')?.value || '';
+        // Arrival: origin SELECT (airport), destination SELECT (city)
+        const originSelect = document.getElementById('transportOriginSelect');
+        const originSlug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
+        destinationName = resolveDestSelect();
       }
     }
 
@@ -8835,6 +9017,12 @@ class ItineraryBuilder {
 
     // Add dragover and drop to container to catch all drops
     container.addEventListener('dragover', (e) => {
+      // Skip if this is a catalog drag-and-drop (handled by DragCatalogManager)
+      if (e.dataTransfer.types.includes('application/x-catalog-item')) {
+        container.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
+        return;
+      }
+
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
 
@@ -8863,6 +9051,9 @@ class ItineraryBuilder {
     });
 
     container.addEventListener('drop', (e) => {
+      // Skip if this is a catalog drag-and-drop
+      if (e.dataTransfer.types.includes('application/x-catalog-item')) return;
+
       e.preventDefault();
       e.stopPropagation();
 
@@ -9684,11 +9875,11 @@ function populateDropdownsForTransportType(transportType, directionType) {
     if (destinationSelectEl) { while (destinationSelectEl.options.length > 1) destinationSelectEl.remove(1); }
     destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
   } else if (isDeparture) {
-    // Aeropuerto / Punto a Punto departure: origin = COMBO (datalist), destination = SELECT
-    populateDatalist(originDatalistEl, origins);
-    originSelectEls.forEach(el => populateSelect(el, origins)); // fallback for slug mapping
+    // Aeropuerto / Punto a Punto departure: origin = SELECT dropdown, destination = SELECT
+    originSelectEls.forEach(el => populateSelect(el, origins));
     populateSelect(destinationSelectEl, destinations);
-    destinationDatalistEls.forEach(el => populateDatalist(el, destinations)); // keep in sync
+    if (originDatalistEl) originDatalistEl.innerHTML = '';
+    destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
   } else if (transportType === 'local') {
     // Local Ida: origin = TEXT (no dropdown needed), destination = SELECT
     populateSelect(destinationSelectEl, destinations);
@@ -9697,12 +9888,12 @@ function populateDropdownsForTransportType(transportType, directionType) {
     if (originDatalistEl) originDatalistEl.innerHTML = '';
     destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
   } else {
-    // Arrival: origins → origin SELECT, destinations → destination datalists
+    // Arrival: origins → origin SELECT, destinations → destination SELECT dropdown
     originSelectEls.forEach(el => populateSelect(el, origins));
-    destinationDatalistEls.forEach(el => populateDatalist(el, destinations));
+    if (destinationSelectEl) populateSelect(destinationSelectEl, destinations);
     // Clear departure-specific elements
     if (originDatalistEl) originDatalistEl.innerHTML = '';
-    if (destinationSelectEl) { while (destinationSelectEl.options.length > 1) destinationSelectEl.remove(1); }
+    destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
   }
 
   // Update options indicators
@@ -9791,10 +9982,10 @@ function populateRoundTripDropdowns(transportType) {
     populateSelect(idaDestSelect, arrivalDestinations);
     if (idaDestCombo) idaDestCombo.innerHTML = '';
   } else {
-    // Aeropuerto / Punto a Punto: origin = SELECT, destination = COMBO
+    // Aeropuerto / Punto a Punto: origin = SELECT, destination = SELECT dropdown
     populateSelect(idaOriginSelect, arrivalOrigins);
-    populateDatalist(idaDestCombo, arrivalDestinations);
-    if (idaDestSelect) { while (idaDestSelect.options.length > 1) idaDestSelect.remove(1); }
+    populateSelect(idaDestSelect, arrivalDestinations);
+    if (idaDestCombo) idaDestCombo.innerHTML = '';
   }
 
   // --- VUELTA (departure pattern) ---
@@ -9808,10 +9999,10 @@ function populateRoundTripDropdowns(transportType) {
     if (vueltaOriginCombo) vueltaOriginCombo.innerHTML = '';
     if (vueltaDestSelect) { while (vueltaDestSelect.options.length > 1) vueltaDestSelect.remove(1); }
   } else {
-    // Aeropuerto / Punto a Punto: origin = COMBO, destination = SELECT
-    populateDatalist(vueltaOriginCombo, departureOrigins);
+    // Aeropuerto / Punto a Punto: origin = SELECT dropdown, destination = SELECT
+    populateSelect(vueltaOriginSelect, departureOrigins);
     populateSelect(vueltaDestSelect, departureDestinations);
-    if (vueltaOriginSelect) { while (vueltaOriginSelect.options.length > 1) vueltaOriginSelect.remove(1); }
+    if (vueltaOriginCombo) vueltaOriginCombo.innerHTML = '';
   }
 }
 
@@ -10167,9 +10358,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const specificLocationRow = document.getElementById('specificLocationRow');
     if (!specificLocationRow) return;
 
-    const originCombo = document.getElementById('transportOriginCombo')?.value || '';
-    const destCombo = document.getElementById('transportDestinationCombo')?.value || '';
-    const needsField = locationNeedsSpecificField(originCombo) || locationNeedsSpecificField(destCombo);
+    const originSelect = document.getElementById('transportOriginSelect');
+    const destSelect = document.getElementById('transportDestinationSelect');
+    const originVal = originSelect?.selectedIndex > 0 ? originSelect.options[originSelect.selectedIndex].text : '';
+    const destVal = destSelect?.selectedIndex > 0 ? destSelect.options[destSelect.selectedIndex].text : '';
+    const needsField = locationNeedsSpecificField(originVal) || locationNeedsSpecificField(destVal);
 
     if (needsField) {
       specificLocationRow.classList.remove('d-none');
@@ -10192,9 +10385,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Ida: check destination combo
+    // Ida: check destination select
     const idaRow = document.getElementById('roundTripSpecificLocationIdaRow');
-    const idaDest = document.getElementById('roundTripDestinationIdaCombo')?.value || '';
+    const idaDest = document.getElementById('roundTripDestinationIdaSelect')?.value || '';
     if (idaRow) {
       if (locationNeedsSpecificField(idaDest)) {
         idaRow.classList.remove('d-none');
@@ -10205,9 +10398,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Vuelta: check origin combo
+    // Vuelta: check origin select
     const vueltaRow = document.getElementById('roundTripSpecificLocationVueltaRow');
-    const vueltaOrigin = document.getElementById('roundTripOriginVueltaCombo')?.value || '';
+    const vueltaOrigin = document.getElementById('roundTripOriginVueltaSelect')?.value || '';
     if (vueltaRow) {
       if (locationNeedsSpecificField(vueltaOrigin)) {
         vueltaRow.classList.remove('d-none');

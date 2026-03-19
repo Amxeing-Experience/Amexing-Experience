@@ -400,9 +400,11 @@ class DragCatalogManager {
       // Only respond to catalog drags
       if (!e.dataTransfer.types.includes('application/x-catalog-item')) return;
 
-      console.log('[DragCatalog] dragover on daysContainer');
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
+
+      // Remove any day-reorder indicators that may have appeared
+      daysContainer.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
 
       const dayCard = e.target.closest('.day-card');
       if (!dayCard) return;
@@ -490,6 +492,8 @@ class DragCatalogManager {
     document.querySelectorAll('.day-card.catalog-drop-available').forEach((card) => {
       card.classList.remove('catalog-drop-available');
     });
+    // Also clear any day-reorder drop indicators that may have appeared
+    document.querySelectorAll('#daysContainer .drop-indicator').forEach((el) => el.remove());
   }
 
   // =====================
@@ -609,27 +613,20 @@ class DragCatalogManager {
     const originIsAirport = (service.originServiceType || '').toLowerCase().includes('aeropuerto');
 
     if (transportType === 'aeropuerto') {
-      // Set direction
-      const directionId = originIsAirport ? 'directionLlegada' : 'directionSalida';
+      // Set direction based on which side is the airport
+      const directionId = originIsAirport ? 'typeArrival' : 'typeDeparture';
       const dirRadio = document.getElementById(directionId);
       if (dirRadio) {
         dirRadio.checked = true;
         dirRadio.dispatchEvent(new Event('change', { bubbles: true }));
       }
-
-      // Wait for dropdowns to populate after direction change, then set origin/destination
-      setTimeout(() => {
-        if (originIsAirport) {
-          // Llegada: origin = SELECT (airport), destination = COMBO (hotel)
-          this.setSelectValueByText('transportOriginSelect', service.origin);
-          this.setComboValueByText('transportDestinationCombo', service.destination);
-        } else {
-          // Salida: origin = COMBO (hotel), destination = SELECT (airport)
-          this.setComboValueByText('transportOriginCombo', service.origin);
-          this.setSelectValueByText('transportDestinationSelect', service.destination);
-        }
-      }, 300);
     }
+
+    // Wait for dropdowns to populate, then set origin/destination
+    setTimeout(() => {
+      this.setSelectValueByText('transportOriginSelect', service.origin);
+      this.setSelectValueByText('transportDestinationSelect', service.destination);
+    }, 300);
   }
 
   setSelectValueByText(selectId, text) {
