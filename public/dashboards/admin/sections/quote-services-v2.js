@@ -207,6 +207,27 @@ class ItineraryBuilder {
       radio.addEventListener('change', (e) => this.handleServiceTypeChange(e.target.value));
     });
 
+    // Additional vehicle checkbox for transport
+    document.getElementById('additionalVehicleCheckbox')?.addEventListener('change', (e) => {
+      const qty = document.getElementById('serviceQuantity');
+      if (qty) qty.value = e.target.checked ? 2 : 1;
+    });
+
+    // Walking tour quantity inputs → update total people count for tier pricing
+    ['walkingTourAdultsQuantity', 'walkingTourChildrenQuantity', 'walkingTourInfantsQuantity'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('change', () => {
+        const adults = parseInt(document.getElementById('walkingTourAdultsQuantity')?.value || 0);
+        const children = parseInt(document.getElementById('walkingTourChildrenQuantity')?.value || 0);
+        const infants = parseInt(document.getElementById('walkingTourInfantsQuantity')?.value || 0);
+        const total = adults + children + infants;
+        const peopleCountField = document.getElementById('walkingTourPeopleCount');
+        if (peopleCountField) peopleCountField.value = total || 1;
+        // Re-highlight tier based on new total
+        if (this.currentTourData) this.highlightWalkingTourTier(this.currentTourData);
+        this.updateServicePriceBreakdown();
+      });
+    });
+
     // Transport Type Toggle
     document.querySelectorAll('input[name="transportType"]').forEach((radio) => {
       radio.addEventListener('change', () => this.handleTransportTypeChange());
@@ -342,7 +363,7 @@ class ItineraryBuilder {
     });
 
     // People quantity inputs - update breakdown when quantities change
-    ['tourAdultsQuantity', 'tourChildrenQuantity', 'tourAdultsNoAlcoholQuantity',
+    ['tourAdultsQuantity', 'tourChildrenQuantity', 'tourInfantsQuantity',
       'adultsQuantity', 'childrenQuantity', 'adultsNoAlcoholQuantity',
       'conceptoAdultsQuantity', 'conceptoChildrenQuantity', 'conceptoAdultsNoAlcoholQuantity'].forEach((id) => {
       document.getElementById(id)?.addEventListener('change', () => {
@@ -615,6 +636,7 @@ class ItineraryBuilder {
     this.editMode = 'service';
     this.currentDayId = dayId;
     this.currentServiceId = serviceId;
+    this.currentServiceAvailabilityPending = false;
 
     const modal = new bootstrap.Modal(document.getElementById('serviceModal'));
     const form = document.getElementById('serviceForm');
@@ -626,13 +648,23 @@ class ItineraryBuilder {
     // Populate rates dropdown when modal opens
     this.populateRatesDropdown();
 
+    // Build day label for modal title
+    const dayInfo = this.days.find((d) => d.id === dayId);
+    let dayLabel = '';
+    if (dayInfo?.date) {
+      const date = new Date(dayInfo.date + 'T12:00:00');
+      const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      dayLabel = ` - ${dayNames[date.getDay()]} ${date.getDate()} de ${monthNames[date.getMonth()]}`;
+    }
+
     // Reset or populate form
     if (serviceId && this.services.has(serviceId)) {
       const service = this.services.get(serviceId);
-      document.getElementById('serviceModalLabel').innerHTML = '<i class="ti ti-pencil me-2"></i>Editar Servicio';
+      document.getElementById('serviceModalLabel').innerHTML = `<i class="ti ti-pencil me-2"></i>Editar Servicio${dayLabel}`;
       this.populateServiceForm(service);
     } else {
-      document.getElementById('serviceModalLabel').innerHTML = '<i class="ti ti-plus-circle me-2"></i>Agregar Servicio';
+      document.getElementById('serviceModalLabel').innerHTML = `<i class="ti ti-plus-circle me-2"></i>Agregar Servicio${dayLabel}`;
       form.reset();
 
       // Clear tour details when opening a new service modal
@@ -679,6 +711,9 @@ class ItineraryBuilder {
     const breakdown = document.getElementById('servicePriceBreakdown');
     if (breakdown) breakdown.classList.add('d-none');
 
+    // Hide additional vehicle checkbox (shown only for transport)
+    document.getElementById('additionalVehicleContainer')?.classList.add('d-none');
+
     // Save current service type fields before switching
     this.saveCurrentServiceTypeFields();
 
@@ -700,6 +735,11 @@ class ItineraryBuilder {
     // Clear experience schedules when switching away from experience type
     if (type !== 'experience') {
       this.clearExperienceSchedule();
+    }
+
+    // Hide "Incluir en total" checkbox for all types except concepto
+    if (type !== 'concepto') {
+      document.getElementById('includeInTotalContainer')?.style.setProperty('display', 'none');
     }
 
     // Show/hide transport-specific selectors
@@ -790,6 +830,9 @@ class ItineraryBuilder {
       document.getElementById('transportCategory')?.removeAttribute('required');
 
       if (type === 'concepto') {
+        // Show "Incluir en total" checkbox only for Concepto
+        document.getElementById('includeInTotalContainer')?.style.setProperty('display', '');
+
         // Hide quantity field for Concepto
         quantityField?.classList.add('d-none');
         document.getElementById('serviceQuantity')?.removeAttribute('required');
@@ -938,9 +981,12 @@ class ItineraryBuilder {
       vehicleField?.classList.remove('d-none');
       guideField?.classList.remove('d-none');
 
-      // Show quantity field for Transport
-      quantityField?.classList.remove('d-none');
-      document.getElementById('serviceQuantity')?.setAttribute('required', 'required');
+      // Hide quantity input, show additional vehicle checkbox for Transport
+      quantityField?.classList.add('d-none');
+      document.getElementById('serviceQuantity')?.removeAttribute('required');
+      document.getElementById('serviceQuantity').value = 1;
+      document.getElementById('additionalVehicleContainer')?.classList.remove('d-none');
+      document.getElementById('additionalVehicleCheckbox').checked = false;
 
       // Reset title and checkbox label for Transport
       if (serviciosLabel) {
@@ -1544,6 +1590,13 @@ class ItineraryBuilder {
       return this.saveRoundTripAsTwo(serviceData);
     }
 
+    const saveBtn = document.getElementById('saveServiceBtn');
+    const originalContent = saveBtn ? saveBtn.innerHTML : '';
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Guardando...';
+    }
+
     try {
       if (this.currentServiceId) {
         // Update existing service
@@ -1588,6 +1641,11 @@ class ItineraryBuilder {
     } catch (error) {
       console.error('Error saving service:', error);
       this.showModalAlert('serviceModalAlert', `Error al guardar el servicio: ${error.message}`, 'danger');
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalContent;
+      }
     }
   }
 
@@ -1757,10 +1815,13 @@ class ItineraryBuilder {
     const data = {
       type,
       price: parseFloat(document.getElementById('servicePrice')?.value || 0),
-      quantity: type === 'concepto' ? 1 : parseInt(document.getElementById('serviceQuantity')?.value || 1),
+      quantity: type === 'concepto' ? 1
+        : type === 'transport' ? (document.getElementById('additionalVehicleCheckbox')?.checked ? 2 : 1)
+        : parseInt(document.getElementById('serviceQuantity')?.value || 1),
       notes: document.getElementById('serviceNotes')?.value,
       includeInTotal: document.getElementById('includeInTotal')?.checked !== false,
       greeterInVehicle: document.getElementById('greeterInVehicle')?.checked || false,
+      availabilityPending: this.currentServiceAvailabilityPending || false,
     };
 
     // For tours and transport, store vehicle type information
@@ -1786,15 +1847,12 @@ class ItineraryBuilder {
         data.childrenQuantity = parseInt(document.getElementById('childrenQuantity')?.value || 0);
         data.adultsNoAlcoholQuantity = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
 
-        // Collect schedule data - get the text content of selected option, not the index value
-        const scheduleSelect = document.getElementById('experienceMultipleTime');
-        if (scheduleSelect && scheduleSelect.selectedIndex > 0) {
-          data.selectedSchedule = scheduleSelect.options[scheduleSelect.selectedIndex].textContent;
-          data.startTime = this.extractStartTimeFromSchedule(data.selectedSchedule);
-        } else {
-          data.selectedSchedule = '';
-          data.startTime = '';
-        }
+        // Collect schedule data from start/end time inputs
+        data.startTime = document.getElementById('experienceStartTime')?.value || '';
+        data.endTime = document.getElementById('experienceEndTime')?.value || '';
+        data.selectedSchedule = data.startTime && data.endTime
+          ? `${data.startTime} - ${data.endTime}`
+          : data.startTime || '';
 
         // Collect price data
         data.adultPrice = parseFloat(document.getElementById('adultPrice')?.value || 0);
@@ -1814,7 +1872,10 @@ class ItineraryBuilder {
         if (selectedTourData?.isWalkingTour) {
           // Walking tour: collect tier-based pricing
           data.isWalkingTour = true;
-          data.walkingTourPeopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10);
+          data.adultsQuantity = parseInt(document.getElementById('walkingTourAdultsQuantity')?.value || 0);
+          data.childrenQuantity = parseInt(document.getElementById('walkingTourChildrenQuantity')?.value || 0);
+          data.infantsQuantity = parseInt(document.getElementById('walkingTourInfantsQuantity')?.value || 0);
+          data.walkingTourPeopleCount = data.adultsQuantity + data.childrenQuantity + data.infantsQuantity || 1;
           data.walkingTourPrice = this.getWalkingTourPrice(selectedTourData, data.walkingTourPeopleCount);
           data.walkingTourCurrency = selectedTourData.walkingPriceCurrency || 'MXN';
           data.persons = data.walkingTourPeopleCount;
@@ -1830,26 +1891,18 @@ class ItineraryBuilder {
           const includeGreeterCheckbox = document.getElementById('includeGreeter');
           data.includeGreeter = includeGreeterCheckbox ? includeGreeterCheckbox.checked : false;
 
-          // Collect passenger quantities for tours (same as experiences)
+          // Collect passenger counts for tours
           data.adultsQuantity = parseInt(document.getElementById('tourAdultsQuantity')?.value || 0);
           data.childrenQuantity = parseInt(document.getElementById('tourChildrenQuantity')?.value || 0);
-          data.adultsNoAlcoholQuantity = parseInt(document.getElementById('tourAdultsNoAlcoholQuantity')?.value || 0);
-
-          // Collect tour-specific prices
-          data.adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
-          data.childPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0);
-          data.noAlcoholPrice = parseFloat(document.getElementById('tourNoAlcoholPrice')?.value || 0);
+          data.infantsQuantity = parseInt(document.getElementById('tourInfantsQuantity')?.value || 0);
         }
 
-        // Collect schedule data - get the text content of selected option, not the index value
-        const tourScheduleSelect = document.getElementById('tourMultipleTime');
-        if (tourScheduleSelect && tourScheduleSelect.selectedIndex > 0) {
-          data.selectedSchedule = tourScheduleSelect.options[tourScheduleSelect.selectedIndex].textContent;
-          data.startTime = this.extractStartTimeFromSchedule(data.selectedSchedule);
-        } else {
-          data.selectedSchedule = '';
-          data.startTime = '';
-        }
+        // Collect schedule data from start/end time inputs
+        data.startTime = document.getElementById('tourStartTime')?.value || '';
+        data.endTime = document.getElementById('tourEndTime')?.value || '';
+        data.selectedSchedule = data.startTime && data.endTime
+          ? `${data.startTime} - ${data.endTime}`
+          : data.startTime || '';
         break;
       }
       case 'transport': {
@@ -2230,6 +2283,9 @@ class ItineraryBuilder {
       includeInTotalCheckbox.checked = service.includeInTotal !== false;
     }
 
+    // Restore availability pending flag
+    this.currentServiceAvailabilityPending = service.availabilityPending || false;
+
     // Populate common fields
     document.getElementById('transportCategory').value = service.category || '';
     // For tours with vehicle type, use vehicleType, otherwise use vehicleId
@@ -2248,6 +2304,13 @@ class ItineraryBuilder {
       document.getElementById('servicePrice').value = this.calculateServicePrice(service);
     }
     document.getElementById('serviceQuantity').value = service.quantity || 1;
+
+    // Restore additional vehicle checkbox for transport
+    if (service.type === 'transport') {
+      const addVehicleCheckbox = document.getElementById('additionalVehicleCheckbox');
+      if (addVehicleCheckbox) addVehicleCheckbox.checked = (service.quantity || 1) >= 2;
+    }
+
     document.getElementById('serviceNotes').value = service.notes || '';
 
     // Handle guide/driver checkbox
@@ -2328,29 +2391,11 @@ class ItineraryBuilder {
               noAlcoholPriceField.value = service.noAlcoholPrice;
             }
 
-            // Also restore schedule field when fields are ready
-            const scheduleField = document.getElementById('experienceMultipleTime');
-
-            // Ensure the schedule dropdown is populated and restore selection
-            if (service.experienceId && service.selectedSchedule) {
-              this.handleExperienceSelection(service.experienceId);
-
-              // Wait for schedule dropdown to be populated, then restore selection
-              setTimeout(() => {
-                const updatedScheduleField = document.getElementById('experienceMultipleTime');
-                if (updatedScheduleField) {
-                  // Find the option with matching text content
-                  for (let i = 0; i < updatedScheduleField.options.length; i++) {
-                    const optionText = updatedScheduleField.options[i].textContent;
-                    if (optionText === service.selectedSchedule) {
-                      updatedScheduleField.selectedIndex = i;
-
-                      break;
-                    }
-                  }
-                }
-              }, 200);
-            }
+            // Restore start/end time fields
+            const expStartTimeField = document.getElementById('experienceStartTime');
+            const expEndTimeField = document.getElementById('experienceEndTime');
+            if (expStartTimeField && service.startTime) expStartTimeField.value = service.startTime;
+            if (expEndTimeField && service.endTime) expEndTimeField.value = service.endTime;
           } else if (attempt < 5) {
             // Retry with longer delay
 
@@ -2371,12 +2416,18 @@ class ItineraryBuilder {
           this.handleTourSelection(service.tourId);
         }
 
-        // Walking tour: restore people count and tier highlight
+        // Walking tour: restore individual counts and tier highlight
         if (service.isWalkingTour) {
           setTimeout(() => {
+            const wAdults = document.getElementById('walkingTourAdultsQuantity');
+            const wChildren = document.getElementById('walkingTourChildrenQuantity');
+            const wInfants = document.getElementById('walkingTourInfantsQuantity');
             const peopleCountField = document.getElementById('walkingTourPeopleCount');
-            if (peopleCountField && service.walkingTourPeopleCount !== undefined) {
-              peopleCountField.value = service.walkingTourPeopleCount;
+            if (wAdults && service.adultsQuantity !== undefined) wAdults.value = service.adultsQuantity;
+            if (wChildren && service.childrenQuantity !== undefined) wChildren.value = service.childrenQuantity;
+            if (wInfants && service.infantsQuantity !== undefined) wInfants.value = service.infantsQuantity;
+            if (peopleCountField) {
+              peopleCountField.value = (service.adultsQuantity || 0) + (service.childrenQuantity || 0) + (service.infantsQuantity || 0) || 1;
             }
             // Re-highlight the correct tier
             if (this.toursCache.has('all')) {
@@ -2433,11 +2484,11 @@ class ItineraryBuilder {
         const populateTourQuantityFields = (attempt = 1) => {
           const tourAdultsQuantityField = document.getElementById('tourAdultsQuantity');
           const tourChildrenQuantityField = document.getElementById('tourChildrenQuantity');
-          const tourAdultsNoAlcoholQuantityField = document.getElementById('tourAdultsNoAlcoholQuantity');
+          const tourInfantsQuantityField = document.getElementById('tourInfantsQuantity');
           const tourContent = document.getElementById('tourContent');
 
           // Check if all fields are available and visible
-          if (tourAdultsQuantityField && tourChildrenQuantityField && tourAdultsNoAlcoholQuantityField
+          if (tourAdultsQuantityField && tourChildrenQuantityField && tourInfantsQuantityField
             && tourContent && !tourContent.classList.contains('d-none')) {
             // Populate the fields
             if (service.adultsQuantity !== undefined) {
@@ -2446,21 +2497,15 @@ class ItineraryBuilder {
             if (service.childrenQuantity !== undefined) {
               tourChildrenQuantityField.value = service.childrenQuantity;
             }
-            if (service.adultsNoAlcoholQuantity !== undefined) {
-              tourAdultsNoAlcoholQuantityField.value = service.adultsNoAlcoholQuantity;
+            if (service.infantsQuantity !== undefined) {
+              tourInfantsQuantityField.value = service.infantsQuantity;
             }
 
-            // Also restore schedule selection if available
-            const tourScheduleSelect = document.getElementById('tourMultipleTime');
-            if (tourScheduleSelect && service.selectedSchedule) {
-              // Find the option that matches the saved schedule
-              for (let i = 0; i < tourScheduleSelect.options.length; i++) {
-                if (tourScheduleSelect.options[i].textContent === service.selectedSchedule) {
-                  tourScheduleSelect.selectedIndex = i;
-                  break;
-                }
-              }
-            }
+            // Restore start/end time fields
+            const tourStartTimeField = document.getElementById('tourStartTime');
+            const tourEndTimeField = document.getElementById('tourEndTime');
+            if (tourStartTimeField && service.startTime) tourStartTimeField.value = service.startTime;
+            if (tourEndTimeField && service.endTime) tourEndTimeField.value = service.endTime;
           } else if (attempt < 5) {
             // Retry with longer delay
 
@@ -2972,6 +3017,13 @@ class ItineraryBuilder {
                                             </div>
                                         </div>
                                     ` : ''}
+                                    ${service.availabilityPending ? `
+                                        <div class="mt-1">
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="ti ti-alert-triangle me-1"></i>Verificar disponibilidad
+                                            </span>
+                                        </div>
+                                    ` : ''}
                                     ${service.notes ? `
                                         <div class="service-notes mt-1 text-muted small d-flex align-items-start">
                                             <i class="ti ti-notes me-1"></i>
@@ -3088,6 +3140,13 @@ class ItineraryBuilder {
                                 <div class="d-flex align-items-center text-warning small mt-1">
                                     <i class="ti ti-clock me-1"></i>
                                     <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
+                                </div>
+                            ` : ''}
+                            ${service.availabilityPending ? `
+                                <div class="mt-1">
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="ti ti-alert-triangle me-1"></i>Verificar disponibilidad
+                                    </span>
                                 </div>
                             ` : ''}
                             ${service.notes ? `
@@ -3302,9 +3361,10 @@ class ItineraryBuilder {
     const adultsQuantity = service.adultsQuantity || 0;
     const childrenQuantity = service.childrenQuantity || 0;
     const adultsNoAlcoholQuantity = service.adultsNoAlcoholQuantity || 0;
+    const infantsQuantity = service.infantsQuantity || 0;
 
     // If we have detailed quantities, show them
-    if (adultsQuantity > 0 || childrenQuantity > 0 || adultsNoAlcoholQuantity > 0) {
+    if (adultsQuantity > 0 || childrenQuantity > 0 || adultsNoAlcoholQuantity > 0 || infantsQuantity > 0) {
       const quantitiesHtml = [];
 
       if (adultsQuantity > 0) {
@@ -3330,6 +3390,15 @@ class ItineraryBuilder {
                     <span class="badge bg-info-subtle text-info d-inline-flex align-items-center gap-1 me-2 mb-1">
                         <i class="ti ti-glass-off fs-6"></i>
                         <span>${adultsNoAlcoholQuantity} sin alcohol</span>
+                    </span>
+                `);
+      }
+
+      if (infantsQuantity > 0) {
+        quantitiesHtml.push(`
+                    <span class="badge bg-warning-subtle text-warning d-inline-flex align-items-center gap-1 me-2 mb-1">
+                        <i class="ti ti-baby-carriage fs-6"></i>
+                        <span>${infantsQuantity} infante${infantsQuantity > 1 ? 's' : ''} (0-2)</span>
                     </span>
                 `);
       }
@@ -3413,6 +3482,137 @@ class ItineraryBuilder {
     }
 
     return result;
+  }
+
+  extractAvailabilitySchedule(item) {
+    const dayAbbrevs = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const dayNamesEn = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayNamesEs = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    const result = []; // Array of { day: 'Lun', times: ['08:00 - 12:00'] }
+
+    // String format: "Sa, Vi, Ju, Mi"
+    if (typeof item.availability === 'string' || typeof item.availableDays === 'string') {
+      const str = item.availability || item.availableDays;
+      const abbrevMap = { do: 0, lu: 1, ma: 2, mi: 3, ju: 4, vi: 5, sa: 6, sá: 6 };
+      str.split(/[,\s]+/).forEach((part) => {
+        const key = part.toLowerCase().substring(0, 2);
+        if (abbrevMap[key] !== undefined) {
+          result.push({ day: dayAbbrevs[abbrevMap[key]], times: [] });
+        }
+      });
+      return result;
+    }
+
+    // Array of day numbers: [0,1,2,3,4,5,6]
+    if (Array.isArray(item.availableDays)) {
+      item.availableDays.forEach((d) => {
+        if (d >= 0 && d <= 6) result.push({ day: dayAbbrevs[d], times: [] });
+      });
+      return result;
+    }
+
+    // Availability array (objects with day keys + time data)
+    if (Array.isArray(item.availability)) {
+      const dayTimesMap = new Map();
+      for (const obj of item.availability) {
+        if (!obj || typeof obj !== 'object') continue;
+        for (let d = 0; d < 7; d++) {
+          const keys = [d.toString(), dayNamesEn[d], dayNamesEs[d]];
+          for (const key of keys) {
+            if (obj.hasOwnProperty(key) && obj[key]) {
+              if (!dayTimesMap.has(d)) dayTimesMap.set(d, []);
+              const extracted = this.extractTimesFromScheduleData(obj[key], 0);
+              extracted.forEach((t) => dayTimesMap.get(d).push(t.label));
+              break;
+            }
+          }
+          if (obj.day === d) {
+            if (!dayTimesMap.has(d)) dayTimesMap.set(d, []);
+            const extracted = this.extractTimesFromScheduleData(obj, 0);
+            extracted.forEach((t) => dayTimesMap.get(d).push(t.label));
+          }
+        }
+      }
+      for (const [d, times] of dayTimesMap) {
+        result.push({ day: dayAbbrevs[d], times });
+      }
+      return result;
+    }
+
+    // Object with days array
+    if (item.availability?.days && Array.isArray(item.availability.days)) {
+      item.availability.days.forEach((d) => {
+        if (d >= 0 && d <= 6) result.push({ day: dayAbbrevs[d], times: [] });
+      });
+      return result;
+    }
+
+    // Object with day-specific booleans
+    if (item.availability && typeof item.availability === 'object') {
+      for (let d = 0; d < 7; d++) {
+        if (item.availability[dayNamesEn[d]] === true || item.availability[dayNamesEs[d]] === true) {
+          result.push({ day: dayAbbrevs[d], times: [] });
+        }
+      }
+      if (result.length > 0) return result;
+    }
+
+    return result; // empty = no availability data = "Todos los días"
+  }
+
+  renderAvailabilityPills(schedule) {
+    if (!schedule || schedule.length === 0 || (schedule.length === 7 && schedule.every((s) => s.times.length === 0))) {
+      return '<span class="badge bg-light text-dark border">Todos los días</span>';
+    }
+    return schedule.map((s) => {
+      const timeStr = s.times.length > 0 ? ` ${s.times.map((t) => t.replace(/\s*-\s*/g, '-')).join(', ')}` : '';
+      return `<span class="badge bg-light text-dark border me-1 mb-1">${s.day}${timeStr}</span>`;
+    }).join('');
+  }
+
+  buildDetailsCard(type, data) {
+    const cardId = type === 'experience' ? 'experienceDetailsCard' : 'tourDetailsCard';
+    const bodyId = type === 'experience' ? 'experienceDetailsCardBody' : 'tourDetailsCardBody';
+    const card = document.getElementById(cardId);
+    const body = document.getElementById(bodyId);
+    if (!card || !body) return;
+
+    const tag = (icon, value) => {
+      if (!value) return '';
+      return `<span class="me-3 small"><i class="ti ti-${icon} me-1 text-muted"></i>${value}</span>`;
+    };
+
+    const infoLine = (icon, label, value) => {
+      if (!value) return '';
+      return `<div class="small py-1"><i class="ti ti-${icon} me-1 text-muted"></i><span class="text-muted">${label}:</span> ${value}</div>`;
+    };
+
+    body.innerHTML = `
+      <h6 class="fw-bold mb-1">${data.title}</h6>
+      ${data.description ? `<p class="text-muted small mb-2">${data.description}</p>` : ''}
+      <hr class="my-2">
+      <div class="d-flex flex-wrap align-items-center mb-2">
+        ${tag('clock', data.duration ? `${data.durationLabel || 'Duración'}: ${data.duration}` : null)}
+        ${tag('calendar-event', `Reserva: ${data.advanceBooking || 'Inmediata'}`)}
+        ${tag('language', data.languages ? `Idiomas: ${data.languages}` : null)}
+      </div>
+      <div class="mb-2">
+        <span class="small text-muted d-block mb-1"><i class="ti ti-calendar me-1"></i>Horarios sugeridos:</span>
+        <div class="d-flex flex-wrap">${this.renderAvailabilityPills(data.availabilitySchedule)}</div>
+      </div>
+      ${data.includes || data.notIncludes || data.clientNotes ? '<hr class="my-2">' : ''}
+      ${infoLine('circle-check', 'Incluye', data.includes)}
+      ${infoLine('circle-x', 'No incluye', data.notIncludes)}
+      ${infoLine('notes', 'Notas', data.clientNotes)}
+    `;
+
+    card.classList.remove('d-none');
+  }
+
+  hideDetailsCard(type) {
+    const cardId = type === 'experience' ? 'experienceDetailsCard' : 'tourDetailsCard';
+    const card = document.getElementById(cardId);
+    if (card) card.classList.add('d-none');
   }
 
   formatDate(dateString) {
@@ -3816,6 +4016,7 @@ class ItineraryBuilder {
             adultsQuantity: subconcept.adultsQuantity || 0,
             childrenQuantity: subconcept.childrenQuantity || 0,
             adultsNoAlcoholQuantity: subconcept.adultsNoAlcoholQuantity || 0,
+            infantsQuantity: subconcept.infantsQuantity || 0,
             // Schedule for experiences (from backend)
             selectedSchedule: subconcept.selectedSchedule || '',
             // Individual prices for experiences (from backend)
@@ -4813,7 +5014,17 @@ class ItineraryBuilder {
       // Clear price and details when no experience is selected
       document.getElementById('servicePrice').value = 0;
       this.clearExperienceDetails();
+      this.currentServiceAvailabilityPending = false;
       return;
+    }
+
+    // Check if selected option is marked as unavailable
+    const expSelect = document.getElementById('experienceSelect');
+    const selectedOption = expSelect?.options[expSelect.selectedIndex];
+    this.currentServiceAvailabilityPending = selectedOption?.dataset?.unavailable === 'true';
+    const expAvailWarning = document.getElementById('experienceAvailabilityWarning');
+    if (expAvailWarning) {
+      expAvailWarning.style.display = this.currentServiceAvailabilityPending ? '' : 'none';
     }
 
     try {
@@ -4886,53 +5097,18 @@ class ItineraryBuilder {
 
     }
 
-    // Fill read-only experience information fields
-    const experienceDescriptionField = document.getElementById('experienceDescription');
-    const experienceLanguagesField = document.getElementById('experienceLanguages');
-    const experienceIncludesField = document.getElementById('experienceIncludes');
-    const experienceNotIncludesField = document.getElementById('experienceNotIncludes');
-    const advanceBookingTimeField = document.getElementById('advanceBookingTime');
-    const experienceClientNotesField = document.getElementById('experienceClientNotes');
-
-    // Fill description
-    if (experienceDescriptionField && experience.description) {
-      experienceDescriptionField.value = experience.description;
-    }
-
-    // Fill languages
-    if (experienceLanguagesField && experience.languages) {
-      const languagesText = Array.isArray(experience.languages)
-        ? experience.languages.join(', ')
-        : experience.languages;
-      experienceLanguagesField.value = languagesText;
-    }
-
-    // Fill includes
-    if (experienceIncludesField && experience.includes) {
-      const includesText = Array.isArray(experience.includes)
-        ? experience.includes.join('\n')
-        : experience.includes;
-      experienceIncludesField.value = includesText;
-    }
-
-    // Fill excludes/not includes
-    if (experienceNotIncludesField && experience.notincludes) {
-      const notIncludesText = Array.isArray(experience.notincludes)
-        ? experience.notincludes.join('\n')
-        : experience.notincludes;
-      experienceNotIncludesField.value = notIncludesText;
-    }
-
-    // Fill advance booking time (convert minutes to hours and minutes)
-    if (advanceBookingTimeField && experience.advance_booking_time) {
-      const formattedTime = this.formatMinutesToHoursAndMinutes(experience.advance_booking_time);
-      advanceBookingTimeField.value = formattedTime;
-    }
-
-    // Fill client notes
-    if (experienceClientNotesField && experience.client_booking_notes) {
-      experienceClientNotesField.value = experience.client_booking_notes;
-    }
+    // Build minimalist experience details card
+    this.buildDetailsCard('experience', {
+      title: experience.title || experience.name || '',
+      description: experience.description || '',
+      duration: experience.duration ? `${experience.duration} horas` : null,
+      advanceBooking: experience.advance_booking_time ? this.formatMinutesToHoursAndMinutes(experience.advance_booking_time) : null,
+      availabilitySchedule: this.extractAvailabilitySchedule(experience),
+      languages: Array.isArray(experience.languages) ? experience.languages.join(', ') : experience.languages,
+      includes: Array.isArray(experience.includes) ? experience.includes.join(', ') : experience.includes,
+      notIncludes: Array.isArray(experience.notincludes) ? experience.notincludes.join(', ') : experience.notincludes,
+      clientNotes: experience.client_booking_notes || '',
+    });
 
     // Handle price fields - Precios
     const adultPriceField = document.getElementById('adultPrice');
@@ -4975,99 +5151,31 @@ class ItineraryBuilder {
   }
 
   handleExperienceSchedule(experience, dayContext = null) {
-    const singleTimeField = document.getElementById('experienceSingleTime');
-    const multipleTimeField = document.getElementById('experienceMultipleTime');
-    const availabilityStatusDiv = document.getElementById('experienceAvailabilityStatus');
-    const availabilityMessageSpan = document.getElementById('experienceAvailabilityMessage');
+    const scheduleInfoDiv = document.getElementById('experienceScheduleInfo');
+    const suggestedTimesDiv = document.getElementById('experienceSuggestedTimes');
 
-    // Hide all schedule elements initially
-    if (singleTimeField) singleTimeField.style.display = 'none';
-    if (multipleTimeField) multipleTimeField.style.display = 'none';
-    if (availabilityStatusDiv) availabilityStatusDiv.style.display = 'none';
+    // Hide suggested times initially
+    if (scheduleInfoDiv) scheduleInfoDiv.classList.add('d-none');
 
     const currentDayOfWeek = dayContext?.dayOfWeek;
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const dayNamesEs = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-    const dayAbbrevEs = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'];
+    const suggestedTimes = [];
 
-    // Check if experience has specific times
+    // Collect all available time slots
     if (experience.startTime && experience.endTime) {
-      // Single fixed time
-      const startTime = this.formatTime(experience.startTime);
-      const endTime = this.formatTime(experience.endTime);
-      const timeRange = `${startTime} - ${endTime}`;
-
-      if (singleTimeField) {
-        singleTimeField.value = timeRange;
-        singleTimeField.style.display = 'block';
-      }
+      suggestedTimes.push(`${this.formatTime(experience.startTime)} - ${this.formatTime(experience.endTime)}`);
     } else if (experience.availability && typeof experience.availability === 'object') {
-      // Handle availability array - extract schedules for current day
-
       if (Array.isArray(experience.availability) && currentDayOfWeek !== null) {
         const timeOptions = this.extractTimeOptionsForDay(experience.availability, currentDayOfWeek);
-
-        if (timeOptions.length > 0 && multipleTimeField) {
-          // Clear existing options
-          const currentSelection = multipleTimeField.value;
-          const currentSelectionText = multipleTimeField.selectedIndex > 0
-            ? multipleTimeField.options[multipleTimeField.selectedIndex].textContent : '';
-
-          multipleTimeField.innerHTML = '<option value="">-- Selecciona un horario --</option>';
-
-          // Add time options
-          timeOptions.forEach((timeOption, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = timeOption.label;
-            option.dataset.timeData = JSON.stringify(timeOption.data);
-            multipleTimeField.appendChild(option);
-          });
-
-          // Try to restore previous selection if it exists
-          if (currentSelectionText) {
-            for (let i = 0; i < multipleTimeField.options.length; i++) {
-              if (multipleTimeField.options[i].textContent === currentSelectionText) {
-                multipleTimeField.selectedIndex = i;
-
-                break;
-              }
-            }
-          }
-
-          multipleTimeField.style.display = 'block';
-        } else {
-          // No specific times found, show generic availability message
-          if (availabilityStatusDiv && availabilityMessageSpan) {
-            availabilityMessageSpan.textContent = 'Horario según disponibilidad';
-            availabilityStatusDiv.style.display = 'block';
-          }
-        }
+        timeOptions.forEach((opt) => suggestedTimes.push(opt.label));
       } else if (experience.availability.times && Array.isArray(experience.availability.times)) {
-        // Availability object with times array
-        if (multipleTimeField) {
-          multipleTimeField.innerHTML = '<option value="">-- Selecciona un horario --</option>';
-          experience.availability.times.forEach((time, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = time;
-            multipleTimeField.appendChild(option);
-          });
-          multipleTimeField.style.display = 'block';
-        }
-      } else {
-        // Show availability status message
-        if (availabilityStatusDiv && availabilityMessageSpan) {
-          availabilityMessageSpan.textContent = 'Horario según disponibilidad';
-          availabilityStatusDiv.style.display = 'block';
-        }
+        experience.availability.times.forEach((time) => suggestedTimes.push(time));
       }
-    } else {
-      // No specific time info, show general availability message
-      if (availabilityStatusDiv && availabilityMessageSpan) {
-        availabilityMessageSpan.textContent = 'Horario según disponibilidad';
-        availabilityStatusDiv.style.display = 'block';
-      }
+    }
+
+    // Show suggested times as read-only text
+    if (suggestedTimes.length > 0 && scheduleInfoDiv && suggestedTimesDiv) {
+      suggestedTimesDiv.textContent = suggestedTimes.join(' • ');
+      scheduleInfoDiv.classList.remove('d-none');
     }
   }
 
@@ -6678,35 +6786,35 @@ class ItineraryBuilder {
     document.getElementById('walkingPriceLargeLabel').textContent = `$${parseFloat(tour.walkingPriceLarge || 0).toLocaleString()} ${currency}`;
     document.getElementById('walkingTourCurrency').value = currency;
 
-    // Pre-fill people count from quote data
+    // Store tour data for tier re-highlight on quantity change
+    this.currentTourData = tour;
+
+    // Pre-fill adults from quote data
+    const adultsField = document.getElementById('walkingTourAdultsQuantity');
     const peopleCountField = document.getElementById('walkingTourPeopleCount');
-    if (peopleCountField && this.numberOfPeople > 0) {
-      peopleCountField.value = this.numberOfPeople;
+    if (adultsField && this.numberOfPeople > 0) {
+      adultsField.value = this.numberOfPeople;
+      if (peopleCountField) peopleCountField.value = this.numberOfPeople;
     }
 
     // Highlight matching tier
     this.highlightWalkingTourTier(tour);
 
-    // Fill detail fields
-    const tourDescriptionField = document.getElementById('tourDescription');
-    const tourAdvanceBookingTimeField = document.getElementById('tourAdvanceBookingTime');
-    const tourLanguagesField = document.getElementById('tourLanguages');
-    const tourIncludesField = document.getElementById('tourIncludes');
-    const tourNotIncludesField = document.getElementById('tourNotIncludes');
-    const tourClientNotesField = document.getElementById('tourClientNotes');
-
-    if (tourDescriptionField) tourDescriptionField.value = tour.description || '';
-    if (tourAdvanceBookingTimeField) {
-      const bookingTime = tour.advance_booking_time;
-      tourAdvanceBookingTimeField.value = bookingTime ? this.formatMinutesToHoursAndMinutes(parseInt(bookingTime, 10)) : 'No especificado';
-    }
-    if (tourLanguagesField) tourLanguagesField.value = (tour.languages || []).join(', ') || '';
-    if (tourIncludesField) tourIncludesField.value = tour.includes || '';
-    if (tourNotIncludesField) tourNotIncludesField.value = tour.notincludes || '';
-    if (tourClientNotesField) tourClientNotesField.value = tour.client_booking_notes || '';
-
-    // Show tour details and schedule
-    this.showTourDetails(tour);
+    // Build minimalist tour details card
+    const tourDuration = tour.time ? this.formatMinutesToHoursAndMinutes(parseInt(tour.time, 10)) : null;
+    const bookingTime = tour.advance_booking_time;
+    this.buildDetailsCard('tour', {
+      title: tour.destinationPOI?.name || tour.name || '',
+      description: tour.description || '',
+      duration: tourDuration,
+      durationLabel: 'Mínimo de horas',
+      advanceBooking: bookingTime ? this.formatMinutesToHoursAndMinutes(parseInt(bookingTime, 10)) : null,
+      availabilitySchedule: this.extractAvailabilitySchedule(tour),
+      languages: (tour.languages || []).join(', ') || null,
+      includes: Array.isArray(tour.includes) ? tour.includes.join(', ') : tour.includes,
+      notIncludes: Array.isArray(tour.notincludes) ? tour.notincludes.join(', ') : tour.notincludes,
+      clientNotes: tour.client_booking_notes || '',
+    });
     this.handleTourSchedule(tour);
     this.updateServicePriceBreakdown();
   }
@@ -6730,40 +6838,59 @@ class ItineraryBuilder {
   highlightWalkingTourTier(tour) {
     const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 0, 10);
 
-    const tiers = ['Small', 'Medium', 'Large'].map((tier) => ({
-      range: this.parseWalkingTourRange(tour[`walkingRange${tier}`]),
-      price: parseFloat(tour[`walkingPrice${tier}`] || 0),
-      card: document.getElementById(`walkingTier${tier}`),
-    }));
+    const tierCards = {
+      Small: document.getElementById('walkingTierSmall'),
+      Medium: document.getElementById('walkingTierMedium'),
+      Large: document.getElementById('walkingTierLarge'),
+    };
 
     // Remove all highlights
-    tiers.forEach((tier) => {
-      if (tier.card) {
-        tier.card.style.border = '';
-        tier.card.style.backgroundColor = '';
+    Object.values(tierCards).forEach((card) => {
+      if (card) {
+        card.style.border = '';
+        card.style.backgroundColor = '';
       }
     });
 
+    const breakdownDiv = document.getElementById('walkingTourGroupBreakdown');
+    const breakdownContent = document.getElementById('walkingTourGroupBreakdownContent');
+    if (breakdownDiv) breakdownDiv.classList.add('d-none');
+
     if (peopleCount <= 0) return;
 
-    // Find matching tier
-    let matchedTier = null;
-    for (const tier of tiers) {
-      if (tier.range && peopleCount >= tier.range.min && peopleCount <= tier.range.max) {
-        matchedTier = tier;
-        break;
+    const groups = this.calculateWalkingTourGroups(tour, peopleCount);
+    const priceCurrency = tour.walkingPriceCurrency || 'MXN';
+
+    // Highlight all used tiers
+    const usedTiers = new Set();
+    groups.forEach((g) => usedTiers.add(g.tier.name));
+    usedTiers.forEach((name) => {
+      const card = tierCards[name];
+      if (card) {
+        card.style.border = '2px solid #0d6efd';
+        card.style.backgroundColor = '#e7f1ff';
       }
-    }
+    });
 
-    // If no exact match, use the largest tier
-    if (!matchedTier) {
-      matchedTier = tiers[tiers.length - 1];
-    }
+    // Show breakdown if multiple groups
+    if (groups.length > 1 && breakdownDiv && breakdownContent) {
+      let total = 0;
+      const lines = groups.map((g, i) => {
+        let price = g.tier.price;
+        if (priceCurrency === 'USD' && this.exchangeRate) {
+          price = Math.round(price * this.exchangeRate);
+        }
+        total += price;
+        return `<div class="d-flex justify-content-between"><span>Grupo ${i + 1}: ${g.tier.label} pax</span><span class="fw-bold">$${price.toLocaleString()}</span></div>`;
+      }).join('');
 
-    // Highlight matching tier
-    if (matchedTier?.card) {
-      matchedTier.card.style.border = '2px solid #0d6efd';
-      matchedTier.card.style.backgroundColor = '#e7f1ff';
+      breakdownContent.innerHTML = `
+        <div class="small fw-bold mb-1"><i class="ti ti-users me-1"></i>${peopleCount} personas total</div>
+        ${lines}
+        <hr class="my-1">
+        <div class="d-flex justify-content-between fw-bold"><span>Total</span><span>$${total.toLocaleString()}</span></div>
+      `;
+      breakdownDiv.classList.remove('d-none');
     }
 
     // Set service price using getWalkingTourPrice (normalizes to MXN)
@@ -6777,35 +6904,54 @@ class ItineraryBuilder {
   /**
    * Get walking tour price for a given people count, normalized to MXN.
    */
-  getWalkingTourPrice(tour, peopleCount) {
+  calculateWalkingTourGroups(tour, peopleCount) {
     const tiers = [
-      { range: this.parseWalkingTourRange(tour.walkingRangeSmall), price: parseFloat(tour.walkingPriceSmall || 0) },
-      { range: this.parseWalkingTourRange(tour.walkingRangeMedium), price: parseFloat(tour.walkingPriceMedium || 0) },
-      { range: this.parseWalkingTourRange(tour.walkingRangeLarge), price: parseFloat(tour.walkingPriceLarge || 0) },
-    ];
+      { name: 'Small', label: tour.walkingRangeSmall, range: this.parseWalkingTourRange(tour.walkingRangeSmall), price: parseFloat(tour.walkingPriceSmall || 0) },
+      { name: 'Medium', label: tour.walkingRangeMedium, range: this.parseWalkingTourRange(tour.walkingRangeMedium), price: parseFloat(tour.walkingPriceMedium || 0) },
+      { name: 'Large', label: tour.walkingRangeLarge, range: this.parseWalkingTourRange(tour.walkingRangeLarge), price: parseFloat(tour.walkingPriceLarge || 0) },
+    ].filter((t) => t.range);
 
+    // Sort tiers by max capacity descending
+    const sortedTiers = [...tiers].sort((a, b) => (b.range.max === Infinity ? 999 : b.range.max) - (a.range.max === Infinity ? 999 : a.range.max));
+
+    const groups = [];
+    let remaining = peopleCount;
+
+    while (remaining > 0) {
+      // Find the largest tier that fits
+      let bestTier = null;
+      for (const tier of sortedTiers) {
+        if (remaining >= tier.range.min) {
+          bestTier = tier;
+          break;
+        }
+      }
+      if (!bestTier) {
+        // Remaining is less than smallest tier min — use smallest tier
+        bestTier = sortedTiers[sortedTiers.length - 1];
+      }
+      const allocated = Math.min(remaining, bestTier.range.max === Infinity ? remaining : bestTier.range.max);
+      groups.push({ tier: bestTier, count: allocated });
+      remaining -= allocated;
+    }
+
+    return groups;
+  }
+
+  getWalkingTourPrice(tour, peopleCount) {
+    const groups = this.calculateWalkingTourGroups(tour, peopleCount);
     const priceCurrency = tour.walkingPriceCurrency || 'MXN';
 
-    // Find matching tier
-    let matchedPrice = 0;
-    for (const tier of tiers) {
-      if (tier.range && peopleCount >= tier.range.min && peopleCount <= tier.range.max) {
-        matchedPrice = tier.price;
-        break;
+    let total = 0;
+    for (const group of groups) {
+      let price = group.tier.price;
+      if (priceCurrency === 'USD' && this.exchangeRate) {
+        price = Math.round(price * this.exchangeRate);
       }
+      total += price;
     }
 
-    // If no match, use largest tier
-    if (matchedPrice === 0 && tiers.length > 0) {
-      matchedPrice = tiers[tiers.length - 1].price;
-    }
-
-    // Normalize to MXN if needed
-    if (priceCurrency === 'USD' && this.exchangeRate) {
-      matchedPrice = Math.round(matchedPrice * this.exchangeRate);
-    }
-
-    return matchedPrice;
+    return total;
   }
 
   handleTourSelection(tourId) {
@@ -6872,7 +7018,17 @@ class ItineraryBuilder {
         tourDetails.style.display = 'none';
         tourDetails.innerHTML = '';
       }
+      this.currentServiceAvailabilityPending = false;
       return;
+    }
+
+    // Check if selected option is marked as unavailable
+    const tourSelect = document.getElementById('tourSelect');
+    const selectedTourOption = tourSelect?.options[tourSelect.selectedIndex];
+    this.currentServiceAvailabilityPending = selectedTourOption?.dataset?.unavailable === 'true';
+    const tourAvailWarning = document.getElementById('tourAvailabilityWarning');
+    if (tourAvailWarning) {
+      tourAvailWarning.style.display = this.currentServiceAvailabilityPending ? '' : 'none';
     }
 
     try {
@@ -6911,14 +7067,6 @@ class ItineraryBuilder {
         const clientNotesField = document.getElementById('clientNotes');
         const providerNotesField = document.getElementById('providerNotes');
         const teamNotesField = document.getElementById('teamNotes');
-
-        // Tour-specific readonly fields
-        const tourDescriptionField = document.getElementById('tourDescription');
-        const tourAdvanceBookingTimeField = document.getElementById('tourAdvanceBookingTime');
-        const tourLanguagesField = document.getElementById('tourLanguages');
-        const tourIncludesField = document.getElementById('tourIncludes');
-        const tourNotIncludesField = document.getElementById('tourNotIncludes');
-        const tourClientNotesField = document.getElementById('tourClientNotes');
 
         // Fill price fields - for tours, set to 0 initially (vehicle cost will be added when vehicle is selected)
         if (servicePriceField) {
@@ -7058,36 +7206,21 @@ class ItineraryBuilder {
           serviceDescriptionField.value = selectedTour.description;
         }
 
-        // Fill tour-specific readonly fields
-        if (tourDescriptionField) {
-          tourDescriptionField.value = selectedTour.description || '';
-        }
-
-        if (tourAdvanceBookingTimeField) {
-          const bookingTime = selectedTour.advance_booking_time || '';
-          tourAdvanceBookingTimeField.value = bookingTime ? `${bookingTime} horas` : 'No especificado';
-        }
-
-        if (tourLanguagesField) {
-          const { languages } = selectedTour;
-          if (Array.isArray(languages)) {
-            tourLanguagesField.value = languages.join(', ');
-          } else {
-            tourLanguagesField.value = languages || 'No especificado';
-          }
-        }
-
-        if (tourIncludesField) {
-          tourIncludesField.value = selectedTour.includes || '';
-        }
-
-        if (tourNotIncludesField) {
-          tourNotIncludesField.value = selectedTour.notincludes || '';
-        }
-
-        if (tourClientNotesField) {
-          tourClientNotesField.value = selectedTour.client_booking_notes || '';
-        }
+        // Build minimalist tour details card
+        const tourDuration = selectedTour.time ? this.formatMinutesToHoursAndMinutes(parseInt(selectedTour.time, 10)) : null;
+        const bookingTimeValue = selectedTour.advance_booking_time;
+        this.buildDetailsCard('tour', {
+          title: selectedTour.destinationPOI?.name || selectedTour.name || '',
+          description: selectedTour.description || '',
+          duration: tourDuration,
+      durationLabel: 'Mínimo de horas',
+          advanceBooking: bookingTimeValue ? this.formatMinutesToHoursAndMinutes(parseInt(bookingTimeValue, 10)) : null,
+          availabilitySchedule: this.extractAvailabilitySchedule(selectedTour),
+          languages: Array.isArray(selectedTour.languages) ? selectedTour.languages.join(', ') : selectedTour.languages || null,
+          includes: Array.isArray(selectedTour.includes) ? selectedTour.includes.join(', ') : selectedTour.includes,
+          notIncludes: Array.isArray(selectedTour.notincludes) ? selectedTour.notincludes.join(', ') : selectedTour.notincludes,
+          clientNotes: selectedTour.client_booking_notes || '',
+        });
 
         // Fill editable notes fields
         if (internalNotesField && selectedTour.internal_notes) {
@@ -7442,225 +7575,61 @@ class ItineraryBuilder {
   }
 
   clearExperienceDetails() {
-    const detailsContainer = document.getElementById('experienceDetails');
-    if (detailsContainer) {
-      detailsContainer.innerHTML = '';
-    }
+    this.hideDetailsCard('experience');
   }
 
   handleTourSchedule(tour) {
-    // Get the current day context using existing method
     const dayContext = this.getCurrentDayContext();
+    const scheduleInfoDiv = document.getElementById('tourScheduleInfo');
+    const suggestedTimesDiv = document.getElementById('tourSuggestedTimes');
 
-    // Deep inspection for Atotonilco tour
-    if (tour.destinationPOI?.name === 'Atotonilco') {
-    }
-
-    const singleTimeField = document.getElementById('tourSingleTime');
-    const multipleTimeField = document.getElementById('tourMultipleTime');
-    const availabilityStatusDiv = document.getElementById('tourAvailabilityStatus');
-    const availabilityMessageSpan = document.getElementById('tourAvailabilityMessage');
-
-    // Hide all schedule elements initially (use setProperty to override !important)
-    if (singleTimeField) singleTimeField.style.setProperty('display', 'none', 'important');
-    if (multipleTimeField) multipleTimeField.style.display = 'none';
-    if (availabilityStatusDiv) availabilityStatusDiv.style.display = 'none';
+    // Hide suggested times initially
+    if (scheduleInfoDiv) scheduleInfoDiv.classList.add('d-none');
 
     const currentDayOfWeek = dayContext?.dayOfWeek;
+    const suggestedTimes = [];
 
-    // Always show the availability status div since we always have something to display
-    let scheduleDisplayed = false;
-
-    // Check if tour has specific times
+    // Collect all available time slots
     if (tour.startTime && tour.endTime) {
-      // Single fixed time
-      const startTime = this.formatTime(tour.startTime);
-      const endTime = this.formatTime(tour.endTime);
-      const timeRange = `${startTime} - ${endTime}`;
-
-      if (singleTimeField) {
-        singleTimeField.value = timeRange;
-        // Remove !important by setting via setAttribute
-        singleTimeField.style.setProperty('display', 'block', 'important');
-
-        scheduleDisplayed = true;
-      }
+      suggestedTimes.push(`${this.formatTime(tour.startTime)} - ${this.formatTime(tour.endTime)}`);
     } else if (tour.availability && typeof tour.availability === 'object') {
-      // Handle availability array - extract schedules for current day
-
       if (Array.isArray(tour.availability) && currentDayOfWeek !== null) {
         const timeOptions = this.extractTimeOptionsForDay(tour.availability, currentDayOfWeek);
-
-        if (timeOptions.length > 0 && multipleTimeField) {
-          // Clear existing options
-          multipleTimeField.innerHTML = '<option value="">-- Selecciona un horario --</option>';
-
-          // Add time options
-          timeOptions.forEach((timeOption, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = timeOption.label;
-            option.dataset.timeData = JSON.stringify(timeOption.data);
-            multipleTimeField.appendChild(option);
-          });
-
-          multipleTimeField.style.display = 'block';
-
-          scheduleDisplayed = true;
-        } else {
-          // No specific times found, show generic availability message
-          if (availabilityStatusDiv && availabilityMessageSpan) {
-            availabilityMessageSpan.textContent = 'Horario según disponibilidad';
-            availabilityStatusDiv.style.display = 'block';
-            scheduleDisplayed = true;
-          }
-        }
+        timeOptions.forEach((opt) => suggestedTimes.push(opt.label));
       } else if (tour.availability.times && Array.isArray(tour.availability.times)) {
-        // Availability object with times array
-        if (multipleTimeField) {
-          multipleTimeField.innerHTML = '<option value="">-- Selecciona un horario --</option>';
-          tour.availability.times.forEach((time, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = time;
-            multipleTimeField.appendChild(option);
-          });
-          multipleTimeField.style.display = 'block';
-
-          scheduleDisplayed = true;
-        }
-      } else {
-        // Show availability status message
-        if (availabilityStatusDiv && availabilityMessageSpan) {
-          availabilityMessageSpan.textContent = 'Horario según disponibilidad';
-          availabilityStatusDiv.style.display = 'block';
-          scheduleDisplayed = true;
-        }
-      }
-    } else if (tour.time) {
-      // If tour has duration but no specific schedule, just show availability message
-      if (availabilityStatusDiv && availabilityMessageSpan) {
-        availabilityMessageSpan.textContent = 'Horario según disponibilidad';
-        availabilityStatusDiv.style.display = 'block';
-        scheduleDisplayed = true;
+        tour.availability.times.forEach((time) => suggestedTimes.push(time));
       }
     }
 
-    // Always show at least a default message if nothing else was shown
-    if (!scheduleDisplayed) {
-      // Default availability message
-      if (availabilityStatusDiv && availabilityMessageSpan) {
-        availabilityMessageSpan.textContent = 'Horario flexible - coordinar con el proveedor';
-        availabilityStatusDiv.style.display = 'block';
-      }
+    // Show suggested times as read-only text
+    if (suggestedTimes.length > 0 && scheduleInfoDiv && suggestedTimesDiv) {
+      suggestedTimesDiv.textContent = suggestedTimes.join(' • ');
+      scheduleInfoDiv.classList.remove('d-none');
     }
   }
 
   clearTourSchedule() {
-    // Clear tour-specific schedule fields
-    const tourSingleTime = document.getElementById('tourSingleTime');
-    const tourMultipleTime = document.getElementById('tourMultipleTime');
-    const tourAvailabilityStatus = document.getElementById('tourAvailabilityStatus');
+    const scheduleInfoDiv = document.getElementById('tourScheduleInfo');
+    if (scheduleInfoDiv) scheduleInfoDiv.classList.add('d-none');
 
-    if (tourSingleTime) {
-      tourSingleTime.value = '';
-      tourSingleTime.style.setProperty('display', 'none', 'important');
-    }
-
-    if (tourMultipleTime) {
-      tourMultipleTime.innerHTML = '<option value="">-- Selecciona un horario --</option>';
-      tourMultipleTime.style.display = 'none';
-    }
-
-    if (tourAvailabilityStatus) {
-      tourAvailabilityStatus.style.display = 'none';
-    }
-
-    // Also clear shared schedule fields if they exist
-    const scheduleSelect = document.getElementById('scheduleSelect');
-    if (scheduleSelect) {
-      scheduleSelect.innerHTML = '<option value="">-- Selecciona un horario --</option>';
-      scheduleSelect.disabled = true;
-    }
-
-    // Clear time input fields
-    const startTimeInput = document.getElementById('startTime');
-    const endTimeInput = document.getElementById('endTime');
-
-    if (startTimeInput) {
-      startTimeInput.value = '';
-      startTimeInput.disabled = false;
-    }
-
-    if (endTimeInput) {
-      endTimeInput.value = '';
-      endTimeInput.disabled = false;
-    }
+    const tourStartTime = document.getElementById('tourStartTime');
+    const tourEndTime = document.getElementById('tourEndTime');
+    if (tourStartTime) tourStartTime.value = '';
+    if (tourEndTime) tourEndTime.value = '';
   }
 
   clearExperienceSchedule() {
-    // Clear experience-specific schedule fields
-    const experienceSingleTime = document.getElementById('experienceSingleTime');
-    const experienceMultipleTime = document.getElementById('experienceMultipleTime');
-    const experienceAvailabilityStatus = document.getElementById('experienceAvailabilityStatus');
+    const scheduleInfoDiv = document.getElementById('experienceScheduleInfo');
+    if (scheduleInfoDiv) scheduleInfoDiv.classList.add('d-none');
 
-    if (experienceSingleTime) {
-      experienceSingleTime.value = '';
-      experienceSingleTime.style.display = 'none';
-    }
-
-    if (experienceMultipleTime) {
-      experienceMultipleTime.innerHTML = '<option value="">-- Selecciona un horario --</option>';
-      experienceMultipleTime.style.display = 'none';
-    }
-
-    if (experienceAvailabilityStatus) {
-      experienceAvailabilityStatus.style.display = 'none';
-    }
-
-    // Clear shared schedule/time fields
-    const scheduleSelect = document.getElementById('scheduleSelect');
-    if (scheduleSelect) {
-      scheduleSelect.innerHTML = '<option value="">-- Selecciona un horario --</option>';
-      scheduleSelect.disabled = true;
-    }
-
-    const startTime = document.getElementById('startTime');
-    const endTime = document.getElementById('endTime');
-
-    if (startTime) {
-      startTime.value = '';
-      startTime.disabled = false;
-    }
-
-    if (endTime) {
-      endTime.value = '';
-      endTime.disabled = false;
-    }
+    const expStartTime = document.getElementById('experienceStartTime');
+    const expEndTime = document.getElementById('experienceEndTime');
+    if (expStartTime) expStartTime.value = '';
+    if (expEndTime) expEndTime.value = '';
   }
 
   clearTourDetails() {
-    const detailsContainer = document.getElementById('tourDetails');
-    if (detailsContainer) {
-      detailsContainer.innerHTML = '';
-    }
-
-    // Clear tour-specific readonly fields
-    const tourFieldIds = [
-      'tourDescription',
-      'tourAdvanceBookingTime',
-      'tourLanguages',
-      'tourIncludes',
-      'tourNotIncludes',
-      'tourClientNotes',
-    ];
-
-    tourFieldIds.forEach((fieldId) => {
-      const field = document.getElementById(fieldId);
-      if (field) {
-        field.value = '';
-      }
-    });
+    this.hideDetailsCard('tour');
   }
 
   getPriceForService(serviceId, rateId) {
@@ -7735,7 +7704,7 @@ class ItineraryBuilder {
             // Check availability for the selected day
             const isAvailableOnDay = this.isExperienceAvailableOnDay(exp, dayOfWeek, dayDate);
 
-            if (id && title && isExperience && isAvailableOnDay) {
+            if (id && title && isExperience) {
               allExperiences.push({
                 id,
                 title,
@@ -7745,6 +7714,7 @@ class ItineraryBuilder {
                 duration: exp.duration || '',
                 location: exp.location || '',
                 price: exp.price || 0,
+                unavailable: !isAvailableOnDay && dayOfWeek !== null,
               });
             }
           });
@@ -7763,21 +7733,22 @@ class ItineraryBuilder {
             && exp.provider.active !== false
             && exp.provider.exists !== false;
 
-          // Check availability for the selected day
-          const isAvailableOnDay = this.isExperienceAvailableOnDay(exp, dayOfWeek, dayDate);
-
-          return hasId && hasTitle && isActive && hasValidProvider && isAvailableOnDay;
+          return hasId && hasTitle && isActive && hasValidProvider;
         });
-        const mappedProviderExperiences = validProviderExperiences.map((provExp) => ({
+        const mappedProviderExperiences = validProviderExperiences.map((provExp) => {
+          const isAvailableOnDay = this.isExperienceAvailableOnDay(provExp, dayOfWeek, dayDate);
+          return {
           id: provExp.id || provExp.objectId,
           title: provExp.title || provExp.name || provExp.experienceName,
           type: 'provider_experience',
+          unavailable: !isAvailableOnDay && dayOfWeek !== null,
           provider: provExp.provider || null,
           description: provExp.description || '',
           duration: provExp.duration || '',
           location: provExp.location || '',
           price: provExp.price || 0,
-        }));
+        };
+        });
 
         allExperiences.push(...mappedProviderExperiences);
       }
@@ -7816,6 +7787,10 @@ class ItineraryBuilder {
           }
         }
 
+        if (exp.unavailable) {
+          // keep original title clean — warning shown below dropdown
+          option.dataset.unavailable = 'true';
+        }
         option.textContent = displayTitle;
         option.dataset.type = exp.type;
         option.dataset.providerId = exp.provider?.id || '';
@@ -8124,18 +8099,15 @@ class ItineraryBuilder {
       if (this.toursCache.has('all')) {
         const tours = this.toursCache.get('all');
 
-        // Filter tours with destinationPOI that has a name
-        let validTours = tours.filter((tour) => tour && tour.destinationPOI && tour.destinationPOI.name && tour.objectId);
+        // Filter tours: must have destinationPOI with name, be active and exist
+        let validTours = tours.filter((tour) => tour && tour.destinationPOI && tour.destinationPOI.name && tour.objectId && tour.active !== false && tour.exists !== false);
 
-        // Filter by availability if we have a specific day
+        // Track availability per tour (don't filter out — mark instead)
+        const tourAvailability = new Map();
         if (dayOfWeek !== null) {
-          validTours = validTours.filter((tour) => {
-            // Check if tour is available on this day
-            const isAvailable = this.checkTourAvailability(tour, dayOfWeek);
-            if (!isAvailable) {
-
-            }
-            return isAvailable;
+          validTours.forEach((tour) => {
+            const tourId = tour.objectId || tour.id;
+            tourAvailability.set(tourId, this.checkTourAvailability(tour, dayOfWeek));
           });
         }
 
@@ -8152,8 +8124,14 @@ class ItineraryBuilder {
 
         const addTourOption = (tour, parent) => {
           const option = document.createElement('option');
-          option.value = tour.objectId || tour.id;
-          option.textContent = tour.destinationPOI?.name || tour.description || 'Tour sin nombre';
+          const tourId = tour.objectId || tour.id;
+          option.value = tourId;
+          let text = tour.destinationPOI?.name || tour.description || 'Tour sin nombre';
+          if (tourAvailability.has(tourId) && !tourAvailability.get(tourId)) {
+            // keep original title clean — warning shown below dropdown
+            option.dataset.unavailable = 'true';
+          }
+          option.textContent = text;
           parent.appendChild(option);
         };
 
@@ -8211,6 +8189,7 @@ class ItineraryBuilder {
             unitPrice: servicePrice,
             quantity: service.quantity || 1,
             notes: service.notes || '',
+            availabilityPending: service.availabilityPending || false,
             hours: service.hours || null,
             total: serviceTotal,
             // Type-specific fields
@@ -8218,10 +8197,11 @@ class ItineraryBuilder {
             tourId: service.tourId || null,
             rateId: service.rateId || null, // Store rate for vehicle pricing
             hotelName: service.hotelName || null,
-            // People quantities for experiences
+            // People quantities
             adultsQuantity: service.adultsQuantity || null,
             childrenQuantity: service.childrenQuantity || null,
             adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity || null,
+            infantsQuantity: service.infantsQuantity || null,
             // Schedule for experiences
             selectedSchedule: service.selectedSchedule || null,
             // Individual prices for experiences
@@ -8958,6 +8938,9 @@ class ItineraryBuilder {
 
       // Drag over for indicators - simplified
       item.addEventListener('dragover', (e) => {
+        // Skip if this is a catalog drag-and-drop (handled by DragCatalogManager)
+        if (e.dataTransfer.types.includes('application/x-catalog-item')) return;
+
         if (draggedElement && draggedElement !== item) {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
@@ -8977,6 +8960,9 @@ class ItineraryBuilder {
 
       // Add drop event to each item as well
       item.addEventListener('drop', (e) => {
+        // Skip if this is a catalog drag-and-drop (handled by DragCatalogManager)
+        if (e.dataTransfer.types.includes('application/x-catalog-item')) return;
+
         e.preventDefault();
         e.stopPropagation();
 
@@ -9006,7 +8992,10 @@ class ItineraryBuilder {
     // Add dragover and drop to container to catch all drops
     container.addEventListener('dragover', (e) => {
       // Skip if this is a catalog drag-and-drop (handled by DragCatalogManager)
-      if (e.dataTransfer.types.includes('application/x-catalog-item')) return;
+      if (e.dataTransfer.types.includes('application/x-catalog-item')) {
+        this.clearDropIndicators(container);
+        return;
+      }
 
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
@@ -9033,7 +9022,10 @@ class ItineraryBuilder {
     // Add dragover to container to allow dropping
     container.addEventListener('dragover', (e) => {
       // Skip if this is a catalog drag-and-drop (handled by DragCatalogManager)
-      if (e.dataTransfer.types.includes('application/x-catalog-item')) return;
+      if (e.dataTransfer.types.includes('application/x-catalog-item')) {
+        this.clearDropIndicators(container);
+        return;
+      }
 
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
