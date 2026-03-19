@@ -333,7 +333,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
                     <p class="mt-3 text-muted">Cargando información...</p>
                 </div>
             </div>
-                <% if (currentUserRole === 'department_manager') { %>
+                <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
                 <div class="modal-footer border-top" id="tourModalFooter">
                     <button type="button" class="btn btn-primary add-tour-to-quote-from-modal-btn">
                         <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
@@ -345,7 +345,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
 </div>
 
 <!-- Add to Quote Picker Modal for Tours -->
-<% if (currentUserRole === 'department_manager') { %>
+<% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
 <div class="modal fade" id="addTourToQuoteModal" tabindex="-1" aria-labelledby="addTourToQuoteLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-md">
         <div class="modal-content">
@@ -858,6 +858,21 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
     padding: 1rem;
     border-radius: 0.5rem;
     border-left: 4px solid #0d6efd;
+}
+
+.availability-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.availability-day-card {
+    background: #f8f9fa;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    border-left: 3px solid #0d6efd;
+    min-width: 160px;
+    flex: 1 1 auto;
 }
 
 .languages .badge {
@@ -1869,35 +1884,55 @@ document.addEventListener('DOMContentLoaded', function() {
             // Format availability days - handle different formats
             let availabilityText = 'Todos los días';
             let availableDays = null;
-            
-            // Check for availableDays field (legacy format - direct array)
-            if (tour.availableDays && Array.isArray(tour.availableDays)) {
-                availableDays = tour.availableDays;
+
+            // Map for converting Spanish day names to short format
+            const dayNameToShort = {
+                'domingo': 'Do', 'lunes': 'Lu', 'martes': 'Ma',
+                'miércoles': 'Mi', 'miercoles': 'Mi', 'jueves': 'Ju',
+                'viernes': 'Vi', 'sábado': 'Sa', 'sabado': 'Sa'
+            };
+            const dayNameOrder = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
+            // Check for availability field first (new format - array of day schedules)
+            if (tour.availability && Array.isArray(tour.availability) && tour.availability.length > 0) {
+                if (typeof tour.availability[0] === 'object' && 'day' in tour.availability[0]) {
+                    availableDays = tour.availability.map(schedule => schedule.day);
+                } else {
+                    availableDays = tour.availability;
+                }
             }
-            // Check for availability field (could be array or object)
-            else if (tour.availability) {
-                // If it's an array of day schedules
-                if (Array.isArray(tour.availability)) {
-                    // Check if it's array of objects with day property
-                    if (tour.availability.length > 0 && typeof tour.availability[0] === 'object' && 'day' in tour.availability[0]) {
-                        availableDays = tour.availability.map(schedule => schedule.day);
-                    } else {
-                        // It's a simple array of day codes
-                        availableDays = tour.availability;
+            // Fallback: Check for availableDays field (legacy format - string day names or numeric)
+            else if (tour.availableDays && Array.isArray(tour.availableDays) && tour.availableDays.length > 0) {
+                // Check if it's string day names (e.g., ["Martes", "Jueves"])
+                if (typeof tour.availableDays[0] === 'string') {
+                    const shortDays = tour.availableDays
+                        .map(name => dayNameToShort[name.toLowerCase()])
+                        .filter(Boolean);
+                    if (shortDays.length > 0 && shortDays.length < 7) {
+                        // Sort by day order
+                        shortDays.sort((a, b) => {
+                            const order = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
+                            return order.indexOf(a) - order.indexOf(b);
+                        });
+                        availabilityText = shortDays.join(', ');
+                    } else if (shortDays.length >= 7) {
+                        availabilityText = 'Todos los días';
                     }
-                }
-                // If it's an object with availableDays property
-                else if (typeof tour.availability === 'object' && tour.availability.availableDays) {
-                    availableDays = tour.availability.availableDays;
+                    availableDays = null; // Already handled
+                } else {
+                    availableDays = tour.availableDays;
                 }
             }
-            
-            // Format the days for display
+            // Check availability as object
+            else if (tour.availability && typeof tour.availability === 'object' && tour.availability.availableDays) {
+                availableDays = tour.availability.availableDays;
+            }
+
+            // Format numeric day codes for display
             if (availableDays && Array.isArray(availableDays) && availableDays.length > 0) {
-                const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-                // Filter valid day codes (0-6)
+                const dayNames = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
                 const validDays = availableDays.filter(day => Number.isInteger(day) && day >= 0 && day <= 6);
-                
+
                 if (validDays.length === 7) {
                     availabilityText = 'Todos los días';
                 } else if (validDays.length > 0) {
@@ -2120,7 +2155,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                     <div class="tour-info-row">
                                         <span class="tour-info-label">
-                                            <i class="ti ti-calendar-event me-1"></i>Días disponibles
+                                            <i class="ti ti-calendar-event me-1"></i>Días sugeridos
                                         </span>
                                         <span class="tour-info-value" style="font-size: 0.8rem;">
                                             ${availabilityText}
@@ -2138,7 +2173,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                             data-tour-type="vehicle">
                                         <i class="ti ti-eye me-1"></i>Ver más
                                     </button>
-                                    <% if (currentUserRole === 'department_manager') { %>
+                                    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
                                     <button class="btn btn-primary btn-sm add-tour-to-quote-btn"
                                             data-tour-id="${tour.id || tour.objectId}"
                                             data-tour-name="${destination}"
@@ -2340,7 +2375,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    <% if (currentUserRole === 'department_manager') { %>
+    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
     // ========== Add Tour to Quote functionality ==========
 
     function getTourAccessToken() {
@@ -2744,7 +2779,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             bootstrap.Modal.getInstance(document.getElementById('addTourToQuoteModal'))?.hide();
-            window.location.href = '/dashboard/department_manager/quotes/' + quoteId + '?section=services';
+            window.location.href = '/dashboard/<%= currentUserRole %>/quotes/' + quoteId + '?section=services';
         } catch (error) {
             console.error('Error creating new quote:', error);
             showTourQuoteError(error.message);
@@ -2759,7 +2794,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const alertHtml = '<div class="alert alert-success alert-dismissible fade show" role="alert">' +
             '<i class="ti ti-check me-2"></i>' +
             'Tour agregado a <strong>' + folio + '</strong> ' +
-            '<a href="/dashboard/department_manager/quotes/' + quoteId + '?section=services" class="alert-link ms-2">' +
+            '<a href="/dashboard/<%= currentUserRole %>/quotes/' + quoteId + '?section=services" class="alert-link ms-2">' +
                 'Ver cotización <i class="ti ti-arrow-right"></i>' +
             '</a>' +
             '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
@@ -3207,11 +3242,26 @@ document.addEventListener('DOMContentLoaded', function() {
         
         detailsContent.innerHTML = `
             
-            ${tour.availability ? `
+            ${tour.availability || tour.availableDays ? `
                 <div class="content-section">
-                    <h5><i class="ti ti-calendar-event me-2"></i>Disponibilidad</h5>
-                    <div class="availability-info">
-                        ${formatAvailability(tour.availability)}
+                    <h5 class="text-info mb-3"><i class="ti ti-calendar me-2"></i>Horarios Sugeridos</h5>
+                    <div class="availability-grid">
+                        ${Array.isArray(tour.availability) && tour.availability.length > 0 ? tour.availability.map(item => {
+                            const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                            let dayName = '';
+                            if (typeof item === 'object' && typeof item.day === 'number') {
+                                dayName = item.day >= 0 && item.day <= 6 ? daysOfWeek[item.day] : 'Día ' + item.day;
+                            } else if (typeof item === 'number') {
+                                dayName = item >= 0 && item <= 6 ? daysOfWeek[item] : 'Día ' + item;
+                            }
+                            // Tours use startTime/endTime (not times array)
+                            const timeStr = item.startTime && item.endTime ? item.startTime + ' - ' + item.endTime : '';
+                            return '<div class="availability-day-card"><strong>' + dayName + '</strong>' + (timeStr ? '<div class="text-muted small mt-1"><span class="d-block">• ' + timeStr + '</span></div>' : '') + '</div>';
+                        }).join('')
+                        : Array.isArray(tour.availableDays) && tour.availableDays.length > 0 ? tour.availableDays.map(day => {
+                            return '<div class="availability-day-card"><strong>' + day + '</strong></div>';
+                        }).join('')
+                        : '<div class="availability-info">' + formatAvailability(tour.availability) + '</div>'}
                     </div>
                 </div>
             ` : ''}

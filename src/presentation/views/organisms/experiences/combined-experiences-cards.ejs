@@ -1227,7 +1227,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                                 <div class="experience-info-row">
                                     <span class="experience-info-label">
-                                        <i class="ti ti-calendar-event me-1"></i>Días disponibles
+                                        <i class="ti ti-calendar-event me-1"></i>Días sugeridos
                                     </span>
                                     <span class="experience-info-value" style="font-size: 0.8rem;">
                                         ${experience.displayAvailability || 'Todos los días'}
@@ -2577,7 +2577,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ${experience.availability ? `
                 <div class="content-section">
                     <h5 class="text-info mb-3">
-                        <i class="ti ti-calendar me-2"></i>Disponibilidad
+                        <i class="ti ti-calendar me-2"></i>Horarios Sugeridos
                     </h5>
                     <div class="availability-grid">
                         ${Array.isArray(experience.availability) ? experience.availability.map(item => {
