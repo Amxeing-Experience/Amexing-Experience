@@ -65,7 +65,7 @@ router.get(
   '/',
   readOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(3), // Employee (3), Client (5), Department Manager (4), Admin (6), SuperAdmin (7)
   (req, res) => QuoteController.getQuotes(req, res)
 );
 
