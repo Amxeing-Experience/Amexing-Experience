@@ -33,7 +33,7 @@ class QuoteService {
   constructor() {
     this.className = 'Quote';
     this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client'];
-    this.validStatuses = ['requested', 'hold', 'scheduled', 'rejected'];
+    this.validStatuses = ['quoted', 'requested', 'hold', 'scheduled', 'rejected'];
     this.pdfService = new PDFReceiptService();
   }
 
@@ -41,8 +41,8 @@ class QuoteService {
    * Update Quote status.
    *
    * Business Rules:
-   * - Only SuperAdmin and Admin can update status
-   * - Status must be one of: requested, hold, scheduled, rejected
+   * - Status must be one of: quoted, requested, hold, scheduled, rejected
+   * - Role-based permissions apply for certain status changes
    * - Maintains exists: true
    * - Updates updatedAt timestamp
    * - Logs activity for audit trail.
@@ -54,7 +54,7 @@ class QuoteService {
    * @returns {Promise<object>} Result with success status and Quote data.
    * @throws {Error} If validation fails or database operation fails.
    * @example
-   * const result = await service.updateQuoteStatus(currentUser, 'abc123', 'sent', 'Quote sent to client');
+   * const result = await service.updateQuoteStatus(currentUser, 'abc123', 'requested', 'Client requested services');
    */
   async updateQuoteStatus(currentUser, quoteId, newStatus, reason = '', userRole = null) {
     try {
@@ -66,9 +66,25 @@ class QuoteService {
       // Get user role
       const role = userRole || currentUser.get('role');
 
-      // Validate user permissions
-      if (!this.allowedRoles.includes(role)) {
-        throw new Error(`Unauthorized: Role '${role}' cannot update Quote status`);
+      // Validate user permissions based on status transition
+      const adminOnlyStatuses = ['hold', 'scheduled', 'rejected'];
+
+      // Check if user is trying to set an admin-only status
+      if (adminOnlyStatuses.includes(newStatus)) {
+        // Only admin and superadmin can set these statuses
+        if (!['admin', 'superadmin'].includes(role)) {
+          throw new Error(`Unauthorized: Only administrators can set status to '${newStatus}'`);
+        }
+      } else if (newStatus === 'requested') {
+        // All allowed roles can change to requested (SOLICITADO)
+        if (!this.allowedRoles.includes(role)) {
+          throw new Error(`Unauthorized: Role '${role}' cannot update Quote status`);
+        }
+      } else if (newStatus === 'quoted') {
+        // Only admin can revert to quoted status
+        if (!['admin', 'superadmin'].includes(role)) {
+          throw new Error('Unauthorized: Only administrators can revert status to \'quoted\'');
+        }
       }
 
       // Validate Quote ID
@@ -98,9 +114,9 @@ class QuoteService {
       quote.set('status', newStatus);
       await quote.save(null, { useMasterKey: true });
 
-      // If scheduling, auto-create Reservation + ReservationServices
+      // If changing to requested (SOLICITADO), auto-create Reservation + ReservationServices
       let reservationData = null;
-      if (newStatus === 'scheduled') {
+      if (newStatus === 'requested' && previousStatus !== 'requested') {
         reservationData = await this.createReservationFromQuote(quote, currentUser);
       }
 
@@ -178,7 +194,7 @@ class QuoteService {
       // Get user role
       const role = userRole || currentUser.get('role');
 
-      // Validate user permissions
+      // Basic permission check
       if (!this.allowedRoles.includes(role)) {
         throw new Error(`Unauthorized: Role '${role}' cannot update Quotes`);
       }
@@ -204,10 +220,25 @@ class QuoteService {
         throw new Error('Quote not found');
       }
 
-      // Check if quote is in 'scheduled' status - prevent status changes
-      const currentStatus = quote.get('status');
-      if (currentStatus === 'scheduled' && updates.status && updates.status !== 'scheduled') {
-        throw new Error('Cannot change status from scheduled. Use specific scheduled quote actions instead.');
+      // Check status change permissions
+      const currentStatus = quote.get('status') || 'quoted';
+      if (updates.status && updates.status !== currentStatus) {
+        const adminOnlyStatuses = ['hold', 'scheduled', 'rejected'];
+
+        // Check if user is trying to set an admin-only status
+        if (adminOnlyStatuses.includes(updates.status)) {
+          if (!['admin', 'superadmin'].includes(role)) {
+            throw new Error(`Unauthorized: Only administrators can set status to '${updates.status}'`);
+          }
+        } else if (updates.status === 'requested') {
+          // All allowed roles can change to requested (SOLICITADO)
+          // No additional check needed
+        } else if (updates.status === 'quoted') {
+          // Only admin can revert to quoted status
+          if (!['admin', 'superadmin'].includes(role)) {
+            throw new Error('Unauthorized: Only administrators can revert status to \'quoted\'');
+          }
+        }
       }
 
       // Apply updates
@@ -240,14 +271,14 @@ class QuoteService {
 
       await quote.save(null, { useMasterKey: true });
 
-      // If status changed to scheduled, auto-create Reservation
+      // If status changed to requested (SOLICITADO), auto-create Reservation
       let reservationData = null;
-      if (appliedUpdates.status === 'scheduled') {
+      if (appliedUpdates.status === 'requested' && currentStatus !== 'requested') {
         reservationData = await this.createReservationFromQuote(quote, currentUser);
 
         // Send confirmation email with PDF (non-blocking)
         this.sendScheduledConfirmationEmail(quote, currentUser, reservationData)
-          .catch((err) => logger.warn('Failed to send scheduled confirmation email', {
+          .catch((err) => logger.warn('Failed to send request confirmation email', {
             error: err.message,
             quoteId: quote.id,
           }));

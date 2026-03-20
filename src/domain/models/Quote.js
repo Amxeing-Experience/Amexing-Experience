@@ -188,12 +188,12 @@ class Quote extends BaseModel {
 
   /**
    * Get status.
-   * @returns {string} Quote status (requested, hold, scheduled, rejected).
+   * @returns {string} Quote status (quoted, requested, hold, scheduled, rejected).
    * @example
    * const status = quote.getStatus();
    */
   getStatus() {
-    return this.get('status');
+    return this.get('status') || 'quoted';
   }
 
   /**
