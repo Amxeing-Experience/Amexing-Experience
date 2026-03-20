@@ -1,0 +1,288 @@
+<%
+/**
+ * Owned Clients DataTable Organism
+ * Advanced DataTable component for hierarchical client management
+ * Allows department_manager and client roles to manage their own clients
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier (default: 'owned-clients-table')
+ * @param {string} apiEndpoint - API endpoint for data loading (default: '/api/owned-clients')
+ * @param {string} userRole - Current user role for permission-based features
+ * @param {boolean} showActions - Whether to show action buttons (default: true)
+ */
+
+// Component Configuration
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'owned-clients-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/owned-clients';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'client';
+
+// All users with this view can manage their own clients
+const canEdit = true;
+const canDelete = true;
+const canCreate = true;
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-building me-2"></i>
+                    Mis Clientes
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Administra tus clientes y sus configuraciones</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#createClientModal">
+                        <i class="ti ti-plus me-1"></i>
+                        Nuevo Cliente
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <!-- DataTable Container -->
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Email</th>
+                        <th>Teléfono</th>
+                        <th>Contacto</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                        <th>Registro</th>
+                        <% if (dtShowActions) { %>
+                            <th>Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data will be loaded via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- DataTable Configuration and Initialization Script -->
+<script>
+/**
+ * Owned Clients DataTable JavaScript Module
+ */
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    initializeOwnedClientsDataTable();
+    
+    // Add event delegation for dynamically created buttons to avoid CSP violations
+    const tableContainer = document.getElementById('<%= dtTableId %>');
+    if (tableContainer) {
+        // Delegate click events for edit buttons
+        tableContainer.addEventListener('click', function(e) {
+            const editBtn = e.target.closest('.btn-edit-client');
+            if (editBtn) {
+                const clientId = editBtn.getAttribute('data-client-id');
+                if (typeof editClient === 'function') {
+                    editClient(clientId);
+                }
+            }
+            
+            const deleteBtn = e.target.closest('.btn-delete-client');
+            if (deleteBtn) {
+                const clientId = deleteBtn.getAttribute('data-client-id');
+                const clientName = deleteBtn.getAttribute('data-client-name');
+                if (typeof deleteClient === 'function') {
+                    deleteClient(clientId, clientName);
+                }
+            }
+        });
+    }
+});
+
+/**
+ * Initialize DataTable for owned clients
+ */
+function initializeOwnedClientsDataTable() {
+    // Destroy existing table if it exists
+    if (window.ownedClientsTable) {
+        window.ownedClientsTable.destroy();
+    }
+
+    // Initialize DataTable with server-side processing
+    window.ownedClientsTable = $('#<%= dtTableId %>').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: '<%= dtApiEndpoint %>',
+            type: 'GET',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            data: function(d) {
+                // Map DataTables parameters to API parameters
+                return {
+                    page: Math.floor(d.start / d.length) + 1,
+                    limit: d.length,
+                    search: d.search.value,
+                    sortField: d.columns[d.order[0]?.column]?.data,
+                    sortDirection: d.order[0]?.dir
+                };
+            },
+            dataSrc: function(json) {
+                // Update total count display
+                if (json.pagination && document.getElementById('total-clients-count')) {
+                    document.getElementById('total-clients-count').textContent = json.pagination.total;
+                }
+                
+                // Map response to DataTables format
+                json.recordsTotal = json.pagination?.total || 0;
+                json.recordsFiltered = json.pagination?.total || 0;
+                
+                return json.data || [];
+            },
+            error: function(xhr, error, thrown) {
+                console.error('DataTable AJAX error:', error, thrown);
+                showErrorAlert('Error al cargar los clientes: ' + (xhr.responseJSON?.error || error));
+            }
+        },
+        columns: [
+            { 
+                data: 'name',
+                render: function(data, type, row) {
+                    return `<strong>${data || 'Sin nombre'}</strong>`;
+                }
+            },
+            { 
+                data: 'email',
+                render: function(data) {
+                    return data || '<span class="text-muted">Sin email</span>';
+                }
+            },
+            { 
+                data: 'phone',
+                render: function(data) {
+                    return data || '<span class="text-muted">-</span>';
+                }
+            },
+            { 
+                data: 'contactPerson',
+                render: function(data) {
+                    return data || '<span class="text-muted">-</span>';
+                }
+            },
+            { 
+                data: 'companyType',
+                render: function(data) {
+                    const types = {
+                        'individual': '<span class="badge bg-info">Persona Física</span>',
+                        'corporate': '<span class="badge bg-primary">Persona Moral</span>',
+                        'travel_agency': '<span class="badge bg-success">Agencia de Viajes</span>',
+                        'tour_operator': '<span class="badge bg-warning">Tour Operador</span>',
+                        'other': '<span class="badge bg-secondary">Otro</span>'
+                    };
+                    return types[data] || '<span class="badge bg-secondary">-</span>';
+                }
+            },
+            { 
+                data: 'active',
+                render: function(data) {
+                    return data ? 
+                        '<span class="badge bg-success">Activo</span>' : 
+                        '<span class="badge bg-danger">Inactivo</span>';
+                }
+            },
+            {
+                data: 'createdAt',
+                render: function(data) {
+                    if (!data) return '-';
+                    const date = new Date(data);
+                    return date.toLocaleDateString('es-MX', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                }
+            },
+            <% if (dtShowActions) { %>
+            {
+                data: null,
+                orderable: false,
+                render: function(data, type, row) {
+                    let actions = '<div class="btn-group btn-group-sm" role="group">';
+                    
+                    actions += `
+                        <button type="button" class="btn btn-outline-info btn-edit-client" 
+                                data-client-id="${row.id}"
+                                title="Editar">
+                            <i class="ti ti-edit"></i>
+                        </button>`;
+                    
+                    actions += `
+                        <button type="button" class="btn btn-outline-danger btn-delete-client" 
+                                data-client-id="${row.id}"
+                                data-client-name="${(row.name || '').replace(/"/g, '&quot;')}"
+                                title="Eliminar">
+                            <i class="ti ti-trash"></i>
+                        </button>`;
+                    
+                    actions += '</div>';
+                    return actions;
+                }
+            }
+            <% } %>
+        ],
+        order: [[6, 'desc']], // Order by creation date descending
+        language: {
+            processing: "Procesando...",
+            search: "Buscar:",
+            lengthMenu: "Mostrar _MENU_ registros",
+            info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            infoEmpty: "Mostrando 0 a 0 de 0 registros",
+            infoFiltered: "(filtrado de _MAX_ registros totales)",
+            loadingRecords: "Cargando...",
+            zeroRecords: "No se encontraron resultados",
+            emptyTable: "No hay datos disponibles",
+            paginate: {
+                first: "Primero",
+                last: "Último",
+                next: "Siguiente",
+                previous: "Anterior"
+            }
+        },
+        responsive: true,
+        autoWidth: false,
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rtip'
+    });
+}
+
+/**
+ * Show error alert
+ * @param {string} message - Error message to display
+ */
+function showErrorAlert(message) {
+    const alertHtml = `
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="ti ti-alert-circle me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    
+    // Insert alert at the top of the card body
+    const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
+    if (cardBody) {
+        cardBody.insertAdjacentHTML('afterbegin', alertHtml);
+    }
+}
+</script>

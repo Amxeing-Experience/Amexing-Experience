@@ -93,14 +93,14 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body pt-2">
-                <p>¿Confirmar esta cotización y reservar tu fecha?</p>
+                <p>¿El cliente ha solicitado estos servicios? Se creará una reservación.</p>
                 <p class="mb-0 text-muted" style="font-size: 0.85rem; display: none;" id="scheduleListEmailNote">
                     <i class="ti ti-mail me-1"></i>Se enviará un correo de confirmación a <strong id="scheduleListEmailAddress"></strong>
                 </p>
             </div>
             <div class="modal-footer border-0 pt-0">
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-sm btn-success" id="confirmScheduleListBtn">Confirmar reserva</button>
+                <button type="button" class="btn btn-sm btn-success" id="confirmScheduleListBtn">Confirmar solicitud</button>
             </div>
         </div>
     </div>
@@ -413,18 +413,63 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     render: function(data, type, row) {
                         const userRole = '<%= dtUserRole %>';
                         
-                        // Define statuses based on user role
-                        const scheduledText = 'AGENDADO';
-                        const statuses = [
+                        // Define all possible statuses
+                        const allStatuses = [
+                            { value: 'quoted', text: 'COTIZADO', class: 'bg-info' },
                             { value: 'requested', text: 'SOLICITADO', class: 'bg-primary' },
                             { value: 'hold', text: 'BLOQUEADO', class: 'bg-warning' },
-                            { value: 'scheduled', text: scheduledText, class: 'bg-success' },
+                            { value: 'scheduled', text: 'AGENDADO', class: 'bg-success' },
                             { value: 'rejected', text: 'RECHAZADO', class: 'bg-danger' }
                         ];
 
-                        // If status is 'scheduled', show a non-editable badge instead of dropdown
-                        if (data === 'scheduled') {
-                            return `<span class="badge bg-success px-3 py-2" style="font-size: 0.75rem;">${scheduledText}</span>`;
+                        // Determine which statuses user can select based on role and current status
+                        const isAdmin = ['admin', 'superadmin'].includes(userRole);
+                        const isClient = userRole === 'client';
+                        
+                        // Clients can only view status, not change it
+                        if (isClient) {
+                            const statusObj = allStatuses.find(s => s.value === data) || allStatuses[0];
+                            return `<span class="badge ${statusObj.class} px-3 py-2" style="font-size: 0.75rem;">${statusObj.text}</span>`;
+                        }
+                        
+                        // Build available statuses based on role
+                        let statuses = [];
+                        if (data === 'quoted') {
+                            // From quoted, anyone can change to requested
+                            statuses.push({ value: 'quoted', text: 'COTIZADO', class: 'bg-info' });
+                            statuses.push({ value: 'requested', text: 'SOLICITADO', class: 'bg-primary' });
+                            // Admins can also set admin-only statuses
+                            if (isAdmin) {
+                                statuses.push({ value: 'hold', text: 'BLOQUEADO', class: 'bg-warning' });
+                                statuses.push({ value: 'rejected', text: 'RECHAZADO', class: 'bg-danger' });
+                            }
+                        } else if (data === 'requested') {
+                            // From requested, only admins can change status
+                            statuses.push({ value: 'requested', text: 'SOLICITADO', class: 'bg-primary' });
+                            if (isAdmin) {
+                                statuses.push({ value: 'hold', text: 'BLOQUEADO', class: 'bg-warning' });
+                                statuses.push({ value: 'scheduled', text: 'AGENDADO', class: 'bg-success' });
+                                statuses.push({ value: 'rejected', text: 'RECHAZADO', class: 'bg-danger' });
+                            }
+                        } else {
+                            // For other statuses, show current and admin-only options if admin
+                            const currentStatus = allStatuses.find(s => s.value === data);
+                            if (currentStatus) {
+                                statuses.push(currentStatus);
+                            }
+                            if (isAdmin) {
+                                // Admin can change between admin-only statuses
+                                if (data !== 'hold') statuses.push({ value: 'hold', text: 'BLOQUEADO', class: 'bg-warning' });
+                                if (data !== 'scheduled') statuses.push({ value: 'scheduled', text: 'AGENDADO', class: 'bg-success' });
+                                if (data !== 'rejected') statuses.push({ value: 'rejected', text: 'RECHAZADO', class: 'bg-danger' });
+                                if (data !== 'quoted') statuses.push({ value: 'quoted', text: 'COTIZADO', class: 'bg-info' });
+                            }
+                        }
+                        
+                        // If user has no options to change status, show as badge
+                        if (statuses.length <= 1 && !isAdmin) {
+                            const statusObj = allStatuses.find(s => s.value === data) || allStatuses[0];
+                            return `<span class="badge ${statusObj.class} px-3 py-2" style="font-size: 0.75rem;">${statusObj.text}</span>`;
                         }
 
                         let select = `<select class="form-select form-select-sm status-selector" data-id="${row.id}" data-folio="${row.folio}" data-email="${row.contactEmail || (row.createdBy && row.createdBy.email) || ''}" style="font-size: 0.75rem; cursor: pointer;">`;
@@ -623,8 +668,8 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
             const newStatus = $select.val();
             const oldStatus = $select.data('previous-status') || 'requested';
 
-            if (newStatus === 'scheduled') {
-                // Show confirmation modal
+            if (newStatus === 'requested' && oldStatus === 'quoted') {
+                // Show confirmation modal when changing from COTIZADO to SOLICITADO
                 pendingSchedule = { quoteId, quoteFolio, newStatus, oldStatus, $select };
                 const email = $select.data('email') || '';
                 const emailNote = document.getElementById('scheduleListEmailNote');

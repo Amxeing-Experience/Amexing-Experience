@@ -105,7 +105,7 @@ class EmailService {
 
       const {
         to, toName, subject, text, html, from, fromName, tags,
-        notificationType, recipientUser, metadata, attachments,
+        notificationType, recipientUser, metadata, attachments, cc,
       } = emailData;
 
       // Validate required fields
@@ -135,6 +135,17 @@ class EmailService {
       // Add tags if provided
       if (tags && Array.isArray(tags)) {
         emailParams.setTags(tags);
+      }
+
+      // Add CC emails if provided
+      if (cc && Array.isArray(cc) && cc.length > 0) {
+        const ccRecipients = cc.map((email) => new Recipient(email, ''));
+        emailParams.setCc(ccRecipients);
+        logger.info('CC emails processed in sendEmail', {
+          ccEmails: cc,
+          recipientEmail: this.maskEmail(to),
+          subject,
+        });
       }
 
       // Add attachments if provided
@@ -809,7 +820,7 @@ This is an automated message from Amexing Experience. Please do not reply to thi
       const {
         recipientEmail, recipientName, folio, reservationFolio,
         eventType, startDate, endDate, numberOfPeople,
-        shareUrl, pdfBuffer, pdfFilename, recipientUser,
+        shareUrl, pdfBuffer, pdfFilename, recipientUser, ccEmails,
       } = quoteEmailData;
 
       const templateVariables = {
@@ -842,7 +853,8 @@ This is an automated message from Amexing Experience. Please do not reply to thi
         });
       }
 
-      return await this.sendEmail({
+      // Build email options
+      const emailOptions = {
         to: recipientEmail,
         toName: recipientName,
         subject: `Confirmación de Cotización ${folio} - Amexing Experience`,
@@ -857,7 +869,19 @@ This is an automated message from Amexing Experience. Please do not reply to thi
           reservationFolio: reservationFolio || null,
           eventType,
         },
-      });
+      };
+
+      // Add CC emails if provided
+      if (ccEmails && ccEmails.length > 0) {
+        emailOptions.cc = ccEmails;
+        logger.info('CC emails added to email options', {
+          ccEmails,
+          recipientEmail: this.maskEmail(recipientEmail),
+          folio,
+        });
+      }
+
+      return await this.sendEmail(emailOptions);
     } catch (error) {
       logger.error('Failed to send quote confirmation email', {
         error: error.message,

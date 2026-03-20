@@ -43,8 +43,12 @@ const steps = [
                     <span class="quote-status-hint">Selecciona el estado actual</span>
                 </div>
                 <div class="quote-status-segments">
+                    <label class="quote-status-seg" data-status="quoted">
+                        <input type="radio" name="quoteStatus" value="quoted">
+                        <span class="quote-status-seg-label"><i class="ti ti-file-text me-1"></i>Cotizado</span>
+                    </label>
                     <label class="quote-status-seg" data-status="requested">
-                        <input type="radio" name="quoteStatus" value="requested" checked>
+                        <input type="radio" name="quoteStatus" value="requested">
                         <span class="quote-status-seg-label"><i class="ti ti-clock me-1"></i>Solicitado</span>
                     </label>
                     <label class="quote-status-seg" data-status="hold">
@@ -299,6 +303,9 @@ const steps = [
     color: #495057;
 }
 /* Active states by status */
+.quote-status-seg[data-status="quoted"]:has(input:checked) .quote-status-seg-label {
+    background: #0dcaf0; color: white; box-shadow: 0 1px 4px rgba(13,202,240,0.3);
+}
 .quote-status-seg[data-status="requested"]:has(input:checked) .quote-status-seg-label {
     background: #0d6efd; color: white; box-shadow: 0 1px 4px rgba(13,110,253,0.3);
 }
