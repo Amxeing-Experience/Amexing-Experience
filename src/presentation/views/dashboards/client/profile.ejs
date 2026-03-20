@@ -5,6 +5,9 @@
  * Created by Denisse Maldonado
  */
 
+// Capture clientId from dashboard-injected user before redefining 'user'
+const dashboardClientId = (locals && locals.user && locals.user.clientId) ? locals.user.clientId : '';
+
 // User data setup
 const user = typeof userData !== 'undefined' && userData !== null ? userData : {};
 const profileData = {
@@ -133,6 +136,19 @@ const formatRoleName = (role) => {
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Billing Profiles Section (Read-Only for Client) -->
+<div class="container-fluid">
+  <div class="row justify-content-center mt-4">
+    <div class="col-12 col-lg-10">
+        <%- include('../../organisms/billing/billing-profiles-section', {
+            userRole: typeof userRole !== 'undefined' ? userRole : 'client',
+            readOnly: true,
+            targetUserId: dashboardClientId
+        }) %>
     </div>
   </div>
 </div>
