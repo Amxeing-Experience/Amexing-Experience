@@ -36,6 +36,12 @@
                                 <span class="badge bg-secondary ms-1" id="toursCount">0</span>
                             </button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-traslados" data-bs-toggle="tab" data-bs-target="#pane-traslados" type="button" role="tab">
+                                <i class="ti ti-car me-1"></i>Traslados
+                                <span class="badge bg-secondary ms-1" id="trasladosCount">0</span>
+                            </button>
+                        </li>
                     </ul>
                     <div class="tab-content">
                         <!-- Experiences Tab -->
@@ -60,6 +66,17 @@
                                 </div>
                             </div>
                         </div>
+                        <!-- Traslados Tab -->
+                        <div class="tab-pane fade" id="pane-traslados" role="tabpanel">
+                            <div class="p-3 pb-2">
+                                <input type="text" class="form-control form-control-sm" id="dragSearchTraslados" placeholder="Buscar traslado...">
+                            </div>
+                            <div class="drag-items-list px-3 pb-3" id="dragTrasladosList" style="max-height: 400px; overflow-y: auto;">
+                                <div class="text-center text-muted py-3">
+                                    <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -75,7 +92,7 @@
                             <i class="ti ti-drag-drop" style="font-size: 4rem; color: #dee2e6;"></i>
                         </div>
                         <h5 class="text-muted mb-2">Sin servicios aun</h5>
-                        <p class="text-muted mb-4">Arrastra experiencias o tours aqui, o usa el boton para agregar</p>
+                        <p class="text-muted mb-4">Arrastra experiencias, tours o traslados aqui, o usa el boton para agregar</p>
                         <button type="button" class="btn btn-primary" id="emptyStateAddServiceBtn">
                             <i class="ti ti-plus me-1"></i>Agregar Primer Servicio
                         </button>
@@ -271,6 +288,44 @@
     .drag-item .drag-badge {
         font-size: 0.7rem;
         margin-left: 8px;
+    }
+
+    .drag-item-transport {
+        align-items: flex-start;
+        padding: 10px 12px;
+    }
+
+    .drag-item-transport .drag-handle,
+    .drag-item-transport .ti-car {
+        margin-top: 4px;
+    }
+
+    .drag-transport-info {
+        flex: 1;
+        min-width: 0;
+        line-height: 1.3;
+    }
+
+    .drag-transport-origin {
+        font-size: 0.8rem;
+        color: #6c757d;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .drag-transport-destination {
+        font-size: 0.875rem;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .drag-group-header {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 
     .services-drop-zone.drag-over > #emptyStateContainer .border-dashed,

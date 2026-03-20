@@ -1199,7 +1199,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <i class="ti ti-clock me-1"></i>Duración
                                     </span>
                                     <span class="experience-info-value">
-                                        ${experience.displayDuration ? experience.displayDuration + ' min' : 'Por definir'}
+                                        ${experience.displayDuration ? experience.displayDuration + ' hrs' : 'Por definir'}
                                     </span>
                                 </div>
                                 <div class="experience-info-row">
@@ -1227,7 +1227,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                                 <div class="experience-info-row">
                                     <span class="experience-info-label">
-                                        <i class="ti ti-calendar-event me-1"></i>Días disponibles
+                                        <i class="ti ti-calendar-event me-1"></i>Días sugeridos
                                     </span>
                                     <span class="experience-info-value" style="font-size: 0.8rem;">
                                         ${experience.displayAvailability || 'Todos los días'}
@@ -2577,7 +2577,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ${experience.availability ? `
                 <div class="content-section">
                     <h5 class="text-info mb-3">
-                        <i class="ti ti-calendar me-2"></i>Disponibilidad
+                        <i class="ti ti-calendar me-2"></i>Horarios Sugeridos
                     </h5>
                     <div class="availability-grid">
                         ${Array.isArray(experience.availability) ? experience.availability.map(item => {
@@ -2970,13 +2970,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Helper functions (copied from tours)
-    function formatDuration(minutes) {
-        if (!minutes) return 'No especificada';
-        if (minutes < 60) return `${minutes} minutos`;
-        const hours = Math.floor(minutes / 60);
-        const remainingMinutes = minutes % 60;
-        if (remainingMinutes === 0) return `${hours}h`;
-        return `${hours}h ${remainingMinutes}min`;
+    function formatDuration(hours) {
+        if (!hours) return 'No especificada';
+        return `${hours} hora${hours > 1 ? 's' : ''}`;
     }
     
     function getOptimizedImageUrl(photo, size = 'medium') {

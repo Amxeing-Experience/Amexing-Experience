@@ -37,7 +37,11 @@
                                     <span style="font-size: 0.9rem;">Tour</span>
                                 </label>
                                 
-                                <!-- Transport option hidden for experiences - keep logic intact for future use -->
+                                <input type="radio" class="btn-check" name="serviceType" id="typeTransport" value="transport">
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeTransport">
+                                    <i class="ti ti-car me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">Transporte</span>
+                                </label>
 
                                 <input type="radio" class="btn-check" name="serviceType" id="typeConcepto" value="concepto">
                                 <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeConcepto">
@@ -210,7 +214,7 @@
                                                     <i class="ti ti-plane-arrival me-1" style="font-size: 1.1rem;"></i>
                                                     <span style="font-size: 0.9rem;">Arrival</span>
                                                 </label>
-                                                
+
                                                 <input type="radio" class="btn-check" name="directionType" id="typeDeparture" value="departure">
                                                 <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeDeparture">
                                                     <i class="ti ti-plane-departure me-1" style="font-size: 1.1rem;"></i>
@@ -219,40 +223,84 @@
                                             </div>
                                         </div>
                                     </div>
-                                
+
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label">Origen <span class="text-danger">*</span></label>
-                                        <!-- Arrival: Dropdown Origin -->
+                                        <label class="form-label" id="transportOriginLabel">Origen <span class="text-danger">*</span></label>
+                                        <!-- Arrival: Dropdown Origin (airports) -->
                                         <select class="form-select transport-origin-arrival" id="transportOriginSelect" required>
                                             <option value="">-- Seleccionar origen --</option>
-                                            <option value="cancun">Cancún</option>
-                                            <option value="playa-del-carmen">Playa del Carmen</option>
-                                            <option value="tulum">Tulum</option>
-                                            <option value="cozumel">Cozumel</option>
-                                            <option value="merida">Mérida</option>
-                                            <option value="chichen-itza">Chichén Itzá</option>
                                         </select>
-                                        <!-- Departure: Text Origin -->
+                                        <!-- Departure: Combo Origin (hotels, cities) -->
+                                        <div class="position-relative d-none" id="transportOriginComboWrapper">
+                                            <input type="text"
+                                                   class="form-control"
+                                                   id="transportOriginCombo"
+                                                   list="transportOriginList"
+                                                   placeholder="Seleccionar o escribir origen...">
+                                            <datalist id="transportOriginList">
+                                            </datalist>
+                                            <small class="text-muted d-none" id="originOptionsIndicator">
+                                                <i class="ti ti-arrow-down"></i> Opciones disponibles
+                                            </small>
+                                        </div>
+                                        <!-- Other types: Text Origin -->
                                         <input type="text" class="form-control transport-origin-departure d-none" id="transportOriginText" placeholder="Ej: Hotel Xcaret, Airbnb Playa">
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label">Destino <span class="text-danger">*</span></label>
-                                        <!-- Arrival: Text Destination -->
-                                        <input type="text" class="form-control transport-destination-arrival" id="transportDestinationText" placeholder="Ej: Hotel Xcaret, Aeropuerto Internacional" required>
-                                        <!-- Departure: Dropdown Destination -->
-                                        <select class="form-select transport-destination-departure d-none" id="transportDestinationSelect">
+                                        <label class="form-label" id="transportDestinationLabel">Destino <span class="text-danger">*</span></label>
+                                        <!-- Arrival/default: Combo Box destination -->
+                                        <div class="position-relative" id="transportDestinationComboWrapper">
+                                            <input type="text"
+                                                   class="form-control"
+                                                   id="transportDestinationCombo"
+                                                   list="transportDestinationList"
+                                                   placeholder="Seleccionar o escribir destino..."
+                                                   required>
+                                            <datalist id="transportDestinationList">
+                                            </datalist>
+                                            <small class="text-muted d-none" id="destinationOptionsIndicator">
+                                                <i class="ti ti-arrow-down"></i> Opciones disponibles
+                                            </small>
+                                        </div>
+                                        <!-- Departure: Dropdown destination (airports) -->
+                                        <select class="form-select d-none" id="transportDestinationSelect">
                                             <option value="">-- Seleccionar destino --</option>
-                                            <option value="cancun">Cancún</option>
-                                            <option value="playa-del-carmen">Playa del Carmen</option>
-                                            <option value="tulum">Tulum</option>
-                                            <option value="cozumel">Cozumel</option>
-                                            <option value="merida">Mérida</option>
-                                            <option value="chichen-itza">Chichén Itzá</option>
                                         </select>
+                                        <!-- Local: Text destination -->
+                                        <input type="text" class="form-control d-none" id="transportDestinationText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
                                     </div>
                                 </div>
-                                
+
+                                <!-- Specific Location field (shown only for certain destinations) -->
+                                <div class="row d-none" id="specificLocationRow">
+                                    <div class="col-md-12 mb-3">
+                                        <label class="form-label">Ubicación Específica <span class="text-info">(Hotel, Dirección, etc.)</span></label>
+                                        <input type="text"
+                                               class="form-control"
+                                               id="transportSpecificLocation"
+                                               placeholder="Ej: Hotel Rosewood, Casa en Aldama 15, Centro Histórico..."
+                                               aria-describedby="specificLocationHelp">
+                                        <small id="specificLocationHelp" class="form-text text-muted">
+                                            Especifique el hotel, dirección o lugar exacto dentro de <span id="selectedDestinationName"></span>
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <!-- Transport Schedule (shown for Punto a Punto and Local) -->
+                                <div id="transportScheduleSection" class="d-none">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="transportStartTime" class="form-label">Horario Inicio</label>
+                                            <input type="text" class="form-control time-input" id="transportStartTime" placeholder="__:__" maxlength="5">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="transportEndTime" class="form-label">Horario Fin</label>
+                                            <input type="text" class="form-control time-input" id="transportEndTime" placeholder="__:__" maxlength="5">
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Flight Details (only show if Aeropuerto is selected) -->
                                 <div id="flightDetailsSection" class="d-none">
                                     <hr class="my-2">
@@ -267,55 +315,69 @@
                                         </div>
                                     </div>
                                     <div class="row">
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-12 mb-3">
                                             <label for="flightTime" class="form-label">Hora de Llegada</label>
-                                            <input type="time" class="form-control" id="flightTime">
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label for="transportPersons" class="form-label">Número de Personas <span class="text-danger">*</span></label>
-                                            <input type="number" class="form-control" id="transportPersons" min="1" max="50" value="1" required>
+                                            <input type="text" class="form-control time-input" id="flightTime" placeholder="__:__" maxlength="5">
                                         </div>
                                     </div>
                                 </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Round Trip Form -->
                             <div id="roundTripForm" class="transport-trip-form d-none">
-                                <!-- Arrival -->
+                                <!-- Ida (Arrival leg) -->
                                 <div class="border rounded p-3 mb-3 bg-light">
-                                    <h6 class="mb-3 text-info">
+                                    <h6 class="mb-3 text-info" id="roundTripIdaHeader">
                                         <i class="ti ti-plane-arrival me-2"></i>Arrival
                                     </h6>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Origen <span class="text-danger">*</span></label>
-                                            <!-- Arrival: Dropdown Origin -->
+                                            <label class="form-label" id="roundTripOriginIdaLabel">Origen <span class="text-danger">*</span></label>
+                                            <!-- Arrival SELECT (airports or origins) -->
                                             <select class="form-select" id="roundTripOriginIdaSelect" required>
                                                 <option value="">-- Seleccionar origen --</option>
-                                                <option value="cancun">Cancún</option>
-                                                <option value="cozumel">Cozumel</option>
-                                                <option value="playa">Playa del Carmen</option>
-                                                <option value="tulum">Tulum</option>
                                             </select>
+                                            <!-- Arrival TEXT (Local Ida) -->
+                                            <input type="text" class="form-control d-none" id="roundTripOriginIdaText" placeholder="Ej: Hotel Xcaret, Airbnb Playa">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Destino <span class="text-danger">*</span></label>
-                                            <!-- Arrival: Text Destination -->
-                                            <input type="text" class="form-control" id="roundTripDestinationIda" placeholder="Ej: Hotel Xcaret, Airbnb Playa" required>
+                                            <label class="form-label" id="roundTripDestinationIdaLabel">Destino <span class="text-danger">*</span></label>
+                                            <!-- COMBO destination (aeropuerto/punto-a-punto arrival) -->
+                                            <div class="position-relative" id="roundTripDestinationIdaComboWrapper">
+                                                <input type="text" class="form-control" id="roundTripDestinationIdaCombo"
+                                                       list="roundTripDestinationIdaList"
+                                                       placeholder="Seleccionar o escribir destino..." required>
+                                                <datalist id="roundTripDestinationIdaList"></datalist>
+                                            </div>
+                                            <!-- SELECT destination (Local Ida) -->
+                                            <select class="form-select d-none" id="roundTripDestinationIdaSelect">
+                                                <option value="">-- Seleccionar destino --</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <!-- Specific Location for Ida -->
+                                    <div class="row d-none" id="roundTripSpecificLocationIdaRow">
+                                        <div class="col-md-12 mb-3">
+                                            <label class="form-label">Ubicación Específica <span class="text-info">(Hotel, Dirección, etc.)</span></label>
+                                            <input type="text" class="form-control" id="roundTripSpecificLocationIda"
+                                                   placeholder="Ej: Hotel Rosewood, Casa en Aldama 15, Centro Histórico...">
+                                            <small class="form-text text-muted">
+                                                Especifique el hotel, dirección o lugar exacto dentro del destino
+                                            </small>
                                         </div>
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripDateIda" class="form-label">Fecha de Llegada</label>
+                                            <label for="roundTripDateIda" class="form-label" id="roundTripDateIdaLabel">Fecha de Llegada</label>
                                             <input type="date" class="form-control" id="roundTripDateIda">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripTimeIda" class="form-label">Hora de Llegada</label>
-                                            <input type="time" class="form-control" id="roundTripTimeIda">
+                                            <label for="roundTripTimeIda" class="form-label" id="roundTripTimeIdaLabel">Hora de Llegada</label>
+                                            <input type="text" class="form-control time-input" id="roundTripTimeIda" placeholder="__:__" maxlength="5">
                                         </div>
                                     </div>
-                                    
+
                                     <!-- Flight Details for Ida (only show if Aeropuerto is selected) -->
                                     <div class="roundtrip-flight-details-ida d-none">
                                         <hr class="my-2">
@@ -332,40 +394,58 @@
                                     </div>
                                 </div>
 
-                                <!-- Departure -->
+                                <!-- Vuelta (Departure leg) -->
                                 <div class="border rounded p-3 bg-light">
-                                    <h6 class="mb-3 text-primary">
+                                    <h6 class="mb-3 text-primary" id="roundTripVueltaHeader">
                                         <i class="ti ti-plane-departure me-2"></i>Departure
                                     </h6>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Origen <span class="text-danger">*</span></label>
-                                            <!-- Departure: Text Origin -->
-                                            <input type="text" class="form-control" id="roundTripOriginVuelta" placeholder="Ej: Hotel Xcaret, Airbnb Playa" required>
+                                            <label class="form-label" id="roundTripOriginVueltaLabel">Origen <span class="text-danger">*</span></label>
+                                            <!-- COMBO origin (aeropuerto/punto-a-punto departure) -->
+                                            <div class="position-relative" id="roundTripOriginVueltaComboWrapper">
+                                                <input type="text" class="form-control" id="roundTripOriginVueltaCombo"
+                                                       list="roundTripOriginVueltaList"
+                                                       placeholder="Seleccionar o escribir origen...">
+                                                <datalist id="roundTripOriginVueltaList"></datalist>
+                                            </div>
+                                            <!-- SELECT origin (Local Vuelta) -->
+                                            <select class="form-select d-none" id="roundTripOriginVueltaSelect">
+                                                <option value="">-- Seleccionar origen --</option>
+                                            </select>
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Destino <span class="text-danger">*</span></label>
-                                            <!-- Departure: Dropdown Destination -->
-                                            <select class="form-select" id="roundTripDestinationVueltaSelect" required>
+                                            <label class="form-label" id="roundTripDestinationVueltaLabel">Destino <span class="text-danger">*</span></label>
+                                            <!-- SELECT destination (aeropuerto/punto-a-punto departure) -->
+                                            <select class="form-select" id="roundTripDestinationVueltaSelect">
                                                 <option value="">-- Seleccionar destino --</option>
-                                                <option value="cancun">Cancún</option>
-                                                <option value="cozumel">Cozumel</option>
-                                                <option value="playa">Playa del Carmen</option>
-                                                <option value="tulum">Tulum</option>
                                             </select>
+                                            <!-- TEXT destination (Local Vuelta) -->
+                                            <input type="text" class="form-control d-none" id="roundTripDestinationVueltaText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
+                                        </div>
+                                    </div>
+                                    <!-- Specific Location for Vuelta -->
+                                    <div class="row d-none" id="roundTripSpecificLocationVueltaRow">
+                                        <div class="col-md-12 mb-3">
+                                            <label class="form-label">Ubicación Específica <span class="text-info">(Hotel, Dirección, etc.)</span></label>
+                                            <input type="text" class="form-control" id="roundTripSpecificLocationVuelta"
+                                                   placeholder="Ej: Hotel Rosewood, Casa en Aldama 15, Centro Histórico...">
+                                            <small class="form-text text-muted">
+                                                Especifique el hotel, dirección o lugar exacto dentro del origen
+                                            </small>
                                         </div>
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripDateVuelta" class="form-label">Fecha de Salida</label>
+                                            <label for="roundTripDateVuelta" class="form-label" id="roundTripDateVueltaLabel">Fecha de Salida</label>
                                             <input type="date" class="form-control" id="roundTripDateVuelta">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripTimeVuelta" class="form-label">Hora de Salida</label>
-                                            <input type="time" class="form-control" id="roundTripTimeVuelta">
+                                            <label for="roundTripTimeVuelta" class="form-label" id="roundTripTimeVueltaLabel">Hora de Salida</label>
+                                            <input type="text" class="form-control time-input" id="roundTripTimeVuelta" placeholder="__:__" maxlength="5">
                                         </div>
                                     </div>
-                                    
+
                                     <!-- Flight Details for Vuelta (only show if Aeropuerto is selected) -->
                                     <div class="roundtrip-flight-details-vuelta d-none">
                                         <hr class="my-2">
@@ -379,14 +459,6 @@
                                                 <input type="text" class="form-control" id="roundTripFlightNumberVuelta" placeholder="Ej: AA5678">
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
-
-                                <!-- Number of Persons -->
-                                <div class="row mt-3">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="roundTripPersons" class="form-label">Número de Personas <span class="text-danger">*</span></label>
-                                        <input type="number" class="form-control" id="roundTripPersons" min="1" max="50" value="1" required>
                                     </div>
                                 </div>
                             </div>
@@ -470,12 +542,34 @@
                                         Guía + Chofer
                                     </label>
                                 </div>
-                                <div class="form-check">
+                                <div class="form-check" id="greeterCheckboxContainer">
                                     <input class="form-check-input" type="checkbox" value="" id="includeGreeter">
                                     <label class="form-check-label small" for="includeGreeter" id="greeterLabel" style="font-size: 0.875rem; line-height: 1.2;">
                                         Greeter
                                     </label>
                                 </div>
+                                <div class="form-check ms-3 d-none" id="greeterInVehicleContainer">
+                                    <input class="form-check-input" type="checkbox" value="" id="greeterInVehicle">
+                                    <label class="form-check-label small text-muted" for="greeterInVehicle" style="font-size: 0.75rem; line-height: 1.2;">
+                                        Viaja en el vehículo
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tiempo de Espera (Transport only) -->
+                    <div id="tiempoEsperaSection" class="d-none mb-3">
+                        <div class="row align-items-end">
+                            <div class="col-md-4">
+                                <label for="waitingTimeHours" class="form-label"><i class="ti ti-clock me-1"></i>Tiempo de espera</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="waitingTimeHours" min="0" step="0.5" value="0" placeholder="0">
+                                    <span class="input-group-text">horas</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-center" style="min-height: 38px; padding-bottom: 4px;">
+                                <small id="waitingTimeRate" class="text-muted"></small>
                             </div>
                         </div>
                     </div>
@@ -490,9 +584,16 @@
                                 <span class="input-group-text" id="currencySymbol">MXN</span>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-6 mb-3" id="quantityFieldContainer">
                             <label for="serviceQuantity" class="form-label">Cantidad</label>
                             <input type="number" class="form-control" id="serviceQuantity" value="1" min="1" required>
+                        </div>
+                        <div class="col-md-6 mb-3 d-none" id="additionalVehicleContainer">
+                            <label class="form-label d-block">&nbsp;</label>
+                            <div class="form-check" style="padding-top: 6px;">
+                                <input class="form-check-input" type="checkbox" id="additionalVehicle">
+                                <label class="form-check-label" for="additionalVehicle">Vehículo adicional</label>
+                            </div>
                         </div>
                     </div>
                     

@@ -38,20 +38,10 @@ const currentPath = '/dashboard/department_manager/tours';
     </div>
 </div>
 
-<!-- Walking Tours Section -->
+<!-- Unified Tours Section (Walking + Vehicle) -->
 <div class="row">
     <div class="col-12">
-        <%- include('../../organisms/tours/walking-tours-section', {
-            walkingToursId: 'department-walking-tours',
-            walkingApiEndpoint: '/api/tours'
-        }) %>
-    </div>
-</div>
-
-<!-- Vehicle Tours Cards -->
-<div class="row">
-    <div class="col-12">
-        <%- include('../../organisms/tours/tours-cards', {
+        <%- include('../../organisms/tours/unified-tours-cards', {
             tableId: 'tours-cards',
             apiEndpoint: '/api/tours',
             userRole: currentUserRole,

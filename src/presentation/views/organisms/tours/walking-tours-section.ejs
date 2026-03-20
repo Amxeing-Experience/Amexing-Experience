@@ -156,15 +156,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const createBtn = document.getElementById('createWalkingTourBtn');
     if (createBtn) {
         createBtn.addEventListener('click', function() {
-            // Check if there's a walking tour modal in the parent page
-            const walkingTourModal = document.getElementById('walkingTourModal');
-            if (walkingTourModal) {
-                // Open the walking tour modal
-                const modal = new bootstrap.Modal(walkingTourModal);
-                modal.show();
+            if (typeof openWalkingTourModal === 'function') {
+                openWalkingTourModal();
             } else {
-                console.error('Walking tour modal not found. Make sure the walking tour modal component is included in the page.');
-                alert('Para crear tours a pie, necesita incluir el componente de modal de tours a pie en la página.');
+                console.error('openWalkingTourModal function not found.');
             }
         });
     }
@@ -785,15 +780,48 @@ function populateWalkingTourForm(tourData) {
     setFieldValue('walkingPriceMedium', tour.walkingPriceMedium || tour.walking_price_medium || tour.priceMedium || tour.price_medium || tour.mediumPrice || '');
     setFieldValue('walkingPriceLarge', tour.walkingPriceLarge || tour.walking_price_large || tour.priceLarge || tour.price_large || tour.largePrice || '');
     
+    // New fields (matching vehicle tour modal)
+    setFieldValue('walkingTourType', tour.type || '');
+    setFieldValue('walkingTravelDuration', tour.travel_duration || '');
+    setFieldValue('walkingMinPeople', tour.min_people || '');
+    setFieldValue('walkingMaxPeople', tour.max_people || '');
+    setFieldValue('walkingInternalNotes', tour.internal_notes || '');
+    setFieldValue('walkingClientBookingNotes', tour.client_booking_notes || '');
+    setFieldValue('walkingProviderNotes', tour.provider_notes || '');
+    setFieldValue('walkingTeamNotes', tour.team_notes || '');
+
+    // Populate availability schedule
+    if (tour.availability && Array.isArray(tour.availability) && tour.availability.length > 0) {
+        // Show availability config panel
+        const walkingSummary = document.querySelector('.walking-availability-summary');
+        const walkingContent = document.querySelector('.walking-availability-content');
+        if (walkingSummary) walkingSummary.style.display = 'none';
+        if (walkingContent) walkingContent.style.display = '';
+
+        // Activate day buttons and create schedule rows with times directly
+        tour.availability.forEach(schedule => {
+            const dayBtn = document.querySelector('.walking-day-btn[data-day="' + schedule.day + '"]');
+            if (dayBtn) {
+                dayBtn.classList.add('active', 'btn-primary');
+                dayBtn.classList.remove('btn-outline-primary');
+            }
+            if (typeof addWalkingDaySchedule === 'function') {
+                addWalkingDaySchedule(schedule.day, dayBtn?.dataset?.dayName || '', schedule.startTime || '', schedule.endTime || '');
+            }
+        });
+        if (typeof updateWalkingNoDaysMessage === 'function') updateWalkingNoDaysMessage();
+        if (typeof updateWalkingAvailabilityStatus === 'function') updateWalkingAvailabilityStatus();
+    }
+
     // Additional fields
     const includesValue = tour.includes || tour.include || tour.whatIncludes || tour.included || '';
     const notIncludesValue = tour.notincludes || tour.not_includes || tour.notInclude || tour.excluded || tour.excludes || '';
     const languagesValue = tour.languages || tour.language || tour.supportedLanguages || '';
-    
+
     setFieldValue('walkingIncludes', Array.isArray(includesValue) ? includesValue.join('\n') : includesValue);
     setFieldValue('walkingNotIncludes', Array.isArray(notIncludesValue) ? notIncludesValue.join('\n') : notIncludesValue);
     setFieldValue('walkingLanguages', Array.isArray(languagesValue) ? languagesValue.join('\n') : languagesValue);
-    
+
     // Set destination POI
     setTimeout(() => {
         const walkingDestElement = document.getElementById('walkingDestinationPOI');
@@ -822,6 +850,23 @@ function populateWalkingTourForm(tourData) {
             }
         }
     }, 1000); // Delay to ensure TomSelect is ready
+
+    // Load existing photos
+    if (tour.photos && Array.isArray(tour.photos) && tour.photos.length > 0) {
+        setTimeout(() => {
+            const photosContainer = $('#walkingTourModal .walking-photos-preview-container');
+            if (photosContainer.length) {
+                photosContainer.empty();
+                tour.photos.forEach((photo) => {
+                    const photoUrl = photo.dataUrl || photo.url;
+                    const fileName = photo.fileName || photo.name || 'image';
+                    if (photoUrl && typeof addTourPhotoPreview === 'function') {
+                        addTourPhotoPreview(photosContainer, { name: fileName }, photoUrl, photo);
+                    }
+                });
+            }
+        }, 500);
+    }
 }
 
 // Initialize walking tours filters when document and jQuery are ready
