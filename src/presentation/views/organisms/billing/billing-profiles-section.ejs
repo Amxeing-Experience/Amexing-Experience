@@ -1,0 +1,986 @@
+<%
+/**
+ * Billing Profiles Section Organism
+ * Displays and manages multiple billing profiles for invoicing.
+ * Reusable across department manager profile and admin views.
+ * Created by Denisse Maldonado
+ *
+ * @param {string} userRole - Current user role (for conditional display)
+ */
+
+const billingUserRole = typeof userRole !== 'undefined' ? userRole : 'department_manager';
+const billingReadOnly = typeof readOnly !== 'undefined' ? readOnly : false;
+const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId : '';
+%>
+
+<style>
+.billing-profile-card {
+    transition: box-shadow 0.2s ease;
+}
+.billing-profile-card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.12) !important;
+}
+.billing-profile-card .card-badge-primary {
+    font-size: 0.7rem;
+}
+.billing-profile-card .profile-country-flag {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+.billing-profile-card .profile-actions .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+.billing-profile-card .profile-detail-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-bottom: 0;
+}
+.billing-profile-card .profile-detail-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+.billing-mx-fields,
+.billing-intl-fields,
+.billing-colonia-field,
+.billing-intl-postal-field,
+.billing-constancia-section {
+    display: none;
+}
+.billing-profile-documents-badge {
+    font-size: 0.75rem;
+}
+#billingProfilesSpinner {
+    min-height: 120px;
+}
+.billing-constancia-info {
+    font-size: 0.8rem;
+    background: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+}
+.billing-additional-doc-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 0.5rem;
+    background: #f8f9fa;
+    border-radius: 0.25rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.8rem;
+}
+</style>
+
+<!-- Billing Profiles Section -->
+<div class="card border-0 shadow-sm" id="billingProfilesSection">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h5 class="mb-1 fw-bold">
+                    <i class="ti ti-file-invoice me-2"></i>Perfiles de Facturacion
+                </h5>
+                <p class="text-muted mb-0 small">Administra tus perfiles de facturacion para diferentes entidades fiscales</p>
+            </div>
+            <% if (!billingReadOnly) { %>
+            <button class="btn btn-primary btn-sm" data-action="bp-new">
+                <i class="ti ti-plus me-1"></i>Nuevo Perfil
+            </button>
+            <% } %>
+        </div>
+
+        <!-- Loading spinner -->
+        <div id="billingProfilesSpinner" class="justify-content-center align-items-center" style="display: flex;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+
+        <!-- Empty state -->
+        <div id="billingProfilesEmpty" class="text-center py-5" style="display:none;">
+            <i class="ti ti-file-invoice" style="font-size: 3rem; color: #ccc;"></i>
+            <p class="text-muted mt-2 mb-0">No hay perfiles de facturacion.</p>
+            <p class="text-muted small">Crea tu primer perfil para comenzar a recibir facturas.</p>
+        </div>
+
+        <!-- Profiles list -->
+        <div id="billingProfilesList" class="row g-3" style="display:none;"></div>
+    </div>
+</div>
+
+<!-- Create/Edit Billing Profile Modal -->
+<div class="modal fade" id="billingProfileModal" tabindex="-1" aria-labelledby="billingProfileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #0891b2 0%, #0ea5e9 100%); border: none;">
+                <h5 class="modal-title fw-bold text-white" id="billingProfileModalLabel">
+                    <i class="ti ti-file-invoice me-2"></i>Nuevo Perfil de Facturacion
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="billingProfileForm" novalidate>
+                    <input type="hidden" id="bp_profileId" value="">
+
+                    <!-- Informacion General -->
+                    <div class="p-3 bg-light rounded mb-4">
+                        <h6 class="fw-bold text-primary mb-3"><i class="ti ti-info-circle me-2"></i>Informacion General</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="bp_country" class="form-label fw-semibold">Pais <span class="text-danger">*</span></label>
+                                <select class="form-select" id="bp_country">
+                                    <option value="MX" selected>Mexico</option>
+                                    <option value="US">Estados Unidos</option>
+                                    <option value="CA">Canada</option>
+                                    <option value="GB">Reino Unido</option>
+                                    <option value="DE">Alemania</option>
+                                    <option value="FR">Francia</option>
+                                    <option value="ES">Espana</option>
+                                    <option value="BR">Brasil</option>
+                                    <option value="CO">Colombia</option>
+                                    <option value="AR">Argentina</option>
+                                    <option value="CL">Chile</option>
+                                    <option value="PE">Peru</option>
+                                    <option value="OTHER">Otro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="bp_label" class="form-label fw-semibold">Nombre del Perfil <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="bp_label" placeholder="Ej: Mi Empresa, Personal, NUBA Mexico">
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="bp_isPrimary">
+                                    <label class="form-check-label fw-semibold" for="bp_isPrimary">Perfil principal</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datos Fiscales Mexico -->
+                    <div class="billing-mx-fields mb-4">
+                        <div class="p-3 border rounded border-success" style="border-left: 4px solid #059669 !important;">
+                            <h6 class="fw-bold text-success mb-3"><i class="ti ti-building me-2"></i>Datos Fiscales (Mexico)</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="bp_rfc" class="form-label fw-semibold">RFC <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="bp_rfc" placeholder="XAXX010101000" maxlength="13" style="text-transform: uppercase;">
+                                    <div class="form-text">Personas fisicas: 13 caracteres | Personas morales: 12 caracteres</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="bp_razonSocial" class="form-label fw-semibold">Razon Social <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="bp_razonSocial" placeholder="Nombre de la empresa o persona fisica">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="bp_regimenFiscal" class="form-label fw-semibold">Regimen Fiscal <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="bp_regimenFiscal">
+                                        <option value="">Seleccionar regimen fiscal</option>
+                                        <option value="601">601 - General de Ley Personas Morales</option>
+                                        <option value="603">603 - Personas Morales con Fines no Lucrativos</option>
+                                        <option value="605">605 - Sueldos y Salarios</option>
+                                        <option value="606">606 - Arrendamiento</option>
+                                        <option value="608">608 - Demas ingresos</option>
+                                        <option value="610">610 - Residentes en el Extranjero</option>
+                                        <option value="612">612 - Actividades Empresariales y Profesionales</option>
+                                        <option value="616">616 - Sin obligaciones fiscales</option>
+                                        <option value="621">621 - Incorporacion Fiscal</option>
+                                        <option value="625">625 - Plataformas Tecnologicas</option>
+                                        <option value="626">626 - Regimen Simplificado de Confianza</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="bp_usoCfdi" class="form-label fw-semibold">Uso de CFDI <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="bp_usoCfdi">
+                                        <option value="">Seleccionar uso de CFDI</option>
+                                        <option value="G01">G01 - Adquisicion de mercancias</option>
+                                        <option value="G03">G03 - Gastos en general</option>
+                                        <option value="I01">I01 - Construcciones</option>
+                                        <option value="I02">I02 - Mobiliario y equipo de oficina</option>
+                                        <option value="I03">I03 - Equipo de transporte</option>
+                                        <option value="I04">I04 - Equipo de computo</option>
+                                        <option value="D01">D01 - Honorarios medicos y dentales</option>
+                                        <option value="D04">D04 - Donativos</option>
+                                        <option value="S01">S01 - Sin efectos fiscales</option>
+                                        <option value="CP01">CP01 - Pagos</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="bp_codigoPostal" class="form-label fw-semibold">Codigo Postal <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="bp_codigoPostal" placeholder="12345" maxlength="5">
+                                    <div class="form-text">5 digitos</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datos Fiscales Internacional -->
+                    <div class="billing-intl-fields mb-4">
+                        <div class="p-3 border rounded border-info" style="border-left: 4px solid #0891b2 !important;">
+                            <h6 class="fw-bold text-info mb-3"><i class="ti ti-world me-2"></i>Datos Fiscales (Internacional)</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="bp_taxId" class="form-label fw-semibold">TAX ID <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="bp_taxId" placeholder="Numero de identificacion fiscal">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="bp_commercialName" class="form-label fw-semibold">Nombre Comercial <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="bp_commercialName" placeholder="Nombre comercial de la empresa">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Direccion -->
+                    <div class="p-3 bg-light rounded mb-4">
+                        <h6 class="fw-bold text-primary mb-3"><i class="ti ti-map-pin me-2"></i>Direccion Fiscal</h6>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label for="bp_streetType" class="form-label">Tipo de Vialidad</label>
+                                <select class="form-select" id="bp_streetType">
+                                    <option value="Calle">Calle</option>
+                                    <option value="Avenida">Avenida</option>
+                                    <option value="Boulevard">Boulevard</option>
+                                    <option value="Calzada">Calzada</option>
+                                    <option value="Camino">Camino</option>
+                                    <option value="Carretera">Carretera</option>
+                                    <option value="Cerrada">Cerrada</option>
+                                    <option value="Circuito">Circuito</option>
+                                    <option value="Paseo">Paseo</option>
+                                    <option value="Privada">Privada</option>
+                                    <option value="Otro">Otro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="bp_streetName" class="form-label">Nombre de la Calle</label>
+                                <input type="text" class="form-control" id="bp_streetName" placeholder="Ej: Reforma, Insurgentes">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="bp_exteriorNumber" class="form-label">No. Exterior</label>
+                                <input type="text" class="form-control" id="bp_exteriorNumber" placeholder="123">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="bp_interiorNumber" class="form-label">No. Interior</label>
+                                <input type="text" class="form-control" id="bp_interiorNumber" placeholder="4B">
+                            </div>
+                            <div class="col-md-4 billing-colonia-field">
+                                <label for="bp_colonia" class="form-label">Colonia</label>
+                                <input type="text" class="form-control" id="bp_colonia" placeholder="Ej: Juarez, Roma Norte">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="bp_city" class="form-label">Ciudad / Municipio</label>
+                                <input type="text" class="form-control" id="bp_city" placeholder="Ej: Ciudad de Mexico">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="bp_state" class="form-label">Estado / Provincia</label>
+                                <input type="text" class="form-control" id="bp_state" placeholder="Ej: CDMX, Jalisco">
+                            </div>
+                            <div class="col-md-4 billing-intl-postal-field">
+                                <label for="bp_postalCode" class="form-label">Codigo Postal / Zip Code</label>
+                                <input type="text" class="form-control" id="bp_postalCode" placeholder="Codigo postal">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contacto -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-12">
+                            <h6 class="fw-bold text-primary mb-3"><i class="ti ti-mail me-2"></i>Contacto de Facturacion</h6>
+                        </div>
+                        <div class="col-md-8">
+                            <label for="bp_billingEmail" class="form-label fw-semibold">Email para envio de facturas <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="bp_billingEmail" placeholder="facturacion@empresa.com">
+                            <div class="form-text">Si no se especifica, se usara el email principal de la cuenta</div>
+                        </div>
+                    </div>
+
+                    <!-- Constancia de Situacion Fiscal (Mexico) -->
+                    <div class="billing-constancia-section mb-4">
+                        <div class="p-3 border rounded" style="border-left: 4px solid #f59e0b !important;">
+                            <h6 class="fw-bold mb-3" style="color: #d97706;"><i class="ti ti-certificate me-2"></i>Constancia de Situacion Fiscal</h6>
+                            <div id="bp_constanciaInfo" style="display:none;" class="billing-constancia-info mb-3"></div>
+                            <div>
+                                <label for="bp_constanciaFile" class="form-label small text-muted">Subir constancia (solo PDF)</label>
+                                <input type="file" class="form-control form-control-sm" id="bp_constanciaFile" accept=".pdf">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Documentos Adicionales -->
+                    <div class="p-3 bg-light rounded">
+                        <h6 class="fw-bold text-primary mb-3"><i class="ti ti-paperclip me-2"></i>Documentos Adicionales</h6>
+                        <div id="bp_additionalDocsList" class="mb-2"></div>
+                        <div>
+                            <label for="bp_additionalDocFile" class="form-label small text-muted">Subir documento adicional</label>
+                            <input type="file" class="form-control form-control-sm" id="bp_additionalDocFile">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="bp_saveBtn" data-action="bp-save">
+                    <i class="ti ti-check me-1"></i><span id="bp_saveBtnText">Guardar Perfil</span>
+                    <span id="bp_saveBtnSpinner" class="spinner-border spinner-border-sm ms-1" role="status" style="display:none;">
+                        <span class="visually-hidden">Guardando...</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Config
+    const billingServerAccessToken = '<%= typeof accessToken !== "undefined" ? accessToken : "" %>';
+    const billingIsReadOnly = <%= billingReadOnly ? 'true' : 'false' %>;
+    const billingTargetUserId = '<%= billingTargetUserId %>';
+
+    function getBillingToken() {
+        // First try server-injected token (most reliable from dashboard)
+        if (billingServerAccessToken && billingServerAccessToken !== '') {
+            return billingServerAccessToken;
+        }
+        // Then try client-side storage
+        let token = localStorage.getItem('accessToken') ||
+                    localStorage.getItem('authToken') ||
+                    localStorage.getItem('token') ||
+                    sessionStorage.getItem('accessToken') ||
+                    sessionStorage.getItem('authToken');
+        if (token && token !== 'undefined' && token !== 'null') return token;
+        // Try cookie
+        const match = document.cookie.match(/accessToken=([^;]+)/);
+        if (match) return match[1];
+        return '';
+    }
+
+    // Country flag helper
+    function getCountryFlag(countryCode) {
+        const flags = {
+            'MX': '\uD83C\uDDF2\uD83C\uDDFD',
+            'US': '\uD83C\uDDFA\uD83C\uDDF8',
+            'CA': '\uD83C\uDDE8\uD83C\uDDE6',
+            'GB': '\uD83C\uDDEC\uD83C\uDDE7',
+            'DE': '\uD83C\uDDE9\uD83C\uDDEA',
+            'FR': '\uD83C\uDDEB\uD83C\uDDF7',
+            'ES': '\uD83C\uDDEA\uD83C\uDDF8',
+            'BR': '\uD83C\uDDE7\uD83C\uDDF7',
+            'CO': '\uD83C\uDDE8\uD83C\uDDF4',
+            'AR': '\uD83C\uDDE6\uD83C\uDDF7',
+            'CL': '\uD83C\uDDE8\uD83C\uDDF1',
+            'PE': '\uD83C\uDDF5\uD83C\uDDEA'
+        };
+        return flags[countryCode] || '\uD83C\uDF0E';
+    }
+
+    // Store modal instance
+    let billingModalInstance = null;
+
+    function getBillingModal() {
+        if (!billingModalInstance) {
+            const modalEl = document.getElementById('billingProfileModal');
+            if (modalEl) {
+                billingModalInstance = new bootstrap.Modal(modalEl);
+            }
+        }
+        return billingModalInstance;
+    }
+
+    // Load billing profiles from API
+    async function loadBillingProfiles() {
+        const spinner = document.getElementById('billingProfilesSpinner');
+        const emptyState = document.getElementById('billingProfilesEmpty');
+        const listContainer = document.getElementById('billingProfilesList');
+
+        spinner.style.display = 'flex';
+        emptyState.style.display = 'none';
+        listContainer.style.display = 'none';
+
+        try {
+            const token = getBillingToken();
+            const headers = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            const apiUrl = billingTargetUserId ? '/api/billing-profiles/user/' + billingTargetUserId : '/api/billing-profiles';
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                credentials: 'include',
+                headers: headers
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load billing profiles');
+            }
+
+            const data = await response.json();
+            const profilesData = data.data || {};
+            const profiles = profilesData.profiles || profilesData.data || (Array.isArray(profilesData) ? profilesData : []);
+
+            spinner.style.display = 'none';
+
+            if (profiles.length === 0) {
+                emptyState.style.display = 'block';
+                listContainer.style.display = 'none';
+            } else {
+                emptyState.style.display = 'none';
+                listContainer.style.display = 'flex';
+                renderBillingProfileCards(profiles);
+            }
+        } catch (err) {
+            console.error('Error loading billing profiles:', err);
+            spinner.style.display = 'none';
+            emptyState.style.display = 'block';
+        }
+    }
+
+    // Render profile cards
+    function renderBillingProfileCards(profiles) {
+        const container = document.getElementById('billingProfilesList');
+        container.innerHTML = '';
+
+        profiles.forEach(function(profile) {
+            const isMX = profile.country === 'MX';
+            const flag = getCountryFlag(profile.country);
+            const primaryBadge = profile.isPrimary
+                ? '<span class="badge bg-warning text-dark card-badge-primary ms-2">Principal</span>'
+                : '';
+
+            // Fiscal info
+            let fiscalHtml = '';
+            if (isMX) {
+                fiscalHtml = '' +
+                    '<div class="mb-1"><span class="profile-detail-label">RFC:</span> <span class="profile-detail-value">' + (profile.rfc || 'N/A') + '</span></div>' +
+                    '<div class="mb-1"><span class="profile-detail-label">Razon Social:</span> <span class="profile-detail-value">' + (profile.razonSocial || 'N/A') + '</span></div>' +
+                    '<div class="mb-1"><span class="profile-detail-label">Regimen Fiscal:</span> <span class="profile-detail-value">' + (profile.regimenFiscal || 'N/A') + '</span></div>';
+            } else {
+                fiscalHtml = '' +
+                    '<div class="mb-1"><span class="profile-detail-label">TAX ID:</span> <span class="profile-detail-value">' + (profile.taxId || 'N/A') + '</span></div>' +
+                    '<div class="mb-1"><span class="profile-detail-label">Nombre Comercial:</span> <span class="profile-detail-value">' + (profile.commercialName || 'N/A') + '</span></div>';
+            }
+
+            // Address
+            let addressParts = [];
+            if (profile.streetType && profile.street) {
+                addressParts.push(profile.streetType + ' ' + profile.street);
+            }
+            if (profile.exteriorNumber) {
+                addressParts.push('#' + profile.exteriorNumber);
+            }
+            if (profile.interiorNumber) {
+                addressParts.push('Int. ' + profile.interiorNumber);
+            }
+            let addressLine2 = [];
+            if (isMX && profile.colonia) {
+                addressLine2.push('Col. ' + profile.colonia);
+            }
+            if (profile.city) addressLine2.push(profile.city);
+            if (profile.state) addressLine2.push(profile.state);
+            let postalDisplay = isMX ? (profile.codigoPostal || '') : (profile.postalCode || '');
+            if (postalDisplay) addressLine2.push('C.P. ' + postalDisplay);
+
+            const addressHtml = '<div class="mb-1"><span class="profile-detail-label">Direccion:</span> <span class="profile-detail-value">' +
+                (addressParts.join(' ') || 'N/A') +
+                (addressLine2.length > 0 ? '<br>' + addressLine2.join(', ') : '') +
+                '</span></div>';
+
+            // Email
+            const emailHtml = '<div class="mb-1"><span class="profile-detail-label">Email de Facturacion:</span> <span class="profile-detail-value">' + (profile.billingEmail || 'N/A') + '</span></div>';
+
+            // Constancia (MX only)
+            let constanciaHtml = '';
+            if (isMX && profile.constancia) {
+                const constDate = profile.constancia.uploadDate ? new Date(profile.constancia.uploadDate).toLocaleDateString('es-MX') : '';
+                constanciaHtml = '<div class="mb-1"><span class="profile-detail-label">Constancia Fiscal:</span> ' +
+                    '<a href="#" class="small text-primary" data-action="bp-download-doc" data-doc-url="' + (profile.constancia.url || '') + '" data-doc-name="constancia_fiscal.pdf">Ver</a>' +
+                    (constDate ? ' <span class="text-muted small">(' + constDate + ')</span>' : '') +
+                    '</div>';
+            }
+
+            // Additional documents with download links
+            let docsHtml = '';
+            if (profile.additionalDocuments && profile.additionalDocuments.length > 0) {
+                docsHtml = '<div class="mt-2"><span class="profile-detail-label">Documentos Adicionales:</span>';
+                profile.additionalDocuments.forEach(function(doc) {
+                    docsHtml += '<div class="ms-2 mb-1"><a href="#" class="small text-primary" data-action="bp-download-doc" data-doc-url="' + (doc.url || '') + '" data-doc-name="' + (doc.fileName || 'documento') + '"><i class="ti ti-download me-1"></i>' + (doc.fileName || 'Documento') + '</a></div>';
+                });
+                docsHtml += '</div>';
+            }
+
+            // Action buttons (hidden in read-only mode)
+            let actionsHtml = '';
+            if (!billingIsReadOnly) {
+                actionsHtml = '<div class="profile-actions mt-3 d-flex gap-2 flex-wrap">';
+                actionsHtml += '<button class="btn btn-outline-primary btn-sm" data-action="bp-edit" data-profile-id="' + profile.objectId + '"><i class="ti ti-edit me-1"></i>Editar</button>';
+                if (!profile.isPrimary) {
+                    actionsHtml += '<button class="btn btn-outline-success btn-sm" data-action="bp-set-primary" data-profile-id="' + profile.objectId + '"><i class="ti ti-star me-1"></i>Hacer Principal</button>';
+                }
+                actionsHtml += '<button class="btn btn-outline-danger btn-sm" data-action="bp-delete" data-profile-id="' + profile.objectId + '"><i class="ti ti-trash me-1"></i>Eliminar</button>';
+                actionsHtml += '</div>';
+            }
+
+            const cardHtml = '' +
+                '<div class="col-12 col-md-6">' +
+                '  <div class="card border-0 shadow-sm billing-profile-card h-100">' +
+                '    <div class="card-body">' +
+                '      <div class="d-flex align-items-center mb-3">' +
+                '        <span class="profile-country-flag me-2">' + flag + '</span>' +
+                '        <h6 class="mb-0 fw-bold">' + (profile.label || 'Perfil sin nombre') + primaryBadge + '</h6>' +
+                '      </div>' +
+                fiscalHtml +
+                addressHtml +
+                emailHtml +
+                constanciaHtml +
+                '      <div class="mt-2">' + docsHtml + '</div>' +
+                actionsHtml +
+                '    </div>' +
+                '  </div>' +
+                '</div>';
+
+            container.insertAdjacentHTML('beforeend', cardHtml);
+        });
+    }
+
+    // Toggle country fields in modal
+    window.toggleBillingCountryFields = function() {
+        const country = document.getElementById('bp_country').value;
+        const isMX = country === 'MX';
+
+        // MX fields
+        document.querySelectorAll('.billing-mx-fields').forEach(function(el) { el.style.display = isMX ? 'block' : 'none'; });
+        document.querySelectorAll('.billing-colonia-field').forEach(function(el) { el.style.display = isMX ? 'block' : 'none'; });
+        document.querySelectorAll('.billing-constancia-section').forEach(function(el) { el.style.display = isMX ? 'block' : 'none'; });
+
+        // International fields
+        document.querySelectorAll('.billing-intl-fields').forEach(function(el) { el.style.display = isMX ? 'none' : 'block'; });
+        document.querySelectorAll('.billing-intl-postal-field').forEach(function(el) { el.style.display = isMX ? 'none' : 'block'; });
+    };
+
+    // Open modal for create or edit
+    window.openBillingProfileModal = async function(profileId) {
+        // Reset form
+        document.getElementById('billingProfileForm').reset();
+        document.getElementById('bp_profileId').value = '';
+        document.getElementById('bp_constanciaInfo').style.display = 'none';
+        document.getElementById('bp_constanciaInfo').innerHTML = '';
+        document.getElementById('bp_additionalDocsList').innerHTML = '';
+        document.getElementById('bp_country').value = 'MX';
+        toggleBillingCountryFields();
+
+        if (profileId) {
+            document.getElementById('billingProfileModalLabel').innerHTML = '<i class="ti ti-file-invoice me-2"></i>Editar Perfil de Facturacion';
+            document.getElementById('bp_saveBtnText').textContent = 'Guardar Cambios';
+
+            try {
+                const token = getBillingToken();
+                const headers = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const response = await fetch('/api/billing-profiles/' + profileId, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: headers
+                });
+
+                if (!response.ok) throw new Error('Error al cargar perfil');
+
+                const data = await response.json();
+                const profile = data.data?.profile || data.data || data;
+
+                document.getElementById('bp_profileId').value = profile.objectId || profile.id || profileId;
+                document.getElementById('bp_country').value = profile.country || 'MX';
+                document.getElementById('bp_label').value = profile.label || '';
+                document.getElementById('bp_isPrimary').checked = !!profile.isPrimary;
+                document.getElementById('bp_billingEmail').value = profile.emailFacturacion || profile.billingEmail || '';
+
+                // Address
+                document.getElementById('bp_streetType').value = profile.streetType || 'Calle';
+                document.getElementById('bp_streetName').value = profile.street || '';
+                document.getElementById('bp_exteriorNumber').value = profile.exteriorNumber || '';
+                document.getElementById('bp_interiorNumber').value = profile.interiorNumber || '';
+                document.getElementById('bp_colonia').value = profile.colonia || '';
+                document.getElementById('bp_city').value = profile.city || '';
+                document.getElementById('bp_state').value = profile.state || '';
+
+                var isMX = profile.country === 'MX';
+                if (isMX) {
+                    document.getElementById('bp_rfc').value = profile.rfc || '';
+                    document.getElementById('bp_razonSocial').value = profile.razonSocial || '';
+                    document.getElementById('bp_regimenFiscal').value = profile.regimenFiscal || '';
+                    document.getElementById('bp_usoCfdi').value = profile.usoCfdi || '';
+                    document.getElementById('bp_codigoPostal').value = profile.codigoPostal || '';
+
+                    if (profile.constancia && profile.constancia.url) {
+                        var constDate = profile.constancia.uploadDate ? new Date(profile.constancia.uploadDate).toLocaleDateString('es-MX') : '';
+                        document.getElementById('bp_constanciaInfo').innerHTML =
+                            '<i class="ti ti-file-check text-success me-1"></i>' +
+                            '<a href="#" data-action="bp-download-doc" data-doc-url="' + (profile.constancia.url || '') + '" data-doc-name="constancia_fiscal.pdf">' + (profile.constancia.fileName || 'Constancia') + '</a>' +
+                            (constDate ? ' <span class="text-muted">- Subida el ' + constDate + '</span>' : '');
+                        document.getElementById('bp_constanciaInfo').style.display = 'block';
+                    }
+                } else {
+                    document.getElementById('bp_taxId').value = profile.taxId || '';
+                    document.getElementById('bp_commercialName').value = profile.commercialName || '';
+                    document.getElementById('bp_postalCode').value = profile.postalCode || '';
+                }
+
+                if (profile.additionalDocuments && profile.additionalDocuments.length > 0) {
+                    var docsList = document.getElementById('bp_additionalDocsList');
+                    profile.additionalDocuments.forEach(function(doc, idx) {
+                        var docItem = document.createElement('div');
+                        docItem.className = 'billing-additional-doc-item';
+                        docItem.innerHTML =
+                            '<a href="#" class="text-truncate me-2" data-action="bp-download-doc" data-doc-url="' + (doc.url || '') + '" data-doc-name="' + (doc.fileName || 'documento') + '">' +
+                            '<i class="ti ti-download me-1"></i>' + (doc.fileName || 'Documento') + '</a>' +
+                            '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" data-action="bp-remove-doc" data-profile-id="' + profileId + '" data-doc-id="' + (doc.objectId || doc.id || idx) + '">' +
+                            '<i class="ti ti-x"></i></button>';
+                        docsList.appendChild(docItem);
+                    });
+                }
+
+                toggleBillingCountryFields();
+            } catch (err) {
+                console.error('Error cargando perfil:', err);
+                alert('No se pudo cargar el perfil. Intenta de nuevo.');
+                return;
+            }
+        } else {
+            document.getElementById('billingProfileModalLabel').innerHTML = '<i class="ti ti-file-invoice me-2"></i>Nuevo Perfil de Facturacion';
+            document.getElementById('bp_saveBtnText').textContent = 'Guardar Perfil';
+        }
+
+        const modal = getBillingModal();
+        if (modal) modal.show();
+    };
+
+    // Save (create or update) billing profile
+    window.saveBillingProfile = async function() {
+        const saveBtn = document.getElementById('bp_saveBtn');
+        const saveBtnText = document.getElementById('bp_saveBtnText');
+        const saveBtnSpinner = document.getElementById('bp_saveBtnSpinner');
+
+        const profileId = document.getElementById('bp_profileId').value;
+        const country = document.getElementById('bp_country').value;
+        const isMX = country === 'MX';
+
+        // Basic validation
+        const label = document.getElementById('bp_label').value.trim();
+        const billingEmail = document.getElementById('bp_billingEmail').value.trim();
+        if (!label) { alert('Por favor ingresa un nombre para el perfil.'); return; }
+        if (!billingEmail) { alert('Por favor ingresa un email de facturacion.'); return; }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billingEmail)) { alert('Por favor ingresa un email valido.'); return; }
+
+        if (isMX) {
+            if (!document.getElementById('bp_rfc').value.trim()) { alert('Por favor ingresa el RFC.'); return; }
+            if (!document.getElementById('bp_razonSocial').value.trim()) { alert('Por favor ingresa la Razon Social.'); return; }
+            if (!document.getElementById('bp_regimenFiscal').value) { alert('Por favor selecciona el Regimen Fiscal.'); return; }
+            if (!document.getElementById('bp_usoCfdi').value) { alert('Por favor selecciona el Uso de CFDI.'); return; }
+            if (!document.getElementById('bp_codigoPostal').value.trim()) { alert('Por favor ingresa el Codigo Postal.'); return; }
+        } else {
+            if (!document.getElementById('bp_taxId').value.trim()) { alert('Por favor ingresa el TAX ID.'); return; }
+            if (!document.getElementById('bp_commercialName').value.trim()) { alert('Por favor ingresa el Nombre Comercial.'); return; }
+        }
+
+        // Build payload
+        const payload = {
+            country: country,
+            label: label,
+            isPrimary: document.getElementById('bp_isPrimary').checked,
+            emailFacturacion: billingEmail,
+            streetType: document.getElementById('bp_streetType').value,
+            street: document.getElementById('bp_streetName').value.trim(),
+            exteriorNumber: document.getElementById('bp_exteriorNumber').value.trim(),
+            interiorNumber: document.getElementById('bp_interiorNumber').value.trim(),
+            city: document.getElementById('bp_city').value.trim(),
+            state: document.getElementById('bp_state').value.trim()
+        };
+
+        if (isMX) {
+            payload.rfc = document.getElementById('bp_rfc').value.trim().toUpperCase();
+            payload.razonSocial = document.getElementById('bp_razonSocial').value.trim();
+            payload.regimenFiscal = document.getElementById('bp_regimenFiscal').value;
+            payload.usoCfdi = document.getElementById('bp_usoCfdi').value;
+            payload.codigoPostal = document.getElementById('bp_codigoPostal').value.trim();
+            payload.colonia = document.getElementById('bp_colonia').value.trim();
+        } else {
+            payload.taxId = document.getElementById('bp_taxId').value.trim();
+            payload.commercialName = document.getElementById('bp_commercialName').value.trim();
+            payload.postalCode = document.getElementById('bp_postalCode').value.trim();
+        }
+
+        // Show spinner
+        saveBtn.disabled = true;
+        saveBtnSpinner.style.display = 'inline-block';
+
+        try {
+            const token = getBillingToken();
+            const isUpdate = !!profileId;
+            const url = isUpdate ? '/api/billing-profiles/' + profileId : '/api/billing-profiles';
+            const method = isUpdate ? 'PUT' : 'POST';
+
+            var fetchHeaders = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+            if (token) fetchHeaders['Authorization'] = 'Bearer ' + token;
+            const response = await fetch(url, {
+                method: method,
+                credentials: 'include',
+                headers: fetchHeaders,
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(function() { return {}; });
+                throw new Error(errData.error || 'Failed to save profile');
+            }
+
+            const result = await response.json();
+            const savedProfileId = profileId || (result.data && (result.data.objectId || (result.data.profile && result.data.profile.objectId))) || '';
+
+            // Upload constancia if a new file was selected (MX only)
+            if (isMX && savedProfileId) {
+                const constanciaInput = document.getElementById('bp_constanciaFile');
+                if (constanciaInput.files && constanciaInput.files.length > 0) {
+                    await uploadConstancia(savedProfileId);
+                }
+            }
+
+            // Upload additional document if selected
+            if (savedProfileId) {
+                const additionalInput = document.getElementById('bp_additionalDocFile');
+                if (additionalInput.files && additionalInput.files.length > 0) {
+                    await uploadAdditionalDocument(savedProfileId);
+                }
+            }
+
+            const modal = getBillingModal();
+            if (modal) modal.hide();
+
+            await loadBillingProfiles();
+        } catch (err) {
+            console.error('Error saving billing profile:', err);
+            alert('Error saving profile: ' + err.message);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtnSpinner.style.display = 'none';
+        }
+    };
+
+    // Delete billing profile
+    window.deleteBillingProfile = async function(profileId) {
+        if (!confirm('Are you sure you want to delete this billing profile? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const token = getBillingToken();
+            const response = await fetch('/api/billing-profiles/' + profileId, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete profile');
+            }
+
+            await loadBillingProfiles();
+        } catch (err) {
+            console.error('Error deleting billing profile:', err);
+            alert('Error deleting profile: ' + err.message);
+        }
+    };
+
+    // Set profile as primary
+    window.setPrimaryProfile = async function(profileId) {
+        try {
+            const token = getBillingToken();
+            const response = await fetch('/api/billing-profiles/' + profileId, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ isPrimary: true })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to set primary profile');
+            }
+
+            await loadBillingProfiles();
+        } catch (err) {
+            console.error('Error setting primary profile:', err);
+            alert('Error setting primary profile: ' + err.message);
+        }
+    };
+
+    // Upload constancia de situacion fiscal
+    async function uploadConstancia(profileId) {
+        const fileInput = document.getElementById('bp_constanciaFile');
+        if (!fileInput.files || fileInput.files.length === 0) return;
+
+        const file = fileInput.files[0];
+        if (file.type !== 'application/pdf') {
+            alert('Constancia must be a PDF file.');
+            return;
+        }
+
+        return new Promise(function(resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = async function() {
+                try {
+                    const token = getBillingToken();
+                    var fetchHeaders = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+                    if (token) fetchHeaders['Authorization'] = 'Bearer ' + token;
+                    const response = await fetch('/api/billing-profiles/' + profileId + '/upload-constancia', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: fetchHeaders,
+                        body: JSON.stringify({
+                            fileName: file.name,
+                            fileData: reader.result
+                        })
+                    });
+                    if (!response.ok) throw new Error('Failed to upload constancia');
+                    resolve();
+                } catch (err) {
+                    console.error('Error uploading constancia:', err);
+                    reject(err);
+                }
+            };
+            reader.onerror = function() { reject(new Error('Failed to read file')); };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Upload additional document
+    async function uploadAdditionalDocument(profileId) {
+        const fileInput = document.getElementById('bp_additionalDocFile');
+        if (!fileInput.files || fileInput.files.length === 0) return;
+
+        const file = fileInput.files[0];
+
+        return new Promise(function(resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = async function() {
+                try {
+                    const token = getBillingToken();
+                    var fetchHeaders = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+                    if (token) fetchHeaders['Authorization'] = 'Bearer ' + token;
+                    const response = await fetch('/api/billing-profiles/' + profileId + '/upload-document', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: fetchHeaders,
+                        body: JSON.stringify({
+                            fileName: file.name,
+                            fileData: reader.result
+                        })
+                    });
+                    if (!response.ok) throw new Error('Failed to upload document');
+                    resolve();
+                } catch (err) {
+                    console.error('Error uploading document:', err);
+                    reject(err);
+                }
+            };
+            reader.onerror = function() { reject(new Error('Failed to read file')); };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Remove additional document
+    async function viewConstancia(profileId) {
+        try {
+            // Fetch profile to get presigned URL
+            var token = getBillingToken();
+            var headers = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            var response = await fetch('/api/billing-profiles/' + profileId, {
+                method: 'GET',
+                credentials: 'include',
+                headers: headers
+            });
+            if (!response.ok) throw new Error('Error al obtener perfil');
+            var data = await response.json();
+            var profile = data.data?.profile || data.data || data;
+            var url = profile.constancia?.url || profile.constanciaFiscalUrl || '';
+            if (!url) { alert('No hay constancia cargada'); return; }
+
+            // Create a hidden link to trigger download
+            var a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.download = 'constancia_fiscal.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (err) {
+            console.error('Error viewing constancia:', err);
+            alert('No se pudo abrir la constancia: ' + err.message);
+        }
+    }
+
+    function downloadDocument(url, fileName) {
+        if (!url) { alert('No hay URL del documento'); return; }
+        var a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.download = fileName || 'documento';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    window.removeAdditionalDocument = async function(profileId, docId, buttonEl) {
+        if (!confirm('Remove this document?')) return;
+
+        try {
+            const token = getBillingToken();
+            const response = await fetch('/api/billing-profiles/' + profileId + '/documents/' + docId, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) throw new Error('Failed to remove document');
+
+            // Remove the DOM element
+            if (buttonEl && buttonEl.parentElement) {
+                buttonEl.parentElement.remove();
+            }
+        } catch (err) {
+            console.error('Error removing document:', err);
+            alert('Error removing document: ' + err.message);
+        }
+    };
+
+    // Event delegation for all billing profile actions (CSP-safe, no inline onclick)
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        var action = btn.dataset.action;
+        var profileId = btn.dataset.profileId;
+
+        switch (action) {
+            case 'bp-new': openBillingProfileModal(); break;
+            case 'bp-edit': openBillingProfileModal(profileId); break;
+            case 'bp-set-primary': setPrimaryProfile(profileId); break;
+            case 'bp-delete': deleteBillingProfile(profileId); break;
+            case 'bp-save': saveBillingProfile(); break;
+            case 'bp-remove-doc': removeAdditionalDocument(profileId, btn.dataset.docId, btn); break;
+            case 'bp-view-constancia': e.preventDefault(); viewConstancia(profileId); break;
+            case 'bp-download-doc': e.preventDefault(); downloadDocument(btn.dataset.docUrl, btn.dataset.docName); break;
+        }
+    });
+
+    // Initialize on DOM ready
+    document.addEventListener('DOMContentLoaded', function() {
+        var countrySelect = document.getElementById('bp_country');
+        if (countrySelect) {
+            countrySelect.addEventListener('change', toggleBillingCountryFields);
+        }
+        toggleBillingCountryFields();
+        loadBillingProfiles();
+    });
+})();
+</script>
