@@ -423,7 +423,6 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         ];
 
                         // Determine which statuses user can select based on role and current status
-                        const userRole = '<%= dtUserRole %>';
                         const isAdmin = ['admin', 'superadmin'].includes(userRole);
                         const isClient = userRole === 'client';
                         

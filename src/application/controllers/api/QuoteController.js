@@ -189,7 +189,7 @@ class QuoteController {
       quote.set('preferredLanguage', preferredLanguage || 'es');
 
       // 9. Set automatic fields
-      quote.set('status', 'requested');
+      quote.set('status', 'quoted');
       // validUntil: 30 days from now
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30);
@@ -205,7 +205,7 @@ class QuoteController {
         contactEmail: contactEmail || '',
         contactPhone: contactPhone || '',
         notes: notes || '',
-        status: 'requested',
+        status: 'quoted',
         userId: currentUser.id,
       });
 
@@ -240,7 +240,7 @@ class QuoteController {
         contactEmail: contactEmail || '',
         contactPhone: contactPhone || '',
         notes: notes || '',
-        status: 'requested',
+        status: 'quoted',
         validUntil: validUntil.toISOString(),
         active: true,
       };
@@ -407,7 +407,7 @@ class QuoteController {
                 fullName: `${createdBy.get('firstName') || ''} ${createdBy.get('lastName') || ''}`.trim(),
               }
               : null,
-            status: quote.get('status') || 'requested',
+            status: quote.get('status') || 'quoted',
             contactPerson: quote.get('contactPerson') || '',
             contactEmail: quote.get('contactEmail') || '',
             contactPhone: quote.get('contactPhone') || '',
@@ -528,7 +528,7 @@ class QuoteController {
         contactEmail: quote.get('contactEmail') || '',
         contactPhone: quote.get('contactPhone') || '',
         notes: quote.get('notes') || '',
-        status: quote.get('status') || 'requested',
+        status: quote.get('status') || 'quoted',
         validUntil: quote.get('validUntil'),
         serviceItems: quote.get('serviceItems') || {
           days: [],

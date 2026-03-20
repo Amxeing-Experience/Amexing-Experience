@@ -38,27 +38,44 @@ const steps = [
             </div>
             <% if (!isNewQuote) { %>
             <div class="quote-status-control" id="quoteStatusControl">
-                <div class="quote-status-header">
-                    <span class="quote-status-title">Estado de la Cotización</span>
-                    <span class="quote-status-hint">Selecciona el estado actual</span>
+                <!-- Available Actions Section -->
+                <div class="quote-status-section available-actions">
+                    <div class="quote-status-header">
+                        <span class="quote-status-title">Acciones Disponibles</span>
+                        <span class="quote-status-hint">Puedes cambiar entre estos estados</span>
+                    </div>
+                    <div class="quote-status-segments">
+                        <label class="quote-status-seg" data-status="quoted">
+                            <input type="radio" name="quoteStatus" value="quoted">
+                            <span class="quote-status-seg-label"><i class="ti ti-file-text me-1"></i>Cotizado</span>
+                        </label>
+                        <label class="quote-status-seg" data-status="requested">
+                            <input type="radio" name="quoteStatus" value="requested">
+                            <span class="quote-status-seg-label"><i class="ti ti-clock me-1"></i>Solicitado</span>
+                        </label>
+                    </div>
                 </div>
-                <div class="quote-status-segments">
-                    <label class="quote-status-seg" data-status="requested">
-                        <input type="radio" name="quoteStatus" value="requested" checked>
-                        <span class="quote-status-seg-label"><i class="ti ti-clock me-1"></i>Solicitado</span>
-                    </label>
-                    <label class="quote-status-seg" data-status="hold">
-                        <input type="radio" name="quoteStatus" value="hold">
-                        <span class="quote-status-seg-label"><i class="ti ti-lock me-1"></i>Bloqueado</span>
-                    </label>
-                    <label class="quote-status-seg" data-status="scheduled">
-                        <input type="radio" name="quoteStatus" value="scheduled">
-                        <span class="quote-status-seg-label"><i class="ti ti-check me-1"></i>Agendado</span>
-                    </label>
-                    <label class="quote-status-seg" data-status="rejected">
-                        <input type="radio" name="quoteStatus" value="rejected">
-                        <span class="quote-status-seg-label"><i class="ti ti-x me-1"></i>Rechazado</span>
-                    </label>
+                
+                <!-- Admin Only States Section -->
+                <div class="quote-status-section admin-only-states mt-3">
+                    <div class="quote-status-header">
+                        <span class="quote-status-title text-muted">Estados Administrativos</span>
+                        <span class="quote-status-hint text-muted">Solo administradores pueden establecer</span>
+                    </div>
+                    <div class="quote-status-segments disabled-section">
+                        <label class="quote-status-seg disabled" data-status="hold">
+                            <input type="radio" name="quoteStatus" value="hold" disabled>
+                            <span class="quote-status-seg-label"><i class="ti ti-lock me-1"></i>Bloqueado</span>
+                        </label>
+                        <label class="quote-status-seg disabled" data-status="scheduled">
+                            <input type="radio" name="quoteStatus" value="scheduled" disabled>
+                            <span class="quote-status-seg-label"><i class="ti ti-check me-1"></i>Agendado</span>
+                        </label>
+                        <label class="quote-status-seg disabled" data-status="rejected">
+                            <input type="radio" name="quoteStatus" value="rejected" disabled>
+                            <span class="quote-status-seg-label"><i class="ti ti-x me-1"></i>Rechazado</span>
+                        </label>
+                    </div>
                 </div>
             </div>
             <% } %>
@@ -313,6 +330,9 @@ const steps = [
     color: #495057;
 }
 /* Active states by status */
+.quote-status-seg[data-status="quoted"]:has(input:checked) .quote-status-seg-label {
+    background: #0dcaf0; color: white; box-shadow: 0 1px 4px rgba(13,202,240,0.3);
+}
 .quote-status-seg[data-status="requested"]:has(input:checked) .quote-status-seg-label {
     background: #0d6efd; color: white; box-shadow: 0 1px 4px rgba(13,110,253,0.3);
 }
@@ -332,6 +352,54 @@ const steps = [
 }
 .quote-status-seg.disabled .quote-status-seg-label {
     cursor: not-allowed;
+}
+
+/* Separated sections for department manager view */
+.quote-status-section {
+    margin-bottom: 1rem;
+}
+
+.available-actions .quote-status-header {
+    color: #212529;
+}
+
+.admin-only-states .quote-status-header {
+    opacity: 0.7;
+}
+
+.admin-only-states .quote-status-title {
+    color: #6c757d;
+    font-size: 0.65rem;
+}
+
+.admin-only-states .quote-status-hint {
+    color: #adb5bd;
+    font-size: 0.6rem;
+}
+
+.disabled-section {
+    background: #f8f9fa;
+    border: 1px dashed #dee2e6;
+    opacity: 0.6;
+}
+
+.disabled-section .quote-status-seg {
+    pointer-events: none;
+}
+
+.disabled-section .quote-status-seg-label {
+    cursor: not-allowed;
+    color: #6c757d;
+}
+
+/* Add visual separator */
+.admin-only-states::before {
+    content: "";
+    display: block;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #dee2e6, transparent);
+    margin-bottom: 1rem;
 }
 
 /* Responsive: on small screens */

@@ -234,8 +234,8 @@ class QuoteService {
           // All allowed roles can change to requested (SOLICITADO)
           // No additional check needed
         } else if (updates.status === 'quoted') {
-          // Only admin can revert to quoted status
-          if (!['admin', 'superadmin'].includes(role)) {
+          // Only admin can revert to quoted status (allow in development for testing)
+          if (!['admin', 'superadmin'].includes(role) && process.env.NODE_ENV !== 'development') {
             throw new Error('Unauthorized: Only administrators can revert status to \'quoted\'');
           }
         }
@@ -960,10 +960,26 @@ class QuoteService {
       if (startDate) reservation.set('startDate', startDate);
       if (endDate) reservation.set('endDate', endDate);
 
-      // Set client pointer
+      // Set client pointer to the quote's client (AmexingUser)
       const client = quote.get('client');
       if (client) {
         reservation.set('clientPtr', client);
+        logger.info('Set clientPtr for reservation from quote client', {
+          reservationId: reservation.id,
+          clientPtr: client,
+          quoteId: quote.id,
+          currentUserId: currentUser?.id,
+        });
+      } else if (currentUser) {
+        // Fallback: if quote has no client, use current user
+        const userPointer = new Parse.Object('AmexingUser');
+        userPointer.id = currentUser.id;
+        reservation.set('clientPtr', userPointer);
+        logger.info('Set clientPtr for reservation to current user (no quote client)', {
+          reservationId: reservation.id,
+          clientPtrUserId: currentUser.id,
+          quoteId: quote.id,
+        });
       }
 
       // Set created by
@@ -1113,6 +1129,26 @@ class QuoteService {
       }
     }
 
+    // Determine additional CC emails based on environment
+    const additionalCCEmails = [];
+    const environment = process.env.NODE_ENV || 'development';
+
+    if (environment === 'production') {
+      additionalCCEmails.push('michelle@amexing.com');
+      logger.info('Adding production CC email for quote confirmation', {
+        quoteId: quote.id,
+        ccEmail: 'michelle@amexing.com',
+        environment,
+      });
+    } else if (environment === 'development') {
+      additionalCCEmails.push('denisse@meeplab.com');
+      logger.info('Adding development CC email for quote confirmation', {
+        quoteId: quote.id,
+        ccEmail: 'denisse@meeplab.com',
+        environment,
+      });
+    }
+
     const result = await emailService.sendQuoteConfirmation({
       recipientEmail,
       recipientName,
@@ -1125,6 +1161,7 @@ class QuoteService {
       shareUrl,
       pdfBuffer,
       pdfFilename,
+      ccEmails: additionalCCEmails, // Add CC emails based on environment
     });
 
     logger.info('Quote confirmation email sent', {

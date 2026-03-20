@@ -85,18 +85,42 @@ class ReservationController {
       clientUsersQuery.equalTo('active', true);
       const clientUsers = await clientUsersQuery.find({ useMasterKey: true });
 
+      const pointers = [];
+
+      // Add user pointers for users with matching clientId
       if (clientUsers.length > 0) {
+        const userIds = clientUsers.map((u) => u.id);
         logger.info('Applied client filter to reservations query (clientPtr)', {
           userId: currentUser.id,
           clientId: userClientId,
           clientUsersCount: clientUsers.length,
+          userIds: userIds.slice(0, 5), // Log first 5 user IDs for debugging
         });
-        return clientUsers.map((user) => ({
-          __type: 'Pointer',
-          className: 'AmexingUser',
-          objectId: user.id,
-        }));
+
+        clientUsers.forEach((user) => {
+          pointers.push({
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: user.id,
+          });
+        });
       }
+
+      // IMPORTANT: Also add the clientId itself as a pointer
+      // This handles legacy reservations where clientPtr was incorrectly set to clientId
+      // instead of a user object ID (e.g., RES-2026-0002)
+      pointers.push({
+        __type: 'Pointer',
+        className: 'AmexingUser',
+        objectId: userClientId,
+      });
+
+      logger.info('Including legacy clientId pointer for old reservations', {
+        clientId: userClientId,
+        totalPointers: pointers.length,
+      });
+
+      return pointers;
     }
 
     // Default: only reservations where they are the client
