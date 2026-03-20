@@ -606,6 +606,7 @@ tr[data-row-type="subconcept"] {
                 quoteState.set('numberOfPeople', quote.numberOfPeople || 1);
                 quoteState.set('rateId', quote.rate?.id || null);
                 quoteState.set('rateName', quote.rate?.name || null);
+                quoteState.set('status', quote.status || 'quoted');
 
                 if (quote.serviceItems) {
                     let days = quote.serviceItems.days || [];
@@ -3445,7 +3446,8 @@ tr[data-row-type="subconcept"] {
         if (subconcept.type) {
             const migrated = {
                 ...subconcept,
-                numberOfPeople: migratedNumberOfPeople
+                numberOfPeople: migratedNumberOfPeople,
+                status: subconcept.status || quoteState.get('status') || 'quoted'
             };
             
             // Ensure capacity fields are populated for transfers/tours with vehicles
@@ -3473,7 +3475,8 @@ tr[data-row-type="subconcept"] {
             numberOfPeople: migratedNumberOfPeople,
             vehicleCapacity: null,
             vehicleMultiplier: 1,
-            isCashPayment: subconcept.isCashPayment !== undefined ? subconcept.isCashPayment : false
+            isCashPayment: subconcept.isCashPayment !== undefined ? subconcept.isCashPayment : false,
+            status: subconcept.status || quoteState.get('status') || 'quoted'
         };
     }
 
@@ -3584,7 +3587,9 @@ tr[data-row-type="subconcept"] {
             vehicleCapacity: null,
             vehicleMultiplier: 1,
             // Payment method fields
-            isCashPayment: type === 'regular' ? true : false
+            isCashPayment: type === 'regular' ? true : false,
+            // Status field - inherits quote status
+            status: quoteState.get('status') || 'quoted'
         };
 
         // Additional fields for traslados

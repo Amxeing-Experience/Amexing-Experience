@@ -2561,6 +2561,9 @@ async function getAccessToken() {
             }
         }
 
+        // Expose globally for walking tour modal reuse
+        window.addTourPhotoPreview = addTourPhotoPreview;
+
         async function loadEmptyPricingStructure() {
             try {
 
@@ -5244,19 +5247,46 @@ function attachWalkingTourHandlers() {
         const fieldsToReset = [
             'walkingTourId', 'walkingTourDescription', 'walkingPriceSmall',
             'walkingPriceMedium', 'walkingPriceLarge', 'walkingDuration',
-            'walkingAdvanceTime', 'walkingIncludes', 'walkingNotIncludes', 'walkingLanguages'
+            'walkingAdvanceTime', 'walkingIncludes', 'walkingNotIncludes', 'walkingLanguages',
+            'walkingTourType', 'walkingTravelDuration',
+            'walkingMinPeople', 'walkingMaxPeople',
+            'walkingInternalNotes', 'walkingClientBookingNotes',
+            'walkingProviderNotes', 'walkingTeamNotes'
         ];
-        
+
         fieldsToReset.forEach(fieldId => {
             const field = document.getElementById(fieldId);
             if (field) field.value = '';
         });
-        
+
         // Clear TomSelect
         const walkingDestElement = document.getElementById('walkingDestinationPOI');
         if (walkingDestElement && walkingDestElement.tomselect) {
             walkingDestElement.tomselect.clear();
         }
+
+        // Reset availability
+        document.querySelectorAll('.walking-day-btn').forEach(btn => {
+            btn.classList.remove('active', 'btn-primary');
+            btn.classList.add('btn-outline-primary');
+        });
+        const walkingSchedules = document.getElementById('walkingDaySchedulesContainer');
+        if (walkingSchedules) walkingSchedules.innerHTML = '';
+        const walkingNoDays = document.getElementById('walkingNoDaysSelected');
+        if (walkingNoDays) walkingNoDays.style.display = '';
+        const walkingSummary = document.querySelector('.walking-availability-summary');
+        if (walkingSummary) walkingSummary.style.display = '';
+        const walkingContent = document.querySelector('.walking-availability-content');
+        if (walkingContent) walkingContent.style.display = 'none';
+        const walkingStatus = document.querySelector('.walking-availability-status');
+        if (walkingStatus) walkingStatus.textContent = 'Disponible todos los dias';
+        // Reset photos
+        const walkingPhotosPreview = document.querySelector('.walking-photos-preview-container');
+        if (walkingPhotosPreview) walkingPhotosPreview.innerHTML = '';
+
+        // Re-enable save button
+        const saveBtn = document.getElementById('saveWalkingTourBtn');
+        if (saveBtn) saveBtn.disabled = false;
     });
 }
 attachWalkingTourHandlers();
@@ -5286,24 +5316,47 @@ function openWalkingTourModal() {
     // Explicitly clear all form fields to ensure they're empty
     const fieldsToReset = [
         'walkingTourId',
-        'walkingTourDescription', 
+        'walkingTourDescription',
         'walkingPriceSmall',
-        'walkingPriceMedium', 
+        'walkingPriceMedium',
         'walkingPriceLarge',
         'walkingDuration',
         'walkingAdvanceTime',
         'walkingIncludes',
         'walkingNotIncludes',
-        'walkingLanguages'
+        'walkingLanguages',
+        'walkingTourType', 'walkingTravelDuration',
+        'walkingMinPeople', 'walkingMaxPeople',
+        'walkingInternalNotes', 'walkingClientBookingNotes',
+        'walkingProviderNotes', 'walkingTeamNotes'
     ];
-    
+
     fieldsToReset.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {
             field.value = '';
         }
     });
-    
+
+    // Reset availability
+    document.querySelectorAll('.walking-day-btn').forEach(btn => {
+        btn.classList.remove('active', 'btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+    const walkingSchedules = document.getElementById('walkingDaySchedulesContainer');
+    if (walkingSchedules) walkingSchedules.innerHTML = '';
+    const walkingNoDays = document.getElementById('walkingNoDaysSelected');
+    if (walkingNoDays) walkingNoDays.style.display = '';
+    const walkingSummary = document.querySelector('.walking-availability-summary');
+    if (walkingSummary) walkingSummary.style.display = '';
+    const walkingContent = document.querySelector('.walking-availability-content');
+    if (walkingContent) walkingContent.style.display = 'none';
+    const walkingStatus = document.querySelector('.walking-availability-status');
+    if (walkingStatus) walkingStatus.textContent = 'Disponible todos los dias';
+    // Reset photos
+    const walkingPhotosPreview = document.querySelector('.walking-photos-preview-container');
+    if (walkingPhotosPreview) walkingPhotosPreview.innerHTML = '';
+
     // Reset labels and button text
     const modalLabel = document.getElementById('walkingTourModalLabel');
     if (modalLabel) modalLabel.innerHTML = '<i class="ti ti-walk me-2"></i>Crear Nuevo Tour a Pie';
@@ -5347,9 +5400,13 @@ async function saveWalkingTour() {
         return;
     }
     
-    // Disable save button to prevent double submission
-    $('#saveWalkingTourBtn').prop('disabled', true);
-    
+    // Disable save button and show loading spinner
+    const $saveBtn = $('#saveWalkingTourBtn');
+    const $saveBtnText = $('#saveWalkingButtonText');
+    const originalBtnText = $saveBtnText.text();
+    $saveBtn.prop('disabled', true);
+    $saveBtnText.html('<span class="spinner-border spinner-border-sm me-1" role="status"></span>Guardando...');
+
     try {
         // Get form data using vanilla JS where possible
         const walkingDestElement = document.getElementById('walkingDestinationPOI');
@@ -5362,6 +5419,44 @@ async function saveWalkingTour() {
             return element ? element.value : '';
         };
         
+        // Collect walking tour availability
+        const walkingAvailability = [];
+        document.querySelectorAll('.walking-day-btn.active').forEach(btn => {
+            const day = parseInt(btn.dataset.day);
+            const scheduleRow = document.querySelector(`#walkingDaySchedulesContainer [data-day="${day}"]`);
+            if (scheduleRow) {
+                const startTime = scheduleRow.querySelector('.walking-day-start-time')?.value || '';
+                const endTime = scheduleRow.querySelector('.walking-day-end-time')?.value || '';
+                if (startTime && endTime) {
+                    walkingAvailability.push({ day, startTime, endTime });
+                } else {
+                    walkingAvailability.push({ day, startTime: '', endTime: '' });
+                }
+            } else {
+                walkingAvailability.push({ day, startTime: '', endTime: '' });
+            }
+        });
+
+        // Collect photos (same pattern as vehicle tours)
+        const walkingPhotosList = [];
+        $('#walkingTourModal .walking-photos-preview-container .photo-preview').each(function() {
+            const img = $(this).find('img');
+            if (img.length > 0) {
+                const photoFullData = $(this).attr('data-photo-full');
+                if (photoFullData) {
+                    try {
+                        const fullData = JSON.parse(photoFullData.replace(/&#39;/g, "'"));
+                        fullData.dataUrl = img.attr('src');
+                        walkingPhotosList.push(fullData);
+                    } catch (e) {
+                        walkingPhotosList.push({ dataUrl: img.attr('src'), fileName: $(this).find('small').attr('title') || 'image.jpg' });
+                    }
+                } else {
+                    walkingPhotosList.push({ dataUrl: img.attr('src'), fileName: $(this).find('small').attr('title') || 'image.jpg' });
+                }
+            }
+        });
+
         const formData = {
             destinationPOI: destinationPOI,
             description: getFieldValue('walkingTourDescription'),
@@ -5378,6 +5473,16 @@ async function saveWalkingTour() {
             includes: getFieldValue('walkingIncludes') ? getFieldValue('walkingIncludes').split('\n').filter(item => item.trim()) : [],
             notincludes: getFieldValue('walkingNotIncludes') ? getFieldValue('walkingNotIncludes').split('\n').filter(item => item.trim()) : [],
             languages: getFieldValue('walkingLanguages') ? getFieldValue('walkingLanguages').split('\n').filter(item => item.trim()) : [],
+            type: getFieldValue('walkingTourType') || null,
+            travel_duration: parseInt(getFieldValue('walkingTravelDuration') || '0') || null,
+            min_people: parseInt(getFieldValue('walkingMinPeople') || '0') || null,
+            max_people: parseInt(getFieldValue('walkingMaxPeople') || '0') || null,
+            internal_notes: getFieldValue('walkingInternalNotes') || null,
+            client_booking_notes: getFieldValue('walkingClientBookingNotes') || null,
+            provider_notes: getFieldValue('walkingProviderNotes') || null,
+            team_notes: getFieldValue('walkingTeamNotes') || null,
+            availability: walkingAvailability.length > 0 ? walkingAvailability : null,
+            photos: walkingPhotosList,
             isWalkingTour: true,
             active: true,
             exists: true
@@ -5386,13 +5491,15 @@ async function saveWalkingTour() {
         // Validate required fields
         if (!destinationPOI) {
             showWalkingTourAlert('Por favor seleccione un destino para el tour.', 'danger');
-            $('#saveWalkingTourBtn').prop('disabled', false);
+            $saveBtn.prop('disabled', false);
+            $saveBtnText.html('<i class="ti ti-check me-1"></i>' + originalBtnText);
             return;
         }
         
         if (!formData.walkingPriceSmall || !formData.walkingPriceMedium || !formData.walkingPriceLarge) {
             showWalkingTourAlert('Por favor complete todos los precios por grupo.', 'danger');
-            $('#saveWalkingTourBtn').prop('disabled', false);
+            $saveBtn.prop('disabled', false);
+            $saveBtnText.html('<i class="ti ti-check me-1"></i>' + originalBtnText);
             return;
         }
         
@@ -5404,7 +5511,8 @@ async function saveWalkingTour() {
         const token = await getAccessToken();
         if (!token) {
             showWalkingTourAlert('Error de autenticación. Por favor vuelva a iniciar sesión.', 'danger');
-            $('#saveWalkingTourBtn').prop('disabled', false);
+            $saveBtn.prop('disabled', false);
+            $saveBtnText.html('<i class="ti ti-check me-1"></i>' + originalBtnText);
             return;
         }
         
@@ -5445,13 +5553,15 @@ async function saveWalkingTour() {
             const defaultErrorMsg = isEdit ? 'Error al actualizar el tour a pie' : 'Error al crear el tour a pie';
             const errorMsg = result.error || result.message || defaultErrorMsg;
             showWalkingTourAlert(errorMsg, 'danger');
-            $('#saveWalkingTourBtn').prop('disabled', false);
+            $saveBtn.prop('disabled', false);
+            $saveBtnText.html('<i class="ti ti-check me-1"></i>' + originalBtnText);
         }
-        
+
     } catch (error) {
         console.error('Error saving walking tour:', error);
         showWalkingTourAlert('Error al conectar con el servidor.', 'danger');
-        $('#saveWalkingTourBtn').prop('disabled', false);
+        $saveBtn.prop('disabled', false);
+        $saveBtnText.html('<i class="ti ti-check me-1"></i>' + originalBtnText);
     }
 }
 
@@ -5483,6 +5593,182 @@ function showWalkingTourAlert(message, type) {
     }
 }
 
+// Walking tour availability handlers
+document.addEventListener('click', function(e) {
+    // Toggle availability panel
+    if (e.target.closest('.toggle-walking-availability-btn')) {
+        const summary = document.querySelector('.walking-availability-summary');
+        const content = document.querySelector('.walking-availability-content');
+        if (summary && content) {
+            if (content.style.display === 'none') {
+                summary.style.display = 'none';
+                content.style.display = '';
+            } else {
+                content.style.display = 'none';
+                summary.style.display = '';
+                updateWalkingAvailabilityStatus();
+            }
+        }
+    }
+
+    // Day button toggle
+    if (e.target.closest('.walking-day-btn')) {
+        const btn = e.target.closest('.walking-day-btn');
+        const dayCode = parseInt(btn.dataset.day);
+        const dayName = btn.dataset.dayName;
+
+        if (btn.classList.contains('active')) {
+            // Deactivate: remove schedule row
+            btn.classList.remove('active', 'btn-primary');
+            btn.classList.add('btn-outline-primary');
+            removeWalkingDaySchedule(dayCode);
+        } else {
+            // Activate: add schedule row
+            btn.classList.add('active', 'btn-primary');
+            btn.classList.remove('btn-outline-primary');
+            addWalkingDaySchedule(dayCode, dayName);
+        }
+        updateWalkingNoDaysMessage();
+        updateWalkingAvailabilityStatus();
+    }
+
+    // Remove day button in schedule row
+    if (e.target.closest('.walking-remove-day-btn')) {
+        const row = e.target.closest('.walking-day-schedule-row');
+        const dayCode = parseInt(row.dataset.day);
+        const btn = document.querySelector('.walking-day-btn[data-day="' + dayCode + '"]');
+        if (btn) {
+            btn.classList.remove('active', 'btn-primary');
+            btn.classList.add('btn-outline-primary');
+        }
+        row.remove();
+        updateWalkingNoDaysMessage();
+        updateWalkingAvailabilityStatus();
+    }
+});
+
+function addWalkingDaySchedule(dayCode, dayName, startTime, endTime) {
+    const container = document.getElementById('walkingDaySchedulesContainer');
+    if (!container) return;
+
+    // Don't add if already exists
+    if (container.querySelector('[data-day="' + dayCode + '"]')) return;
+
+    const row = document.createElement('div');
+    row.className = 'walking-day-schedule-row mb-3 p-3 border rounded bg-light';
+    row.dataset.day = dayCode;
+    row.innerHTML = `
+        <div class="row align-items-center">
+            <div class="col-md-3">
+                <strong class="text-primary">
+                    <i class="ti ti-calendar me-1"></i>
+                    <span>${dayName}</span>
+                </strong>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Hora de Inicio</label>
+                <input type="text" class="form-control form-control-sm walking-day-start-time time-input" placeholder="HH:MM" maxlength="5" value="${startTime || ''}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Hora de Fin</label>
+                <input type="text" class="form-control form-control-sm walking-day-end-time time-input" placeholder="HH:MM" maxlength="5" value="${endTime || ''}">
+            </div>
+            <div class="col-md-1 text-end">
+                <button type="button" class="btn btn-sm btn-outline-danger walking-remove-day-btn" title="Eliminar dia">
+                    <i class="ti ti-x"></i>
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Insert sorted (Mon-Sun, Sunday last)
+    const sortValue = dayCode === 0 ? 7 : dayCode;
+    const existingRows = container.querySelectorAll('.walking-day-schedule-row');
+    let inserted = false;
+    existingRows.forEach(existing => {
+        const existingDay = parseInt(existing.dataset.day);
+        const existingSortValue = existingDay === 0 ? 7 : existingDay;
+        if (!inserted && sortValue < existingSortValue) {
+            container.insertBefore(row, existing);
+            inserted = true;
+        }
+    });
+    if (!inserted) container.appendChild(row);
+}
+
+function removeWalkingDaySchedule(dayCode) {
+    const container = document.getElementById('walkingDaySchedulesContainer');
+    if (!container) return;
+    const row = container.querySelector('[data-day="' + dayCode + '"]');
+    if (row) row.remove();
+}
+
+function updateWalkingNoDaysMessage() {
+    const container = document.getElementById('walkingDaySchedulesContainer');
+    const noDaysMsg = document.getElementById('walkingNoDaysSelected');
+    if (!container || !noDaysMsg) return;
+    const hasDays = container.querySelectorAll('.walking-day-schedule-row').length > 0;
+    noDaysMsg.style.display = hasDays ? 'none' : '';
+}
+
+function updateWalkingAvailabilityStatus() {
+    const statusText = document.querySelector('.walking-availability-status');
+    if (!statusText) return;
+    const activeDays = document.querySelectorAll('.walking-day-btn.active');
+    if (activeDays.length === 0 || activeDays.length === 7) {
+        statusText.textContent = 'Disponible todos los dias';
+    } else {
+        const dayNames = [];
+        activeDays.forEach(btn => dayNames.push(btn.dataset.dayName.substring(0, 3)));
+        statusText.textContent = 'Disponible: ' + dayNames.join(', ');
+    }
+}
+
+// Keep for external use (edit loading)
+function updateWalkingDaySchedules() {
+    // Rebuild from active buttons (used when loading edit data)
+    document.querySelectorAll('.walking-day-btn.active').forEach(btn => {
+        addWalkingDaySchedule(parseInt(btn.dataset.day), btn.dataset.dayName);
+    });
+    updateWalkingNoDaysMessage();
+    updateWalkingAvailabilityStatus();
+}
+
+// Walking tour photo handlers (matching vehicle tour pattern, reuses addTourPhotoPreview)
+// Wrapped in jQuery ready to ensure $ is available
+(function initWalkingPhotoHandlers() {
+    if (typeof $ === 'undefined') {
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof $ !== 'undefined') attachWalkingPhotoHandlers();
+        });
+        return;
+    }
+    attachWalkingPhotoHandlers();
+
+    function attachWalkingPhotoHandlers() {
+        $('#walkingTourModal').on('click', '.walking-add-photo-btn', function() {
+            $(this).closest('.walking-tour-photos-container').find('.walking-tour-photo-input').click();
+        });
+
+        $('#walkingTourModal').on('change', '.walking-tour-photo-input', function(e) {
+            const files = e.target.files;
+            const previewContainer = $(this).closest('.walking-tour-photos-container').find('.walking-photos-preview-container');
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    addTourPhotoPreview(previewContainer, file, ev.target.result);
+                };
+                reader.readAsDataURL(file);
+            });
+            $(this).val('');
+        });
+
+        $('#walkingTourModal').on('click', '.remove-photo-btn', function() {
+            $(this).closest('.photo-preview').remove();
+        });
+    }
+})();
+
 // ========== END WALKING TOUR FUNCTIONALITY ==========
 
 </script>
@@ -5505,22 +5791,33 @@ function showWalkingTourAlert(message, type) {
                 <form id="walkingTourForm">
                     <input type="hidden" id="walkingTourId">
                     
-                    <!-- Destino -->
-                    <div class="mb-3">
-                        <label class="form-label form-label-sm fw-medium text-success">
-                            Destino <span class="text-danger">*</span>
-                        </label>
-                        <%- include('../../atoms/common/tom-select', {
-                            id: 'walkingDestinationPOI',
-                            name: 'walkingDestinationPOI',
-                            multiple: false,
-                            placeholder: 'Seleccionar destino del tour a pie',
-                            label: false,
-                            required: true,
-                            helpText: false,
-                            options: [],
-                            selected: []
-                        }) %>
+                    <!-- Destino y Tipo -->
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label class="form-label form-label-sm fw-medium text-success">
+                                Destino <span class="text-danger">*</span>
+                            </label>
+                            <%- include('../../atoms/common/tom-select', {
+                                id: 'walkingDestinationPOI',
+                                name: 'walkingDestinationPOI',
+                                multiple: false,
+                                placeholder: 'Seleccionar destino del tour a pie',
+                                label: false,
+                                required: true,
+                                helpText: false,
+                                options: [],
+                                selected: []
+                            }) %>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="walkingTourType" class="form-label form-label-sm fw-medium text-success">Tipo</label>
+                            <select class="form-select" id="walkingTourType">
+                                <option value="">Seleccionar</option>
+                                <option value="Exclusivo">Exclusivo</option>
+                                <option value="Compartido">Compartido</option>
+                                <option value="Privado">Privado</option>
+                            </select>
+                        </div>
                     </div>
                     
                     <!-- Descripción -->
@@ -5572,23 +5869,45 @@ function showWalkingTourAlert(message, type) {
                         </div>
                     </div>
 
-                    <!-- Duración -->
+                    <!-- Campos de tiempo -->
                     <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label form-label-sm fw-medium text-success">Duración (hrs) mínima</label>
-                            <input type="number" class="form-control" id="walkingDuration" min="0" step="0.5" 
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">Duracion (hrs) minima</label>
+                            <input type="number" class="form-control" id="walkingDuration" min="0" step="0.5"
                                    placeholder="2" value="2">
                             <div class="form-text">
                                 <small>Tiempo total del tour a pie</small>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipación (min)</label>
-                            <input type="number" class="form-control" id="walkingAdvanceTime" min="0" step="1" 
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">Duracion Trayecto (min)</label>
+                            <input type="number" class="form-control" id="walkingTravelDuration" min="0" step="1"
+                                   placeholder="60">
+                            <div class="form-text">
+                                <small>Tiempo traslado</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipacion (min)</label>
+                            <input type="number" class="form-control" id="walkingAdvanceTime" min="0" step="1"
                                    placeholder="1440" value="1440">
                             <div class="form-text">
                                 <small>Ej: 1440 = 24hrs</small>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Campos de personas -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="walkingMinPeople" class="form-label form-label-sm fw-medium text-success">Min. Personas</label>
+                            <input type="number" class="form-control" id="walkingMinPeople" min="1" step="1"
+                                   placeholder="1">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="walkingMaxPeople" class="form-label form-label-sm fw-medium text-success">Max. Personas</label>
+                            <input type="number" class="form-control" id="walkingMaxPeople" min="1" step="1"
+                                   placeholder="15">
                         </div>
                     </div>
 
@@ -5620,6 +5939,138 @@ function showWalkingTourAlert(message, type) {
                         <textarea class="form-control" id="walkingLanguages" rows="2" maxlength="500"
                                   placeholder="Español&#10;Inglés"
                                   style="font-size: 1rem; line-height: 1.5;"></textarea>
+                    </div>
+
+                    <!-- Disponibilidad compacta -->
+                    <div class="availability-section mb-3">
+                        <div class="walking-availability-summary">
+                            <label class="form-label form-label-sm fw-medium text-success d-flex justify-content-between align-items-center">
+                                <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
+                                <button type="button" class="btn btn-sm btn-link p-0 toggle-walking-availability-btn" title="Configurar horarios">
+                                    <i class="ti ti-settings"></i>
+                                </button>
+                            </label>
+                            <div class="availability-display bg-light border rounded p-2" style="min-height: 35px;">
+                                <small class="text-success">
+                                    <i class="ti ti-check-circle me-1"></i>
+                                    <span class="walking-availability-status">Disponible todos los dias</span>
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="walking-availability-content" style="display: none;">
+                            <label class="form-label form-label-sm fw-medium text-success d-flex justify-content-between align-items-center">
+                                <span>Configurar Disponibilidad</span>
+                                <button type="button" class="btn btn-sm btn-link p-0 toggle-walking-availability-btn" title="Cerrar configuracion">
+                                    <i class="ti ti-x"></i>
+                                </button>
+                            </label>
+                            <div class="mb-2">
+                                <div class="d-flex gap-1 flex-wrap" id="walkingAvailableDaysContainer">
+                                    <button type="button" class="btn btn-outline-primary btn-sm walking-day-btn" data-day="1" data-day-name="Lunes">Lu</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm walking-day-btn" data-day="2" data-day-name="Martes">Ma</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm walking-day-btn" data-day="3" data-day-name="Miercoles">Mi</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm walking-day-btn" data-day="4" data-day-name="Jueves">Ju</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm walking-day-btn" data-day="5" data-day-name="Viernes">Vi</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm walking-day-btn" data-day="6" data-day-name="Sabado">Sa</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm walking-day-btn" data-day="0" data-day-name="Domingo">Do</button>
+                                </div>
+                            </div>
+
+                            <div id="walkingDaySchedulesContainer" class="mb-2"></div>
+
+                            <div id="walkingNoDaysSelected" class="text-center text-muted py-2 border rounded bg-light" style="font-size: 1rem;">
+                                <i class="ti ti-calendar-off me-1"></i>
+                                <small>Selecciona dias para configurar horarios</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fotos del tour -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            Fotos <span class="text-muted">(Opcional)</span>
+                        </label>
+                        <div class="walking-tour-photos-container">
+                            <div class="row g-2 mb-2 walking-photos-preview-container">
+                            </div>
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-outline-primary btn-sm walking-add-photo-btn">
+                                    <i class="ti ti-camera-plus me-1"></i>
+                                    Agregar Foto
+                                </button>
+                            </div>
+                            <input type="file"
+                                   class="d-none walking-tour-photo-input"
+                                   accept=".jpg,.jpeg,.png,.webp"
+                                   multiple>
+                        </div>
+                        <div class="form-text">
+                            <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small>
+                        </div>
+                    </div>
+
+                    <!-- Notas (4 campos) -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-notes me-1"></i>Notas internas <span class="text-muted">(Uso interno)</span>
+                                </label>
+                                <textarea class="form-control" id="walkingInternalNotes"
+                                          rows="3"
+                                          placeholder="Notas para uso exclusivo interno del equipo..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-lock me-1"></i>Solo visible para el equipo interno</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-user-check me-1"></i>Notas cliente (reservar) <span class="text-muted">(Cliente)</span>
+                                </label>
+                                <textarea class="form-control" id="walkingClientBookingNotes"
+                                          rows="3"
+                                          placeholder="Notas que vera el cliente al reservar este tour..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-eye me-1"></i>Visible para el cliente durante reserva</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-building-store me-1"></i>Notas proveedor <span class="text-muted">(Proveedor)</span>
+                                </label>
+                                <textarea class="form-control" id="walkingProviderNotes"
+                                          rows="3"
+                                          placeholder="Notas e instrucciones para el proveedor del tour..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-truck me-1"></i>Instrucciones para el proveedor</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-users me-1"></i>Notas colaboradores Amexing <span class="text-muted">(Equipo)</span>
+                                </label>
+                                <textarea class="form-control" id="walkingTeamNotes"
+                                          rows="3"
+                                          placeholder="Notas para colaboradores y equipo de Amexing..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-heart me-1"></i>Informacion para el equipo Amexing</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Alert informativo para tours a pie -->

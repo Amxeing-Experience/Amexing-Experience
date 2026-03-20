@@ -32,8 +32,8 @@ const ReservationService = require('../../domain/models/ReservationService');
 class QuoteService {
   constructor() {
     this.className = 'Quote';
-    this.allowedRoles = ['superadmin', 'admin', 'department_manager'];
-    this.validStatuses = ['requested', 'hold', 'scheduled', 'rejected'];
+    this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client'];
+    this.validStatuses = ['quoted', 'requested', 'hold', 'scheduled', 'rejected'];
     this.pdfService = new PDFReceiptService();
   }
 
@@ -41,8 +41,8 @@ class QuoteService {
    * Update Quote status.
    *
    * Business Rules:
-   * - Only SuperAdmin and Admin can update status
-   * - Status must be one of: requested, hold, scheduled, rejected
+   * - Status must be one of: quoted, requested, hold, scheduled, rejected
+   * - Role-based permissions apply for certain status changes
    * - Maintains exists: true
    * - Updates updatedAt timestamp
    * - Logs activity for audit trail.
@@ -54,7 +54,7 @@ class QuoteService {
    * @returns {Promise<object>} Result with success status and Quote data.
    * @throws {Error} If validation fails or database operation fails.
    * @example
-   * const result = await service.updateQuoteStatus(currentUser, 'abc123', 'sent', 'Quote sent to client');
+   * const result = await service.updateQuoteStatus(currentUser, 'abc123', 'requested', 'Client requested services');
    */
   async updateQuoteStatus(currentUser, quoteId, newStatus, reason = '', userRole = null) {
     try {
@@ -66,9 +66,25 @@ class QuoteService {
       // Get user role
       const role = userRole || currentUser.get('role');
 
-      // Validate user permissions
-      if (!this.allowedRoles.includes(role)) {
-        throw new Error(`Unauthorized: Role '${role}' cannot update Quote status`);
+      // Validate user permissions based on status transition
+      const adminOnlyStatuses = ['hold', 'scheduled', 'rejected'];
+
+      // Check if user is trying to set an admin-only status
+      if (adminOnlyStatuses.includes(newStatus)) {
+        // Only admin and superadmin can set these statuses
+        if (!['admin', 'superadmin'].includes(role)) {
+          throw new Error(`Unauthorized: Only administrators can set status to '${newStatus}'`);
+        }
+      } else if (newStatus === 'requested') {
+        // All allowed roles can change to requested (SOLICITADO)
+        if (!this.allowedRoles.includes(role)) {
+          throw new Error(`Unauthorized: Role '${role}' cannot update Quote status`);
+        }
+      } else if (newStatus === 'quoted') {
+        // Only admin can revert to quoted status
+        if (!['admin', 'superadmin'].includes(role)) {
+          throw new Error('Unauthorized: Only administrators can revert status to \'quoted\'');
+        }
       }
 
       // Validate Quote ID
@@ -98,9 +114,9 @@ class QuoteService {
       quote.set('status', newStatus);
       await quote.save(null, { useMasterKey: true });
 
-      // If scheduling, auto-create Reservation + ReservationServices
+      // If changing to requested (SOLICITADO), auto-create Reservation + ReservationServices
       let reservationData = null;
-      if (newStatus === 'scheduled') {
+      if (newStatus === 'requested' && previousStatus !== 'requested') {
         reservationData = await this.createReservationFromQuote(quote, currentUser);
       }
 
@@ -178,7 +194,7 @@ class QuoteService {
       // Get user role
       const role = userRole || currentUser.get('role');
 
-      // Validate user permissions
+      // Basic permission check
       if (!this.allowedRoles.includes(role)) {
         throw new Error(`Unauthorized: Role '${role}' cannot update Quotes`);
       }
@@ -204,16 +220,35 @@ class QuoteService {
         throw new Error('Quote not found');
       }
 
-      // Check if quote is in 'scheduled' status - prevent status changes
-      const currentStatus = quote.get('status');
-      if (currentStatus === 'scheduled' && updates.status && updates.status !== 'scheduled') {
-        throw new Error('Cannot change status from scheduled. Use specific scheduled quote actions instead.');
+      // Check status change permissions
+      const currentStatus = quote.get('status') || 'quoted';
+      if (updates.status && updates.status !== currentStatus) {
+        const adminOnlyStatuses = ['hold', 'scheduled', 'rejected'];
+
+        // Check if user is trying to set an admin-only status
+        if (adminOnlyStatuses.includes(updates.status)) {
+          if (!['admin', 'superadmin'].includes(role)) {
+            throw new Error(`Unauthorized: Only administrators can set status to '${updates.status}'`);
+          }
+        } else if (updates.status === 'requested') {
+          // All allowed roles can change to requested (SOLICITADO)
+          // No additional check needed
+        } else if (updates.status === 'quoted') {
+          // Only admin can revert to quoted status (allow in development for testing)
+          if (!['admin', 'superadmin'].includes(role) && process.env.NODE_ENV !== 'development') {
+            throw new Error('Unauthorized: Only administrators can revert status to \'quoted\'');
+          }
+        }
       }
 
       // Apply updates
       const allowedFields = [
         'status',
         'numberOfPeople',
+        'numberOfAdults',
+        'numberOfChildren',
+        'numberOfInfants',
+        'preferredLanguage',
         'contactPerson',
         'contactEmail',
         'contactPhone',
@@ -234,16 +269,92 @@ class QuoteService {
         }
       });
 
+      // Handle client field updates - DUAL FIELD ARCHITECTURE
+      const clientIdNormalized = updates.client || updates.clientId;
+      if (clientIdNormalized) {
+        try {
+          // 1. Save as companyClientPtr (Client pointer) for new system
+          const companyClientPointer = {
+            __type: 'Pointer',
+            className: 'Client',
+            objectId: clientIdNormalized,
+          };
+          quote.set('companyClientPtr', companyClientPointer);
+          appliedUpdates.companyClientPtr = clientIdNormalized;
+
+          logger.info('QuoteService.updateQuote - Setting companyClientPtr', {
+            quoteId: quote.id,
+            clientId: clientIdNormalized,
+            companyClientPointer,
+          });
+
+          // 2. Find the AmexingUser who owns this Client for backward compatibility
+          const clientQuery = new Parse.Query('Client');
+          const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+          const ownedByPointer = clientRecord.get('ownedBy');
+
+          if (ownedByPointer) {
+            // Extract the actual ID from the ownedBy pointer
+            const ownerId = ownedByPointer.id || ownedByPointer.objectId || ownedByPointer;
+
+            // Role-based logic for client field assignment
+            let clientAmexingUserId;
+            if (role === 'department_manager') {
+              // Department manager: client field should be the department manager themselves
+              clientAmexingUserId = currentUser.id;
+              logger.info('QuoteService.updateQuote - Department manager: setting client to currentUser', {
+                currentUserId: currentUser.id,
+                selectedClientId: clientIdNormalized,
+              });
+            } else {
+              // Client role: client field should be the owner of the selected Client
+              clientAmexingUserId = ownerId;
+              logger.info('QuoteService.updateQuote - Client role: setting client to Client owner', {
+                clientId: clientIdNormalized,
+                ownerId,
+              });
+            }
+
+            const amexingUserPointer = {
+              __type: 'Pointer',
+              className: 'AmexingUser',
+              objectId: clientAmexingUserId,
+            };
+            quote.set('client', amexingUserPointer);
+            appliedUpdates.client = clientAmexingUserId;
+
+            logger.info('QuoteService.updateQuote - Setting client (AmexingUser) for backward compatibility', {
+              quoteId: quote.id,
+              clientCompanyId: clientIdNormalized,
+              ownerId,
+              amexingUserPointer,
+            });
+          } else {
+            logger.warn('QuoteService.updateQuote - Client record has no ownedBy field', {
+              quoteId: quote.id,
+              clientId: clientIdNormalized,
+            });
+          }
+        } catch (error) {
+          logger.error('QuoteService.updateQuote - Error setting client pointers', {
+            error: error.message,
+            quoteId: quote.id,
+            clientId: clientIdNormalized,
+          });
+          // Continue without failing the entire update
+        }
+      }
+
       await quote.save(null, { useMasterKey: true });
 
-      // If status changed to scheduled, auto-create Reservation
+      // If status changed to requested (SOLICITADO), auto-create Reservation
       let reservationData = null;
-      if (appliedUpdates.status === 'scheduled') {
+      if (appliedUpdates.status === 'requested' && currentStatus !== 'requested') {
         reservationData = await this.createReservationFromQuote(quote, currentUser);
 
         // Send confirmation email with PDF (non-blocking)
         this.sendScheduledConfirmationEmail(quote, currentUser, reservationData)
-          .catch((err) => logger.warn('Failed to send scheduled confirmation email', {
+          .catch((err) => logger.warn('Failed to send request confirmation email', {
             error: err.message,
             quoteId: quote.id,
           }));
@@ -320,8 +431,8 @@ class QuoteService {
       // Get user role
       const role = userRole || currentUser.get('role');
 
-      // Validate user permissions (superadmin, admin, and department_manager)
-      if (!['superadmin', 'admin', 'department_manager'].includes(role)) {
+      // Validate user permissions
+      if (!['superadmin', 'admin', 'department_manager', 'client'].includes(role)) {
         throw new Error(`Unauthorized: Role '${role}' cannot delete Quotes`);
       }
 
@@ -925,10 +1036,26 @@ class QuoteService {
       if (startDate) reservation.set('startDate', startDate);
       if (endDate) reservation.set('endDate', endDate);
 
-      // Set client pointer
+      // Set client pointer to the quote's client (AmexingUser)
       const client = quote.get('client');
       if (client) {
         reservation.set('clientPtr', client);
+        logger.info('Set clientPtr for reservation from quote client', {
+          reservationId: reservation.id,
+          clientPtr: client,
+          quoteId: quote.id,
+          currentUserId: currentUser?.id,
+        });
+      } else if (currentUser) {
+        // Fallback: if quote has no client, use current user
+        const userPointer = new Parse.Object('AmexingUser');
+        userPointer.id = currentUser.id;
+        reservation.set('clientPtr', userPointer);
+        logger.info('Set clientPtr for reservation to current user (no quote client)', {
+          reservationId: reservation.id,
+          clientPtrUserId: currentUser.id,
+          quoteId: quote.id,
+        });
       }
 
       // Set created by
@@ -1078,6 +1205,26 @@ class QuoteService {
       }
     }
 
+    // Determine additional CC emails based on environment
+    const additionalCCEmails = [];
+    const environment = process.env.NODE_ENV || 'development';
+
+    if (environment === 'production') {
+      additionalCCEmails.push('michelle@amexing.com');
+      logger.info('Adding production CC email for quote confirmation', {
+        quoteId: quote.id,
+        ccEmail: 'michelle@amexing.com',
+        environment,
+      });
+    } else if (environment === 'development') {
+      additionalCCEmails.push('denisse@meeplab.com');
+      logger.info('Adding development CC email for quote confirmation', {
+        quoteId: quote.id,
+        ccEmail: 'denisse@meeplab.com',
+        environment,
+      });
+    }
+
     const result = await emailService.sendQuoteConfirmation({
       recipientEmail,
       recipientName,
@@ -1090,6 +1237,7 @@ class QuoteService {
       shareUrl,
       pdfBuffer,
       pdfFilename,
+      ccEmails: additionalCCEmails, // Add CC emails based on environment
     });
 
     logger.info('Quote confirmation email sent', {

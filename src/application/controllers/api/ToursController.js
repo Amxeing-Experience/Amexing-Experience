@@ -102,6 +102,7 @@ class ToursController {
       // Get total records count (with tour type filter but without search filter)
       const totalRecordsQuery = new Parse.Query('Tour');
       totalRecordsQuery.equalTo('exists', true);
+      totalRecordsQuery.equalTo('active', true);
 
       // Apply tour type filter to total count
       if (tourType === 'walking') {
@@ -114,9 +115,10 @@ class ToursController {
         useMasterKey: true,
       });
 
-      // Build base query for all existing records
+      // Build base query for all active existing records
       const baseQuery = new Parse.Query('Tour');
       baseQuery.equalTo('exists', true);
+      baseQuery.equalTo('active', true);
       baseQuery.include(['destinationPOI']);
 
       // Apply tour type filter if provided
@@ -237,6 +239,7 @@ class ToursController {
           },
           time: tour.get('time') || 0,
           availability: tour.get('availability') || null,
+          availableDays: tour.get('availableDays') || null,
           active: tour.get('active') || false,
           exists: tour.get('exists') || true,
           createdAt: tour.get('createdAt'),
@@ -371,6 +374,7 @@ class ToursController {
           : null,
         time: tour.get('time'),
         availability: tour.get('availability'),
+        availableDays: tour.get('availableDays') || null,
         active: tour.get('active'),
         exists: tour.get('exists'),
         createdAt: tour.get('createdAt'),

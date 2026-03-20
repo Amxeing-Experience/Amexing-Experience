@@ -464,6 +464,76 @@ async function getADisposicionData(priceOptions) {
     .sort((a, b) => a.vehicleType.localeCompare(b.vehicleType) || a.rate.localeCompare(b.rate));
 }
 
+// =====================
+// FORMATTING HELPERS
+// =====================
+
+/**
+ *
+ * @param availability
+ * @param availableDays
+ * @example
+ */
+function formatAvailabilityDays(availability, availableDays) {
+  const dayNames = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
+  if (availability && Array.isArray(availability) && availability.length > 0) {
+    const days = availability.map((s) => (typeof s === 'object' && typeof s.day === 'number' ? dayNames[s.day] : '')).filter(Boolean);
+    return days.length >= 7 ? 'Todos los dias' : days.join(', ');
+  }
+  if (availableDays && Array.isArray(availableDays) && availableDays.length > 0) {
+    if (typeof availableDays[0] === 'string') {
+      return availableDays.length >= 7 ? 'Todos los dias' : availableDays.map((d) => d.substring(0, 2)).join(', ');
+    }
+  }
+  return 'Todos los dias';
+}
+
+/**
+ *
+ * @param availability
+ * @example
+ */
+function formatAvailabilityTimes(availability) {
+  if (!availability || !Array.isArray(availability) || availability.length === 0) return '-';
+  const dayNames = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
+  const times = availability
+    .filter((s) => s.startTime && s.endTime)
+    .map((s) => `${dayNames[s.day] || ''}: ${s.startTime}-${s.endTime}`);
+  return times.length > 0 ? times.join(', ') : '-';
+}
+
+/**
+ *
+ * @param minutes
+ * @example
+ */
+function formatAdvanceBooking(minutes) {
+  if (!minutes || minutes <= 0) return '-';
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hrs >= 24) {
+    const days = Math.floor(hrs / 24);
+    return days === 1 ? '1 dia' : `${days} dias`;
+  }
+  if (hrs > 0 && mins > 0) return `${hrs}h ${mins}min`;
+  if (hrs > 0) return hrs === 1 ? '1 hora' : `${hrs} hrs`;
+  return `${mins} min`;
+}
+
+/**
+ *
+ * @param minutes
+ * @example
+ */
+function formatDurationMinutes(minutes) {
+  if (!minutes || minutes <= 0) return '-';
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hrs > 0 && mins > 0) return `${hrs}h ${mins}min`;
+  if (hrs > 0) return `${hrs}h`;
+  return `${mins}min`;
+}
+
 /**
  * Get experiences data for export.
  * @returns {Promise<Array>} Formatted experience data.
@@ -494,23 +564,47 @@ async function getExperienciasData() {
   const rows = [];
 
   experiences.forEach((exp) => {
+    const avail = exp.get('availability') || [];
+    const availDays = exp.get('availableDays') || [];
+    const incl = exp.get('includes') || [];
+    const notIncl = exp.get('notincludes') || [];
+    const langs = exp.get('languages') || [];
     rows.push({
       name: exp.get('name') || '',
       description: exp.get('description') || '',
       cost: exp.get('cost') || 0,
       tipo: 'Experiencia',
       provider: '-',
+      duration: formatDurationMinutes(exp.get('duration') || 0),
+      diasSugeridos: formatAvailabilityDays(avail, availDays),
+      horarios: formatAvailabilityTimes(avail),
+      anticipacion: formatAdvanceBooking(exp.get('advance_booking_time') || 0),
+      incluye: Array.isArray(incl) ? incl.join(', ') : (incl || ''),
+      noIncluye: Array.isArray(notIncl) ? notIncl.join(', ') : (notIncl || ''),
+      idiomas: Array.isArray(langs) ? langs.join(', ') : (langs || ''),
     });
   });
 
   providerExperiencias.forEach((pe) => {
     const prov = pe.get('provider');
+    const avail = pe.get('availability') || [];
+    const availDays = pe.get('availableDays') || [];
+    const incl = pe.get('includes') || [];
+    const notIncl = pe.get('notincludes') || [];
+    const langs = pe.get('languages') || [];
     rows.push({
       name: pe.get('name') || '',
       description: pe.get('description') || '',
       cost: pe.get('price') || 0,
       tipo: pe.get('tipo') || 'Proveedor',
       provider: prov ? prov.get('name') : '-',
+      duration: formatDurationMinutes(pe.get('duration') || 0),
+      diasSugeridos: formatAvailabilityDays(avail, availDays),
+      horarios: formatAvailabilityTimes(avail),
+      anticipacion: formatAdvanceBooking(pe.get('advance_booking_time') || 0),
+      incluye: Array.isArray(incl) ? incl.join(', ') : (incl || ''),
+      noIncluye: Array.isArray(notIncl) ? notIncl.join(', ') : (notIncl || ''),
+      idiomas: Array.isArray(langs) ? langs.join(', ') : (langs || ''),
     });
   });
 
@@ -605,13 +699,40 @@ async function getToursData(clientId, priceOptions) {
   tours.forEach((tour) => {
     const dest = tour.get('destinationPOI');
     const destName = dest ? dest.get('name') : 'N/A';
-    const duration = tour.get('time') || 0;
+    const durationMin = tour.get('time') || 0;
+    const duration = formatDurationMinutes(durationMin);
     const isWalking = tour.get('isWalkingTour');
+
+    // Common detail fields for all tour types
+    const avail = tour.get('availability') || [];
+    const availDays = tour.get('availableDays') || [];
+    const incl = tour.get('includes') || [];
+    const notIncl = tour.get('notincludes') || [];
+    const langs = tour.get('languages') || [];
+    const tourDetails = {
+      description: tour.get('description') || tour.get('notes') || '',
+      diasSugeridos: formatAvailabilityDays(avail, availDays),
+      horarios: formatAvailabilityTimes(avail),
+      anticipacion: formatAdvanceBooking(tour.get('advance_booking_time') || 0),
+      incluye: Array.isArray(incl) ? incl.join(', ') : (incl || ''),
+      noIncluye: Array.isArray(notIncl) ? notIncl.join(', ') : (notIncl || ''),
+      idiomas: Array.isArray(langs) ? langs.join(', ') : (langs || ''),
+    };
 
     if (isWalking) {
       const priceMap = priceLookup[`${tour.id}|none`] || {};
+      const walkingSmall = applyPriceAdjustments(tour.get('walkingPriceSmall') || 0, priceOptions);
+      const walkingMedium = applyPriceAdjustments(tour.get('walkingPriceMedium') || 0, priceOptions);
+      const walkingLarge = applyPriceAdjustments(tour.get('walkingPriceLarge') || 0, priceOptions);
       const row = {
-        destination: destName, duration, walkingTour: 'Si', vehicleType: 'A Pie',
+        destination: destName,
+        duration,
+        walkingTour: 'Si',
+        vehicleType: 'A Pie',
+        walkingPriceSmall: walkingSmall,
+        walkingPriceMedium: walkingMedium,
+        walkingPriceLarge: walkingLarge,
+        ...tourDetails,
       };
       rateNames.forEach((name) => { row[`rate_${name}`] = priceMap[name] || 0; });
       rows.push(row);
@@ -624,20 +745,30 @@ async function getToursData(clientId, priceOptions) {
 
     if (vehicleTypeIds.length === 0) {
       const row = {
-        destination: destName, duration, walkingTour: 'No', vehicleType: 'N/A',
+        destination: destName, duration, walkingTour: 'No', vehicleType: 'N/A', ...tourDetails,
       };
       rateNames.forEach((name) => { row[`rate_${name}`] = 0; });
       rows.push(row);
       return;
     }
 
-    vehicleTypeIds.forEach((vtId) => {
+    vehicleTypeIds.forEach((vtId, idx) => {
       const priceMap = priceLookup[`${tour.id}|${vtId}`] || {};
       const row = {
         destination: destName,
         duration,
         walkingTour: 'No',
         vehicleType: vtNames[vtId] || 'N/A',
+        // Only show details on first vehicle row to avoid repetition
+        ...(idx === 0 ? tourDetails : {
+          description: '',
+          diasSugeridos: '',
+          horarios: '',
+          anticipacion: '',
+          incluye: '',
+          noIncluye: '',
+          idiomas: '',
+        }),
       };
       rateNames.forEach((name) => { row[`rate_${name}`] = priceMap[name] || 0; });
       rows.push(row);
@@ -968,24 +1099,36 @@ async function addADisposicionSheet(workbook, priceOptions) {
 async function addExperienciasSheet(workbook, priceOptions) {
   const data = await getExperienciasData();
   const sheet = workbook.addWorksheet('Experiencias', { properties: { tabColor: { argb: LIGHT_GREEN } } });
-  const colCount = 3;
+  const headers = ['Nombre', 'Descripcion', 'Costo', 'Duracion', 'Dias Sugeridos', 'Horarios', 'Anticipacion', 'Incluye', 'No Incluye', 'Idiomas'];
+  const colCount = headers.length;
 
   const dataStart = await addCompanyHeader(sheet, workbook, colCount, priceOptions);
   addSectionTitleRow(sheet, dataStart, 'TARIFARIO - EXPERIENCIAS', colCount);
   const headerRowNum = dataStart + 1;
 
-  sheet.getColumn(1).width = 30;
-  sheet.getColumn(2).width = 45;
+  sheet.getColumn(1).width = 25;
+  sheet.getColumn(2).width = 35;
   sheet.getColumn(3).width = 15;
+  sheet.getColumn(4).width = 12;
+  sheet.getColumn(5).width = 18;
+  sheet.getColumn(6).width = 25;
+  sheet.getColumn(7).width = 14;
+  sheet.getColumn(8).width = 30;
+  sheet.getColumn(9).width = 30;
+  sheet.getColumn(10).width = 18;
 
   const headerRow = sheet.getRow(headerRowNum);
-  ['Nombre', 'Descripcion', 'Costo'].forEach((h, i) => {
+  headers.forEach((h, i) => {
     headerRow.getCell(i + 1).value = h;
   });
   styleHeaderRow(sheet, headerRowNum);
 
   data.forEach((item) => {
-    const row = sheet.addRow([item.name, item.description, item.cost]);
+    const row = sheet.addRow([
+      item.name, item.description, item.cost, item.duration,
+      item.diasSugeridos, item.horarios, item.anticipacion,
+      item.incluye, item.noIncluye, item.idiomas,
+    ]);
     styleDataRow(row, 3);
   });
 }
@@ -1002,18 +1145,32 @@ async function addToursSheet(workbook, clientId, priceOptions) {
   const { rows, rateNames } = await getToursData(clientId, priceOptions);
   const sheet = workbook.addWorksheet('Tours', { properties: { tabColor: { argb: LIGHT_GREEN } } });
 
-  const headerNames = ['Destino', 'Duracion (min)', 'Walking Tour', 'Tipo Vehiculo', ...rateNames];
+  const fixedHeaders = ['Destino', 'Descripcion', 'Min. Horas', 'Walking Tour', 'Tipo Vehiculo',
+    '1-5 pax', '6-10 pax', '11-15 pax',
+    'Dias Sugeridos', 'Horarios', 'Anticipacion', 'Incluye', 'No Incluye', 'Idiomas'];
+  const headerNames = [...fixedHeaders, ...rateNames];
   const colCount = headerNames.length;
+  const rateStartCol = fixedHeaders.length + 1;
 
   const dataStart = await addCompanyHeader(sheet, workbook, colCount, priceOptions);
   addSectionTitleRow(sheet, dataStart, 'TARIFARIO - TOURS', colCount);
   const headerRowNum = dataStart + 1;
 
-  sheet.getColumn(1).width = 25;
-  sheet.getColumn(2).width = 16;
-  sheet.getColumn(3).width = 14;
-  sheet.getColumn(4).width = 18;
-  rateNames.forEach((_, i) => { sheet.getColumn(5 + i).width = 18; });
+  sheet.getColumn(1).width = 22;
+  sheet.getColumn(2).width = 30;
+  sheet.getColumn(3).width = 12;
+  sheet.getColumn(4).width = 12;
+  sheet.getColumn(5).width = 16;
+  sheet.getColumn(6).width = 14;
+  sheet.getColumn(7).width = 14;
+  sheet.getColumn(8).width = 14;
+  sheet.getColumn(9).width = 16;
+  sheet.getColumn(10).width = 22;
+  sheet.getColumn(11).width = 14;
+  sheet.getColumn(12).width = 28;
+  sheet.getColumn(13).width = 28;
+  sheet.getColumn(14).width = 16;
+  rateNames.forEach((_, i) => { sheet.getColumn(rateStartCol + i).width = 18; });
 
   const headerRow = sheet.getRow(headerRowNum);
   headerNames.forEach((h, i) => { headerRow.getCell(i + 1).value = h; });
@@ -1021,10 +1178,12 @@ async function addToursSheet(workbook, clientId, priceOptions) {
 
   const firstDataRow = headerRowNum + 1;
   rows.forEach((item) => {
-    const vals = [item.destination, item.duration, item.walkingTour, item.vehicleType];
+    const vals = [item.destination, item.description, item.duration, item.walkingTour, item.vehicleType,
+      item.walkingPriceSmall || '', item.walkingPriceMedium || '', item.walkingPriceLarge || '',
+      item.diasSugeridos, item.horarios, item.anticipacion, item.incluye, item.noIncluye, item.idiomas];
     rateNames.forEach((name) => { vals.push(item[`rate_${name}`] || 0); });
     const row = sheet.addRow(vals);
-    styleDataRow(row, 5);
+    styleDataRow(row, 6);
   });
 
   // Merge repeated Destino cells
@@ -1104,29 +1263,49 @@ async function buildPDFSection(doc, section, clientId, priceOptions) {
       const tableRows = data.map((d) => [
         d.name, d.description,
         formatCurrency(d.cost, priceOptions ? priceOptions.currency : null),
+        d.duration, d.diasSugeridos, d.horarios, d.anticipacion,
+        d.incluye, d.noIncluye, d.idiomas,
       ]);
       await drawPDFTable({
-        doc, title: 'Experiencias', headers: ['Nombre', 'Descripcion', 'Costo'], rows: tableRows, colWidths: [250, 380, 120], priceOptions,
+        doc,
+        title: 'Experiencias',
+        headers: ['Nombre', 'Descripcion', 'Costo', 'Duracion', 'Dias', 'Horarios', 'Anticipacion', 'Incluye', 'No Incluye', 'Idiomas'],
+        rows: tableRows,
+        colWidths: [100, 150, 60, 50, 60, 80, 55, 100, 100, 60],
+        priceOptions,
       });
       break;
     }
     case 'tours': {
       const { rows, rateNames } = await getToursData(clientId, priceOptions);
-      const hdrs = ['Destino', 'Duracion', 'Walking', 'Vehiculo', ...rateNames];
-      const fixedW = 360;
+      const cur = priceOptions ? priceOptions.currency : null;
+      const hdrs = ['Destino', 'Descripcion', 'Min. Hrs', 'Walking', 'Vehiculo',
+        '1-5 pax', '6-10 pax', '11-15 pax',
+        'Dias', 'Horarios', 'Anticipacion', 'Incluye', 'No Incluye', 'Idiomas', ...rateNames];
+      const fixedW = 780;
       const remainW = doc.page.width - 100 - fixedW;
-      const rateW = rateNames.length > 0 ? remainW / rateNames.length : 80;
+      const rateW = rateNames.length > 0 ? Math.max(remainW / rateNames.length, 45) : 45;
       let prevTourDest = '';
       const tableRows = rows.map((r) => {
         const showDest = r.destination !== prevTourDest;
         prevTourDest = r.destination;
-        const base = [showDest ? r.destination : '', r.duration, r.walkingTour, r.vehicleType];
-        const cur = priceOptions ? priceOptions.currency : null;
+        const base = [showDest ? r.destination : '', r.description || '', r.duration, r.walkingTour, r.vehicleType,
+          r.walkingPriceSmall ? formatCurrency(r.walkingPriceSmall, cur) : '',
+          r.walkingPriceMedium ? formatCurrency(r.walkingPriceMedium, cur) : '',
+          r.walkingPriceLarge ? formatCurrency(r.walkingPriceLarge, cur) : '',
+          r.diasSugeridos || '', r.horarios || '', r.anticipacion || '',
+          r.incluye || '', r.noIncluye || '', r.idiomas || ''];
         rateNames.forEach((name) => { base.push(formatCurrency(r[`rate_${name}`], cur)); });
         return base;
       });
       await drawPDFTable({
-        doc, title: 'Tours', headers: hdrs, rows: tableRows, colWidths: [130, 70, 60, 100, ...rateNames.map(() => rateW)], groupColumns: [0], priceOptions,
+        doc,
+        title: 'Tours',
+        headers: hdrs,
+        rows: tableRows,
+        colWidths: [70, 75, 35, 35, 55, 45, 45, 45, 45, 55, 45, 60, 60, 40, ...rateNames.map(() => rateW)],
+        groupColumns: [0],
+        priceOptions,
       });
       break;
     }

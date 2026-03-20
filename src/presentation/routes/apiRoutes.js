@@ -380,6 +380,7 @@ router.use(jwtMiddleware.authenticateToken);
 const userManagementRoutes = require('./api/userManagementRoutes');
 const amexingUsersRoutes = require('./api/amexingUsersRoutes');
 const clientsRoutes = require('./api/clientsRoutes');
+const ownedClientsRoutes = require('./api/ownedClientsRoutes');
 const employeesRoutes = require('./api/employeesRoutes');
 const rolesRoutes = require('./api/rolesRoutes');
 // Vehicle Management API routes
@@ -412,6 +413,7 @@ const invoicesRoutes = require('./api/invoicesRoutes');
 // Payment Info Management API routes
 const paymentInfoRoutes = require('./api/paymentInfoRoutes');
 const billingRoutes = require('./api/billingRoutes');
+const billingProfileRoutes = require('./api/billingProfileRoutes');
 // Price Adjustments API routes
 const priceAdjustmentsRoutes = require('./api/priceAdjustmentsRoutes');
 // Exchange Rate API routes
@@ -431,6 +433,7 @@ router.use('/profile', require('./api/profileImageRoutes'));
 // Profile image endpoints
 router.use('/amexingusers', amexingUsersRoutes);
 router.use('/clients', clientsRoutes);
+router.use('/owned-clients', ownedClientsRoutes);
 router.use('/employees', employeesRoutes);
 router.use('/roles', rolesRoutes);
 router.use('/vehicle-types', vehicleTypesRoutes);
@@ -456,6 +459,7 @@ router.use('/cancellation-requests', cancellationRequestsRoutes); // Cancellatio
 router.use('/invoices', invoicesRoutes); // Invoice management endpoints
 router.use('/payment-info', paymentInfoRoutes); // Payment info management endpoints
 router.use('/billing', billingRoutes); // Billing info management endpoints
+router.use('/billing-profiles', billingProfileRoutes); // Billing profiles management endpoints
 router.use('/price-adjustments', priceAdjustmentsRoutes); // Price adjustments management endpoints
 router.use('/exchange-rate', exchangeRateRoutes); // Exchange rate management endpoints
 router.use('/inflation-rate', inflationRateRoutes); // Inflation rate management endpoints

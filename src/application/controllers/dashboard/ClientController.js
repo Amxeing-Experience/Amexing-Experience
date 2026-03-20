@@ -770,6 +770,39 @@ class ClientController extends RoleBasedController {
       this.handleError(res, error);
     }
   }
+
+  /**
+   * Renders the owned clients management page.
+   * Allows client role users to manage their own clients.
+   * Created by Denisse Maldonado.
+   * @function ownedClients
+   * @param {object} req - Express request object containing user session and authentication data.
+   * @param {object} res - Express response object for rendering the owned clients view.
+   * @returns {Promise<void>} - Renders the owned clients view or handles errors.
+   * @example
+   * // GET /dashboard/client/clients
+   * await clientController.ownedClients(req, res);
+   */
+  async ownedClients(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'owned-clients', {
+        title: 'Mis Clientes',
+        breadcrumb: null,
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
 }
 
 module.exports = new ClientController();

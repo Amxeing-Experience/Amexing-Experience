@@ -1,15 +1,16 @@
 <%
 /**
- * Tours Card Layout Component
- * Displays tours with vehicles in card format while preserving all pricing functionality
- * 
+ * Unified Tours Card Layout Component
+ * Displays both walking tours and vehicle tours in a single unified section
+ * with a tour type filter for department managers
+ *
  * @param {string} userRole - Current user role
  * @param {boolean} showActions - Whether to show action buttons
  * @param {boolean} showClientPricing - Whether to show client-specific pricing
  * @param {string} clientId - Client ID for pricing context
  * @param {string} tableId - Unique table identifier
  * @param {string} apiEndpoint - API endpoint for tours data
- * 
+ *
  * Created by Denisse Maldonado
  */
 
@@ -26,7 +27,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
         <div class="row align-items-center">
             <div class="col">
                 <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-car me-2"></i>Tours con Vehículos
+                    <i class="ti ti-map me-2"></i>Tours
                 </h5>
             </div>
         </div>
@@ -36,76 +37,120 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
     <div class="card-body border-bottom bg-light">
         <!-- Desktop Layout (lg and above) -->
         <div class="d-none d-lg-block">
-            <div class="row g-3">
-                <!-- Search -->
-                <div class="col-lg-3">
-                    <label for="searchTour" class="form-label fw-semibold">
-                        <i class="ti ti-search me-1"></i>Buscar Tour
+            <!-- Row 1: Pills + Search -->
+            <div class="d-flex align-items-end gap-3 mb-3">
+                <!-- Tour Type Pills -->
+                <div>
+                    <label class="form-label fw-semibold mb-2">Tipo de Tour</label>
+                    <ul class="nav nav-pills" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active tour-type-pill" data-tour-type="all" type="button" role="tab">
+                                Todos
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link tour-type-pill" data-tour-type="walking" type="button" role="tab">
+                                <i class="ti ti-walk me-1"></i>A Pie
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link tour-type-pill" data-tour-type="vehicle" type="button" role="tab">
+                                <i class="ti ti-car me-1"></i>Con Vehiculos
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Service Type Pills (vehicle-only) -->
+                <div id="vehicleFiltersDesktop">
+                    <label class="form-label fw-semibold mb-2">Tipo de Servicio</label>
+                    <ul class="nav nav-pills" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active filter-pill" data-filter="guide-only" type="button" role="tab">
+                                Solo Guia
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link filter-pill" data-filter="with-driver" type="button" role="tab">
+                                Guia + Chofer
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Search (fills remaining space) -->
+                <div class="flex-grow-1">
+                    <label for="searchTour" class="form-label fw-semibold mb-2">
+                        <i class="ti ti-search me-1"></i>Buscar
                     </label>
                     <input type="text" class="form-control" id="searchTour" placeholder="Buscar...">
                 </div>
-                
-                <!-- Filter Pills and Dropdowns Container -->
-                <div class="col-lg-9">
-                    <div class="d-flex justify-content-between align-items-end h-100">
-                        <!-- Pills for Guide Type -->
-                        <div>
-                            <label class="form-label fw-semibold mb-2">Tipo de Servicio</label>
-                            <ul class="nav nav-pills" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active filter-pill" data-filter="guide-only" type="button" role="tab">
-                                        Solo Guía
-                                    </button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link filter-pill" data-filter="with-driver" type="button" role="tab">
-                                        Guía + Chofer
-                                    </button>
-                                </li>
-                            </ul>
-                        </div>
-                        
-                        <!-- Dropdowns Container -->
-                        <div class="d-flex gap-2">
-                            <!-- Rate Selection Dropdown -->
-                            <div class="d-flex align-items-center gap-1">
-                                <label for="rateFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Segmento:</label>
-                                <select class="form-select" id="rateFilter-<%= dtTableId %>" style="min-width: 150px;">
-                                    <option value="">Seleccionar segmento...</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Currency Dropdown -->
-                            <div class="d-flex align-items-center gap-1">
-                                <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
-                                <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
-                                    <option value="MXN" selected>MXN</option>
-                                    <option value="USD">USD</option>
-                                </select>
-                            </div>
+            </div>
 
-                            <!-- Payment Type Dropdown -->
-                            <div class="d-flex align-items-center gap-1">
-                                <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
-                                <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
-                                    <% if (isDepartmentManager || isClient) { %>
-                                        <option value="efectivo">Efectivo</option>
-                                        <option value="transferencia" selected>Transferencia</option>
-                                    <% } else { %>
-                                        <option value="efectivo" selected>Efectivo</option>
-                                        <option value="transferencia">Transferencia</option>
-                                    <% } %>
-                                    <option value="tarjeta">Tarjeta Débito/Crédito</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+            <!-- Row 2: Segmento left, Moneda+Pago right -->
+            <div class="d-flex align-items-center gap-2">
+                <!-- Rate Selection (vehicle-only) - pushed left -->
+                <div class="d-flex align-items-center gap-1" id="rateFilterDesktopContainer">
+                    <label for="rateFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Segmento:</label>
+                    <select class="form-select" id="rateFilter-<%= dtTableId %>" style="min-width: 150px;">
+                        <option value="">Seleccionar segmento...</option>
+                    </select>
+                </div>
+
+                <!-- Spacer pushes Moneda+Pago to the right -->
+                <div class="flex-grow-1"></div>
+
+                <!-- Currency -->
+                <div class="d-flex align-items-center gap-1">
+                    <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
+                    <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
+                        <option value="MXN" selected>MXN</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+
+                <!-- Payment Type -->
+                <div class="d-flex align-items-center gap-1">
+                    <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
+                    <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
+                        <% if (isDepartmentManager || isClient) { %>
+                            <option value="efectivo">Efectivo</option>
+                            <option value="transferencia" selected>Transferencia</option>
+                        <% } else { %>
+                            <option value="efectivo" selected>Efectivo</option>
+                            <option value="transferencia">Transferencia</option>
+                        <% } %>
+                        <option value="tarjeta">Tarjeta Debito/Credito</option>
+                    </select>
                 </div>
             </div>
         </div>
 
         <!-- Tablet and Mobile Layout (md and below) -->
         <div class="d-lg-none">
+            <!-- Tour Type Filter Row -->
+            <div class="row g-3 mb-3">
+                <div class="col-12">
+                    <label class="form-label fw-semibold mb-2">Tipo de Tour</label>
+                    <ul class="nav nav-pills" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active tour-type-pill" data-tour-type="all" type="button" role="tab">
+                                Todos
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link tour-type-pill" data-tour-type="walking" type="button" role="tab">
+                                <i class="ti ti-walk me-1"></i>A Pie
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link tour-type-pill" data-tour-type="vehicle" type="button" role="tab">
+                                <i class="ti ti-car me-1"></i>Con Vehiculos
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
             <!-- First Row: Search and Service Type Pills -->
             <div class="row g-3 mb-3">
                 <!-- Search -->
@@ -115,29 +160,29 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
                     </label>
                     <input type="text" class="form-control search-input" id="searchTourMobile" placeholder="Buscar...">
                 </div>
-                
-                <!-- Service Type Pills -->
-                <div class="col-md-6 col-12">
+
+                <!-- Service Type Pills (vehicle-only) -->
+                <div class="col-md-6 col-12" id="vehicleFiltersMobile">
                     <label class="form-label fw-semibold mb-2">Tipo de Servicio</label>
                     <ul class="nav nav-pills" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active filter-pill" data-filter="guide-only" type="button" role="tab">
-                                Solo Guía
+                                Solo Guia
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link filter-pill" data-filter="with-driver" type="button" role="tab">
-                                Guía + Chofer
+                                Guia + Chofer
                             </button>
                         </li>
                     </ul>
                 </div>
             </div>
-            
+
             <!-- Second Row: Filter Dropdowns -->
             <div class="row g-3">
-                <!-- Rate Selection -->
-                <div class="col-md-4 col-12">
+                <!-- Rate Selection (vehicle-only) -->
+                <div class="col-md-4 col-12" id="rateFilterMobileContainer">
                     <label for="rateFilterMobile-<%= dtTableId %>" class="form-label fw-semibold">
                         <i class="ti ti-tag me-1"></i>Segmento
                     </label>
@@ -145,7 +190,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
                         <option value="">Seleccionar segmento...</option>
                     </select>
                 </div>
-                
+
                 <!-- Currency -->
                 <div class="col-md-4 col-6">
                     <label for="currencyFilterMobile-<%= dtTableId %>" class="form-label fw-semibold">
@@ -170,7 +215,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
                             <option value="efectivo" selected>Efectivo</option>
                             <option value="transferencia">Transferencia</option>
                         <% } %>
-                        <option value="tarjeta">Tarjeta Débito/Crédito</option>
+                        <option value="tarjeta">Tarjeta Debito/Credito</option>
                     </select>
                 </div>
             </div>
@@ -184,7 +229,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Cargando tours...</span>
             </div>
-            <p class="mt-2 text-muted">Cargando tours con vehículos...</p>
+            <p class="mt-2 text-muted">Cargando tours...</p>
         </div>
 
         <!-- Tours Grid -->
@@ -288,7 +333,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
                     <p class="mt-3 text-muted">Cargando información...</p>
                 </div>
             </div>
-                <% if (currentUserRole === 'department_manager') { %>
+                <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
                 <div class="modal-footer border-top" id="tourModalFooter">
                     <button type="button" class="btn btn-primary add-tour-to-quote-from-modal-btn">
                         <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
@@ -300,7 +345,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
 </div>
 
 <!-- Add to Quote Picker Modal for Tours -->
-<% if (currentUserRole === 'department_manager') { %>
+<% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
 <div class="modal fade" id="addTourToQuoteModal" tabindex="-1" aria-labelledby="addTourToQuoteLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-md">
         <div class="modal-content">
@@ -813,6 +858,21 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
     padding: 1rem;
     border-radius: 0.5rem;
     border-left: 4px solid #0d6efd;
+}
+
+.availability-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.availability-day-card {
+    background: #f8f9fa;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    border-left: 3px solid #0d6efd;
+    min-width: 160px;
+    flex: 1 1 auto;
 }
 
 .languages .badge {
@@ -1424,7 +1484,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentDriverTourRate = 0; // Driver tour rate surcharge percentage
     let currentGuideFilter = 'guide-only'; // Filter for guide type - default to guide-only (Solo Guía)
     let selectedRateId = null; // Currently selected rate
-    
+    let currentTourTypeFilter = 'all'; // 'all', 'walking', 'vehicle'
+
     // DOM elements
     const toursLoading = document.getElementById('toursLoading');
     const toursGrid = document.getElementById('toursGrid');
@@ -1447,13 +1508,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load available rates from API
     async function loadAvailableRates() {
         try {
-            console.log('🔄 Loading available segmentos from /api/rates/active...');
+            console.log('Loading available segmentos from /api/rates/active...');
             const response = await fetch('/api/rates/active');
-            console.log('📡 Rate API response status:', response.status, response.statusText);
+            console.log('Rate API response status:', response.status, response.statusText);
             
             if (response.ok) {
                 const data = await response.json();
-                console.log('📦 Rate API response data:', data);
+                console.log('Rate API response data:', data);
                 
                 if (data.success && data.data) {
                     // Filter out "Económico" rate
@@ -1461,16 +1522,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         const rateName = (rate.label || rate.name || '').toLowerCase();
                         return !rateName.includes('económico') && !rateName.includes('economico');
                     });
-                    console.log('✅ Available segmentos loaded:', availableRates.length, 'segmentos (excluding Económico):', availableRates);
+                    console.log('Available segmentos loaded:', availableRates.length, 'segmentos (excluding Económico):', availableRates);
                     populateRateDropdown();
                 } else {
-                    console.warn('❌ Rate API returned success=false or no data:', data);
+                    console.warn('Rate API returned success=false or no data:', data);
                 }
             } else {
-                console.warn('❌ Rate API request failed:', response.status, response.statusText);
+                console.warn('Rate API request failed:', response.status, response.statusText);
             }
         } catch (error) {
-            console.warn('❌ Could not load available rates:', error);
+            console.warn('Could not load available rates:', error);
         }
     }
     
@@ -1480,7 +1541,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (rateFilterDesktop) rateFilterDesktop.innerHTML = '';
         if (rateFilterMobile) rateFilterMobile.innerHTML = '';
         
-        console.log('🔍 Populating rates:', availableRates);
+        console.log('Populating rates:', availableRates);
         
         availableRates.forEach((rate, index) => {
             const optionDesktop = document.createElement('option');
@@ -1514,11 +1575,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 rateFilterMobile.appendChild(optionMobile);
             }
             
-            console.log('➕ Added segmento:', text, 'ID:', value);
+            console.log('Added segmento:', text, 'ID:', value);
         });
         
-        console.log('✅ Segmento dropdown populated with', availableRates.length, 'segmentos');
-        console.log('🎯 Auto-selected first segmento:', selectedRateId);
+        console.log('Segmento dropdown populated with', availableRates.length, 'segmentos');
+        console.log('Auto-selected first segmento:', selectedRateId);
     }
     
     // Load rates functions
@@ -1529,7 +1590,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
                 if (data.success && data.data && data.data.value !== undefined) {
                     currentExchangeRate = parseFloat(data.data.value);
-                    console.log('✅ Exchange rate loaded:', currentExchangeRate, 'MXN per USD');
+                    console.log('Exchange rate loaded:', currentExchangeRate, 'MXN per USD');
                 }
             }
         } catch (error) {
@@ -1572,7 +1633,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
                 if (data.success && data.data && data.data.value !== undefined) {
                     currentDriverTourRate = parseFloat(data.data.value);
-                    console.log('✅ Driver tour rate loaded:', currentDriverTourRate, 'pesos');
+                    console.log('Driver tour rate loaded:', currentDriverTourRate, 'pesos');
                 }
             }
         } catch (error) {
@@ -1611,93 +1672,166 @@ document.addEventListener('DOMContentLoaded', function() {
             return `$${adjustedPrice.toFixed(2)}`;
         }
     }
-    
+
+    // Helper function to extract pricing for walking tours
+    function getWalkingTourPricing(tour) {
+        const defaultPricing = {
+            small: '$1,050 MXN',
+            medium: '$2,100 MXN',
+            large: '$3,150 MXN',
+            smallNumber: 1050,
+            mediumNumber: 2100,
+            largeNumber: 3150,
+            hasTourPricing: false
+        };
+
+        if (tour.walkingPriceSmall && tour.walkingPriceMedium && tour.walkingPriceLarge) {
+            const currency = tour.walkingPriceCurrency || 'MXN';
+            const smallRange = tour.walkingRangeSmall || '1-5 pax';
+            const mediumRange = tour.walkingRangeMedium || '6-10 pax';
+            const largeRange = tour.walkingRangeLarge || '11-15 pax';
+
+            return {
+                small: '$' + tour.walkingPriceSmall.toLocaleString() + ' ' + currency,
+                medium: '$' + tour.walkingPriceMedium.toLocaleString() + ' ' + currency,
+                large: '$' + tour.walkingPriceLarge.toLocaleString() + ' ' + currency,
+                smallNumber: tour.walkingPriceSmall,
+                mediumNumber: tour.walkingPriceMedium,
+                largeNumber: tour.walkingPriceLarge,
+                smallRange: smallRange.replace(' pax', ' personas'),
+                mediumRange: mediumRange.replace(' pax', ' personas'),
+                largeRange: largeRange.replace(' pax', ' personas'),
+                hasTourPricing: true
+            };
+        }
+
+        if (tour.hasClientPrices && tour.clientPrices) {
+            const clientPrices = tour.clientPrices;
+            const priceKeys = Object.keys(clientPrices);
+
+            if (priceKeys.length > 0) {
+                const firstPrice = clientPrices[priceKeys[0]];
+                const basePrice = firstPrice.price || firstPrice.basePrice || 1050;
+
+                return {
+                    small: '$' + basePrice.toLocaleString() + ' MXN',
+                    medium: '$' + (basePrice * 2).toLocaleString() + ' MXN',
+                    large: '$' + (basePrice * 3).toLocaleString() + ' MXN',
+                    smallNumber: basePrice,
+                    mediumNumber: basePrice * 2,
+                    largeNumber: basePrice * 3,
+                    hasTourPricing: false
+                };
+            }
+        }
+
+        return defaultPricing;
+    }
+
+    // Convert walking tour price with payment and currency adjustments
+    function convertWalkingPrice(basePrice, currency, paymentType) {
+        let adjustedPrice = basePrice;
+
+        // Apply payment surcharge
+        if (paymentType === 'transferencia' && currentTransferRate > 0) {
+            adjustedPrice = adjustedPrice * (1 + currentTransferRate / 100);
+        } else if (paymentType === 'tarjeta' && currentAgencyRate > 0) {
+            adjustedPrice = adjustedPrice * (1 + currentAgencyRate / 100);
+        }
+
+        // Convert currency
+        if (currency === 'USD') {
+            const usdPrice = adjustedPrice / currentExchangeRate;
+            const roundedPrice = PricingUtils ? PricingUtils.applyUSDRoundingRules(usdPrice) : Math.round(usdPrice);
+            return '$' + roundedPrice + ' USD';
+        } else {
+            return '$' + adjustedPrice.toFixed(2);
+        }
+    }
+
     // Load tours from API
     async function loadTours() {
         try {
             showLoading();
-            
+
             let apiUrl = '<%= apiEndpoint %>';
             let queryParams = new URLSearchParams();
-            
-            // If a rate is selected, use the tours-with-rate-prices endpoint
-            if (selectedRateId) {
+
+            // If a rate is selected and we're not showing only walking tours, use the tours-with-rate-prices endpoint
+            if (selectedRateId && currentTourTypeFilter !== 'walking') {
                 apiUrl = '/api/tours/with-rate-prices';
                 queryParams.append('rateId', selectedRateId);
                 <% if (typeof clientId !== 'undefined' && clientId) { %>
                 queryParams.append('clientId', '<%= clientId %>');
                 <% } %>
+            } else {
+                <% if (typeof clientId !== 'undefined' && clientId) { %>
+                queryParams.append('clientId', '<%= clientId %>');
+                <% } %>
             }
-            
-            // Add query parameters if any
+
             if (queryParams.toString()) {
                 apiUrl += '?' + queryParams.toString();
             }
-            
-            console.log('🌐 Fetching tours from:', apiUrl);
+
+            console.log('Fetching tours from:', apiUrl);
             const response = await fetch(apiUrl);
-            
+
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                throw new Error('HTTP ' + response.status + ': ' + response.statusText);
             }
-            
+
             const data = await response.json();
-            
+
             if (data.success && data.data) {
-                // Filter for tours with vehicles (not walking tours)
-                allTours = data.data.filter(tour => !tour.isWalkingTour);
-                
-                // Sort tours alphabetically by destination (Destino)
+                allTours = data.data; // Include ALL tours (both walking and vehicle)
+
                 allTours.sort((a, b) => {
                     const destA = (a.destinationPOI?.name || '').toLowerCase();
                     const destB = (b.destinationPOI?.name || '').toLowerCase();
                     return destA.localeCompare(destB, 'es', { numeric: true, sensitivity: 'base' });
                 });
-                
-                console.log(`✅ Loaded ${allTours.length} tours with vehicles (sorted alphabetically by destination)`);
-                console.log('🔍 First tour data structure:', allTours[0]);
-                console.log('🔍 Selected rate ID:', selectedRateId);
+
                 applyFilters();
             } else {
                 throw new Error(data.message || 'Failed to load tours');
             }
         } catch (error) {
-            console.error('❌ Error loading tours:', error);
+            console.error('Error loading tours:', error);
             showError('Error al cargar los tours');
         }
     }
     
     // Apply filters and search
     function applyFilters() {
-        // Get search term from active input (desktop or mobile)
         const searchTerm = (searchInputDesktop?.value || searchInputMobile?.value || '').toLowerCase().trim();
-        
-        // Get currency from active filter (desktop or mobile)
         const currency = currencyFilterDesktop?.value || currencyFilterMobile?.value || 'MXN';
-        
-        // Get payment type from active filter (desktop or mobile)
         const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'efectivo';
-        
+
         filteredTours = allTours.filter(tour => {
-            // Search filter - use actual API field names
-            const searchMatch = !searchTerm || 
+            // Search filter
+            const searchMatch = !searchTerm ||
                 (tour.destinationPOI?.name && tour.destinationPOI.name.toLowerCase().includes(searchTerm)) ||
                 (tour.description && tour.description.toLowerCase().includes(searchTerm));
-            
-            // Guide type filter - always show all vehicle tours regardless of pill selection
-            // The pill selection affects pricing and capacity display, not visibility
-            const guideMatch = true;
-            
-            return searchMatch && guideMatch;
+
+            // Tour type filter
+            let tourTypeMatch = true;
+            if (currentTourTypeFilter === 'walking') {
+                tourTypeMatch = tour.isWalkingTour === true;
+            } else if (currentTourTypeFilter === 'vehicle') {
+                tourTypeMatch = !tour.isWalkingTour;
+            }
+
+            return searchMatch && tourTypeMatch;
         });
-        
-        // Sort tours alphabetically by destination (Destino)
+
+        // Sort tours alphabetically by destination
         filteredTours.sort((a, b) => {
             const destA = (a.destinationPOI?.name || '').toLowerCase();
             const destB = (b.destinationPOI?.name || '').toLowerCase();
             return destA.localeCompare(destB, 'es', { numeric: true, sensitivity: 'base' });
         });
-        
+
         displayTours();
     }
     
@@ -1739,7 +1873,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const advanceBookingTime = tour.advance_booking_time || tour.advanceBookingTime || tour.advanceBooking;
             
             // Debug logging for advance booking time
-            console.log('🕒 Tour advance booking time:', {
+            console.log('Tour advance booking time:', {
                 tourName: tour.destinationPOI?.name,
                 advance_booking_time: tour.advance_booking_time,
                 advanceBookingTime: tour.advanceBookingTime,
@@ -1750,35 +1884,55 @@ document.addEventListener('DOMContentLoaded', function() {
             // Format availability days - handle different formats
             let availabilityText = 'Todos los días';
             let availableDays = null;
-            
-            // Check for availableDays field (legacy format - direct array)
-            if (tour.availableDays && Array.isArray(tour.availableDays)) {
-                availableDays = tour.availableDays;
+
+            // Map for converting Spanish day names to short format
+            const dayNameToShort = {
+                'domingo': 'Do', 'lunes': 'Lu', 'martes': 'Ma',
+                'miércoles': 'Mi', 'miercoles': 'Mi', 'jueves': 'Ju',
+                'viernes': 'Vi', 'sábado': 'Sa', 'sabado': 'Sa'
+            };
+            const dayNameOrder = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
+            // Check for availability field first (new format - array of day schedules)
+            if (tour.availability && Array.isArray(tour.availability) && tour.availability.length > 0) {
+                if (typeof tour.availability[0] === 'object' && 'day' in tour.availability[0]) {
+                    availableDays = tour.availability.map(schedule => schedule.day);
+                } else {
+                    availableDays = tour.availability;
+                }
             }
-            // Check for availability field (could be array or object)
-            else if (tour.availability) {
-                // If it's an array of day schedules
-                if (Array.isArray(tour.availability)) {
-                    // Check if it's array of objects with day property
-                    if (tour.availability.length > 0 && typeof tour.availability[0] === 'object' && 'day' in tour.availability[0]) {
-                        availableDays = tour.availability.map(schedule => schedule.day);
-                    } else {
-                        // It's a simple array of day codes
-                        availableDays = tour.availability;
+            // Fallback: Check for availableDays field (legacy format - string day names or numeric)
+            else if (tour.availableDays && Array.isArray(tour.availableDays) && tour.availableDays.length > 0) {
+                // Check if it's string day names (e.g., ["Martes", "Jueves"])
+                if (typeof tour.availableDays[0] === 'string') {
+                    const shortDays = tour.availableDays
+                        .map(name => dayNameToShort[name.toLowerCase()])
+                        .filter(Boolean);
+                    if (shortDays.length > 0 && shortDays.length < 7) {
+                        // Sort by day order
+                        shortDays.sort((a, b) => {
+                            const order = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
+                            return order.indexOf(a) - order.indexOf(b);
+                        });
+                        availabilityText = shortDays.join(', ');
+                    } else if (shortDays.length >= 7) {
+                        availabilityText = 'Todos los días';
                     }
-                }
-                // If it's an object with availableDays property
-                else if (typeof tour.availability === 'object' && tour.availability.availableDays) {
-                    availableDays = tour.availability.availableDays;
+                    availableDays = null; // Already handled
+                } else {
+                    availableDays = tour.availableDays;
                 }
             }
-            
-            // Format the days for display
+            // Check availability as object
+            else if (tour.availability && typeof tour.availability === 'object' && tour.availability.availableDays) {
+                availableDays = tour.availability.availableDays;
+            }
+
+            // Format numeric day codes for display
             if (availableDays && Array.isArray(availableDays) && availableDays.length > 0) {
-                const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-                // Filter valid day codes (0-6)
+                const dayNames = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
                 const validDays = availableDays.filter(day => Number.isInteger(day) && day >= 0 && day <= 6);
-                
+
                 if (validDays.length === 7) {
                     availabilityText = 'Todos los días';
                 } else if (validDays.length > 0) {
@@ -1817,36 +1971,72 @@ document.addEventListener('DOMContentLoaded', function() {
             let priceSection = '';
             let vehicleInfo = '';
             let typeSection = '';
-            
-            console.log('🔍 Display logic for tour:', tour.destinationPOI?.name, {
-                selectedRateId,
-                hasPriceData: !!tour.priceData,
-                priceDataLength: tour.priceData?.length || 0,
-                priceData: tour.priceData,
-                tourId: tour.id
-            });
-            
-            if (selectedRateId && tour.priceData && tour.priceData.length > 0) {
+
+            if (tour.isWalkingTour) {
+                // Walking tour pricing: group-based tiers
+                const pricing = getWalkingTourPricing(tour);
+                const smallPrice = convertWalkingPrice(pricing.smallNumber, currency, paymentType);
+                const mediumPrice = convertWalkingPrice(pricing.mediumNumber, currency, paymentType);
+                const largePrice = convertWalkingPrice(pricing.largeNumber, currency, paymentType);
+
+                priceSection = `
+                    <div class="vehicle-pricing">
+                        <div class="vehicle-option mb-2 p-2 border rounded" style="background: #f0fdf4;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong style="color: #16a34a;"><i class="ti ti-users me-1"></i>${pricing.smallRange || '1-5 personas'}</strong>
+                                    <div class="small text-muted">por hora</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold text-success" style="font-size: 1.1rem;">${smallPrice}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="vehicle-option mb-2 p-2 border rounded" style="background: #fefce8;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong style="color: #ca8a04;"><i class="ti ti-users me-1"></i>${pricing.mediumRange || '6-10 personas'}</strong>
+                                    <div class="small text-muted">por hora</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold text-success" style="font-size: 1.1rem;">${mediumPrice}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="vehicle-option mb-2 p-2 border rounded" style="background: #eff6ff;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong style="color: #2563eb;"><i class="ti ti-users me-1"></i>${pricing.largeRange || '11-15 personas'}</strong>
+                                    <div class="small text-muted">por hora</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold text-success" style="font-size: 1.1rem;">${largePrice}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (selectedRateId && tour.priceData && tour.priceData.length > 0) {
                 // Show detailed vehicles and pricing when rate is selected
                 const vehicleCards = tour.priceData.map(priceData => {
                     const vehicleName = priceData.vehicleType?.name || 'Vehículo';
                     const baseCapacity = priceData.vehicleType?.defaultCapacity || 0;
                     let finalPrice = priceData.price || 0;
-                    
+
                     // Adjust capacity based on guide filter
                     let adjustedCapacity = baseCapacity;
                     if (currentGuideFilter === 'with-driver' && baseCapacity > 0) {
                         adjustedCapacity = baseCapacity - 1; // Driver takes a seat
                     }
-                    
+
                     // Check if there's a client-specific price
                     const isClientSpecific = priceData.isClientPrice;
-                    
+
                     // Apply driver rate if "with-driver" is selected
                     const formattedPrice = convertTourPrice(finalPrice, currency, paymentType, true);
-                    const clientBadge = isClientSpecific ? 
+                    const clientBadge = isClientSpecific ?
                         '<span class="badge bg-primary text-white ms-1" style="font-size: 0.6rem;">Cliente</span>' : '';
-                    
+
                     return `
                         <div class="vehicle-option mb-2 p-2 border rounded" style="background: #f8f9fa;">
                             <div class="d-flex justify-content-between align-items-center">
@@ -1863,15 +2053,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     `;
                 }).join('');
-                
+
                 priceSection = `
                     <div class="vehicle-pricing">
                         ${vehicleCards}
                     </div>
                 `;
-                
+
                 vehicleInfo = ``;
-                
+
                 // Don't show type section - removed as requested
                 typeSection = '';
             } else {
@@ -1942,6 +2132,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ${pictureElement}
                         <div class="tour-card-body">
                             <h6 class="tour-card-title">${destination}</h6>
+                            ${tour.isWalkingTour ? '<span class="badge bg-success mb-1"><i class="ti ti-walk me-1"></i>Tour a Pie</span>' : ''}
                             <p class="tour-card-description">${description.substring(0, 120)}${description.length > 120 ? '...' : ''}</p>
                             
                             ${vehicleInfo}
@@ -1964,7 +2155,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                     <div class="tour-info-row">
                                         <span class="tour-info-label">
-                                            <i class="ti ti-calendar-event me-1"></i>Días disponibles
+                                            <i class="ti ti-calendar-event me-1"></i>Días sugeridos
                                         </span>
                                         <span class="tour-info-value" style="font-size: 0.8rem;">
                                             ${availabilityText}
@@ -1982,7 +2173,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                             data-tour-type="vehicle">
                                         <i class="ti ti-eye me-1"></i>Ver más
                                     </button>
-                                    <% if (currentUserRole === 'department_manager') { %>
+                                    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
                                     <button class="btn btn-primary btn-sm add-tour-to-quote-btn"
                                             data-tour-id="${tour.id || tour.objectId}"
                                             data-tour-name="${destination}"
@@ -2093,8 +2284,8 @@ document.addEventListener('DOMContentLoaded', function() {
         rateFilterDesktop.addEventListener('change', function() {
             selectedRateId = this.value || null;
             syncDropdowns(rateFilterDesktop, rateFilterMobile);
-            console.log('🔄 Segmento changed to:', selectedRateId);
-            console.log('🔍 Selected rate element:', this.selectedOptions[0]?.textContent);
+            console.log('Segmento changed to:', selectedRateId);
+            console.log('Selected rate element:', this.selectedOptions[0]?.textContent);
             loadTours(); // Reload tours with new rate pricing
         });
     }
@@ -2103,8 +2294,8 @@ document.addEventListener('DOMContentLoaded', function() {
         rateFilterMobile.addEventListener('change', function() {
             selectedRateId = this.value || null;
             syncDropdowns(rateFilterMobile, rateFilterDesktop);
-            console.log('🔄 Segmento changed to:', selectedRateId);
-            console.log('🔍 Selected rate element:', this.selectedOptions[0]?.textContent);
+            console.log('Segmento changed to:', selectedRateId);
+            console.log('Selected rate element:', this.selectedOptions[0]?.textContent);
             loadTours(); // Reload tours with new rate pricing
         });
     }
@@ -2115,16 +2306,49 @@ document.addEventListener('DOMContentLoaded', function() {
             // Update active state
             filterPills.forEach(p => p.classList.remove('active'));
             this.classList.add('active');
-            
+
             // Update filter
             currentGuideFilter = this.getAttribute('data-filter');
-            console.log('🚗 Guide filter changed to:', currentGuideFilter);
-            
+            console.log('Guide filter changed to:', currentGuideFilter);
+
             // Refresh display to recalculate capacity and pricing
             displayTours();
         });
     });
-    
+
+    // Tour type filter pills event handlers
+    const tourTypePills = document.querySelectorAll('.tour-type-pill');
+    tourTypePills.forEach(pill => {
+        pill.addEventListener('click', function() {
+            tourTypePills.forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+
+            currentTourTypeFilter = this.getAttribute('data-tour-type');
+
+            // Show/hide vehicle-specific filters
+            const vehicleFiltersDesktop = document.getElementById('vehicleFiltersDesktop');
+            const vehicleFiltersMobile = document.getElementById('vehicleFiltersMobile');
+            const rateFilterDesktopContainer = document.getElementById('rateFilterDesktopContainer');
+            const rateFilterMobileContainer = document.getElementById('rateFilterMobileContainer');
+
+            if (currentTourTypeFilter === 'walking') {
+                // Hide vehicle-specific filters
+                if (vehicleFiltersDesktop) vehicleFiltersDesktop.style.display = 'none';
+                if (vehicleFiltersMobile) vehicleFiltersMobile.style.display = 'none';
+                if (rateFilterDesktopContainer) rateFilterDesktopContainer.style.display = 'none';
+                if (rateFilterMobileContainer) rateFilterMobileContainer.style.display = 'none';
+            } else {
+                // Show vehicle-specific filters
+                if (vehicleFiltersDesktop) vehicleFiltersDesktop.style.display = '';
+                if (vehicleFiltersMobile) vehicleFiltersMobile.style.display = '';
+                if (rateFilterDesktopContainer) rateFilterDesktopContainer.style.display = '';
+                if (rateFilterMobileContainer) rateFilterMobileContainer.style.display = '';
+            }
+
+            applyFilters();
+        });
+    });
+
     // Debounce function for search
     function debounce(func, wait) {
         let timeout;
@@ -2151,7 +2375,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    <% if (currentUserRole === 'department_manager') { %>
+    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
     // ========== Add Tour to Quote functionality ==========
 
     function getTourAccessToken() {
@@ -2555,7 +2779,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             bootstrap.Modal.getInstance(document.getElementById('addTourToQuoteModal'))?.hide();
-            window.location.href = '/dashboard/department_manager/quotes/' + quoteId + '?section=services';
+            window.location.href = '/dashboard/<%= currentUserRole %>/quotes/' + quoteId + '?section=services';
         } catch (error) {
             console.error('Error creating new quote:', error);
             showTourQuoteError(error.message);
@@ -2570,7 +2794,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const alertHtml = '<div class="alert alert-success alert-dismissible fade show" role="alert">' +
             '<i class="ti ti-check me-2"></i>' +
             'Tour agregado a <strong>' + folio + '</strong> ' +
-            '<a href="/dashboard/department_manager/quotes/' + quoteId + '?section=services" class="alert-link ms-2">' +
+            '<a href="/dashboard/<%= currentUserRole %>/quotes/' + quoteId + '?section=services" class="alert-link ms-2">' +
                 'Ver cotización <i class="ti ti-arrow-right"></i>' +
             '</a>' +
             '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
@@ -2645,7 +2869,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             // Always fetch complete tour data from individual tour API endpoint
             // This ensures we get all tour fields including those missing from the tours list
-            console.log('🌐 Fetching complete tour details from API for tourId:', tourId);
+            console.log('Fetching complete tour details from API for tourId:', tourId);
             const response = await fetch(`/api/tours/${tourId}`, {
                 method: 'GET',
                 headers: {
@@ -2659,9 +2883,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             const tourData = await response.json();
-            console.log('📋 Complete tour data from API:', tourData);
+            console.log('Complete tour data from API:', tourData);
             const tourDetail = tourData.data.tour || tourData.data;
-            console.log('🔍 Final tour detail object:', tourDetail);
+            console.log('Final tour detail object:', tourDetail);
 
             // Store tour for Add to Quote button
             window._currentModalTour = {
@@ -2670,8 +2894,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 type: 'tour',
                 price: tourDetail.price || 0
             };
-            console.log('🔑 All tour data fields:', Object.keys(tourDetail));
-            console.log('🔍 Tour data field categories:', {
+            console.log('All tour data fields:', Object.keys(tourDetail));
+            console.log('Tour data field categories:', {
                 basic: Object.keys(tourDetail).filter(key => !key.includes('_') && !key.includes('price') && !key.includes('Price')),
                 pricing: Object.keys(tourDetail).filter(key => key.toLowerCase().includes('price') || key.toLowerCase().includes('cost')),
                 capacity: Object.keys(tourDetail).filter(key => key.toLowerCase().includes('capacity') || key.toLowerCase().includes('people') || key.toLowerCase().includes('pax')),
@@ -2914,7 +3138,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${tour.advance_booking_time ? `
                     <div class="alert alert-warning">
                         <i class="ti ti-clock-hour-4 me-2"></i>
-                        <strong>Reservar con anticipación:</strong> Mínimo ${tour.advance_booking_time} horas antes
+                        <strong>Reservar con anticipación:</strong> Mínimo ${formatDuration(tour.advance_booking_time)} antes
                     </div>
                 ` : ''}
                 
@@ -3014,15 +3238,30 @@ document.addEventListener('DOMContentLoaded', function() {
         const detailsContent = document.getElementById('detailsContent');
         
         // Debug tour object to console
-        console.log('🔍 Complete tour object for details tab:', tour);
+        console.log('Complete tour object for details tab:', tour);
         
         detailsContent.innerHTML = `
             
-            ${tour.availability ? `
+            ${tour.availability || tour.availableDays ? `
                 <div class="content-section">
-                    <h5><i class="ti ti-calendar-event me-2"></i>Disponibilidad</h5>
-                    <div class="availability-info">
-                        ${formatAvailability(tour.availability)}
+                    <h5 class="text-info mb-3"><i class="ti ti-calendar me-2"></i>Horarios Sugeridos</h5>
+                    <div class="availability-grid">
+                        ${Array.isArray(tour.availability) && tour.availability.length > 0 ? tour.availability.map(item => {
+                            const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                            let dayName = '';
+                            if (typeof item === 'object' && typeof item.day === 'number') {
+                                dayName = item.day >= 0 && item.day <= 6 ? daysOfWeek[item.day] : 'Día ' + item.day;
+                            } else if (typeof item === 'number') {
+                                dayName = item >= 0 && item <= 6 ? daysOfWeek[item] : 'Día ' + item;
+                            }
+                            // Tours use startTime/endTime (not times array)
+                            const timeStr = item.startTime && item.endTime ? item.startTime + ' - ' + item.endTime : '';
+                            return '<div class="availability-day-card"><strong>' + dayName + '</strong>' + (timeStr ? '<div class="text-muted small mt-1"><span class="d-block">• ' + timeStr + '</span></div>' : '') + '</div>';
+                        }).join('')
+                        : Array.isArray(tour.availableDays) && tour.availableDays.length > 0 ? tour.availableDays.map(day => {
+                            return '<div class="availability-day-card"><strong>' + day + '</strong></div>';
+                        }).join('')
+                        : '<div class="availability-info">' + formatAvailability(tour.availability) + '</div>'}
                     </div>
                 </div>
             ` : ''}
@@ -3152,7 +3391,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const pricesContent = document.getElementById('pricesContent');
         
         // Debug tour pricing data to console
-        console.log('💰 Complete tour pricing data:', {
+        console.log('Complete tour pricing data:', {
             tourId: tour.id,
             tourName: tour.destinationPOI?.name,
             priceData: tour.priceData,
@@ -3183,7 +3422,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Additional debug for priceData structure
         if (tour.priceData && Array.isArray(tour.priceData)) {
-            console.log('🚗 Vehicle pricing details:');
+            console.log('Vehicle pricing details:');
             tour.priceData.forEach((price, index) => {
                 console.log(`  Vehicle ${index + 1}:`, {
                     vehicleType: price.vehicleType,
