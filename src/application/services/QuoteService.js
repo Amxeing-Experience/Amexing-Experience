@@ -32,7 +32,7 @@ const ReservationService = require('../../domain/models/ReservationService');
 class QuoteService {
   constructor() {
     this.className = 'Quote';
-    this.allowedRoles = ['superadmin', 'admin', 'department_manager'];
+    this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client'];
     this.validStatuses = ['requested', 'hold', 'scheduled', 'rejected'];
     this.pdfService = new PDFReceiptService();
   }
@@ -214,6 +214,10 @@ class QuoteService {
       const allowedFields = [
         'status',
         'numberOfPeople',
+        'numberOfAdults',
+        'numberOfChildren',
+        'numberOfInfants',
+        'preferredLanguage',
         'contactPerson',
         'contactEmail',
         'contactPhone',
@@ -320,8 +324,8 @@ class QuoteService {
       // Get user role
       const role = userRole || currentUser.get('role');
 
-      // Validate user permissions (superadmin, admin, and department_manager)
-      if (!['superadmin', 'admin', 'department_manager'].includes(role)) {
+      // Validate user permissions
+      if (!['superadmin', 'admin', 'department_manager', 'client'].includes(role)) {
         throw new Error(`Unauthorized: Role '${role}' cannot delete Quotes`);
       }
 

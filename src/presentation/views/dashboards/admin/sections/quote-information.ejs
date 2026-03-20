@@ -36,7 +36,7 @@
 
                 <div class="row">
                     <div class="col-md-12 mb-3">
-                        <% if (typeof userRole !== 'undefined' && userRole === 'department_manager') { %>
+                        <% if (typeof userRole !== 'undefined' && (userRole === 'department_manager' || userRole === 'client')) { %>
                             <!-- Department Manager: Current user as client (read-only) -->
                             <label class="form-label">Cliente <span class="text-danger">*</span></label>
                             <div class="form-control bg-light d-flex align-items-center">
@@ -84,13 +84,29 @@
                     </div>
 
                     <div class="col-md-4 mb-3">
-                        <label for="numberOfPeople" class="form-label">Número de Personas <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="numberOfPeople" name="numberOfPeople"
-                               min="1" placeholder="0" required>
-                        <div class="form-text">Cantidad de personas/asistentes</div>
-                        <div class="invalid-feedback">Por favor ingresa el número de personas</div>
+                        <label for="preferredLanguage" class="form-label">Idioma de Preferencia</label>
+                        <select class="form-select" id="preferredLanguage" name="preferredLanguage">
+                            <option value="es">Español</option>
+                            <option value="en">Inglés</option>
+                        </select>
                     </div>
                 </div>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="numberOfAdults" class="form-label">Número de adultos (12+) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control quote-people-input" id="numberOfAdults" name="numberOfAdults" min="0" value="0">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="numberOfChildren" class="form-label">Número de niños (3-12)</label>
+                        <input type="number" class="form-control quote-people-input" id="numberOfChildren" name="numberOfChildren" min="0" value="0">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="numberOfInfants" class="form-label">Número de infantes (0-2)</label>
+                        <input type="number" class="form-control quote-people-input" id="numberOfInfants" name="numberOfInfants" min="0" value="0">
+                    </div>
+                </div>
+                <input type="hidden" id="numberOfPeople" name="numberOfPeople" value="0">
             </div>
 
             <!-- Sección: Información de Contacto -->
@@ -268,7 +284,8 @@
         email: '<%= typeof user !== "undefined" && user ? user.email || "" : "" %>',
         firstName: '<%= typeof user !== "undefined" && user ? user.firstName || "" : "" %>',
         lastName: '<%= typeof user !== "undefined" && user ? user.lastName || "" : "" %>',
-        phone: '<%= typeof user !== "undefined" && user ? user.phone || "" : "" %>'
+        phone: '<%= typeof user !== "undefined" && user ? user.phone || "" : "" %>',
+        clientId: '<%= typeof user !== "undefined" && user ? user.clientId || "" : "" %>'
     };
 
     // Get JWT token from cookies
@@ -355,30 +372,52 @@
         }
     }
 
-    // Load current user info for department manager (using server-side data)
-    function loadCurrentUserAsClient() {
+    // Load current user info for department manager / client role
+    async function loadCurrentUserAsClient() {
         try {
+            // For client role, use the clientId (org owner) instead of current user
+            if (userRole === 'client' && currentUserData.clientId) {
+                const clientUserId = currentUserData.clientId;
+                document.getElementById('clientId').value = clientUserId;
+
+                // Fetch org owner's name from API
+                try {
+                    const token = getAccessToken();
+                    const resp = await fetch(`/api/users/${clientUserId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (resp.ok) {
+                        const result = await resp.json();
+                        const owner = result.data || result;
+                        const ownerName = [owner.firstName, owner.lastName].filter(Boolean).join(' ') || owner.companyName || owner.email || 'Cliente';
+                        document.getElementById('currentUserName').textContent = ownerName;
+                    } else {
+                        document.getElementById('currentUserName').textContent = 'Cliente';
+                    }
+                } catch {
+                    document.getElementById('currentUserName').textContent = 'Cliente';
+                }
+
+                // Auto-fill contact info from current user
+                const fullName = `${currentUserData.firstName || ''} ${currentUserData.lastName || ''}`.trim();
+                if (fullName) document.getElementById('contactPerson').value = fullName;
+                if (currentUserData.email) document.getElementById('contactEmail').value = currentUserData.email;
+                if (currentUserData.phone) document.getElementById('contactPhone').value = currentUserData.phone;
+                return;
+            }
+
+            // Department manager: use current user as client
             if (currentUserData.id) {
-                // Set current user name in the display
                 const displayName = currentUserData.name || currentUserData.email || 'Usuario actual';
                 document.getElementById('currentUserName').textContent = displayName;
-                
-                // Set the hidden client ID field to the current user's ID
                 document.getElementById('clientId').value = currentUserData.id;
-                
-                // Auto-fill contact information with user data
+
                 if (currentUserData.firstName || currentUserData.lastName) {
                     const fullName = `${currentUserData.firstName || ''} ${currentUserData.lastName || ''}`.trim();
-                    if (fullName) {
-                        document.getElementById('contactPerson').value = fullName;
-                    }
+                    if (fullName) document.getElementById('contactPerson').value = fullName;
                 }
-                if (currentUserData.email) {
-                    document.getElementById('contactEmail').value = currentUserData.email;
-                }
-                if (currentUserData.phone) {
-                    document.getElementById('contactPhone').value = currentUserData.phone;
-                }
+                if (currentUserData.email) document.getElementById('contactEmail').value = currentUserData.email;
+                if (currentUserData.phone) document.getElementById('contactPhone').value = currentUserData.phone;
             } else {
                 document.getElementById('currentUserName').textContent = 'Usuario no disponible';
             }
@@ -558,8 +597,8 @@
                 const quote = result.data;
 
                 // Handle client population based on user role
-                if (userRole === 'department_manager') {
-                    // For department manager: populate client info in read-only display
+                if (userRole === 'department_manager' || userRole === 'client') {
+                    // For department manager / client: populate client info in read-only display
                     if (quote.client && quote.client.fullName) {
                         document.getElementById('currentUserName').textContent = quote.client.fullName;
                     }
@@ -581,6 +620,18 @@
 
                 if (quote.numberOfPeople) {
                     document.getElementById('numberOfPeople').value = quote.numberOfPeople;
+                }
+                if (quote.numberOfAdults !== undefined) {
+                    document.getElementById('numberOfAdults').value = quote.numberOfAdults;
+                }
+                if (quote.numberOfChildren !== undefined) {
+                    document.getElementById('numberOfChildren').value = quote.numberOfChildren;
+                }
+                if (quote.numberOfInfants !== undefined) {
+                    document.getElementById('numberOfInfants').value = quote.numberOfInfants;
+                }
+                if (quote.preferredLanguage) {
+                    document.getElementById('preferredLanguage').value = quote.preferredLanguage;
                 }
 
                 if (quote.contactPerson) {
@@ -627,8 +678,8 @@
 
         // Get client ID based on user role
         let clientId;
-        if (userRole === 'department_manager') {
-            // For department manager: get from hidden input
+        if (userRole === 'department_manager' || userRole === 'client') {
+            // For department manager / client: get from hidden input
             clientId = document.getElementById('clientId').value;
         } else {
             // For admin/superadmin: get from Tom Select
@@ -645,6 +696,10 @@
         const formData = {
             eventType: document.getElementById('eventType').value.trim() || undefined,
             numberOfPeople: document.getElementById('numberOfPeople').value ? parseInt(document.getElementById('numberOfPeople').value, 10) : undefined,
+            numberOfAdults: parseInt(document.getElementById('numberOfAdults').value || 0),
+            numberOfChildren: parseInt(document.getElementById('numberOfChildren').value || 0),
+            numberOfInfants: parseInt(document.getElementById('numberOfInfants').value || 0),
+            preferredLanguage: document.getElementById('preferredLanguage').value || 'es',
             contactPerson: document.getElementById('contactPerson').value.trim() || undefined,
             contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
             contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
@@ -712,8 +767,8 @@
 
         // Get client ID based on user role
         let clientId;
-        if (userRole === 'department_manager') {
-            // For department manager: get from hidden input
+        if (userRole === 'department_manager' || userRole === 'client') {
+            // For department manager / client: get from hidden input
             clientId = document.getElementById('clientId').value;
         } else {
             // For admin/superadmin: get from Tom Select
@@ -731,6 +786,10 @@
             clientId: clientId,
             eventType: document.getElementById('eventType').value.trim() || undefined,
             numberOfPeople: document.getElementById('numberOfPeople').value ? parseInt(document.getElementById('numberOfPeople').value, 10) : undefined,
+            numberOfAdults: parseInt(document.getElementById('numberOfAdults').value || 0),
+            numberOfChildren: parseInt(document.getElementById('numberOfChildren').value || 0),
+            numberOfInfants: parseInt(document.getElementById('numberOfInfants').value || 0),
+            preferredLanguage: document.getElementById('preferredLanguage').value || 'es',
             contactPerson: document.getElementById('contactPerson').value.trim() || undefined,
             contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
             contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
@@ -759,7 +818,8 @@
                 showAlert('quoteInformationAlerts', result.message || 'Cotización creada exitosamente', 'success');
 
                 // Redirect to quote detail page with services section (use appropriate dashboard path)
-                const dashboardPath = userRole === 'department_manager' ? '/dashboard/department_manager' : '/dashboard/admin';
+                const dashboardPathMap = { department_manager: '/dashboard/department_manager', client: '/dashboard/client' };
+                const dashboardPath = dashboardPathMap[userRole] || '/dashboard/admin';
                 setTimeout(() => {
                     window.location.href = `${dashboardPath}/quotes/${result.data.id}?section=services`;
                 }, 1500);
@@ -783,9 +843,9 @@
 
         try {
             // Load data based on user role
-            if (userRole === 'department_manager') {
-                // For department manager: load current user as client
-                loadCurrentUserAsClient();
+            if (userRole === 'department_manager' || userRole === 'client') {
+                // For department manager / client: load current user as client
+                await loadCurrentUserAsClient();
             } else {
                 // For admin/superadmin: load clients
                 await loadActiveClients();
@@ -804,8 +864,18 @@
                 await loadQuoteData(quoteId);
             }
 
+            // Auto-sum people fields into hidden numberOfPeople
+            document.querySelectorAll('.quote-people-input').forEach(input => {
+                input.addEventListener('change', () => {
+                    const adults = parseInt(document.getElementById('numberOfAdults').value || 0);
+                    const children = parseInt(document.getElementById('numberOfChildren').value || 0);
+                    const infants = parseInt(document.getElementById('numberOfInfants').value || 0);
+                    document.getElementById('numberOfPeople').value = adults + children + infants;
+                });
+            });
+
             // Event listeners (only for admin/superadmin)
-            if (userRole !== 'department_manager') {
+            if (userRole !== 'department_manager' && userRole !== 'client') {
                 document.getElementById('createQuickClientBtn').addEventListener('click', openQuickClientModal);
                 document.getElementById('saveQuickClientBtn').addEventListener('click', saveQuickClient);
             }

@@ -140,6 +140,7 @@ class QuoteController {
       // 2. Extract fields from request body
       const {
         client, clientId, contactPerson, contactEmail, contactPhone, notes, eventType, numberOfPeople,
+        numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
       } = req.body;
 
       // Normalize field names (accept both formats)
@@ -182,6 +183,10 @@ class QuoteController {
       quote.set('notes', notes || '');
       quote.set('eventType', eventType || '');
       quote.set('numberOfPeople', numberOfPeople ? parseInt(numberOfPeople, 10) : 1);
+      quote.set('numberOfAdults', numberOfAdults ? parseInt(numberOfAdults, 10) : 0);
+      quote.set('numberOfChildren', numberOfChildren ? parseInt(numberOfChildren, 10) : 0);
+      quote.set('numberOfInfants', numberOfInfants ? parseInt(numberOfInfants, 10) : 0);
+      quote.set('preferredLanguage', preferredLanguage || 'es');
 
       // 9. Set automatic fields
       quote.set('status', 'requested');
@@ -515,6 +520,10 @@ class QuoteController {
           : null,
         eventType: quote.get('eventType') || '',
         numberOfPeople: quote.get('numberOfPeople') || 1,
+        numberOfAdults: quote.get('numberOfAdults') || 0,
+        numberOfChildren: quote.get('numberOfChildren') || 0,
+        numberOfInfants: quote.get('numberOfInfants') || 0,
+        preferredLanguage: quote.get('preferredLanguage') || 'es',
         contactPerson: quote.get('contactPerson') || '',
         contactEmail: quote.get('contactEmail') || '',
         contactPhone: quote.get('contactPhone') || '',
@@ -1176,19 +1185,28 @@ class QuoteController {
    */
   async generateFolio() {
     try {
-      // Get count of existing quotes
-      const query = new Parse.Query('Quote');
-      query.equalTo('exists', true);
-      const count = await query.count({ useMasterKey: true });
-
-      // Generate folio with current year
       const year = new Date().getFullYear();
-      const sequenceNumber = String(count + 1).padStart(4, '0');
+      const prefix = `QTE-${year}-`;
 
-      return `QTE-${year}-${sequenceNumber}`;
+      // Find the highest existing folio for this year (include ALL quotes, even deleted)
+      const query = new Parse.Query('Quote');
+      query.startsWith('folio', prefix);
+      query.descending('folio');
+      query.limit(1);
+      query.select('folio');
+
+      const lastQuote = await query.first({ useMasterKey: true });
+
+      let nextNumber = 1;
+      if (lastQuote) {
+        const lastFolio = lastQuote.get('folio');
+        const lastNumber = parseInt(lastFolio.replace(prefix, ''), 10);
+        if (!Number.isNaN(lastNumber)) nextNumber = lastNumber + 1;
+      }
+
+      return `${prefix}${String(nextNumber).padStart(4, '0')}`;
     } catch (error) {
       logger.error('Error generating folio', { error: error.message });
-      // Fallback to timestamp-based folio
       return `QTE-${new Date().getFullYear()}-${Date.now()}`;
     }
   }
@@ -2114,27 +2132,54 @@ class QuoteController {
         return true;
       }
 
-      // Department managers can access quotes created by users in their department
+      // Department managers can access quotes created by users in their department or organization
       if (userRole === 'department_manager') {
         const userDepartmentId = currentUser.departmentId || currentUser.get('departmentId');
-        if (!userDepartmentId || !createdBy) {
-          return false;
+
+        // Check if client pointer matches the current user (quotes assigned to them)
+        const clientPtr = quote.get('client');
+        if (clientPtr && clientPtr.id === currentUser.id) {
+          return true;
         }
 
-        // Check if the quote creator is in the same department
-        try {
-          const creatorQuery = new Parse.Query('AmexingUser');
-          const creator = await creatorQuery.get(createdBy.id, { useMasterKey: true });
+        if (createdBy) {
+          try {
+            const creatorQuery = new Parse.Query('AmexingUser');
+            const creator = await creatorQuery.get(createdBy.id, { useMasterKey: true });
 
-          if (creator) {
-            const creatorDepartmentId = creator.departmentId || creator.get('departmentId');
-            return creatorDepartmentId === userDepartmentId;
+            if (creator) {
+              // Check same department
+              const creatorDepartmentId = creator.departmentId || creator.get('departmentId');
+              if (userDepartmentId && creatorDepartmentId === userDepartmentId) {
+                return true;
+              }
+              // Check if creator's clientId points to current user (org member)
+              const creatorClientId = creator.get('clientId');
+              if (creatorClientId === currentUser.id) {
+                return true;
+              }
+            }
+          } catch (error) {
+            logger.warn('Could not fetch quote creator for access check', {
+              createdById: createdBy.id,
+              error: error.message,
+            });
           }
-        } catch (error) {
-          logger.warn('Could not fetch quote creator for department check', {
-            createdById: createdBy.id,
-            error: error.message,
-          });
+        }
+      }
+
+      // Clients can access quotes in their organization
+      if (userRole === 'client') {
+        const userClientId = currentUser.clientId || currentUser.get('clientId');
+        const clientPtr = quote.get('client');
+
+        // Check if client pointer matches the org owner
+        if (clientPtr && userClientId && clientPtr.id === userClientId) {
+          return true;
+        }
+        // Check if client pointer matches current user
+        if (clientPtr && clientPtr.id === currentUser.id) {
+          return true;
         }
       }
 
@@ -2199,24 +2244,48 @@ class QuoteController {
 
         const departmentUsers = await departmentUsersQuery.find({ useMasterKey: true });
 
-        if (departmentUsers.length === 0) {
-          query.equalTo('client', {
-            __type: 'Pointer',
-            className: 'AmexingUser',
-            objectId: currentUser.id,
-          });
-          return;
-        }
+        // Also find users whose clientId points to this manager (org members)
+        const orgUsersQuery = new Parse.Query('AmexingUser');
+        orgUsersQuery.equalTo('clientId', currentUser.id);
+        orgUsersQuery.equalTo('exists', true);
+        orgUsersQuery.equalTo('active', true);
 
-        // Create array of user pointers for the department
-        const departmentUserPointers = departmentUsers.map((user) => ({
+        const orgUsers = await orgUsersQuery.find({ useMasterKey: true });
+
+        // Merge department + org users (deduplicate by id)
+        const allUserIds = new Set();
+        const allUserPointers = [];
+
+        // Always include current user
+        allUserIds.add(currentUser.id);
+        allUserPointers.push({
           __type: 'Pointer',
           className: 'AmexingUser',
-          objectId: user.id,
-        }));
+          objectId: currentUser.id,
+        });
 
-        // Filter quotes to those FOR clients in this department
-        query.containedIn('client', departmentUserPointers);
+        [...departmentUsers, ...orgUsers].forEach((user) => {
+          if (!allUserIds.has(user.id)) {
+            allUserIds.add(user.id);
+            allUserPointers.push({
+              __type: 'Pointer',
+              className: 'AmexingUser',
+              objectId: user.id,
+            });
+          }
+        });
+
+        // Query 1: Quotes where client matches department/org users
+        const queryByClient = new Parse.Query('Quote');
+        queryByClient.containedIn('client', allUserPointers);
+
+        // Query 2: Quotes created by department/org users
+        const queryByCreator = new Parse.Query('Quote');
+        queryByCreator.containedIn('createdBy', allUserPointers);
+
+        // Combine with OR
+        // eslint-disable-next-line no-underscore-dangle
+        query._orQuery([queryByClient, queryByCreator]);
 
         logger.info('Applied department filter to quotes query (client)', {
           userId: currentUser.id,
@@ -2227,34 +2296,58 @@ class QuoteController {
         return;
       }
 
-      // Clients see quotes FOR users in their organization
-      if (userRole === 'client') {
-        const userClientId = currentUser.clientId || currentUser.get('clientId') || currentUser.id;
+      // Clients see quotes FOR their organization + quotes they created
+      // Match by role name OR by having a clientId (client org members may have non-client roles)
+      const userClientId = currentUser.clientId || currentUser.get('clientId');
+      if (userRole === 'client' || userClientId) {
+        const effectiveClientId = userClientId || currentUser.id;
 
         // Find all users in the same client organization
         const clientUsersQuery = new Parse.Query('AmexingUser');
-        clientUsersQuery.equalTo('clientId', userClientId);
+        clientUsersQuery.equalTo('clientId', effectiveClientId);
         clientUsersQuery.equalTo('exists', true);
         clientUsersQuery.equalTo('active', true);
 
         const clientUsers = await clientUsersQuery.find({ useMasterKey: true });
 
-        if (clientUsers.length === 0) {
-          query.equalTo('client', {
-            __type: 'Pointer',
-            className: 'AmexingUser',
-            objectId: currentUser.id,
-          });
-          return;
-        }
-
+        // Build list of client pointers (organization users)
         const clientUserPointers = clientUsers.map((user) => ({
           __type: 'Pointer',
           className: 'AmexingUser',
           objectId: user.id,
         }));
 
-        query.containedIn('client', clientUserPointers);
+        // Also include the "parent" client user (the one whose objectId IS the clientId)
+        // This covers cases where the client pointer on quotes points to the org owner
+        if (effectiveClientId && !clientUserPointers.find((p) => p.objectId === effectiveClientId)) {
+          clientUserPointers.push({
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: effectiveClientId,
+          });
+        }
+
+        // Always include current user pointer
+        const currentUserPointer = {
+          __type: 'Pointer',
+          className: 'AmexingUser',
+          objectId: currentUser.id,
+        };
+        if (!clientUserPointers.find((p) => p.objectId === currentUser.id)) {
+          clientUserPointers.push(currentUserPointer);
+        }
+
+        // Query 1: Quotes where client pointer matches organization users
+        const queryByClient = new Parse.Query('Quote');
+        queryByClient.containedIn('client', clientUserPointers);
+
+        // Query 2: Quotes created by the current user
+        const queryByCreator = new Parse.Query('Quote');
+        queryByCreator.equalTo('createdBy', currentUserPointer);
+
+        // Combine with OR — client sees quotes assigned to their org OR created by them
+        // eslint-disable-next-line no-underscore-dangle
+        query._orQuery([queryByClient, queryByCreator]);
 
         logger.info('Applied client filter to quotes query (client)', {
           userId: currentUser.id,

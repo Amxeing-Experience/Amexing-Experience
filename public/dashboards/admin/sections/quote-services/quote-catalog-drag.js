@@ -103,25 +103,31 @@ class DragCatalogManager {
     let html = '';
     let count = 0;
 
-    // Regular experiences only (type === 'Experience', from cache array keyed by 'all')
+    // Collect all experiences into a single array for sorting
+    const allExps = [];
+
+    // Regular experiences (type === 'Experience')
     const experiences = this.builder.experiencesCache.get('all') || [];
     experiences.forEach((exp) => {
       if (!exp.name || exp.active === false || exp.type !== 'Experience') return;
-      html += this.renderDraggableItem(exp.id, exp.name, 'experience', 'ti-beach', null);
-      count++;
+      allExps.push({ id: exp.objectId || exp.id, name: exp.name, icon: 'ti-beach', subLabel: null });
     });
 
-    // Provider experiences — only visible to admin role
-    if (window.userRole === 'admin') {
-      const providerExps = this.builder.providerExperiencesCache || [];
-      providerExps.forEach((exp) => {
-        // Skip if no name or provider doesn't exist anymore (resolved pointer must have name)
-        if (!exp.name || !exp.provider || !exp.provider.name) return;
-        const providerLabel = exp.provider.name;
-        html += this.renderDraggableItem(exp.id, exp.name, 'experience', 'ti-beach', providerLabel);
-        count++;
-      });
-    }
+    // Provider experiences
+    const providerExps = this.builder.providerExperiencesCache || [];
+    providerExps.forEach((exp) => {
+      if (!exp.name || !exp.provider || !exp.provider.name) return;
+      const showProvider = window.userRole === 'admin';
+      allExps.push({ id: exp.objectId || exp.id, name: exp.name, icon: 'ti-beach', subLabel: showProvider ? exp.provider.name : null });
+    });
+
+    // Sort alphabetically A-Z
+    allExps.sort((a, b) => a.name.localeCompare(b.name));
+
+    allExps.forEach((exp) => {
+      html += this.renderDraggableItem(exp.id, exp.name, 'experience', exp.icon, exp.subLabel);
+      count++;
+    });
 
     container.innerHTML = html || '<div class="catalog-empty-state">No hay experiencias disponibles</div>';
     this.updateBadge('catalogExpCount', count);
@@ -139,9 +145,9 @@ class DragCatalogManager {
     tours.forEach((tour) => {
       const name = tour.destinationPOI?.name || tour.name || '';
       // Skip inactive, non-existing, or unnamed tours
-      if (!name || tour.active === false) return;
+      if (!name || tour.active === false || tour.exists === false) return;
       const subLabel = tour.isWalkingTour ? 'Walking' : null;
-      html += this.renderDraggableItem(tour.id, name, 'tour', 'ti-map-2', subLabel);
+      html += this.renderDraggableItem(tour.objectId || tour.id, name, 'tour', 'ti-map-2', subLabel);
       count++;
     });
 
@@ -352,6 +358,7 @@ class DragCatalogManager {
       const item = e.target.closest('.catalog-drag-item');
       if (!item) return;
 
+      console.log('[DragCatalog] dragstart:', item.dataset.catalogId, item.dataset.catalogType);
       item.classList.add('dragging');
       document.body.classList.add('catalog-dragging');
 
@@ -396,6 +403,9 @@ class DragCatalogManager {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
 
+      // Remove any day-reorder indicators that may have appeared
+      daysContainer.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
+
       const dayCard = e.target.closest('.day-card');
       if (!dayCard) return;
 
@@ -420,14 +430,14 @@ class DragCatalogManager {
       this.removeDropLabel(dayCard);
     });
 
-    // Delegated drop
+    // Delegated drop — use CAPTURE phase so it fires before per-item bubble handlers
     daysContainer.addEventListener('drop', (e) => {
       // Only handle catalog drops
       const catalogData = e.dataTransfer.getData('application/x-catalog-item');
       if (!catalogData) return;
 
       e.preventDefault();
-      e.stopPropagation();
+      e.stopImmediatePropagation();
 
       this.clearAllDropFeedback();
 
@@ -439,13 +449,14 @@ class DragCatalogManager {
 
       try {
         const data = JSON.parse(catalogData);
+        console.log('[DragCatalog] drop:', data.type, data.id, '→ day', dayId);
         if (data.id && data.type) {
           this.handleDrop(dayId, data.id, data.type);
         }
       } catch (err) {
         console.error('[DragCatalog] Drop error:', err);
       }
-    });
+    }, true); // capture phase
   }
 
   refreshDropTargetState() {
@@ -481,6 +492,8 @@ class DragCatalogManager {
     document.querySelectorAll('.day-card.catalog-drop-available').forEach((card) => {
       card.classList.remove('catalog-drop-available');
     });
+    // Also clear any day-reorder drop indicators that may have appeared
+    document.querySelectorAll('#daysContainer .drop-indicator').forEach((el) => el.remove());
   }
 
   // =====================
@@ -491,7 +504,7 @@ class DragCatalogManager {
     // Open the service modal for the target day
     this.builder.openServiceModal(dayId);
 
-    // Wait for modal to render, then pre-select type and item
+    // Wait for modal to render, then select the correct service type tab
     setTimeout(() => {
       if (itemType === 'experience') {
         this.preselectExperience(itemId);
@@ -504,45 +517,51 @@ class DragCatalogManager {
   }
 
   preselectExperience(experienceId) {
-    // Select the Experience service type radio
     const radio = document.getElementById('typeExperience');
     if (radio) {
       radio.checked = true;
       this.builder.handleServiceTypeChange('experience');
     }
-
-    // Wait for experience fields to render, then select the item
-    setTimeout(() => {
-      const select = document.getElementById('experienceSelect');
-      if (select) {
-        select.value = experienceId;
-        // Trigger the selection handler
-        if (typeof this.builder.handleExperienceSelection === 'function') {
-          this.builder.handleExperienceSelection(experienceId);
-        }
-      }
-    }, 100);
+    // Wait for dropdown to be populated, then select item
+    this.waitForOptionAndSelect('experienceSelect', experienceId, (id) => {
+      this.builder.handleExperienceSelection(id);
+    });
   }
 
   preselectTour(tourId) {
-    // Select the Tour service type radio
     const radio = document.getElementById('typeTour');
     if (radio) {
       radio.checked = true;
       this.builder.handleServiceTypeChange('tour');
     }
+    // Wait for dropdown to be populated, then select item
+    this.waitForOptionAndSelect('tourSelect', tourId, (id) => {
+      this.builder.handleTourSelection(id);
+    });
+  }
 
-    // Wait for tour fields to render, then select the item
-    setTimeout(() => {
-      const select = document.getElementById('tourSelect');
+  waitForOptionAndSelect(selectId, itemId, callback, maxAttempts = 5) {
+    let attempts = 0;
+    const check = () => {
+      const select = document.getElementById(selectId);
       if (select) {
-        select.value = tourId;
-        // Trigger the selection handler
-        if (typeof this.builder.handleTourSelection === 'function') {
-          this.builder.handleTourSelection(tourId);
+        const option = select.querySelector(`option[value="${itemId}"]`);
+        if (option) {
+          select.value = itemId;
+          if (select.value === itemId && callback) {
+            callback(itemId);
+          }
+          return;
         }
       }
-    }, 100);
+      attempts++;
+      if (attempts < maxAttempts) {
+        setTimeout(check, 100);
+      } else {
+        console.warn(`[DragCatalog] option "${itemId}" not found in #${selectId} after ${maxAttempts} attempts`);
+      }
+    };
+    check();
   }
 
   preselectTransport(serviceId) {
@@ -591,34 +610,43 @@ class DragCatalogManager {
   }
 
   preselectTransportRoute(service, transportType) {
-    // The service label usually contains origin → destination info
-    // Try to match against available dropdown options
-    // This is best-effort since transport forms are complex
-
-    // For aeropuerto type with one-way, try to set direction based on POI
-    const originPOI = service.originPOI || null;
-    const destPOI = service.destinationPOI || null;
+    const originIsAirport = (service.originServiceType || '').toLowerCase().includes('aeropuerto');
 
     if (transportType === 'aeropuerto') {
-      // Check if origin or destination is the airport
-      const originIsAirport = (service.originServiceType || '').toLowerCase().includes('aeropuerto');
-
-      if (originIsAirport) {
-        // Airport → Hotel = Llegada
-        const dirLlegada = document.getElementById('directionLlegada');
-        if (dirLlegada) {
-          dirLlegada.checked = true;
-          dirLlegada.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      } else {
-        // Hotel → Airport = Salida
-        const dirSalida = document.getElementById('directionSalida');
-        if (dirSalida) {
-          dirSalida.checked = true;
-          dirSalida.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+      // Set direction based on which side is the airport
+      const directionId = originIsAirport ? 'typeArrival' : 'typeDeparture';
+      const dirRadio = document.getElementById(directionId);
+      if (dirRadio) {
+        dirRadio.checked = true;
+        dirRadio.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }
+
+    // Wait for dropdowns to populate, then set origin/destination
+    setTimeout(() => {
+      this.setSelectValueByText('transportOriginSelect', service.origin);
+      this.setSelectValueByText('transportDestinationSelect', service.destination);
+    }, 300);
+  }
+
+  setSelectValueByText(selectId, text) {
+    const select = document.getElementById(selectId);
+    if (!select || !text) return;
+    for (const option of select.options) {
+      if (option.textContent.trim() === text || option.value === text) {
+        select.value = option.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+    }
+  }
+
+  setComboValueByText(inputId, text) {
+    const input = document.getElementById(inputId);
+    if (!input || !text) return;
+    input.value = text;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
   }
 }
 
@@ -628,7 +656,9 @@ class DragCatalogManager {
 
 // Initialize when itinerary caches are ready
 document.addEventListener('itinerary-caches-ready', () => {
+  console.log('[DragCatalog] itinerary-caches-ready fired, builder:', !!window.itineraryBuilder);
   if (window.itineraryBuilder) {
     window.catalogManager = new DragCatalogManager(window.itineraryBuilder);
+    console.log('[DragCatalog] Manager initialized');
   }
 });
