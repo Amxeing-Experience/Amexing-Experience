@@ -128,6 +128,7 @@ class QuoteController {
   async createQuote(req, res) {
     // Declare variables at method scope for error logging
     let clientObj = null;
+    let companyClientObj = null;
     let createdByObj = null;
 
     try {
@@ -146,13 +147,70 @@ class QuoteController {
       // Normalize field names (accept both formats)
       const clientIdNormalized = client || clientId;
 
-      // 3. Create client pointer to AmexingUser (if provided)
+      // 3. Handle client field - DUAL FIELD ARCHITECTURE
       if (clientIdNormalized) {
-        clientObj = {
-          __type: 'Pointer',
-          className: 'AmexingUser',
-          objectId: clientIdNormalized,
-        };
+        try {
+          // 3a. Save as companyClientPtr (Client pointer) for new hierarchical system
+          const companyClientPointer = {
+            __type: 'Pointer',
+            className: 'Client',
+            objectId: clientIdNormalized,
+          };
+
+          // 3b. Find the AmexingUser who owns this Client for backward compatibility
+          const clientQuery = new Parse.Query('Client');
+          const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+          const ownedByPointer = clientRecord.get('ownedBy');
+
+          if (ownedByPointer) {
+            // Extract the actual ID from the ownedBy pointer
+            const ownerId = ownedByPointer.id || ownedByPointer.objectId || ownedByPointer;
+
+            // Role-based logic for client field assignment
+            let clientAmexingUserId;
+            if (req.userRole === 'department_manager') {
+              // Department manager: client field should be the department manager themselves
+              clientAmexingUserId = currentUser.id;
+              logger.info('QuoteController.createQuote - Department manager: setting client to currentUser', {
+                currentUserId: currentUser.id,
+                selectedClientId: clientIdNormalized,
+              });
+            } else {
+              // Client role: client field should be the owner of the selected Client
+              clientAmexingUserId = ownerId;
+              logger.info('QuoteController.createQuote - Client role: setting client to Client owner', {
+                clientId: clientIdNormalized,
+                ownerId,
+              });
+            }
+
+            // Create AmexingUser pointer for backward compatibility
+            clientObj = {
+              __type: 'Pointer',
+              className: 'AmexingUser',
+              objectId: clientAmexingUserId,
+            };
+
+            // Store both pointers - we'll set them after creating the quote object
+            companyClientObj = companyClientPointer;
+          } else {
+            logger.warn('QuoteController.createQuote - Client has no owner', {
+              clientId: clientIdNormalized,
+            });
+          }
+        } catch (error) {
+          logger.error('QuoteController.createQuote - Error setting client pointers', {
+            error: error.message,
+            clientId: clientIdNormalized,
+          });
+
+          // Fallback to old behavior if Client lookup fails
+          clientObj = {
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: clientIdNormalized,
+          };
+        }
       }
 
       // 4. Create createdBy pointer to current user (required)
@@ -170,7 +228,10 @@ class QuoteController {
 
       // 7. Assign Parse objects (NOT string IDs!) - Using Pointer structure
       if (clientObj) {
-        quote.set('client', clientObj); // Full Pointer object (optional)
+        quote.set('client', clientObj); // AmexingUser pointer for backward compatibility
+      }
+      if (companyClientObj) {
+        quote.set('companyClientPtr', companyClientObj); // Client pointer for new hierarchical system
       }
       // Note: Rate is no longer set at quote level (v2.0.0+)
       quote.set('createdBy', createdByObj); // Full Pointer object (required)
@@ -477,6 +538,7 @@ class QuoteController {
       // Query quote with includes
       const query = new Parse.Query('Quote');
       query.include('client');
+      query.include('companyClientPtr');
       query.include('rate');
       query.include('createdBy');
       query.equalTo('exists', true);
@@ -494,8 +556,23 @@ class QuoteController {
       }
 
       const client = quote.get('client');
+      const companyClientPtr = quote.get('companyClientPtr');
       const rate = quote.get('rate');
       const createdBy = quote.get('createdBy');
+
+      // DEBUG: Log what we're getting for client and companyClientPtr
+      logger.info('DEBUG getQuoteById - client data:', {
+        quoteId: quote.id,
+        folio: quote.get('folio'),
+        clientRaw: client,
+        clientId: client ? client.id : null,
+        clientKeys: client ? Object.keys(client.attributes || {}) : null,
+        hasClientPointer: !!quote.get('client'),
+        companyClientPtrRaw: companyClientPtr,
+        companyClientPtrId: companyClientPtr ? companyClientPtr.id : null,
+        companyClientPtrKeys: companyClientPtr ? Object.keys(companyClientPtr.attributes || {}) : null,
+        hasCompanyClientPointer: !!quote.get('companyClientPtr'),
+      });
 
       const data = {
         id: quote.id,
@@ -509,6 +586,16 @@ class QuoteController {
             email: client.get('email') || '',
             phone: client.get('phone') || '',
             fullName: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+          }
+          : null,
+        companyClientPtr: companyClientPtr
+          ? {
+            id: companyClientPtr.id,
+            name: companyClientPtr.get('name') || '',
+            email: companyClientPtr.get('email') || '',
+            phone: companyClientPtr.get('phone') || '',
+            contactPerson: companyClientPtr.get('contactPerson') || null,
+            fullName: companyClientPtr.get('name') || '',
           }
           : null,
         rate: rate

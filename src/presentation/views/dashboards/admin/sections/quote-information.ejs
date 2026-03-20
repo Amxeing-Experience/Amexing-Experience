@@ -37,15 +37,21 @@
                 <div class="row">
                     <div class="col-md-12 mb-3">
                         <% if (typeof userRole !== 'undefined' && (userRole === 'department_manager' || userRole === 'client')) { %>
-                            <!-- Department Manager: Current user as client (read-only) -->
-                            <label class="form-label">Cliente <span class="text-danger">*</span></label>
-                            <div class="form-control bg-light d-flex align-items-center">
-                                <i class="ti ti-user me-2 text-muted"></i>
-                                <span id="currentUserName">Cargando...</span>
-                                <small class="text-muted ms-auto">(Usuario actual)</small>
-                            </div>
-                            <input type="hidden" id="clientId" name="clientId" value="">
-                            <div class="form-text">Tu cuenta será automáticamente asignada como cliente para esta cotización</div>
+                            <!-- Department Manager/Client: Select from their owned clients -->
+                            <%- include('../../../atoms/common/tom-select', {
+                                id: 'clientId',
+                                name: 'clientId',
+                                multiple: false,
+                                placeholder: 'Buscar cliente por nombre',
+                                label: 'Cliente',
+                                required: true,
+                                helpText: 'Selecciona uno de tus clientes o crea uno nuevo',
+                                options: [],
+                                selected: []
+                            }) %>
+                            <!-- <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
+                                <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
+                            </button> -->
                         <% } else { %>
                             <!-- Admin/SuperAdmin: Client selection -->
                             <%- include('../../../atoms/common/tom-select', {
@@ -427,10 +433,17 @@
         }
     }
 
-    // Load active clients for Tom Select (admin/superadmin only)
+    // Load active clients for Tom Select
     async function loadActiveClients() {
         try {
-            const response = await fetch('/api/clients/active', {
+            // Use different endpoint based on user role
+            const endpoint = (userRole === 'department_manager' || userRole === 'client') 
+                ? '/api/owned-clients/active' 
+                : '/api/clients/active';
+            
+            console.log('🔍 DEBUG: Loading clients from endpoint:', endpoint);
+            
+            const response = await fetch(endpoint, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${getAccessToken()}`,
@@ -439,8 +452,10 @@
             });
 
             const result = await response.json();
+            console.log('🔍 DEBUG: Clients API response:', result);
 
             if (result.success && result.data) {
+                console.log('🔍 DEBUG: Number of clients loaded:', result.data.length);
                 const clientTS = await waitForTomSelect('clientId');
 
                 // Clear existing options
@@ -448,6 +463,7 @@
 
                 // Add client options
                 result.data.forEach(client => {
+                    console.log('🔍 DEBUG: Adding client option:', client);
                     clientTS.addOption({
                         value: client.value,
                         text: client.label,
@@ -459,6 +475,9 @@
 
                 // Refresh to apply changes
                 clientTS.refreshOptions(false);
+                console.log('🔍 DEBUG: Client options loaded and refreshed');
+            } else {
+                console.log('🔍 DEBUG: No client data or API error:', result);
             }
         } catch (error) {
             console.error('Error loading clients:', error);
@@ -530,7 +549,12 @@
         clearAlerts('quickClientModalAlerts');
 
         try {
-            const response = await fetch('/api/clients/quick', {
+            // Use different endpoint based on user role
+            const endpoint = (userRole === 'department_manager' || userRole === 'client') 
+                ? '/api/owned-clients/quick' 
+                : '/api/clients/quick';
+            
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${getAccessToken()}`,
@@ -583,6 +607,7 @@
     // Load existing quote data
     async function loadQuoteData(quoteId) {
         try {
+            console.log('🔍 DEBUG: Loading quote data for ID:', quoteId);
             const response = await fetch(`/api/quotes/${quoteId}`, {
                 method: 'GET',
                 headers: {
@@ -592,25 +617,68 @@
             });
 
             const result = await response.json();
+            console.log('🔍 DEBUG: Quote API response:', result);
 
             if (result.success && result.data) {
                 const quote = result.data;
+                console.log('🔍 DEBUG: Quote data:', quote);
+                console.log('🔍 DEBUG: Client data in quote:', quote.client);
 
-                // Handle client population based on user role
-                if (userRole === 'department_manager' || userRole === 'client') {
-                    // For department manager / client: populate client info in read-only display
-                    if (quote.client && quote.client.fullName) {
-                        document.getElementById('currentUserName').textContent = quote.client.fullName;
-                    }
+                // Handle client population - DUAL FIELD ARCHITECTURE
+                const clientTS = await waitForTomSelect('clientId');
+                console.log('🔍 DEBUG: TomSelect instance ready:', clientTS);
+                console.log('🔍 DEBUG: companyClientPtr in quote:', quote.companyClientPtr);
+                console.log('🔍 DEBUG: client in quote:', quote.client);
+                
+                // Role-based client field prioritization
+                let selectedClientId = null;
+                let selectedClientData = null;
+                
+                if (userRole === 'admin' || userRole === 'superadmin') {
+                    // Admin/superadmin: prioritize legacy client field (AmexingUser objects)
                     if (quote.client && quote.client.id) {
-                        document.getElementById('clientId').value = quote.client.id;
+                        selectedClientId = quote.client.id;
+                        selectedClientData = quote.client;
+                        console.log('🔍 DEBUG: Admin role - Using legacy client field:', selectedClientId);
+                    } else if (quote.companyClientPtr && quote.companyClientPtr.id) {
+                        selectedClientId = quote.companyClientPtr.id;
+                        selectedClientData = quote.companyClientPtr;
+                        console.log('🔍 DEBUG: Admin role - Fallback to companyClientPtr:', selectedClientId);
                     }
                 } else {
-                    // For admin/superadmin: wait for Tom Select and populate
-                    const clientTS = await waitForTomSelect('clientId');
-                    if (quote.client && quote.client.id) {
-                        clientTS.setValue(quote.client.id);
+                    // Hierarchical roles: prioritize companyClientPtr (Client objects)
+                    if (quote.companyClientPtr && quote.companyClientPtr.id) {
+                        selectedClientId = quote.companyClientPtr.id;
+                        selectedClientData = quote.companyClientPtr;
+                        console.log('🔍 DEBUG: Hierarchical role - Using companyClientPtr:', selectedClientId);
+                    } else if (quote.client && quote.client.id) {
+                        selectedClientId = quote.client.id;
+                        selectedClientData = quote.client;
+                        console.log('🔍 DEBUG: Hierarchical role - Fallback to legacy client:', selectedClientId);
                     }
+                }
+                
+                if (selectedClientId && selectedClientData) {
+                    console.log('🔍 DEBUG: Setting client ID:', selectedClientId);
+                    
+                    // First ensure the option exists in the dropdown
+                    if (!clientTS.getOption(selectedClientId)) {
+                        console.log('🔍 DEBUG: Adding missing client option to dropdown');
+                        // Add the client option if it doesn't exist
+                        clientTS.addOption({
+                            value: selectedClientId,
+                            text: selectedClientData.fullName || selectedClientData.name || `Cliente ${selectedClientId}`,
+                            email: selectedClientData.email || ''
+                        });
+                    } else {
+                        console.log('🔍 DEBUG: Client option already exists in dropdown');
+                    }
+                    
+                    // Set the selected value
+                    clientTS.setValue(selectedClientId);
+                    console.log('🔍 DEBUG: Client value set to:', selectedClientId);
+                } else {
+                    console.log('🔍 DEBUG: No client data in quote (neither companyClientPtr nor client)');
                 }
 
                 // Populate form fields
@@ -676,16 +744,9 @@
 
         clearAlerts('quoteInformationAlerts');
 
-        // Get client ID based on user role
-        let clientId;
-        if (userRole === 'department_manager' || userRole === 'client') {
-            // For department manager / client: get from hidden input
-            clientId = document.getElementById('clientId').value;
-        } else {
-            // For admin/superadmin: get from Tom Select
-            const clientTS = await waitForTomSelect('clientId');
-            clientId = clientTS.getValue();
-        }
+        // Get client ID - all user roles now use TomSelect
+        const clientTS = await waitForTomSelect('clientId');
+        const clientId = clientTS.getValue();
 
         if (!clientId) {
             showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
@@ -765,16 +826,9 @@
 
         clearAlerts('quoteInformationAlerts');
 
-        // Get client ID based on user role
-        let clientId;
-        if (userRole === 'department_manager' || userRole === 'client') {
-            // For department manager / client: get from hidden input
-            clientId = document.getElementById('clientId').value;
-        } else {
-            // For admin/superadmin: get from Tom Select
-            const clientTS = await waitForTomSelect('clientId');
-            clientId = clientTS.getValue();
-        }
+        // Get client ID - all user roles now use TomSelect
+        const clientTS = await waitForTomSelect('clientId');
+        const clientId = clientTS.getValue();
 
         if (!clientId) {
             showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
@@ -842,17 +896,11 @@
         showPageLoader('quoteInformationCard');
 
         try {
-            // Load data based on user role
-            if (userRole === 'department_manager' || userRole === 'client') {
-                // For department manager / client: load current user as client
-                await loadCurrentUserAsClient();
-            } else {
-                // For admin/superadmin: load clients
-                await loadActiveClients();
-
-                // Setup client selection handler only for admin/superadmin
-                await handleClientSelection();
-            }
+            // Load active clients for all users (different endpoints based on role)
+            await loadActiveClients();
+            
+            // Setup client selection handler for all users
+            await handleClientSelection();
 
             // Check if we're in edit mode
             const quoteIdInput = document.getElementById('quoteId');
@@ -874,10 +922,15 @@
                 });
             });
 
-            // Event listeners (only for admin/superadmin)
-            if (userRole !== 'department_manager' && userRole !== 'client') {
-                document.getElementById('createQuickClientBtn').addEventListener('click', openQuickClientModal);
-                document.getElementById('saveQuickClientBtn').addEventListener('click', saveQuickClient);
+            // Event listeners for quick client buttons (all users who have the button)
+            const createBtn = document.getElementById('createQuickClientBtn');
+            const saveBtn = document.getElementById('saveQuickClientBtn');
+            
+            if (createBtn) {
+                createBtn.addEventListener('click', openQuickClientModal);
+            }
+            if (saveBtn) {
+                saveBtn.addEventListener('click', saveQuickClient);
             }
 
             // Form submission - use appropriate function based on mode

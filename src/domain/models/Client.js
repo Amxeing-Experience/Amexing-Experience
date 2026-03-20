@@ -18,6 +18,7 @@
  * // Returns: model operation result
  */
 
+const Parse = require('parse/node');
 const BaseModel = require('./BaseModel');
 const logger = require('../../infrastructure/logger');
 
@@ -26,8 +27,9 @@ const logger = require('../../infrastructure/logger');
  * Implements BaseModel for consistent lifecycle management across the platform.
  */
 class Client extends BaseModel {
-  // Constructor removed - useless constructor that only calls super with no additional logic
-  // Parse.Object.extend pattern handles this automatically
+  constructor() {
+    super('Client');
+  }
 
   /**
    * Creates a new Client instance with default lifecycle values.
@@ -70,28 +72,41 @@ class Client extends BaseModel {
     client.set('defaultEmployeeRole', clientData.defaultEmployeeRole || 'employee');
     client.set('employeeAccessLevel', clientData.employeeAccessLevel || 'basic');
 
-    // Lifecycle fields are set by BaseModel constructor
-    // active: true, exists: true are defaults
+    // Ownership fields for hierarchical client management
+    // ownedBy expects a Pointer<AmexingUser>
+    if (clientData.ownedBy) {
+      if (typeof clientData.ownedBy === 'string') {
+        const AmexingUser = require('./AmexingUser');
+        const ownerPointer = new AmexingUser();
+        ownerPointer.id = clientData.ownedBy;
+        client.set('ownedBy', ownerPointer);
+      } else {
+        client.set('ownedBy', clientData.ownedBy);
+      }
+    }
+    client.set('ownerType', clientData.ownerType || 'admin'); // admin, department_manager, client
 
-    // Audit fields - Handle both User objects and string IDs as Pointers
+    // Lifecycle fields - explicitly set defaults since BaseModel doesn't set them automatically
+    client.set('active', clientData.active !== undefined ? clientData.active : true);
+    client.set('exists', clientData.exists !== undefined ? clientData.exists : true);
+
+    // Audit fields - createdBy expects String according to error
     if (clientData.createdBy) {
       if (typeof clientData.createdBy === 'string') {
-        const AmexingUser = require('./AmexingUser');
-        const createdByPointer = new AmexingUser();
-        createdByPointer.id = clientData.createdBy;
-        client.set('createdBy', createdByPointer);
-      } else {
         client.set('createdBy', clientData.createdBy);
+      } else if (clientData.createdBy.id) {
+        client.set('createdBy', clientData.createdBy.id);
+      } else {
+        client.set('createdBy', clientData.createdBy.get ? clientData.createdBy.get('id') : clientData.createdBy);
       }
     }
     if (clientData.modifiedBy) {
       if (typeof clientData.modifiedBy === 'string') {
-        const AmexingUser = require('./AmexingUser');
-        const modifiedByPointer = new AmexingUser();
-        modifiedByPointer.id = clientData.modifiedBy;
-        client.set('modifiedBy', modifiedByPointer);
-      } else {
         client.set('modifiedBy', clientData.modifiedBy);
+      } else if (clientData.modifiedBy.id) {
+        client.set('modifiedBy', clientData.modifiedBy.id);
+      } else {
+        client.set('modifiedBy', clientData.modifiedBy.get ? clientData.modifiedBy.get('id') : clientData.modifiedBy);
       }
     }
 

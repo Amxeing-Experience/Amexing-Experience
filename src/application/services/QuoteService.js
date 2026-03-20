@@ -269,6 +269,82 @@ class QuoteService {
         }
       });
 
+      // Handle client field updates - DUAL FIELD ARCHITECTURE
+      const clientIdNormalized = updates.client || updates.clientId;
+      if (clientIdNormalized) {
+        try {
+          // 1. Save as companyClientPtr (Client pointer) for new system
+          const companyClientPointer = {
+            __type: 'Pointer',
+            className: 'Client',
+            objectId: clientIdNormalized,
+          };
+          quote.set('companyClientPtr', companyClientPointer);
+          appliedUpdates.companyClientPtr = clientIdNormalized;
+
+          logger.info('QuoteService.updateQuote - Setting companyClientPtr', {
+            quoteId: quote.id,
+            clientId: clientIdNormalized,
+            companyClientPointer,
+          });
+
+          // 2. Find the AmexingUser who owns this Client for backward compatibility
+          const clientQuery = new Parse.Query('Client');
+          const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+          const ownedByPointer = clientRecord.get('ownedBy');
+
+          if (ownedByPointer) {
+            // Extract the actual ID from the ownedBy pointer
+            const ownerId = ownedByPointer.id || ownedByPointer.objectId || ownedByPointer;
+
+            // Role-based logic for client field assignment
+            let clientAmexingUserId;
+            if (role === 'department_manager') {
+              // Department manager: client field should be the department manager themselves
+              clientAmexingUserId = currentUser.id;
+              logger.info('QuoteService.updateQuote - Department manager: setting client to currentUser', {
+                currentUserId: currentUser.id,
+                selectedClientId: clientIdNormalized,
+              });
+            } else {
+              // Client role: client field should be the owner of the selected Client
+              clientAmexingUserId = ownerId;
+              logger.info('QuoteService.updateQuote - Client role: setting client to Client owner', {
+                clientId: clientIdNormalized,
+                ownerId,
+              });
+            }
+
+            const amexingUserPointer = {
+              __type: 'Pointer',
+              className: 'AmexingUser',
+              objectId: clientAmexingUserId,
+            };
+            quote.set('client', amexingUserPointer);
+            appliedUpdates.client = clientAmexingUserId;
+
+            logger.info('QuoteService.updateQuote - Setting client (AmexingUser) for backward compatibility', {
+              quoteId: quote.id,
+              clientCompanyId: clientIdNormalized,
+              ownerId,
+              amexingUserPointer,
+            });
+          } else {
+            logger.warn('QuoteService.updateQuote - Client record has no ownedBy field', {
+              quoteId: quote.id,
+              clientId: clientIdNormalized,
+            });
+          }
+        } catch (error) {
+          logger.error('QuoteService.updateQuote - Error setting client pointers', {
+            error: error.message,
+            quoteId: quote.id,
+            clientId: clientIdNormalized,
+          });
+          // Continue without failing the entire update
+        }
+      }
+
       await quote.save(null, { useMasterKey: true });
 
       // If status changed to requested (SOLICITADO), auto-create Reservation

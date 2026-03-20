@@ -83,6 +83,7 @@ router.get('/admin/tarifario-export', dashboardAuth.requireRole('admin'), (req, 
 router.get('/client', dashboardAuth.requireRole('client'), (req, res) => res.redirect('/dashboard/client/vehicles'));
 router.get('/client/profile', dashboardAuth.requireRole('client'), (req, res) => clientController.profile(req, res));
 router.get('/client/change-password', dashboardAuth.requireRole('client'), (req, res) => clientController.changePassword(req, res));
+router.get('/client/clients', dashboardAuth.requireRole('client'), (req, res) => clientController.ownedClients(req, res));
 router.get('/client/departments', dashboardAuth.requireRole('client'), (req, res) => clientController.departments(req, res));
 router.get('/client/employees', dashboardAuth.requireRole('client'), (req, res) => clientController.employees(req, res));
 router.get('/client/team', dashboardAuth.requireRole('client'), (req, res) => clientController.team(req, res));
@@ -111,6 +112,7 @@ router.get('/client/tarifario-export', dashboardAuth.requireRole('client'), (req
 router.get('/department_manager', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.index(req, res));
 router.get('/department_manager/profile', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.profile(req, res));
 router.get('/department_manager/change-password', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.changePassword(req, res));
+router.get('/department_manager/clients', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.ownedClients(req, res));
 router.get('/department_manager/team', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.team(req, res));
 router.get('/department_manager/approvals', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.team(req, res));
 router.get('/department_manager/bookings', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.bookings(req, res));
