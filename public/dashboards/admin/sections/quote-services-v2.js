@@ -254,6 +254,9 @@ class ItineraryBuilder {
       this.setupEventListeners();
       this.renderItinerary();
 
+      // Initialize continue button state
+      this.updateContinueButton('saved');
+
       // Initialize tooltips and popovers
       this.initializeTooltips();
 
@@ -766,6 +769,17 @@ class ItineraryBuilder {
     document.getElementById('previewItineraryBtn')?.addEventListener('click', () => this.showPreview());
     document.getElementById('exportPdfBtn')?.addEventListener('click', () => this.exportPdf());
 
+    // Continue to Summary Button
+    document.getElementById('continueToSummaryBtn')?.addEventListener('click', () => {
+      // Only allow navigation if quote is fully saved
+      if (!this.hasUnsavedChanges && !this._saveInProgress) {
+        const quoteId = document.querySelector('[data-quote-id]')?.getAttribute('data-quote-id');
+        if (quoteId) {
+          window.location.href = `/dashboard/admin/quotes/${quoteId}?section=summary`;
+        }
+      }
+    });
+
     // Auto-save on form changes - disabled to prevent 401 errors
     // this.setupAutoSave();
 
@@ -824,6 +838,40 @@ class ItineraryBuilder {
     };
 
     indicator.innerHTML = badges[status] || badges.saved;
+    
+    // Update continue button state
+    this.updateContinueButton(status);
+  }
+
+  updateContinueButton(status) {
+    const continueBtn = document.getElementById('continueToSummaryBtn');
+    const continueText = document.getElementById('continueButtonText');
+    
+    if (!continueBtn || !continueText) return;
+
+    // Check if quote is fully saved and ready to continue
+    const isReadyToContinue = status === 'saved' && !this.hasUnsavedChanges && !this._saveInProgress;
+
+    if (isReadyToContinue) {
+      // Enable button for continuation
+      continueBtn.disabled = false;
+      continueBtn.className = 'btn btn-primary btn-lg px-4 py-2';
+      continueText.textContent = 'Continuar al Resumen';
+    } else {
+      // Disable button and show appropriate message
+      continueBtn.disabled = true;
+      continueBtn.className = 'btn btn-secondary btn-lg px-4 py-2';
+      
+      if (status === 'saving' || this._saveInProgress) {
+        continueText.textContent = 'Guardando cambios...';
+      } else if (status === 'error') {
+        continueText.textContent = 'Error - Guardar primero';
+      } else if (this.hasUnsavedChanges) {
+        continueText.textContent = 'Guardar cambios primero';
+      } else {
+        continueText.textContent = 'Continuar al Resumen';
+      }
+    }
   }
 
   setupKeyboardShortcuts() {
