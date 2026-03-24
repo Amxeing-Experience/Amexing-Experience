@@ -54,8 +54,25 @@
             <div class="tab-pane fade" id="catalogPaneTours" role="tabpanel">
                 <div class="p-3 pb-2">
                     <input type="text" class="form-control form-control-sm" id="catalogSearchTours" placeholder="Buscar tour...">
+                    <!-- Tour Type Filter -->
+                    <div class="btn-group btn-group-sm w-100 mt-2" role="group" aria-label="Filtro de tours">
+                        <input type="radio" class="btn-check" name="tourTypeFilter" id="tourFilterAll" value="all" checked>
+                        <label class="btn btn-outline-secondary" for="tourFilterAll">
+                            <i class="ti ti-list me-1"></i>Todos
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="tourTypeFilter" id="tourFilterWalking" value="walking">
+                        <label class="btn btn-outline-secondary" for="tourFilterWalking">
+                            <i class="ti ti-walk me-1"></i>Walking
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="tourTypeFilter" id="tourFilterVehicle" value="vehicle">
+                        <label class="btn btn-outline-secondary" for="tourFilterVehicle">
+                            <i class="ti ti-car me-1"></i>En Vehículo
+                        </label>
+                    </div>
                 </div>
-                <div class="catalog-drag-items-list px-3 pb-3" id="catalogToursList" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+                <div class="catalog-drag-items-list px-3 pb-3" id="catalogToursList" style="max-height: calc(100vh - 240px); overflow-y: auto;">
                     <div class="text-center text-muted py-3">
                         <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
                     </div>
