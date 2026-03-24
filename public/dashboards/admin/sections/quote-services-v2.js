@@ -1046,7 +1046,30 @@ class ItineraryBuilder {
 
     // Reset or populate form
     if (serviceId && this.services.has(serviceId)) {
-      const service = this.services.get(serviceId);
+      const originalService = this.services.get(serviceId);
+      
+      // Debug: Log what service data is retrieved from Map for walking tours
+      if (originalService.isWalkingTour || (originalService.concept && originalService.concept.toLowerCase().includes('pie'))) {
+        console.log('🔄 Retrieved walking tour from services Map for edit:', {
+          serviceId: serviceId,
+          retrievedPeopleData: {
+            adultsQuantity: originalService.adultsQuantity,
+            childrenQuantity: originalService.childrenQuantity,
+            infantsQuantity: originalService.infantsQuantity,
+            walkingTourPeopleCount: originalService.walkingTourPeopleCount
+          },
+          isWalkingTour: originalService.isWalkingTour,
+          concept: originalService.concept,
+          allServiceKeys: Object.keys(originalService)
+        });
+      }
+      
+      // CRITICAL FIX: Create a deep copy of the service object to prevent reference corruption
+      // This ensures that modifications during populateServiceForm don't affect the original in the Map
+      const service = JSON.parse(JSON.stringify(originalService));
+      
+      console.log('🔒 Created service copy to prevent Map corruption');
+      
       document.getElementById('serviceModalLabel').innerHTML = `<i class="ti ti-pencil me-2"></i>Editar Servicio${dayLabel}`;
       this.populateServiceForm(service);
     } else {
@@ -1529,47 +1552,26 @@ class ItineraryBuilder {
         const tours = this.toursCache.get('all');
         const selectedTour = tours.find((tour) => tour.id === selectedTourId || tour.objectId === selectedTourId);
         
-        // Handle walking tours differently
+        // Handle walking tours differently - DISABLED FOR NOW
         if (selectedTour?.isWalkingTour) {
+          // Walking tour price override is temporarily disabled
+          // Always hide price override UI for walking tours
           const walkingTourManualPriceContainer = document.getElementById('walkingTourManualPriceContainer');
           const walkingTourManualPrice = document.getElementById('walkingTourManualPrice');
           const walkingTierCards = document.querySelectorAll('.walking-tier-card');
           
-          if (isOverride) {
-            // Show manual price field and enable it
-            walkingTourManualPriceContainer?.classList.remove('d-none');
-            if (walkingTourManualPrice) {
-              walkingTourManualPrice.readOnly = false;
-              walkingTourManualPrice.classList.add('price-override-active');
-              
-              // Set current calculated price as initial value
-              const currentPrice = this.currentWalkingTourPrice || 0;
-              walkingTourManualPrice.value = currentPrice.toFixed(2);
-            }
-            
-            // Initialize per-group inputs if needed
-            this.initializeWalkingTourGroupPricing(selectedTour);
-            
-            // Hide tier pricing cards when overriding
-            walkingTierCards.forEach(card => card.style.opacity = '0.5');
-          } else {
-            // Hide manual price field and disable it
-            walkingTourManualPriceContainer?.classList.add('d-none');
-            if (walkingTourManualPrice) {
-              walkingTourManualPrice.readOnly = true;
-              walkingTourManualPrice.classList.remove('price-override-active');
-              walkingTourManualPrice.value = '';
-            }
-            
-            // Clear per-group pricing data
-            clearWalkingTourGroupPricing();
-            
-            // Restore tier pricing cards visibility
-            walkingTierCards.forEach(card => card.style.opacity = '1');
-            
-            // Re-calculate tier pricing
-            this.updateWalkingTourPricing();
+          // Always hide manual price field and disable it for walking tours
+          walkingTourManualPriceContainer?.classList.add('d-none');
+          if (walkingTourManualPrice) {
+            walkingTourManualPrice.classList.remove('price-override-active');
+            walkingTourManualPrice.value = '';
           }
+          
+          // Restore tier pricing cards visibility  
+          walkingTierCards.forEach(card => card.style.opacity = '1');
+          
+          // Re-calculate tier pricing
+          this.updateWalkingTourPricing();
           
           // Update the breakdown
           this.updateServicePriceBreakdown();
@@ -2599,10 +2601,33 @@ class ItineraryBuilder {
         if (selectedTourData?.isWalkingTour) {
           // Walking tour: collect tier-based pricing
           data.isWalkingTour = true;
+          
+          // Debug: Check form values before collection
+          const walkingAdults = document.getElementById('walkingTourAdultsQuantity')?.value;
+          const walkingChildren = document.getElementById('walkingTourChildrenQuantity')?.value;
+          const walkingInfants = document.getElementById('walkingTourInfantsQuantity')?.value;
+          
+          console.log('🚶‍♂️ Walking tour form values before collection:', {
+            walkingAdults, walkingChildren, walkingInfants,
+            regularAdults: document.getElementById('tourAdultsQuantity')?.value,
+            regularChildren: document.getElementById('tourChildrenQuantity')?.value,
+            regularInfants: document.getElementById('tourInfantsQuantity')?.value,
+            walkingFormExists: !!document.getElementById('walkingTourAdultsQuantity'),
+            regularFormExists: !!document.getElementById('tourAdultsQuantity')
+          });
+          
           data.adultsQuantity = parseInt(document.getElementById('walkingTourAdultsQuantity')?.value || 0);
           data.childrenQuantity = parseInt(document.getElementById('walkingTourChildrenQuantity')?.value || 0);
           data.infantsQuantity = parseInt(document.getElementById('walkingTourInfantsQuantity')?.value || 0);
           data.walkingTourPeopleCount = data.adultsQuantity + data.childrenQuantity + data.infantsQuantity || 1;
+          
+          // Debug: Check final collected data
+          console.log('🚶‍♂️ Walking tour final collected data:', {
+            adultsQuantity: data.adultsQuantity,
+            childrenQuantity: data.childrenQuantity,
+            infantsQuantity: data.infantsQuantity,
+            walkingTourPeopleCount: data.walkingTourPeopleCount
+          });
           
           // Check for price override on walking tours
           const walkingTourOverride = document.getElementById('tourOverridePrices')?.checked;
@@ -2630,7 +2655,9 @@ class ItineraryBuilder {
               }
             }
           } else {
-            data.walkingTourPrice = this.getWalkingTourPrice(selectedTourData, data.walkingTourPeopleCount);
+            // Get duration for walking tour calculation
+            const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
+            data.walkingTourPrice = this.getWalkingTourPrice(selectedTourData, data.walkingTourPeopleCount, duration);
             data.walkingTourPriceOverride = false;
             data.walkingTourPriceMode = 'calculated';
           }
@@ -2997,6 +3024,13 @@ class ItineraryBuilder {
         break;
     }
 
+    // Collect common fields for all service types
+    data.serviceDescription = document.getElementById('serviceDescription')?.value || '';
+    data.internalNotes = document.getElementById('internalNotes')?.value || '';
+    data.clientNotes = document.getElementById('clientNotes')?.value || '';
+    data.providerNotes = document.getElementById('providerNotes')?.value || '';
+    data.teamNotes = document.getElementById('teamNotes')?.value || '';
+
     return data;
   }
 
@@ -3082,6 +3116,18 @@ class ItineraryBuilder {
 
   async populateServiceForm(service) {
     if (!service) return;
+    
+    // Debug: Log service object at the start of populateServiceForm for walking tours
+    if (service.isWalkingTour) {
+      console.log('🔍 Service object at START of populateServiceForm:', {
+        serviceId: service.id,
+        peopleData: {
+          adultsQuantity: service.adultsQuantity,
+          childrenQuantity: service.childrenQuantity,
+          infantsQuantity: service.infantsQuantity
+        }
+      });
+    }
 
     // Restore price override toggle FIRST (before setting service type)
     // This ensures the toggle state is correct when handleServiceTypeChange runs
@@ -3126,7 +3172,32 @@ class ItineraryBuilder {
     const serviceTypeRadio = document.querySelector(`input[name="serviceType"][value="${service.type}"]`);
     if (serviceTypeRadio) {
       serviceTypeRadio.checked = true;
+      
+      // Debug: Log service object BEFORE handleServiceTypeChange for walking tours
+      if (service.isWalkingTour) {
+        console.log('🔍 Service object BEFORE handleServiceTypeChange:', {
+          serviceId: service.id,
+          peopleData: {
+            adultsQuantity: service.adultsQuantity,
+            childrenQuantity: service.childrenQuantity,
+            infantsQuantity: service.infantsQuantity
+          }
+        });
+      }
+      
       this.handleServiceTypeChange(service.type);
+      
+      // Debug: Log service object AFTER handleServiceTypeChange for walking tours
+      if (service.isWalkingTour) {
+        console.log('🔍 Service object AFTER handleServiceTypeChange:', {
+          serviceId: service.id,
+          peopleData: {
+            adultsQuantity: service.adultsQuantity,
+            childrenQuantity: service.childrenQuantity,
+            infantsQuantity: service.infantsQuantity
+          }
+        });
+      }
     }
 
     // Populate include in total checkbox
@@ -3297,6 +3368,18 @@ class ItineraryBuilder {
     }
 
     // Type-specific population
+    if (service.isWalkingTour) {
+      console.log('🔍 Service object BEFORE type-specific switch:', {
+        serviceId: service.id,
+        serviceType: service.type,
+        peopleData: {
+          adultsQuantity: service.adultsQuantity,
+          childrenQuantity: service.childrenQuantity,
+          infantsQuantity: service.infantsQuantity
+        }
+      });
+    }
+    
     switch (service.type) {
       case 'experience':
         const experienceSelect = document.getElementById('experienceSelect');
@@ -3377,32 +3460,123 @@ class ItineraryBuilder {
         break;
 
       case 'tour':
+        console.log('🔍 ENTERED tour case - service object at start:', {
+          serviceId: service.id,
+          isWalkingTour: service.isWalkingTour,
+          peopleData: {
+            adultsQuantity: service.adultsQuantity,
+            childrenQuantity: service.childrenQuantity,
+            infantsQuantity: service.infantsQuantity
+          }
+        });
+        
         const tourSelect = document.getElementById('tourSelect');
         if (tourSelect && service.tourId) {
           tourSelect.value = service.tourId;
           // Trigger tour selection to show tour content
+          console.log('🔍 About to call handleTourSelection');
           this.handleTourSelection(service.tourId);
+          console.log('🔍 After handleTourSelection - service object:', {
+            adultsQuantity: service.adultsQuantity,
+            childrenQuantity: service.childrenQuantity,
+            infantsQuantity: service.infantsQuantity
+          });
         }
 
         // Walking tour: restore individual counts and tier highlight
         if (service.isWalkingTour) {
+          // ONLY hide standard pricing section for walking tours during EDIT mode
+          // (This should NOT affect creating new walking tours or other service types)
+          const standardPricingSection = document.getElementById('standardPricingSection');
+          if (standardPricingSection) {
+            standardPricingSection.classList.add('d-none');
+            standardPricingSection.style.display = 'none'; // Force hide with inline style
+            console.log('🚶‍♂️ Walking tour: Hiding standard pricing section during EDIT ONLY');
+          }
+          
           setTimeout(() => {
             const wAdults = document.getElementById('walkingTourAdultsQuantity');
             const wChildren = document.getElementById('walkingTourChildrenQuantity');
             const wInfants = document.getElementById('walkingTourInfantsQuantity');
             const peopleCountField = document.getElementById('walkingTourPeopleCount');
-            if (wAdults && service.adultsQuantity !== undefined) wAdults.value = service.adultsQuantity;
-            if (wChildren && service.childrenQuantity !== undefined) wChildren.value = service.childrenQuantity;
-            if (wInfants && service.infantsQuantity !== undefined) wInfants.value = service.infantsQuantity;
-            if (peopleCountField) {
-              peopleCountField.value = (service.adultsQuantity || 0) + (service.childrenQuantity || 0) + (service.infantsQuantity || 0) || 1;
+            
+            // Debug: Check all service object properties for walking tours
+            console.log('🔍 Service object before walking tour restoration:', {
+              allPeopleKeys: Object.keys(service).filter(k => k.includes('adult') || k.includes('child') || k.includes('infant')),
+              serviceValues: {
+                adultsQuantity: service.adultsQuantity,
+                childrenQuantity: service.childrenQuantity,
+                infantsQuantity: service.infantsQuantity,
+                transportAdults: service.transportAdults,
+                transportChildren: service.transportChildren,
+                transportInfants: service.transportInfants,
+                walkingTourPeopleCount: service.walkingTourPeopleCount
+              },
+              serviceId: service.id,
+              isWalkingTour: service.isWalkingTour
+            });
+            
+            console.log('🚶‍♂️ Walking tour people count restoration:', {
+              serviceData: {
+                adults: service.adultsQuantity,
+                children: service.childrenQuantity,
+                infants: service.infantsQuantity
+              },
+              domElements: {
+                wAdults: !!wAdults,
+                wChildren: !!wChildren,
+                wInfants: !!wInfants,
+                peopleCountField: !!peopleCountField
+              }
+            });
+            
+            if (wAdults && service.adultsQuantity !== undefined) {
+              wAdults.value = service.adultsQuantity;
+              console.log('✅ Set adults:', service.adultsQuantity);
             }
-            // Re-highlight the correct tier
+            if (wChildren && service.childrenQuantity !== undefined) {
+              wChildren.value = service.childrenQuantity;
+              console.log('✅ Set children:', service.childrenQuantity);
+            }
+            if (wInfants && service.infantsQuantity !== undefined) {
+              wInfants.value = service.infantsQuantity;
+              console.log('✅ Set infants:', service.infantsQuantity);
+            }
+            if (peopleCountField) {
+              const totalPeople = (service.adultsQuantity || 0) + (service.childrenQuantity || 0) + (service.infantsQuantity || 0) || 1;
+              peopleCountField.value = totalPeople;
+              console.log('✅ Set total people count:', totalPeople);
+            }
+            
+            // Re-highlight the correct tier AFTER people count fields are populated
             if (this.toursCache.has('all')) {
               const walkingTourData = this.toursCache.get('all').find(
                 (t) => (t.id === service.tourId || t.objectId === service.tourId) && t.isWalkingTour,
               );
-              if (walkingTourData) this.highlightWalkingTourTier(walkingTourData);
+              if (walkingTourData) {
+                console.log('🎯 Highlighting walking tour tier after people count restoration');
+                this.highlightWalkingTourTier(walkingTourData);
+              }
+            }
+            
+            // Restore start/end time fields for walking tours
+            const tourStartTimeField = document.getElementById('tourStartTime');
+            const tourEndTimeField = document.getElementById('tourEndTime');
+            if (tourStartTimeField && service.startTime) tourStartTimeField.value = service.startTime;
+            if (tourEndTimeField && service.endTime) tourEndTimeField.value = service.endTime;
+            
+            // Restore tour duration for walking tours
+            const tourDurationField = document.getElementById('tourDuration');
+            if (tourDurationField && service.duration) {
+              tourDurationField.value = service.duration;
+            }
+            
+            // Re-enforce hiding standard pricing section for walking tours during EDIT mode only
+            const standardPricingSectionTimeout = document.getElementById('standardPricingSection');
+            if (standardPricingSectionTimeout) {
+              standardPricingSectionTimeout.classList.add('d-none');
+              standardPricingSectionTimeout.style.display = 'none'; // Force hide with inline style
+              console.log('🚶‍♂️ Walking tour: Re-enforcing standard pricing section hiding during EDIT ONLY');
             }
           }, 300);
           break;
@@ -3515,7 +3689,19 @@ class ItineraryBuilder {
           }
         };
 
-        setTimeout(populateTourQuantityFields, 50);
+        // Only prefill from information step for NEW tours (not when editing existing tours)
+        console.log('🔍 Tour prefill decision:', {
+          currentServiceId: this.currentServiceId,
+          hasCurrentServiceId: !!this.currentServiceId,
+          isEditing: !!this.currentServiceId
+        });
+        
+        if (!this.currentServiceId) {
+          setTimeout(populateTourQuantityFields, 50);
+          console.log('🔄 Scheduling tour quantity prefill for new tour');
+        } else {
+          console.log('🚫 Skipping tour quantity prefill during edit (currentServiceId: ' + this.currentServiceId + ')');
+        }
         break;
 
       case 'transport':
@@ -3847,6 +4033,29 @@ class ItineraryBuilder {
           }
         }
         break;
+    }
+
+    // Populate common fields for all service types
+    const serviceDescriptionField = document.getElementById('serviceDescription');
+    const internalNotesField = document.getElementById('internalNotes');
+    const clientNotesField = document.getElementById('clientNotes');
+    const providerNotesField = document.getElementById('providerNotes');
+    const teamNotesField = document.getElementById('teamNotes');
+
+    if (serviceDescriptionField && service.serviceDescription) {
+      serviceDescriptionField.value = service.serviceDescription;
+    }
+    if (internalNotesField && service.internalNotes) {
+      internalNotesField.value = service.internalNotes;
+    }
+    if (clientNotesField && service.clientNotes) {
+      clientNotesField.value = service.clientNotes;
+    }
+    if (providerNotesField && service.providerNotes) {
+      providerNotesField.value = service.providerNotes;
+    }
+    if (teamNotesField && service.teamNotes) {
+      teamNotesField.value = service.teamNotes;
     }
   }
 
@@ -4225,7 +4434,7 @@ class ItineraryBuilder {
   calculateServicePrice(service) {
     // console.log('🔍 calculateServicePrice called for service:', service.type, service.id || 'no-id');
 
-    // Walking tour: return the tier-based price directly
+    // Walking tour: return the tier-based price (already includes duration multiplication)
     if (service.type === 'tour' && service.isWalkingTour) {
       return service.walkingTourPrice || service.price || 0;
     }
@@ -5119,7 +5328,31 @@ class ItineraryBuilder {
       if (day.subconcepts && Array.isArray(day.subconcepts)) {
         day.subconcepts.forEach((subconcept) => {
           const serviceId = subconcept.id || this.generateId('service');
-          this.services.set(serviceId, {
+          
+          // Debug: Log ALL service data coming from backend to detect walking tours
+          console.log('🔍 Backend service data for ID', serviceId + ':', {
+            concept: subconcept.concept,
+            type: subconcept.type,
+            isWalkingTour: subconcept.isWalkingTour,
+            walkingTourFlags: {
+              hasWalkingTourPrice: subconcept.walkingTourPrice !== undefined,
+              hasWalkingTourPeopleCount: subconcept.walkingTourPeopleCount !== undefined,
+              conceptContainsWalking: subconcept.concept && subconcept.concept.toLowerCase().includes('pie'),
+              typeIsTour: subconcept.type === 'tour'
+            },
+            peopleData: {
+              adultsQuantity: subconcept.adultsQuantity,
+              childrenQuantity: subconcept.childrenQuantity,
+              infantsQuantity: subconcept.infantsQuantity,
+              walkingTourPeopleCount: subconcept.walkingTourPeopleCount,
+              transportAdults: subconcept.transportAdults,
+              transportChildren: subconcept.transportChildren,
+              transportInfants: subconcept.transportInfants
+            },
+            allWalkingKeys: Object.keys(subconcept).filter(k => k.toLowerCase().includes('walking')),
+            allPeopleKeys: Object.keys(subconcept).filter(k => k.includes('adult') || k.includes('child') || k.includes('infant'))
+          });
+          const serviceData = {
             id: serviceId,
             dayId: dayData.id,
             type: subconcept.type || 'other',
@@ -5187,7 +5420,36 @@ class ItineraryBuilder {
             priceOverride: subconcept.priceOverride || false,
             customPrice: subconcept.customPrice || null,
             customPrices: subconcept.customPrices || null,
-          });
+            // Walking tour fields (from backend)
+            isWalkingTour: subconcept.isWalkingTour || false,
+            walkingTourPrice: subconcept.walkingTourPrice || null,
+            walkingTourPeopleCount: subconcept.walkingTourPeopleCount || null,
+            walkingTourCurrency: subconcept.walkingTourCurrency || null,
+            walkingTourPriceOverride: subconcept.walkingTourPriceOverride || false,
+            walkingTourPriceMode: subconcept.walkingTourPriceMode || null,
+            walkingTourGroupPrices: subconcept.walkingTourGroupPrices || null,
+          };
+          
+          // Debug: Log what gets stored in services Map for walking tours
+          if (subconcept.isWalkingTour || (subconcept.concept && subconcept.concept.toLowerCase().includes('pie'))) {
+            console.log('💾 Storing walking tour in services Map:', {
+              serviceId: serviceId,
+              storedPeopleData: {
+                adultsQuantity: serviceData.adultsQuantity,
+                childrenQuantity: serviceData.childrenQuantity,
+                infantsQuantity: serviceData.infantsQuantity,
+                walkingTourPeopleCount: serviceData.walkingTourPeopleCount
+              },
+              isWalkingTour: serviceData.isWalkingTour,
+              originalBackendData: {
+                adultsQuantity: subconcept.adultsQuantity,
+                childrenQuantity: subconcept.childrenQuantity,
+                infantsQuantity: subconcept.infantsQuantity
+              }
+            });
+          }
+          
+          this.services.set(serviceId, serviceData);
           
           // Debug logging for loaded service data
           if ((subconcept.type === 'tour' || subconcept.type === 'experience') && subconcept.priceOverride) {
@@ -5208,6 +5470,26 @@ class ItineraryBuilder {
           // Debug logging for includeGuide loading
           if (subconcept.type === 'tour' && subconcept.includeGuide) {
             // console.log('🔄 Loading tour with includeGuide from backend:', subconcept.includeGuide);
+          }
+
+          // Debug logging for walking tour data loading
+          if (subconcept.isWalkingTour) {
+            console.log('🚶‍♂️ Loading walking tour from backend:', {
+              concept: subconcept.concept,
+              isWalkingTour: subconcept.isWalkingTour,
+              backendPeopleData: {
+                adultsQuantity: subconcept.adultsQuantity,
+                childrenQuantity: subconcept.childrenQuantity,
+                infantsQuantity: subconcept.infantsQuantity,
+                walkingTourPeopleCount: subconcept.walkingTourPeopleCount
+              },
+              walkingTourPrice: subconcept.walkingTourPrice,
+              duration: subconcept.duration,
+              rawSubconcept: Object.keys(subconcept).filter(k => k.includes('adult') || k.includes('child') || k.includes('infant')).reduce((obj, key) => {
+                obj[key] = subconcept[key];
+                return obj;
+              }, {})
+            });
           }
 
           dayData.services.push(serviceId);
@@ -6637,12 +6919,9 @@ class ItineraryBuilder {
       // Clear pricing field values when hidden
       const servicePrice = document.getElementById('servicePrice');
       const quantity = document.getElementById('quantity');
-      const currencySelect = document.getElementById('currencySelect');
-      const priceTypeSelect = document.getElementById('priceTypeSelect');
 
       if (quantity) quantity.value = '1';
-      if (currencySelect) currencySelect.value = 'USD';
-      if (priceTypeSelect) priceTypeSelect.value = 'per_person';
+      // Note: Currency and payment type are preserved from saved values
 
       // Recalculate price without vehicle costs for tours
       this.recalculateTourPrice();
@@ -6658,7 +6937,7 @@ class ItineraryBuilder {
           currentService.rateId = null;
           // Update the display immediately
           this.updateTotals();
-          this.renderDays();
+          this.renderDaysContent();
         }
       }
     }
@@ -7448,63 +7727,36 @@ class ItineraryBuilder {
         if (walkingTourData) {
           isWalkingTourBreakdown = true;
           const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10);
-          const priceCurrency = walkingTourData.walkingPriceCurrency || 'MXN';
-          // Check if walking tour price is overridden
-          const walkingTourOverride = document.getElementById('tourOverridePrices')?.checked;
-          const walkingPriceMode = document.querySelector('input[name="walkingPriceMode"]:checked')?.value || 'total';
+          const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
           
-          let walkingPrice;
-          if (walkingTourOverride) {
-            if (walkingPriceMode === 'group') {
-              // Per-group pricing mode - show detailed breakdown
-              const groups = this.calculateWalkingTourGroups(walkingTourData, peopleCount);
-              const groupInputs = document.querySelectorAll('.walking-group-price');
+          // SIMPLIFIED: Walking tour price overrides are disabled, show only calculated price
+          // Calculate and show basic tier breakdown
+          const groups = this.calculateWalkingTourGroups(walkingTourData, peopleCount);
+          const walkingPrice = this.getWalkingTourPrice(walkingTourData, peopleCount, duration);
+          
+          if (groups.length > 1) {
+            // Multiple groups - show detailed breakdown with hours
+            groups.forEach((group, index) => {
+              // Calculate actual price for this group - let getDisplayPrice handle currency conversion
+              let groupPrice = group.tier.price || 0;
+              const priceCurrency = walkingTourData.walkingPriceCurrency || 'MXN';
               
-              groups.forEach((group, index) => {
-                const groupPrice = groupInputs[index] ? parseFloat(groupInputs[index].value) || 0 : group.tier.price;
-                items.push({ 
-                  label: `Grupo ${index + 1} (${group.tier.label}) - ${group.count} personas`, 
-                  amountMXN: groupPrice 
-                });
-              });
-              
-              walkingPrice = Array.from(groupInputs).reduce((sum, input) => sum + (parseFloat(input.value) || 0), 0);
-              items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precio por grupo personalizado</span>', amountMXN: 0 });
-            } else {
-              // Total price override mode
-              const walkingTourManualPrice = document.getElementById('walkingTourManualPrice')?.value;
-              if (walkingTourManualPrice) {
-                walkingPrice = parseFloat(walkingTourManualPrice);
-                items.push({ label: `Tour a Pie (${peopleCount} personas)`, amountMXN: walkingPrice });
-                items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precio total personalizado</span>', amountMXN: 0 });
+              // If source price is in USD, convert to MXN for internal storage
+              if (priceCurrency === 'USD' && this.exchangeRate) {
+                groupPrice = Math.round(groupPrice * this.exchangeRate);
               }
-            }
-          } else {
-            // Calculated price - show tier breakdown if multiple groups
-            const groups = this.calculateWalkingTourGroups(walkingTourData, peopleCount);
-            
-            if (groups.length > 1) {
-              // Multiple groups - show detailed breakdown
-              groups.forEach((group, index) => {
-                let price = group.tier.price;
-                if (priceCurrency === 'USD' && this.exchangeRate) {
-                  price = Math.round(price * this.exchangeRate);
-                }
-                items.push({ 
-                  label: `Grupo ${index + 1} (${group.tier.label}) - ${group.count} personas`, 
-                  amountMXN: price 
-                });
+              
+              // Multiply by duration for final price
+              const totalGroupPrice = groupPrice * duration;
+              
+              items.push({ 
+                label: `Grupo ${index + 1} (${group.tier.label}) - ${group.count} personas × ${duration}h`, 
+                amountMXN: totalGroupPrice 
               });
-            } else {
-              // Single group - show simple breakdown
-              walkingPrice = this.getWalkingTourPrice(walkingTourData, peopleCount);
-              items.push({ label: `Tour a Pie (${peopleCount} personas)`, amountMXN: walkingPrice });
-            }
-            
-            walkingPrice = this.getWalkingTourPrice(walkingTourData, peopleCount);
-          }
-          if (priceCurrency === 'USD' && this.exchangeRate) {
-            // Already normalized in getWalkingTourPrice, just display
+            });
+          } else {
+            // Single group - show simple breakdown with hours
+            items.push({ label: `Tour a Pie (${peopleCount} personas) × ${duration}h`, amountMXN: walkingPrice });
           }
         }
       }
@@ -8222,13 +8474,14 @@ class ItineraryBuilder {
     // Store tour data for tier re-highlight on quantity change
     this.currentTourData = tour;
 
-    // Pre-fill individual person counts from quote data
+    // Pre-fill individual person counts from quote data (but only for NEW walking tours, not when editing)
     const adultsField = document.getElementById('walkingTourAdultsQuantity');
     const childrenField = document.getElementById('walkingTourChildrenQuantity');
     const infantsField = document.getElementById('walkingTourInfantsQuantity');
     const peopleCountField = document.getElementById('walkingTourPeopleCount');
     
-    if (this.quoteData) {
+    if (this.quoteData && !this.currentServiceId) {
+      console.log('🔄 Prefilling walking tour from information step (NEW tour)');
       const numberOfAdults = this.quoteData.numberOfAdults || 0;
       const numberOfChildren = this.quoteData.numberOfChildren || 0;
       const numberOfInfants = this.quoteData.numberOfInfants || 0;
@@ -8238,10 +8491,32 @@ class ItineraryBuilder {
       if (childrenField) childrenField.value = numberOfChildren;
       if (infantsField) infantsField.value = numberOfInfants;
       if (peopleCountField) peopleCountField.value = totalPeople || 1;
+    } else if (this.currentServiceId) {
+      console.log('🚫 Skipping walking tour prefill during edit (currentServiceId: ' + this.currentServiceId + ')');
     }
 
     // Highlight matching tier
+    console.log('🔍 BEFORE highlightWalkingTourTier - checking if service object exists');
+    if (this.currentServiceId && this.services.has(this.currentServiceId)) {
+      const currentService = this.services.get(this.currentServiceId);
+      console.log('🔍 Service in Map BEFORE highlightWalkingTourTier:', {
+        adultsQuantity: currentService.adultsQuantity,
+        childrenQuantity: currentService.childrenQuantity,
+        infantsQuantity: currentService.infantsQuantity
+      });
+    }
+    
     this.highlightWalkingTourTier(tour);
+    
+    console.log('🔍 AFTER highlightWalkingTourTier - checking service object again');
+    if (this.currentServiceId && this.services.has(this.currentServiceId)) {
+      const currentService = this.services.get(this.currentServiceId);
+      console.log('🔍 Service in Map AFTER highlightWalkingTourTier:', {
+        adultsQuantity: currentService.adultsQuantity,
+        childrenQuantity: currentService.childrenQuantity,
+        infantsQuantity: currentService.infantsQuantity
+      });
+    }
 
     // Set default duration from tour.time (minutes to hours)
     const durationField = document.getElementById('tourDuration');
@@ -8329,18 +8604,23 @@ class ItineraryBuilder {
       let total = 0;
       const lines = groups.map((g, i) => {
         let price = g.tier.price;
+        // If source price is in USD, convert to MXN for internal storage
         if (priceCurrency === 'USD' && this.exchangeRate) {
           price = Math.round(price * this.exchangeRate);
         }
         total += price;
-        return `<div class="d-flex justify-content-between"><span>Grupo ${i + 1}: ${g.tier.label} pax</span><span class="fw-bold">$${price.toLocaleString()}</span></div>`;
+        // Use getDisplayPrice for proper currency display with payment surcharges
+        const displayPrice = this.getDisplayPrice(price);
+        return `<div class="d-flex justify-content-between"><span>Grupo ${i + 1}: ${g.tier.label} pax</span><span class="fw-bold">${this.formatCurrency(displayPrice)}</span></div>`;
       }).join('');
 
+      // Use getDisplayPrice for total as well
+      const displayTotal = this.getDisplayPrice(total);
       breakdownContent.innerHTML = `
         <div class="small fw-bold mb-1"><i class="ti ti-users me-1"></i>${peopleCount} personas total</div>
         ${lines}
         <hr class="my-1">
-        <div class="d-flex justify-content-between fw-bold"><span>Total</span><span>$${total.toLocaleString()}</span></div>
+        <div class="d-flex justify-content-between fw-bold"><span>Total</span><span>${this.formatCurrency(displayTotal)}</span></div>
       `;
       breakdownDiv.classList.remove('d-none');
     }
@@ -8348,7 +8628,8 @@ class ItineraryBuilder {
     // Set service price using getWalkingTourPrice (normalizes to MXN)
     const servicePriceField = document.getElementById('servicePrice');
     if (servicePriceField) {
-      const mxnPrice = this.getWalkingTourPrice(tour, peopleCount);
+      const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
+      const mxnPrice = this.getWalkingTourPrice(tour, peopleCount, duration);
       servicePriceField.value = mxnPrice;
     }
   }
@@ -8390,17 +8671,19 @@ class ItineraryBuilder {
     return groups;
   }
 
-  getWalkingTourPrice(tour, peopleCount) {
+  getWalkingTourPrice(tour, peopleCount, duration = 1) {
     const groups = this.calculateWalkingTourGroups(tour, peopleCount);
     const priceCurrency = tour.walkingPriceCurrency || 'MXN';
 
     let total = 0;
     for (const group of groups) {
       let price = group.tier.price;
+      // If source price is in USD, convert to MXN for internal storage
       if (priceCurrency === 'USD' && this.exchangeRate) {
         price = Math.round(price * this.exchangeRate);
       }
-      total += price;
+      // Multiply group price by duration (hours)
+      total += price * duration;
     }
 
     // Store the calculated price for use in override
@@ -8441,6 +8724,12 @@ class ItineraryBuilder {
         tourRequiresTransport.disabled = false;
         tourTransportContainer.style.display = 'block';
         this.handleTourTransportToggle(false); // Hide transport fields
+      }
+      
+      // Show standard pricing section when no tour is selected
+      const standardPricingSection = document.getElementById('standardPricingSection');
+      if (standardPricingSection) {
+        standardPricingSection.classList.remove('d-none');
       }
       
       // Hide tour override toggles when no tour is selected
@@ -8537,20 +8826,23 @@ class ItineraryBuilder {
           if (vehiclePricingSection) vehiclePricingSection.classList.add('d-none');
           if (walkingPricingSection) walkingPricingSection.classList.remove('d-none');
           
-          // Show the tour person prices override toggle for walking tours
+          // Hide the tour person prices override toggle for walking tours (DISABLED FOR NOW)
           if (this.canEditPrices) {
-            document.getElementById('tourOverridePricesContainer')?.classList.remove('d-none');
+            document.getElementById('tourOverridePricesContainer')?.classList.add('d-none');
           }
           
-          // Reset transport checkbox to normal state for walking tours
+          // Hide transport checkbox for walking tours (they don't require transport)
           const tourRequiresTransport = document.getElementById('tourRequiresTransport');
           const tourTransportContainer = document.getElementById('tourTransportCheckboxContainer');
           if (tourRequiresTransport && tourTransportContainer) {
             tourRequiresTransport.checked = false;
-            tourRequiresTransport.disabled = false;
-            tourTransportContainer.style.display = 'block';
+            tourRequiresTransport.disabled = true;
+            tourTransportContainer.style.display = 'none'; // Hide the entire transport checkbox container
             this.handleTourTransportToggle(false); // Hide transport fields
           }
+          
+          // Note: Standard pricing section hiding is only done during edit mode for walking tours
+          // This allows walking tours to show pricing section when creating new ones
           
           this.handleWalkingTourSelection(selectedTour);
           return;
@@ -8563,6 +8855,12 @@ class ItineraryBuilder {
         // Hide the tour person prices override toggle for vehicle tours
         if (this.canEditPrices) {
           document.getElementById('tourOverridePricesContainer')?.classList.add('d-none');
+        }
+        
+        // Show standard pricing section (Precio base and Cantidad fields) for vehicle tours
+        const standardPricingSection = document.getElementById('standardPricingSection');
+        if (standardPricingSection) {
+          standardPricingSection.classList.remove('d-none');
         }
         
         // Auto-enable transport for vehicle tours
@@ -11084,14 +11382,164 @@ class ItineraryBuilder {
       window._walkingGroupListener = () => {
         const newCount = parseInt(peopleCountInput?.value || 0);
         if (newCount > 0) {
-          generateWalkingTourGroupInputs(tour, newCount);
+          this.generateWalkingTourGroupInputs(tour, newCount);
         }
       };
-      peopleCountInput?.addEventListener('input', window._walkingGroupListener);
+      peopleCountInput?.addEventListener('input', window._walkingGroupListener.bind(this));
     }
     
     // Generate initial group inputs
-    generateWalkingTourGroupInputs(tour, peopleCount);
+    this.generateWalkingTourGroupInputs(tour, peopleCount);
+  }
+
+  // Generate dynamic input fields for each walking tour group
+  generateWalkingTourGroupInputs(tour, peopleCount) {
+    const priceMode = document.querySelector('input[name="walkingPriceMode"]:checked')?.value || 'total';
+    const groupPricesContainer = document.getElementById('walkingTourGroupPrices');
+    const totalPriceContainer = document.getElementById('walkingTourTotalPriceContainer');
+    const groupPricesSection = document.getElementById('walkingTourGroupPricesSection');
+    
+    if (priceMode === 'total') {
+      // Show total price mode
+      totalPriceContainer?.classList.remove('d-none');
+      groupPricesSection?.classList.add('d-none');
+    } else {
+      // Show per-group mode
+      totalPriceContainer?.classList.add('d-none');
+      groupPricesSection?.classList.remove('d-none');
+      
+      if (!groupPricesContainer) return;
+      
+      // Calculate groups
+      const groups = this.calculateWalkingTourGroups(tour, peopleCount);
+      const priceCurrency = tour.walkingPriceCurrency || 'MXN';
+      
+      // Generate input fields for each group
+      let html = '';
+      groups.forEach((group, index) => {
+        let defaultPrice = group.tier.price;
+        // If source price is in USD, convert to MXN for internal storage
+        if (priceCurrency === 'USD' && this.exchangeRate) {
+          defaultPrice = Math.round(defaultPrice * this.exchangeRate);
+        }
+        
+        html += `
+          <div class="mb-3">
+            <label class="form-label d-flex justify-content-between align-items-center">
+              <span>
+                <i class="ti ti-users me-1"></i>
+                Grupo ${index + 1} (${group.tier.label})
+              </span>
+              <span class="text-muted small">${group.count} personas</span>
+            </label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="text" 
+                     class="form-control walking-group-price" 
+                     id="walkingGroupPrice_${index}" 
+                     data-group-index="${index}"
+                     value="${defaultPrice.toFixed(2)}"
+                     placeholder="Precio del grupo">
+              <span class="input-group-text">MXN</span>
+            </div>
+          </div>
+        `;
+      });
+      
+      // Add total calculation display
+      html += `
+        <div class="border-top pt-2 mt-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-bold">Total:</span>
+            <span class="fw-bold text-primary" id="walkingGroupTotalDisplay">$0.00 MXN</span>
+          </div>
+        </div>
+      `;
+      
+      groupPricesContainer.innerHTML = html;
+      
+      // Add event listeners to group price inputs
+      const groupInputs = groupPricesContainer.querySelectorAll('.walking-group-price');
+      groupInputs.forEach(input => {
+        input.addEventListener('input', (e) => {
+          // Apply price validation
+          const inp = e.target;
+          let value = inp.value;
+          
+          // Remove any non-numeric characters except decimal point
+          value = value.replace(/[^0-9.]/g, '');
+          
+          // Allow only one decimal point
+          const parts = value.split('.');
+          if (parts.length > 2) {
+            value = parts[0] + '.' + parts.slice(1).join('');
+          }
+          
+          // Limit to 2 decimal places
+          if (parts.length === 2 && parts[1].length > 2) {
+            value = parts[0] + '.' + parts[1].substring(0, 2);
+          }
+          
+          // Update the input value if it was modified
+          if (inp.value !== value) {
+            inp.value = value;
+          }
+          
+          // Update total display
+          updateWalkingGroupTotalDisplay();
+          // Update breakdown
+          this.updateServicePriceBreakdown();
+        });
+        
+        // Add keydown handler to prevent invalid characters
+        input.addEventListener('keydown', (e) => {
+          // Allow: backspace, delete, tab, escape, enter, decimal point
+          if ([46, 8, 9, 27, 13, 110, 190].indexOf(e.keyCode) !== -1 ||
+              // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+              (e.keyCode === 65 && e.ctrlKey === true) ||
+              (e.keyCode === 67 && e.ctrlKey === true) ||
+              (e.keyCode === 86 && e.ctrlKey === true) ||
+              (e.keyCode === 88 && e.ctrlKey === true) ||
+              // Allow: home, end, left, right
+              (e.keyCode >= 35 && e.keyCode <= 39)) {
+            // Allow decimal point only if not already present
+            if ((e.keyCode === 110 || e.keyCode === 190) && e.target.value.indexOf('.') !== -1) {
+              e.preventDefault();
+            }
+            return;
+          }
+          // Ensure that it is a number and stop the keypress
+          if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+            e.preventDefault();
+          }
+        });
+        
+        // Add paste handler to validate pasted content
+        input.addEventListener('paste', (e) => {
+          e.preventDefault();
+          const clipboard = e.clipboardData || window.clipboardData;
+          const pastedText = clipboard ? clipboard.getData('text') : '';
+          // Clean the pasted text
+          let cleanedText = pastedText.replace(/[^0-9.]/g, '');
+          // Ensure only one decimal point
+          const parts = cleanedText.split('.');
+          if (parts.length > 2) {
+            cleanedText = parts[0] + '.' + parts.slice(1).join('');
+          }
+          // Insert cleaned text at cursor position
+          const inp = e.target;
+          const start = inp.selectionStart;
+          const end = inp.selectionEnd;
+          const currentValue = inp.value;
+          inp.value = currentValue.substring(0, start) + cleanedText + currentValue.substring(end);
+          // Trigger input event to apply full validation
+          inp.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      });
+      
+      // Calculate initial total
+      updateWalkingGroupTotalDisplay();
+    }
   }
 }
 
@@ -11960,155 +12408,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  
-  // Generate dynamic input fields for each walking tour group
-  function generateWalkingTourGroupInputs(tour, peopleCount) {
-    const priceMode = document.querySelector('input[name="walkingPriceMode"]:checked')?.value || 'total';
-    const groupPricesContainer = document.getElementById('walkingTourGroupPrices');
-    const totalPriceContainer = document.getElementById('walkingTourTotalPriceContainer');
-    const groupPricesSection = document.getElementById('walkingTourGroupPricesSection');
-    
-    if (priceMode === 'total') {
-      // Show total price mode
-      totalPriceContainer?.classList.remove('d-none');
-      groupPricesSection?.classList.add('d-none');
-    } else {
-      // Show per-group mode
-      totalPriceContainer?.classList.add('d-none');
-      groupPricesSection?.classList.remove('d-none');
-      
-      if (!groupPricesContainer) return;
-      
-      // Calculate groups
-      const groups = window.itineraryBuilder ? window.itineraryBuilder.calculateWalkingTourGroups(tour, peopleCount) : [];
-      const priceCurrency = tour.walkingPriceCurrency || 'MXN';
-      
-      // Generate input fields for each group
-      let html = '';
-      groups.forEach((group, index) => {
-        let defaultPrice = group.tier.price;
-        if (priceCurrency === 'USD' && this.exchangeRate) {
-          defaultPrice = Math.round(defaultPrice * this.exchangeRate);
-        }
-        
-        html += `
-          <div class="mb-3">
-            <label class="form-label d-flex justify-content-between align-items-center">
-              <span>
-                <i class="ti ti-users me-1"></i>
-                Grupo ${index + 1} (${group.tier.label})
-              </span>
-              <span class="text-muted small">${group.count} personas</span>
-            </label>
-            <div class="input-group">
-              <span class="input-group-text">$</span>
-              <input type="text" 
-                     class="form-control walking-group-price" 
-                     id="walkingGroupPrice_${index}" 
-                     data-group-index="${index}"
-                     value="${defaultPrice.toFixed(2)}"
-                     placeholder="Precio del grupo">
-              <span class="input-group-text">MXN</span>
-            </div>
-          </div>
-        `;
-      });
-      
-      // Add total calculation display
-      html += `
-        <div class="border-top pt-2 mt-3">
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-bold">Total:</span>
-            <span class="fw-bold text-primary" id="walkingGroupTotalDisplay">$0.00 MXN</span>
-          </div>
-        </div>
-      `;
-      
-      groupPricesContainer.innerHTML = html;
-      
-      // Add event listeners to group price inputs
-      const groupInputs = groupPricesContainer.querySelectorAll('.walking-group-price');
-      groupInputs.forEach(input => {
-        input.addEventListener('input', (e) => {
-          // Apply price validation
-          const inp = e.target;
-          let value = inp.value;
-          
-          // Remove any non-numeric characters except decimal point
-          value = value.replace(/[^0-9.]/g, '');
-          
-          // Allow only one decimal point
-          const parts = value.split('.');
-          if (parts.length > 2) {
-            value = parts[0] + '.' + parts.slice(1).join('');
-          }
-          
-          // Limit to 2 decimal places
-          if (parts.length === 2 && parts[1].length > 2) {
-            value = parts[0] + '.' + parts[1].substring(0, 2);
-          }
-          
-          // Update the input value if it was modified
-          if (inp.value !== value) {
-            inp.value = value;
-          }
-          
-          // Update total display
-          updateWalkingGroupTotalDisplay();
-          // Update breakdown
-          this.updateServicePriceBreakdown();
-        });
-        
-        // Add keydown handler to prevent invalid characters
-        input.addEventListener('keydown', (e) => {
-          // Allow: backspace, delete, tab, escape, enter, decimal point
-          if ([46, 8, 9, 27, 13, 110, 190].indexOf(e.keyCode) !== -1 ||
-              // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
-              (e.keyCode === 65 && e.ctrlKey === true) ||
-              (e.keyCode === 67 && e.ctrlKey === true) ||
-              (e.keyCode === 86 && e.ctrlKey === true) ||
-              (e.keyCode === 88 && e.ctrlKey === true) ||
-              // Allow: home, end, left, right
-              (e.keyCode >= 35 && e.keyCode <= 39)) {
-            // Allow decimal point only if not already present
-            if ((e.keyCode === 110 || e.keyCode === 190) && e.target.value.indexOf('.') !== -1) {
-              e.preventDefault();
-            }
-            return;
-          }
-          // Ensure that it is a number and stop the keypress
-          if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
-            e.preventDefault();
-          }
-        });
-        
-        // Add paste handler to validate pasted content
-        input.addEventListener('paste', (e) => {
-          e.preventDefault();
-          const clipboard = e.clipboardData || window.clipboardData;
-      const pastedText = clipboard ? clipboard.getData('text') : '';
-          // Clean the pasted text
-          let cleanedText = pastedText.replace(/[^0-9.]/g, '');
-          // Ensure only one decimal point
-          const parts = cleanedText.split('.');
-          if (parts.length > 2) {
-            cleanedText = parts[0] + '.' + parts.slice(1).join('');
-          }
-          // Insert cleaned text at cursor position
-          const inp = e.target;
-          const start = inp.selectionStart;
-          const end = inp.selectionEnd;
-          const currentValue = inp.value;
-          inp.value = currentValue.substring(0, start) + cleanedText + currentValue.substring(end);
-          // Trigger input event to apply full validation
-          inp.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-      });
-      
-      // Calculate initial total
-      updateWalkingGroupTotalDisplay();
-    }
-  }
   
   // Update the total display for per-group pricing
   function updateWalkingGroupTotalDisplay() {
