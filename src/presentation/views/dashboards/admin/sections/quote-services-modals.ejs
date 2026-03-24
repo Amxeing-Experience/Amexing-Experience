@@ -3,6 +3,10 @@
  * Quote Services Modals - Modal components for the itinerary builder
  * Created by Denisse Maldonado
  */
+
+// Define role-based permissions at the top of the file
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : '';
+const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
 %>
 
 <!-- Day Modal -->
@@ -199,6 +203,21 @@
                                 </div>
                             </div>
                             
+                            <!-- Tour duration field -->
+                            <div class="row mb-3">
+                                <div class="col-md-12">
+                                    <label for="tourDuration" class="form-label">Duración del tour (horas)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="ti ti-clock-hour-3"></i></span>
+                                        <input type="number" class="form-control" id="tourDuration" min="0.5" step="0.5" value="1">
+                                        <span class="input-group-text">horas</span>
+                                    </div>
+                                    <small id="tourDurationWarning" class="text-warning d-none">
+                                        <i class="ti ti-alert-triangle"></i> Duración menor al mínimo recomendado
+                                    </small>
+                                </div>
+                            </div>
+                            
                             <hr class="my-4">
                             
                             <!-- Tour People Limits Alert -->
@@ -209,6 +228,7 @@
                                     Total actual: <strong id="tourCurrentTotalPeople">0</strong>
                                 </small>
                             </div>
+                            
                             
                             <div id="vehicleTourPricingSection">
                             <!-- Passenger Counts for Tour -->
@@ -277,7 +297,59 @@
                                 <div id="walkingTourGroupBreakdown" class="alert alert-info py-2 mt-3 d-none">
                                     <div id="walkingTourGroupBreakdownContent"></div>
                                 </div>
+                                
+                                <!-- Manual Price Field for Walking Tours (Hidden by default) -->
+                                <div id="walkingTourManualPriceContainer" class="d-none">
+                                    <!-- Toggle between total and per-group pricing -->
+                                    <div class="d-flex align-items-center justify-content-between mb-3">
+                                        <label class="form-label mb-0">Modo de edición de precios</label>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <input type="radio" class="btn-check" name="walkingPriceMode" id="walkingPriceModeTotal" value="total" checked>
+                                            <label class="btn btn-outline-primary" for="walkingPriceModeTotal">
+                                                <i class="ti ti-calculator"></i> Precio Total
+                                            </label>
+                                            <input type="radio" class="btn-check" name="walkingPriceMode" id="walkingPriceModeGroup" value="group">
+                                            <label class="btn btn-outline-primary" for="walkingPriceModeGroup">
+                                                <i class="ti ti-users"></i> Por Grupo
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Total price input (default) -->
+                                    <div id="walkingTourTotalPriceSection">
+                                        <label for="walkingTourManualPrice" class="form-label">Precio Total <span class="text-danger">*</span></label>
+                                        <div class="input-group mb-2">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" class="form-control" id="walkingTourManualPrice" placeholder="0.00" step="0.01" min="0" readonly>
+                                            <span class="input-group-text currency-symbol">MXN</span>
+                                        </div>
+                                        <small class="text-muted">Precio manual para el tour a pie (reemplaza el cálculo por niveles)</small>
+                                    </div>
+                                    
+                                    <!-- Per-group price inputs (hidden by default) -->
+                                    <div id="walkingTourGroupPricesSection" class="d-none">
+                                        <label class="form-label mb-2">Precios por Grupo</label>
+                                        <div id="walkingTourGroupPricesContainer">
+                                            <!-- Dynamic group price inputs will be inserted here -->
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">Total: </small>
+                                            <strong id="walkingTourGroupPricesTotal">$0.00</strong>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+                            
+                            <!-- Tour Price Override Toggle (Admin Only) -->
+                            <% if (canEditPrices) { %>
+                            <div class="form-check mt-3 mb-3" id="tourOverridePricesContainer">
+                                <input class="form-check-input" type="checkbox" id="tourOverridePrices">
+                                <label class="form-check-label" for="tourOverridePrices">
+                                    <i class="ti ti-edit me-1"></i>Editar precios manualmente
+                                </label>
+                                <small class="text-muted d-block ms-4">Permite modificar los precios calculados automáticamente</small>
+                            </div>
+                            <% } %>
                         </div>
 
                         <!-- Transport Fields -->
@@ -765,6 +837,39 @@
                                 <input type="number" class="form-control" id="servicePrice" placeholder="0.00" step="0.01" min="0" required>
                                 <span class="input-group-text">MXN</span>
                             </div>
+                            
+                            <!-- Tour Vehicle Price Override Toggle (Admin Only) -->
+                            <% if (canEditPrices) { %>
+                            <div class="form-check mt-2 d-none" id="tourVehicleOverridePricesContainer">
+                                <input class="form-check-input" type="checkbox" id="tourVehicleOverridePrices">
+                                <label class="form-check-label" for="tourVehicleOverridePrices">
+                                    <i class="ti ti-edit me-1"></i>Editar precio manualmente
+                                </label>
+                                <small class="text-muted d-block ms-4">Permite modificar el precio calculado del vehículo</small>
+                            </div>
+                            <% } %>
+                            
+                            <!-- Transport Price Override Toggle (Admin Only) -->
+                            <% if (canEditPrices) { %>
+                            <div class="form-check mt-2 d-none" id="transportOverridePricesContainer">
+                                <input class="form-check-input" type="checkbox" id="transportOverridePrices">
+                                <label class="form-check-label" for="transportOverridePrices">
+                                    <i class="ti ti-edit me-1"></i>Editar precio manualmente
+                                </label>
+                                <small class="text-muted d-block ms-4">Permite modificar el precio calculado automáticamente</small>
+                            </div>
+                            <% } %>
+                            
+                            <!-- A Disposición Price Override Toggle (Admin Only) -->
+                            <% if (canEditPrices) { %>
+                            <div class="form-check mt-2 d-none" id="aDisposicionOverridePricesContainer">
+                                <input class="form-check-input" type="checkbox" id="aDisposicionOverridePrices">
+                                <label class="form-check-label" for="aDisposicionOverridePrices">
+                                    <i class="ti ti-edit me-1"></i>Editar precio manualmente
+                                </label>
+                                <small class="text-muted d-block ms-4">Permite modificar el precio calculado automáticamente</small>
+                            </div>
+                            <% } %>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="serviceQuantity" class="form-label">Cantidad</label>
@@ -838,7 +943,7 @@
                                 <label for="adultPrice" class="form-label">Precio Adulto <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" id="adultPrice" placeholder="0.00" step="0.01" min="0">
+                                    <input type="number" class="form-control" id="adultPrice" placeholder="0.00" step="0.01" min="0" readonly>
                                     <span class="input-group-text currency-symbol">MXN</span>
                                 </div>
                             </div>
@@ -846,7 +951,7 @@
                                 <label for="childPrice" class="form-label">Precio Niño</label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" id="childPrice" placeholder="0.00" step="0.01" min="0">
+                                    <input type="number" class="form-control" id="childPrice" placeholder="0.00" step="0.01" min="0" readonly>
                                     <span class="input-group-text currency-symbol">MXN</span>
                                 </div>
                             </div>
@@ -854,11 +959,22 @@
                                 <label for="noAlcoholPrice" class="form-label">Precio sin alcohol</label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" id="noAlcoholPrice" placeholder="0.00" step="0.01" min="0">
+                                    <input type="number" class="form-control" id="noAlcoholPrice" placeholder="0.00" step="0.01" min="0" readonly>
                                     <span class="input-group-text currency-symbol">MXN</span>
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Price Override Toggle (Admin Only) -->
+                        <% if (canEditPrices) { %>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="experienceOverridePrices">
+                            <label class="form-check-label" for="experienceOverridePrices">
+                                <i class="ti ti-edit me-1"></i>Editar precios manualmente
+                            </label>
+                            <small class="text-muted d-block ms-4">Permite modificar los precios calculados automáticamente</small>
+                        </div>
+                        <% } %>
                     </div>
                     
 

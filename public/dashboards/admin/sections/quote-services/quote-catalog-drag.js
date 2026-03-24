@@ -17,6 +17,8 @@ class DragCatalogManager {
     this.offcanvas = null;
     this.isOpen = false;
     this.transportServicesCache = [];
+    this.tourTypeFilter = 'all'; // Track current tour filter
+    this.tourSearchQuery = ''; // Track current search query
 
     if (!this.offcanvasEl) {
       console.warn('[DragCatalog] Offcanvas element not found');
@@ -117,7 +119,8 @@ class DragCatalogManager {
     const providerExps = this.builder.providerExperiencesCache || [];
     providerExps.forEach((exp) => {
       if (!exp.name || !exp.provider || !exp.provider.name) return;
-      const showProvider = window.userRole === 'admin';
+      // Only admin and superadmin can see provider names
+      const showProvider = window.userRole === 'admin' || window.userRole === 'superadmin';
       allExps.push({ id: exp.objectId || exp.id, name: exp.name, icon: 'ti-beach', subLabel: showProvider ? exp.provider.name : null });
     });
 
@@ -139,6 +142,7 @@ class DragCatalogManager {
 
     let html = '';
     let count = 0;
+    let filteredCount = 0;
 
     // Tours (from cache array keyed by 'all')
     const tours = this.builder.toursCache.get('all') || [];
@@ -146,13 +150,30 @@ class DragCatalogManager {
       const name = tour.destinationPOI?.name || tour.name || '';
       // Skip inactive, non-existing, or unnamed tours
       if (!name || tour.active === false || tour.exists === false) return;
+      
+      // Apply tour type filter
+      if (this.tourTypeFilter !== 'all') {
+        if (this.tourTypeFilter === 'walking' && !tour.isWalkingTour) return;
+        if (this.tourTypeFilter === 'vehicle' && tour.isWalkingTour) return;
+      }
+      
       const subLabel = tour.isWalkingTour ? 'Walking' : null;
-      html += this.renderDraggableItem(tour.objectId || tour.id, name, 'tour', 'ti-map-2', subLabel);
+      const itemHtml = this.renderDraggableItem(tour.objectId || tour.id, name, 'tour', 'ti-map-2', subLabel);
+      
+      // Store original HTML with data attributes for search filtering
+      html += itemHtml.replace('<div class="catalog-drag-item"', 
+        `<div class="catalog-drag-item" data-tour-name="${this.escapeHtml(name.toLowerCase())}" data-is-walking="${tour.isWalkingTour}"`);
+      filteredCount++;
       count++;
     });
 
     container.innerHTML = html || '<div class="catalog-empty-state">No hay tours disponibles</div>';
-    this.updateBadge('catalogToursCount', count);
+    this.updateBadge('catalogToursCount', filteredCount);
+    
+    // Apply search filter if there's a query
+    if (this.tourSearchQuery) {
+      this.applyTourSearchFilter();
+    }
   }
 
   renderTransportServices() {
@@ -222,10 +243,11 @@ class DragCatalogManager {
   renderTransportItem(service, isLocal = false) {
     const origin = this.escapeHtml(service.origin || 'Sin origen');
     const destination = this.escapeHtml(service.destination || '-');
+    const tooltipText = isLocal ? destination : `${origin} → ${destination}`;
 
     if (isLocal) {
       return `
-        <div class="catalog-drag-item" draggable="true" data-catalog-id="${service.value}" data-catalog-type="transport">
+        <div class="catalog-drag-item" draggable="true" data-catalog-id="${service.value}" data-catalog-type="transport" title="${tooltipText}">
           <i class="ti ti-grip-vertical catalog-drag-handle"></i>
           <div class="catalog-transport-info">
             <div class="catalog-transport-route">${destination}</div>
@@ -235,7 +257,7 @@ class DragCatalogManager {
     }
 
     return `
-      <div class="catalog-drag-item catalog-drag-item-tall" draggable="true" data-catalog-id="${service.value}" data-catalog-type="transport">
+      <div class="catalog-drag-item catalog-drag-item-tall" draggable="true" data-catalog-id="${service.value}" data-catalog-type="transport" title="${tooltipText}">
         <i class="ti ti-grip-vertical catalog-drag-handle"></i>
         <div class="catalog-transport-info">
           <div class="catalog-transport-origin">${origin}</div>
@@ -250,7 +272,7 @@ class DragCatalogManager {
       ? `<span class="catalog-drag-badge badge bg-light text-muted">${subLabel}</span>`
       : '';
     return `
-      <div class="catalog-drag-item" draggable="true" data-catalog-id="${id}" data-catalog-type="${type}">
+      <div class="catalog-drag-item" draggable="true" data-catalog-id="${id}" data-catalog-type="${type}" title="${this.escapeHtml(name)}">
         <i class="ti ti-grip-vertical catalog-drag-handle"></i>
         <i class="ti ${icon} catalog-drag-icon"></i>
         <span class="catalog-drag-name">${this.escapeHtml(name)}</span>
@@ -314,11 +336,54 @@ class DragCatalogManager {
         el.addEventListener('input', (e) => this.filterItems(e.target.value, container));
       }
     });
+    
+    // Initialize tour type filter buttons
+    this.initTourTypeFilter();
+  }
+  
+  initTourTypeFilter() {
+    const filterButtons = document.querySelectorAll('input[name="tourTypeFilter"]');
+    filterButtons.forEach(button => {
+      button.addEventListener('change', (e) => {
+        this.tourTypeFilter = e.target.value;
+        this.renderTours();
+      });
+    });
+  }
+  
+  applyTourSearchFilter() {
+    const container = document.getElementById('catalogToursList');
+    if (!container) return;
+    
+    const items = container.querySelectorAll('.catalog-drag-item');
+    let visibleCount = 0;
+    
+    items.forEach((item) => {
+      const tourName = item.getAttribute('data-tour-name') || '';
+      const matchesSearch = !this.tourSearchQuery || tourName.includes(this.tourSearchQuery);
+      
+      if (matchesSearch) {
+        item.style.display = '';
+        visibleCount++;
+      } else {
+        item.style.display = 'none';
+      }
+    });
+    
+    // Update count badge with visible items
+    this.updateBadge('catalogToursCount', visibleCount);
   }
 
   filterItems(query, containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
+
+    // Special handling for tours
+    if (containerId === 'catalogToursList') {
+      this.tourSearchQuery = query.toLowerCase().trim();
+      this.applyTourSearchFilter();
+      return;
+    }
 
     const items = container.querySelectorAll('.catalog-drag-item');
     const q = query.toLowerCase().trim();
