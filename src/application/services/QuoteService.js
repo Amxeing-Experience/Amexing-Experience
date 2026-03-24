@@ -992,12 +992,9 @@ class QuoteService {
         return { id: existing.id, folio: existing.get('folio') };
       }
 
-      // Generate folio: RES-YYYY-NNNN
-      const year = new Date().getFullYear();
-      const countQuery = new Parse.Query('Reservation');
-      countQuery.startsWith('folio', `RES-${year}-`);
-      const count = await countQuery.count({ useMasterKey: true });
-      const folio = `RES-${year}-${String(count + 1).padStart(4, '0')}`;
+      // Generate new folio format: [SERVICE_MONTH_PREFIX][YEAR][CREATION_MONTH][CONSECUTIVE]
+      // Example: ABR20260301 = Service in April 2026, created in March, first quote for April
+      const folio = await this.generateReservationFolio(quote);
 
       const serviceItems = quote.get('serviceItems') || {};
       const days = serviceItems.days || [];
@@ -1361,6 +1358,109 @@ class QuoteService {
     });
 
     return results;
+  }
+
+  /**
+   * Get Spanish 3-letter month abbreviation from date.
+   * @param {Date} date - Date object.
+   * @returns {string} 3-letter Spanish month abbreviation.
+   * @private
+   * @example
+   * const prefix = this.getSpanishMonthPrefix(new Date('2026-04-10'));
+   * console.log(prefix); // 'ABR'
+   */
+  getSpanishMonthPrefix(date) {
+    const monthNames = [
+      'ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN',
+      'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC',
+    ];
+    return monthNames[date.getMonth()];
+  }
+
+  /**
+   * Generate reservation folio based on service date and creation date.
+   * Format: [SERVICE_MONTH_PREFIX][YEAR][CREATION_MONTH][CONSECUTIVE].
+   * Example: ABR20260301 = Service in April 2026, created in March, first quote for April.
+   * @param {Parse.Object} quote - Quote object with serviceItems.
+   * @returns {Promise<string>} Generated folio.
+   * @private
+   * @example
+   * const folio = await this.generateReservationFolio(quote);
+   * console.log(folio); // 'ABR20260301'
+   */
+  async generateReservationFolio(quote) {
+    try {
+      const serviceItems = quote.get('serviceItems') || {};
+      const days = serviceItems.days || [];
+
+      // Find the earliest service date (first day of service)
+      let earliestServiceDate = null;
+      const serviceDays = days.filter((day) => day.date);
+      for (const day of serviceDays) {
+        const d = new Date(`${day.date}T12:00:00`);
+        if (!earliestServiceDate || d < earliestServiceDate) {
+          earliestServiceDate = d;
+        }
+      }
+
+      // Fallback to current date if no service date found
+      if (!earliestServiceDate) {
+        earliestServiceDate = new Date();
+        logger.warn('No service date found in quote, using current date for folio generation', {
+          quoteId: quote.id,
+        });
+      }
+
+      const creationDate = new Date();
+      const serviceYear = earliestServiceDate.getFullYear();
+      const serviceMonthPrefix = this.getSpanishMonthPrefix(earliestServiceDate);
+      const creationMonth = String(creationDate.getMonth() + 1).padStart(2, '0');
+
+      // Get consecutive number for this service month/year combination
+      const prefix = `${serviceMonthPrefix}${serviceYear}${creationMonth}`;
+      const countQuery = new Parse.Query('Reservation');
+      countQuery.startsWith('folio', prefix);
+      countQuery.equalTo('exists', true);
+      countQuery.descending('folio');
+      countQuery.limit(1);
+      countQuery.select('folio');
+
+      const lastReservation = await countQuery.first({ useMasterKey: true });
+
+      let nextNumber = 1;
+      if (lastReservation) {
+        const lastFolio = lastReservation.get('folio');
+        // Extract the last 2 digits (consecutive number)
+        const lastNumberStr = lastFolio.slice(-2);
+        const lastNumber = parseInt(lastNumberStr, 10);
+        if (!Number.isNaN(lastNumber)) {
+          nextNumber = lastNumber + 1;
+        }
+      }
+
+      const consecutiveStr = String(nextNumber).padStart(2, '0');
+      const folio = `${prefix}${consecutiveStr}`;
+
+      logger.info('Generated reservation folio', {
+        quoteId: quote.id,
+        serviceDate: earliestServiceDate.toISOString().split('T')[0],
+        serviceMonthPrefix,
+        serviceYear,
+        creationMonth,
+        consecutiveNumber: nextNumber,
+        folio,
+      });
+
+      return folio;
+    } catch (error) {
+      logger.error('Error generating reservation folio', {
+        quoteId: quote.id,
+        error: error.message,
+      });
+      // Fallback to timestamp-based folio to ensure uniqueness
+      const timestamp = Date.now();
+      return `ERR${timestamp}`;
+    }
   }
 }
 

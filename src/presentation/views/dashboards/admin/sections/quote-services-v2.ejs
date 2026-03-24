@@ -143,6 +143,14 @@
                     <small class="text-muted">Los cambios se guardan automáticamente</small>
                 </div>
             </div>
+
+            <!-- Continue to Third Step Button -->
+            <div class="continue-step-section mt-4 d-flex justify-content-center">
+                <button type="button" class="btn btn-primary btn-lg px-4 py-2" id="continueToSummaryBtn" disabled>
+                    <i class="ti ti-arrow-right me-2"></i>
+                    <span id="continueButtonText">Continuar al Resumen</span>
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -504,6 +512,22 @@
         50% {
             box-shadow: 0 0 16px rgba(0, 123, 255, 0.8);
         }
+    }
+    
+    /* Price Override Styles */
+    .price-override-active {
+        background-color: #fff3cd !important;
+        border-color: #ffc107 !important;
+    }
+    
+    .price-override-indicator {
+        color: #856404;
+        font-size: 0.875rem;
+        margin-left: 0.5rem;
+    }
+    
+    .form-check-input:checked ~ .form-check-label {
+        font-weight: 500;
     }
 </style>
 
