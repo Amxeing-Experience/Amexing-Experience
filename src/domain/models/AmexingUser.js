@@ -587,17 +587,16 @@ class AmexingUser extends BaseModel {
   /**
    * Checks if user has OAuth account for provider.
    * @param {string} provider - OAuth provider name.
-   * @param _provider
    * @returns {boolean} - Boolean result True if user has account for provider.
    * @example
    * // Model method usage
-   * const result = await amexinguser.hasOAuthAccount({ provider: 'example' });
+   * const result = await amexinguser.hasOAuthAccount('google');
    * // Returns: model operation result
    * // const result = await authService.login(credentials);
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  hasOAuthAccount(_provider) {
-    return this.getOAuthAccount(_provider) !== null;
+  hasOAuthAccount(provider) {
+    return this.getOAuthAccount(provider) !== null;
   }
 
   /**

@@ -1,0 +1,150 @@
+<%
+/**
+ * OAuth Connection Status Component
+ * Shows connected OAuth accounts with disconnect functionality
+ * Created by Denisse Maldonado
+ * 
+ * @param {object} userData - User data object
+ * @param {string} csrfToken - CSRF token for forms
+ * 
+ * Usage: include('../../organisms/profile/oauth-connection-status', { userData, csrfToken })
+ */
+
+// Check for OAuth accounts
+const oauthAccounts = (userData && userData.oauthAccounts) ? userData.oauthAccounts : [];
+const hasGoogleOAuth = oauthAccounts.some(account => account.provider === 'google');
+const googleAccount = oauthAccounts.find(account => account.provider === 'google');
+%>
+
+<!-- OAuth Connections -->
+<div class="oauth-connections-section mb-3">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <label class="text-muted small mb-0">Connected Accounts</label>
+        <% if (hasGoogleOAuth) { %>
+            <small class="text-success">
+                <i class="ti ti-check-circle me-1"></i>1 connected
+            </small>
+        <% } else { %>
+            <small class="text-muted">None connected</small>
+        <% } %>
+    </div>
+    
+    <% if (hasGoogleOAuth) { %>
+        <!-- Google Account Connected -->
+        <div class="oauth-account-item d-flex align-items-center justify-content-between p-2 border rounded">
+            <div class="d-flex align-items-center">
+                <div class="oauth-provider-icon me-2">
+                    <i class="ti ti-brand-google text-danger"></i>
+                </div>
+                <div>
+                    <small class="fw-semibold">Google</small>
+                    <% if (googleAccount && googleAccount.email) { %>
+                        <br><small class="text-muted"><%= googleAccount.email %></small>
+                    <% } %>
+                </div>
+            </div>
+            <div>
+                <button type="button" 
+                        class="btn btn-sm btn-outline-danger disconnect-oauth-btn" 
+                        data-provider="google"
+                        data-bs-toggle="tooltip"
+                        title="Disconnect Google account">
+                    <i class="ti ti-unlink"></i>
+                </button>
+            </div>
+        </div>
+    <% } else { %>
+        <!-- No OAuth Connected -->
+        <div class="no-oauth-connections p-3 text-center border rounded bg-light">
+            <i class="ti ti-link-off text-muted mb-2 d-block" style="font-size: 1.5rem;"></i>
+            <small class="text-muted">No external accounts connected</small>
+            <br>
+            <small class="text-muted">You can link accounts from the login page</small>
+        </div>
+    <% } %>
+</div>
+
+<!-- Disconnect Confirmation Modal -->
+<div class="modal fade" id="disconnectOAuthModal" tabindex="-1" aria-labelledby="disconnectOAuthModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="disconnectOAuthModalLabel">
+                    <i class="ti ti-unlink me-2"></i>Disconnect Account
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <div class="mb-3">
+                        <i class="ti ti-alert-triangle text-warning" style="font-size: 3rem;"></i>
+                    </div>
+                    <h6>¿Disconnect your Google account?</h6>
+                    <p class="text-muted">
+                        You will no longer be able to sign in with Google. 
+                        You can reconnect it later from the login page.
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="disconnectOAuthForm" method="POST" style="display: inline;">
+                    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                    <input type="hidden" name="_method" value="DELETE">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="ti ti-unlink me-1"></i>Disconnect
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .oauth-account-item {
+        background-color: rgba(0, 123, 255, 0.05);
+        border-color: rgba(0, 123, 255, 0.15) !important;
+    }
+    
+    .oauth-provider-icon i {
+        font-size: 1.2rem;
+    }
+    
+    .disconnect-oauth-btn {
+        border-width: 1px;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .no-oauth-connections {
+        background-color: rgba(108, 117, 125, 0.05) !important;
+        border-color: rgba(108, 117, 125, 0.15) !important;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle OAuth disconnect buttons
+    const disconnectButtons = document.querySelectorAll('.disconnect-oauth-btn');
+    const disconnectModal = document.getElementById('disconnectOAuthModal');
+    const disconnectForm = document.getElementById('disconnectOAuthForm');
+    
+    disconnectButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const provider = this.getAttribute('data-provider');
+            
+            // Set the form action for the disconnect request
+            disconnectForm.action = `/auth/oauth/${provider}/unlink`;
+            
+            // Show the modal
+            const modal = new bootstrap.Modal(disconnectModal);
+            modal.show();
+        });
+    });
+
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>

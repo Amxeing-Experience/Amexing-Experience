@@ -65,7 +65,7 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             width: 100%;
-            max-width: 500px;
+            max-width: 1200px;
             padding: 3rem;
             position: relative;
             z-index: 2;
@@ -74,13 +74,43 @@
         }
 
         .auth-wrapper.with-header .auth-card {
-            max-width: 600px;
+            max-width: 1200px;
             padding: 2rem;
         }
 
         .auth-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Responsive adjustments for auth-card */
+        @media (max-width: 1400px) {
+            .auth-card {
+                max-width: 90%;
+                padding: 2.5rem;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .auth-card {
+                max-width: 85%;
+                padding: 2rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .auth-card {
+                max-width: 95%;
+                padding: 1.5rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .auth-card {
+                max-width: 100%;
+                padding: 1rem;
+                margin: 0 1rem;
+            }
         }
 
         .auth-logo {
@@ -262,19 +292,21 @@
                 </div>
             <% } %>
 
-            <!-- Flash Messages -->
-            <% if (typeof error !== 'undefined' && error) { %>
-                <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
-                    <i class="ti ti-alert-circle me-2"></i>
-                    <div><%= error %></div>
-                </div>
-            <% } %>
+            <!-- Flash Messages (only show if no content or body - content handles its own messages) -->
+            <% if (!(typeof body !== 'undefined' && body) && !(typeof content !== 'undefined' && content)) { %>
+                <% if (typeof error !== 'undefined' && error) { %>
+                    <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
+                        <i class="ti ti-alert-circle me-2"></i>
+                        <div><%= error %></div>
+                    </div>
+                <% } %>
 
-            <% if (typeof success !== 'undefined' && success) { %>
-                <div class="alert alert-success d-flex align-items-center mb-4" role="alert">
-                    <i class="ti ti-circle-check me-2"></i>
-                    <div><%= success %></div>
-                </div>
+                <% if (typeof success !== 'undefined' && success) { %>
+                    <div class="alert alert-success d-flex align-items-center mb-4" role="alert">
+                        <i class="ti ti-circle-check me-2"></i>
+                        <div><%= success %></div>
+                    </div>
+                <% } %>
             <% } %>
 
             <!-- Content -->
@@ -300,18 +332,48 @@
     </div>
 
     <!-- Core JavaScript -->
-    <script src="/flexy-bootstrap-lite-1.0.0/assets/libs/jquery/dist/jquery.min.js"></script>
-    <script src="/flexy-bootstrap-lite-1.0.0/assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/flexy-bootstrap-lite-1.0.0/node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="/flexy-bootstrap-lite-1.0.0/node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Auth Layout Script -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Hide loading screen
             const loader = document.getElementById('authLoader');
-            if (loader) {
-                setTimeout(() => {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Check if this is a redirect from a failed form submission
+            const isErrorRedirect = urlParams.has('error') || urlParams.has('message');
+            
+            if (isErrorRedirect) {
+                // Immediately hide loader for error redirects - no delay
+                if (loader) {
                     loader.classList.remove('show');
-                }, 300);
+                    // Force hide the loader by setting styles directly
+                    loader.style.opacity = '0';
+                    loader.style.visibility = 'hidden';
+                    loader.style.display = 'none';
+                }
+                
+                // Reset all submit buttons to normal state
+                const submitBtns = document.querySelectorAll('button[type="submit"]');
+                submitBtns.forEach(btn => {
+                    btn.disabled = false;
+                    
+                    // Restore original button text if available, otherwise use default
+                    if (btn.dataset.originalText) {
+                        btn.innerHTML = btn.dataset.originalText;
+                    } else {
+                        // Default text for login button
+                        btn.innerHTML = '<i class="ti ti-login me-2"></i>Iniciar Sesión';
+                    }
+                });
+            } else {
+                // Normal page load - hide loader with delay for smooth transition
+                if (loader) {
+                    setTimeout(() => {
+                        loader.classList.remove('show');
+                    }, 300);
+                }
             }
 
             // Smooth form animations
@@ -336,19 +398,28 @@
             // Form submission loading state
             const forms = document.querySelectorAll('form');
             forms.forEach(form => {
-                form.addEventListener('submit', function() {
-                    const submitBtn = form.querySelector('button[type="submit"]');
-                    if (submitBtn) {
-                        submitBtn.innerHTML = `
-                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            Processing...
-                        `;
-                        submitBtn.disabled = true;
-                    }
+                form.addEventListener('submit', function(event) {
+                    // Check if form validation will pass before showing loading state
+                    if (form.checkValidity()) {
+                        const submitBtn = form.querySelector('button[type="submit"]');
+                        if (submitBtn && !submitBtn.disabled) {
+                            // Store original button text for restoration
+                            if (!submitBtn.dataset.originalText) {
+                                submitBtn.dataset.originalText = submitBtn.innerHTML;
+                            }
+                            
+                            submitBtn.innerHTML = `
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                Processing...
+                            `;
+                            submitBtn.disabled = true;
+                        }
 
-                    if (loader) {
-                        loader.classList.add('show');
+                        if (loader) {
+                            loader.classList.add('show');
+                        }
                     }
+                    // If validation fails, don't show loading state - let validation messages appear
                 });
             });
 
@@ -357,8 +428,20 @@
             alerts.forEach(alert => {
                 if (alert.classList.contains('alert-success')) {
                     setTimeout(() => {
-                        const bsAlert = new bootstrap.Alert(alert);
-                        bsAlert.close();
+                        // Check if bootstrap is available
+                        if (typeof bootstrap !== 'undefined' && bootstrap.Alert) {
+                            const bsAlert = new bootstrap.Alert(alert);
+                            bsAlert.close();
+                        } else {
+                            // Fallback: simple fade out
+                            alert.style.transition = 'opacity 0.5s ease';
+                            alert.style.opacity = '0';
+                            setTimeout(() => {
+                                if (alert.parentNode) {
+                                    alert.parentNode.removeChild(alert);
+                                }
+                            }, 500);
+                        }
                     }, 5000);
                 }
             });
@@ -381,6 +464,22 @@
         // Global error handler
         window.addEventListener('error', function(e) {
             console.error('Auth error:', e.error);
+        });
+
+        // Safety mechanism: Hide loader when page becomes visible (handles tab switching, etc.)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                const loader = document.getElementById('authLoader');
+                const urlParams = new URLSearchParams(window.location.search);
+                
+                // If there are error/message parameters, ensure loader is hidden
+                if ((urlParams.has('error') || urlParams.has('message')) && loader) {
+                    loader.classList.remove('show');
+                    loader.style.opacity = '0';
+                    loader.style.visibility = 'hidden';
+                    loader.style.display = 'none';
+                }
+            }
         });
 
         // Prevent context menu in production

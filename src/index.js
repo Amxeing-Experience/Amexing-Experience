@@ -19,6 +19,12 @@
  * NODE_ENV=production npm start
  */
 
+console.log('🟡 ========== SERVER STARTING ==========');
+console.log('🟡 Time:', new Date().toISOString());
+console.log('🟡 Node Version:', process.version);
+console.log('🟡 Environment:', process.env.NODE_ENV || 'development');
+console.log('🟡 =====================================');
+
 require('dotenv').config({
   path: `./environments/.env.${process.env.NODE_ENV || 'development'}`,
 });
@@ -67,6 +73,26 @@ if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging')
 app.set('views', path.join(__dirname, 'presentation', 'views'));
 app.set('view engine', 'ejs');
 
+// VERY FIRST REQUEST LOGGER - Log ALL requests to see what's happening
+app.use((req, res, next) => {
+  // Log ALL requests first
+  console.log('📍 ALL REQUESTS:', req.method, req.url);
+
+  // Then log forgot-password specifically
+  if (req.url.includes('forgot-password') || req.path.includes('forgot-password')) {
+    console.log('🟢 ========== VERY FIRST: forgot-password request ==========');
+    console.log('🟢 Time:', new Date().toISOString());
+    console.log('🟢 Method:', req.method);
+    console.log('🟢 URL:', req.url);
+    console.log('🟢 Path:', req.path);
+    console.log('🟢 Original URL:', req.originalUrl);
+    console.log('🟢 User Agent:', req.headers['user-agent']);
+    console.log('🟢 Content Type:', req.headers['content-type']);
+    console.log('🟢 ========================================');
+  }
+  next();
+});
+
 // CSP Report endpoint (must be before body parser to handle application/csp-report)
 app.post(
   '/api/csp-report',
@@ -92,6 +118,26 @@ app.use(express.json({ limit: '250mb' }));
 app.use(express.urlencoded({ extended: true, limit: '250mb' }));
 app.use(cookieParser());
 app.use(methodOverride('_method'));
+
+// DEBUG: Log ALL requests
+app.use((req, res, next) => {
+  if (req.method === 'POST' && req.path === '/forgot-password') {
+    console.log('🔴 ========== APP LEVEL: POST /forgot-password DETECTED ==========');
+    console.log('🔴 Time:', new Date().toISOString());
+    console.log('🔴 Method:', req.method);
+    console.log('🔴 Path:', req.path);
+    console.log('🔴 URL:', req.originalUrl);
+    console.log('🔴 Body:', JSON.stringify(req.body, null, 2));
+    console.log('🔴 Headers:', {
+      'content-type': req.headers['content-type'],
+      'content-length': req.headers['content-length'],
+      referer: req.headers.referer,
+    });
+    console.log('🔴 Session ID:', req.sessionID || req.session?.id || 'no session');
+    console.log('🔴 ========================================');
+  }
+  next();
+});
 
 // Compression middleware
 app.use(compression());

@@ -99,18 +99,101 @@ class EmailService {
    */
   async sendEmail(emailData) {
     try {
-      if (!this.isAvailable()) {
-        throw new Error('Email service is not available. Check MailerSend configuration.');
-      }
-
       const {
         to, toName, subject, text, html, from, fromName, tags,
         notificationType, recipientUser, metadata, attachments, cc,
       } = emailData;
 
-      // Validate required fields
+      // Validate required fields first
       if (!to || !subject || (!text && !html)) {
         throw new Error('Missing required email fields: to, subject, and content (text or html)');
+      }
+
+      // Check for development mode BEFORE checking availability
+      const isDevMode = process.env.NODE_ENV === 'development';
+      const apiToken = process.env.MAILERSEND_API_TOKEN;
+      const hasValidToken = apiToken && apiToken !== 'your-mailersend-api-token-change-this';
+
+      console.log('📧 DEBUG: Email send attempt - Dev Mode:', isDevMode, 'Has Valid Token:', hasValidToken);
+      console.log('📧 DEBUG: notificationType received:', notificationType);
+      console.log('📧 DEBUG: notificationType type:', typeof notificationType);
+
+      // Check if we should simulate or send real email
+      if (isDevMode && !hasValidToken) {
+        // In development with no valid MailerSend token, simulate for non-password-reset emails
+        console.log('📧 === ENTERING EMAIL SIMULATION MODE ===');
+        logger.info('📧 SIMULATING EMAIL SEND (Development Mode)', {
+          to: this.maskEmail(to),
+          subject,
+          notificationType: notificationType || 'generic',
+          timestamp: new Date().toISOString(),
+          html: html ? `HTML content (${html.length} chars)` : 'No HTML',
+          text: text ? `Text content (${text.length} chars)` : 'No text',
+        });
+
+        // Simulate successful response
+        const result = {
+          body: {
+            message_id: `dev_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          },
+        };
+
+        // Log email content for development debugging
+        const emailSimulationLog = `
+📧 === DEVELOPMENT EMAIL SIMULATION ===
+TO: ${to}
+SUBJECT: ${subject}
+TYPE: ${notificationType || 'generic'}
+${html ? `--- HTML PREVIEW ---\n${html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 200)}...` : ''}
+${text ? `--- TEXT CONTENT ---\n${text.substring(0, 200)}...` : ''}
+=================================
+`;
+
+        console.log(emailSimulationLog);
+
+        // Also write to file for debugging
+        const fs = require('fs');
+        const timestamp = new Date().toISOString();
+        const logEntry = `[${timestamp}] EMAIL SIMULATION:\n${emailSimulationLog}\n`;
+        fs.appendFileSync('/tmp/email-debug.log', logEntry);
+
+        // Also try process.stdout.write directly
+        process.stdout.write(`\n🔥 DIRECT OUTPUT: Email simulation would be sent to: ${to}\n`);
+
+        // Skip the rest of the method and return simulated success
+        const messageId = result.body.message_id;
+
+        // Log email to database for traceability (still do this in dev mode)
+        await this.logEmailSent({
+          messageId,
+          recipientEmail: to,
+          recipientUser,
+          notificationType: notificationType || 'generic',
+          status: 'simulated',
+          metadata: {
+            ...metadata,
+            simulatedInDevelopment: true,
+          },
+        });
+
+        logger.info('Email sent successfully (simulated)', {
+          messageId,
+          to: this.maskEmail(to),
+          subject,
+          notificationType: notificationType || 'generic',
+          mode: 'simulation',
+        });
+
+        return {
+          success: true,
+          messageId,
+          message: 'Email simulated successfully in development mode',
+        };
+      }
+
+      // Production mode or valid token - check availability
+      if (!this.isAvailable()) {
+        throw new Error('Email service is not available. Check MailerSend configuration.');
       }
 
       // Create email parameters
@@ -156,7 +239,7 @@ class EmailService {
         emailParams.setAttachments(mailAttachments);
       }
 
-      // Send email
+      // Production mode or valid API token - send real email
       const result = await this.mailerSend.email.send(emailParams);
       const messageId = result.body?.message_id || null;
 
@@ -236,6 +319,136 @@ class EmailService {
       return {
         success: false,
         error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Send email using SMTP as fallback when MailerSend is unavailable.
+   * @param {object} emailData - Email configuration.
+   * @returns {Promise<object>} Send result.
+   * @private
+   * @example
+   */
+  async sendViaSmtp(emailData) {
+    try {
+      console.log('📧 ========== SMTP Email Send START ==========');
+
+      const nodemailer = require('nodemailer');
+
+      const {
+        to, toName, subject, text, html, from, fromName,
+        notificationType, recipientUser, metadata,
+      } = emailData;
+
+      // Create SMTP transporter
+      const transporter = nodemailer.createTransporter({
+        host: process.env.EMAIL_HOST,
+        port: process.env.EMAIL_PORT || 587,
+        secure: (process.env.EMAIL_PORT || 587) === 465, // true for 465, false for other ports
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+        tls: {
+          rejectUnauthorized: false, // For development only
+        },
+      });
+
+      console.log('📧 SMTP: Transporter configured');
+      console.log('📧 SMTP: Host:', process.env.EMAIL_HOST);
+      console.log('📧 SMTP: Port:', process.env.EMAIL_PORT || 587);
+      console.log('📧 SMTP: User:', process.env.EMAIL_USER);
+
+      // Prepare email options
+      const mailOptions = {
+        from: `${fromName || process.env.EMAIL_FROM_NAME || 'Amexing Experience'} <${from || process.env.EMAIL_USER}>`,
+        to: toName ? `${toName} <${to}>` : to,
+        subject,
+        text,
+        html,
+      };
+
+      console.log('📧 SMTP: Sending email to:', to);
+      console.log('📧 SMTP: Subject:', subject);
+
+      // Send email
+      const result = await transporter.sendMail(mailOptions);
+
+      console.log('📧 SMTP: Email sent successfully');
+      console.log('📧 SMTP: Message ID:', result.messageId);
+
+      // Log email to database for traceability
+      await this.logEmailSent({
+        messageId: result.messageId,
+        recipientEmail: to,
+        recipientUser,
+        notificationType: notificationType || 'generic',
+        subject,
+        htmlContent: html || '',
+        textContent: text || '',
+        status: 'sent_smtp',
+        metadata: {
+          ...metadata,
+          sentViaSmtp: true,
+          smtpHost: process.env.EMAIL_HOST,
+        },
+      });
+
+      logger.info('Email sent via SMTP successfully', {
+        messageId: result.messageId,
+        to: this.maskEmail(to),
+        subject,
+        notificationType: notificationType || 'generic',
+      });
+
+      console.log('📧 ========== SMTP Email Send SUCCESS END ==========');
+
+      return {
+        success: true,
+        messageId: result.messageId,
+        message: 'Email sent via SMTP successfully',
+        method: 'smtp',
+      };
+    } catch (error) {
+      console.log('📧 SMTP ERROR: Failed to send email via SMTP');
+      console.log('📧 SMTP ERROR:', error.message);
+      console.log('📧 SMTP ERROR Stack:', error.stack);
+
+      // Log failed email attempt to database
+      try {
+        await this.logEmailSent({
+          messageId: null,
+          recipientEmail: emailData.to,
+          recipientUser: emailData.recipientUser,
+          notificationType: emailData.notificationType || 'generic',
+          subject: emailData.subject,
+          htmlContent: emailData.html || '',
+          textContent: emailData.text || '',
+          status: 'failed_smtp',
+          metadata: {
+            ...emailData.metadata,
+            smtpError: error.message,
+            sentViaSmtp: false,
+          },
+          error: error.message,
+        });
+      } catch (logError) {
+        logger.error('Failed to log SMTP email error', {
+          error: logError.message,
+        });
+      }
+
+      logger.error('Failed to send email via SMTP', {
+        error: error.message,
+        to: this.maskEmail(emailData.to),
+        subject: emailData.subject,
+      });
+
+      return {
+        success: false,
+        error: error.message,
+        method: 'smtp',
       };
     }
   }
@@ -350,10 +563,24 @@ class EmailService {
    * });
    */
   async sendPasswordResetEmail(resetData) {
+    console.log('📧 ========== EmailService.sendPasswordResetEmail START ==========');
+    console.log('📧 DEBUG: Method called at:', new Date().toISOString());
+    console.log('📧 DEBUG: Full resetData received:', JSON.stringify({
+      email: resetData.email,
+      name: resetData.name,
+      resetUrl: resetData.resetUrl,
+      hasRecipientUser: !!resetData.recipientUser,
+      recipientUserId: resetData.recipientUser ? resetData.recipientUser.id : null,
+      expirationTime: resetData.expirationTime,
+    }, null, 2));
+
     try {
       const {
         email, name, resetUrl, recipientUser, expirationTime,
       } = resetData;
+
+      console.log('📧 DEBUG: Extracted email:', email);
+      console.log('📧 DEBUG: Preparing to send password reset email');
 
       // Prepare template variables
       const templateVariables = {
@@ -364,10 +591,13 @@ class EmailService {
       };
 
       // Render template
+      console.log('📧 DEBUG: Rendering password_reset template');
       const { html, text } = TemplateService.render('password_reset', templateVariables, { includeText: true });
+      console.log('📧 DEBUG: Template rendered - HTML length:', html ? html.length : 0, 'Text length:', text ? text.length : 0);
 
       // Send email
-      return await this.sendEmail({
+      console.log('📧 DEBUG: Calling sendEmail method');
+      const result = await this.sendEmail({
         to: email,
         toName: name,
         subject: 'Restablecer Contraseña - Amexing Experience',
@@ -381,11 +611,22 @@ class EmailService {
           expirationTime: expirationTime || '1 hora',
         },
       });
+
+      console.log('📧 DEBUG: sendEmail returned successfully');
+      console.log('📧 DEBUG: Email result:', result);
+      console.log('📧 ========== EmailService.sendPasswordResetEmail SUCCESS END ==========');
+      return result;
     } catch (error) {
+      console.log('📧 ERROR: Exception caught in sendPasswordResetEmail');
+      console.log('📧 ERROR: Error message:', error.message);
+      console.log('📧 ERROR: Error stack:', error.stack);
+
       logger.error('Failed to send password reset email', {
         error: error.message,
         email: this.maskEmail(resetData.email),
       });
+
+      console.log('📧 ========== EmailService.sendPasswordResetEmail ERROR END ==========');
 
       return {
         success: false,
