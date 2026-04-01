@@ -354,8 +354,9 @@ class SecurityMiddleware {
     const sessionConfig = {
       secret: process.env.SESSION_SECRET || 'default-secret-change-in-production',
       name: 'amexing.sid',
-      resave: false,
+      resave: true, // Changed to true to ensure session saves
       saveUninitialized: true, // Changed to true for CSRF initialization
+      rolling: true, // Reset cookie expiration on each request
     };
 
     // Use MongoStore in production and production-local
@@ -492,13 +493,11 @@ class SecurityMiddleware {
       cookie: {
         secure: cookieSecure, // HTTPS required in true production only
         httpOnly: true,
-        maxAge: parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 * 1000 || 900000,
-        expires: new Date(Date.now() + (parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 * 1000 || 900000)), // Explicit expires
+        maxAge: parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 * 1000 || 3600000, // Default 60 minutes
         path: '/', // Explicit path configuration
         sameSite: cookieSameSite,
         domain: cookieDomain,
       },
-      rolling: true,
       unset: 'destroy',
     });
   }
@@ -687,6 +686,9 @@ class SecurityMiddleware {
           || req.path.startsWith('/api/')
           || req.path === '/auth/login'
           || req.path === '/auth/change-password'
+          || req.path === '/forgot-password' // Public password reset form
+          || req.path === '/auth/forgot-password' // Alternative path
+          || req.path === '/auth/reset-password' // Password reset completion form
           || isRefreshWithBearer
         ) {
           // Generate CSRF token for forms if session exists

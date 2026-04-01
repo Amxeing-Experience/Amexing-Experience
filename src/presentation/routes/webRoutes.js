@@ -14,6 +14,8 @@ router.get('/about', homeController.about);
 // Auth pages
 router.get('/login', dashboardAuth.redirectIfAuthenticated, authController.showLogin);
 router.get('/register', dashboardAuth.redirectIfAuthenticated, authController.showRegister);
+router.get('/auth/request-access', dashboardAuth.redirectIfAuthenticated, authController.showRequestAccess);
+router.get('/request-access', dashboardAuth.redirectIfAuthenticated, authController.showRequestAccess);
 router.post('/logout', dashboardAuth.logout, (req, res) => {
   // Force redirect to login without any middleware interference
   res.redirect(`/login?message=${encodeURIComponent('You have been logged out successfully')}`);
@@ -22,6 +24,38 @@ router.get('/logout', dashboardAuth.logout, (req, res) => {
   res.redirect(`/login?message=${encodeURIComponent('You have been logged out successfully')}`);
 });
 router.get('/auth/forgot-password', dashboardAuth.redirectIfAuthenticated, authController.showForgotPassword);
+router.get('/forgot-password', dashboardAuth.redirectIfAuthenticated, authController.showForgotPassword);
+
+// TEST ROUTE - Remove this after debugging
+router.get('/test-route', (req, res) => {
+  console.log('🔥 TEST ROUTE HIT: /test-route');
+  res.json({ message: 'Test route working!', timestamp: new Date().toISOString() });
+});
+
+router.post('/test-post', (req, res) => {
+  console.log('🔥 TEST POST HIT: /test-post');
+  console.log('🔥 Body:', req.body);
+  res.json({ message: 'Test POST working!', body: req.body, timestamp: new Date().toISOString() });
+});
+router.post('/forgot-password', (req, res, next) => {
+  console.log('🚀 ========== ROUTE HIT: POST /forgot-password ==========');
+  console.log('🚀 Time:', new Date().toISOString());
+  console.log('🚀 Request body:', JSON.stringify(req.body, null, 2));
+  console.log('🚀 Request method:', req.method);
+  console.log('🚀 Request URL:', req.originalUrl);
+  console.log('🚀 Content-Type:', req.headers['content-type']);
+  next();
+}, async (req, res, _next) => {
+  console.log('🚀 Calling authController.processForgotPassword...');
+  try {
+    await authController.processForgotPassword(req, res);
+  } catch (error) {
+    console.log('🚀 ERROR in processForgotPassword:', error.message);
+    console.log('🚀 ERROR stack:', error.stack);
+    // Redirect with error message
+    res.redirect(`/forgot-password?error=${encodeURIComponent('An unexpected error occurred. Please try again.')}`);
+  }
+});
 router.get('/auth/reset-password', dashboardAuth.redirectIfAuthenticated, authController.showResetPassword);
 
 // Email verification pages

@@ -618,14 +618,14 @@ router.post('/register', async (req, res) => {
     res.cookie('accessToken', result.tokens.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Match session cookie configuration
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
 
     res.cookie('refreshToken', result.tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Match session cookie configuration
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -786,14 +786,14 @@ router.post('/refresh', async (req, res) => {
     res.cookie('accessToken', result.tokens.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Match session cookie configuration
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
 
     res.cookie('refreshToken', result.tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Match session cookie configuration
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -872,8 +872,13 @@ router.post('/refresh', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-// Password reset request (apply stricter rate limiting)
+// Password reset request (API endpoint - use for AJAX requests)
+// For form submissions, use the web route at /forgot-password in webRoutes.js
+// TEMPORARILY DISABLED to avoid route conflicts
+/*
 router.post('/forgot-password', strictAuthRateLimit, async (req, res) => {
+  console.log('🚨 DEBUG: authRoutes /forgot-password API endpoint called');
+  console.log('🚨 DEBUG: This should NOT be called for form submissions');
   try {
     const { email } = req.body;
 
@@ -885,17 +890,19 @@ router.post('/forgot-password', strictAuthRateLimit, async (req, res) => {
       });
     }
 
-    const result = await Parse.Cloud.run('initiatePasswordReset', { email });
+    // Use the new requestPasswordReset cloud function
+    const result = await Parse.Cloud.run('requestPasswordReset', { email });
 
     res.json(result);
   } catch (error) {
-    logger.error('Forgot password route error:', error);
+    logger.error('Forgot password API route error:', error);
     res.status(500).json({
       success: false,
       error: 'Password reset request failed',
     });
   }
 });
+*/
 
 /**
  * @swagger
@@ -938,22 +945,30 @@ router.post('/forgot-password', strictAuthRateLimit, async (req, res) => {
 router.post('/reset-password', strictAuthRateLimit, async (req, res) => {
   try {
     const { token, password, confirmPassword } = req.body;
+    const isApiRequest = req.headers['content-type']?.includes('application/json')
+                        || req.headers.accept?.includes('application/json');
 
     // Check if token or password is missing
     if (!token || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Token and password are required',
-      });
+      if (isApiRequest) {
+        return res.status(400).json({
+          success: false,
+          error: 'Token and password are required',
+        });
+      }
+      return res.redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=${encodeURIComponent('Token and password are required')}`);
     }
 
     // Check if passwords do not match
     // eslint-disable-next-line security/detect-possible-timing-attacks
     if (password !== confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'Passwords do not match',
-      });
+      if (isApiRequest) {
+        return res.status(400).json({
+          success: false,
+          error: 'Passwords do not match',
+        });
+      }
+      return res.redirect(`/auth/reset-password?token=${encodeURIComponent(token)}&error=${encodeURIComponent('Passwords do not match')}`);
     }
 
     const result = await Parse.Cloud.run('resetPassword', {
@@ -961,13 +976,27 @@ router.post('/reset-password', strictAuthRateLimit, async (req, res) => {
       newPassword: password,
     });
 
-    res.json(result);
+    if (isApiRequest) {
+      res.json(result);
+    } else {
+      // Web form submission - redirect to login with success message
+      res.redirect('/login?message=password_updated');
+    }
   } catch (error) {
     logger.error('Reset password route error:', error);
-    res.status(400).json({
-      success: false,
-      error: error.message || 'Password reset failed',
-    });
+    const isApiRequest = req.headers['content-type']?.includes('application/json')
+                        || req.headers.accept?.includes('application/json');
+
+    if (isApiRequest) {
+      res.status(400).json({
+        success: false,
+        error: error.message || 'Password reset failed',
+      });
+    } else {
+      // Web form submission - redirect back with error
+      const { token } = req.body;
+      res.redirect(`/auth/reset-password?token=${encodeURIComponent(token || '')}&error=${encodeURIComponent(error.message || 'Password reset failed')}`);
+    }
   }
 });
 
@@ -1142,11 +1171,11 @@ router.get('/oauth/providers', async (req, res) => {
 // OAuth initiation
 router.get('/oauth/:provider', async (req, res) => {
   try {
-    const { _provider } = req.params;
+    const { provider } = req.params;
     const state = req.query.state || 'default';
 
     const result = await Parse.Cloud.run('generateOAuthUrl', {
-      provider: _provider,
+      _provider: provider,
       state,
     });
 
@@ -1215,8 +1244,9 @@ router.get('/oauth/:provider', async (req, res) => {
  */
 // OAuth callback
 router.get('/oauth/:provider/callback', async (req, res) => {
+  const { provider } = req.params; // Move provider outside try block for error handling
+
   try {
-    const { provider: _provider } = req.params;
     const { code, state, error } = req.query;
 
     // Check if OAuth callback has error
@@ -1231,23 +1261,49 @@ router.get('/oauth/:provider/callback', async (req, res) => {
     }
 
     const result = await Parse.Cloud.run('handleOAuthCallback', {
-      provider: _provider,
+      provider,
       code,
       state,
     });
 
+    // Debug logging
+    logger.info('OAuth callback result:', {
+      hasResult: !!result,
+      hasTokens: !!(result && result.tokens),
+      hasAccessToken: !!(result && result.tokens && result.tokens.accessToken),
+      hasUser: !!(result && result.user),
+      userRole: result && result.user ? result.user.role : 'not found',
+      resultKeys: result ? Object.keys(result) : [],
+    });
+
+    // Check if we have tokens in the result
+    if (!result || !result.tokens || !result.tokens.accessToken) {
+      logger.error('OAuth callback missing tokens:', {
+        provider,
+        resultStructure: result ? JSON.stringify(result).substring(0, 200) : 'null',
+      });
+      throw new Error('OAuth authentication succeeded but tokens were not generated');
+    }
+
     // Set secure HTTP-only cookies for tokens
+    logger.info('Setting OAuth cookies:', {
+      provider,
+      hasAccessToken: !!result.tokens.accessToken,
+      hasRefreshToken: !!result.tokens.refreshToken,
+      userRole: result.user ? result.user.role : 'unknown',
+    });
+
     res.cookie('accessToken', result.tokens.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Match session cookie configuration
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
 
     res.cookie('refreshToken', result.tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Match session cookie configuration
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -1268,10 +1324,173 @@ router.get('/oauth/:provider/callback', async (req, res) => {
 
     const redirectUrl = req.session.returnTo || defaultRedirect;
     delete req.session.returnTo;
+
+    logger.info('OAuth callback redirecting:', {
+      provider,
+      userRole,
+      defaultRedirect,
+      sessionReturnTo: req.session.returnTo,
+      finalRedirectUrl: redirectUrl,
+      userId: result.user ? result.user.id : 'unknown',
+    });
+
     res.redirect(redirectUrl);
   } catch (error) {
     logger.error('OAuth callback route error:', error);
+
+    // Handle our custom error scenarios from the cloud function
+    logger.info('OAuth callback error details', {
+      errorType: error.constructor.name,
+      isParseError: error instanceof Parse.Error,
+      errorCode: error.code,
+      errorMessage: error.message,
+      provider,
+    });
+
+    if (error instanceof Parse.Error && error.message) {
+      try {
+        const errorData = JSON.parse(error.message);
+
+        logger.info('OAuth callback: Parsed error data', {
+          errorData,
+          provider,
+          hasLinkingConfirmation: !!errorData.requiresLinkingConfirmation,
+          hasAccountDeactivated: errorData.error === 'account_deactivated',
+          hasAgencyRequest: !!errorData.requiresAgencyRequest,
+        });
+
+        // Handle deactivated account - redirect to agency request with toast
+        if (errorData.error === 'account_deactivated' && errorData.toast) {
+          return res.redirect(errorData.redirectUrl);
+        }
+
+        // Handle OAuth linking confirmation needed
+        if (errorData.requiresLinkingConfirmation) {
+          // Store OAuth info in session for the confirmation modal
+          const linkingData = {
+            existingUser: errorData.existingUser,
+            oauthInfo: errorData.oauthInfo,
+            provider,
+            timestamp: Date.now(),
+          };
+
+          req.session.oauthLinkingData = linkingData;
+
+          logger.info('OAuth linking confirmation: Storing session data before redirect', {
+            provider,
+            sessionId: req.sessionID,
+            existingUserEmail: errorData.existingUser?.email,
+            oauthEmail: errorData.oauthInfo?.email,
+            hasSessionStore: !!req.session.store,
+            sessionDataKeys: Object.keys(linkingData),
+          });
+
+          // Force session save before redirect to ensure data persistence
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              logger.error('Failed to save OAuth linking session:', {
+                error: saveErr.message,
+                sessionId: req.sessionID,
+                provider,
+              });
+              return res.redirect(`/login?error=${encodeURIComponent('Session save failed. Please try again.')}`);
+            }
+
+            logger.info('OAuth linking confirmation: Session save successful, redirecting', {
+              provider,
+              sessionId: req.sessionID,
+              redirectUrl: `/login?oauth_confirmation=true&provider=${provider}`,
+            });
+
+            return res.redirect(`/login?oauth_confirmation=true&provider=${provider}&debug=session_saved`);
+          });
+          return; // Prevent further execution
+        }
+
+        // Handle agency request needed
+        if (errorData.requiresAgencyRequest) {
+          return res.redirect(errorData.redirectUrl);
+        }
+
+        // Generic error with redirect URL
+        if (errorData.redirectUrl) {
+          return res.redirect(errorData.redirectUrl);
+        }
+      } catch (parseError) {
+        // If we can't parse the error JSON, fall through to generic error handling
+        logger.warn('Could not parse OAuth error data:', parseError);
+      }
+    }
+
+    // Generic error handling
     res.redirect(`/login?error=${encodeURIComponent(error.message || 'OAuth authentication failed')}`);
+  }
+});
+
+/**
+ * OAuth linking confirmation endpoint
+ * Handles user approval/denial for linking OAuth accounts.
+ */
+router.post('/oauth/confirm-link', async (req, res) => {
+  try {
+    const { action } = req.body; // 'approve' or 'deny'
+    const oauthData = req.session.oauthLinkingData;
+
+    if (!oauthData) {
+      return res.redirect(`/login?error=${encodeURIComponent('OAuth linking session expired')}`);
+    }
+
+    // Clear session data
+    delete req.session.oauthLinkingData;
+
+    if (action === 'deny') {
+      // User denied linking - redirect to login with info
+      return res.redirect(`/login?info=${encodeURIComponent('OAuth linking cancelled. You can login with your regular credentials.')}`);
+    }
+
+    if (action === 'approve') {
+      // User approved linking - call cloud function
+      const result = await Parse.Cloud.run('confirmOAuthLinking', {
+        existingUser: oauthData.existingUser,
+        oauthInfo: oauthData.oauthInfo,
+      });
+
+      // Set secure HTTP-only cookies for tokens
+      res.cookie('accessToken', result.tokens.accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 8 * 60 * 60 * 1000, // 8 hours
+      });
+
+      res.cookie('refreshToken', result.tokens.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      // Redirect to dashboard
+      let userRole = 'guest';
+      if (result.user && result.user.role) {
+        userRole = result.user.role;
+      }
+
+      let defaultRedirect;
+      if (userRole === 'admin') {
+        defaultRedirect = '/dashboard/admin/bookings';
+      } else {
+        defaultRedirect = `/dashboard/${userRole}`;
+      }
+
+      return res.redirect(defaultRedirect);
+    }
+
+    // Invalid action
+    res.redirect(`/login?error=${encodeURIComponent('Invalid OAuth linking action')}`);
+  } catch (error) {
+    logger.error('OAuth confirmation route error:', error);
+    res.redirect(`/login?error=${encodeURIComponent(error.message || 'OAuth linking confirmation failed')}`);
   }
 });
 

@@ -10,7 +10,8 @@
  */
 
 // Default parameters
-const loginError = typeof error !== 'undefined' ? error : '';
+const loginError = typeof error !== 'undefined' && error ? error : null;
+const loginInfo = typeof info !== 'undefined' && info ? info : null;
 const loginCsrfToken = typeof csrfToken !== 'undefined' ? csrfToken : '';
 const loginOauthProviders = typeof oauthProviders !== 'undefined' ? oauthProviders : [];
 const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
@@ -27,6 +28,14 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
         <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
             <i class="ti ti-alert-circle me-2"></i>
             <div><%= loginError %></div>
+        </div>
+    <% } %>
+
+    <!-- Info Alert -->
+    <% if (loginInfo) { %>
+        <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
+            <i class="ti ti-info-circle me-2"></i>
+            <div><%= loginInfo %></div>
         </div>
     <% } %>
 
@@ -107,32 +116,67 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
 
         <div class="oauth-providers">
             <% loginOauthProviders.forEach(function(provider) { %>
-                <a href="/auth/oauth/<%= provider.name %><% if (loginRedirectTo) { %>?redirectTo=<%= encodeURIComponent(loginRedirectTo) %><% } %>"
-                   class="btn btn-outline-dark btn-lg w-100 mb-2 oauth-btn oauth-<%= provider.name %>">
-                    <% if (provider.name === 'apple') { %>
-                        <i class="ti ti-brand-apple me-2"></i>
-                    <% } else if (provider.name === 'google') { %>
+                <% if (provider.name === 'google') { %>
+                    <a href="/auth/oauth/<%= provider.name %><% if (loginRedirectTo) { %>?redirectTo=<%= encodeURIComponent(loginRedirectTo) %><% } %>"
+                       class="btn btn-outline-dark btn-lg w-100 mb-2 oauth-btn oauth-<%= provider.name %>">
                         <i class="ti ti-brand-google me-2"></i>
-                    <% } else if (provider.name === 'microsoft') { %>
-                        <i class="ti ti-brand-microsoft me-2"></i>
-                    <% } else { %>
-                        <i class="ti ti-login me-2"></i>
-                    <% } %>
-                    Continuar con <%= provider.displayName %>
-                </a>
+                        Continuar con <%= provider.displayName %>
+                    </a>
+                <% } %>
             <% }); %>
         </div>
     <% } %>
 
-    <!-- Register Link -->
+    <!-- Agency Access Request Link -->
     <div class="text-center mt-4">
         <p class="text-muted mb-0">
-            ¿No tienes una cuenta?
-            <a href="/auth/register<% if (loginRedirectTo) { %>?redirectTo=<%= encodeURIComponent(loginRedirectTo) %><% } %>"
+            ¿Eres una agencia de viajes?
+            <a href="/auth/request-access"
                class="text-primary text-decoration-none fw-semibold">
-                Regístrate aquí
+                Solicitar Acceso como Agencia
             </a>
         </p>
+    </div>
+</div>
+
+<!-- OAuth Linking Confirmation Modal -->
+<div class="modal fade" id="oauthConfirmationModal" tabindex="-1" aria-labelledby="oauthConfirmationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="oauthConfirmationModalLabel">
+                    <i class="ti ti-link me-2"></i>Vincular Cuenta
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <div class="oauth-provider-icon mb-3">
+                        <i class="ti ti-brand-google" style="font-size: 3rem; color: #4285F4;"></i>
+                    </div>
+                    <h6>¿Vincular tu cuenta de Google?</h6>
+                    <p class="text-muted mb-3">
+                        Queremos vincular tu cuenta de <strong><span id="oauthEmail"></span></strong> 
+                        con tu cuenta existente de Amexing <strong><span id="existingEmail"></span></strong>.
+                    </p>
+                    <div class="alert alert-info">
+                        <i class="ti ti-info-circle me-2"></i>
+                        Esto te permitirá iniciar sesión con Google en el futuro.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <form action="/auth/oauth/confirm-link" method="POST" class="d-flex gap-2 w-100">
+                    <input type="hidden" name="csrfToken" value="<%= loginCsrfToken %>">
+                    <button type="submit" name="action" value="deny" class="btn btn-outline-secondary flex-fill">
+                        <i class="ti ti-x me-1"></i>Cancelar
+                    </button>
+                    <button type="submit" name="action" value="approve" class="btn btn-primary flex-fill">
+                        <i class="ti ti-check me-1"></i>Vincular Cuenta
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -276,6 +320,53 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
         background: rgba(102, 126, 234, 0.15);
         transform: scale(0.98);
     }
+    
+    /* Clean modal styling without backdrop - only when shown */
+    #oauthConfirmationModal.show {
+        z-index: 1055 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+    }
+    
+    /* Hide modal by default */
+    #oauthConfirmationModal {
+        display: none !important;
+    }
+    
+    #oauthConfirmationModal .modal-dialog {
+        pointer-events: auto !important;
+        margin: 0 !important;
+        position: relative !important;
+        top: 0 !important;
+        transform: none !important;
+    }
+    
+    #oauthConfirmationModal .modal-content {
+        pointer-events: auto !important;
+        background-color: white !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
+        border-radius: 12px !important;
+    }
+    
+    /* Ensure all interactive elements work properly */
+    #oauthConfirmationModal button,
+    #oauthConfirmationModal .btn {
+        pointer-events: auto !important;
+        cursor: pointer !important;
+    }
+    
+    /* Remove any Bootstrap modal backdrop completely */
+    .modal-backdrop,
+    .modal-backdrop.show,
+    .modal-backdrop.fade {
+        display: none !important;
+    }
 
 </style>
 
@@ -315,6 +406,42 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
         const firstInput = document.getElementById('identifier');
         if (firstInput) {
             firstInput.focus();
+        }
+
+        // Handle OAuth confirmation modal
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('oauth_confirmation') === 'true') {
+            const provider = urlParams.get('provider') || 'google';
+            
+            <% if (typeof oauthLinkingData !== 'undefined' && oauthLinkingData) { %>
+            // Populate modal with actual data from session
+            document.getElementById('oauthEmail').textContent = '<%= oauthLinkingData.oauthInfo.email %>';
+            document.getElementById('existingEmail').textContent = '<%= oauthLinkingData.existingUser.email %>';
+            
+            // Show the modal with proper options to ensure interaction
+            const modalElement = document.getElementById('oauthConfirmationModal');
+            
+            // Remove any existing modal backdrops first (in case of duplicates)
+            const existingBackdrops = document.querySelectorAll('.modal-backdrop, .custom-modal-backdrop');
+            existingBackdrops.forEach(backdrop => backdrop.remove());
+            
+            // Create modal with specific options - no backdrop at all
+            const modal = new bootstrap.Modal(modalElement, {
+                backdrop: false, // No backdrop
+                keyboard: true, // Allow escape key to close
+                focus: true // Focus the modal
+            });
+            
+            // Show the modal
+            modal.show();
+            
+            // Ensure modal is properly positioned and styled
+            modalElement.style.zIndex = '1055';
+            modalElement.style.position = 'relative';
+            <% } else { %>
+            // No OAuth data found, redirect to login with error
+            window.location.href = '/login?error=' + encodeURIComponent('OAuth session expired. Please try again.');
+            <% } %>
         }
     });
 </script>
