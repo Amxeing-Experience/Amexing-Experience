@@ -441,8 +441,6 @@
                 ? '/api/owned-clients/active' 
                 : '/api/clients/active';
             
-            console.log('🔍 DEBUG: Loading clients from endpoint:', endpoint);
-            
             const response = await fetch(endpoint, {
                 method: 'GET',
                 headers: {
@@ -452,10 +450,8 @@
             });
 
             const result = await response.json();
-            console.log('🔍 DEBUG: Clients API response:', result);
 
             if (result.success && result.data) {
-                console.log('🔍 DEBUG: Number of clients loaded:', result.data.length);
                 const clientTS = await waitForTomSelect('clientId');
 
                 // Clear existing options
@@ -463,7 +459,6 @@
 
                 // Add client options
                 result.data.forEach(client => {
-                    console.log('🔍 DEBUG: Adding client option:', client);
                     clientTS.addOption({
                         value: client.value,
                         text: client.label,
@@ -475,9 +470,8 @@
 
                 // Refresh to apply changes
                 clientTS.refreshOptions(false);
-                console.log('🔍 DEBUG: Client options loaded and refreshed');
             } else {
-                console.log('🔍 DEBUG: No client data or API error:', result);
+                console.error('No client data or API error:', result);
             }
         } catch (error) {
             console.error('Error loading clients:', error);
@@ -607,7 +601,6 @@
     // Load existing quote data
     async function loadQuoteData(quoteId) {
         try {
-            console.log('🔍 DEBUG: Loading quote data for ID:', quoteId);
             const response = await fetch(`/api/quotes/${quoteId}`, {
                 method: 'GET',
                 headers: {
@@ -617,18 +610,12 @@
             });
 
             const result = await response.json();
-            console.log('🔍 DEBUG: Quote API response:', result);
 
             if (result.success && result.data) {
                 const quote = result.data;
-                console.log('🔍 DEBUG: Quote data:', quote);
-                console.log('🔍 DEBUG: Client data in quote:', quote.client);
 
                 // Handle client population - DUAL FIELD ARCHITECTURE
                 const clientTS = await waitForTomSelect('clientId');
-                console.log('🔍 DEBUG: TomSelect instance ready:', clientTS);
-                console.log('🔍 DEBUG: companyClientPtr in quote:', quote.companyClientPtr);
-                console.log('🔍 DEBUG: client in quote:', quote.client);
                 
                 // Role-based client field prioritization
                 let selectedClientId = null;
@@ -639,31 +626,25 @@
                     if (quote.client && quote.client.id) {
                         selectedClientId = quote.client.id;
                         selectedClientData = quote.client;
-                        console.log('🔍 DEBUG: Admin role - Using legacy client field:', selectedClientId);
                     } else if (quote.companyClientPtr && quote.companyClientPtr.id) {
                         selectedClientId = quote.companyClientPtr.id;
                         selectedClientData = quote.companyClientPtr;
-                        console.log('🔍 DEBUG: Admin role - Fallback to companyClientPtr:', selectedClientId);
                     }
                 } else {
                     // Hierarchical roles: prioritize companyClientPtr (Client objects)
                     if (quote.companyClientPtr && quote.companyClientPtr.id) {
                         selectedClientId = quote.companyClientPtr.id;
                         selectedClientData = quote.companyClientPtr;
-                        console.log('🔍 DEBUG: Hierarchical role - Using companyClientPtr:', selectedClientId);
                     } else if (quote.client && quote.client.id) {
                         selectedClientId = quote.client.id;
                         selectedClientData = quote.client;
-                        console.log('🔍 DEBUG: Hierarchical role - Fallback to legacy client:', selectedClientId);
                     }
                 }
                 
                 if (selectedClientId && selectedClientData) {
-                    console.log('🔍 DEBUG: Setting client ID:', selectedClientId);
                     
                     // First ensure the option exists in the dropdown
                     if (!clientTS.getOption(selectedClientId)) {
-                        console.log('🔍 DEBUG: Adding missing client option to dropdown');
                         // Add the client option if it doesn't exist
                         clientTS.addOption({
                             value: selectedClientId,
@@ -671,14 +652,12 @@
                             email: selectedClientData.email || ''
                         });
                     } else {
-                        console.log('🔍 DEBUG: Client option already exists in dropdown');
                     }
                     
                     // Set the selected value
                     clientTS.setValue(selectedClientId);
-                    console.log('🔍 DEBUG: Client value set to:', selectedClientId);
                 } else {
-                    console.log('🔍 DEBUG: No client data in quote (neither companyClientPtr nor client)');
+                    // No client data in quote
                 }
 
                 // Populate form fields

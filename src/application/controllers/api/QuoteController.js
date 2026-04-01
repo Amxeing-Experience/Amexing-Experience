@@ -6,6 +6,9 @@
 const Parse = require('parse/node');
 const Quote = require('../../../domain/models/Quote');
 const QuoteService = require('../../services/QuoteService');
+const QuoteOwnershipService = require('../../services/QuoteOwnershipService');
+const QuoteCollaborationService = require('../../services/QuoteCollaborationService');
+const QuoteVersioningService = require('../../services/QuoteVersioningService');
 const pricingHelper = require('../../utils/pricingHelper');
 const logger = require('../../../infrastructure/logger');
 const FileStorageService = require('../../services/FileStorageService');
@@ -107,6 +110,9 @@ async function batchFetchPrimaryImages(imageClass, pointerField, parentClass, id
 class QuoteController {
   constructor() {
     this.quoteService = new QuoteService();
+    this.ownershipService = new QuoteOwnershipService();
+    this.collaborationService = new QuoteCollaborationService();
+    this.versioningService = new QuoteVersioningService();
   }
 
   /**
@@ -283,12 +289,20 @@ class QuoteController {
         },
       });
 
+      // 11a. Initialize ownership for the new quote
+      await this.ownershipService.initializeOwnership(quote.id, currentUser.id);
+
+      // 11b. Set the owner field on the quote
+      quote.set('owner', createdByObj);
+      await quote.save(null, { useMasterKey: true });
+
       // 12. Log success (using Pointer objects - IDs only)
-      logger.info('Quote created successfully', {
+      logger.info('Quote created successfully with ownership', {
         quoteId: quote.id,
         folio,
         clientId: clientObj ? clientObj.objectId : null,
         createdBy: currentUser.id,
+        ownerId: currentUser.id,
         createdByEmail: currentUser.get('email'),
       });
 
@@ -549,11 +563,21 @@ class QuoteController {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
 
-      // Check access permissions after getting the quote
-      const hasAccess = await this.checkQuoteAccess(currentUser, quote, req.userRole);
+      // Check access permissions after getting the quote using collaboration service
+      const hasAccess = await this.collaborationService.hasAccess(quoteId, currentUser.id);
       if (!hasAccess) {
-        return this.sendError(res, 'No tienes permisos para acceder a esta cotización', 403);
+        // Fallback to original check for backward compatibility
+        const hasLegacyAccess = await this.checkQuoteAccess(currentUser, quote, req.userRole);
+        if (!hasLegacyAccess) {
+          return this.sendError(res, 'No tienes permisos para acceder a esta cotización', 403);
+        }
       }
+
+      // Get user's access details
+      const userAccess = await this.collaborationService.getUserAccess(quoteId, currentUser.id);
+
+      // Get current owner
+      const owner = await this.ownershipService.getCurrentOwner(quoteId);
 
       const client = quote.get('client');
       const companyClientPtr = quote.get('companyClientPtr');
@@ -635,6 +659,12 @@ class QuoteController {
         active: quote.get('active'),
         createdAt: quote.createdAt,
         updatedAt: quote.updatedAt,
+        // Add ownership and collaboration info
+        owner,
+        userAccess,
+        version: quote.get('version') || 1,
+        collaborationEnabled: quote.isCollaborationEnabled(),
+        requiresApproval: quote.requiresApproval(),
       };
 
       // Batch fetch primary images for tours and experiences in serviceItems
@@ -701,7 +731,23 @@ class QuoteController {
       const quoteId = req.params.id;
       const updates = req.body;
 
-      // Call service
+      // Check if user has permission to edit
+      const canEdit = await this.versioningService.canEdit(quoteId, currentUser.id);
+      if (!canEdit) {
+        return this.sendError(res, 'No tienes permisos para editar esta cotización', 403);
+      }
+
+      // Track the edit with versioning service
+      const editRecord = await this.versioningService.recordEdit(
+        quoteId,
+        currentUser.id,
+        updates,
+        {
+          description: updates.reason || 'Quote updated',
+        }
+      );
+
+      // Call original service for backward compatibility
       const result = await this.quoteService.updateQuote(
         currentUser,
         quoteId,
@@ -709,6 +755,11 @@ class QuoteController {
         updates.reason || 'Quote updated',
         req.userRole // Pass userRole from JWT middleware
       );
+
+      // Add edit tracking info to result
+      result.editId = editRecord.id;
+      result.version = editRecord.version;
+      result.requiresApproval = editRecord.approvalStatus === 'pending';
 
       return res.json(result);
     } catch (error) {

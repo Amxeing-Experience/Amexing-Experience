@@ -15,6 +15,14 @@ const steps = [
 ];
 %>
 
+<script>
+// Make current user info available to all sections
+window.currentUser = {
+    role: '<%= typeof userRole !== "undefined" ? userRole : "admin" %>',
+    id: '<%= typeof userId !== "undefined" ? userId : "" %>'
+};
+</script>
+
 <!-- Page Header -->
 <div class="row mb-3">
     <div class="col-12">
@@ -103,6 +111,15 @@ const steps = [
         <% }); %>
     </div>
 </div>
+
+<!-- Ownership Panel (only show for existing quotes) -->
+<% if (!isNewQuote) { %>
+<div class="row mb-3">
+    <div class="col-12">
+        <%- include('./sections/quote-ownership', { quoteId: quoteId }) %>
+    </div>
+</div>
+<% } %>
 
 <!-- Full-Width Content Area -->
 <div class="row">
