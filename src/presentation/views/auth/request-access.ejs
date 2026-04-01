@@ -1,0 +1,9 @@
+<%- include('../templates/auth-layout', {
+    title: 'Solicitud de Acceso - Agencias - Amexing',
+    page: 'request-access',
+    showAuthHeader: false,
+    content: include('../molecules/auth/request-access-form', {
+        csrfToken: csrfToken,
+        supportEmail: supportEmail
+    })
+}) %>

@@ -279,6 +279,7 @@ class AmexingAuthService {
   /**
    * Handle OAuth authentication flow.
    * @param {string} _provider - OAuth provider (google, microsoft, apple) - unused parameter.
+   * @param provider
    * @param {object} oauthProfile - OAuth user profile.
    * @param {object} tokens - OAuth tokens.
    * @returns {object} - Operation result User and session tokens.
@@ -289,9 +290,9 @@ class AmexingAuthService {
    * // const result = await authService.login(credentials);
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async handleOAuthUser(_provider, oauthProfile, tokens) {
+  async handleOAuthUser(provider, oauthProfile, tokens) {
     try {
-      let user = await this.findUserByOAuth(_provider, oauthProfile.id);
+      let user = await this.findUserByOAuth(provider, oauthProfile.id);
 
       if (!user) {
         // Try to find by email for account linking
@@ -299,14 +300,14 @@ class AmexingAuthService {
 
         if (user) {
           // Link OAuth to existing account
-          await this.linkOAuthAccount(user, _provider, oauthProfile, tokens);
+          await this.linkOAuthAccount(user, provider, oauthProfile, tokens);
         } else {
           // Create new OAuth user
-          user = await this.createOAuthUser(_provider, oauthProfile, tokens);
+          user = await this.createOAuthUser(provider, oauthProfile, tokens);
         }
       } else {
         // Update existing OAuth user
-        await this.updateOAuthUser(user, _provider, oauthProfile, tokens);
+        await this.updateOAuthUser(user, provider, oauthProfile, tokens);
       }
 
       // Handle corporate integration if applicable
@@ -319,11 +320,11 @@ class AmexingAuthService {
       await this.createSession({
         userId: user.id,
         authMethod: 'oauth',
-        oauthProvider: _provider,
+        oauthProvider: provider,
         tokens: sessionTokens.accessToken,
       });
 
-      logger.info(`OAuth user authenticated: ${oauthProfile.email} via ${_provider}`);
+      logger.info(`OAuth user authenticated: ${oauthProfile.email} via ${provider}`);
 
       return {
         user: this.sanitizeUser(user),

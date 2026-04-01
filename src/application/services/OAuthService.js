@@ -50,6 +50,28 @@ class OAuthService {
   constructor() {
     this.mockMode = process.env.OAUTH_MOCK_MODE === 'true';
     this.providers = this.initializeProviders();
+    this.initialized = false;
+    this.corporateService = new CorporateOAuthService();
+  }
+
+  /**
+   * Ensures providers are initialized with current environment variables.
+   * @private
+   */
+  ensureInitialized() {
+    // Always reinitialize providers to ensure latest env vars are loaded
+    // This is important for development when env vars change
+    this.mockMode = process.env.OAUTH_MOCK_MODE === 'true';
+    this.providers = this.initializeProviders();
+    this.initialized = true;
+  }
+
+  /**
+   * Reinitialize providers configuration - useful for testing and development.
+   */
+  reinitialize() {
+    this.providers = this.initializeProviders();
+    return this;
   }
 
   /**
@@ -67,6 +89,7 @@ class OAuthService {
    * const providers = service.initializeProviders();
    */
   initializeProviders() {
+    // Updated configuration - Apple and Microsoft disabled
     return {
       google: {
         clientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
@@ -74,7 +97,7 @@ class OAuthService {
         redirectUri: process.env.GOOGLE_OAUTH_REDIRECT_URI,
         enabled: process.env.GOOGLE_OAUTH_ENABLED === 'true',
         mockMode: process.env.GOOGLE_OAUTH_MOCK_MODE === 'true',
-        scopes: ['openid', 'profile', 'email'],
+        scopes: process.env.GOOGLE_OAUTH_SCOPES ? process.env.GOOGLE_OAUTH_SCOPES.split(',') : ['openid', 'profile', 'email'],
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
         userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
@@ -84,7 +107,7 @@ class OAuthService {
         clientSecret: process.env.MICROSOFT_OAUTH_CLIENT_SECRET,
         redirectUri: process.env.MICROSOFT_OAUTH_REDIRECT_URI,
         tenantId: process.env.MICROSOFT_OAUTH_TENANT_ID,
-        enabled: process.env.MICROSOFT_OAUTH_ENABLED === 'true',
+        enabled: false, // Disabled - removed from login form
         mockMode: process.env.MICROSOFT_OAUTH_MOCK_MODE === 'true',
         scopes: ['openid', 'profile', 'email'],
         authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
@@ -96,7 +119,7 @@ class OAuthService {
         teamId: process.env.APPLE_OAUTH_TEAM_ID,
         keyId: process.env.APPLE_OAUTH_KEY_ID,
         redirectUri: process.env.APPLE_OAUTH_REDIRECT_URI,
-        enabled: process.env.APPLE_OAUTH_ENABLED === 'true',
+        enabled: false, // Disabled - removed from login form
         mockMode: process.env.APPLE_OAUTH_MOCK_MODE === 'true',
         scopes: ['name', 'email'],
         authUrl: 'https://appleid.apple.com/auth/authorize',
@@ -109,6 +132,7 @@ class OAuthService {
    * Generates OAuth authorization URL.
    * @param {string} provider - Provider name (google, microsoft, apple).
    * @param _provider
+   * @param providerName
    * @param {string} state - State parameter for CSRF protection.
    * @returns {Promise<string>} - Authorization URL.
    * @example
@@ -122,17 +146,18 @@ class OAuthService {
    * const service = new OAuthService();
    * const authUrl = await service.generateAuthorizationUrl('google', 'state123');
    */
-  async generateAuthorizationUrl(_provider, state = null) {
+  async generateAuthorizationUrl(providerName, state = null) {
     try {
-      const providerConfig = this.providers[provider]; // eslint-disable-line no-undef
+      this.ensureInitialized();
+      const providerConfig = this.providers[providerName];
 
       if (!providerConfig) {
-        throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${_provider}`);
+        throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${providerName}`);
       }
 
       // In mock mode, return mock URL
       if (this.mockMode || providerConfig.mockMode) {
-        return this.generateMockAuthUrl(_provider, state);
+        return this.generateMockAuthUrl(providerName, state);
       }
 
       // Generate state if not provided
@@ -143,7 +168,7 @@ class OAuthService {
 
       // Store state for verification (in production, use Redis or database)
       await this.storeOAuthState(stateValue, {
-        provider: _provider,
+        provider: providerName,
         timestamp: Date.now(),
       });
 
@@ -156,24 +181,29 @@ class OAuthService {
       });
 
       // Provider-specific parameters
-      if (_provider === 'microsoft' && providerConfig.tenantId) {
+      if (providerName === 'google') {
+        // Force Google to show account selection screen even if user is logged in
+        params.append('prompt', 'select_account');
+      }
+
+      if (providerName === 'microsoft' && providerConfig.tenantId) {
         params.append('tenant', providerConfig.tenantId);
       }
 
-      if (_provider === 'apple') {
+      if (providerName === 'apple') {
         params.append('response_mode', 'form_post');
       }
 
       const authUrl = `${providerConfig.authUrl}?${params.toString()}`;
 
       logger.logSecurityEvent('OAUTH_AUTH_URL_GENERATED', {
-        provider, // eslint-disable-line no-undef
+        provider: providerName,
         state: `${stateValue.substring(0, 8)}***`,
       });
 
       return authUrl;
     } catch (error) {
-      logger.error(`OAuth authorization URL generation error for ${_provider}:`, error);
+      logger.error(`OAuth authorization URL generation error for ${providerName}:`, error);
       throw error;
     }
   }
@@ -196,56 +226,194 @@ class OAuthService {
    * const service = new OAuthService();
    * const result = await service.handleCallback('google', 'auth_code_123', 'state123');
    */
-  async handleCallback(_provider, code, state) {
+  async handleCallback(provider, code, state) {
     try {
-      const providerConfig = this.providers[provider]; // eslint-disable-line no-undef
+      this.ensureInitialized();
+      const providerConfig = this.providers[provider];
 
       if (!providerConfig) {
-        throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${_provider}`);
+        throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${provider}`);
       }
 
       // Verify state parameter
       const stateData = await this.verifyOAuthState(state);
-      if (!stateData || stateData.provider !== _provider) {
-        throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Invalid state parameter');
+      if (!stateData || stateData.provider !== provider) {
+        // In development mode, be more lenient with state validation
+        if (process.env.NODE_ENV === 'development') {
+          logger.warn(`OAuth state validation failed for ${provider}, but allowing in development mode. State: ${state}`);
+        } else {
+          throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Invalid state parameter');
+        }
       }
 
       let userInfo;
 
       // In mock mode, return mock user data
       if (this.mockMode || providerConfig.mockMode) {
-        userInfo = this.getMockUserInfo(_provider, code);
+        userInfo = this.getMockUserInfo(provider, code);
       } else {
         // Exchange code for tokens
-        const tokens = await this.exchangeCodeForTokens(_provider, code);
+        const tokens = await this.exchangeCodeForTokens(provider, code);
 
         // Get user information
-        if (_provider === 'apple' && tokens.userInfo) {
+        if (provider === 'apple' && tokens.userInfo) {
           // For Apple, user info comes from the ID token parsed during token exchange
           const { userInfo: _userInfo } = tokens;
           userInfo = _userInfo;
         } else {
           // For other providers, get user info via API
-          userInfo = await this.getUserInfo(_provider, tokens.accesstoken);
+          userInfo = await this.getUserInfo(provider, tokens.access_token);
         }
       }
 
       // Find or create user
-      const authResult = await this.findOrCreateUser(_provider, userInfo);
+      const authResult = await this.findOrCreateUser(provider, userInfo);
 
-      logger.logSecurityEvent('OAUTH_LOGIN_SUCCESS', {
-        provider, // eslint-disable-line no-undef
-        userId: authResult.user.id,
-        email: this.maskEmail(userInfo.email),
-      });
+      // Only log success if we have a user (successful login/registration)
+      if (authResult.success && authResult.user && authResult.user.id) {
+        logger.logSecurityEvent('OAUTH_LOGIN_SUCCESS', {
+          provider,
+          userId: authResult.user.id,
+          email: this.maskEmail(userInfo.email),
+        });
+      }
 
       return authResult;
     } catch (error) {
-      logger.error(`OAuth callback error for ${_provider}:`, error);
+      logger.error(`OAuth callback error for ${provider}:`, error);
       logger.logSecurityEvent('OAUTH_LOGIN_FAILURE', {
-        provider, // eslint-disable-line no-undef
+        provider,
         error: error.message,
       });
+      throw error;
+    }
+  }
+
+  /**
+   * Confirms OAuth account linking for existing user after user approval.
+   * @param {object} oauthInfo - OAuth information from the confirmation flow.
+   * @param {object} existingUser - Existing user information.
+   * @returns {Promise<object>} - Link result with tokens.
+   * @example
+   * const result = await service.confirmOAuthLinking(oauthInfo, existingUser);
+   */
+  async confirmOAuthLinking(oauthInfo, existingUser) {
+    try {
+      const user = await AuthenticationService.findUserById(existingUser.id);
+
+      if (!user) {
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found');
+      }
+
+      // Validate user is still active and exists
+      if (!user.get('active')) {
+        throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Account is deactivated');
+      }
+
+      if (!user.get('exists')) {
+        throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Account no longer exists');
+      }
+
+      // Check if OAuth account is already linked to another user
+      const existingOAuthUser = await this.findUserByOAuth(oauthInfo.provider, oauthInfo.providerId);
+      if (existingOAuthUser && existingOAuthUser.id !== user.id) {
+        throw new Parse.Error(Parse.Error.DUPLICATE_VALUE, 'OAuth account is already linked to another user');
+      }
+
+      // Add OAuth account to user
+      const existingAccounts = user.get('oauthAccounts') || [];
+      const oauthData = {
+        provider: oauthInfo.provider,
+        providerId: oauthInfo.providerId,
+        email: oauthInfo.email,
+        name: oauthInfo.name,
+        profileData: oauthInfo.profileData,
+      };
+
+      // Check if account already exists
+      const existingIndex = existingAccounts.findIndex(
+        (account) => account.provider === oauthData.provider && account.providerId === oauthData.providerId
+      );
+
+      if (existingIndex >= 0) {
+        // Update existing account
+        existingAccounts[existingIndex] = {
+          ...existingAccounts[existingIndex],
+          ...oauthData,
+          updatedAt: new Date(),
+        };
+      } else {
+        // Add new account
+        existingAccounts.push({
+          ...oauthData,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
+      user.set('oauthAccounts', existingAccounts);
+
+      // Set as primary if it's the first OAuth account
+      if (!user.get('primaryOAuthProvider')) {
+        user.set('primaryOAuthProvider', oauthData.provider);
+      }
+
+      // Record successful OAuth login
+      user.set('loginAttempts', 0);
+      user.set('lockedUntil', null);
+      user.set('lastLoginAt', new Date());
+      user.set('lastAuthMethod', `oauth_${oauthInfo.provider}`);
+      await user.save(null, { useMasterKey: true });
+
+      const tokens = await AuthenticationService.generateTokens(user);
+
+      // Resolve user role for dashboard redirect
+      let roleName = 'guest';
+      const rolePointer = user.get('roleId');
+      if (rolePointer) {
+        try {
+          const roleObject = await rolePointer.fetch({ useMasterKey: true });
+          roleName = roleObject.get('name') || 'guest';
+        } catch (error) {
+          // Fallback to direct role field if relationship fails
+          roleName = user.get('role') || 'guest';
+        }
+      } else {
+        // Fall back to old role field if no roleId
+        roleName = user.get('role') || 'guest';
+      }
+
+      logger.logSecurityEvent('OAUTH_ACCOUNT_LINKED', {
+        userId: user.id,
+        provider: oauthInfo.provider,
+        email: this.maskEmail(oauthInfo.email),
+      });
+
+      return {
+        success: true,
+        user: {
+          id: user.id,
+          username: user.get('username'),
+          email: user.get('email'),
+          firstName: user.get('firstName'),
+          lastName: user.get('lastName'),
+          role: roleName,
+          roleName,
+          roleId: user.get('roleId'),
+          active: user.get('active'),
+          exists: user.get('exists'),
+          lastLoginAt: user.get('lastLoginAt'),
+          primaryOAuthProvider: user.get('primaryOAuthProvider'),
+          hasOAuth: (user.get('oauthAccounts') || []).length > 0,
+          createdAt: user.get('createdAt'),
+          updatedAt: user.get('updatedAt'),
+        },
+        tokens,
+        linkedAccount: true,
+        message: 'OAuth account linked and login successful',
+      };
+    } catch (error) {
+      logger.error('OAuth account linking confirmation error:', error);
       throw error;
     }
   }
@@ -268,7 +436,7 @@ class OAuthService {
    * const service = new OAuthService();
    * const result = await service.linkOAuthAccount('user123', 'google', oauthData);
    */
-  async linkOAuthAccount(userId, _provider, oauthData) {
+  async linkOAuthAccount(userId, provider, oauthData) {
     try {
       const user = await AuthenticationService.findUserById(userId);
 
@@ -277,32 +445,93 @@ class OAuthService {
       }
 
       // Check if OAuth account is already linked to another user
-      const existingUser = await this.findUserByOAuth(_provider, oauthData.id);
+      const existingUser = await this.findUserByOAuth(provider, oauthData.id);
       if (existingUser && existingUser.id !== userId) {
         throw new Parse.Error(Parse.Error.DUPLICATE_VALUE, 'OAuth account is already linked to another user');
       }
 
       // Add OAuth account to user
-      user.addOAuthAccount({
-        _provider,
+      const existingAccounts = user.get('oauthAccounts') || [];
+      const newOAuthData = {
+        provider,
         providerId: oauthData.id,
         email: oauthData.email,
         name: oauthData.name,
         profileData: oauthData,
-      });
+      };
+
+      // Check if account already exists
+      const existingIndex = existingAccounts.findIndex(
+        (account) => account.provider === newOAuthData.provider && account.providerId === newOAuthData.providerId
+      );
+
+      if (existingIndex >= 0) {
+        // Update existing account
+        existingAccounts[existingIndex] = {
+          ...existingAccounts[existingIndex],
+          ...newOAuthData,
+          updatedAt: new Date(),
+        };
+      } else {
+        // Add new account
+        existingAccounts.push({
+          ...newOAuthData,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
+      user.set('oauthAccounts', existingAccounts);
+
+      // Set as primary if it's the first OAuth account
+      if (!user.get('primaryOAuthProvider')) {
+        user.set('primaryOAuthProvider', newOAuthData.provider);
+      }
 
       await user.save(null, { useMasterKey: true });
 
+      // Resolve user role for dashboard redirect
+      let roleName = 'guest';
+      const rolePointer = user.get('roleId');
+      if (rolePointer) {
+        try {
+          const roleObject = await rolePointer.fetch({ useMasterKey: true });
+          roleName = roleObject.get('name') || 'guest';
+        } catch (error) {
+          // Fallback to direct role field if relationship fails
+          roleName = user.get('role') || 'guest';
+        }
+      } else {
+        // Fall back to old role field if no roleId
+        roleName = user.get('role') || 'guest';
+      }
+
       logger.logSecurityEvent('OAUTH_ACCOUNT_LINKED', {
         userId,
-        _provider,
+        provider,
         email: this.maskEmail(oauthData.email),
       });
 
       return {
         success: true,
         message: 'OAuth account linked successfully',
-        user: user.toSafeJSON(),
+        user: {
+          id: user.id,
+          username: user.get('username'),
+          email: user.get('email'),
+          firstName: user.get('firstName'),
+          lastName: user.get('lastName'),
+          role: roleName,
+          roleName,
+          roleId: user.get('roleId'),
+          active: user.get('active'),
+          exists: user.get('exists'),
+          lastLoginAt: user.get('lastLoginAt'),
+          primaryOAuthProvider: user.get('primaryOAuthProvider'),
+          hasOAuth: (user.get('oauthAccounts') || []).length > 0,
+          createdAt: user.get('createdAt'),
+          updatedAt: user.get('updatedAt'),
+        },
       };
     } catch (error) {
       logger.error('OAuth account linking error:', error);
@@ -327,7 +556,7 @@ class OAuthService {
    * const service = new OAuthService();
    * const result = await service.unlinkOAuthAccount('user123', 'google');
    */
-  async unlinkOAuthAccount(userId, _provider) {
+  async unlinkOAuthAccount(userId, provider) {
     try {
       const user = await AuthenticationService.findUserById(userId);
 
@@ -335,24 +564,67 @@ class OAuthService {
         throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found');
       }
 
-      const oauthAccount = user.getOAuthAccount(_provider);
+      const accounts = user.get('oauthAccounts') || [];
+      const oauthAccount = accounts.find((account) => account.provider === provider) || null;
       if (!oauthAccount) {
         throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'OAuth account not found');
       }
 
       // Remove OAuth account
-      user.removeOAuthAccount(_provider, oauthAccount.providerId);
+      const existingAccounts = user.get('oauthAccounts') || [];
+      const filteredAccounts = existingAccounts.filter(
+        (account) => !(account.provider === provider && account.providerId === oauthAccount.providerId)
+      );
+
+      user.set('oauthAccounts', filteredAccounts);
+
+      // Update primary provider if needed
+      if (user.get('primaryOAuthProvider') === provider) {
+        user.set('primaryOAuthProvider', filteredAccounts.length > 0 ? filteredAccounts[0].provider : null);
+      }
       await user.save(null, { useMasterKey: true });
+
+      // Resolve user role for dashboard redirect
+      let roleName = 'guest';
+      const rolePointer = user.get('roleId');
+      if (rolePointer) {
+        try {
+          const roleObject = await rolePointer.fetch({ useMasterKey: true });
+          roleName = roleObject.get('name') || 'guest';
+        } catch (error) {
+          // Fallback to direct role field if relationship fails
+          roleName = user.get('role') || 'guest';
+        }
+      } else {
+        // Fall back to old role field if no roleId
+        roleName = user.get('role') || 'guest';
+      }
 
       logger.logSecurityEvent('OAUTH_ACCOUNT_UNLINKED', {
         userId,
-        _provider,
+        provider,
       });
 
       return {
         success: true,
         message: 'OAuth account unlinked successfully',
-        user: user.toSafeJSON(),
+        user: {
+          id: user.id,
+          username: user.get('username'),
+          email: user.get('email'),
+          firstName: user.get('firstName'),
+          lastName: user.get('lastName'),
+          role: roleName,
+          roleName,
+          roleId: user.get('roleId'),
+          active: user.get('active'),
+          exists: user.get('exists'),
+          lastLoginAt: user.get('lastLoginAt'),
+          primaryOAuthProvider: user.get('primaryOAuthProvider'),
+          hasOAuth: (user.get('oauthAccounts') || []).length > 0,
+          createdAt: user.get('createdAt'),
+          updatedAt: user.get('updatedAt'),
+        },
       };
     } catch (error) {
       logger.error('OAuth account unlinking error:', error);
@@ -404,31 +676,31 @@ class OAuthService {
    * const service = new OAuthService();
    * const userInfo = service.getMockUserInfo('google', 'mock_code');
    */
-  getMockUserInfo(_provider, _code) {
+  getMockUserInfo(provider, _code) {
     const baseUser = {
-      id: `mock_${_provider}_${crypto.randomBytes(8).toString('hex')}`,
-      name: `Test User ${_provider}`,
+      id: `mock_${provider}_${crypto.randomBytes(8).toString('hex')}`,
+      name: `Test User ${provider}`,
       given_name: 'Test',
       family_name: 'User',
-      picture: `https://via.placeholder.com/150?text=${_provider}`,
+      picture: `https://via.placeholder.com/150?text=${provider}`,
       locale: 'en',
       verifiedemail: true,
     };
 
-    switch (_provider) {
+    switch (provider) {
       case 'google':
         return {
           ...baseUser,
-          email: `test.${_provider}@utq.edu.mx`, // Mock corporate domain
+          email: `test.${provider}@utq.edu.mx`, // Mock corporate domain
           hd: 'utq.edu.mx', // Hosted domain for Google Workspace
         };
 
       case 'microsoft':
         return {
           ...baseUser,
-          email: `test.${_provider}@nuba.com.mx`, // Mock corporate domain
-          mail: `test.${_provider}@nuba.com.mx`,
-          userPrincipalName: `test.${_provider}@nuba.com.mx`,
+          email: `test.${provider}@nuba.com.mx`, // Mock corporate domain
+          mail: `test.${provider}@nuba.com.mx`,
+          userPrincipalName: `test.${provider}@nuba.com.mx`,
           jobTitle: 'Test Employee',
           department: 'IT',
         };
@@ -436,7 +708,7 @@ class OAuthService {
       case 'apple':
         return {
           ...baseUser,
-          email: `test.${_provider}@icloud.com`,
+          email: `test.${provider}@icloud.com`,
           email_verified: true,
           is_privateemail: false,
         };
@@ -466,38 +738,38 @@ class OAuthService {
    * const service = new OAuthService();
    * const tokens = await service.exchangeCodeForTokens('google', 'auth_code_123', 'state123');
    */
-  async exchangeCodeForTokens(_provider, code, _state) {
-    const providerConfig = this.providers[provider]; // eslint-disable-line no-undef
+  async exchangeCodeForTokens(provider, code, _state) {
+    const providerConfig = this.providers[provider];
 
     if (!providerConfig) {
-      throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${_provider}`);
+      throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${provider}`);
     }
 
     // In mock mode, return mock tokens
     if (this.mockMode || providerConfig.mockMode) {
       return {
-        accesstoken: `mock_accesstoken_${_provider}`,
+        accesstoken: `mock_accesstoken_${provider}`,
         token_type: 'Bearer',
         expires_in: 3600,
-        refreshtoken: `mock_refreshtoken_${_provider}`,
+        refreshtoken: `mock_refreshtoken_${provider}`,
         scope: providerConfig.scopes.join(' '),
       };
     }
 
     // Real token exchange implementation
     try {
-      const tokenData = await this.performTokenExchange(_provider, code, providerConfig);
+      const tokenData = await this.performTokenExchange(provider, code, providerConfig);
 
       logger.logSecurityEvent('OAUTH_TOKEN_EXCHANGE_SUCCESS', null, {
-        provider, // eslint-disable-line no-undef
+        provider,
         hasRefreshToken: !!tokenData.refreshtoken,
       });
 
       return tokenData;
     } catch (error) {
-      logger.error(`OAuth token exchange failed for ${_provider}:`, error);
+      logger.error(`OAuth token exchange failed for ${provider}:`, error);
       logger.logSecurityEvent('OAUTH_TOKEN_EXCHANGE_FAILURE', null, {
-        provider, // eslint-disable-line no-undef
+        provider,
         error: error.message,
       });
       throw new Parse.Error(Parse.Error.OTHER_CAUSE, `Token exchange failed: ${error.message}`);
@@ -523,7 +795,7 @@ class OAuthService {
    * const service = new OAuthService();
    * const tokenData = await service.performTokenExchange('google', 'auth_code_123', providerConfig);
    */
-  async performTokenExchange(_provider, code, config) {
+  async performTokenExchange(provider, code, config) {
     const tokenPayload = {
       grant_type: 'authorization_code',
       client_id: config.clientId,
@@ -532,11 +804,22 @@ class OAuthService {
       redirect_uri: config.redirectUri,
     };
 
+    // Debug logging for Google OAuth
+    if (provider === 'google') {
+      logger.info('Google OAuth token exchange attempt:', {
+        clientId: config.clientId,
+        redirectUri: config.redirectUri,
+        codeLength: code ? code.length : 0,
+        codePrefix: code ? `${code.substring(0, 10)}...` : 'null',
+        tokenUrl: config.tokenUrl,
+      });
+    }
+
     // Initialize configuration
     let configWithTenantUrl = null;
 
     // Microsoft Azure AD specific configuration
-    if (_provider === 'microsoft') {
+    if (provider === 'microsoft') {
       const tenantId = process.env.MICROSOFT_OAUTH_TENANT_ID || 'common';
       const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
       // Create updated configuration without modifying parameter
@@ -547,7 +830,7 @@ class OAuthService {
     }
 
     // Apple requires JWT client assertion instead of client_secret
-    if (_provider === 'apple') {
+    if (provider === 'apple') {
       delete tokenPayload.client_secret;
       tokenPayload.client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
       tokenPayload.client_assertion = await this.createAppleClientAssertion(config);
@@ -564,25 +847,39 @@ class OAuthService {
 
     if (!response.ok) {
       const errorData = await response.text();
-      logger.error(`Token exchange failed for ${_provider}:`, {
+      logger.error(`Token exchange failed for ${provider}:`, {
         status: response.status,
         statusText: response.statusText,
         error: errorData,
         tokenUrl: configWithTenantUrl?.tokenUrl || config.tokenUrl,
+        requestPayload: {
+          client_id: tokenPayload.client_id,
+          redirect_uri: tokenPayload.redirect_uri,
+          grant_type: tokenPayload.grant_type,
+          code_length: tokenPayload.code ? tokenPayload.code.length : 0,
+          code_prefix: tokenPayload.code ? `${tokenPayload.code.substring(0, 20)}...` : 'null',
+        },
       });
       throw new Error(`HTTP ${response.status}: ${errorData}`);
     }
 
     const tokenData = await response.json();
 
+    logger.info(`Token exchange successful for ${provider}:`, {
+      hasAccessToken: !!tokenData.access_token,
+      hasRefreshToken: !!tokenData.refresh_token,
+      tokenType: tokenData.token_type,
+      expiresIn: tokenData.expires_in,
+    });
+
     // Microsoft-specific token validation
-    if (_provider === 'microsoft' && tokenData.accesstoken) {
-      await this.validateMicrosoftToken(tokenData.accesstoken);
+    if (provider === 'microsoft' && tokenData.access_token) {
+      await this.validateMicrosoftToken(tokenData.access_token);
     }
 
     // Apple-specific ID token processing
-    if (_provider === 'apple' && tokenData.idtoken) {
-      tokenData.userInfo = await this.parseAppleIdToken(tokenData.idtoken);
+    if (provider === 'apple' && tokenData.id_token) {
+      tokenData.userInfo = await this.parseAppleIdToken(tokenData.id_token);
     }
 
     return tokenData;
@@ -650,33 +947,40 @@ class OAuthService {
    * const service = new OAuthService();
    * const userInfo = await service.getUserInfo('google', 'accesstoken_123');
    */
-  async getUserInfo(_provider, accessToken) {
+  async getUserInfo(provider, accessToken) {
     if (this.mockMode) {
-      return this.getMockUserInfo(_provider, 'mock_code');
+      return this.getMockUserInfo(provider, 'mock_code');
     }
 
-    const config = this.providers[provider]; // eslint-disable-line no-undef
+    const config = this.providers[provider];
     if (!config) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, `Unsupported provider: ${_provider}`);
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, `Unsupported provider: ${provider}`);
     }
 
     try {
       let userInfo;
 
-      if (_provider === 'google') {
+      if (provider === 'google') {
         const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         if (!response.ok) {
-          throw new Error(`Google API error: ${response.status}`);
+          const errorText = await response.text();
+          logger.error(`Google userinfo API error: ${response.status} - ${errorText}`);
+          throw new Error(`Google API error: ${response.status} - ${errorText}`);
         }
 
         userInfo = await response.json();
-      } else if (_provider === 'microsoft') {
+        logger.info('Google userinfo retrieved successfully:', {
+          id: userInfo.id,
+          email: this.maskEmail(userInfo.email),
+          name: userInfo.name,
+        });
+      } else if (provider === 'microsoft') {
         // Use specialized Microsoft method for directory information
         userInfo = await this.getMicrosoftUserProfile(accessToken);
-      } else if (_provider === 'apple') {
+      } else if (provider === 'apple') {
         // Apple returns user info in the ID token JWT
         // Access token is used for Apple's API but user info comes from ID token
         throw new Parse.Error(
@@ -686,15 +990,15 @@ class OAuthService {
       }
 
       logger.logSecurityEvent('OAUTH_USER_INFO_RETRIEVED', null, {
-        provider, // eslint-disable-line no-undef
+        provider,
         userId: userInfo.id || userInfo.sub,
         email: this.maskEmail(userInfo.email),
       });
 
       return userInfo;
     } catch (error) {
-      logger.error(`Error getting user info from ${_provider}:`, error);
-      throw new Parse.Error(Parse.Error.OTHER_CAUSE, `Failed to get user information from ${_provider}`);
+      logger.error(`Error getting user info from ${provider}:`, error);
+      throw new Parse.Error(Parse.Error.OTHER_CAUSE, `Failed to get user information from ${provider}`);
     }
   }
 
@@ -715,60 +1019,137 @@ class OAuthService {
    * const service = new OAuthService();
    * const result = await service.findOrCreateUser('google', userInfo);
    */
-  async findOrCreateUser(_provider, userInfo) {
+  async findOrCreateUser(provider, userInfo) {
     try {
-      // Check if this is a corporate user first
-      const corporateResult = await CorporateOAuthService.mapCorporateUser(userInfo, _provider);
+      // ===== DEBUG LOGGING START =====
+      logger.info('🔍 OAuth findOrCreateUser: Starting user lookup process', {
+        provider,
+        userInfoEmail: userInfo.email,
+        userInfoEmailLength: userInfo.email ? userInfo.email.length : 0,
+        userInfoEmailTrimmed: userInfo.email ? userInfo.email.trim() : null,
+        userInfoEmailLowercase: userInfo.email ? userInfo.email.toLowerCase() : null,
+        userInfoId: userInfo.id,
+        userInfoName: userInfo.name,
+        userInfoKeys: Object.keys(userInfo),
+      });
+      // ===== DEBUG LOGGING END =====
 
-      if (corporateResult.isCorporateUser) {
-        // Corporate user handling - generate tokens for corporate user
-        const tokens = await AuthenticationService.generateTokens(corporateResult.user);
+      // SIMPLIFIED OAUTH FLOW: No special corporate treatment
+      // All OAuth logins follow the same consistent flow:
+      // 1. Check if user has OAuth account linked → Login
+      // 2. Check if user exists by email → Show linking modal
+      // 3. User doesn't exist → Redirect to agency request
 
-        logger.logSecurityEvent('CORPORATE_OAUTH_LOGIN_SUCCESS', corporateResult.user.id, {
-          provider, // eslint-disable-line no-undef
-          clientId: corporateResult.client?.id,
-          clientName: corporateResult.client?.get('name'),
-          email: this.maskEmail(userInfo.email),
-        });
+      logger.info('🔄 OAuth findOrCreateUser: Using unified flow for all domains', {
+        provider,
+        email: this.maskEmail(userInfo.email),
+        flow: 'unified_oauth_flow',
+        behavior: 'No corporate special treatment - consistent for all domains',
+      });
 
-        return {
-          success: true,
-          user: corporateResult.user.toSafeJSON(),
-          tokens,
-          isNewUser: !corporateResult.user.existed(),
-          isCorporateUser: true,
-          client: corporateResult.client ? {
-            id: corporateResult.client.id,
-            name: corporateResult.client.get('name'),
-            type: corporateResult.client.get('type'),
-          } : null,
-          message: corporateResult.user.existed()
-            ? 'Corporate OAuth login successful'
-            : 'Corporate OAuth account created and login successful',
-        };
-      }
+      // Step 1: Try to find existing user by OAuth ID first
+      logger.info('🔍 OAuth findOrCreateUser: Checking for existing OAuth account', {
+        provider,
+        providerId: userInfo.id,
+        searching: 'oauthAccounts array',
+      });
 
-      // Regular OAuth user handling (non-corporate)
-      // Try to find existing user by OAuth ID
-      let user = await this.findUserByOAuth(_provider, userInfo.id);
+      let user = await this.findUserByOAuth(provider, userInfo.id);
+
+      logger.info('🔍 OAuth findOrCreateUser: OAuth account lookup result', {
+        provider,
+        providerId: userInfo.id,
+        userFound: !!user,
+        userId: user ? user.id : null,
+        userEmail: user ? user.get('email') : null,
+        userActive: user ? user.get('active') : null,
+        userExists: user ? user.get('exists') : null,
+      });
 
       if (user) {
-        // Update OAuth data
-        user.addOAuthAccount({
-          _provider,
-          providerId: userInfo.id,
-          email: userInfo.email,
-          name: userInfo.name,
-          profileData: userInfo,
-        });
+        // User already has this OAuth account linked
+        // Validate user account status
+        if (!user.get('active')) {
+          // Account is deactivated
+          return {
+            success: false,
+            error: 'account_deactivated',
+            redirectUrl: '/auth/request-access?error=account_deactivated&toast=true',
+            message: 'Your account is deactivated. Please contact support.',
+          };
+        }
 
-        await user.recordSuccessfulLogin(`oauth_${_provider}`);
+        if (!user.get('exists')) {
+          // Account is soft-deleted
+          return {
+            success: false,
+            error: 'account_not_found',
+            redirectUrl: `/auth/request-access?oauth_attempted=${provider}&email=${encodeURIComponent(userInfo.email)}`,
+            message: 'Please request agency access to use this account.',
+          };
+        }
+
+        // Update existing OAuth account with fresh data
+        const existingAccounts = user.get('oauthAccounts') || [];
+        const accountIndex = existingAccounts.findIndex(
+          (account) => account.provider === provider && account.providerId === userInfo.id
+        );
+
+        if (accountIndex >= 0) {
+          // Update existing account with fresh profile data
+          existingAccounts[accountIndex] = {
+            ...existingAccounts[accountIndex],
+            email: userInfo.email,
+            name: userInfo.name,
+            profileData: userInfo,
+            lastUsed: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          user.set('oauthAccounts', existingAccounts);
+        }
+
+        // Record successful login
+        user.set('lastLoginAt', new Date());
+        user.set('lastAuthMethod', `oauth_${provider}`);
+        await user.save(null, { useMasterKey: true });
 
         const tokens = await AuthenticationService.generateTokens(user);
 
+        // Resolve user role for dashboard redirect
+        let roleName = 'guest';
+        const rolePointer = user.get('roleId');
+        if (rolePointer) {
+          try {
+            const roleObject = await rolePointer.fetch({ useMasterKey: true });
+            roleName = roleObject.get('name') || 'guest';
+          } catch (error) {
+            // Fallback to direct role field if relationship fails
+            roleName = user.get('role') || 'guest';
+          }
+        } else {
+          // Fall back to old role field if no roleId
+          roleName = user.get('role') || 'guest';
+        }
+
         return {
           success: true,
-          user: user.toSafeJSON(),
+          user: {
+            id: user.id,
+            username: user.get('username'),
+            email: user.get('email'),
+            firstName: user.get('firstName'),
+            lastName: user.get('lastName'),
+            role: roleName,
+            roleName,
+            roleId: user.get('roleId'),
+            active: user.get('active'),
+            exists: user.get('exists'),
+            lastLoginAt: user.get('lastLoginAt'),
+            primaryOAuthProvider: user.get('primaryOAuthProvider'),
+            hasOAuth: (user.get('oauthAccounts') || []).length > 0,
+            createdAt: user.get('createdAt'),
+            updatedAt: user.get('updatedAt'),
+          },
           tokens,
           isNewUser: false,
           isCorporateUser: false,
@@ -776,70 +1157,121 @@ class OAuthService {
         };
       }
 
-      // Try to find user by email
+      // Step 2: Try to find user by email (existing AmexingUser without OAuth link)
+      logger.info('🔍 OAuth findOrCreateUser: Checking for existing user by email', {
+        provider,
+        emailToSearch: userInfo.email,
+        emailToSearchTrimmed: userInfo.email ? userInfo.email.trim() : null,
+        emailToSearchLowercase: userInfo.email ? userInfo.email.toLowerCase() : null,
+        searching: 'AmexingUser table by email',
+        queryFilters: 'exists=true, active=true',
+      });
+
       user = await AuthenticationService.findUserByEmail(userInfo.email);
 
+      logger.info('🔍 OAuth findOrCreateUser: Email lookup result - THIS IS THE CRITICAL CHECK', {
+        provider,
+        emailSearched: userInfo.email,
+        userFound: !!user,
+        userId: user ? user.id : null,
+        userEmail: user ? user.get('email') : null,
+        userActive: user ? user.get('active') : null,
+        userExists: user ? user.get('exists') : null,
+        userRole: user ? user.get('role') : null,
+        userCreatedAt: user ? user.get('createdAt') : null,
+        willShowLinkingModal: !!user,
+        shouldShowAgencyRequest: !user,
+      });
+
       if (user) {
-        // Link OAuth account to existing user
-        user.addOAuthAccount({
-          _provider,
-          providerId: userInfo.id,
-          email: userInfo.email,
-          name: userInfo.name,
-          profileData: userInfo,
+        // Validate user account status before linking
+        if (!user.get('active')) {
+          // Account is deactivated
+          return {
+            success: false,
+            error: 'account_deactivated',
+            redirectUrl: '/auth/request-access?error=account_deactivated&toast=true',
+            message: 'Your account is deactivated. Please contact support.',
+          };
+        }
+
+        if (!user.get('exists')) {
+          // Account is soft-deleted
+          return {
+            success: false,
+            error: 'account_not_found',
+            redirectUrl: `/auth/request-access?oauth_attempted=${provider}&email=${encodeURIComponent(userInfo.email)}`,
+            message: 'Please request agency access to use this account.',
+          };
+        }
+
+        // Check if user already has this OAuth provider linked
+        const oauthAccounts = user.get('oauthAccounts') || [];
+        const hasProvider = oauthAccounts.some((account) => account.provider === provider);
+        if (hasProvider) {
+          // Already linked, proceed with login
+          // Record successful login
+          user.set('lastLoginAt', new Date());
+          user.set('lastAuthMethod', `oauth_${provider}`);
+          await user.save(null, { useMasterKey: true });
+
+          const tokens = await AuthenticationService.generateTokens(user);
+
+          return {
+            success: true,
+            user: user.toJSON(),
+            tokens,
+            isNewUser: false,
+            isCorporateUser: false,
+            message: 'OAuth login successful',
+          };
+        }
+
+        // User exists but doesn't have OAuth linked - require confirmation
+        logger.info('🔍 OAuth findOrCreateUser: RETURNING LINKING CONFIRMATION - This is why the modal shows!', {
+          provider,
+          existingUserId: user.id,
+          existingUserEmail: user.get('email'),
+          oauthEmail: userInfo.email,
+          outcome: 'requiresLinkingConfirmation=true',
+          resultingBehavior: 'Will show Vincular cuenta modal',
         });
 
-        await user.recordSuccessfulLogin(`oauth_${_provider}`);
-        await user.save(null, { useMasterKey: true });
-
-        const tokens = await AuthenticationService.generateTokens(user);
-
         return {
-          success: true,
-          user: user.toSafeJSON(),
-          tokens,
-          isNewUser: false,
-          isCorporateUser: false,
-          linkedAccount: true,
-          message: 'OAuth account linked and login successful',
+          success: false,
+          requiresLinkingConfirmation: true,
+          existingUser: {
+            id: user.id,
+            email: user.get('email'),
+            name: user.getDisplayName ? user.getDisplayName() : `${user.get('firstName')} ${user.get('lastName')}`,
+          },
+          oauthInfo: {
+            provider,
+            email: userInfo.email,
+            name: userInfo.name,
+            providerId: userInfo.id,
+            profileData: userInfo,
+          },
+          redirectUrl: `/auth/oauth/confirm-link?provider=${provider}&email=${encodeURIComponent(userInfo.email)}`,
+          message: 'Please confirm linking your Google account to your existing Amexing account',
         };
       }
 
-      // Create new user from OAuth data
-      user = AmexingUser.create({
-        username: this.generateUsernameFromEmail(userInfo.email),
-        email: userInfo.email,
-        firstName: userInfo.given_name || userInfo.name?.split(' ')[0] || 'User',
-        lastName: userInfo.family_name || userInfo.name?.split(' ').slice(1).join(' ') || '',
-        role: this.determineUserRole(userInfo),
-        primaryOAuthProvider: provider, // eslint-disable-line no-undef
+      // Step 3: No existing user found - redirect to agency request
+      logger.info('🔍 OAuth findOrCreateUser: RETURNING AGENCY REQUEST - This is the correct behavior for non-existent users!', {
+        provider,
+        searchedEmail: userInfo.email,
+        outcome: 'requiresAgencyRequest=true',
+        redirectUrl: `/auth/request-access?oauth_attempted=${provider}&email=${encodeURIComponent(userInfo.email)}`,
+        resultingBehavior: 'Will redirect to agency request page',
       });
-
-      // Add OAuth account
-      user.addOAuthAccount({
-        _provider,
-        providerId: userInfo.id,
-        email: userInfo.email,
-        name: userInfo.name,
-        profileData: userInfo,
-      });
-
-      // Set email as verified if provider confirms it
-      if (userInfo.verifiedemail || userInfo.email_verified) {
-        user.set('emailVerified', true);
-      }
-
-      const savedUser = await user.save(null, { useMasterKey: true });
-      await savedUser.recordSuccessfulLogin(`oauth_${_provider}`);
-
-      const tokens = await AuthenticationService.generateTokens(savedUser);
 
       return {
-        success: true,
-        user: savedUser.toSafeJSON(),
-        tokens,
-        isNewUser: true,
-        message: 'Account created and OAuth login successful',
+        success: false,
+        error: 'user_not_found',
+        requiresAgencyRequest: true,
+        redirectUrl: `/auth/request-access?oauth_attempted=${provider}&email=${encodeURIComponent(userInfo.email)}`,
+        message: 'Google account detected. Please request agency access to use this login method.',
       };
     } catch (error) {
       logger.error('Find or create OAuth user error:', error);
@@ -864,12 +1296,11 @@ class OAuthService {
    * const service = new OAuthService();
    * const user = await service.findUserByOAuth('google', 'provider_user_123');
    */
-  async findUserByOAuth(_provider, providerId) {
+  async findUserByOAuth(provider, providerId) {
     const query = new Parse.Query(AmexingUser);
-    query.contains('oauthAccounts', {
-      provider, // eslint-disable-line no-undef
-      providerId,
-    });
+    query.equalTo('oauthAccounts.provider', provider);
+    query.equalTo('oauthAccounts.providerId', providerId);
+    query.equalTo('exists', true); // Only find existing users (not soft deleted)
 
     return query.first({ useMasterKey: true });
   }
@@ -1286,6 +1717,7 @@ class OAuthService {
    * Gets provider configuration (safe for client).
    * @param {string} provider - Provider name.
    * @param _provider
+   * @param providerName
    * @returns {object} - Operation result Safe provider config.
    * @example
    * // OAuth service usage
@@ -1299,14 +1731,21 @@ class OAuthService {
    * const service = new OAuthService();
    * const config = service.getProviderConfig('google');
    */
-  getProviderConfig(_provider) {
-    const config = this.providers[provider]; // eslint-disable-line no-undef
+  getProviderConfig(providerName) {
+    const config = this.providers[providerName];
     if (!config) {
       return null;
     }
 
+    const displayNames = {
+      google: 'Google',
+      microsoft: 'Microsoft',
+      apple: 'Apple',
+    };
+
     return {
-      name: provider, // eslint-disable-line no-undef
+      name: providerName,
+      displayName: displayNames[providerName] || providerName,
       enabled: config.enabled || this.mockMode,
       mockMode: config.mockMode || this.mockMode,
       scopes: config.scopes,
@@ -1329,7 +1768,7 @@ class OAuthService {
    * const domains = service.getAvailableCorporateDomains();
    */
   getAvailableCorporateDomains() {
-    return CorporateOAuthService.getAvailableCorporateDomains();
+    return this.corporateService.getAvailableCorporateDomains();
   }
 
   /**
@@ -1349,8 +1788,8 @@ class OAuthService {
    * const config = service.getCorporateDomainConfig('user@company.com');
    */
   getCorporateDomainConfig(email) {
-    const _domain = CorporateOAuthService.extractEmailDomain(email); // eslint-disable-line no-underscore-dangle
-    const corporateDomains = CorporateOAuthService.getAvailableCorporateDomains();
+    const _domain = this.corporateService.extractEmailDomain(email); // eslint-disable-line no-underscore-dangle
+    const corporateDomains = this.corporateService.getAvailableCorporateDomains();
 
     return corporateDomains.find((config) => config.domain === _domain) || null;
   }
@@ -1374,7 +1813,7 @@ class OAuthService {
    * const result = service.addCorporateDomain('company.com', corporateConfig);
    */
   addCorporateDomain(_domain, config) {
-    return CorporateOAuthService.addCorporateDomain(_domain, config);
+    return this.corporateService.addCorporateDomain(_domain, config);
   }
 }
 

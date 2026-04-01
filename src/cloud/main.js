@@ -402,6 +402,76 @@ function registerCloudFunctions() {
       }
     });
 
+    /**
+     * Requests password reset and sends email to user.
+     * Uses secure token generation and prevents user enumeration.
+     * @function requestPasswordReset
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Always returns success to prevent user enumeration.
+     * @example
+     * // Call from client
+     * const result = await Parse.Cloud.run('requestPasswordReset', {
+     *   email: 'john@example.com'
+     * });
+     * // Always returns: { success: true, message: '...' }
+     */
+    Parse.Cloud.define('requestPasswordReset', async (request) => {
+      console.log('☁️ ========== CLOUD FUNCTION: requestPasswordReset START ==========');
+      console.log('☁️ CLOUD: requestPasswordReset called at:', new Date().toISOString());
+      const { params } = request;
+      console.log('☁️ CLOUD: Full params received:', JSON.stringify(params, null, 2));
+
+      const { email } = params;
+      console.log('☁️ CLOUD: Email extracted:', email);
+      console.log('☁️ CLOUD: Email type:', typeof email);
+      console.log('☁️ CLOUD: Email length:', email ? email.length : 'undefined');
+
+      // Validate email parameter
+      if (!email || typeof email !== 'string') {
+        console.log('☁️ ERROR: Email validation failed - missing or invalid type');
+        throw new Parse.Error(Parse.Error.INVALID_PARAMETERS, 'Email is required');
+      }
+
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        console.log('☁️ ERROR: Email format validation failed');
+        throw new Parse.Error(Parse.Error.INVALID_PARAMETERS, 'Invalid email format');
+      }
+
+      console.log('☁️ CLOUD: Email validation passed');
+      console.log('☁️ CLOUD: Calling AuthenticationService.requestPasswordReset');
+
+      try {
+        const result = await AuthenticationService.requestPasswordReset(email);
+        console.log('☁️ CLOUD: AuthenticationService returned successfully');
+        console.log('☁️ CLOUD: Service result:', JSON.stringify(result, null, 2));
+        console.log('☁️ ========== CLOUD FUNCTION: requestPasswordReset SUCCESS END ==========');
+        return result;
+      } catch (error) {
+        console.log('☁️ ERROR: AuthenticationService.requestPasswordReset threw error');
+        console.log('☁️ ERROR: Error message:', error.message);
+        console.log('☁️ ERROR: Error stack:', error.stack);
+        console.log('☁️ ERROR: Full error:', error);
+
+        // Log error but don't expose it to prevent information disclosure
+        logger.error('Password reset request error:', {
+          error: error.message,
+          email: AuthenticationService.prototype.maskEmail
+            ? AuthenticationService.prototype.maskEmail(email) : email,
+        });
+
+        console.log('☁️ CLOUD: Returning generic success to prevent user enumeration');
+        console.log('☁️ ========== CLOUD FUNCTION: requestPasswordReset ERROR END ==========');
+
+        // Always return success to prevent user enumeration
+        return {
+          success: true,
+          message: 'If an account exists with that email, password reset instructions have been sent.',
+        };
+      }
+    });
+
     // OAuth Cloud Functions
     /**
      * Generates an OAuth authorization URL for the specified provider.
@@ -445,16 +515,62 @@ function registerCloudFunctions() {
      */
     Parse.Cloud.define('handleOAuthCallback', async (request) => {
       const { params, ip } = request;
-      const { _provider, code, state } = params;
+      const { provider, code, state } = params;
 
       try {
-        logger.info(`OAuth ${_provider} callback from IP: ${ip}`);
+        logger.info(`OAuth ${provider} callback from IP: ${ip}`);
 
-        const result = await OAuthService.handleCallback(_provider, code, state);
+        const result = await OAuthService.handleCallback(provider, code, state);
+
+        // Handle different OAuth outcomes based on the new business logic
+        if (!result.success || result.requiresLinkingConfirmation || result.requiresAgencyRequest) {
+          // Handle various failure scenarios
+          if (result.error === 'account_deactivated') {
+            // Account is deactivated - return error for redirect handling
+            throw new Parse.Error(Parse.Error.OTHER_CAUSE, JSON.stringify({
+              error: result.error,
+              redirectUrl: result.redirectUrl,
+              message: result.message,
+              toast: true,
+            }));
+          }
+
+          if (result.requiresLinkingConfirmation) {
+            // User exists but needs to confirm OAuth linking
+            throw new Parse.Error(Parse.Error.OTHER_CAUSE, JSON.stringify({
+              requiresLinkingConfirmation: true,
+              existingUser: result.existingUser,
+              oauthInfo: result.oauthInfo,
+              redirectUrl: result.redirectUrl,
+              message: result.message,
+            }));
+          }
+
+          if (result.requiresAgencyRequest) {
+            // New user needs agency access
+            throw new Parse.Error(Parse.Error.OTHER_CAUSE, JSON.stringify({
+              requiresAgencyRequest: true,
+              redirectUrl: result.redirectUrl,
+              message: result.message,
+            }));
+          }
+
+          // Generic error
+          throw new Parse.Error(Parse.Error.OTHER_CAUSE, result.message || 'OAuth authentication failed');
+        }
+
+        // Success - return tokens and user data
         return result;
       } catch (error) {
         logger.error('OAuth callback error:', error);
-        throw error;
+
+        // Re-throw Parse.Error with our custom data
+        if (error instanceof Parse.Error) {
+          throw error;
+        }
+
+        // Handle generic errors
+        throw new Parse.Error(Parse.Error.OTHER_CAUSE, error.message || 'OAuth callback failed');
       }
     });
 
@@ -513,6 +629,34 @@ function registerCloudFunctions() {
         return result;
       } catch (error) {
         logger.error('OAuth account unlinking error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Confirms OAuth account linking after user approval.
+     * Handles the linking confirmation flow when a user approves connecting their OAuth account.
+     * @function confirmOAuthLinking
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to authentication result with user data and tokens.
+     * @example
+     * // Call from OAuth confirmation modal
+     * const result = await Parse.Cloud.run('confirmOAuthLinking', {
+     *   existingUser: { id: 'user123', email: 'user@example.com' },
+     *   oauthInfo: { provider: 'google', providerId: '123', email: 'user@gmail.com' }
+     * });
+     */
+    Parse.Cloud.define('confirmOAuthLinking', async (request) => {
+      const { params, ip } = request;
+      const { existingUser, oauthInfo } = params;
+
+      try {
+        logger.info(`OAuth linking confirmation for user ${existingUser.id} from IP: ${ip}`);
+
+        const result = await OAuthService.confirmOAuthLinking(oauthInfo, existingUser);
+        return result;
+      } catch (error) {
+        logger.error('OAuth linking confirmation error:', error);
         throw error;
       }
     });

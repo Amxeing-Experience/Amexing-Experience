@@ -184,6 +184,8 @@ class AuthenticationServiceCore {
   async findUserByEmail(email) {
     const query = new Parse.Query(AmexingUser);
     query.equalTo('email', email.toLowerCase());
+    query.equalTo('exists', true);
+    query.equalTo('active', true);
     return query.first({ useMasterKey: true });
   }
 
@@ -239,9 +241,11 @@ class AuthenticationServiceCore {
     // Process role pointer if it exists
     if (rolePointer) {
       try {
-        // Check if role is already fetched or just a pointer
-        if (rolePointer.get && typeof rolePointer.get === 'function') {
-          // Role object is already fetched
+        // Check if role is already fetched by looking for actual data
+        const hasRoleData = rolePointer.get && rolePointer.get('name');
+
+        if (hasRoleData) {
+          // Role object has data and is already fetched
           roleName = rolePointer.get('name') || 'guest';
           roleObjectId = rolePointer.id;
         } else if (typeof rolePointer === 'string') {
@@ -255,8 +259,8 @@ class AuthenticationServiceCore {
             roleName = roleObject.get('name') || 'guest';
             roleObjectId = roleObject.id;
           }
-        } else {
-          // rolePointer is a pointer object, fetch it
+        } else if (rolePointer.id) {
+          // rolePointer is a pointer object (has id but no data), fetch it
           const roleQuery = new Parse.Query('Role');
           const roleObject = await roleQuery.get(rolePointer.id, {
             useMasterKey: true,

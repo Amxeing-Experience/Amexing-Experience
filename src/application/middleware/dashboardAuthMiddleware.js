@@ -57,6 +57,13 @@ class DashboardAuthMiddleware {
     const sessionToken = req.cookies?.sessionToken;
 
     if (!accessToken && !sessionToken) {
+      logger.info('Dashboard auth: No tokens found, redirecting to login:', {
+        path: currentPath,
+        hasAccessToken: !!accessToken,
+        hasSessionToken: !!sessionToken,
+        allCookies: Object.keys(req.cookies || {}),
+        redirectTo: req.originalUrl,
+      });
       return res.redirect(`/login?returnTo=${encodeURIComponent(req.originalUrl)}`);
     }
 
@@ -72,6 +79,12 @@ class DashboardAuthMiddleware {
     // First check JWT token
     if (accessToken) {
       try {
+        logger.info('Dashboard auth: JWT token found, attempting verification:', {
+          path: currentPath,
+          tokenLength: accessToken.length,
+          tokenStart: `${accessToken.substring(0, 20)}...`,
+        });
+
         const decoded = jwt.verify(accessToken, this.jwtSecret);
         user = {
           id: decoded.userId || 'unknown',
@@ -82,8 +95,20 @@ class DashboardAuthMiddleware {
           organizationId: decoded.organizationId,
           isActive: true,
         };
+
+        logger.info('Dashboard auth: JWT verification successful:', {
+          path: currentPath,
+          userId: user.id,
+          userRole: user.role,
+          username: user.username,
+        });
       } catch (error) {
-        logger.warn('Invalid JWT token:', error.message);
+        logger.warn('Dashboard auth: Invalid JWT token:', {
+          path: currentPath,
+          error: error.message,
+          tokenPresent: !!accessToken,
+          tokenLength: accessToken ? accessToken.length : 0,
+        });
       }
     } else if (sessionToken && req.session && req.session.user) {
       // If no valid JWT user, check session
