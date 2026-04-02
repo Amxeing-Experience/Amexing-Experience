@@ -1598,6 +1598,7 @@ class ExperienceController {
   buildBaseQuery(typeFilter, excludeId, dayDate) {
     const query = new Parse.Query('Experience');
     query.equalTo('exists', true);
+    query.equalTo('active', true);
     // Only get active records (valid_until IS NULL) - price versioning
     query.doesNotExist('valid_until');
     if (typeFilter && ['Experience', 'Provider'].includes(typeFilter)) {
@@ -1634,6 +1635,7 @@ class ExperienceController {
   buildSearchQuery(searchValue, typeFilter, excludeId, dayDate) {
     const nameQuery = new Parse.Query('Experience');
     nameQuery.equalTo('exists', true);
+    nameQuery.equalTo('active', true);
     // Only get active records (valid_until IS NULL) - price versioning
     nameQuery.doesNotExist('valid_until');
     if (typeFilter) nameQuery.equalTo('type', typeFilter);
@@ -1642,6 +1644,7 @@ class ExperienceController {
 
     const descQuery = new Parse.Query('Experience');
     descQuery.equalTo('exists', true);
+    descQuery.equalTo('active', true);
     // Only get active records (valid_until IS NULL) - price versioning
     descQuery.doesNotExist('valid_until');
     if (typeFilter) descQuery.equalTo('type', typeFilter);

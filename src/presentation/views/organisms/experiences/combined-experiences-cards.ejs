@@ -183,7 +183,7 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
                         <span class="visually-hidden">Cargando detalles de la experiencia...</span>
                     </div>
                 </div>
-                <% if (currentUserRole === 'department_manager') { %>
+                <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
                 <div class="modal-footer border-top" id="experienceModalFooter">
                     <button type="button" class="btn btn-primary add-to-quote-from-modal-btn">
                         <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
@@ -195,7 +195,7 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 </div>
 
 <!-- Add to Quote Picker Modal -->
-<% if (currentUserRole === 'department_manager') { %>
+<% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
 <div class="modal fade" id="addToQuoteModal" tabindex="-1" aria-labelledby="addToQuoteLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-md">
         <div class="modal-content">
@@ -1264,7 +1264,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                             data-experience-type="${experience.source}">
                                         <i class="ti ti-eye me-1"></i>Ver más
                                     </button>
-                                    <% if (currentUserRole === 'department_manager') { %>
+                                    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
                                     <button class="btn btn-primary btn-sm add-to-quote-btn"
                                             data-experience-id="${experience.id || experience.objectId}"
                                             data-experience-name="${experience.displayName}"
@@ -1363,10 +1363,22 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('filterCurrency').addEventListener('change', function() {
         // Only update display to recalculate prices, don't filter
         displayExperiences();
+        
+        // If modal is open, refresh the pricing tab
+        const modal = document.getElementById('experienceModal');
+        if (modal && modal.classList.contains('show') && window._selectedExperience) {
+            loadPricesTab(window._selectedExperience);
+        }
     });
     document.getElementById('filterPayment').addEventListener('change', function() {
         // Only update display to recalculate prices, don't filter
         displayExperiences();
+        
+        // If modal is open, refresh the pricing tab
+        const modal = document.getElementById('experienceModal');
+        if (modal && modal.classList.contains('show') && window._selectedExperience) {
+            loadPricesTab(window._selectedExperience);
+        }
     });
 
     // Set up event listener for "Ver más" buttons
@@ -1381,7 +1393,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    <% if (currentUserRole === 'department_manager') { %>
+    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
     // ========== Add to Quote functionality ==========
 
     // Event: Add to Quote from card
@@ -2660,15 +2672,19 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear any existing content first
         pricesContent.innerHTML = '';
         
+        // Get current currency and payment type from dropdowns
+        const currency = document.getElementById('filterCurrency').value;
+        const paymentType = document.getElementById('filterPayment').value;
+        
         let pricingHtml = '';
         
-        // Check for per-person pricing (cost = Adulto, only for regular experiences)
-        if (experience.type !== 'Provider' && (experience.cost || experience.price_child || experience.price_no_alcohol)) {
+        // Check for per-person pricing (support both original and display fields)
+        if (experience.displayPrice || experience.displayPriceChild || experience.displayPriceNoAlcohol || experience.cost || experience.price_child || experience.price_no_alcohol || experience.price) {
             pricingHtml += `
                 <div class="additional-pricing-section">
                     <h6 class="mb-3"><i class="ti ti-users me-2"></i>Precios por Persona</h6>
                     <div class="row g-3">
-                        ${experience.cost ? `
+                        ${(experience.displayPrice || experience.cost || experience.price) ? `
                             <div class="col-md-4">
                                 <div class="additional-price-card">
                                     <div class="additional-price-icon bg-primary">
@@ -2676,13 +2692,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                     <div class="additional-price-info">
                                         <span class="additional-price-label">Adulto</span>
-                                        <span class="additional-price-value">${formatCurrency(experience.cost)}</span>
+                                        <span class="additional-price-value">${convertExperiencePrice(experience.displayPrice || experience.cost || experience.price, currency, paymentType)}</span>
                                         <small class="text-muted">Precio general</small>
                                     </div>
                                 </div>
                             </div>
                         ` : ''}
-                        ${experience.price_child ? `
+                        ${(experience.displayPriceChild || experience.price_child) ? `
                             <div class="col-md-4">
                                 <div class="additional-price-card">
                                     <div class="additional-price-icon bg-info">
@@ -2690,13 +2706,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                     <div class="additional-price-info">
                                         <span class="additional-price-label">Niño</span>
-                                        <span class="additional-price-value">${formatCurrency(experience.price_child)}</span>
+                                        <span class="additional-price-value">${convertExperiencePrice(experience.displayPriceChild || experience.price_child, currency, paymentType)}</span>
                                         <small class="text-muted">Menor de edad</small>
                                     </div>
                                 </div>
                             </div>
                         ` : ''}
-                        ${experience.price_no_alcohol ? `
+                        ${(experience.displayPriceNoAlcohol || experience.price_no_alcohol) ? `
                             <div class="col-md-4">
                                 <div class="additional-price-card">
                                     <div class="additional-price-icon bg-success">
@@ -2704,7 +2720,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                     <div class="additional-price-info">
                                         <span class="additional-price-label">Sin Alcohol</span>
-                                        <span class="additional-price-value">${formatCurrency(experience.price_no_alcohol)}</span>
+                                        <span class="additional-price-value">${convertExperiencePrice(experience.displayPriceNoAlcohol || experience.price_no_alcohol, currency, paymentType)}</span>
                                         <small class="text-muted">Sin bebidas alcohólicas</small>
                                     </div>
                                 </div>

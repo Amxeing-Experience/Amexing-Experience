@@ -2254,6 +2254,12 @@ document.addEventListener('DOMContentLoaded', function() {
         currencyFilterDesktop.addEventListener('change', () => {
             syncDropdowns(currencyFilterDesktop, currencyFilterMobile);
             applyFilters();
+            
+            // If modal is open, refresh the pricing tab
+            const modal = document.getElementById('tourModal');
+            if (modal && modal.classList.contains('show') && window._selectedTour) {
+                loadPricesTab(window._selectedTour);
+            }
         });
     }
     
@@ -2261,6 +2267,12 @@ document.addEventListener('DOMContentLoaded', function() {
         currencyFilterMobile.addEventListener('change', () => {
             syncDropdowns(currencyFilterMobile, currencyFilterDesktop);
             applyFilters();
+            
+            // If modal is open, refresh the pricing tab
+            const modal = document.getElementById('tourModal');
+            if (modal && modal.classList.contains('show') && window._selectedTour) {
+                loadPricesTab(window._selectedTour);
+            }
         });
     }
     
@@ -2269,6 +2281,12 @@ document.addEventListener('DOMContentLoaded', function() {
         paymentFilterDesktop.addEventListener('change', () => {
             syncDropdowns(paymentFilterDesktop, paymentFilterMobile);
             applyFilters();
+            
+            // If modal is open, refresh the pricing tab
+            const modal = document.getElementById('tourModal');
+            if (modal && modal.classList.contains('show') && window._selectedTour) {
+                loadPricesTab(window._selectedTour);
+            }
         });
     }
     
@@ -2276,6 +2294,12 @@ document.addEventListener('DOMContentLoaded', function() {
         paymentFilterMobile.addEventListener('change', () => {
             syncDropdowns(paymentFilterMobile, paymentFilterDesktop);
             applyFilters();
+            
+            // If modal is open, refresh the pricing tab
+            const modal = document.getElementById('tourModal');
+            if (modal && modal.classList.contains('show') && window._selectedTour) {
+                loadPricesTab(window._selectedTour);
+            }
         });
     }
     
@@ -3390,6 +3414,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadPricesTab(tour) {
         const pricesContent = document.getElementById('pricesContent');
         
+        // Get current currency and payment type from dropdowns
+        const currencyFilter = document.getElementById('currencyFilter-<%= dtTableId %>') || document.getElementById('currencyFilterMobile-<%= dtTableId %>');
+        const paymentFilter = document.getElementById('paymentTypeFilter-<%= dtTableId %>') || document.getElementById('paymentTypeFilterMobile-<%= dtTableId %>');
+        const currency = currencyFilter ? currencyFilter.value : 'MXN';
+        const paymentType = paymentFilter ? paymentFilter.value : 'efectivo';
+        
         // Debug tour pricing data to console
         console.log('Complete tour pricing data:', {
             tourId: tour.id,
@@ -3494,9 +3524,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 <p class="text-muted mb-1">
                                                     <i class="ti ti-users me-1"></i>${priceData.vehicleType?.defaultCapacity || 0} personas
                                                 </p>
-                                                <p class="price-amount">${formatCurrency(priceData.price)}</p>
+                                                <p class="price-amount">${convertTourPrice(priceData.price, currency, paymentType)}</p>
                                                 ${priceData.originalPrice && priceData.originalPrice !== priceData.price ? 
-                                                    `<p class="text-decoration-line-through text-muted small">Original: ${formatCurrency(priceData.originalPrice)}</p>` : ''
+                                                    `<p class="text-decoration-line-through text-muted small">Original: ${convertTourPrice(priceData.originalPrice, currency, paymentType)}</p>` : ''
                                                 }
                                             </div>
                                         </div>
@@ -3522,7 +3552,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         </div>
                                         <div class="additional-price-info">
                                             <span class="additional-price-label">Adulto</span>
-                                            <span class="additional-price-value">${formatCurrency(tour.price)}</span>
+                                            <span class="additional-price-value">${convertTourPrice(tour.price, currency, paymentType)}</span>
                                             <small class="text-muted">Con alcohol incluido</small>
                                         </div>
                                     </div>
@@ -3536,7 +3566,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         </div>
                                         <div class="additional-price-info">
                                             <span class="additional-price-label">Niño</span>
-                                            <span class="additional-price-value">${formatCurrency(tour.price_child)}</span>
+                                            <span class="additional-price-value">${convertTourPrice(tour.price_child, currency, paymentType)}</span>
                                             <small class="text-muted">Menor de edad</small>
                                         </div>
                                     </div>
@@ -3550,7 +3580,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         </div>
                                         <div class="additional-price-info">
                                             <span class="additional-price-label">Adulto Sin Alcohol</span>
-                                            <span class="additional-price-value">${formatCurrency(tour.price_no_alcohol)}</span>
+                                            <span class="additional-price-value">${convertTourPrice(tour.price_no_alcohol, currency, paymentType)}</span>
                                             <small class="text-muted">Sin bebidas alcohólicas</small>
                                         </div>
                                     </div>
@@ -3576,7 +3606,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="price-info">
                                         <h6>Grupo Pequeño</h6>
                                         <p class="text-muted mb-1">1-4 personas</p>
-                                        <p class="price-amount">${formatCurrency(tour.walkingPriceSmall)}</p>
+                                        <p class="price-amount">${convertTourPrice(tour.walkingPriceSmall, currency, paymentType)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -3590,7 +3620,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="price-info">
                                         <h6>Grupo Mediano</h6>
                                         <p class="text-muted mb-1">5-8 personas</p>
-                                        <p class="price-amount">${formatCurrency(tour.walkingPriceMedium)}</p>
+                                        <p class="price-amount">${convertTourPrice(tour.walkingPriceMedium, currency, paymentType)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -3604,7 +3634,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="price-info">
                                         <h6>Grupo Grande</h6>
                                         <p class="text-muted mb-1">9+ personas</p>
-                                        <p class="price-amount">${formatCurrency(tour.walkingPriceLarge)}</p>
+                                        <p class="price-amount">${convertTourPrice(tour.walkingPriceLarge, currency, paymentType)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -3628,7 +3658,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="price-info">
                                         <h6>Adulto</h6>
                                         <p class="text-muted mb-1">${tour.price ? 'Con alcohol' : 'Precio base'}</p>
-                                        <p class="price-amount">${formatCurrency(tour.price || tour.base_price)}</p>
+                                        <p class="price-amount">${convertTourPrice(tour.price || tour.base_price, currency, paymentType)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -3642,7 +3672,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="price-info">
                                         <h6>Niño</h6>
                                         <p class="text-muted mb-1">Menor de edad</p>
-                                        <p class="price-amount">${formatCurrency(tour.price_child)}</p>
+                                        <p class="price-amount">${convertTourPrice(tour.price_child, currency, paymentType)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -3656,7 +3686,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="price-info">
                                         <h6>Sin Alcohol</h6>
                                         <p class="text-muted mb-1">Bebidas no alcohólicas</p>
-                                        <p class="price-amount">${formatCurrency(tour.price_no_alcohol)}</p>
+                                        <p class="price-amount">${convertTourPrice(tour.price_no_alcohol, currency, paymentType)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -3670,7 +3700,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="price-info">
                                         <h6>Tour Privado</h6>
                                         <p class="text-muted mb-1">Exclusivo</p>
-                                        <p class="price-amount">${formatCurrency(tour.private_price)}</p>
+                                        <p class="price-amount">${convertTourPrice(tour.private_price, currency, paymentType)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -3684,7 +3714,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="price-info">
                                         <h6>Grupo</h6>
                                         <p class="text-muted mb-1">Precio grupal</p>
-                                        <p class="price-amount">${formatCurrency(tour.group_price)}</p>
+                                        <p class="price-amount">${convertTourPrice(tour.group_price, currency, paymentType)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -3698,7 +3728,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="price-info">
                                         <h6>Fin de Semana</h6>
                                         <p class="text-muted mb-1">Precio especial</p>
-                                        <p class="price-amount">${formatCurrency(tour.weekend_price)}</p>
+                                        <p class="price-amount">${convertTourPrice(tour.weekend_price, currency, paymentType)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -3712,7 +3742,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="price-info">
                                         <h6>Días Festivos</h6>
                                         <p class="text-muted mb-1">Precio especial</p>
-                                        <p class="price-amount">${formatCurrency(tour.holiday_price)}</p>
+                                        <p class="price-amount">${convertTourPrice(tour.holiday_price, currency, paymentType)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -3726,7 +3756,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="price-info">
                                         <h6>Temporada</h6>
                                         <p class="text-muted mb-1">Precio estacional</p>
-                                        <p class="price-amount">${formatCurrency(tour.seasonal_price)}</p>
+                                        <p class="price-amount">${convertTourPrice(tour.seasonal_price, currency, paymentType)}</p>
                                     </div>
                                 </div>
                             </div>

@@ -1090,7 +1090,7 @@ table.dataTable thead th:nth-child(2) select {
                                 const priceFormatted = `$${p.price.toLocaleString()} MXN`;
                                 const priceHtml = `<div class="fw-bold text-primary small" data-price="${priceFormatted}">${priceFormatted}</div>`;
                                 
-                                const addToQuoteBtn = isDepartmentManager ? `
+                                const addToQuoteBtn = (isDepartmentManager || isClient) ? `
                                     <button type="button" class="btn btn-primary btn-sm add-svc-to-quote-btn ms-2"
                                         data-service-id="${row.id || row.objectId}"
                                         data-vehicle-name="${vehicleName}"
@@ -2587,7 +2587,7 @@ table.dataTable thead th:nth-child(2) select {
                                     
                                     const capacityInfo = `${defaultCapacity} <i class="ti ti-user"></i> ${trunkCapacity} <i class="ti ti-briefcase"></i>`;
                                     
-                                    const expandQuoteBtn = isDepartmentManager ? `
+                                    const expandQuoteBtn = (isDepartmentManager || isClient) ? `
                                         <button type="button" class="btn btn-primary btn-sm add-svc-to-quote-btn ms-2"
                                             data-service-id="${rowId}"
                                             data-vehicle-name="${vehicleName}"
@@ -4767,7 +4767,7 @@ table.dataTable thead th:nth-child(2) select {
 }
 </style>
 
-<% if (isDepartmentManager) { %>
+<% if (isDepartmentManager || isClient) { %>
 <!-- ═══════════ Add Service to Quote Modal ═══════════ -->
 <div class="modal fade" id="addServiceToQuoteModal" tabindex="-1" aria-labelledby="addServiceToQuoteLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-md">
@@ -4944,6 +4944,9 @@ table.dataTable thead th:nth-child(2) select {
 
 <script>
 (function() {
+    // Get current user role for dynamic URLs
+    const currentUserRole = '<%= userRole %>';
+    
     // ── Move modal to body to escape .dashboard-content overflow ──
     const svcModal = document.getElementById('addServiceToQuoteModal');
     if (svcModal && svcModal.parentElement !== document.body) {
@@ -5234,7 +5237,7 @@ table.dataTable thead th:nth-child(2) select {
             if (!r.ok) throw new Error((await r.json()).error || 'Error');
 
             bootstrap.Modal.getInstance(document.getElementById('addServiceToQuoteModal'))?.hide();
-            showSvcAlert('success', 'Traslado agregado a <strong>' + (quote.folio || quoteId) + '</strong> <a href="/dashboard/department_manager/quotes/' + quoteId + '?section=services" class="alert-link ms-2">Ver cotización</a>');
+            showSvcAlert('success', 'Traslado agregado a <strong>' + (quote.folio || quoteId) + '</strong> <a href="/dashboard/' + currentUserRole + '/quotes/' + quoteId + '?section=services" class="alert-link ms-2">Ver cotización</a>');
         } catch (err) {
             showSvcAlert('danger', err.message);
             if (ds) ds.style.display = 'block';
@@ -5265,7 +5268,7 @@ table.dataTable thead th:nth-child(2) select {
             if (!r.ok) throw new Error((await r.json()).error || 'Error');
 
             bootstrap.Modal.getInstance(document.getElementById('addServiceToQuoteModal'))?.hide();
-            showSvcAlert('success', 'Traslado agregado a <strong>' + (quote.folio || quoteId) + '</strong> <a href="/dashboard/department_manager/quotes/' + quoteId + '?section=services" class="alert-link ms-2">Ver cotización</a>');
+            showSvcAlert('success', 'Traslado agregado a <strong>' + (quote.folio || quoteId) + '</strong> <a href="/dashboard/' + currentUserRole + '/quotes/' + quoteId + '?section=services" class="alert-link ms-2">Ver cotización</a>');
         } catch (err) {
             showSvcAlert('danger', err.message);
             if (ds) ds.style.display = 'block';
@@ -5306,7 +5309,7 @@ table.dataTable thead th:nth-child(2) select {
             if (!r.ok) throw new Error((await r.json()).error || 'Error');
 
             bootstrap.Modal.getInstance(document.getElementById('addServiceToQuoteModal'))?.hide();
-            window.location.href = '/dashboard/department_manager/quotes/' + quoteId + '?section=services';
+            window.location.href = '/dashboard/' + currentUserRole + '/quotes/' + quoteId + '?section=services';
         } catch (err) {
             showSvcAlert('danger', err.message);
             document.getElementById('svcQuotePickerList').style.display = 'block';
