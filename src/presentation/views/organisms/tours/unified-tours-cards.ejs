@@ -848,6 +848,52 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
     color: #0d6efd;
 }
 
+/* Tour Type Badge Styles */
+.experience-type-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    box-shadow: none;
+    z-index: 10;
+}
+
+.type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+}
+
+.type-badge.tour {
+    background: white;
+    color: #6b7280;
+    border: none;
+}
+
+.type-badge.actividad {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.type-badge.experiencia {
+    background: #e9d5ff;
+    color: #6b21a8;
+}
+
+.type-badge.otro {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
 .additional-price-info small {
     font-size: 0.75rem;
     color: #6c757d;
@@ -882,6 +928,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
 
 /* Tour Card Styles */
 .tour-card {
+    position: relative;
     border: 1px solid #e5e7eb;
     border-radius: 0.5rem;
     overflow: hidden;
@@ -1848,7 +1895,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'efectivo';
         
         const cardsHTML = filteredTours.map(tour => {
-            // Map API data to display format
+            // Map API data to display format first
             const destination = tour.destinationPOI?.name || 'Destino no especificado';
             
             // Convert minutes to hours and minutes format
@@ -2130,6 +2177,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="tour-card-wrapper">
                     <div class="tour-card">
                         ${pictureElement}
+                        <!-- Tour Type Badge -->
+                        ${tour.type ? `
+                            <div class="experience-type-badge">
+                                <span class="type-badge tour">${tour.type}</span>
+                            </div>
+                        ` : ''}
                         <div class="tour-card-body">
                             <h6 class="tour-card-title">${destination}</h6>
                             ${tour.isWalkingTour ? '<span class="badge bg-success mb-1"><i class="ti ti-walk me-1"></i>Tour a Pie</span>' : ''}

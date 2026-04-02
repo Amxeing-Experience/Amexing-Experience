@@ -1185,6 +1185,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <img src="/img/amexing_logo_horizontal.avif" alt="Amexing" style="max-width: 60%; max-height: 50%; object-fit: contain;">
                                 </div>`
                             }
+                            <!-- Experience Type Badge -->
+                            ${experience.displayType && experience.displayType !== 'experiencia' ? 
+                                `<div class="experience-type-badge">
+                                    <span class="type-badge ${typeClass}">${typeName}</span>
+                                </div>` : ''}
                         </div>
                         <div class="experience-card-body">
                             <h5 class="experience-card-title" title="${experience.displayName}">
@@ -2283,19 +2288,41 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 ` : ''}
 
+                <!-- Tipo de Experiencia Section -->
+                ${(experience.experienceType || experience.tipo) ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-tag me-2"></i>Tipo de Experiencia</h5>
+                        <span class="type-badge tour">${experience.experienceType || experience.tipo || 'experiencia'}</span>
+                    </div>
+                ` : ''}
+
                 <!-- Advance Booking -->
-                ${experience.advance_minutes ? `
+                ${(experience.advance_minutes || experience.advance_booking_time || experience.advanceBookingTime) ? `
                     <div class="alert alert-warning">
                         <i class="ti ti-clock-hour-4 me-2"></i>
-                        <strong>Reservar con anticipación:</strong> Mínimo ${experience.advance_minutes >= 60 ? Math.floor(experience.advance_minutes / 60) + ' hora' + (Math.floor(experience.advance_minutes / 60) > 1 ? 's' : '') + (experience.advance_minutes % 60 > 0 ? ' ' + (experience.advance_minutes % 60) + ' min' : '') : experience.advance_minutes + ' minutos'} antes
+                        <strong>Reservar con anticipación:</strong> Mínimo ${(() => {
+                            let minutes = experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime) || 0;
+                            
+                            if (minutes >= 60) {
+                                const hours = Math.floor(minutes / 60);
+                                const remainingMinutes = minutes % 60;
+                                let result = hours + ' hora' + (hours > 1 ? 's' : '');
+                                if (remainingMinutes > 0) {
+                                    result += ' ' + remainingMinutes + ' minutos';
+                                }
+                                return result;
+                            } else {
+                                return minutes + ' minutos';
+                            }
+                        })()} antes
                     </div>
                 ` : ''}
 
                 <!-- Booking Notes -->
-                ${experience.client_booking_notes ? `
+                ${(experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes) ? `
                     <div class="content-section">
                         <h5><i class="ti ti-note me-2"></i>Notas de Reserva</h5>
-                        <p>${experience.client_booking_notes}</p>
+                        <p>${experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes}</p>
                     </div>
                 ` : ''}
             </div>
