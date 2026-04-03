@@ -35,7 +35,7 @@
                 </h6>
 
                 <div class="row">
-                    <div class="col-md-12 mb-3">
+                    <div class="col-md-10">
                         <% if (typeof userRole !== 'undefined' && (userRole === 'department_manager' || userRole === 'client')) { %>
                             <!-- Department Manager/Client: Select from their owned clients -->
                             <%- include('../../../atoms/common/tom-select', {
@@ -49,9 +49,6 @@
                                 options: [],
                                 selected: []
                             }) %>
-                            <!-- <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
-                                <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
-                            </button> -->
                         <% } else { %>
                             <!-- Admin/SuperAdmin: Client selection -->
                             <%- include('../../../atoms/common/tom-select', {
@@ -65,11 +62,45 @@
                                 options: [],
                                 selected: []
                             }) %>
-                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
-                                <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
-                            </button>
                         <% } %>
                     </div>
+                    <div class="col-md-2">
+                        <% if (typeof userRole === 'undefined' || !['department_manager', 'client'].includes(userRole)) { %>
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-outline-primary w-100 px-2 py-2" id="createQuickClientBtn">
+                            <i class="ti ti-plus me-1"></i>Crear Cliente
+                        </button>
+                        <% } %>
+                    </div>
+                </div>
+                
+                <!-- Ownership and Sharing Controls -->
+                <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded border">
+                    <!-- Left: Owner Info -->
+                    <div class="d-flex align-items-center">
+                        <div class="badge bg-secondary me-3">
+                            <i class="ti ti-user me-1"></i>
+                            Propietario
+                        </div>
+                        <div>
+                            <div class="fw-medium" id="compactOwnerName">
+                                <div class="placeholder-glow" id="ownerLoader">
+                                    <span class="placeholder col-6 placeholder-sm"></span>
+                                </div>
+                            </div>
+                            <small class="text-muted" id="compactOwnerEmail">
+                                <div class="placeholder-glow" id="ownerEmailLoader">
+                                    <span class="placeholder col-8 placeholder-xs"></span>
+                                </div>
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <!-- Right: Compartir Button -->
+                    <button type="button" class="btn btn-primary" id="btnManageCollaborators">
+                        <i class="ti ti-user-plus me-1"></i>
+                        Compartir
+                    </button>
                 </div>
             </div>
 
@@ -306,20 +337,46 @@
         return null;
     }
 
-    // Helper function to wait for Tom Select to be initialized
-    function waitForTomSelect(elementId, maxAttempts = 50) {
+    // Helper function to wait for Custom Select to be initialized  
+    function waitForTomSelect(elementId, maxAttempts = 100) {
         return new Promise((resolve, reject) => {
+            const element = document.getElementById(elementId);
+            
+            // Check if already initialized (support both tomselect and customSelect)
+            if (element && (element.tomselect || element.customSelect)) {
+                resolve(element.tomselect || element.customSelect);
+                return;
+            }
+            
+            // Listen for the ready event
+            const handleReady = (e) => {
+                element.removeEventListener('tomselect:ready', handleReady);
+                clearInterval(checkInterval);
+                resolve(e.detail.instance);
+            };
+            
+            if (element) {
+                element.addEventListener('tomselect:ready', handleReady);
+            }
+            
+            // Also poll as a fallback
             let attempts = 0;
             const checkInterval = setInterval(() => {
-                const element = document.getElementById(elementId);
-                if (element && element.tomselect) {
+                const el = document.getElementById(elementId);
+                if (el && (el.tomselect || el.customSelect)) {
+                    if (element) {
+                        element.removeEventListener('tomselect:ready', handleReady);
+                    }
                     clearInterval(checkInterval);
-                    resolve(element.tomselect);
+                    resolve(el.tomselect || el.customSelect);
                 } else {
                     attempts++;
                     if (attempts >= maxAttempts) {
+                        if (element) {
+                            element.removeEventListener('tomselect:ready', handleReady);
+                        }
                         clearInterval(checkInterval);
-                        reject(new Error(`Tom Select not initialized on #${elementId}`));
+                        reject(new Error(`Custom Select not initialized on #${elementId} after ${maxAttempts} attempts`));
                     }
                 }
             }, 100);
@@ -433,15 +490,24 @@
         }
     }
 
-    // Load active clients for Tom Select
-    async function loadActiveClients() {
+    // Load active clients for Tom Select with optional search
+    // Make this function globally available for the custom dropdown component
+    window.loadActiveClients = async function loadActiveClients(searchTerm = '', page = 1) {
         try {
             // Use different endpoint based on user role
             const endpoint = (userRole === 'department_manager' || userRole === 'client') 
                 ? '/api/owned-clients/active' 
                 : '/api/clients/active';
             
-            const response = await fetch(endpoint, {
+            // Build query parameters
+            const params = new URLSearchParams();
+            if (searchTerm) params.append('search', searchTerm);
+            params.append('page', page.toString());
+            params.append('limit', '100'); // Get 100 results per search
+            
+            const url = `${endpoint}${params.toString() ? '?' + params.toString() : ''}`;
+            
+            const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${getAccessToken()}`,
@@ -454,14 +520,27 @@
             if (result.success && result.data) {
                 const clientTS = await waitForTomSelect('clientId');
 
-                // Clear existing options
-                clientTS.clearOptions();
+                // For server-side search, clear options only on new search (page 1)
+                if (page === 1) {
+                    clientTS.clearOptions();
+                }
 
+                // Handle different response formats
+                const clients = result.data.clients || result.data;
+                
                 // Add client options
-                result.data.forEach(client => {
+                clients.forEach(client => {
+                    // Extract enterprise name from parentheses if present
+                    // Example: "Abercrombie & Kent Mexico (Abercrombie)" -> "Abercrombie"
+                    let displayText = client.label;
+                    const parenthesesMatch = client.label.match(/\(([^)]+)\)$/);
+                    if (parenthesesMatch) {
+                        displayText = parenthesesMatch[1];
+                    }
+                    
                     clientTS.addOption({
                         value: client.value,
-                        text: client.label,
+                        text: displayText,
                         email: client.email,
                         contactPerson: client.contactPerson,
                         phone: client.phone
@@ -470,12 +549,20 @@
 
                 // Refresh to apply changes
                 clientTS.refreshOptions(false);
+                
+                // Return pagination info for possible future use
+                return {
+                    hasMore: result.data.pagination?.hasMore || false,
+                    total: result.data.pagination?.total || clients.length
+                };
             } else {
                 console.error('No client data or API error:', result);
+                return { hasMore: false, total: 0 };
             }
         } catch (error) {
             console.error('Error loading clients:', error);
             showAlert('quoteInformationAlerts', 'Error al cargar la lista de clientes', 'danger');
+            return { hasMore: false, total: 0 };
         }
     }
 
@@ -875,6 +962,9 @@
         showPageLoader('quoteInformationCard');
 
         try {
+            // Small delay to ensure Tom Select can initialize
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
             // Load active clients for all users (different endpoints based on role)
             await loadActiveClients();
             

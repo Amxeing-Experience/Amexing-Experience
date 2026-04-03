@@ -264,19 +264,38 @@ class QuoteAccess extends BaseModel {
    * @example
    */
   isValid() {
-    if (this.isRevoked()) {
-      return false;
-    }
-
-    if (!this.get('active')) {
-      return false;
-    }
-
+    const isRevoked = this.isRevoked();
+    const active = this.get('active');
     const expiresAt = this.getExpiresAt();
-    if (expiresAt && expiresAt < new Date()) {
+    const isExpired = expiresAt && expiresAt < new Date();
+
+    console.log('DEBUG: QuoteAccess.isValid() check', {
+      accessId: this.id,
+      agentId: this.getAgent()?.id,
+      isRevoked,
+      active,
+      expiresAt,
+      isExpired,
+      exists: this.get('exists'),
+      role: this.getRole(),
+    });
+
+    if (isRevoked) {
+      console.log('DEBUG: QuoteAccess.isValid() - FALSE: isRevoked');
       return false;
     }
 
+    if (!active) {
+      console.log('DEBUG: QuoteAccess.isValid() - FALSE: not active', { active });
+      return false;
+    }
+
+    if (isExpired) {
+      console.log('DEBUG: QuoteAccess.isValid() - FALSE: expired', { expiresAt, now: new Date() });
+      return false;
+    }
+
+    console.log('DEBUG: QuoteAccess.isValid() - TRUE: all checks passed');
     return true;
   }
 
@@ -291,31 +310,65 @@ class QuoteAccess extends BaseModel {
    * @example
    */
   validate(attrs) {
+    console.log('DEBUG: QuoteAccess validate() called', {
+      attrs,
+      attrsKeys: Object.keys(attrs || {}),
+      isNew: this.isNew(),
+      hasQuote: this.has('quote'),
+      hasAgent: this.has('agent'),
+    });
+
     const parentError = super.validate(attrs);
     if (parentError) {
+      console.log('DEBUG: Parent validation error', parentError);
       return parentError;
     }
 
-    // Quote is required
-    if (!attrs.quote && !this.has('quote')) {
-      return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Quote is required');
+    // Only run full validation during save operations, not during individual property setting
+    // Check if this is a save operation by looking for multiple required fields being set at once
+    const isSaveOperation = (attrs.quote && attrs.agent && attrs.role)
+                           || (attrs.quote && attrs.agent && attrs.grantedBy)
+                           || (Object.keys(attrs).length >= 3); // Multiple fields being set at once
+
+    console.log('DEBUG: Validation check', {
+      isSaveOperation,
+      isNew: this.isNew(),
+      attrsKeys: Object.keys(attrs || {}),
+      attrsLength: Object.keys(attrs || {}).length,
+      attrsHasQuote: !!attrs.quote,
+      attrsHasAgent: !!attrs.agent,
+      attrsHasRole: !!attrs.role,
+    });
+
+    if (isSaveOperation) {
+      console.log('DEBUG: Running full validation (save operation detected)');
+
+      // Quote is required
+      if (!attrs.quote && !this.has('quote')) {
+        console.log('DEBUG: Quote validation failed');
+        return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Quote is required');
+      }
+
+      // Agent is required
+      if (!attrs.agent && !this.has('agent')) {
+        console.log('DEBUG: Agent validation failed - this is the error!');
+        return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Agent is required');
+      }
+
+      // Role is required
+      if (!attrs.role && !this.has('role')) {
+        return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Role is required');
+      }
+
+      // Granted by is required
+      if (!attrs.grantedBy && !this.has('grantedBy')) {
+        return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'GrantedBy is required');
+      }
+    } else {
+      console.log('DEBUG: Skipping validation (individual property setting)');
     }
 
-    // Agent is required
-    if (!attrs.agent && !this.has('agent')) {
-      return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Agent is required');
-    }
-
-    // Role is required
-    if (!attrs.role && !this.has('role')) {
-      return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Role is required');
-    }
-
-    // Granted by is required
-    if (!attrs.grantedBy && !this.has('grantedBy')) {
-      return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'GrantedBy is required');
-    }
-
+    console.log('DEBUG: Validation completed successfully');
     return undefined;
   }
 
@@ -336,18 +389,53 @@ class QuoteAccess extends BaseModel {
   static async grantAccess(quote, agent, role, grantedBy, options = {}) {
     const { expiresAt = null, reason = '' } = options;
 
+    console.log('DEBUG: QuoteAccess.grantAccess - ENTRY POINT - Method called!', {
+      quoteId: quote?.id,
+      agentId: agent?.id,
+      role,
+    });
+
+    // Debug logging
+    logger.info('QuoteAccess.grantAccess - Starting', {
+      quoteId: quote?.id,
+      agentId: agent?.id,
+      agentType: typeof agent,
+      agentIsNull: agent === null,
+      role,
+      grantedById: grantedBy?.id,
+      options,
+    });
+
     // Check for existing access
     const existingAccess = await this.getAgentAccess(quote, agent);
     if (existingAccess && existingAccess.isValid()) {
+      console.log('DEBUG: QuoteAccess.grantAccess - Updating existing access', {
+        accessId: existingAccess.id,
+        currentActive: existingAccess.get('active'),
+        currentRevoked: existingAccess.get('revoked'),
+        currentExists: existingAccess.get('exists'),
+      });
+
       // Update existing access
       existingAccess.setRole(role);
       existingAccess.setGrantedBy(grantedBy);
       existingAccess.setGrantedAt(new Date());
+      // Ensure critical fields are set for existing records too
+      existingAccess.set('active', true);
+      existingAccess.set('exists', true);
+      existingAccess.set('revoked', false);
       if (expiresAt) {
         existingAccess.setExpiresAt(expiresAt);
         existingAccess.setAccessType(QuoteAccess.ACCESS_TYPES.TEMPORARY);
       }
       await existingAccess.save(null, { useMasterKey: true });
+
+      console.log('DEBUG: QuoteAccess.grantAccess - Updated existing access with fields', {
+        accessId: existingAccess.id,
+        active: existingAccess.get('active'),
+        revoked: existingAccess.get('revoked'),
+        exists: existingAccess.get('exists'),
+      });
 
       logger.info('Updated existing quote access', {
         quoteId: quote.id,
@@ -360,12 +448,66 @@ class QuoteAccess extends BaseModel {
     }
 
     // Create new access record
+    logger.info('QuoteAccess.grantAccess - Creating new access record', {
+      quoteId: quote?.id,
+      agentId: agent?.id,
+      role,
+      grantedById: grantedBy?.id,
+    });
+
     const access = new QuoteAccess();
-    access.setQuote(quote);
-    access.setAgent(agent);
-    access.setRole(role);
-    access.setGrantedBy(grantedBy);
-    access.setGrantedAt(new Date());
+
+    logger.info('QuoteAccess.grantAccess - Setting access properties', {
+      agentIsNull: agent === null,
+      agentId: agent?.id,
+    });
+
+    try {
+      console.log('DEBUG: About to set quote', {
+        quoteId: quote?.id,
+        quoteType: typeof quote,
+        quoteIsNull: quote === null,
+        quoteClassName: quote?.className,
+      });
+
+      access.setQuote(quote);
+      console.log('DEBUG: Quote set successfully');
+
+      logger.info('QuoteAccess.grantAccess - Setting agent', { agentId: agent?.id });
+      access.setAgent(agent);
+
+      logger.info('QuoteAccess.grantAccess - Setting role', { role });
+      access.setRole(role);
+
+      logger.info('QuoteAccess.grantAccess - Setting grantedBy', { grantedById: grantedBy?.id });
+      access.setGrantedBy(grantedBy);
+
+      logger.info('QuoteAccess.grantAccess - Setting grantedAt');
+      access.setGrantedAt(new Date());
+
+      logger.info('QuoteAccess.grantAccess - Properties set successfully');
+    } catch (propertyError) {
+      console.error('DEBUG: Error setting properties!', {
+        error: propertyError.message,
+        errorCode: propertyError.code,
+        errorName: propertyError.name,
+        stack: propertyError.stack,
+        quoteId: quote?.id,
+        agentId: agent?.id,
+        role,
+      });
+
+      logger.error('QuoteAccess.grantAccess - Error setting properties', {
+        error: propertyError.message,
+        errorCode: propertyError.code,
+        errorStack: propertyError.stack,
+        errorName: propertyError.name,
+        quoteId: quote?.id,
+        agentId: agent?.id,
+        role,
+      });
+      throw propertyError;
+    }
 
     if (expiresAt) {
       access.setExpiresAt(expiresAt);
@@ -376,11 +518,38 @@ class QuoteAccess extends BaseModel {
 
     access.set('active', true);
     access.set('exists', true);
+    access.set('revoked', false);
     access.set('reason', reason);
 
+    logger.info('QuoteAccess.grantAccess - About to save access record', {
+      agentSet: !!access.get('agent'),
+      quoteSet: !!access.get('quote'),
+      roleSet: !!access.get('role'),
+    });
+
     try {
+      console.log('DEBUG: QuoteAccess.grantAccess - About to save with fields:', {
+        quoteId: quote.id,
+        agentId: agent.id,
+        role,
+        active: access.get('active'),
+        exists: access.get('exists'),
+        revoked: access.get('revoked'),
+      });
+
       await access.save(null, { useMasterKey: true });
-      logger.info('Granted quote access', {
+
+      console.log('DEBUG: QuoteAccess.grantAccess - SAVED access record with ID:', {
+        accessId: access.id,
+        quoteId: quote.id,
+        agentId: agent.id,
+        role,
+        active: access.get('active'),
+        exists: access.get('exists'),
+        revoked: access.get('revoked'),
+      });
+
+      logger.info('QuoteAccess.grantAccess - Successfully saved access record', {
         quoteId: quote.id,
         agentId: agent.id,
         role,
@@ -389,10 +558,14 @@ class QuoteAccess extends BaseModel {
       });
       return access;
     } catch (error) {
-      logger.error('Failed to grant access', {
+      logger.error('QuoteAccess.grantAccess - Failed to save access record', {
         error: error.message,
-        quoteId: quote.id,
-        agentId: agent.id,
+        errorCode: error.code,
+        agentId: agent?.id,
+        quoteId: quote?.id,
+        agentIsNull: agent === null,
+        agentType: typeof agent,
+        agentValue: JSON.stringify(agent?.toJSON?.() || agent),
       });
       throw error;
     }
@@ -417,25 +590,25 @@ class QuoteAccess extends BaseModel {
       return false;
     }
 
-    access.setRevoked(true);
-    access.setRevokedBy(revokedBy);
-    access.setRevokeReason(reason);
-    access.set('active', false);
-
     try {
-      await access.save(null, { useMasterKey: true });
-      logger.info('Revoked quote access', {
+      // Delete the access record completely instead of just marking as revoked
+      // This ensures collaborators don't reappear after page reload
+      await access.destroy({ useMasterKey: true });
+
+      logger.info('Deleted quote access record', {
         quoteId: quote.id,
         agentId: agent.id,
         revokedById: revokedBy.id,
         reason,
+        accessId: access.id,
       });
       return true;
     } catch (error) {
-      logger.error('Failed to revoke access', {
+      logger.error('Failed to delete access record', {
         error: error.message,
         quoteId: quote.id,
         agentId: agent.id,
+        accessId: access.id,
       });
       throw error;
     }
@@ -498,12 +671,20 @@ class QuoteAccess extends BaseModel {
       quoteObj = Quote.createWithoutData(quote);
     }
 
+    console.log('DEBUG: QuoteAccess.getQuoteCollaborators - Query setup', {
+      quoteId: quote.id,
+      includeRevoked,
+      role,
+      quoteObjId: quoteObj.id,
+    });
+
     query.equalTo('quote', quoteObj);
     query.equalTo('exists', true);
 
     if (!includeRevoked) {
       query.equalTo('revoked', false);
       query.equalTo('active', true);
+      console.log('DEBUG: QuoteAccess.getQuoteCollaborators - Added filters: revoked=false, active=true');
     }
 
     if (role) {
@@ -516,9 +697,37 @@ class QuoteAccess extends BaseModel {
     try {
       const collaborators = await query.find({ useMasterKey: true });
 
+      console.log('DEBUG: QuoteAccess.getQuoteCollaborators - About to process collaborators', {
+        totalFound: collaborators.length,
+        quoteId: quote.id,
+      });
+
+      logger.info('QuoteAccess.getQuoteCollaborators - Raw collaborators found', {
+        quoteId: quote.id,
+        totalCount: collaborators.length,
+        includeRevoked,
+        collaborators: collaborators.map((access) => ({
+          id: access.id,
+          agentId: access.getAgent()?.id,
+          role: access.getRole(),
+          active: access.get('active'),
+          exists: access.get('exists'),
+          revoked: access.isRevoked(),
+          isValid: access.isValid(),
+        })),
+      });
+
       // Filter out expired access
       const validCollaborators = collaborators.filter((access) => {
         if (!includeRevoked && !access.isValid()) {
+          logger.info('QuoteAccess.getQuoteCollaborators - Filtering out invalid access', {
+            accessId: access.id,
+            agentId: access.getAgent()?.id,
+            active: access.get('active'),
+            exists: access.get('exists'),
+            revoked: access.isRevoked(),
+            isValid: access.isValid(),
+          });
           return false;
         }
         return true;
@@ -526,7 +735,9 @@ class QuoteAccess extends BaseModel {
 
       logger.info('Retrieved quote collaborators', {
         quoteId: quote.id,
-        count: validCollaborators.length,
+        rawCount: collaborators.length,
+        validCount: validCollaborators.length,
+        filtered: collaborators.length - validCollaborators.length,
       });
 
       return validCollaborators;

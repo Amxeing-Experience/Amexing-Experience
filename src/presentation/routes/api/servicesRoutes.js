@@ -67,7 +67,7 @@ router.use(serviceApiLimiter);
 router.get(
   '/',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
   (req, res) => ServicesController.getServices(req, res)
 );
 
@@ -92,7 +92,7 @@ router.get('/active', jwtMiddleware.authenticateToken, (req, res) => ServicesCon
 router.get(
   '/with-rate-prices',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
   (req, res) => ServicesController.getServicesWithRatePrices(req, res)
 );
 
@@ -119,7 +119,7 @@ router.get(
 router.get(
   '/:id/all-rate-prices',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
   (req, res) => ServicesController.getAllRatePricesForService(req, res)
 );
 
@@ -132,7 +132,7 @@ router.get(
 router.get(
   '/:id/all-rate-prices-with-client-prices',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
   (req, res) => ServicesController.getAllRatePricesForServiceWithClientPrices(req, res)
 );
 
@@ -146,7 +146,7 @@ router.get(
 router.get(
   '/debug-rate-prices',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
   (req, res) => ServicesController.debugRatePrices(req, res)
 );
 
@@ -160,7 +160,7 @@ router.get(
 router.get(
   '/debug-client-prices',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
   (req, res) => ServicesController.debugClientPrices(req, res)
 );
 
@@ -186,7 +186,7 @@ router.get(
 router.get(
   '/:id',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
   (req, res) => ServicesController.getServiceById(req, res)
 );
 

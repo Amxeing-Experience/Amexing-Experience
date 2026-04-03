@@ -54,6 +54,17 @@ class QuoteCollaborationController {
     const grantedById = req.user?.id;
     const userRole = req.userRole || req.user?.role;
 
+    // Debug logging
+    logger.info('addCollaborator - Request details', {
+      quoteId,
+      requestBody: req.body,
+      agentId,
+      role,
+      grantedById,
+      userRole,
+      bodyKeys: Object.keys(req.body || {}),
+    });
+
     if (!grantedById) {
       return res.status(401).json({
         success: false,
@@ -62,6 +73,13 @@ class QuoteCollaborationController {
     }
 
     if (!agentId || !role) {
+      logger.warn('addCollaborator - Missing required fields', {
+        agentId: !!agentId,
+        role: !!role,
+        agentIdValue: agentId,
+        roleValue: role,
+        requestBody: req.body,
+      });
       return res.status(400).json({
         success: false,
         error: 'Agent ID and role are required',

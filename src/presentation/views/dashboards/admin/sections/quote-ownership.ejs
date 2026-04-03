@@ -6,185 +6,98 @@
  */
 %>
 
-<!-- Ownership & Collaboration Panel -->
-<div class="card shadow-sm mb-4" id="ownershipPanel">
-    <div class="card-header bg-white border-0 py-3">
-        <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-semibold">
-                <i class="ti ti-users me-2 text-primary"></i>
-                Propiedad y Agentes
-            </h5>
-            <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-outline-primary" id="btnViewHistory" data-bs-toggle="tooltip" title="Ver historial">
-                    <i class="ti ti-history me-1"></i>
-                    Historial de cambios
-                </button>
-                <button class="btn btn-sm btn-primary" id="btnManageCollaborators">
-                    <i class="ti ti-user-plus me-1"></i>
-                    Gestionar Acceso
-                </button>
-            </div>
-        </div>
-    </div>
-    
-    <div class="card-body">
-        <!-- Owner Information -->
-        <div class="mb-4">
-            <h6 class="text-muted mb-2">Propietario</h6>
-            <div class="d-flex align-items-center justify-content-between">
-                <div class="d-flex align-items-center">
-                    <div class="avatar avatar-sm bg-primary-subtle text-primary rounded-circle me-3">
-                        <i class="ti ti-user"></i>
-                    </div>
-                    <div>
-                        <div class="fw-semibold" id="ownerName">Cargando...</div>
-                        <small class="text-muted" id="ownerEmail">...</small>
-                    </div>
-                </div>
-                <div>
-                    <small class="text-muted" id="ownerSince">Desde: ...</small>
-                </div>
-            </div>
-        </div>
-
-        <!-- Agents List -->
-        <div class="mb-4">
-            <h6 class="text-muted mb-2">Agentes</h6>
-            <div id="collaboratorsList">
-                <div class="text-center py-3 text-muted">
-                    <i class="ti ti-users-off mb-2" style="font-size: 2rem;"></i>
-                    <p class="mb-0">No hay agentes asignados</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Access Info for Current User -->
-        <div id="currentUserAccess" class="alert alert-info d-none">
-            <div class="d-flex align-items-center">
-                <i class="ti ti-info-circle me-2"></i>
-                <div>
-                    <strong>Tu acceso:</strong> <span id="userAccessRole"></span>
-                    <div class="small" id="userAccessDetails"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Pending Edits Alert (only visible to owner) -->
-        <div id="pendingEditsAlert" class="alert alert-warning d-none">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <i class="ti ti-alert-circle me-2"></i>
-                    <strong>Ediciones pendientes de aprobación:</strong> <span id="pendingCount">0</span>
-                </div>
-                <button class="btn btn-sm btn-warning" id="btnReviewEdits">
-                    Revisar
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Ownership & Collaboration Panel - Removed for performance -->
+<!-- Panel content moved to modals accessible via buttons in quote form -->
 
 
 <!-- Manage Collaborators Modal -->
 <div class="modal fade" id="manageCollaboratorsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title">
-                    <i class="ti ti-settings me-2"></i>
-                    Gestionar Acceso y Propiedad
+                    Compartir "Cotización"
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <!-- Ownership Transfer Section -->
-                <div class="card mb-4" id="ownershipTransferSection">
-                    <div class="card-header bg-warning-subtle">
-                        <h6 class="card-title mb-0">
-                            <i class="ti ti-crown me-2"></i>
-                            Gestionar Propiedad
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <!-- Current Owner Display -->
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Propietario Actual</label>
-                            <div class="d-flex align-items-center p-2 bg-light rounded">
-                                <div class="avatar avatar-sm bg-primary-subtle text-primary rounded-circle me-3">
-                                    <i class="ti ti-user"></i>
-                                </div>
-                                <div class="flex-grow-1">
-                                    <div class="fw-medium" id="modalOwnerName">Cargando...</div>
-                                    <small class="text-muted" id="modalOwnerEmail">...</small>
-                                </div>
-                                <span class="badge bg-primary">Propietario</span>
+            <div class="modal-body pt-2">
+                <!-- Add People Searchable Dropdown (Google Style) -->
+                <div class="mb-4 position-relative">
+                    <input type="text" class="form-control form-control-lg border-2" id="addPeopleInput" 
+                           placeholder="Añadir Personas" 
+                           style="border-color: #1a73e8; box-shadow: none; border-radius: 8px;"
+                           autocomplete="off">
+                    <div class="dropdown-menu w-100" id="userDropdown" style="max-height: 200px; overflow-y: auto; display: none;">
+                        <div class="p-2">
+                            <div class="text-center text-muted">
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                Cargando usuarios...
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <!-- Transfer Ownership Form -->
-                        <div class="border-top pt-3" id="transferOwnershipForm">
-                            <div class="alert alert-warning">
-                                <i class="ti ti-alert-triangle me-2"></i>
-                                <strong>Importante:</strong> Al transferir la propiedad, perderás el control total sobre esta cotización.
-                                Mantendrás acceso como editor.
-                            </div>
+                <!-- Ownership Transfer Section (Simplified) -->
+                <div class="border-top pt-4 mt-4" id="ownershipTransferSection">
+                    <details class="mb-3">
+                        <summary class="btn btn-link text-start p-0 d-flex align-items-center text-muted" style="cursor: pointer; border: none; background: none;">
+                            <i class="ti ti-chevron-right me-2 transition-transform" id="transferChevron" style="font-size: 0.8rem; transition: transform 0.2s;"></i>
+                            <small>Transferir propiedad</small>
+                        </summary>
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <small class="text-muted d-block mb-3">
+                                Al transferir la propiedad, mantendrás acceso como editor.
+                            </small>
                             
-                            <div class="row g-3">
-                                <div class="col-md-8">
-                                    <label class="form-label">Transferir Propiedad a:</label>
-                                    <select class="form-select" id="newOwnerSelectMain">
+                            <div class="row g-2">
+                                <div class="col-8">
+                                    <select class="form-select form-select-sm" id="newOwnerSelectMain">
                                         <option value="">Seleccionar nuevo propietario...</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">&nbsp;</label>
-                                    <button class="btn btn-warning w-100" id="btnConfirmTransferMain">
+                                <div class="col-4">
+                                    <button class="btn btn-sm btn-outline-warning w-100" id="btnConfirmTransferMain">
                                         <i class="ti ti-transfer me-1"></i>
                                         Transferir
                                     </button>
                                 </div>
                             </div>
                             
-                            <div class="mt-3">
-                                <label class="form-label">Razón de la transferencia (opcional)</label>
-                                <textarea class="form-control" id="transferReasonMain" rows="2" 
-                                          placeholder="Explica por qué transfieres la propiedad"></textarea>
+                            <div class="mt-2">
+                                <textarea class="form-control form-control-sm" id="transferReasonMain" rows="1" 
+                                          placeholder="Razón (opcional)"></textarea>
                             </div>
                         </div>
-                    </div>
+                    </details>
                 </div>
 
-                <!-- Add Collaborator Form -->
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <h6 class="card-title">Agregar Agente</h6>
-                        <div class="row g-2">
-                            <div class="col-md-6">
-                                <select class="form-select" id="collaboratorSelect">
-                                    <option value="">Seleccionar agente...</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <select class="form-select" id="collaboratorRole">
-                                    <option value="viewer">Visualizador</option>
-                                    <option value="editor">Editor</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <button class="btn btn-primary w-100" id="btnAddCollaborator">
-                                    <i class="ti ti-plus me-1"></i>
-                                    Agregar
-                                </button>
-                            </div>
+                <!-- People with Access (Google Style) -->
+                <div class="mb-4">
+                    <h6 class="mb-3">Personas con acceso</h6>
+                    
+                    <!-- Owner Display -->
+                    <div class="d-flex align-items-center mb-3 p-2">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" 
+                             style="width: 40px; height: 40px; font-weight: 500;">
+                            <span id="ownerInitials">D</span>
                         </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-medium" id="modalOwnerName">Cargando...</div>
+                            <small class="text-muted" id="modalOwnerEmail">...</small>
+                        </div>
+                        <span class="text-muted">Propietario</span>
+                    </div>
+                    
+                    <!-- Collaborators List -->
+                    <div id="collaboratorsManagementList">
+                        <p class="text-muted text-center py-3">Cargando agentes...</p>
                     </div>
                 </div>
-
-                <!-- Current Agents -->
-                <h6 class="mb-2">Agentes Actuales</h6>
-                <div id="collaboratorsManagementList">
-                    <p class="text-muted text-center py-3">Cargando agentes...</p>
-                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-primary" id="btnSaveAndClose">
+                    Hecho
+                </button>
             </div>
         </div>
     </div>
@@ -254,49 +167,156 @@
 </div>
 
 <style>
-/* Ownership Panel Styles */
-#ownershipPanel .avatar {
+/* Google-Style Sharing Modal */
+#manageCollaboratorsModal .modal-content {
+    border: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    border-radius: 8px;
+}
+
+#manageCollaboratorsModal .modal-body {
+    padding: 1.5rem;
+}
+
+/* Add People Input */
+#addPeopleInput {
+    border-radius: 8px;
+    font-size: 0.95rem;
+    padding: 12px 16px;
+}
+
+#addPeopleInput:focus {
+    border-color: #1a73e8 !important;
+    box-shadow: 0 0 0 0.2rem rgba(26, 115, 232, 0.15) !important;
+}
+
+/* User Dropdown Styles */
+#userDropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1050;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+#userDropdown.show {
+    display: block !important;
+}
+
+.dropdown-user-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 2px;
+    transition: background-color 0.15s;
+}
+
+.dropdown-user-item:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-user-item.active {
+    background-color: #e3f2fd;
+}
+
+.dropdown-user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 8px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* People List Items */
+.person-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    border-radius: 8px;
+    transition: background-color 0.2s;
+}
+
+.person-item:hover {
+    background-color: #f8f9fa;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.person-avatar {
     width: 40px;
     height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 50%;
+    font-weight: 500;
+    font-size: 14px;
+    margin-right: 12px;
 }
 
+/* Role Selector */
+.role-selector {
+    border: none;
+    background: transparent;
+    color: #5f6368;
+    font-size: 0.875rem;
+    cursor: pointer;
+    text-align: right;
+    min-width: 80px;
+}
+
+.role-selector:focus {
+    border: 1px solid #1a73e8;
+    border-radius: 4px;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Transfer Ownership */
+details summary {
+    outline: none;
+    list-style: none;
+    padding: 8px 0;
+}
+
+details summary::-webkit-details-marker {
+    display: none;
+}
+
+details[open] summary {
+    margin-bottom: 8px;
+}
+
+details[open] summary #transferChevron {
+    transform: rotate(90deg);
+}
+
+/* Clean spacing */
 .collaborator-item {
-    padding: 0.75rem;
-    border: 1px solid #e9ecef;
-    border-radius: 0.375rem;
-    margin-bottom: 0.5rem;
+    padding: 8px 0;
+    border: none;
+    border-radius: 0;
+    margin-bottom: 0;
     transition: all 0.2s;
 }
 
 .collaborator-item:hover {
     background-color: #f8f9fa;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-radius: 8px;
 }
 
-.role-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.role-badge.editor {
-    background-color: #d1ecf1;
-    color: #0c5460;
-}
-
-.role-badge.viewer {
-    background-color: #d4edda;
-    color: #155724;
-}
-
-.role-badge.owner {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-
+/* Legacy styles for edit history modal */
 .edit-item {
     padding: 1rem;
     border: 1px solid #dee2e6;

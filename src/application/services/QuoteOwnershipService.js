@@ -127,9 +127,22 @@ class QuoteOwnershipService {
       let currentOwnership = await QuoteOwnership.getCurrentOwnership(quote);
       let currentOwner;
 
+      logger.info('Transfer ownership - checking existing ownership', {
+        quoteId,
+        hasOwnership: !!currentOwnership,
+        quoteExists: !!quote,
+      });
+
       if (!currentOwnership) {
         // No formal ownership yet, check if we have createdBy
         const createdBy = quote.getCreatedBy();
+
+        logger.info('No existing ownership, checking createdBy', {
+          quoteId,
+          hasCreatedBy: !!createdBy,
+          createdById: createdBy ? createdBy.id : null,
+        });
+
         if (!createdBy) {
           throw new Error('No ownership and no createdBy found for quote');
         }
@@ -140,11 +153,100 @@ class QuoteOwnershipService {
           newOwnerId,
         });
 
-        // Create initial ownership record for createdBy user
-        currentOwnership = await QuoteOwnership.createInitialOwnership(quote, createdBy);
-        currentOwner = createdBy;
+        // Fetch the createdBy user to ensure we have all attributes
+        if (createdBy.get && createdBy.id) {
+          try {
+            await createdBy.fetch({ useMasterKey: true });
+          } catch (fetchError) {
+            logger.error('Failed to fetch createdBy user', {
+              error: fetchError.message,
+              createdById: createdBy.id,
+              quoteId,
+            });
+          }
+        }
+
+        try {
+          // Validate that we have valid objects before creating ownership
+          if (!quote || !quote.id) {
+            throw new Error('Invalid quote object provided to createInitialOwnership');
+          }
+          if (!createdBy || !createdBy.id) {
+            throw new Error('Invalid createdBy user object provided to createInitialOwnership');
+          }
+
+          logger.info('Creating initial ownership with validated objects', {
+            quoteId: quote.id,
+            createdById: createdBy.id,
+            createdByActive: createdBy.get ? createdBy.get('active') : 'unknown',
+            createdByExists: createdBy.get ? createdBy.get('exists') : 'unknown',
+          });
+
+          // Ensure createdBy has proper Parse pointer structure
+          // The issue is that createdBy doesn't have objectId property
+          if (createdBy && createdBy.id && !createdBy.objectId) {
+            console.log('=== FIXING CREATED BY POINTER ===');
+            console.log('createdBy.id before:', createdBy.id);
+            console.log('createdBy.objectId before:', createdBy.objectId);
+
+            // Set objectId property to match id
+            createdBy.objectId = createdBy.id;
+
+            console.log('createdBy.objectId after:', createdBy.objectId);
+            console.log('=== FIXED CREATED BY POINTER ===');
+          }
+
+          // Create initial ownership record for createdBy user
+          currentOwnership = await QuoteOwnership.createInitialOwnership(quote, createdBy);
+          currentOwner = createdBy;
+
+          logger.info('Successfully created initial ownership', {
+            quoteId,
+            ownershipId: currentOwnership.id,
+            currentOwnerId: currentOwner.id,
+          });
+        } catch (createError) {
+          logger.error('Failed to create initial ownership', {
+            error: createError.message,
+            stack: createError.stack,
+            quoteId,
+            createdById: createdBy ? createdBy.id : 'null',
+            quoteExists: !!quote,
+            createdByExists: !!createdBy,
+            isOwnerRequiredError: createError.message.includes('Owner is required'),
+          });
+
+          // If it's specifically the "Owner is required" validation error,
+          // try a more explicit approach
+          if (createError.message.includes('Owner is required')) {
+            console.log('=== OWNER VALIDATION FAILED DEBUG ===');
+            console.log('createdByType:', typeof createdBy);
+            console.log('createdById:', createdBy ? createdBy.id : null);
+            console.log('createdByClassName:', createdBy ? createdBy.className : null);
+            console.log('hasGetMethod:', !!(createdBy && createdBy.get));
+            console.log('createdBy instanceof Parse.Object:', createdBy instanceof Parse.Object);
+            console.log('createdBy instanceof Parse.User:', createdBy instanceof Parse.User);
+            console.log('createdBy has objectId:', !!createdBy.objectId);
+            console.log('=== END OWNER DEBUG ===');
+
+            logger.error('Owner validation failed - investigating createdBy user object', {
+              createdByType: typeof createdBy,
+              createdById: createdBy ? createdBy.id : null,
+              createdByClassName: createdBy ? createdBy.className : null,
+              hasGetMethod: !!(createdBy && createdBy.get),
+              quoteId,
+            });
+          }
+
+          throw createError;
+        }
       } else {
         currentOwner = currentOwnership.getOwner();
+        logger.info('Using existing ownership', {
+          quoteId,
+          ownershipId: currentOwnership.id,
+          currentOwnerId: currentOwner ? currentOwner.id : null,
+        });
       }
       const newOwner = await this.getUserById(newOwnerId);
       const transferredBy = await this.getUserById(transferredById);
@@ -163,11 +265,24 @@ class QuoteOwnershipService {
       );
 
       // Update quote
+      console.log('=== UPDATING QUOTE WITH NEW OWNER ===');
+      console.log('Quote ID:', quote.id);
+      console.log('Current Owner before update:', quote.getOwner()?.id);
+      console.log('New Owner ID:', newOwner.id);
+
       quote.setOwner(newOwner);
       quote.setLastEditedBy(transferredBy);
       quote.setLastEditedAt(new Date());
       quote.incrementVersion();
+
+      console.log('Quote Owner after setOwner:', quote.getOwner()?.id);
+      console.log('About to save quote...');
+
       await quote.save(null, { useMasterKey: true });
+
+      console.log('Quote saved successfully!');
+      console.log('Final verification - Quote Owner after save:', quote.getOwner()?.id);
+      console.log('=== QUOTE UPDATE COMPLETED ===');
 
       // Record edit for ownership transfer
       await QuoteEdit.recordEdit(
@@ -203,6 +318,49 @@ class QuoteOwnershipService {
         collaborators.push(currentOwner.id);
         quote.setCollaborators(collaborators);
         await quote.save(null, { useMasterKey: true });
+      }
+
+      // Remove new owner from collaborators if they exist there
+      // (ownership supersedes collaboration)
+      const updatedCollaborators = quote.getCollaborators();
+      const newOwnerIndex = updatedCollaborators.indexOf(newOwnerId);
+      if (newOwnerIndex > -1) {
+        updatedCollaborators.splice(newOwnerIndex, 1);
+        quote.setCollaborators(updatedCollaborators);
+        await quote.save(null, { useMasterKey: true });
+
+        logger.info('Removed new owner from collaborators list', {
+          quoteId,
+          newOwnerId,
+          removedFromPosition: newOwnerIndex,
+        });
+      }
+
+      // Revoke any existing QuoteAccess records for the new owner
+      // (ownership supersedes collaboration access)
+      try {
+        const existingAccess = await QuoteAccess.getAgentAccess(quote, newOwner);
+        if (existingAccess && existingAccess.isValid()) {
+          await QuoteAccess.revokeAccess(
+            quote,
+            newOwner,
+            transferredBy,
+            'Ownership supersedes collaboration access'
+          );
+
+          logger.info('Revoked existing collaboration access for new owner', {
+            quoteId,
+            newOwnerId,
+            previousRole: existingAccess.getRole(),
+          });
+        }
+      } catch (accessCleanupError) {
+        // Log but don't fail the transfer - this is cleanup
+        logger.warn('Failed to cleanup existing access for new owner', {
+          error: accessCleanupError.message,
+          quoteId,
+          newOwnerId,
+        });
       }
 
       // Audit log
@@ -430,20 +588,141 @@ class QuoteOwnershipService {
       // Check if user is the current owner
       const isOwner = await this.isOwner(quoteId, userId);
       if (isOwner) {
+        logger.info('User can transfer ownership - is current owner', {
+          quoteId,
+          userId,
+        });
         return true;
       }
 
       // Check if user has admin privileges
       const user = await this.getUserById(userId);
       if (!user) {
+        logger.warn('User not found for transfer permission check', {
+          quoteId,
+          userId,
+        });
         return false;
       }
 
+      // Try multiple approaches to get user role
       const role = user.get('role');
-      if (role && (role.get('name') === 'admin' || role.get('name') === 'super_admin')) {
+      const displayRole = user.get('displayRole');
+      const rolePointer = user.get('roleId');
+
+      logger.info('Checking user role for transfer permission', {
+        quoteId,
+        userId,
+        hasRole: !!role,
+        hasDisplayRole: !!displayRole,
+        hasRolePointer: !!rolePointer,
+      });
+
+      // Handle both string roles (legacy) and role objects (new system)
+      let hasAdminRole = false;
+      let roleToCheck = null;
+
+      // Priority order: rolePointer (actual role), role field, then displayRole field
+      if (rolePointer && typeof rolePointer === 'object') {
+        // Try rolePointer object - need to fetch it first if it's just an ID reference
+        try {
+          let roleObject = rolePointer;
+
+          // The rolePointer is already a Parse Role object but needs to be fetched to get attributes
+          if (rolePointer.get && rolePointer.id) {
+            try {
+              // Fetch the role attributes
+              await rolePointer.fetch({ useMasterKey: true });
+              roleObject = rolePointer;
+            } catch (fetchError) {
+              logger.error('Failed to fetch role from rolePointer', {
+                error: fetchError.message,
+                rolePointerId: rolePointer.id,
+                quoteId,
+                userId,
+              });
+              // If fetching fails, try to use the existing roleObject
+              roleObject = rolePointer;
+            }
+          }
+
+          const roleName = roleObject && roleObject.get ? roleObject.get('name') : undefined;
+          roleToCheck = roleName;
+          hasAdminRole = ['admin', 'superadmin', 'super_admin', 'department_manager'].includes(roleName);
+
+          logger.info('Checked rolePointer object for admin privileges', {
+            quoteId,
+            userId,
+            roleName,
+            roleLevel: roleObject && roleObject.get ? roleObject.get('level') : undefined,
+            hasAdminRole,
+          });
+        } catch (fetchError) {
+          logger.error('Failed to fetch role from rolePointer', {
+            error: fetchError.message,
+            rolePointerId: rolePointer.objectId,
+            quoteId,
+            userId,
+          });
+        }
+      } else if (typeof role === 'string' && role) {
+        roleToCheck = role;
+        hasAdminRole = ['admin', 'superadmin', 'super_admin'].includes(role);
+        logger.info('Checked role field (string) for admin privileges', {
+          quoteId,
+          userId,
+          role,
+          hasAdminRole,
+        });
+      } else if (typeof displayRole === 'string' && displayRole) {
+        roleToCheck = displayRole;
+        hasAdminRole = ['admin', 'superadmin', 'super_admin'].includes(displayRole);
+        logger.info('Checked displayRole field (string) for admin privileges', {
+          quoteId,
+          userId,
+          displayRole,
+          hasAdminRole,
+        });
+      } else if (role && typeof role === 'object' && role.get) {
+        // New role system - role is a Parse object
+        const roleName = role.get('name');
+        roleToCheck = roleName;
+        hasAdminRole = ['admin', 'superadmin', 'super_admin'].includes(roleName);
+        logger.info('Checked role object for admin privileges', {
+          quoteId,
+          userId,
+          roleName,
+          hasAdminRole,
+        });
+      } else {
+        logger.warn('No valid role field found', {
+          quoteId,
+          userId,
+          role,
+          roleType: typeof role,
+          displayRole,
+          displayRoleType: typeof displayRole,
+          rolePointer,
+          rolePointerType: typeof rolePointer,
+          availableFields: Object.keys(user.attributes || {}),
+        });
+      }
+
+      if (hasAdminRole) {
+        logger.info('User can transfer ownership - has admin role', {
+          quoteId,
+          userId,
+          roleToCheck,
+        });
         return true;
       }
 
+      logger.info('User cannot transfer ownership - insufficient privileges', {
+        quoteId,
+        userId,
+        roleToCheck,
+        hasAdminRole,
+      });
       return false;
     } catch (error) {
       logger.error('Failed to check transfer permission', {
@@ -654,8 +933,13 @@ class QuoteOwnershipService {
       queries.push(agentsQuery);
 
       // 3. Always include admins for oversight
+      // Create subquery to find Role records with admin names
+      const adminRoleQuery = new Parse.Query('Role');
+      adminRoleQuery.containedIn('name', ['admin', 'superadmin']);
+
+      // Query users who have roleId pointing to admin roles
       const adminQuery = new Parse.Query('AmexingUser');
-      adminQuery.containedIn('role', ['admin', 'superadmin']);
+      adminQuery.matchesQuery('roleId', adminRoleQuery);
       queries.push(adminQuery);
 
       // Combine queries with OR
@@ -691,8 +975,30 @@ class QuoteOwnershipService {
    */
   async getAllDepartmentManagersAndAdmins() {
     try {
-      const query = new Parse.Query('AmexingUser');
-      query.containedIn('role', ['department_manager', 'admin', 'superadmin']);
+      // Create separate queries for different role types
+      const roleQueries = [];
+
+      // Department manager role (try both approaches)
+      const deptMgrRoleQuery = new Parse.Query('Role');
+      deptMgrRoleQuery.equalTo('name', 'department_manager');
+      const deptMgrQuery = new Parse.Query('AmexingUser');
+      deptMgrQuery.matchesQuery('roleId', deptMgrRoleQuery);
+      roleQueries.push(deptMgrQuery);
+
+      // Also try string-based dept manager for backward compatibility
+      const deptMgrStringQuery = new Parse.Query('AmexingUser');
+      deptMgrStringQuery.equalTo('role', 'department_manager');
+      roleQueries.push(deptMgrStringQuery);
+
+      // Admin roles (use roleId pointer)
+      const adminRoleQuery = new Parse.Query('Role');
+      adminRoleQuery.containedIn('name', ['admin', 'superadmin']);
+      const adminQuery = new Parse.Query('AmexingUser');
+      adminQuery.matchesQuery('roleId', adminRoleQuery);
+      roleQueries.push(adminQuery);
+
+      // Combine the queries
+      const query = Parse.Query.or(...roleQueries);
       query.equalTo('active', true);
       query.equalTo('exists', true);
       query.ascending('firstName', 'lastName');

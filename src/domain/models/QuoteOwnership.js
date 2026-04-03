@@ -210,19 +210,49 @@ class QuoteOwnership extends BaseModel {
       return parentError;
     }
 
-    // Quote is required
-    if (!attrs.quote && !this.has('quote')) {
-      return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Quote is required');
-    }
+    // Debug validation
+    console.log('=== QUOTE OWNERSHIP VALIDATION ===');
+    console.log('attrs.quote:', !!attrs.quote);
+    console.log('this.has("quote"):', this.has('quote'));
+    console.log('attrs.owner:', !!attrs.owner);
+    console.log('attrs.owner type:', typeof attrs.owner);
+    console.log('attrs.owner.id:', attrs.owner ? attrs.owner.id : null);
+    console.log('attrs.owner.objectId:', attrs.owner ? attrs.owner.objectId : null);
+    console.log('this.has("owner"):', this.has('owner'));
+    console.log('validation attrs keys:', Object.keys(attrs));
 
-    // Owner is required
-    if (!attrs.owner && !this.has('owner')) {
-      return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Owner is required');
-    }
+    // Only validate required fields during save operations (when multiple fields are set)
+    // Skip validation during individual property setting
+    const isSaveOperation = (attrs.quote && attrs.owner && attrs.ownershipStartDate)
+                           || (Object.keys(attrs).length >= 3)
+                           || (this.has('quote') && this.has('owner') && this.has('ownershipStartDate'));
 
-    // Ownership start date is required
-    if (!attrs.ownershipStartDate && !this.has('ownershipStartDate')) {
-      return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Ownership start date is required');
+    console.log('isSaveOperation:', isSaveOperation);
+    console.log('=== END VALIDATION DEBUG ===');
+
+    // Only run required field validation during save operations
+    if (isSaveOperation) {
+      // Quote is required
+      if (!attrs.quote && !this.has('quote')) {
+        console.log('VALIDATION FAILED: Quote is required');
+        return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Quote is required');
+      }
+
+      // Owner is required
+      if (!attrs.owner && !this.has('owner')) {
+        console.log('VALIDATION FAILED: Owner is required');
+        console.log('attrs.owner is falsy:', !attrs.owner);
+        console.log('this.has("owner") is falsy:', !this.has('owner'));
+        return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Owner is required');
+      }
+
+      // Ownership start date is required
+      if (!attrs.ownershipStartDate && !this.has('ownershipStartDate')) {
+        console.log('VALIDATION FAILED: Ownership start date is required');
+        return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Ownership start date is required');
+      }
+    } else {
+      console.log('SKIPPING VALIDATION: Not a save operation, individual property setting');
     }
 
     return undefined;

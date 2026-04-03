@@ -47,8 +47,19 @@ class QuoteCollaborationService {
    */
   async grantAccess(quoteId, agentId, role, grantedById, options = {}) {
     try {
-      // Validate permission to grant access
-      const canGrant = await this.canGrantAccess(quoteId, grantedById);
+      // Debug logging for service layer
+      logger.info('QuoteCollaborationService.grantAccess - Parameters received', {
+        quoteId,
+        agentId,
+        role,
+        grantedById,
+        options,
+        agentIdType: typeof agentId,
+        agentIdValue: JSON.stringify(agentId),
+      });
+
+      // Validate permission to grant access - pass userRole from options
+      const canGrant = await this.canGrantAccess(quoteId, grantedById, options.userRole);
       if (!canGrant) {
         throw new Error('User does not have permission to grant access');
       }
@@ -59,26 +70,62 @@ class QuoteCollaborationService {
       }
 
       // Get entities
+      logger.info('QuoteCollaborationService.grantAccess - Fetching entities', {
+        quoteId,
+        agentId,
+        grantedById,
+      });
+
       const quote = await this.getQuoteById(quoteId);
       const agent = await this.getUserById(agentId);
       const grantedBy = await this.getUserById(grantedById);
+
+      logger.info('QuoteCollaborationService.grantAccess - Entity fetch results', {
+        quoteFound: !!quote,
+        agentFound: !!agent,
+        grantedByFound: !!grantedBy,
+        agentId,
+      });
 
       if (!quote) {
         throw new Error('Quote not found');
       }
 
       if (!agent) {
-        throw new Error('Agent user not found');
+        logger.error('QuoteCollaborationService.grantAccess - Agent user not found', {
+          agentId,
+          agentIdType: typeof agentId,
+          agentIdLength: agentId?.length,
+        });
+        throw new Error(`Agent user not found. User ID '${agentId}' does not exist in the database.`);
       }
 
       if (!grantedBy) {
         throw new Error('Granting user not found');
       }
 
-      // Check if agent is the owner
-      const isOwner = await QuoteOwnership.isOwner(quote, agent);
-      if (isOwner) {
-        throw new Error('Cannot grant access to the owner');
+      // Check if agent is the current owner
+      // (ownership supersedes collaboration)
+      let isCurrentOwner = false;
+      try {
+        isCurrentOwner = await QuoteOwnership.isOwner(quote, agent);
+      } catch (ownershipCheckError) {
+        logger.warn('Could not verify ownership status during access grant', {
+          error: ownershipCheckError.message,
+          quoteId,
+          agentId,
+        });
+      }
+
+      if (isCurrentOwner) {
+        const errorMessage = `Cannot grant collaborator access to the current owner. User '${agent.get('firstName')} ${agent.get('lastName')}' (${agent.get('email')}) is already the owner of this quote.`;
+        logger.warn('Attempted to grant access to current owner', {
+          quoteId,
+          agentId,
+          agentName: `${agent.get('firstName')} ${agent.get('lastName')}`,
+          agentEmail: agent.get('email'),
+        });
+        throw new Error(errorMessage);
       }
 
       // Grant access
@@ -90,42 +137,123 @@ class QuoteCollaborationService {
         options
       );
 
+      logger.info('QuoteCollaborationService.grantAccess - QuoteAccess.grantAccess completed successfully, proceeding with post-save steps', {
+        accessId: access.id,
+        quoteId,
+        agentId,
+      });
+
       // Update quote collaborators list
-      const collaborators = quote.getCollaborators();
-      if (!collaborators.includes(agentId)) {
-        collaborators.push(agentId);
-        quote.setCollaborators(collaborators);
-        await quote.save(null, { useMasterKey: true });
+      try {
+        logger.info('QuoteCollaborationService.grantAccess - Starting collaborators list update', { quoteId, agentId });
+
+        const collaborators = quote.getCollaborators();
+        logger.info('QuoteCollaborationService.grantAccess - Current collaborators', {
+          collaborators,
+          collaboratorsType: typeof collaborators,
+          collaboratorsLength: collaborators?.length,
+          includesAgent: collaborators?.includes(agentId),
+        });
+
+        if (!collaborators.includes(agentId)) {
+          collaborators.push(agentId);
+          quote.setCollaborators(collaborators);
+          logger.info('QuoteCollaborationService.grantAccess - About to save quote with updated collaborators', {
+            newCollaborators: collaborators,
+          });
+          await quote.save(null, { useMasterKey: true });
+          logger.info('QuoteCollaborationService.grantAccess - Quote collaborators updated successfully');
+        } else {
+          logger.info('QuoteCollaborationService.grantAccess - Agent already in collaborators list, skipping update');
+        }
+      } catch (collaboratorsError) {
+        logger.error('QuoteCollaborationService.grantAccess - Failed to update quote collaborators', {
+          error: collaboratorsError.message,
+          stack: collaboratorsError.stack,
+          quoteId,
+          agentId,
+        });
+        throw new Error(`Failed to update quote collaborators: ${collaboratorsError.message}`);
       }
 
       // Record edit
-      await QuoteEdit.recordEdit(
-        quote,
-        grantedBy,
-        QuoteEdit.EDIT_TYPES.UPDATE,
-        {
-          collaboratorAdded: agentId,
-          role,
-        },
-        {
-          description: `Added ${role} access for user ${agent.get('username')}`,
-          autoApprove: true,
-        }
-      );
-
-      // Audit log
-      await this.createAuditLog({
-        action: 'quote.access.granted',
-        objectClass: 'Quote',
-        objectId: quoteId,
-        userId: grantedById,
-        details: {
+      try {
+        logger.info('QuoteCollaborationService.grantAccess - Starting QuoteEdit.recordEdit', {
+          quoteId,
           agentId,
           role,
-          accessId: access.id,
-          expiresAt: options.expiresAt,
-        },
-      });
+          quoteObjectId: quote?.id,
+          grantedByObjectId: grantedBy?.id,
+          grantedByUsername: grantedBy?.get?.('username'),
+          agentUsername: agent?.get?.('username'),
+          editType: QuoteEdit.EDIT_TYPES.UPDATE,
+        });
+
+        // Validate objects before passing to recordEdit
+        if (!quote || !quote.id) {
+          throw new Error('Quote object is invalid or missing ID');
+        }
+        if (!grantedBy || !grantedBy.id) {
+          throw new Error('GrantedBy user object is invalid or missing ID');
+        }
+        if (!agent || !agent.get) {
+          throw new Error('Agent user object is invalid');
+        }
+
+        await QuoteEdit.recordEdit(
+          quote,
+          grantedBy,
+          QuoteEdit.EDIT_TYPES.UPDATE,
+          {
+            collaboratorAdded: agentId,
+            role,
+          },
+          {
+            description: `Added ${role} access for user ${agent.get('username')}`,
+            autoApprove: true,
+          }
+        );
+
+        logger.info('QuoteCollaborationService.grantAccess - QuoteEdit.recordEdit completed successfully');
+      } catch (editError) {
+        logger.error('QuoteCollaborationService.grantAccess - Failed to record edit', {
+          error: editError.message,
+          stack: editError.stack,
+          quoteId,
+          agentId,
+          errorCode: editError.code,
+          errorName: editError.name,
+        });
+        throw new Error(`Failed to record edit: ${editError.message}`);
+      }
+
+      // Audit log
+      try {
+        logger.info('QuoteCollaborationService.grantAccess - Starting audit log creation', { quoteId, agentId });
+
+        await this.createAuditLog({
+          action: 'quote.access.granted',
+          objectClass: 'Quote',
+          objectId: quoteId,
+          userId: grantedById,
+          details: {
+            agentId,
+            role,
+            accessId: access.id,
+            expiresAt: options.expiresAt,
+          },
+        });
+
+        logger.info('QuoteCollaborationService.grantAccess - Audit log created successfully');
+      } catch (auditError) {
+        logger.error('QuoteCollaborationService.grantAccess - Failed to create audit log', {
+          error: auditError.message,
+          stack: auditError.stack,
+          quoteId,
+          agentId,
+        });
+        throw new Error(`Failed to create audit log: ${auditError.message}`);
+      }
 
       logger.info('Granted quote access', {
         quoteId,
@@ -153,13 +281,14 @@ class QuoteCollaborationService {
    * @param {string} agentId - Agent user ID.
    * @param {string} revokedById - User revoking access.
    * @param {string} reason - Revocation reason.
+   * @param requestUserRole
    * @returns {Promise<boolean>} True if revoked successfully.
    * @example
    */
-  async revokeAccess(quoteId, agentId, revokedById, reason = '') {
+  async revokeAccess(quoteId, agentId, revokedById, reason = '', requestUserRole = null) {
     try {
-      // Validate permission to revoke access
-      const canRevoke = await this.canRevokeAccess(quoteId, revokedById);
+      // Validate permission to revoke access - pass userRole from request
+      const canRevoke = await this.canRevokeAccess(quoteId, revokedById, requestUserRole);
       if (!canRevoke) {
         throw new Error('User does not have permission to revoke access');
       }
@@ -351,7 +480,37 @@ class QuoteCollaborationService {
         throw new Error('Quote not found');
       }
 
-      const collaborators = await QuoteAccess.getQuoteCollaborators(quote, options);
+      const rawCollaborators = await QuoteAccess.getQuoteCollaborators(quote, options);
+
+      // Get current owner to filter them out of collaborators
+      // (ownership supersedes collaboration)
+      let currentOwnerId = null;
+      try {
+        const ownership = await QuoteOwnership.getCurrentOwnership(quote);
+        if (ownership) {
+          const owner = ownership.getOwner();
+          currentOwnerId = owner ? owner.id : null;
+        }
+      } catch (ownershipError) {
+        logger.warn('Could not determine current owner for collaborator filtering', {
+          error: ownershipError.message,
+          quoteId,
+        });
+      }
+
+      // Filter out current owner from collaborators list
+      const collaborators = rawCollaborators.filter((access) => {
+        const agentId = access.getAgent()?.id;
+        if (currentOwnerId && agentId === currentOwnerId) {
+          logger.info('Filtered out current owner from collaborators list', {
+            quoteId,
+            ownerId: currentOwnerId,
+            agentId,
+          });
+          return false;
+        }
+        return true;
+      });
 
       const result = await Promise.all(
         collaborators.map(async (access) => {
@@ -373,7 +532,10 @@ class QuoteCollaborationService {
 
       logger.info('Retrieved quote collaborators', {
         quoteId,
-        count: result.length,
+        rawCount: rawCollaborators.length,
+        filteredCount: result.length,
+        currentOwnerId,
+        ownerFiltered: rawCollaborators.length !== collaborators.length,
       });
 
       return result;
@@ -597,14 +759,16 @@ class QuoteCollaborationService {
    * Check if user can grant access.
    * @param {string} quoteId - Quote ID.
    * @param {string} userId - User ID.
+   * @param requestUserRole
    * @returns {Promise<boolean>} True if user can grant access.
    * @example
    */
-  async canGrantAccess(quoteId, userId) {
+  async canGrantAccess(quoteId, userId, requestUserRole = null) {
     try {
       logger.info('Checking grant access permission', {
         quoteId,
         userId,
+        requestUserRole,
       });
 
       // Check if user is the owner
@@ -621,12 +785,15 @@ class QuoteCollaborationService {
         return false;
       }
 
-      // Get the role - it's stored as a string directly on the user
-      const role = user.get('role');
+      // Get the role - check both request context and database
+      const dbRole = user.get('role');
+      const role = requestUserRole || dbRole;
 
       logger.info('Checking user role for grant access', {
         userId,
-        role,
+        dbRole,
+        requestUserRole,
+        effectiveRole: role,
         roleType: typeof role,
       });
 
@@ -660,10 +827,11 @@ class QuoteCollaborationService {
    * Check if user can revoke access.
    * @param {string} quoteId - Quote ID.
    * @param {string} userId - User ID.
+   * @param requestUserRole
    * @returns {Promise<boolean>} True if user can revoke access.
    * @example
    */
-  async canRevokeAccess(quoteId, userId) {
+  async canRevokeAccess(quoteId, userId, requestUserRole = null) {
     try {
       // Check if user is the owner
       const isOwner = await QuoteOwnership.isOwner(quoteId, userId);
@@ -677,8 +845,9 @@ class QuoteCollaborationService {
         return false;
       }
 
-      // Get the role - it's stored as a string directly on the user
-      const role = user.get('role');
+      // Get the role - check both request context and database
+      const dbRole = user.get('role');
+      const role = requestUserRole || dbRole;
 
       // Direct string comparison like other services do
       const allowedRoles = ['admin', 'superadmin', 'department_manager'];
@@ -782,15 +951,79 @@ class QuoteCollaborationService {
    * @example
    */
   async getUserById(userId) {
+    logger.info('QuoteCollaborationService.getUserById - Looking up user', {
+      userId,
+      userIdType: typeof userId,
+      userIdLength: userId?.length,
+    });
+
+    // Try multiple approaches to find the user
     const query = new Parse.Query('AmexingUser');
     query.equalTo('exists', true);
 
     try {
+      // First try: direct get by objectId
       const user = await query.get(userId, { useMasterKey: true });
+      logger.info('QuoteCollaborationService.getUserById - User found via direct get', {
+        userId,
+        userFound: !!user,
+        userName: user?.get?.('username'),
+        userEmail: user?.get?.('email'),
+      });
       return user;
-    } catch (error) {
-      logger.error('User not found', { userId, error: error.message });
-      return null;
+    } catch (directError) {
+      logger.warn('QuoteCollaborationService.getUserById - Direct get failed, trying alternative approach', {
+        userId,
+        error: directError.message,
+        errorCode: directError.code,
+      });
+
+      // Second try: query with find (more permissive)
+      try {
+        const altQuery = new Parse.Query('AmexingUser');
+        altQuery.equalTo('objectId', userId);
+        altQuery.equalTo('exists', true);
+        const users = await altQuery.find({ useMasterKey: true });
+
+        logger.info('QuoteCollaborationService.getUserById - Alternative query results', {
+          userId,
+          usersFound: users.length,
+          firstUser: users[0] ? {
+            id: users[0].id,
+            username: users[0].get('username'),
+            email: users[0].get('email'),
+          } : null,
+        });
+
+        if (users.length > 0) {
+          return users[0];
+        }
+
+        // Third try: check if user exists without exists=true filter
+        const noFilterQuery = new Parse.Query('AmexingUser');
+        noFilterQuery.equalTo('objectId', userId);
+        const allUsers = await noFilterQuery.find({ useMasterKey: true });
+
+        logger.info('QuoteCollaborationService.getUserById - Query without exists filter', {
+          userId,
+          usersFound: allUsers.length,
+          firstUser: allUsers[0] ? {
+            id: allUsers[0].id,
+            username: allUsers[0].get('username'),
+            exists: allUsers[0].get('exists'),
+            active: allUsers[0].get('active'),
+          } : null,
+        });
+
+        return null;
+      } catch (altError) {
+        logger.error('QuoteCollaborationService.getUserById - All lookup methods failed', {
+          userId,
+          directError: directError.message,
+          altError: altError.message,
+        });
+        return null;
+      }
     }
   }
 

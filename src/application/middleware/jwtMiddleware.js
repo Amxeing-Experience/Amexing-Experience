@@ -305,20 +305,42 @@ const requirePermission = (permission, contextExtractor = () => ({})) => async (
  */
 const requireRoleLevel = (minimumLevel) => async (req, res, next) => {
   try {
-    if (!req.user || !req.roleObject) {
+    if (!req.user) {
       return res.status(401).json({
         success: false,
         error: 'Authentication required',
       });
     }
 
-    const userLevel = req.roleObject.getLevel();
+    // Get user level from roleObject or fallback to role name mapping
+    let userLevel = 0;
 
-    logger.debug('Role level check:', {
+    if (req.roleObject && req.roleObject.getLevel) {
+      userLevel = req.roleObject.getLevel();
+    } else if (req.userRole) {
+      // Fallback to role name mapping when roleObject is not available
+      const roleLevelMap = {
+        superadmin: 7,
+        admin: 6,
+        client: 5,
+        department_manager: 4,
+        manager: 4,
+        sales: 3,
+        agent: 2,
+        user: 1,
+        guest: 0,
+      };
+      userLevel = roleLevelMap[req.userRole] || 0;
+    }
+
+    logger.info('Role level check:', {
       userId: req.userId,
       userLevel,
       requiredLevel: minimumLevel,
       userRole: req.userRole,
+      hasRoleObject: !!req.roleObject,
+      roleObjectType: req.roleObject ? typeof req.roleObject : 'undefined',
+      roleObjectClass: req.roleObject ? req.roleObject.className : 'N/A',
       method: req.method,
       url: req.url,
     });

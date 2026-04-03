@@ -77,7 +77,23 @@ class QuoteEdit extends BaseModel {
    * @example
    */
   setQuote(quote) {
-    this.set('quote', quote);
+    console.log('DEBUG: QuoteEdit.setQuote() called', {
+      quoteId: quote?.id,
+      quoteClassName: quote?.className,
+      quoteIsParseObject: quote instanceof Parse.Object,
+      quoteType: typeof quote,
+    });
+
+    try {
+      this.set('quote', quote);
+      console.log('DEBUG: QuoteEdit.setQuote() - set() completed successfully');
+    } catch (setError) {
+      console.log('DEBUG: QuoteEdit.setQuote() - set() failed', {
+        error: setError.message,
+        stack: setError.stack,
+      });
+      throw setError;
+    }
   }
 
   /**
@@ -367,26 +383,55 @@ class QuoteEdit extends BaseModel {
    * @example
    */
   validate(attrs) {
+    console.log('DEBUG: QuoteEdit.validate() called', {
+      attrs,
+      attrsKeys: Object.keys(attrs || {}),
+      hasQuote: this.has('quote'),
+      hasEditor: this.has('editor'),
+      hasEditType: this.has('editType'),
+      isNew: this.isNew(),
+    });
+
     const parentError = super.validate(attrs);
     if (parentError) {
+      console.log('DEBUG: QuoteEdit.validate() - Parent validation failed', {
+        errorMessage: parentError.message,
+        errorCode: parentError.code,
+      });
       return parentError;
+    }
+
+    // Only run full validation during save operations (when multiple fields are being set)
+    // or when the object already has most required fields
+    const isSaveOperation = (attrs.quote && attrs.editor && attrs.editType)
+                           || (attrs.quote && attrs.editor)
+                           || (Object.keys(attrs).length >= 3)
+                           || (!this.isNew() && this.has('quote') && this.has('editor') && this.has('editType'));
+
+    if (!isSaveOperation) {
+      console.log('DEBUG: QuoteEdit.validate() - Skipping validation (individual property setting)');
+      return undefined;
     }
 
     // Quote is required
     if (!attrs.quote && !this.has('quote')) {
+      console.log('DEBUG: QuoteEdit.validate() - Quote is required');
       return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Quote is required');
     }
 
     // Editor is required
     if (!attrs.editor && !this.has('editor')) {
+      console.log('DEBUG: QuoteEdit.validate() - Editor is required');
       return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Editor is required');
     }
 
     // Edit type is required
     if (!attrs.editType && !this.has('editType')) {
+      console.log('DEBUG: QuoteEdit.validate() - Edit type is required');
       return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Edit type is required');
     }
 
+    console.log('DEBUG: QuoteEdit.validate() - Validation passed');
     return undefined;
   }
 
@@ -405,6 +450,14 @@ class QuoteEdit extends BaseModel {
    * @example
    */
   static async recordEdit(quote, editor, editType, changes, options = {}) {
+    logger.info('QuoteEdit.recordEdit - Method called', {
+      quoteId: quote?.id,
+      editorId: editor?.id,
+      editType,
+      changes,
+      options,
+    });
+
     const {
       previousValues = {},
       newValues = {},
@@ -412,6 +465,11 @@ class QuoteEdit extends BaseModel {
       editorRole = 'editor',
       autoApprove = false,
     } = options;
+
+    logger.info('QuoteEdit.recordEdit - Starting version query', {
+      quoteId: quote?.id,
+      hasQuote: !!quote,
+    });
 
     // Get the latest version number
     const versionQuery = new Parse.Query('QuoteEdit');
@@ -421,46 +479,153 @@ class QuoteEdit extends BaseModel {
 
     let latestVersion = 0;
     try {
+      logger.info('QuoteEdit.recordEdit - Executing version query');
       const latestEdit = await versionQuery.first({ useMasterKey: true });
       if (latestEdit) {
         latestVersion = latestEdit.getVersion();
+        logger.info('QuoteEdit.recordEdit - Found latest version', { latestVersion });
+      } else {
+        logger.info('QuoteEdit.recordEdit - No previous edits found, starting at version 0');
       }
     } catch (error) {
-      logger.warn('Could not get latest version', { error: error.message });
+      logger.error('QuoteEdit.recordEdit - Could not get latest version', {
+        error: error.message,
+        stack: error.stack,
+        errorCode: error.code,
+      });
+      // Don't throw here, continue with version 0
     }
+
+    logger.info('QuoteEdit.recordEdit - Creating new edit record', {
+      quoteId: quote?.id,
+      editorId: editor?.id,
+      editType,
+      newVersion: latestVersion + 1,
+    });
 
     // Create new edit record
-    const edit = new QuoteEdit();
-    edit.setQuote(quote);
-    edit.setEditor(editor);
-    edit.setEditType(editType);
-    edit.setVersion(latestVersion + 1);
-    edit.setChanges(changes);
-    edit.setPreviousValues(previousValues);
-    edit.setNewValues(newValues);
-    edit.setEditedAt(new Date());
-    edit.setDescription(description);
-    edit.setEditorRole(editorRole);
-    edit.setIsApplied(true);
+    let edit;
+    try {
+      logger.info('QuoteEdit.recordEdit - Creating QuoteEdit instance');
+      edit = new QuoteEdit();
 
-    // Extract changed field names
-    const changedFields = Object.keys(changes);
-    edit.setChangedFields(changedFields);
+      // Safe logging without circular reference issues
+      const quoteDebugInfo = {
+        quoteId: quote?.id,
+        quoteClassName: quote?.className,
+        quoteIsParseObject: quote instanceof Parse.Object,
+        quoteType: typeof quote,
+        quoteKeys: quote ? Object.keys(quote) : null,
+      };
 
-    // Set approval status
-    if (autoApprove || editorRole === 'owner') {
-      edit.setApprovalStatus(QuoteEdit.APPROVAL_STATUS.AUTO_APPROVED);
-      edit.setApprovedBy(editor);
-      edit.setApprovedAt(new Date());
-    } else {
-      edit.setApprovalStatus(QuoteEdit.APPROVAL_STATUS.PENDING);
+      // Try to add more info if possible
+      try {
+        if (quote && quote.toJSON) {
+          quoteDebugInfo.quoteJSON = quote.toJSON();
+        }
+      } catch (jsonError) {
+        quoteDebugInfo.jsonError = jsonError.message;
+      }
+
+      logger.info('QuoteEdit.recordEdit - Setting quote', quoteDebugInfo);
+
+      // Validate the quote object
+      if (!quote) {
+        throw new Error('Quote object is null or undefined');
+      }
+      if (!(quote instanceof Parse.Object)) {
+        throw new Error(`Quote is not a Parse.Object instance. Type: ${typeof quote}, className: ${quote.className}`);
+      }
+
+      // Try wrapping setQuote in try-catch to get more specific error
+      try {
+        edit.setQuote(quote);
+        logger.info('QuoteEdit.recordEdit - Quote set successfully');
+      } catch (setQuoteError) {
+        logger.error('QuoteEdit.recordEdit - Failed to set quote', {
+          error: setQuoteError.message,
+          stack: setQuoteError.stack,
+          errorCode: setQuoteError.code,
+          errorName: setQuoteError.name,
+        });
+        throw new Error(`Failed to set quote on QuoteEdit: ${setQuoteError.message}`);
+      }
+
+      logger.info('QuoteEdit.recordEdit - Setting editor');
+      edit.setEditor(editor);
+
+      logger.info('QuoteEdit.recordEdit - Setting edit type');
+      edit.setEditType(editType);
+
+      logger.info('QuoteEdit.recordEdit - Setting version');
+      edit.setVersion(latestVersion + 1);
+
+      logger.info('QuoteEdit.recordEdit - Setting changes');
+      edit.setChanges(changes);
+
+      logger.info('QuoteEdit.recordEdit - Setting previous values');
+      edit.setPreviousValues(previousValues);
+
+      logger.info('QuoteEdit.recordEdit - Setting new values');
+      edit.setNewValues(newValues);
+
+      logger.info('QuoteEdit.recordEdit - Setting edited at');
+      edit.setEditedAt(new Date());
+
+      logger.info('QuoteEdit.recordEdit - Setting description');
+      edit.setDescription(description);
+
+      logger.info('QuoteEdit.recordEdit - Setting editor role');
+      edit.setEditorRole(editorRole);
+
+      logger.info('QuoteEdit.recordEdit - Setting is applied');
+      edit.setIsApplied(true);
+
+      // Extract changed field names
+      logger.info('QuoteEdit.recordEdit - Setting changed fields');
+      const changedFields = Object.keys(changes);
+      edit.setChangedFields(changedFields);
+
+      // Set approval status
+      logger.info('QuoteEdit.recordEdit - Setting approval status', { autoApprove, editorRole });
+      if (autoApprove || editorRole === 'owner') {
+        edit.setApprovalStatus(QuoteEdit.APPROVAL_STATUS.AUTO_APPROVED);
+        edit.setApprovedBy(editor);
+        edit.setApprovedAt(new Date());
+      } else {
+        edit.setApprovalStatus(QuoteEdit.APPROVAL_STATUS.PENDING);
+      }
+
+      logger.info('QuoteEdit.recordEdit - Setting base fields');
+      edit.set('active', true);
+      edit.set('exists', true);
+
+      logger.info('QuoteEdit.recordEdit - Object creation completed successfully');
+    } catch (creationError) {
+      logger.error('QuoteEdit.recordEdit - Error during object creation', {
+        error: creationError.message,
+        stack: creationError.stack,
+        errorCode: creationError.code,
+      });
+      throw creationError;
     }
 
-    edit.set('active', true);
-    edit.set('exists', true);
-
     try {
+      logger.info('QuoteEdit.recordEdit - About to save edit record', {
+        quoteId: quote.id,
+        editorId: editor.id,
+        editType,
+        version: edit.getVersion(),
+        hasQuote: !!edit.get('quote'),
+        hasEditor: !!edit.get('editor'),
+        hasEditType: !!edit.get('editType'),
+        changes,
+        description,
+        autoApprove,
+      });
+
       await edit.save(null, { useMasterKey: true });
+
       logger.info('Recorded quote edit', {
         quoteId: quote.id,
         editorId: editor.id,
@@ -472,8 +637,17 @@ class QuoteEdit extends BaseModel {
     } catch (error) {
       logger.error('Failed to record edit', {
         error: error.message,
+        stack: error.stack,
+        errorCode: error.code,
+        errorName: error.name,
         quoteId: quote.id,
         editorId: editor.id,
+        editType,
+        version: edit.getVersion(),
+        hasQuote: !!edit.get('quote'),
+        hasEditor: !!edit.get('editor'),
+        hasEditType: !!edit.get('editType'),
+        validationError: error.message?.includes('validation') || error.code === Parse.Error.VALIDATION_ERROR,
       });
       throw error;
     }
