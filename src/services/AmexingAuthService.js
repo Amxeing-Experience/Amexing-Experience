@@ -657,7 +657,9 @@ class AmexingAuthService {
     session.set('oauthProvider', sessionData.oauthProvider || null);
     session.set('status', 'active');
     session.set('active', true); // Para compatibilidad con tests
-    session.set('expiresAt', new Date(Date.now() + 60 * 60 * 1000)); // 1 hour
+    // Use same session timeout as normal login for consistency
+    const sessionTimeoutMinutes = parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) || 60;
+    session.set('expiresAt', new Date(Date.now() + sessionTimeoutMinutes * 60 * 1000));
     session.set('lastActivityAt', new Date());
     session.set('ipAddress', sessionData.ipAddress || 'unknown');
     session.set('userAgent', sessionData.userAgent || 'unknown');

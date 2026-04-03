@@ -1,0 +1,101 @@
+<%
+/**
+ * First Name Input Atom
+ * Reusable first name field with validation
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'firstName')
+ * @param {string} id - Input ID attribute (default: 'firstName')
+ * @param {string} label - Field label text (default: 'Nombre')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} placeholder - Placeholder text (default: 'Ej: Juan')
+ * @param {string} helpText - Help text below field (default: 'Primer nombre')
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string} value - Initial value (default: '')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'firstName';
+const inputId = typeof id !== 'undefined' ? id : 'firstName';
+const inputLabel = typeof label !== 'undefined' ? label : 'Nombre';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Ej: Juan';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Primer nombre';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const initialValue = typeof value !== 'undefined' ? value : '';
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-user me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <input 
+        type="text"
+        class="form-control"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        placeholder="<%= inputPlaceholder %>"
+        value="<%= initialValue %>"
+        <%= isRequired ? 'required' : '' %>
+        maxlength="100"
+        pattern="^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s'-]+$"
+        title="Solo letras, espacios y guiones permitidos"
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    >
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor ingrese un nombre válido (solo letras y espacios)
+    </div>
+</div>
+
+<script>
+(function() {
+    // Real-time validation for first name
+    const firstNameInput = document.getElementById('<%= inputId %>');
+    
+    if (firstNameInput) {
+        // Auto-capitalize first letter
+        firstNameInput.addEventListener('input', function() {
+            const value = this.value;
+            if (value.length === 1) {
+                this.value = value.charAt(0).toUpperCase();
+            } else if (value.includes(' ')) {
+                // Capitalize after spaces
+                this.value = value.replace(/(^|\s)\S/g, l => l.toUpperCase());
+            }
+            
+            // Validate pattern
+            const pattern = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s'-]*$/;
+            if (pattern.test(value) && value.trim().length > 0) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else if (value.trim().length > 0) {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-valid', 'is-invalid');
+            }
+        });
+        
+        firstNameInput.addEventListener('blur', function() {
+            this.value = this.value.trim();
+        });
+    }
+})();
+</script>

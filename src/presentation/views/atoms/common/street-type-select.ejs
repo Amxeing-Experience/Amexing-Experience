@@ -1,0 +1,105 @@
+<%
+/**
+ * Street Type Select Atom
+ * Dropdown for Mexican street types (Tipo de Vialidad)
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'streetType')
+ * @param {string} id - Input ID attribute (default: 'streetType')
+ * @param {string} label - Field label text (default: 'Tipo de Vialidad')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} helpText - Help text below field
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string} value - Initial selected value (default: 'Calle')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'streetType';
+const inputId = typeof id !== 'undefined' ? id : 'streetType';
+const inputLabel = typeof label !== 'undefined' ? label : 'Tipo de Vialidad';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Seleccione el tipo de vía';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const selectedValue = typeof value !== 'undefined' ? value : 'Calle';
+
+// Mexican street types
+const streetTypes = [
+    { value: 'Calle', text: 'Calle' },
+    { value: 'Avenida', text: 'Avenida' },
+    { value: 'Boulevard', text: 'Boulevard' },
+    { value: 'Calzada', text: 'Calzada' },
+    { value: 'Camino', text: 'Camino' },
+    { value: 'Carretera', text: 'Carretera' },
+    { value: 'Cerrada', text: 'Cerrada' },
+    { value: 'Circuito', text: 'Circuito' },
+    { value: 'Pasaje', text: 'Pasaje' },
+    { value: 'Privada', text: 'Privada' }
+];
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-road me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <select 
+        class="form-select"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        <%= isRequired ? 'required' : '' %>
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    >
+        <% streetTypes.forEach(function(type) { %>
+            <option 
+                value="<%= type.value %>" 
+                <%= type.value === selectedValue ? 'selected' : '' %>
+            >
+                <%= type.text %>
+            </option>
+        <% }); %>
+    </select>
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <i class="ti ti-info-circle"></i>
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor seleccione un tipo de vialidad
+    </div>
+</div>
+
+<script>
+(function() {
+    // Street type selector enhancement
+    const streetTypeSelect = document.getElementById('<%= inputId %>');
+    
+    if (streetTypeSelect) {
+        streetTypeSelect.addEventListener('change', function() {
+            if (this.value) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else if (<%= isRequired ? 'true' : 'false' %>) {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            }
+        });
+        
+        // Initial validation if value exists
+        if (streetTypeSelect.value) {
+            streetTypeSelect.classList.add('is-valid');
+        }
+    }
+})();
+</script>

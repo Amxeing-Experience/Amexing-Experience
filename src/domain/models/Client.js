@@ -51,19 +51,79 @@ class Client extends BaseModel {
     client.set('email', clientData.email);
     client.set('phone', clientData.phone || null);
     client.set('contactPerson', clientData.contactPerson || null);
-    client.set('companyType', clientData.companyType || 'corporate');
+    client.set('companyType', clientData.companyType || null);
     client.set('taxId', clientData.taxId || null);
     client.set('website', clientData.website || null);
     client.set('notes', clientData.notes || '');
 
-    // Address as embedded object
-    client.set('address', {
-      street: clientData.address?.street || '',
-      city: clientData.address?.city || '',
-      state: clientData.address?.state || '',
-      zipCode: clientData.address?.zipCode || '',
-      country: clientData.address?.country || '',
-    });
+    // New separated name fields
+    client.set('firstName', clientData.firstName || '');
+    client.set('lastName', clientData.lastName || '');
+
+    // Contact person separated fields
+    client.set('contactFirstName', clientData.contactFirstName || '');
+    client.set('contactLastName', clientData.contactLastName || '');
+
+    // Emergency contact fields
+    client.set('emergencyContactName', clientData.emergencyContactName || '');
+    client.set('emergencyContactPhone', clientData.emergencyContactPhone || '');
+
+    // Special requirements fields
+    client.set('preferredLanguage', clientData.preferredLanguage || 'es');
+    client.set('accessibilityRequirements', clientData.accessibilityRequirements || '');
+
+    // Arrays for allergies and dietary restrictions
+    client.set('allergies', clientData.allergies || []);
+    client.set('dietaryRestrictions', clientData.dietaryRestrictions || []);
+
+    // Address as embedded object - support both structured and legacy formats
+    if (clientData.address) {
+      if (typeof clientData.address === 'object' && clientData.address.streetType !== undefined) {
+        // New structured address format
+        client.set('address', {
+          streetType: clientData.address.streetType || '',
+          streetName: clientData.address.streetName || '',
+          exteriorNumber: clientData.address.exteriorNumber || '',
+          interiorNumber: clientData.address.interiorNumber || '',
+          colonia: clientData.address.colonia || '',
+          city: clientData.address.city || '',
+          state: clientData.address.state || '',
+          postalCode: clientData.address.postalCode || '',
+          country: 'MX', // Default to Mexico
+        });
+      } else if (typeof clientData.address === 'object') {
+        // Legacy address format - maintain backward compatibility
+        client.set('address', {
+          street: clientData.address.street || '',
+          city: clientData.address.city || '',
+          state: clientData.address.state || '',
+          zipCode: clientData.address.zipCode || '',
+          country: clientData.address.country || 'MX',
+        });
+      } else {
+        // String address - convert to legacy format
+        client.set('address', {
+          street: clientData.address || '',
+          city: '',
+          state: '',
+          zipCode: '',
+          country: 'MX',
+        });
+      }
+    } else {
+      // No address provided
+      client.set('address', {
+        streetType: '',
+        streetName: '',
+        exteriorNumber: '',
+        interiorNumber: '',
+        colonia: '',
+        city: '',
+        state: '',
+        postalCode: '',
+        country: 'MX',
+      });
+    }
 
     // OAuth and employee management settings
     client.set('isCorporate', clientData.isCorporate !== undefined ? clientData.isCorporate : true);
@@ -600,7 +660,7 @@ class Client extends BaseModel {
     }
 
     // Company type validation
-    const allowedCompanyTypes = ['corporate', 'government', 'nonprofit', 'individual'];
+    const allowedCompanyTypes = ['individual', 'corporate', 'travel_agency', 'tour_operator', 'other'];
     if (clientData.companyType && !allowedCompanyTypes.includes(clientData.companyType)) {
       errors.push('Invalid company type');
     }

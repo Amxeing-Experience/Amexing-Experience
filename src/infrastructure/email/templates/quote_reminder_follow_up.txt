@@ -1,0 +1,44 @@
+AMEXING EXPERIENCE - SU COTIZACIÓN SIGUE DISPONIBLE
+
+Su experiencia única le espera
+
+Estimado/a {{NOMBRE_CLIENTE}},
+
+Queríamos recordarle que su cotización para una experiencia excepcional en San Miguel de Allende sigue disponible y válida.
+
+Sabemos que elegir la experiencia perfecta requiere tiempo y consideración. Nuestro equipo ha preparado cuidadosamente esta cotización pensando en sus necesidades específicas y en crear momentos verdaderamente memorables para usted.
+
+¿Tiene alguna duda o pregunta sobre los servicios cotizados? Estaremos encantados de aclarar cualquier detalle o realizar ajustes que considere necesarios.
+
+RECORDATORIO: Su cotización es válida hasta el {{FECHA_VENCIMIENTO}}. No queremos que pierda la oportunidad de vivir esta experiencia única.
+
+DETALLES DE SU COTIZACIÓN
+==========================
+Número de cotización: {{FOLIO_COTIZACION}}
+Total estimado: {{TOTAL_COTIZACION}} {{MONEDA}}
+Estado: Disponible para reservar
+Recordatorio #: {{NUMERO_RECORDATORIO}} de {{TOTAL_RECORDATORIOS}}
+
+Para revisar y confirmar: {{URL_COTIZACION}}
+Para modificar cotización: {{URL_MODIFICAR}}
+
+Si prefiere hablar con uno de nuestros especialistas, estaremos disponibles para atenderle personalmente.
+
+CONTACTO
+========
+Teléfono: {{TELEFONO}}
+Email: {{EMAIL_CONTACTO}}
+Emergencias 24/7: {{TELEFONO_EMERGENCIAS}}
+
+Sitio web: {{SITIO_WEB}}
+Instagram: {{INSTAGRAM}}
+Facebook: {{FACEBOOK}}
+TripAdvisor: {{TRIPADVISOR}}
+
+"{{TAGLINE}}"
+
+© {{AÑO}} Amexing Experience. Todos los derechos reservados.
+
+---
+Este es un email automático del sistema de recordatorios de Amexing Experience.
+Si no desea recibir más recordatorios, responda este email solicitando ser removido de la lista.

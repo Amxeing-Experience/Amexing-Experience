@@ -1,0 +1,167 @@
+<%
+/**
+ * Dietary Restrictions Input Atom with Bullet Point Support
+ * Multi-line text field for dietary restrictions that processes into bullet points
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'dietaryRestrictions')
+ * @param {string} id - Input ID attribute (default: 'dietaryRestrictions')
+ * @param {string} label - Field label text (default: 'Restricciones Alimenticias')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} placeholder - Placeholder text
+ * @param {string} helpText - Help text below field
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string|Array} value - Initial value (string or array) (default: '')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'dietaryRestrictions';
+const inputId = typeof id !== 'undefined' ? id : 'dietaryRestrictions';
+const inputLabel = typeof label !== 'undefined' ? label : 'Restricciones Alimenticias';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Ingrese cada restricción en una línea separada:\nVegetariano\nSin gluten\nSin cerdo';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Una restricción por línea. Se mostrarán como puntos en el perfil del cliente.';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+
+// Convert array to string if needed
+let initialValue = '';
+if (typeof value !== 'undefined') {
+    if (Array.isArray(value)) {
+        initialValue = value.join('\n');
+    } else {
+        initialValue = value;
+    }
+}
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-salad text-success me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <textarea 
+        class="form-control"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        placeholder="<%= inputPlaceholder %>"
+        <%= isRequired ? 'required' : '' %>
+        rows="4"
+        style="resize: vertical;"
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    ><%= initialValue %></textarea>
+    
+    <!-- Live preview of bullet points -->
+    <div id="<%= inputId %>-preview" class="mt-2 p-2 bg-light rounded" style="display: none;">
+        <small class="text-muted d-block mb-1">Vista previa:</small>
+        <ul id="<%= inputId %>-list" class="mb-0 text-dark"></ul>
+    </div>
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <i class="ti ti-info-circle"></i>
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor ingrese las restricciones alimenticias del cliente
+    </div>
+</div>
+
+<script>
+(function() {
+    // Real-time bullet point preview for dietary restrictions
+    const dietaryInput = document.getElementById('<%= inputId %>');
+    const preview = document.getElementById('<%= inputId %>-preview');
+    const list = document.getElementById('<%= inputId %>-list');
+    
+    if (dietaryInput && preview && list) {
+        function updatePreview() {
+            const value = dietaryInput.value.trim();
+            
+            if (value) {
+                // Split by newlines and filter empty lines
+                const items = value.split('\n')
+                    .map(item => item.trim())
+                    .filter(item => item.length > 0);
+                
+                if (items.length > 0) {
+                    // Clear existing list
+                    list.innerHTML = '';
+                    
+                    // Add each item as a bullet point with proper dietary icons
+                    items.forEach(item => {
+                        const li = document.createElement('li');
+                        
+                        // Add specific icons for common dietary restrictions
+                        let icon = '';
+                        const itemLower = item.toLowerCase();
+                        if (itemLower.includes('vegetarian') || itemLower.includes('vegano')) {
+                            icon = '🥬 ';
+                        } else if (itemLower.includes('gluten')) {
+                            icon = '🌾 ';
+                        } else if (itemLower.includes('lácteos') || itemLower.includes('lactosa')) {
+                            icon = '🥛 ';
+                        } else if (itemLower.includes('kosher')) {
+                            icon = '✡️ ';
+                        } else if (itemLower.includes('halal')) {
+                            icon = '☪️ ';
+                        }
+                        
+                        li.textContent = icon + item;
+                        list.appendChild(li);
+                    });
+                    
+                    preview.style.display = 'block';
+                    dietaryInput.classList.add('is-valid');
+                    dietaryInput.classList.remove('is-invalid');
+                } else {
+                    preview.style.display = 'none';
+                    dietaryInput.classList.remove('is-valid', 'is-invalid');
+                }
+            } else {
+                preview.style.display = 'none';
+                dietaryInput.classList.remove('is-valid', 'is-invalid');
+            }
+        }
+        
+        // Update preview on input
+        dietaryInput.addEventListener('input', updatePreview);
+        
+        // Clean up on blur
+        dietaryInput.addEventListener('blur', function() {
+            // Remove extra blank lines
+            const lines = this.value.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+            this.value = lines.join('\n');
+            updatePreview();
+        });
+        
+        // Initial preview if there's existing data
+        if (dietaryInput.value) {
+            updatePreview();
+        }
+        
+        // Store as array for form submission
+        dietaryInput.form?.addEventListener('submit', function(e) {
+            // Convert textarea to array before submission
+            const items = dietaryInput.value.split('\n')
+                .map(item => item.trim())
+                .filter(item => item.length > 0);
+            
+            // Store as JSON string for backend processing
+            dietaryInput.dataset.arrayValue = JSON.stringify(items);
+        });
+    }
+})();
+</script>

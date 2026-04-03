@@ -24,6 +24,85 @@ const AtomicController = require('../../application/controllers/atomicController
 // Main atomic design showcase index
 router.get('/', AtomicController.index);
 
+// Test validation components route
+router.get('/test-validation', (req, res) => {
+  res.render('test-components', {
+    title: 'Test Validation Components',
+  });
+});
+
+// Debug validation components route
+router.get('/debug-validation', (req, res) => {
+  try {
+    res.render('templates/auth-layout', {
+      title: 'Debug Validation Components',
+      headerTitle: 'Debug Validation',
+      body: `
+                <div class="container mt-4">
+                    <h3>Testing Atomic Validation Components</h3>
+                    <form>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Email Component</h5>
+                                <%- include('../atoms/common/email-input', {
+                                    name: 'email',
+                                    id: 'debug-email',
+                                    label: 'Email Test',
+                                    required: true,
+                                    placeholder: 'test@example.com',
+                                    helpText: 'Debug email validation'
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Phone Component</h5>
+                                <%- include('../atoms/common/phone-input', {
+                                    name: 'phone',
+                                    id: 'debug-phone',
+                                    label: 'Phone Test',
+                                    required: false,
+                                    countryCode: 'MX',
+                                    placeholder: '999 123 4567',
+                                    helpText: 'Debug phone validation'
+                                }) %>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>RFC Component</h5>
+                                <%- include('../atoms/common/rfc-input', {
+                                    name: 'rfc',
+                                    id: 'debug-rfc',
+                                    label: 'RFC Test',
+                                    required: false,
+                                    placeholder: 'ABCD123456ABC',
+                                    helpText: 'Debug RFC validation'
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>URL Component</h5>
+                                <%- include('../atoms/common/url-input', {
+                                    name: 'website',
+                                    id: 'debug-url',
+                                    label: 'Website Test',
+                                    required: false,
+                                    placeholder: 'https://example.com',
+                                    helpText: 'Debug URL validation'
+                                }) %>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            `,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: error.stack,
+    });
+  }
+});
+
 // Dashboard components showcase
 router.get('/dashboard', AtomicController.dashboard);
 

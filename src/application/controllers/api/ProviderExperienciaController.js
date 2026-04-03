@@ -85,10 +85,48 @@ class ProviderExperienciaController {
 
       const experiencias = await query.find({ useMasterKey: true });
 
+      // Filter out experiencias where the provider is not active or doesn't exist
+      const activeExperiencias = experiencias.filter((exp) => {
+        const provider = exp.get('provider');
+        if (!provider) {
+          // No provider linked, exclude this experiencia
+          logger.warn('Provider experiencia without provider reference', {
+            experienciaId: exp.id,
+            experienciaName: exp.get('name'),
+          });
+          return false;
+        }
+        // Only include if provider is both active and exists
+        const isProviderActive = provider.get('active') === true;
+        const isProviderExists = provider.get('exists') === true;
+
+        if (!isProviderActive || !isProviderExists) {
+          logger.debug('Excluding experiencia due to inactive/deleted provider', {
+            experienciaId: exp.id,
+            experienciaName: exp.get('name'),
+            providerId: provider.id,
+            providerName: provider.get('name'),
+            providerActive: isProviderActive,
+            providerExists: isProviderExists,
+          });
+        }
+
+        return isProviderActive && isProviderExists;
+      });
+
+      // Log filtering results if any were excluded
+      if (experiencias.length !== activeExperiencias.length) {
+        logger.info('Provider experiencias filtered by provider status', {
+          totalFound: experiencias.length,
+          activeCount: activeExperiencias.length,
+          filteredOut: experiencias.length - activeExperiencias.length,
+        });
+      }
+
       // Format response with ALL fields from database including extra fields AND optimized photos
       const acceptHeader = req.get('accept') || '';
       const startTime = Date.now();
-      const data = await Promise.all(experiencias.map(async (exp) => {
+      const data = await Promise.all(activeExperiencias.map(async (exp) => {
         // Process photos with optimization
         const photos = exp.get('photos') || [];
         const processedPhotos = [];

@@ -1,0 +1,160 @@
+<%
+/**
+ * Postal Code Input Atom
+ * Input for Mexican postal codes with 5-digit validation
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'postalCode')
+ * @param {string} id - Input ID attribute (default: 'postalCode')
+ * @param {string} label - Field label text (default: 'Código Postal')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} placeholder - Placeholder text
+ * @param {string} helpText - Help text below field
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string} value - Initial value (default: '')
+ * @param {string} country - Country for validation rules (default: 'MX')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'postalCode';
+const inputId = typeof id !== 'undefined' ? id : 'postalCode';
+const inputLabel = typeof label !== 'undefined' ? label : 'Código Postal';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : '12345';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : '5 dígitos para México';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const initialValue = typeof value !== 'undefined' ? value : '';
+const inputCountry = typeof country !== 'undefined' ? country : 'MX';
+
+// Validation patterns by country
+const patterns = {
+    'MX': { pattern: '[0-9]{5}', maxlength: '5', title: 'Código postal mexicano (5 dígitos)' },
+    'US': { pattern: '[0-9]{5}(-[0-9]{4})?', maxlength: '10', title: 'ZIP code (12345 or 12345-6789)' },
+    'CA': { pattern: '[A-Z][0-9][A-Z] [0-9][A-Z][0-9]', maxlength: '7', title: 'Postal code (A1A 1A1)' }
+};
+
+const validation = patterns[inputCountry] || patterns['MX'];
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-mail me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <input 
+        type="text"
+        class="form-control"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        placeholder="<%= inputPlaceholder %>"
+        value="<%= initialValue %>"
+        <%= isRequired ? 'required' : '' %>
+        maxlength="<%= validation.maxlength %>"
+        pattern="<%= validation.pattern %>"
+        title="<%= validation.title %>"
+        inputmode="<%= inputCountry === 'MX' ? 'numeric' : 'text' %>"
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    >
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <i class="ti ti-info-circle"></i>
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor ingrese un código postal válido
+    </div>
+</div>
+
+<script>
+(function() {
+    // Real-time validation for postal code
+    const postalInput = document.getElementById('<%= inputId %>');
+    const country = '<%= inputCountry %>';
+    
+    if (postalInput) {
+        postalInput.addEventListener('input', function() {
+            let value = this.value;
+            
+            // Country-specific formatting and validation
+            if (country === 'MX') {
+                // Only allow numbers
+                value = value.replace(/\D/g, '');
+                this.value = value;
+                
+                // Validate Mexican postal code (5 digits)
+                if (/^[0-9]{5}$/.test(value)) {
+                    this.classList.remove('is-invalid');
+                    this.classList.add('is-valid');
+                } else if (value.length > 0) {
+                    this.classList.remove('is-valid');
+                    this.classList.add('is-invalid');
+                } else {
+                    this.classList.remove('is-valid', 'is-invalid');
+                }
+            } else if (country === 'US') {
+                // Format US ZIP code
+                value = value.replace(/\D/g, '');
+                if (value.length > 5) {
+                    value = value.slice(0, 5) + '-' + value.slice(5, 9);
+                }
+                this.value = value;
+                
+                // Validate US ZIP code
+                if (/^[0-9]{5}(-[0-9]{4})?$/.test(value)) {
+                    this.classList.remove('is-invalid');
+                    this.classList.add('is-valid');
+                } else if (value.length > 0) {
+                    this.classList.remove('is-valid');
+                    this.classList.add('is-invalid');
+                } else {
+                    this.classList.remove('is-valid', 'is-invalid');
+                }
+            } else if (country === 'CA') {
+                // Format Canadian postal code
+                value = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                if (value.length > 3) {
+                    value = value.slice(0, 3) + ' ' + value.slice(3, 6);
+                }
+                this.value = value;
+                
+                // Validate Canadian postal code
+                if (/^[A-Z][0-9][A-Z] [0-9][A-Z][0-9]$/.test(value)) {
+                    this.classList.remove('is-invalid');
+                    this.classList.add('is-valid');
+                } else if (value.length > 0) {
+                    this.classList.remove('is-valid');
+                    this.classList.add('is-invalid');
+                } else {
+                    this.classList.remove('is-valid', 'is-invalid');
+                }
+            }
+        });
+        
+        // Prevent invalid characters for Mexico
+        if (country === 'MX') {
+            postalInput.addEventListener('keypress', function(e) {
+                const char = String.fromCharCode(e.which);
+                if (!/[0-9]/.test(char)) {
+                    e.preventDefault();
+                }
+            });
+        }
+        
+        postalInput.addEventListener('blur', function() {
+            this.value = this.value.trim();
+        });
+    }
+})();
+</script>

@@ -1,0 +1,151 @@
+<%
+/**
+ * Language Select Atom
+ * Reusable language preference dropdown with flag icons
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'preferredLanguage')
+ * @param {string} id - Input ID attribute (default: 'preferredLanguage')
+ * @param {string} label - Field label text (default: 'Idioma Preferido')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} helpText - Help text below field
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string} value - Initial selected value (default: 'es')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'preferredLanguage';
+const inputId = typeof id !== 'undefined' ? id : 'preferredLanguage';
+const inputLabel = typeof label !== 'undefined' ? label : 'Idioma Preferido';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Idioma para comunicaciones y servicios';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const selectedValue = typeof value !== 'undefined' ? value : 'es';
+
+// Available languages with their names and country codes for flags
+const languages = [
+    { value: 'es', label: 'Español', flag: 'mx' },
+    { value: 'en', label: 'English', flag: 'us' },
+    { value: 'fr', label: 'Français', flag: 'fr' },
+    { value: 'de', label: 'Deutsch', flag: 'de' },
+    { value: 'it', label: 'Italiano', flag: 'it' },
+    { value: 'pt', label: 'Português', flag: 'br' },
+    { value: 'zh', label: '中文', flag: 'cn' },
+    { value: 'ja', label: '日本語', flag: 'jp' },
+    { value: 'ru', label: 'Русский', flag: 'ru' },
+    { value: 'ar', label: 'العربية', flag: 'sa' }
+];
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-language me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <select 
+        class="form-select"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        <%= isRequired ? 'required' : '' %>
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    >
+        <option value="">Seleccione un idioma</option>
+        <% languages.forEach(function(lang) { %>
+            <option 
+                value="<%= lang.value %>" 
+                <%= lang.value === selectedValue ? 'selected' : '' %>
+                data-flag="<%= lang.flag %>"
+            >
+                <%= lang.label %>
+            </option>
+        <% }); %>
+    </select>
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <i class="ti ti-info-circle"></i>
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor seleccione un idioma preferido
+    </div>
+</div>
+
+<style>
+/* Custom styling for language dropdown with flags */
+#<%= inputId %> option {
+    padding-left: 25px;
+    background-repeat: no-repeat;
+    background-position: 5px center;
+    background-size: 16px 12px;
+}
+</style>
+
+<script>
+(function() {
+    // Enhanced language selector with flag display
+    const languageSelect = document.getElementById('<%= inputId %>');
+    
+    if (languageSelect) {
+        // Language data with emoji flags for display
+        const languageEmojis = {
+            'es': '🇲🇽',
+            'en': '🇺🇸',
+            'fr': '🇫🇷',
+            'de': '🇩🇪',
+            'it': '🇮🇹',
+            'pt': '🇧🇷',
+            'zh': '🇨🇳',
+            'ja': '🇯🇵',
+            'ru': '🇷🇺',
+            'ar': '🇸🇦'
+        };
+        
+        // Update options to include emoji flags
+        Array.from(languageSelect.options).forEach(option => {
+            if (option.value && languageEmojis[option.value]) {
+                option.text = languageEmojis[option.value] + ' ' + option.text;
+            }
+        });
+        
+        // Validation on change
+        languageSelect.addEventListener('change', function() {
+            if (this.value) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+                
+                // Display selected language info
+                const selectedOption = this.options[this.selectedIndex];
+                const languageName = selectedOption.text.replace(/^[^\s]+\s/, ''); // Remove emoji
+                
+                // Optional: Update a preview or display element
+                const preview = document.getElementById(this.id + '-preview');
+                if (preview) {
+                    preview.textContent = 'Comunicaciones en: ' + languageName;
+                }
+            } else {
+                this.classList.remove('is-valid');
+                if (<%= isRequired ? 'true' : 'false' %>) {
+                    this.classList.add('is-invalid');
+                }
+            }
+        });
+        
+        // Initial validation if value exists
+        if (languageSelect.value) {
+            languageSelect.classList.add('is-valid');
+        }
+    }
+})();
+</script>
