@@ -995,6 +995,82 @@ function registerCloudFunctions() {
       }
     });
 
+    /**
+     * AfterSave trigger for Quote that manages reminder lifecycle.
+     * Automatically creates reminders when status becomes "COTIZADO" and cancels when status changes.
+     * Created by Denisse Maldonado.
+     * @function afterSaveQuote
+     * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
+     * @returns {Promise<void>} - Promise that resolves when reminder operations are complete.
+     */
+    Parse.Cloud.afterSave('Quote', async (request) => {
+      const { object: quote, original } = request;
+
+      try {
+        // Import services dynamically to avoid circular dependencies in cloud code
+        const QuoteReminderService = require('../application/services/QuoteReminderService');
+        const reminderService = new QuoteReminderService();
+
+        const currentStatus = quote.get('status');
+        const previousStatus = original ? original.get('status') : null;
+
+        logger.debug('Quote afterSave hook triggered', {
+          quoteId: quote.id,
+          currentStatus,
+          previousStatus,
+          isNew: !quote.existed(),
+        });
+
+        // Case 1: Quote status changed to "COTIZADO" - create reminder
+        if (currentStatus === 'COTIZADO' && previousStatus !== 'COTIZADO') {
+          logger.info('Quote status changed to COTIZADO, creating reminder', {
+            quoteId: quote.id,
+            folio: quote.get('folio'),
+          });
+
+          await reminderService.createInitialReminder(quote, {
+            initialDelay: 5, // Start reminders 5 days after quoting
+            maxReminders: 6, // Maximum 6 reminders
+            reminderInterval: 5, // Send every 5 days
+          });
+
+          logger.info('Quote reminder created successfully', {
+            quoteId: quote.id,
+            folio: quote.get('folio'),
+          });
+        } else if (previousStatus === 'COTIZADO' && currentStatus !== 'COTIZADO') {
+          // Case 2: Quote status changed away from "COTIZADO" - cancel reminders
+          logger.info('Quote status changed from COTIZADO, cancelling reminders', {
+            quoteId: quote.id,
+            folio: quote.get('folio'),
+            newStatus: currentStatus,
+          });
+
+          const cancelled = await reminderService.cancelRemindersForQuote(
+            quote,
+            `Status changed from COTIZADO to ${currentStatus}`
+          );
+
+          logger.info('Quote reminders cancelled', {
+            quoteId: quote.id,
+            folio: quote.get('folio'),
+            cancelledCount: cancelled,
+          });
+        }
+      } catch (error) {
+        // Log error but don't throw to avoid breaking the save operation
+        logger.error('Error in Quote afterSave reminder hook:', {
+          error: error.message,
+          stack: error.stack,
+          quoteId: quote?.id,
+          folio: quote?.get('folio'),
+        });
+
+        // Optional: Create alert for admin about failed reminder operation
+        // This ensures the quote save succeeds even if reminder creation fails
+      }
+    });
+
     // Before Delete Triggers
     /**
      * BeforeDelete trigger for legacy Parse.User that enforces deletion security.
@@ -2156,6 +2232,85 @@ function registerCloudFunctions() {
         return auditResults;
       } catch (error) {
         logger.error('Error in security audit:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Daily background job that processes quote reminders.
+     * Scans for quotes with "COTIZADO" status that have due reminders and sends reminder emails.
+     * Created by Denisse Maldonado.
+     * @function processQuoteReminders
+     * @param {Parse.Cloud.JobRequest} request - The Parse Cloud job request object.
+     * @returns {Promise<object>} - Promise resolving to processing results with statistics.
+     * @example
+     * // Schedule this job daily in Parse Dashboard or via cron
+     * // Returns: { processed: 15, sent: 12, failed: 3, errors: [...] }
+     */
+    Parse.Cloud.job('processQuoteReminders', async (request) => {
+      const { message } = request;
+      message('Starting quote reminders processing...');
+
+      try {
+        // Import services dynamically to avoid circular dependencies
+        const QuoteReminderService = require('../application/services/QuoteReminderService');
+        const reminderService = new QuoteReminderService();
+
+        // Process all due reminders
+        const results = await reminderService.processDueReminders();
+
+        message(`Processed ${results.processed} reminders: ${results.sent} sent, ${results.failed} failed`);
+
+        if (results.errors.length > 0) {
+          message(`Errors: ${results.errors.map((e) => e.error).join(', ')}`);
+        }
+
+        logger.info('Quote reminders job completed', results);
+
+        return {
+          success: true,
+          ...results,
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        logger.error('Error in quote reminders job:', error);
+        message(`Job failed: ${error.message}`);
+        throw error;
+      }
+    });
+
+    /**
+     * Cloud function to manually trigger quote reminder processing.
+     * Created by Denisse Maldonado.
+     * @function triggerQuoteReminders
+     * @param {Parse.Cloud.FunctionRequest} request - The cloud function request.
+     * @returns {Promise<object>} - Promise resolving to job trigger result.
+     */
+    Parse.Cloud.define('triggerQuoteReminders', async (request) => {
+      try {
+        // Validate admin permissions
+        if (!request.user || !request.user.get('isAdmin')) {
+          throw new Error('Admin access required');
+        }
+
+        // Start the reminder processing job
+        await Parse.Cloud.startJob('processQuoteReminders', {
+          triggeredBy: request.user.get('username') || request.user.get('email'),
+          manual: true,
+        });
+
+        logger.info('Quote reminders job triggered manually', {
+          userId: request.user.id,
+          userEmail: request.user.get('email'),
+        });
+
+        return {
+          success: true,
+          message: 'Quote reminders job started successfully',
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        logger.error('Error triggering quote reminders job:', error);
         throw error;
       }
     });

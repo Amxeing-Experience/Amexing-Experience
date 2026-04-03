@@ -1291,6 +1291,108 @@ This is an automated message from Amexing Experience. Please do not reply to thi
       };
     }
   }
+
+  /**
+   * Send quote reminder email using template system.
+   * Created by Denisse Maldonado for quote reminders feature.
+   * @param {object} emailData - Email data for reminder.
+   * @param {string} templateType - Template type (initial, follow_up, final).
+   * @returns {Promise<object>} Send result.
+   * @example
+   * await emailService.sendQuoteReminder(emailData, 'initial');
+   */
+  async sendQuoteReminder(emailData, templateType = 'initial') {
+    try {
+      const {
+        to, name, quote, reminder,
+      } = emailData;
+
+      // Validate required data
+      if (!to || !quote) {
+        throw new Error('Missing required email data (to, quote)');
+      }
+
+      // Map template type to actual template file
+      const templateMap = {
+        initial: 'quote_reminder_initial',
+        follow_up: 'quote_reminder_follow_up',
+        final: 'quote_reminder_final',
+      };
+
+      const templateName = templateMap[templateType] || 'quote_reminder_initial';
+
+      // Calculate quote expiration date (30 days from creation)
+      const quoteDate = quote.createdAt || new Date();
+      const expirationDate = new Date(quoteDate);
+      expirationDate.setDate(expirationDate.getDate() + 30);
+
+      // Prepare template variables
+      const templateVariables = {
+        ...TemplateService.getCommonVariables(),
+        ASUNTO: `Recordatorio - Cotización ${quote.folio}`,
+        NOMBRE_CLIENTE: name || 'Cliente',
+        FOLIO_COTIZACION: quote.folio || 'N/A',
+        TOTAL_COTIZACION: new Intl.NumberFormat('es-MX').format(quote.total || 0),
+        MONEDA: quote.currency || 'MXN',
+        FECHA_COTIZACION: quoteDate.toLocaleDateString('es-MX', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }),
+        FECHA_VENCIMIENTO: expirationDate.toLocaleDateString('es-MX', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }),
+        URL_COTIZACION: `${process.env.EMAIL_BASE_URL || 'http://localhost:1337'}/dashboard/client/quotes`,
+        URL_MODIFICAR: `${process.env.EMAIL_BASE_URL || 'http://localhost:1337'}/dashboard/client/quotes/${quote.folio || ''}`,
+        URL_EXTENDER: `${process.env.EMAIL_BASE_URL || 'http://localhost:1337'}/dashboard/client/quotes/${quote.folio || ''}/extend`,
+        NUMERO_RECORDATORIO: reminder?.count || 1,
+        TOTAL_RECORDATORIOS: reminder?.maxReminders || 6,
+      };
+
+      // Render template
+      const { html, text } = TemplateService.render(templateName, templateVariables, { includeText: true });
+
+      // Prepare email data
+      const emailParams = {
+        to,
+        subject: `Recordatorio - Cotización ${quote.folio} | Amexing Experience`,
+        html,
+        text,
+        tags: ['quote-reminder', templateType],
+        notificationType: 'QUOTE_REMINDER',
+        metadata: {
+          quoteId: quote.id || 'unknown',
+          quoteFolio: quote.folio || 'unknown',
+          reminderType: templateType,
+          reminderCount: reminder?.count || 1,
+          templateUsed: templateName,
+        },
+      };
+
+      // Send email
+      const result = await this.sendEmail(emailParams);
+
+      logger.info('Quote reminder email sent successfully', {
+        to,
+        quoteFolio: quote.folio,
+        templateType,
+        emailId: result.id,
+        reminderCount: reminder?.count || 1,
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to send quote reminder email', {
+        error: error.message,
+        to: emailData?.to,
+        quoteFolio: emailData?.quote?.folio,
+        templateType,
+      });
+      throw error;
+    }
+  }
 }
 
 module.exports = new EmailService();

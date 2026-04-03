@@ -1,0 +1,54 @@
+AMEXING EXPERIENCE - ÚLTIMA OPORTUNIDAD
+
+⏰ ÚLTIMA OPORTUNIDAD - Su cotización vence pronto
+
+Estimado/a {{NOMBRE_CLIENTE}},
+
+Este es nuestro último recordatorio sobre su cotización para una experiencia única en San Miguel de Allende. LA VALIDEZ DE SU COTIZACIÓN EXPIRA MUY PRONTO.
+
+Hemos preparado esta experiencia especialmente para usted, considerando cada detalle para crear momentos inolvidables. Sería una verdadera lástima perder esta oportunidad.
+
+¿Está listo para vivir esta experiencia excepcional?
+
+⚠️ COTIZACIÓN EXPIRA: {{FECHA_VENCIMIENTO}}
+
+Después de esta fecha, será necesario generar una nueva cotización que podría tener precios diferentes.
+
+RESUMEN FINAL DE SU COTIZACIÓN
+===============================
+Número de cotización: {{FOLIO_COTIZACION}}
+Total estimado: {{TOTAL_COTIZACION}} {{MONEDA}}
+VÁLIDA HASTA: {{FECHA_VENCIMIENTO}}
+Recordatorio final #: {{NUMERO_RECORDATORIO}} de {{TOTAL_RECORDATORIOS}}
+
+🚀 CONFIRMAR AHORA: {{URL_COTIZACION}}
+
+¿NECESITA MÁS TIEMPO O TIENE DUDAS?
+
+Opciones disponibles:
+- Extender validez: {{URL_EXTENDER}}
+- Modificar cotización: {{URL_MODIFICAR}}
+
+NOTA PERSONAL: Si decide no proceder con esta cotización, agradecemos sinceramente el tiempo que nos dedicó. Esperamos poder servirle en una futura ocasión y crear juntos esa experiencia inolvidable que usted merece.
+
+¿Prefiere hablar directamente con nosotros?
+Llámenos ahora y un especialista le atenderá inmediatamente.
+
+🔥 CONTACTO INMEDIATO
+====================
+Teléfono: {{TELEFONO}}
+Email: {{EMAIL_CONTACTO}}
+Emergencias 24/7: {{TELEFONO_EMERGENCIAS}}
+
+Sitio web: {{SITIO_WEB}}
+Instagram: {{INSTAGRAM}}
+Facebook: {{FACEBOOK}}
+TripAdvisor: {{TRIPADVISOR}}
+
+"{{TAGLINE}}"
+
+© {{AÑO}} Amexing Experience. Todos los derechos reservados.
+
+---
+ESTE ES EL ÚLTIMO RECORDATORIO AUTOMÁTICO.
+Si no desea recibir más comunicaciones, responda este email solicitando ser removido de todas nuestras listas.
