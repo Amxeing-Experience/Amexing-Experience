@@ -479,6 +479,26 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentTransferRate = 0; // Transfer payment surcharge percentage
     let currentAgencyRate = 0; // Credit card payment surcharge percentage
     
+    // Helper function to format duration in hours (for experience duration)
+    function formatDuration(hours) {
+        if (!hours) return 'No especificada';
+        return `${hours}h`;
+    }
+
+    // Helper function to format travel duration from minutes to hours and minutes (for travel_duration)
+    function formatTravelDuration(minutes) {
+        if (!minutes) return 'No especificada';
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (hours > 0 && mins > 0) {
+            return `${hours}h ${mins}min`;
+        } else if (hours > 0) {
+            return `${hours}h`;
+        } else {
+            return `${mins}min`;
+        }
+    }
+    
     // Load exchange rate
     async function loadExchangeRate() {
         try {
@@ -1204,7 +1224,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <i class="ti ti-clock me-1"></i>Duración
                                     </span>
                                     <span class="experience-info-value">
-                                        ${experience.displayDuration ? experience.displayDuration + ' hrs' : 'Por definir'}
+                                        ${experience.displayDuration ? formatDuration(experience.displayDuration) : 'Por definir'}
                                     </span>
                                 </div>
                                 <div class="experience-info-row">
@@ -2273,7 +2293,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                                 <div>
                                     <h6>Tiempo de Viaje</h6>
-                                    <p class="text-muted mb-0">${formatDuration(experience.travel_duration)}</p>
+                                    <p class="text-muted mb-0">${formatTravelDuration(experience.travel_duration)}</p>
                                 </div>
                             </div>
                         </div>
@@ -2300,21 +2320,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${(experience.advance_minutes || experience.advance_booking_time || experience.advanceBookingTime) ? `
                     <div class="alert alert-warning">
                         <i class="ti ti-clock-hour-4 me-2"></i>
-                        <strong>Reservar con anticipación:</strong> Mínimo ${(() => {
-                            let minutes = experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime) || 0;
-                            
-                            if (minutes >= 60) {
-                                const hours = Math.floor(minutes / 60);
-                                const remainingMinutes = minutes % 60;
-                                let result = hours + ' hora' + (hours > 1 ? 's' : '');
-                                if (remainingMinutes > 0) {
-                                    result += ' ' + remainingMinutes + ' minutos';
-                                }
-                                return result;
-                            } else {
-                                return minutes + ' minutos';
-                            }
-                        })()} antes
+                        <strong>Reservar con anticipación:</strong> Mínimo ${formatTravelDuration(experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime) || 0)} antes
                     </div>
                 ` : ''}
 
@@ -2703,7 +2709,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const currency = document.getElementById('filterCurrency').value;
         const paymentType = document.getElementById('filterPayment').value;
         
-        let pricingHtml = '';
+        // Create selections info display for experiences
+        const currencyText = currency === 'USD' ? 'USD' : 'MXN';
+        const paymentText = paymentType === 'efectivo' ? 'Efectivo' : 
+                            paymentType === 'transferencia' ? 'Transferencia' : 'Tarjeta Débito/Crédito';
+        
+        let pricingHtml = `
+            <div class="alert alert-info d-flex align-items-center mb-4" style="background-color: #f0f7ff; border-color: #b3d9ff;">
+                <i class="ti ti-info-circle me-2" style="font-size: 1.2rem;"></i>
+                <div>
+                    <strong>Configuración actual de precios:</strong>
+                    <div class="mt-1">
+                        <span class="badge me-2" style="background-color: white; color: black; border: 1px solid #dee2e6;">
+                            <i class="ti ti-currency-dollar me-1"></i>${currencyText}
+                        </span>
+                        <span class="badge me-2" style="background-color: white; color: black; border: 1px solid #dee2e6;">
+                            <i class="ti ti-credit-card me-1"></i>${paymentText}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
         
         // Check for per-person pricing (support both original and display fields)
         if (experience.displayPrice || experience.displayPriceChild || experience.displayPriceNoAlcohol || experience.cost || experience.price_child || experience.price_no_alcohol || experience.price) {
@@ -2729,7 +2755,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="col-md-4">
                                 <div class="additional-price-card">
                                     <div class="additional-price-icon bg-info">
-                                        <i class="ti ti-baby-carriage"></i>
+                                        <i class="ti ti-mood-kid"></i>
                                     </div>
                                     <div class="additional-price-info">
                                         <span class="additional-price-label">Niño</span>
@@ -2758,9 +2784,11 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
         
-        // If no pricing data found, show a clean message
-        if (!pricingHtml) {
-            pricingHtml = `
+        // If no pricing data found, show a clean message (but keep the info banner)
+        const hasNoPricingData = !experience.displayPrice && !experience.displayPriceChild && !experience.displayPriceNoAlcohol && !experience.cost && !experience.price_child && !experience.price_no_alcohol && !experience.price;
+        
+        if (hasNoPricingData) {
+            pricingHtml += `
                 <div class="text-center py-5">
                     <i class="ti ti-currency-dollar" style="font-size: 3rem; color: #dee2e6;"></i>
                     <p class="mt-3 text-muted">No hay información de precios disponible</p>
@@ -3012,11 +3040,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return badges[type] || { class: 'bg-light text-dark', label: type || 'Otro' };
     }
 
-    // Helper functions (copied from tours)
-    function formatDuration(hours) {
-        if (!hours) return 'No especificada';
-        return `${hours} hora${hours > 1 ? 's' : ''}`;
-    }
+    // Helper functions (copied from tours) - formatDuration removed (using the one that handles minutes)
     
     function getOptimizedImageUrl(photo, size = 'medium') {
         console.log('🔧 getOptimizedImageUrl called with photo:', photo);
