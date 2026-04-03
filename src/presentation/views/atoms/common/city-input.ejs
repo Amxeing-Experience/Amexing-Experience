@@ -1,0 +1,102 @@
+<%
+/**
+ * City Input Atom
+ * Input for city/municipality names with validation
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'city')
+ * @param {string} id - Input ID attribute (default: 'city')
+ * @param {string} label - Field label text (default: 'Ciudad / Municipio')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} placeholder - Placeholder text
+ * @param {string} helpText - Help text below field
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string} value - Initial value (default: '')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'city';
+const inputId = typeof id !== 'undefined' ? id : 'city';
+const inputLabel = typeof label !== 'undefined' ? label : 'Ciudad / Municipio';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Ej: Ciudad de México, Guadalajara';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Nombre de la ciudad o municipio';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const initialValue = typeof value !== 'undefined' ? value : '';
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-building-community me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <input 
+        type="text"
+        class="form-control"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        placeholder="<%= inputPlaceholder %>"
+        value="<%= initialValue %>"
+        <%= isRequired ? 'required' : '' %>
+        maxlength="100"
+        pattern="^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\.\-]+$"
+        title="Nombre de la ciudad (letras, espacios, puntos y guiones)"
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    >
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <i class="ti ti-info-circle"></i>
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor ingrese un nombre de ciudad válido
+    </div>
+</div>
+
+<script>
+(function() {
+    // Real-time validation for city
+    const cityInput = document.getElementById('<%= inputId %>');
+    
+    if (cityInput) {
+        // Auto-capitalize first letter of each word
+        cityInput.addEventListener('input', function() {
+            const value = this.value;
+            
+            // Capitalize first letter of each word
+            if (value.length > 0) {
+                this.value = value.replace(/(^|\s)\S/g, l => l.toUpperCase());
+            }
+            
+            // Validate pattern
+            const pattern = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\.\-]*$/;
+            if (pattern.test(value) && value.trim().length > 0) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else if (value.trim().length > 0) {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-valid', 'is-invalid');
+            }
+        });
+        
+        cityInput.addEventListener('blur', function() {
+            // Clean up multiple spaces
+            this.value = this.value.replace(/\s+/g, ' ').trim();
+        });
+    }
+})();
+</script>

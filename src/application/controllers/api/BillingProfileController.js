@@ -983,11 +983,15 @@ class BillingProfileController {
   validateProfileData(body) {
     const allowedFields = [
       'country', 'label', 'isPrimary',
+      // Contact information
+      'firstName', 'lastName', 'phone', 'emailFacturacion',
+      // Mexico-specific fields
       'rfc', 'razonSocial', 'regimenFiscal', 'usoCfdi', 'codigoPostal',
+      // International fields
       'taxId', 'commercialName',
+      // Address fields
       'streetType', 'street', 'exteriorNumber', 'interiorNumber',
       'colonia', 'city', 'state', 'postalCode',
-      'emailFacturacion',
     ];
 
     const profileData = {};
@@ -1112,23 +1116,31 @@ class BillingProfileController {
       country: profile.get('country') || 'MX',
       label: profile.get('label') || '',
       isPrimary: profile.get('isPrimary') || false,
+      // Contact information
+      firstName: profile.get('firstName') || '',
+      lastName: profile.get('lastName') || '',
+      phone: profile.get('phone') || '',
+      emailFacturacion: profile.get('emailFacturacion') || '',
+      billingEmail: profile.get('emailFacturacion') || '',
+      // Mexico-specific fields
       rfc: profile.get('rfc') || '',
       razonSocial: profile.get('razonSocial') || '',
       regimenFiscal: profile.get('regimenFiscal') || '',
       usoCfdi: profile.get('usoCfdi') || '',
       codigoPostal: profile.get('codigoPostal') || '',
+      // International fields
       taxId: profile.get('taxId') || '',
       commercialName: profile.get('commercialName') || '',
+      // Address fields
       streetType: profile.get('streetType') || '',
       street: profile.get('street') || '',
+      streetName: profile.get('street') || '', // Alias for backward compatibility
       exteriorNumber: profile.get('exteriorNumber') || '',
       interiorNumber: profile.get('interiorNumber') || '',
       colonia: profile.get('colonia') || '',
       city: profile.get('city') || '',
       state: profile.get('state') || '',
       postalCode: profile.get('postalCode') || '',
-      emailFacturacion: profile.get('emailFacturacion') || '',
-      billingEmail: profile.get('emailFacturacion') || '',
       constancia: {
         s3Key: constanciaS3Key,
         url: constanciaUrl,

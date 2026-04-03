@@ -278,6 +278,119 @@ class OwnedClientsController {
   }
 
   /**
+   * GET /api/owned-clients/:id - Get a specific owned client by ID.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async getOwnedClientById(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      const userRole = currentUser.role || currentUser.get('role');
+
+      // Only department_manager and client roles can manage owned clients
+      if (!['department_manager', 'client', 'admin', 'superadmin'].includes(userRole)) {
+        return this.sendError(res, 'Access denied', 403);
+      }
+
+      const clientId = req.params.id;
+      if (!clientId) {
+        return this.sendError(res, 'Client ID is required', 400);
+      }
+
+      // Build hierarchical query based on role
+      let query;
+
+      if (userRole === 'admin' || userRole === 'superadmin') {
+        // Admins can see any client
+        query = this.createClientQuery();
+        query.equalTo('objectId', clientId);
+      } else {
+        // Use hierarchical query for department managers and client users
+        query = await this.buildHierarchicalQuery(currentUser, userRole);
+        query.equalTo('objectId', clientId);
+
+        // Apply ownerType filtering for security
+        if (userRole === 'department_manager') {
+          query.containedIn('ownerType', ['department_manager', 'client']);
+        } else if (userRole === 'client') {
+          query.containedIn('ownerType', ['client', 'department_manager']);
+        }
+      }
+
+      query.equalTo('exists', true);
+
+      const client = await query.first({ useMasterKey: true });
+
+      if (!client) {
+        return this.sendError(res, 'Client not found or access denied', 404);
+      }
+
+      // Format response
+      const storedAddress = client.get('address') || {};
+      const isAddressObject = typeof storedAddress === 'object' && storedAddress !== null && !Array.isArray(storedAddress);
+
+      const formattedClient = {
+        id: client.id,
+        firstName: client.get('firstName') || '',
+        lastName: client.get('lastName') || '',
+        email: client.get('email') || '',
+        phone: client.get('phone') || '',
+        contactFirstName: client.get('contactFirstName') || '',
+        contactLastName: client.get('contactLastName') || '',
+        emergencyContactName: client.get('emergencyContactName') || '',
+        emergencyContactPhone: client.get('emergencyContactPhone') || '',
+        companyType: client.get('companyType') || '',
+        taxId: client.get('taxId') || '',
+        website: client.get('website') || '',
+
+        // Address fields (extracted from structured object or individual fields)
+        streetType: isAddressObject ? (storedAddress.streetType || '') : (client.get('streetType') || ''),
+        streetName: isAddressObject ? (storedAddress.streetName || '') : (client.get('streetName') || ''),
+        exteriorNumber: isAddressObject ? (storedAddress.exteriorNumber || '') : (client.get('exteriorNumber') || ''),
+        interiorNumber: isAddressObject ? (storedAddress.interiorNumber || '') : (client.get('interiorNumber') || ''),
+        colonia: isAddressObject ? (storedAddress.colonia || '') : (client.get('colonia') || ''),
+        city: isAddressObject ? (storedAddress.city || '') : (client.get('city') || ''),
+        state: isAddressObject ? (storedAddress.state || '') : (client.get('state') || ''),
+        postalCode: isAddressObject ? (storedAddress.postalCode || '') : (client.get('postalCode') || ''),
+
+        // Legacy address field for backward compatibility
+        address: typeof storedAddress === 'string' ? storedAddress : '',
+
+        allergies: client.get('allergies') || '',
+        dietaryRestrictions: client.get('dietaryRestrictions') || '',
+        preferredLanguage: client.get('preferredLanguage') || '',
+        accessibilityRequirements: client.get('accessibilityRequirements') || '',
+        notes: client.get('notes') || '',
+        active: client.get('active') !== false,
+
+        // Metadata
+        createdAt: client.get('createdAt'),
+        updatedAt: client.get('updatedAt'),
+        ownedBy: client.get('ownedBy'),
+        ownerType: client.get('ownerType'),
+      };
+
+      return res.json({
+        success: true,
+        data: formattedClient,
+      });
+    } catch (error) {
+      logger.error('Error fetching owned client by ID:', {
+        error: error.message,
+        clientId: req.params.id,
+        userId: req.user?.id,
+      });
+      return this.sendError(res, 'Failed to fetch client', 500);
+    }
+  }
+
+  /**
    * POST /api/owned-clients - Create a new owned client.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
@@ -299,25 +412,82 @@ class OwnedClientsController {
       }
 
       const {
-        name, email, phone, contactPerson, companyType, taxId, website, notes, address,
+        // Name fields (separated)
+        firstName, lastName,
+        // Contact fields
+        email, phone,
+        contactFirstName, contactLastName,
+        emergencyContactName, emergencyContactPhone,
+        // Company fields
+        companyType, taxId, website,
+        // Address fields (structured)
+        streetType, streetName, exteriorNumber, interiorNumber,
+        colonia, city, state, postalCode,
+        // Special requirements
+        preferredLanguage, accessibilityRequirements,
+        allergies, dietaryRestrictions,
+        notes,
+        // Legacy address field for backward compatibility
+        address,
       } = req.body;
 
       // Validate required fields
-      if (!name) {
-        return this.sendError(res, 'Client name is required', 400);
+      if (!firstName || !lastName) {
+        return this.sendError(res, 'First name and last name are required', 400);
       }
 
-      // Create client with ownership
+      // Combine names for backward compatibility
+      const name = `${firstName} ${lastName}`.trim();
+      const contactPerson = contactFirstName || contactLastName
+        ? `${contactFirstName || ''} ${contactLastName || ''}`.trim()
+        : null;
+
+      // Process allergies and dietary restrictions into arrays
+      const processedAllergies = allergies
+        ? allergies.split('\n').map((item) => item.trim()).filter((item) => item.length > 0)
+        : [];
+
+      const processedDietaryRestrictions = dietaryRestrictions
+        ? dietaryRestrictions.split('\n').map((item) => item.trim()).filter((item) => item.length > 0)
+        : [];
+
+      // Build structured address object if structured fields are provided
+      let structuredAddress = null;
+      if (streetType || streetName || exteriorNumber || interiorNumber || colonia || city || state || postalCode) {
+        structuredAddress = {
+          streetType: streetType || '',
+          streetName: streetName || '',
+          exteriorNumber: exteriorNumber || '',
+          interiorNumber: interiorNumber || '',
+          colonia: colonia || '',
+          city: city || '',
+          state: state || '',
+          postalCode: postalCode || '',
+        };
+      }
+
+      // Create client with ownership and all new fields
       const clientData = {
         name,
+        firstName,
+        lastName,
         email: email || '',
         phone,
         contactPerson,
+        contactFirstName,
+        contactLastName,
+        emergencyContactName,
+        emergencyContactPhone,
         companyType,
         taxId,
         website,
         notes,
-        address,
+        // Use structured address if available, fall back to legacy address
+        address: structuredAddress || address,
+        preferredLanguage,
+        accessibilityRequirements,
+        allergies: processedAllergies,
+        dietaryRestrictions: processedDietaryRestrictions,
         ownedBy: currentUser.id,
         ownerType: userRole === 'admin' || userRole === 'superadmin' ? 'admin' : userRole,
         createdBy: currentUser.id,
@@ -453,9 +623,84 @@ class OwnedClientsController {
 
       // Update allowed fields
       const {
-        name, email, phone, contactPerson, companyType, taxId, website, notes, address, active,
+        // Name fields (separated)
+        firstName, lastName,
+        // Contact fields
+        email, phone,
+        contactFirstName, contactLastName,
+        emergencyContactName, emergencyContactPhone,
+        // Company fields
+        companyType, taxId, website,
+        // Address fields (structured)
+        streetType, streetName, exteriorNumber, interiorNumber,
+        colonia, city, state, postalCode,
+        // Special requirements
+        preferredLanguage, accessibilityRequirements,
+        allergies, dietaryRestrictions,
+        notes, active,
+        // Legacy address field for backward compatibility
+        address,
       } = req.body;
 
+      // Combine names for backward compatibility if provided
+      let name;
+      if (firstName !== undefined || lastName !== undefined) {
+        const currentFirst = firstName !== undefined ? firstName : client.get('firstName') || '';
+        const currentLast = lastName !== undefined ? lastName : client.get('lastName') || '';
+        name = `${currentFirst} ${currentLast}`.trim();
+      }
+
+      let contactPerson;
+      if (contactFirstName !== undefined || contactLastName !== undefined) {
+        const currentContactFirst = contactFirstName !== undefined ? contactFirstName : client.get('contactFirstName') || '';
+        const currentContactLast = contactLastName !== undefined ? contactLastName : client.get('contactLastName') || '';
+        contactPerson = `${currentContactFirst} ${currentContactLast}`.trim();
+      }
+
+      // Process allergies and dietary restrictions into arrays if provided
+      let processedAllergies;
+      if (allergies !== undefined) {
+        if (typeof allergies === 'string') {
+          processedAllergies = allergies.split('\n').map((item) => item.trim()).filter((item) => item.length > 0);
+        } else {
+          processedAllergies = allergies;
+        }
+      } else {
+        processedAllergies = undefined;
+      }
+
+      let processedDietaryRestrictions;
+      if (dietaryRestrictions !== undefined) {
+        if (typeof dietaryRestrictions === 'string') {
+          processedDietaryRestrictions = dietaryRestrictions.split('\n').map((item) => item.trim()).filter((item) => item.length > 0);
+        } else {
+          processedDietaryRestrictions = dietaryRestrictions;
+        }
+      } else {
+        processedDietaryRestrictions = undefined;
+      }
+
+      // Build structured address object if structured fields are provided
+      let structuredAddress;
+      if (streetType !== undefined || streetName !== undefined || exteriorNumber !== undefined
+          || interiorNumber !== undefined || colonia !== undefined || city !== undefined
+          || state !== undefined || postalCode !== undefined) {
+        // Get current address or create new one
+        const currentAddress = client.get('address') || {};
+
+        structuredAddress = {
+          streetType: streetType !== undefined ? streetType : currentAddress.streetType || '',
+          streetName: streetName !== undefined ? streetName : currentAddress.streetName || '',
+          exteriorNumber: exteriorNumber !== undefined ? exteriorNumber : currentAddress.exteriorNumber || '',
+          interiorNumber: interiorNumber !== undefined ? interiorNumber : currentAddress.interiorNumber || '',
+          colonia: colonia !== undefined ? colonia : currentAddress.colonia || '',
+          city: city !== undefined ? city : currentAddress.city || '',
+          state: state !== undefined ? state : currentAddress.state || '',
+          postalCode: postalCode !== undefined ? postalCode : currentAddress.postalCode || '',
+        };
+      }
+
+      // Update original fields
       if (name !== undefined) client.set('name', name);
       if (email !== undefined) client.set('email', email);
       if (phone !== undefined) client.set('phone', phone);
@@ -464,8 +709,25 @@ class OwnedClientsController {
       if (taxId !== undefined) client.set('taxId', taxId);
       if (website !== undefined) client.set('website', website);
       if (notes !== undefined) client.set('notes', notes);
-      if (address !== undefined) client.set('address', address);
+      // Use structured address if provided, otherwise use legacy address
+      if (structuredAddress !== undefined) {
+        client.set('address', structuredAddress);
+      } else if (address !== undefined) {
+        client.set('address', address);
+      }
       if (active !== undefined) client.set('active', active);
+
+      // Update new separated fields
+      if (firstName !== undefined) client.set('firstName', firstName);
+      if (lastName !== undefined) client.set('lastName', lastName);
+      if (contactFirstName !== undefined) client.set('contactFirstName', contactFirstName);
+      if (contactLastName !== undefined) client.set('contactLastName', contactLastName);
+      if (emergencyContactName !== undefined) client.set('emergencyContactName', emergencyContactName);
+      if (emergencyContactPhone !== undefined) client.set('emergencyContactPhone', emergencyContactPhone);
+      if (preferredLanguage !== undefined) client.set('preferredLanguage', preferredLanguage);
+      if (accessibilityRequirements !== undefined) client.set('accessibilityRequirements', accessibilityRequirements);
+      if (processedAllergies !== undefined) client.set('allergies', processedAllergies);
+      if (processedDietaryRestrictions !== undefined) client.set('dietaryRestrictions', processedDietaryRestrictions);
 
       client.set('modifiedBy', currentUser);
       await client.save(null, { useMasterKey: true });
