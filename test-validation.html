@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Validation Components</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/icons-sprite.svg">
+    <style>
+        body { padding: 20px; background-color: #f8f9fa; }
+        .test-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="test-container">
+            <h2>🧪 Validation Components Test</h2>
+            <p>This page tests our new validation components independently:</p>
+            
+            <form id="testForm">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4>📧 Email Component Test</h4>
+                        <!-- Email validation test -->
+                        <div class="email-input-wrapper mb-3">
+                            <label for="test-email" class="form-label">Email <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="test-email" name="email" 
+                                   placeholder="test@example.com" required 
+                                   pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}">
+                            <div class="invalid-feedback">Por favor proporciona un email válido</div>
+                            <div class="valid-feedback">Email válido</div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h4>📱 Phone Component Test</h4>
+                        <!-- Phone validation test -->
+                        <div class="phone-input-wrapper mb-3">
+                            <label for="test-phone" class="form-label">Teléfono</label>
+                            <div class="input-group">
+                                <span class="input-group-text">🇲🇽 +52</span>
+                                <input type="tel" class="form-control" id="test-phone" name="phone" 
+                                       placeholder="999 123 4567" maxlength="10">
+                                <div class="invalid-feedback">Número de teléfono inválido</div>
+                                <div class="valid-feedback">Número válido</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4>📄 RFC Component Test</h4>
+                        <!-- RFC validation test -->
+                        <div class="rfc-input-wrapper mb-3">
+                            <label for="test-rfc" class="form-label">RFC</label>
+                            <input type="text" class="form-control text-uppercase" id="test-rfc" name="rfc" 
+                                   placeholder="ABC123456789" maxlength="13" style="font-family: monospace;">
+                            <div class="invalid-feedback">RFC inválido</div>
+                            <div class="valid-feedback">RFC válido</div>
+                            <div class="form-text">Personas morales: 12 chars | Personas físicas: 13 chars</div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h4>🌐 URL Component Test</h4>
+                        <!-- URL validation test -->
+                        <div class="url-input-wrapper mb-3">
+                            <label for="test-url" class="form-label">Website</label>
+                            <div class="input-group">
+                                <span class="input-group-text">🌐</span>
+                                <input type="url" class="form-control" id="test-url" name="website" 
+                                       placeholder="https://www.example.com">
+                                <div class="invalid-feedback">URL inválida</div>
+                                <div class="valid-feedback">URL válida</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Test Form Submission</button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🧪 Validation test page loaded');
+            
+            // Email validation
+            const emailInput = document.getElementById('test-email');
+            emailInput.addEventListener('input', function() {
+                const emailPattern = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{\|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+                if (emailPattern.test(this.value)) {
+                    this.classList.remove('is-invalid');
+                    this.classList.add('is-valid');
+                } else {
+                    this.classList.add('is-invalid');
+                    this.classList.remove('is-valid');
+                }
+            });
+            
+            // Phone validation
+            const phoneInput = document.getElementById('test-phone');
+            phoneInput.addEventListener('input', function() {
+                const digits = this.value.replace(/\D/g, '');
+                if (digits.length === 10) {
+                    this.classList.remove('is-invalid');
+                    this.classList.add('is-valid');
+                } else {
+                    this.classList.add('is-invalid');
+                    this.classList.remove('is-valid');
+                }
+            });
+            
+            // RFC validation
+            const rfcInput = document.getElementById('test-rfc');
+            rfcInput.addEventListener('input', function() {
+                this.value = this.value.toUpperCase();
+                const RFC_MORAL = /^[A-ZÑ&]{3}[0-9]{6}[A-Z0-9]{3}$/;
+                const RFC_FISICA = /^[A-ZÑ&]{4}[0-9]{6}[A-Z0-9]{3}$/;
+                
+                if (RFC_MORAL.test(this.value) || RFC_FISICA.test(this.value)) {
+                    this.classList.remove('is-invalid');
+                    this.classList.add('is-valid');
+                } else {
+                    this.classList.add('is-invalid');
+                    this.classList.remove('is-valid');
+                }
+            });
+            
+            // URL validation
+            const urlInput = document.getElementById('test-url');
+            urlInput.addEventListener('input', function() {
+                const urlPattern = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
+                if (urlPattern.test(this.value)) {
+                    this.classList.remove('is-invalid');
+                    this.classList.add('is-valid');
+                } else {
+                    this.classList.add('is-invalid');
+                    this.classList.remove('is-valid');
+                }
+            });
+            
+            // Form submission test
+            document.getElementById('testForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                alert('✅ Form validation passed! All components are working.');
+            });
+        });
+    </script>
+</body>
+</html>

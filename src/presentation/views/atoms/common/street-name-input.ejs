@@ -1,0 +1,102 @@
+<%
+/**
+ * Street Name Input Atom
+ * Text input for street names with proper validation
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'streetName')
+ * @param {string} id - Input ID attribute (default: 'streetName')
+ * @param {string} label - Field label text (default: 'Nombre de la Calle')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} placeholder - Placeholder text
+ * @param {string} helpText - Help text below field
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string} value - Initial value (default: '')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'streetName';
+const inputId = typeof id !== 'undefined' ? id : 'streetName';
+const inputLabel = typeof label !== 'undefined' ? label : 'Nombre de la Calle';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Ej: Reforma, Insurgentes, 60';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Nombre de la calle o avenida';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const initialValue = typeof value !== 'undefined' ? value : '';
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-map-pin me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <input 
+        type="text"
+        class="form-control"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        placeholder="<%= inputPlaceholder %>"
+        value="<%= initialValue %>"
+        <%= isRequired ? 'required' : '' %>
+        maxlength="100"
+        pattern="^[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s\.\-]+$"
+        title="Nombre de la calle (letras, números, espacios, puntos y guiones)"
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    >
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <i class="ti ti-info-circle"></i>
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor ingrese un nombre de calle válido
+    </div>
+</div>
+
+<script>
+(function() {
+    // Real-time validation for street name
+    const streetInput = document.getElementById('<%= inputId %>');
+    
+    if (streetInput) {
+        // Auto-capitalize first letter of each word
+        streetInput.addEventListener('input', function() {
+            const value = this.value;
+            
+            // Capitalize first letter of each word
+            if (value.length > 0) {
+                this.value = value.replace(/(^|\s)\S/g, l => l.toUpperCase());
+            }
+            
+            // Validate pattern
+            const pattern = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s\.\-]*$/;
+            if (pattern.test(value) && value.trim().length > 0) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else if (value.trim().length > 0) {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-valid', 'is-invalid');
+            }
+        });
+        
+        streetInput.addEventListener('blur', function() {
+            // Clean up multiple spaces
+            this.value = this.value.replace(/\s+/g, ' ').trim();
+        });
+    }
+})();
+</script>

@@ -1,0 +1,239 @@
+<%
+// RFC Input Atom - Mexican RFC (Registro Federal de Contribuyentes) validation component
+// Parameters: name, id, label, required, value, placeholder, helpText, containerClass
+
+// Default parameters
+const inputName = typeof name !== 'undefined' ? name : '';
+const inputId = typeof id !== 'undefined' ? id : inputName || 'rfc_' + Math.random().toString(36).substr(2, 9);
+const inputLabel = typeof label !== 'undefined' ? label : 'RFC';
+const inputRequired = typeof required !== 'undefined' ? required : false;
+const inputValue = typeof value !== 'undefined' ? value : '';
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Ej: ABC123456789 o ABCD123456ABC';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Personas morales: 12 caracteres | Personas físicas: 13 caracteres';
+const inputContainerClass = typeof containerClass !== 'undefined' ? containerClass : '';
+
+// RFC patterns for HTML5 validation (simplified for pattern attribute)
+// Personas Morales: 3 letters + 6 digits + 3 alphanumeric (12 chars)
+// Personas Físicas: 4 letters + 6 digits + 3 alphanumeric (13 chars)
+const rfcPattern = '[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}';
+%>
+
+<div class="rfc-input-wrapper mb-3 <%= inputContainerClass %>">
+    <!-- Label -->
+    <label for="<%= inputId %>" class="form-label">
+        <%= inputLabel %>
+        <% if (inputRequired) { %>
+            <span class="text-danger ms-1">*</span>
+        <% } %>
+    </label>
+
+    <!-- RFC Input -->
+    <input
+        type="text"
+        class="form-control text-uppercase"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        placeholder="<%= inputPlaceholder %>"
+        value="<%= inputValue %>"
+        <% if (inputRequired) { %>required<% } %>
+        maxlength="13"
+        pattern="<%= rfcPattern %>"
+        autocomplete="off"
+        data-rfc-input="<%= inputName %>"
+        style="text-transform: uppercase;"
+    >
+
+    <!-- Validation Feedback -->
+    <div class="invalid-feedback">
+        Por favor proporciona un RFC válido
+    </div>
+
+    <div class="valid-feedback">
+        RFC válido
+    </div>
+
+    <!-- Help Text -->
+    <% if (inputHelpText) { %>
+        <div class="form-text text-muted mt-1">
+            <%= inputHelpText %>
+        </div>
+    <% } %>
+</div>
+
+<style>
+    .rfc-input-wrapper .form-control {
+        transition: all 0.3s ease;
+        font-family: monospace;
+        letter-spacing: 0.05em;
+    }
+
+    .rfc-input-wrapper .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+
+    .rfc-input-wrapper .form-control.is-invalid {
+        border-color: #dc3545;
+    }
+
+    .rfc-input-wrapper .form-control.is-valid {
+        border-color: #198754;
+    }
+</style>
+
+<script>
+(function() {
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initRfcValidation);
+    } else {
+        initRfcValidation();
+    }
+
+    function initRfcValidation() {
+        const rfcInput = document.getElementById('<%= inputId %>');
+        if (!rfcInput) return;
+
+        // RFC validation patterns
+        // Personas Morales: 3 letters (including Ñ and &) + YYMMDD + 3 alphanumeric (12 chars)
+        const RFC_MORAL_PATTERN = /^[A-ZÑ&]{3}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[A-Z0-9]{3}$/;
+        
+        // Personas Físicas: 4 letters (including Ñ and &) + YYMMDD + 3 alphanumeric (13 chars)
+        const RFC_FISICA_PATTERN = /^[A-ZÑ&]{4}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[A-Z0-9]{3}$/;
+
+        // Generic RFC test pattern (public/generic RFCs)
+        const RFC_GENERIC = /^XAXX010101000$/;
+        const RFC_FOREIGN = /^XEXX010101000$/;
+
+        // Auto-uppercase on input
+        rfcInput.addEventListener('input', function() {
+            // Convert to uppercase and remove invalid characters
+            let value = this.value.toUpperCase();
+            
+            // Remove any character that's not A-Z, Ñ, &, or 0-9
+            value = value.replace(/[^A-ZÑ&0-9]/g, '');
+            
+            // Update value if changed
+            if (value !== this.value) {
+                this.value = value;
+            }
+
+            // Validate RFC
+            validateRfc();
+        });
+
+        // Prevent lowercase and special characters on keypress
+        rfcInput.addEventListener('keypress', function(e) {
+            const char = String.fromCharCode(e.which || e.keyCode);
+            
+            // Allow: backspace, delete, tab, escape, enter
+            if ([8, 9, 27, 13, 46].indexOf(e.keyCode) !== -1) {
+                return true;
+            }
+            
+            // Allow: A-Z, Ñ, &, 0-9
+            if (!/[A-ZÑ&0-9]/i.test(char)) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // Validation function
+        function validateRfc() {
+            const value = rfcInput.value.trim().toUpperCase();
+
+            if (!value && !<%= inputRequired %>) {
+                // Optional field, empty is valid
+                rfcInput.classList.remove('is-invalid', 'is-valid');
+                return true;
+            }
+
+            if (!value && <%= inputRequired %>) {
+                // Required field, empty is invalid
+                rfcInput.classList.add('is-invalid');
+                rfcInput.classList.remove('is-valid');
+                return false;
+            }
+
+            // Check if it's a valid RFC
+            const isValidMoral = RFC_MORAL_PATTERN.test(value);
+            const isValidFisica = RFC_FISICA_PATTERN.test(value);
+            const isGeneric = RFC_GENERIC.test(value);
+            const isForeign = RFC_FOREIGN.test(value);
+            
+            const isValid = isValidMoral || isValidFisica || isGeneric || isForeign;
+
+            if (isValid) {
+                rfcInput.classList.remove('is-invalid');
+                rfcInput.classList.add('is-valid');
+                
+                // Update help text to show detected type
+                const helpText = rfcInput.closest('.rfc-input-wrapper').querySelector('.form-text');
+                if (helpText) {
+                    if (isGeneric || isForeign) {
+                        helpText.textContent = 'RFC genérico / público';
+                    } else if (isValidMoral) {
+                        helpText.textContent = 'RFC de persona moral (12 caracteres)';
+                    } else if (isValidFisica) {
+                        helpText.textContent = 'RFC de persona física (13 caracteres)';
+                    }
+                }
+            } else {
+                rfcInput.classList.add('is-invalid');
+                rfcInput.classList.remove('is-valid');
+                
+                // Show appropriate error message
+                const invalidFeedback = rfcInput.closest('.rfc-input-wrapper').querySelector('.invalid-feedback');
+                if (invalidFeedback) {
+                    if (value.length < 12) {
+                        invalidFeedback.textContent = 'RFC incompleto. Mínimo 12 caracteres';
+                    } else if (value.length > 13) {
+                        invalidFeedback.textContent = 'RFC demasiado largo. Máximo 13 caracteres';
+                    } else {
+                        invalidFeedback.textContent = 'Formato de RFC inválido. Verifica la estructura';
+                    }
+                }
+            }
+
+            return isValid;
+        }
+
+        // Blur event - final validation
+        rfcInput.addEventListener('blur', function() {
+            if (this.value) {
+                // Ensure uppercase and validate
+                this.value = this.value.toUpperCase().trim();
+                validateRfc();
+            } else if (!<%= inputRequired %>) {
+                // Optional empty field - remove validation states
+                rfcInput.classList.remove('is-invalid', 'is-valid');
+            }
+        });
+
+        // Form submission validation
+        const form = rfcInput.closest('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const isValid = validateRfc();
+
+                if (!isValid && (<%= inputRequired %> || rfcInput.value)) {
+                    e.preventDefault();
+                    rfcInput.focus();
+                    return false;
+                }
+
+                // Ensure uppercase before submission
+                if (rfcInput.value) {
+                    rfcInput.value = rfcInput.value.toUpperCase().trim();
+                }
+            });
+        }
+
+        // Initial validation if there's a value
+        if (rfcInput.value) {
+            rfcInput.value = rfcInput.value.toUpperCase();
+            validateRfc();
+        }
+    }
+})();
+</script>

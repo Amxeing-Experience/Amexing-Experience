@@ -412,10 +412,12 @@ class ServicesController {
           const originQuery = new Parse.Query('Services');
           originQuery.containedIn('originPOI', aeropuertoPOIs);
           originQuery.equalTo('exists', true);
-          if (activeFilter === 'true') {
-            originQuery.equalTo('active', true);
-          } else if (activeFilter === 'false') {
+          // Default to active=true unless explicitly requesting inactive
+          if (activeFilter === 'false') {
             originQuery.equalTo('active', false);
+          } else {
+            // Default behavior: show only active services
+            originQuery.equalTo('active', true);
           }
           originQuery.include('originPOI');
           originQuery.include('originPOI.serviceType');
@@ -427,10 +429,12 @@ class ServicesController {
           const destQuery = new Parse.Query('Services');
           destQuery.containedIn('destinationPOI', aeropuertoPOIs);
           destQuery.equalTo('exists', true);
-          if (activeFilter === 'true') {
-            destQuery.equalTo('active', true);
-          } else if (activeFilter === 'false') {
+          // Default to active=true unless explicitly requesting inactive
+          if (activeFilter === 'false') {
             destQuery.equalTo('active', false);
+          } else {
+            // Default behavior: show only active services
+            destQuery.equalTo('active', true);
           }
           destQuery.include('originPOI');
           destQuery.include('originPOI.serviceType');
@@ -445,10 +449,12 @@ class ServicesController {
           query = new Parse.Query('Services');
           // Apply common filters
           query.equalTo('exists', true);
-          if (activeFilter === 'true') {
-            query.equalTo('active', true);
-          } else if (activeFilter === 'false') {
+          // Default to active=true unless explicitly requesting inactive
+          if (activeFilter === 'false') {
             query.equalTo('active', false);
+          } else {
+            // Default behavior: show only active services
+            query.equalTo('active', true);
           }
           query.include('originPOI');
           query.include('originPOI.serviceType');
@@ -485,10 +491,12 @@ class ServicesController {
           query.include('vehicleType');
           query.include('rate');
 
-          if (activeFilter === 'true') {
-            query.equalTo('active', true);
-          } else if (activeFilter === 'false') {
+          // Default to active=true unless explicitly requesting inactive
+          if (activeFilter === 'false') {
             query.equalTo('active', false);
+          } else {
+            // Default behavior: show only active services
+            query.equalTo('active', true);
           }
 
           // Add aeropuerto constraints if needed

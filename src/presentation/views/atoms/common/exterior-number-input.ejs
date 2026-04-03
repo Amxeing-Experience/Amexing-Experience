@@ -1,0 +1,104 @@
+<%
+/**
+ * Exterior Number Input Atom
+ * Input for building exterior numbers with validation
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'exteriorNumber')
+ * @param {string} id - Input ID attribute (default: 'exteriorNumber')
+ * @param {string} label - Field label text (default: 'No. Exterior')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} placeholder - Placeholder text
+ * @param {string} helpText - Help text below field
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string} value - Initial value (default: '')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'exteriorNumber';
+const inputId = typeof id !== 'undefined' ? id : 'exteriorNumber';
+const inputLabel = typeof label !== 'undefined' ? label : 'No. Exterior';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Ej: 123, 45-A';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Número exterior del inmueble';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const initialValue = typeof value !== 'undefined' ? value : '';
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-hash me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <input 
+        type="text"
+        class="form-control"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        placeholder="<%= inputPlaceholder %>"
+        value="<%= initialValue %>"
+        <%= isRequired ? 'required' : '' %>
+        maxlength="10"
+        pattern="^[0-9A-Za-z\-]+$"
+        title="Número exterior (números, letras y guiones)"
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    >
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <i class="ti ti-info-circle"></i>
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor ingrese un número exterior válido
+    </div>
+</div>
+
+<script>
+(function() {
+    // Real-time validation for exterior number
+    const exteriorInput = document.getElementById('<%= inputId %>');
+    
+    if (exteriorInput) {
+        exteriorInput.addEventListener('input', function() {
+            let value = this.value.toUpperCase();
+            this.value = value;
+            
+            // Validate pattern (numbers, letters, dashes)
+            const pattern = /^[0-9A-Z\-]*$/;
+            if (pattern.test(value) && value.trim().length > 0) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else if (value.trim().length > 0) {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-valid', 'is-invalid');
+            }
+        });
+        
+        // Prevent invalid characters
+        exteriorInput.addEventListener('keypress', function(e) {
+            const char = String.fromCharCode(e.which);
+            if (!/[0-9A-Za-z\-]/.test(char)) {
+                e.preventDefault();
+            }
+        });
+        
+        exteriorInput.addEventListener('blur', function() {
+            this.value = this.value.trim();
+        });
+    }
+})();
+</script>

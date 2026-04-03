@@ -1,0 +1,151 @@
+<%
+/**
+ * Allergies Input Atom with Bullet Point Support
+ * Multi-line text field for allergies that processes into bullet points
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'allergies')
+ * @param {string} id - Input ID attribute (default: 'allergies')
+ * @param {string} label - Field label text (default: 'Alergias')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} placeholder - Placeholder text
+ * @param {string} helpText - Help text below field
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string|Array} value - Initial value (string or array) (default: '')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'allergies';
+const inputId = typeof id !== 'undefined' ? id : 'allergies';
+const inputLabel = typeof label !== 'undefined' ? label : 'Alergias';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Ingrese cada alergia en una línea separada:\nNueces\nMariscos\nLácteos';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Una alergia por línea. Se mostrarán como puntos en el perfil del cliente.';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+
+// Convert array to string if needed
+let initialValue = '';
+if (typeof value !== 'undefined') {
+    if (Array.isArray(value)) {
+        initialValue = value.join('\n');
+    } else {
+        initialValue = value;
+    }
+}
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-medical-cross text-warning me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <textarea 
+        class="form-control"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        placeholder="<%= inputPlaceholder %>"
+        <%= isRequired ? 'required' : '' %>
+        rows="4"
+        style="resize: vertical;"
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    ><%= initialValue %></textarea>
+    
+    <!-- Live preview of bullet points -->
+    <div id="<%= inputId %>-preview" class="mt-2 p-2 bg-light rounded" style="display: none;">
+        <small class="text-muted d-block mb-1">Vista previa:</small>
+        <ul id="<%= inputId %>-list" class="mb-0 text-dark"></ul>
+    </div>
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <i class="ti ti-info-circle"></i>
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor ingrese las alergias del cliente
+    </div>
+</div>
+
+<script>
+(function() {
+    // Real-time bullet point preview for allergies
+    const allergiesInput = document.getElementById('<%= inputId %>');
+    const preview = document.getElementById('<%= inputId %>-preview');
+    const list = document.getElementById('<%= inputId %>-list');
+    
+    if (allergiesInput && preview && list) {
+        function updatePreview() {
+            const value = allergiesInput.value.trim();
+            
+            if (value) {
+                // Split by newlines and filter empty lines
+                const items = value.split('\n')
+                    .map(item => item.trim())
+                    .filter(item => item.length > 0);
+                
+                if (items.length > 0) {
+                    // Clear existing list
+                    list.innerHTML = '';
+                    
+                    // Add each item as a bullet point
+                    items.forEach(item => {
+                        const li = document.createElement('li');
+                        li.textContent = item;
+                        list.appendChild(li);
+                    });
+                    
+                    preview.style.display = 'block';
+                    allergiesInput.classList.add('is-valid');
+                    allergiesInput.classList.remove('is-invalid');
+                } else {
+                    preview.style.display = 'none';
+                    allergiesInput.classList.remove('is-valid', 'is-invalid');
+                }
+            } else {
+                preview.style.display = 'none';
+                allergiesInput.classList.remove('is-valid', 'is-invalid');
+            }
+        }
+        
+        // Update preview on input
+        allergiesInput.addEventListener('input', updatePreview);
+        
+        // Clean up on blur
+        allergiesInput.addEventListener('blur', function() {
+            // Remove extra blank lines
+            const lines = this.value.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+            this.value = lines.join('\n');
+            updatePreview();
+        });
+        
+        // Initial preview if there's existing data
+        if (allergiesInput.value) {
+            updatePreview();
+        }
+        
+        // Store as array for form submission
+        allergiesInput.form?.addEventListener('submit', function(e) {
+            // Convert textarea to array before submission
+            const items = allergiesInput.value.split('\n')
+                .map(item => item.trim())
+                .filter(item => item.length > 0);
+            
+            // Store as JSON string for backend processing
+            allergiesInput.dataset.arrayValue = JSON.stringify(items);
+        });
+    }
+})();
+</script>

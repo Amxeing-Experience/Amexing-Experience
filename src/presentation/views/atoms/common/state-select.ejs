@@ -1,0 +1,133 @@
+<%
+/**
+ * State Select Atom
+ * Dropdown for Mexican states with validation
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'state')
+ * @param {string} id - Input ID attribute (default: 'state')
+ * @param {string} label - Field label text (default: 'Estado')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} helpText - Help text below field
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string} value - Initial selected value (default: '')
+ * @param {string} country - Country for state list (default: 'MX')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'state';
+const inputId = typeof id !== 'undefined' ? id : 'state';
+const inputLabel = typeof label !== 'undefined' ? label : 'Estado';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Seleccione el estado o provincia';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const selectedValue = typeof value !== 'undefined' ? value : '';
+const inputCountry = typeof country !== 'undefined' ? country : 'MX';
+
+// Mexican states
+const mexicanStates = [
+    { value: 'AGS', text: 'Aguascalientes' },
+    { value: 'BC', text: 'Baja California' },
+    { value: 'BCS', text: 'Baja California Sur' },
+    { value: 'CAM', text: 'Campeche' },
+    { value: 'CHIS', text: 'Chiapas' },
+    { value: 'CHIH', text: 'Chihuahua' },
+    { value: 'CDMX', text: 'Ciudad de México' },
+    { value: 'COAH', text: 'Coahuila' },
+    { value: 'COL', text: 'Colima' },
+    { value: 'DGO', text: 'Durango' },
+    { value: 'GTO', text: 'Guanajuato' },
+    { value: 'GRO', text: 'Guerrero' },
+    { value: 'HGO', text: 'Hidalgo' },
+    { value: 'JAL', text: 'Jalisco' },
+    { value: 'MEX', text: 'Estado de México' },
+    { value: 'MICH', text: 'Michoacán' },
+    { value: 'MOR', text: 'Morelos' },
+    { value: 'NAY', text: 'Nayarit' },
+    { value: 'NL', text: 'Nuevo León' },
+    { value: 'OAX', text: 'Oaxaca' },
+    { value: 'PUE', text: 'Puebla' },
+    { value: 'QRO', text: 'Querétaro' },
+    { value: 'QROO', text: 'Quintana Roo' },
+    { value: 'SLP', text: 'San Luis Potosí' },
+    { value: 'SIN', text: 'Sinaloa' },
+    { value: 'SON', text: 'Sonora' },
+    { value: 'TAB', text: 'Tabasco' },
+    { value: 'TAMS', text: 'Tamaulipas' },
+    { value: 'TLAX', text: 'Tlaxcala' },
+    { value: 'VER', text: 'Veracruz' },
+    { value: 'YUC', text: 'Yucatán' },
+    { value: 'ZAC', text: 'Zacatecas' }
+];
+
+// Use Mexican states by default
+const states = mexicanStates;
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-map-2 me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <select 
+        class="form-select"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        <%= isRequired ? 'required' : '' %>
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    >
+        <option value="">Seleccione un estado</option>
+        <% states.forEach(function(state) { %>
+            <option 
+                value="<%= state.value %>" 
+                <%= state.value === selectedValue ? 'selected' : '' %>
+            >
+                <%= state.text %>
+            </option>
+        <% }); %>
+    </select>
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <i class="ti ti-info-circle"></i>
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor seleccione un estado
+    </div>
+</div>
+
+<script>
+(function() {
+    // State selector enhancement
+    const stateSelect = document.getElementById('<%= inputId %>');
+    
+    if (stateSelect) {
+        stateSelect.addEventListener('change', function() {
+            if (this.value) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else if (<%= isRequired ? 'true' : 'false' %>) {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            }
+        });
+        
+        // Initial validation if value exists
+        if (stateSelect.value) {
+            stateSelect.classList.add('is-valid');
+        }
+    }
+})();
+</script>

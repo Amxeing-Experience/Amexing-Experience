@@ -388,6 +388,9 @@ async function getTrasladosData(clientId, priceOptions) {
 
     if (!destination || !vehicleType || !rate) return;
 
+    // Skip if the service is not active or doesn't exist
+    if (!service || service.get('active') !== true || service.get('exists') !== true) return;
+
     const originName = origin ? origin.get('name') : 'N/A';
     const destName = destination.get('name') || 'N/A';
     const vtName = vehicleType.get('name') || 'N/A';
@@ -477,7 +480,11 @@ async function getADisposicionData(priceOptions) {
 function formatAvailabilityDays(availability, availableDays) {
   const dayNames = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
   if (availability && Array.isArray(availability) && availability.length > 0) {
-    const days = availability.map((s) => (typeof s === 'object' && typeof s.day === 'number' ? dayNames[s.day] : '')).filter(Boolean);
+    const days = availability
+      .filter((s) => (typeof s === 'object' && typeof s.day === 'number')
+               && ((s.startTime && s.endTime) || (s.times && Array.isArray(s.times) && s.times.length > 0)))
+      .map((s) => dayNames[s.day] || '')
+      .filter(Boolean);
     return days.length >= 7 ? 'Todos los dias' : days.join(', ');
   }
   if (availableDays && Array.isArray(availableDays) && availableDays.length > 0) {
@@ -497,8 +504,27 @@ function formatAvailabilityTimes(availability) {
   if (!availability || !Array.isArray(availability) || availability.length === 0) return '-';
   const dayNames = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
   const times = availability
-    .filter((s) => s.startTime && s.endTime)
-    .map((s) => `${dayNames[s.day] || ''}: ${s.startTime}-${s.endTime}`);
+    .filter((s) => (s.startTime && s.endTime) || (s.times && Array.isArray(s.times) && s.times.length > 0))
+    .map((s) => {
+      const dayName = dayNames[s.day] || '';
+
+      // Multi-slot format: {day, times: [{start, end}, ...]}
+      if (s.times && Array.isArray(s.times) && s.times.length > 0) {
+        const timeSlots = s.times
+          .filter((slot) => slot.start && slot.end)
+          .map((slot) => `${slot.start}-${slot.end}`)
+          .join(', ');
+        return timeSlots ? `${dayName}: ${timeSlots}` : null;
+      }
+
+      // Simple format: {day, startTime, endTime}
+      if (s.startTime && s.endTime) {
+        return `${dayName}: ${s.startTime}-${s.endTime}`;
+      }
+
+      return null;
+    })
+    .filter(Boolean);
   return times.length > 0 ? times.join(', ') : '-';
 }
 
@@ -587,6 +613,9 @@ async function getExperienciasData() {
 
   providerExperiencias.forEach((pe) => {
     const prov = pe.get('provider');
+
+    // Skip if the provider is not active or doesn't exist
+    if (!prov || prov.get('active') !== true || prov.get('exists') !== true) return;
     const avail = pe.get('availability') || [];
     const availDays = pe.get('availableDays') || [];
     const incl = pe.get('includes') || [];
