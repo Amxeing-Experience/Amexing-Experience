@@ -39,7 +39,7 @@ const getUserPermissionInheritance = async (request) => {
 
     // Check authorization
     if (userId !== request.user.id) {
-      const userRole = request.user.get('role');
+      const userRole = request.user.get('role') || 'guest';
       if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
         throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, "Cannot view other users' permission inheritance");
       }
@@ -49,7 +49,7 @@ const getUserPermissionInheritance = async (request) => {
 
     logger.logSecurityEvent('PERMISSION_INHERITANCE_VIEWED', request.user.id, {
       targetUserId: userId,
-      viewerRole: request.user.get('role'),
+      viewerRole: request.user.get('role') || 'guest',
       hasInheritance: inheritance.hasInheritance,
     });
 
@@ -85,7 +85,7 @@ const getAvailableContexts = async (request) => {
 
     // Only allow users to view their own contexts unless admin
     if (userId !== request.user.id) {
-      const userRole = request.user.get('role');
+      const userRole = request.user.get('role') || 'guest';
       if (!['admin', 'superadmin'].includes(userRole)) {
         throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, "Cannot view other users' contexts");
       }
@@ -174,7 +174,7 @@ const createPermissionDelegation = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['manager', 'admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Insufficient permissions to create delegation');
     }
@@ -283,7 +283,7 @@ const createEmergencyElevation = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for emergency elevation');
     }
@@ -354,7 +354,7 @@ const createPermissionOverride = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for permission overrides');
     }
@@ -437,7 +437,7 @@ const checkUserPermission = async (request) => {
 
     // Check authorization
     if (userId !== request.user.id) {
-      const userRole = request.user.get('role');
+      const userRole = request.user.get('role') || 'guest';
       if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
         throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, "Cannot check other users' permissions");
       }
@@ -480,7 +480,7 @@ const getActiveDelegations = async (request) => {
 
     // Check authorization
     if (managerId !== request.user.id) {
-      const userRole = request.user.get('role');
+      const userRole = request.user.get('role') || 'guest';
       if (!['admin', 'superadmin'].includes(userRole)) {
         throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, "Cannot view other managers' delegations");
       }
@@ -521,7 +521,7 @@ const getDelegatedPermissions = async (request) => {
 
     // Check authorization
     if (employeeId !== request.user.id) {
-      const userRole = request.user.get('role');
+      const userRole = request.user.get('role') || 'guest';
       if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
         throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, "Cannot view other employees' delegated permissions");
       }
@@ -558,7 +558,7 @@ const getPermissionAuditReport = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for audit reports');
     }
@@ -615,7 +615,7 @@ const getPermissionAuditStats = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for audit statistics');
     }
@@ -656,7 +656,7 @@ const getAvailablePermissions = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['manager', 'admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Manager access required to view available permissions');
     }

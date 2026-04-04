@@ -2218,11 +2218,8 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
+      // Permission check is already handled by middleware (requireRoleLevel)
+      const userRole = req.userRole || currentUser.get?.('role') || currentUser.role;
 
       const {
         originPOI, destinationPOI, vehicleType, rate, note, routeDuration,
@@ -2311,12 +2308,8 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions - use req.userRole from JWT middleware instead of accessing user object directly
+      // Permission check is already handled by middleware (requireRoleLevel)
       const { userRole } = req;
-
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
 
       const { id } = req.params;
       const {
@@ -2419,11 +2412,17 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
+      // Permission check is already handled by middleware (requireRoleLevel)
+      // The middleware already validated the user has the required role level
+      const userRole = req.userRole || currentUser.get?.('role') || currentUser.role;
+
+      logger.info('toggleServiceStatus - User role check', {
+        userId: currentUser.id,
+        reqUserRole: req.userRole,
+        getUserRole: currentUser.get?.('role'),
+        directRole: currentUser.role,
+        finalRole: userRole,
+      });
 
       const { id } = req.params;
       const { active } = req.body;
@@ -2485,11 +2484,8 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
+      // Permission check is already handled by middleware (requireRoleLevel)
+      const userRole = req.userRole || currentUser.get?.('role') || currentUser.role;
 
       const { id } = req.params;
       if (!id) {
@@ -2547,11 +2543,8 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
+      // Permission check is already handled by middleware (requireRoleLevel)
+      const userRole = req.userRole || currentUser.get?.('role') || currentUser.role;
 
       const { id } = req.params;
       const { rateId } = req.body;

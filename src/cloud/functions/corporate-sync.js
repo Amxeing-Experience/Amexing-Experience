@@ -35,7 +35,7 @@ const triggerCorporateSync = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for corporate sync');
     }
@@ -88,7 +88,7 @@ const startPeriodicSync = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for sync management');
     }
@@ -156,7 +156,7 @@ const stopPeriodicSync = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for sync management');
     }
@@ -206,7 +206,7 @@ const getAllSyncStatuses = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for sync status');
     }
@@ -250,7 +250,7 @@ const getCorporateSyncHistory = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for sync history');
     }

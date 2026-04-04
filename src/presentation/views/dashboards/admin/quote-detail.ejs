@@ -15,6 +15,14 @@ const steps = [
 ];
 %>
 
+<script>
+// Make current user info available to all sections
+window.currentUser = {
+    role: '<%= typeof userRole !== "undefined" ? userRole : "admin" %>',
+    id: '<%= typeof userId !== "undefined" ? userId : "" %>'
+};
+</script>
+
 <!-- Page Header -->
 <div class="row mb-3">
     <div class="col-12">
@@ -26,6 +34,10 @@ const steps = [
                         <span id="quoteFolioSpan" class="text-muted" style="font-size: 0.9em;">
                             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                         </span>
+                        <button class="btn btn-sm btn-outline-secondary ms-2" id="btnViewHistory" 
+                                data-bs-toggle="tooltip" title="Ver historial de cambios">
+                            <i class="ti ti-history"></i>
+                        </button>
                     <% } %>
                 </h2>
                 <nav aria-label="breadcrumb">
@@ -101,6 +113,13 @@ const steps = [
                 </a>
             <% } %>
         <% }); %>
+    </div>
+</div>
+
+<!-- Ownership Panel -->
+<div class="row mb-3">
+    <div class="col-12">
+        <%- include('./sections/quote-ownership', { quoteId: quoteId }) %>
     </div>
 </div>
 
@@ -545,3 +564,6 @@ document.addEventListener('DOMContentLoaded', function() {
     <% } %>
 });
 </script>
+
+<!-- Toast Container for Notifications -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100;"></div>

@@ -6,9 +6,15 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const QuoteController = require('../../../application/controllers/api/QuoteController');
+const QuoteOwnershipController = require('../../../application/controllers/api/QuoteOwnershipController');
+const QuoteCollaborationController = require('../../../application/controllers/api/QuoteCollaborationController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 
 const router = express.Router();
+
+// Initialize controllers (only new ones need instantiation)
+const ownershipController = new QuoteOwnershipController();
+const collaborationController = new QuoteCollaborationController();
 
 /**
  * Rate limiter for read operations (GET)
@@ -110,6 +116,18 @@ router.post(
 );
 
 /**
+ * GET /api/quotes/owned - Get quotes owned by current user.
+ * Private access (Authenticated users).
+ * NOTE: This must come before /:id routes to avoid conflict.
+ */
+router.get(
+  '/owned',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => ownershipController.getOwnedQuotes(req, res)
+);
+
+/**
  * GET /api/quotes/with-invoices - Get quotes with completed invoices for download.
  * Private access (Department Manager, Admin and SuperAdmin).
  *
@@ -146,6 +164,166 @@ router.get(
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.getQuotesWithInvoices(req, res)
+);
+
+// ===== OWNERSHIP ROUTES (Must come before /:id routes) =====
+
+/**
+ * POST /api/quotes/:quoteId/ownership/transfer - Transfer quote ownership.
+ * Private access (Owner or Admin).
+ */
+router.post(
+  '/:quoteId/ownership/transfer',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => ownershipController.transferOwnership(req, res)
+);
+
+/**
+ * GET /api/quotes/:quoteId/available-owners - Get available owners for a quote.
+ * Private access (Admin and Department Manager only).
+ */
+router.get(
+  '/:quoteId/available-owners',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => ownershipController.getAvailableOwners(req, res)
+);
+
+/**
+ * GET /api/quotes/:quoteId/ownership - Get current ownership.
+ * Private access (Authenticated users).
+ */
+router.get(
+  '/:quoteId/ownership',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => ownershipController.getCurrentOwnership(req, res)
+);
+
+/**
+ * GET /api/quotes/:quoteId/ownership/history - Get ownership history.
+ * Private access (Owner or users with access).
+ */
+router.get(
+  '/:quoteId/ownership/history',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => ownershipController.getOwnershipHistory(req, res)
+);
+
+// ===== COLLABORATION ROUTES (Must come before /:id routes) =====
+
+/**
+ * GET /api/quotes/:quoteId/access - Get current user access.
+ * Private access (Authenticated users).
+ */
+router.get(
+  '/:quoteId/access',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => collaborationController.getCurrentUserAccess(req, res)
+);
+
+/**
+ * POST /api/quotes/:quoteId/collaborators - Add collaborator.
+ * Private access (Owner only).
+ */
+router.post(
+  '/:quoteId/collaborators',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => collaborationController.addCollaborator(req, res)
+);
+
+/**
+ * GET /api/quotes/:quoteId/collaborators - Get collaborators.
+ * Private access (Users with access).
+ */
+router.get(
+  '/:quoteId/collaborators',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => collaborationController.getCollaborators(req, res)
+);
+
+/**
+ * DELETE /api/quotes/:quoteId/collaborators/:agentId - Remove collaborator.
+ * Private access (Owner only).
+ */
+router.delete(
+  '/:quoteId/collaborators/:agentId',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => collaborationController.removeCollaborator(req, res)
+);
+
+/**
+ * PUT /api/quotes/:quoteId/collaborators/:agentId/role - Update collaborator role.
+ * Private access (Owner only).
+ */
+router.put(
+  '/:quoteId/collaborators/:agentId/role',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => collaborationController.updateCollaboratorRole(req, res)
+);
+
+// ===== EDIT TRACKING ROUTES =====
+
+/**
+ * GET /api/quotes/:quoteId/edits/pending - Get pending edits.
+ * Private access (Owner only).
+ */
+router.get(
+  '/:quoteId/edits/pending',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => collaborationController.getPendingEdits(req, res)
+);
+
+/**
+ * POST /api/quotes/:quoteId/edits - Record an edit.
+ * Private access (Users with edit permission).
+ */
+router.post(
+  '/:quoteId/edits',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => collaborationController.recordEdit(req, res)
+);
+
+/**
+ * GET /api/quotes/:quoteId/edits - Get edit history.
+ * Private access (Users with access).
+ */
+router.get(
+  '/:quoteId/edits',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => collaborationController.getEditHistory(req, res)
+);
+
+/**
+ * POST /api/quotes/:quoteId/edits/:editId/approve - Approve an edit.
+ * Private access (Owner only).
+ */
+router.post(
+  '/:quoteId/edits/:editId/approve',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => collaborationController.approveEdit(req, res)
+);
+
+/**
+ * POST /api/quotes/:quoteId/edits/:editId/reject - Reject an edit.
+ * Private access (Owner only).
+ */
+router.post(
+  '/:quoteId/edits/:editId/reject',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => collaborationController.rejectEdit(req, res)
 );
 
 /**

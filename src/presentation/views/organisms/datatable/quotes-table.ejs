@@ -376,11 +376,21 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     data: 'client',
                     render: function(data) {
                         if (!data) return '<em class="text-muted">Sin cliente</em>';
-                        const fullName = data.fullName || '-';
-                        const company = data.companyName;
-                        return company
-                            ? `${fullName} <small class="text-muted">(${company})</small>`
-                            : fullName;
+                        
+                        // Priority: companyName > fullName > firstName + lastName
+                        let displayText = data.companyName || 
+                                        data.fullName || 
+                                        `${data.firstName || ''} ${data.lastName || ''}`.trim() || 
+                                        '-';
+                        
+                        // Extract enterprise name from parentheses if present
+                        // Example: "Abercrombie & Kent Mexico (Abercrombie)" -> "Abercrombie"
+                        const parenthesesMatch = displayText.match(/\(([^)]+)\)$/);
+                        if (parenthesesMatch) {
+                            displayText = parenthesesMatch[1];
+                        }
+                        
+                        return `<span>${displayText}</span>`;
                     }
                 },
                 <% } %>
@@ -394,10 +404,17 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     }
                 },
                 {
-                    data: 'numberOfPeople',
+                    data: null,
                     className: 'text-center',
-                    render: function(data) {
-                        return `<span class="fw-semibold">${data || 1}</span>`;
+                    render: function(data, type, row) {
+                        // Calculate total from individual fields
+                        const adults = row.numberOfAdults || 0;
+                        const children = row.numberOfChildren || 0;
+                        const infants = row.numberOfInfants || 0;
+                        const total = adults + children + infants;
+                        
+                        // Always use calculated total (no fallback)
+                        return `<span class="fw-semibold">${total}</span>`;
                     }
                 },
                 {
@@ -434,35 +451,24 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         
                         // Build available statuses based on role
                         let statuses = [];
-                        if (data === 'quoted') {
-                            // From quoted, anyone can change to requested
-                            statuses.push({ value: 'quoted', text: 'COTIZADO', class: 'bg-info' });
-                            statuses.push({ value: 'requested', text: 'SOLICITADO', class: 'bg-primary' });
-                            // Admins can also set admin-only statuses
-                            if (isAdmin) {
-                                statuses.push({ value: 'hold', text: 'BLOQUEADO', class: 'bg-warning' });
-                                statuses.push({ value: 'rejected', text: 'RECHAZADO', class: 'bg-danger' });
-                            }
-                        } else if (data === 'requested') {
-                            // From requested, only admins can change status
-                            statuses.push({ value: 'requested', text: 'SOLICITADO', class: 'bg-primary' });
-                            if (isAdmin) {
-                                statuses.push({ value: 'hold', text: 'BLOQUEADO', class: 'bg-warning' });
-                                statuses.push({ value: 'scheduled', text: 'AGENDADO', class: 'bg-success' });
-                                statuses.push({ value: 'rejected', text: 'RECHAZADO', class: 'bg-danger' });
-                            }
+                        
+                        if (isAdmin) {
+                            // Admins can change to any status from any state
+                            statuses = allStatuses.slice(); // Include all 5 statuses
                         } else {
-                            // For other statuses, show current and admin-only options if admin
-                            const currentStatus = allStatuses.find(s => s.value === data);
-                            if (currentStatus) {
-                                statuses.push(currentStatus);
-                            }
-                            if (isAdmin) {
-                                // Admin can change between admin-only statuses
-                                if (data !== 'hold') statuses.push({ value: 'hold', text: 'BLOQUEADO', class: 'bg-warning' });
-                                if (data !== 'scheduled') statuses.push({ value: 'scheduled', text: 'AGENDADO', class: 'bg-success' });
-                                if (data !== 'rejected') statuses.push({ value: 'rejected', text: 'RECHAZADO', class: 'bg-danger' });
-                                if (data !== 'quoted') statuses.push({ value: 'quoted', text: 'COTIZADO', class: 'bg-info' });
+                            // Non-admins have limited transitions
+                            if (data === 'quoted') {
+                                // From quoted, non-admins can only change to requested
+                                statuses = [
+                                    { value: 'quoted', text: 'COTIZADO', class: 'bg-info' },
+                                    { value: 'requested', text: 'SOLICITADO', class: 'bg-primary' }
+                                ];
+                            } else {
+                                // For all other statuses, non-admins can only view (not change)
+                                const currentStatus = allStatuses.find(s => s.value === data);
+                                if (currentStatus) {
+                                    statuses = [currentStatus];
+                                }
                             }
                         }
                         
@@ -642,7 +648,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando Cotizaciones...'
             },
-            order: [[<%= showClientColumn ? 8 : 7 %>, 'desc']], // Sort by updatedAt column by default (most recent first)
+            order: [[<%= showClientColumn ? 7 : 6 %>, 'desc']], // Sort by updatedAt column by default (most recent first)
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +

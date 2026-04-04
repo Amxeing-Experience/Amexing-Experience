@@ -35,7 +35,7 @@
                 </h6>
 
                 <div class="row">
-                    <div class="col-md-12 mb-3">
+                    <div class="col-md-10">
                         <% if (typeof userRole !== 'undefined' && (userRole === 'department_manager' || userRole === 'client')) { %>
                             <!-- Department Manager/Client: Select from their owned clients -->
                             <%- include('../../../atoms/common/tom-select', {
@@ -49,9 +49,6 @@
                                 options: [],
                                 selected: []
                             }) %>
-                            <!-- <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
-                                <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
-                            </button> -->
                         <% } else { %>
                             <!-- Admin/SuperAdmin: Client selection -->
                             <%- include('../../../atoms/common/tom-select', {
@@ -65,11 +62,45 @@
                                 options: [],
                                 selected: []
                             }) %>
-                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
-                                <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
-                            </button>
                         <% } %>
                     </div>
+                    <div class="col-md-2">
+                        <% if (typeof userRole === 'undefined' || !['department_manager', 'client'].includes(userRole)) { %>
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-outline-primary w-100 px-2 py-2" id="createQuickClientBtn">
+                            <i class="ti ti-plus me-1"></i>Crear Cliente
+                        </button>
+                        <% } %>
+                    </div>
+                </div>
+                
+                <!-- Ownership and Sharing Controls -->
+                <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded border">
+                    <!-- Left: Owner Info -->
+                    <div class="d-flex align-items-center">
+                        <div class="badge bg-secondary me-3">
+                            <i class="ti ti-user me-1"></i>
+                            Propietario
+                        </div>
+                        <div>
+                            <div class="fw-medium" id="compactOwnerName">
+                                <div class="placeholder-glow" id="ownerLoader">
+                                    <span class="placeholder col-6 placeholder-sm"></span>
+                                </div>
+                            </div>
+                            <small class="text-muted" id="compactOwnerEmail">
+                                <div class="placeholder-glow" id="ownerEmailLoader">
+                                    <span class="placeholder col-8 placeholder-xs"></span>
+                                </div>
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <!-- Right: Compartir Button -->
+                    <button type="button" class="btn btn-primary" id="btnManageCollaborators">
+                        <i class="ti ti-user-plus me-1"></i>
+                        Compartir
+                    </button>
                 </div>
             </div>
 
@@ -82,11 +113,10 @@
 
                 <div class="row">
                     <div class="col-md-8 mb-3">
-                        <label for="eventType" class="form-label">Tipo de Evento / Motivo <span class="text-danger">*</span></label>
+                        <label for="eventType" class="form-label">Tipo de Evento / Motivo</label>
                         <input type="text" class="form-control" id="eventType" name="eventType"
-                               placeholder="Ej: Experiencias para despedida de soltera" required>
+                               placeholder="Ej: Experiencias para despedida de soltera">
                         <div class="form-text">Describe el tipo de evento o el motivo del viaje</div>
-                        <div class="invalid-feedback">Por favor ingresa el tipo de evento o motivo</div>
                     </div>
 
                     <div class="col-md-4 mb-3">
@@ -100,16 +130,16 @@
 
                 <div class="row">
                     <div class="col-md-4 mb-3">
-                        <label for="numberOfAdults" class="form-label">Número de adultos (12+) <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control quote-people-input" id="numberOfAdults" name="numberOfAdults" min="0" value="0">
+                        <label for="numberOfAdults" class="form-label">Número de adultos (12+)</label>
+                        <input type="number" class="form-control quote-people-input" id="numberOfAdults" name="numberOfAdults" min="0" placeholder="0">
                     </div>
                     <div class="col-md-4 mb-3">
                         <label for="numberOfChildren" class="form-label">Número de niños (3-12)</label>
-                        <input type="number" class="form-control quote-people-input" id="numberOfChildren" name="numberOfChildren" min="0" value="0">
+                        <input type="number" class="form-control quote-people-input" id="numberOfChildren" name="numberOfChildren" min="0" placeholder="0">
                     </div>
                     <div class="col-md-4 mb-3">
                         <label for="numberOfInfants" class="form-label">Número de infantes (0-2)</label>
-                        <input type="number" class="form-control quote-people-input" id="numberOfInfants" name="numberOfInfants" min="0" value="0">
+                        <input type="number" class="form-control quote-people-input" id="numberOfInfants" name="numberOfInfants" min="0" placeholder="0">
                     </div>
                 </div>
                 <input type="hidden" id="numberOfPeople" name="numberOfPeople" value="0">
@@ -306,20 +336,46 @@
         return null;
     }
 
-    // Helper function to wait for Tom Select to be initialized
-    function waitForTomSelect(elementId, maxAttempts = 50) {
+    // Helper function to wait for Custom Select to be initialized  
+    function waitForTomSelect(elementId, maxAttempts = 100) {
         return new Promise((resolve, reject) => {
+            const element = document.getElementById(elementId);
+            
+            // Check if already initialized (support both tomselect and customSelect)
+            if (element && (element.tomselect || element.customSelect)) {
+                resolve(element.tomselect || element.customSelect);
+                return;
+            }
+            
+            // Listen for the ready event
+            const handleReady = (e) => {
+                element.removeEventListener('tomselect:ready', handleReady);
+                clearInterval(checkInterval);
+                resolve(e.detail.instance);
+            };
+            
+            if (element) {
+                element.addEventListener('tomselect:ready', handleReady);
+            }
+            
+            // Also poll as a fallback
             let attempts = 0;
             const checkInterval = setInterval(() => {
-                const element = document.getElementById(elementId);
-                if (element && element.tomselect) {
+                const el = document.getElementById(elementId);
+                if (el && (el.tomselect || el.customSelect)) {
+                    if (element) {
+                        element.removeEventListener('tomselect:ready', handleReady);
+                    }
                     clearInterval(checkInterval);
-                    resolve(element.tomselect);
+                    resolve(el.tomselect || el.customSelect);
                 } else {
                     attempts++;
                     if (attempts >= maxAttempts) {
+                        if (element) {
+                            element.removeEventListener('tomselect:ready', handleReady);
+                        }
                         clearInterval(checkInterval);
-                        reject(new Error(`Tom Select not initialized on #${elementId}`));
+                        reject(new Error(`Custom Select not initialized on #${elementId} after ${maxAttempts} attempts`));
                     }
                 }
             }, 100);
@@ -433,17 +489,24 @@
         }
     }
 
-    // Load active clients for Tom Select
-    async function loadActiveClients() {
+    // Load active clients for Tom Select with optional search
+    // Make this function globally available for the custom dropdown component
+    window.loadActiveClients = async function loadActiveClients(searchTerm = '', page = 1) {
         try {
             // Use different endpoint based on user role
             const endpoint = (userRole === 'department_manager' || userRole === 'client') 
                 ? '/api/owned-clients/active' 
                 : '/api/clients/active';
             
-            console.log('🔍 DEBUG: Loading clients from endpoint:', endpoint);
+            // Build query parameters
+            const params = new URLSearchParams();
+            if (searchTerm) params.append('search', searchTerm);
+            params.append('page', page.toString());
+            params.append('limit', '100'); // Get 100 results per search
             
-            const response = await fetch(endpoint, {
+            const url = `${endpoint}${params.toString() ? '?' + params.toString() : ''}`;
+            
+            const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${getAccessToken()}`,
@@ -452,21 +515,31 @@
             });
 
             const result = await response.json();
-            console.log('🔍 DEBUG: Clients API response:', result);
 
             if (result.success && result.data) {
-                console.log('🔍 DEBUG: Number of clients loaded:', result.data.length);
                 const clientTS = await waitForTomSelect('clientId');
 
-                // Clear existing options
-                clientTS.clearOptions();
+                // For server-side search, clear options only on new search (page 1)
+                if (page === 1) {
+                    clientTS.clearOptions();
+                }
 
+                // Handle different response formats
+                const clients = result.data.clients || result.data;
+                
                 // Add client options
-                result.data.forEach(client => {
-                    console.log('🔍 DEBUG: Adding client option:', client);
+                clients.forEach(client => {
+                    // Extract enterprise name from parentheses if present
+                    // Example: "Abercrombie & Kent Mexico (Abercrombie)" -> "Abercrombie"
+                    let displayText = client.label;
+                    const parenthesesMatch = client.label.match(/\(([^)]+)\)$/);
+                    if (parenthesesMatch) {
+                        displayText = parenthesesMatch[1];
+                    }
+                    
                     clientTS.addOption({
                         value: client.value,
-                        text: client.label,
+                        text: displayText,
                         email: client.email,
                         contactPerson: client.contactPerson,
                         phone: client.phone
@@ -475,13 +548,20 @@
 
                 // Refresh to apply changes
                 clientTS.refreshOptions(false);
-                console.log('🔍 DEBUG: Client options loaded and refreshed');
+                
+                // Return pagination info for possible future use
+                return {
+                    hasMore: result.data.pagination?.hasMore || false,
+                    total: result.data.pagination?.total || clients.length
+                };
             } else {
-                console.log('🔍 DEBUG: No client data or API error:', result);
+                console.error('No client data or API error:', result);
+                return { hasMore: false, total: 0 };
             }
         } catch (error) {
             console.error('Error loading clients:', error);
             showAlert('quoteInformationAlerts', 'Error al cargar la lista de clientes', 'danger');
+            return { hasMore: false, total: 0 };
         }
     }
 
@@ -607,7 +687,6 @@
     // Load existing quote data
     async function loadQuoteData(quoteId) {
         try {
-            console.log('🔍 DEBUG: Loading quote data for ID:', quoteId);
             const response = await fetch(`/api/quotes/${quoteId}`, {
                 method: 'GET',
                 headers: {
@@ -617,18 +696,12 @@
             });
 
             const result = await response.json();
-            console.log('🔍 DEBUG: Quote API response:', result);
 
             if (result.success && result.data) {
                 const quote = result.data;
-                console.log('🔍 DEBUG: Quote data:', quote);
-                console.log('🔍 DEBUG: Client data in quote:', quote.client);
 
                 // Handle client population - DUAL FIELD ARCHITECTURE
                 const clientTS = await waitForTomSelect('clientId');
-                console.log('🔍 DEBUG: TomSelect instance ready:', clientTS);
-                console.log('🔍 DEBUG: companyClientPtr in quote:', quote.companyClientPtr);
-                console.log('🔍 DEBUG: client in quote:', quote.client);
                 
                 // Role-based client field prioritization
                 let selectedClientId = null;
@@ -639,46 +712,75 @@
                     if (quote.client && quote.client.id) {
                         selectedClientId = quote.client.id;
                         selectedClientData = quote.client;
-                        console.log('🔍 DEBUG: Admin role - Using legacy client field:', selectedClientId);
                     } else if (quote.companyClientPtr && quote.companyClientPtr.id) {
                         selectedClientId = quote.companyClientPtr.id;
                         selectedClientData = quote.companyClientPtr;
-                        console.log('🔍 DEBUG: Admin role - Fallback to companyClientPtr:', selectedClientId);
                     }
                 } else {
                     // Hierarchical roles: prioritize companyClientPtr (Client objects)
                     if (quote.companyClientPtr && quote.companyClientPtr.id) {
                         selectedClientId = quote.companyClientPtr.id;
                         selectedClientData = quote.companyClientPtr;
-                        console.log('🔍 DEBUG: Hierarchical role - Using companyClientPtr:', selectedClientId);
                     } else if (quote.client && quote.client.id) {
                         selectedClientId = quote.client.id;
                         selectedClientData = quote.client;
-                        console.log('🔍 DEBUG: Hierarchical role - Fallback to legacy client:', selectedClientId);
                     }
                 }
                 
                 if (selectedClientId && selectedClientData) {
-                    console.log('🔍 DEBUG: Setting client ID:', selectedClientId);
+                    // Apply same enterprise name extraction logic as initial dropdown
+                    let displayText = selectedClientData.companyName || 
+                                     selectedClientData.fullName || 
+                                     selectedClientData.name || 
+                                     `Cliente ${selectedClientId}`;
                     
-                    // First ensure the option exists in the dropdown
-                    if (!clientTS.getOption(selectedClientId)) {
-                        console.log('🔍 DEBUG: Adding missing client option to dropdown');
-                        // Add the client option if it doesn't exist
-                        clientTS.addOption({
-                            value: selectedClientId,
-                            text: selectedClientData.fullName || selectedClientData.name || `Cliente ${selectedClientId}`,
-                            email: selectedClientData.email || ''
-                        });
-                    } else {
-                        console.log('🔍 DEBUG: Client option already exists in dropdown');
+                    // Extract enterprise name from parentheses if present
+                    // Example: "Abercrombie & Kent Mexico (Abercrombie)" -> "Abercrombie"
+                    const parenthesesMatch = displayText.match(/\(([^)]+)\)$/);
+                    if (parenthesesMatch) {
+                        displayText = parenthesesMatch[1];
                     }
                     
-                    // Set the selected value
-                    clientTS.setValue(selectedClientId);
-                    console.log('🔍 DEBUG: Client value set to:', selectedClientId);
+                    // TomSelect doesn't have updateOption, we need to remove and re-add
+                    // First check if the option already exists
+                    const existingOptions = clientTS.options;
+                    
+                    if (existingOptions && existingOptions[selectedClientId]) {
+                        // Store current value to restore selection
+                        const currentValue = clientTS.getValue();
+                        
+                        // Clear the current selection silently
+                        clientTS.clear(true);
+                        
+                        // Remove the old option
+                        delete clientTS.options[selectedClientId];
+                        
+                        // Add the updated option
+                        clientTS.addOption({
+                            value: selectedClientId,
+                            text: displayText,
+                            email: selectedClientData.email || '',
+                            contactPerson: selectedClientData.contactPerson || '',
+                            phone: selectedClientData.phone || ''
+                        });
+                        
+                        // Restore selection
+                        clientTS.setValue(selectedClientId);
+                    } else {
+                        // Add new option if it doesn't exist
+                        clientTS.addOption({
+                            value: selectedClientId,
+                            text: displayText,
+                            email: selectedClientData.email || '',
+                            contactPerson: selectedClientData.contactPerson || '',
+                            phone: selectedClientData.phone || ''
+                        });
+                        
+                        // Set the selected value
+                        clientTS.setValue(selectedClientId);
+                    }
                 } else {
-                    console.log('🔍 DEBUG: No client data in quote (neither companyClientPtr nor client)');
+                    // No client data in quote
                 }
 
                 // Populate form fields
@@ -794,11 +896,12 @@
             if (result.success) {
                 showAlert('quoteInformationAlerts', 'Cotización actualizada exitosamente', 'success');
 
-                // Keep the button disabled for a moment
+                // Redirect to quote detail page with services section (use appropriate dashboard path)
+                const dashboardPathMap = { department_manager: '/dashboard/department_manager', client: '/dashboard/client' };
+                const dashboardPath = dashboardPathMap[userRole] || '/dashboard/admin';
                 setTimeout(() => {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = originalText;
-                }, 2000);
+                    window.location.href = `${dashboardPath}/quotes/${quoteId}?section=services`;
+                }, 1500);
             } else {
                 showAlert('quoteInformationAlerts', result.error || 'Error al actualizar la cotización', 'danger');
                 submitBtn.disabled = false;
@@ -815,6 +918,15 @@
     // Create quote
     async function createQuote(event) {
         event.preventDefault();
+
+        // Defensive check - if quote already exists, update instead
+        const quoteIdField = document.getElementById('quoteId');
+        const existingQuoteId = quoteIdField?.value;
+        
+        if (existingQuoteId && existingQuoteId.trim() !== '' && existingQuoteId !== 'new') {
+            console.warn('createQuote() called but quote already exists, calling updateQuote instead:', existingQuoteId);
+            return updateQuote(existingQuoteId, event);
+        }
 
         const form = document.getElementById('quoteInformationForm');
 
@@ -896,6 +1008,9 @@
         showPageLoader('quoteInformationCard');
 
         try {
+            // Small delay to ensure Tom Select can initialize
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
             // Load active clients for all users (different endpoints based on role)
             await loadActiveClients();
             
@@ -933,11 +1048,18 @@
                 saveBtn.addEventListener('click', saveQuickClient);
             }
 
-            // Form submission - use appropriate function based on mode
+            // Form submission - use appropriate function based on current state
             document.getElementById('quoteInformationForm').addEventListener('submit', function(event) {
-                if (isEditMode) {
-                    updateQuote(quoteId, event);
+                // Check current quote ID dynamically (not just initial page load state)
+                const quoteIdField = document.getElementById('quoteId');
+                const currentQuoteId = quoteIdField?.value;
+                const hasExistingQuote = currentQuoteId && currentQuoteId.trim() !== '' && currentQuoteId !== 'new';
+                
+                if (hasExistingQuote) {
+                    console.log('Form submission: Updating existing quote', currentQuoteId);
+                    updateQuote(currentQuoteId, event);
                 } else {
+                    console.log('Form submission: Creating new quote');
                     createQuote(event);
                 }
             });

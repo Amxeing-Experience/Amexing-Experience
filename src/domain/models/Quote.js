@@ -287,6 +287,179 @@ class Quote extends BaseModel {
   }
 
   /**
+   * Get quote owner.
+   * @returns {object} AmexingUser Parse object who owns the quote.
+   * @example
+   * const owner = quote.getOwner();
+   */
+  getOwner() {
+    return this.get('owner');
+  }
+
+  /**
+   * Set quote owner.
+   * @param {object} owner - AmexingUser Parse object or Pointer.
+   * @example
+   * quote.setOwner(userPointer);
+   */
+  setOwner(owner) {
+    this.set('owner', owner);
+  }
+
+  /**
+   * Get last edited by user.
+   * @returns {object} AmexingUser Parse object who last edited the quote.
+   * @example
+   * const lastEditor = quote.getLastEditedBy();
+   */
+  getLastEditedBy() {
+    return this.get('lastEditedBy');
+  }
+
+  /**
+   * Set last edited by user.
+   * @param {object} lastEditedBy - AmexingUser Parse object or Pointer.
+   * @example
+   * quote.setLastEditedBy(userPointer);
+   */
+  setLastEditedBy(lastEditedBy) {
+    this.set('lastEditedBy', lastEditedBy);
+  }
+
+  /**
+   * Get last edited date.
+   * @returns {Date} Date when quote was last edited.
+   * @example
+   * const lastEditDate = quote.getLastEditedAt();
+   */
+  getLastEditedAt() {
+    return this.get('lastEditedAt');
+  }
+
+  /**
+   * Set last edited date.
+   * @param {Date} date - Date of last edit.
+   * @example
+   * quote.setLastEditedAt(new Date());
+   */
+  setLastEditedAt(date) {
+    this.set('lastEditedAt', date);
+  }
+
+  /**
+   * Get collaborators list.
+   * @returns {Array} Array of user IDs with access to the quote.
+   * @example
+   * const collaborators = quote.getCollaborators();
+   */
+  getCollaborators() {
+    return this.get('collaborators') || [];
+  }
+
+  /**
+   * Set collaborators list.
+   * @param {Array} collaborators - Array of user IDs.
+   * @example
+   * quote.setCollaborators(['userId1', 'userId2']);
+   */
+  setCollaborators(collaborators) {
+    this.set('collaborators', collaborators);
+  }
+
+  /**
+   * Get approval status.
+   * @returns {string} Approval status for pending edits.
+   * @example
+   * const approvalStatus = quote.getApprovalStatus();
+   */
+  getApprovalStatus() {
+    return this.get('approvalStatus');
+  }
+
+  /**
+   * Set approval status.
+   * @param {string} status - Approval status.
+   * @example
+   * quote.setApprovalStatus('pending_approval');
+   */
+  setApprovalStatus(status) {
+    this.set('approvalStatus', status);
+  }
+
+  /**
+   * Get collaboration enabled status.
+   * @returns {boolean} Whether collaboration is enabled.
+   * @example
+   * const isCollaborative = quote.isCollaborationEnabled();
+   */
+  isCollaborationEnabled() {
+    return this.get('collaborationEnabled') !== false;
+  }
+
+  /**
+   * Set collaboration enabled status.
+   * @param {boolean} enabled - Whether collaboration is enabled.
+   * @example
+   * quote.setCollaborationEnabled(true);
+   */
+  setCollaborationEnabled(enabled) {
+    this.set('collaborationEnabled', enabled);
+  }
+
+  /**
+   * Get require approval for edits.
+   * @returns {boolean} Whether edits require owner approval.
+   * @example
+   * const requiresApproval = quote.requiresApproval();
+   */
+  requiresApproval() {
+    return this.get('requireApproval') === true;
+  }
+
+  /**
+   * Set require approval for edits.
+   * @param {boolean} required - Whether approval is required.
+   * @example
+   * quote.setRequireApproval(true);
+   */
+  setRequireApproval(required) {
+    this.set('requireApproval', required);
+  }
+
+  /**
+   * Get version number.
+   * @returns {number} Current version number of the quote.
+   * @example
+   * const version = quote.getVersion();
+   */
+  getVersion() {
+    return this.get('version') || 1;
+  }
+
+  /**
+   * Set version number.
+   * @param {number} version - Version number.
+   * @example
+   * quote.setVersion(2);
+   */
+  setVersion(version) {
+    this.set('version', version);
+  }
+
+  /**
+   * Increment version number.
+   * @returns {number} New version number.
+   * @example
+   * const newVersion = quote.incrementVersion();
+   */
+  incrementVersion() {
+    const currentVersion = this.getVersion();
+    const newVersion = currentVersion + 1;
+    this.setVersion(newVersion);
+    return newVersion;
+  }
+
+  /**
    * Get service items (itinerary days).
    * @returns {object} Service items object with days array and totals.
    * @example

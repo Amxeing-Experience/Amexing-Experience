@@ -257,6 +257,8 @@ class QuoteService {
       ];
 
       const appliedUpdates = {};
+      let personFieldsUpdated = false;
+
       Object.keys(updates).forEach((key) => {
         if (allowedFields.includes(key)) {
           // Validate status if being updated
@@ -264,84 +266,102 @@ class QuoteService {
             throw new Error(`Invalid status. Must be one of: ${this.validStatuses.join(', ')}`);
           }
 
+          // Track if any person field is updated
+          if (['numberOfAdults', 'numberOfChildren', 'numberOfInfants'].includes(key)) {
+            personFieldsUpdated = true;
+          }
+
           quote.set(key, updates[key]);
           appliedUpdates[key] = updates[key];
         }
       });
 
+      // Recalculate numberOfPeople if any individual person field was updated
+      if (personFieldsUpdated) {
+        const adults = parseInt(quote.get('numberOfAdults') || 0, 10);
+        const children = parseInt(quote.get('numberOfChildren') || 0, 10);
+        const infants = parseInt(quote.get('numberOfInfants') || 0, 10);
+        const calculatedTotal = adults + children + infants;
+
+        quote.set('numberOfPeople', calculatedTotal);
+        appliedUpdates.numberOfPeople = calculatedTotal;
+
+        logger.info('QuoteService.updateQuote - Recalculated numberOfPeople', {
+          quoteId: quote.id,
+          adults,
+          children,
+          infants,
+          total: calculatedTotal,
+        });
+      }
+
       // Handle client field updates - DUAL FIELD ARCHITECTURE
       const clientIdNormalized = updates.client || updates.clientId;
+
+      // Log client update for debugging
+      logger.info('QuoteService.updateQuote - Client update requested', {
+        quoteId: quote.id,
+        clientIdNormalized,
+        clientIdType: typeof clientIdNormalized,
+      });
+
       if (clientIdNormalized) {
         try {
-          // 1. Save as companyClientPtr (Client pointer) for new system
-          const companyClientPointer = {
+          console.log('=== AMEXING USER CLIENT UPDATE ===');
+          console.log('Updating quote with AmexingUser ID:', clientIdNormalized);
+
+          // Verify the AmexingUser exists
+          const userQuery = new Parse.Query('AmexingUser');
+          let amexingUser;
+
+          try {
+            amexingUser = await userQuery.get(clientIdNormalized, { useMasterKey: true });
+            console.log('✅ AmexingUser found:', {
+              id: amexingUser.id,
+              firstName: amexingUser.get('firstName'),
+              lastName: amexingUser.get('lastName'),
+              email: amexingUser.get('email'),
+            });
+          } catch (userError) {
+            logger.error('QuoteService.updateQuote - AmexingUser not found', {
+              quoteId: quote.id,
+              amexingUserId: clientIdNormalized,
+              error: userError.message,
+            });
+            throw new Error(`AmexingUser not found: ${clientIdNormalized}`);
+          }
+
+          // Set client field to point to the AmexingUser
+          const amexingUserPointer = {
             __type: 'Pointer',
-            className: 'Client',
+            className: 'AmexingUser',
             objectId: clientIdNormalized,
           };
-          quote.set('companyClientPtr', companyClientPointer);
-          appliedUpdates.companyClientPtr = clientIdNormalized;
+          quote.set('client', amexingUserPointer);
+          appliedUpdates.client = clientIdNormalized;
 
-          logger.info('QuoteService.updateQuote - Setting companyClientPtr', {
+          // Note: Avoiding companyClientPtr due to schema constraints (expects Client class)
+          console.log('Skipping companyClientPtr due to schema mismatch - using client field only');
+
+          console.log('✅ CLIENT UPDATE SUCCESSFUL:', {
             quoteId: quote.id,
-            clientId: clientIdNormalized,
-            companyClientPointer,
+            amexingUserId: clientIdNormalized,
+            amexingUserName: `${amexingUser.get('firstName')} ${amexingUser.get('lastName')}`,
+            pointer: amexingUserPointer,
           });
 
-          // 2. Find the AmexingUser who owns this Client for backward compatibility
-          const clientQuery = new Parse.Query('Client');
-          const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
-          const ownedByPointer = clientRecord.get('ownedBy');
-
-          if (ownedByPointer) {
-            // Extract the actual ID from the ownedBy pointer
-            const ownerId = ownedByPointer.id || ownedByPointer.objectId || ownedByPointer;
-
-            // Role-based logic for client field assignment
-            let clientAmexingUserId;
-            if (role === 'department_manager') {
-              // Department manager: client field should be the department manager themselves
-              clientAmexingUserId = currentUser.id;
-              logger.info('QuoteService.updateQuote - Department manager: setting client to currentUser', {
-                currentUserId: currentUser.id,
-                selectedClientId: clientIdNormalized,
-              });
-            } else {
-              // Client role: client field should be the owner of the selected Client
-              clientAmexingUserId = ownerId;
-              logger.info('QuoteService.updateQuote - Client role: setting client to Client owner', {
-                clientId: clientIdNormalized,
-                ownerId,
-              });
-            }
-
-            const amexingUserPointer = {
-              __type: 'Pointer',
-              className: 'AmexingUser',
-              objectId: clientAmexingUserId,
-            };
-            quote.set('client', amexingUserPointer);
-            appliedUpdates.client = clientAmexingUserId;
-
-            logger.info('QuoteService.updateQuote - Setting client (AmexingUser) for backward compatibility', {
-              quoteId: quote.id,
-              clientCompanyId: clientIdNormalized,
-              ownerId,
-              amexingUserPointer,
-            });
-          } else {
-            logger.warn('QuoteService.updateQuote - Client record has no ownedBy field', {
-              quoteId: quote.id,
-              clientId: clientIdNormalized,
-            });
-          }
+          logger.info('QuoteService.updateQuote - Client updated with AmexingUser', {
+            quoteId: quote.id,
+            amexingUserId: clientIdNormalized,
+            amexingUserEmail: amexingUser.get('email'),
+          });
         } catch (error) {
-          logger.error('QuoteService.updateQuote - Error setting client pointers', {
+          logger.error('QuoteService.updateQuote - Error setting AmexingUser client', {
             error: error.message,
             quoteId: quote.id,
-            clientId: clientIdNormalized,
+            amexingUserId: clientIdNormalized,
           });
-          // Continue without failing the entire update
+          throw error; // Don't continue if client update fails
         }
       }
 

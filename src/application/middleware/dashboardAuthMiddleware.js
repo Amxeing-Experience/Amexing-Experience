@@ -160,7 +160,7 @@ class DashboardAuthMiddleware {
       return res.redirect(`/login?returnTo=${encodeURIComponent(req.originalUrl)}`);
     }
 
-    const userRole = req.user.role;
+    const userRole = req.user.role || req.userRole || 'guest';
     // eslint-disable-next-line security/detect-object-injection
     const userLevel = this.roleHierarchy[userRole] || 0;
     // eslint-disable-next-line security/detect-object-injection
@@ -175,7 +175,7 @@ class DashboardAuthMiddleware {
       });
 
       // Instead of error page, redirect to user's own dashboard to prevent loops
-      return res.redirect(`/dashboard/${userRole}`);
+      return res.redirect(`/dashboard/${userRole || 'guest'}`);
     }
 
     next();
@@ -202,10 +202,10 @@ class DashboardAuthMiddleware {
 
     if (!requestedDashboard) {
       // Root dashboard access - redirect to user's default dashboard
-      return res.redirect(`/dashboard/${req.user.role}`);
+      return res.redirect(`/dashboard/${req.user.role || req.userRole || 'guest'}`);
     }
 
-    const userRole = req.user.role;
+    const userRole = req.user.role || req.userRole || 'guest';
     // eslint-disable-next-line security/detect-object-injection
     const allowedDashboards = this.dashboardPermissions[userRole] || [];
 
@@ -216,7 +216,7 @@ class DashboardAuthMiddleware {
         userRole,
         requestedDashboard,
       });
-      return res.redirect(`/dashboard/${userRole}`);
+      return res.redirect(`/dashboard/${userRole || 'guest'}`);
     }
 
     // Allow access if user has permission OR if it's their own dashboard
@@ -229,7 +229,7 @@ class DashboardAuthMiddleware {
         requestedDashboard,
         allowedDashboards,
       });
-      return res.redirect(`/dashboard/${userRole}`);
+      return res.redirect(`/dashboard/${userRole || 'guest'}`);
     }
   };
 

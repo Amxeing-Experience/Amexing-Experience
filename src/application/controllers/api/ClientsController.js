@@ -795,13 +795,14 @@ class ClientsController {
   }
 
   /**
-   * GET /api/clients/active - Get active clients for dropdown/selector.
+   * GET /api/clients/active - Get active clients for dropdown/selector with search.
    * Returns simplified client data formatted for Tom Select component.
+   * Supports server-side search for better performance with large datasets.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * GET /api/clients/active
+   * GET /api/clients/active?search=enterprise
    * Response: {success: true, data: [{value: 'id', label: 'Company Name', email: 'email@domain.com', contactPerson: 'John Doe', phone: '+52...'}]}
    */
   async getActiveClients(req, res) {
@@ -811,16 +812,30 @@ class ClientsController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      // Get all active clients with role department_manager
+      // Parse query parameters for search functionality
+      const searchTerm = req.query.search?.trim() || '';
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = Math.min(parseInt(req.query.limit, 10) || 100, this.maxPageSize);
+
+      // Build options for service call
       const options = {
         targetRole: this.clientRole,
-        active: true,
-        exists: true,
-        limit: 1000, // Get all for selector
-        page: 1,
-        sortField: 'lastName',
-        sortDirection: 'asc',
+        filters: {
+          active: true,
+          exists: true,
+        },
+        limit,
+        page,
+        sort: {
+          field: 'lastName',
+          direction: 'asc',
+        },
       };
+
+      // Add search filter if provided
+      if (searchTerm) {
+        options.filters.search = searchTerm;
+      }
 
       const result = await this.userService.getUsers(currentUser, options);
 
@@ -843,10 +858,26 @@ class ClientsController {
 
       logger.info('Active clients retrieved for selector', {
         count: clients.length,
+        searchTerm: searchTerm || 'none',
+        page,
+        limit,
+        totalCount: result.pagination?.total || clients.length,
         requestedBy: currentUser.id,
       });
 
-      this.sendSuccess(res, clients, 'Active clients retrieved successfully');
+      // Include pagination metadata for frontend
+      const response = {
+        clients,
+        pagination: {
+          page,
+          limit,
+          total: result.pagination?.total || clients.length,
+          hasMore: result.pagination?.hasNextPage || false,
+        },
+        searchTerm,
+      };
+
+      this.sendSuccess(res, response, 'Active clients retrieved successfully');
     } catch (error) {
       logger.error('Error in ClientsController.getActiveClients', {
         error: error.message,

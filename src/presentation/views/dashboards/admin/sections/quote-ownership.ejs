@@ -1,0 +1,365 @@
+<%
+/**
+ * Quote Ownership & Collaboration Component
+ * Displays and manages quote ownership, collaborators, and edit history
+ * Created by Denisse Maldonado
+ */
+%>
+
+<!-- Ownership & Collaboration Panel - Removed for performance -->
+<!-- Panel content moved to modals accessible via buttons in quote form -->
+
+
+<!-- Manage Collaborators Modal -->
+<div class="modal fade" id="manageCollaboratorsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title">
+                    Compartir "Cotización"
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <!-- Add People Searchable Dropdown (Google Style) -->
+                <div class="mb-4 position-relative">
+                    <input type="text" class="form-control form-control-lg border-2" id="addPeopleInput" 
+                           placeholder="Añadir Personas" 
+                           style="border-color: #1a73e8; box-shadow: none; border-radius: 8px;"
+                           autocomplete="off">
+                    <div class="dropdown-menu w-100" id="userDropdown" style="max-height: 200px; overflow-y: auto; display: none;">
+                        <div class="p-2">
+                            <div class="text-center text-muted">
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                Cargando usuarios...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ownership Transfer Section (Simplified) -->
+                <div class="border-top pt-4 mt-4" id="ownershipTransferSection">
+                    <details class="mb-3">
+                        <summary class="btn btn-link text-start p-0 d-flex align-items-center text-muted" style="cursor: pointer; border: none; background: none;">
+                            <i class="ti ti-chevron-right me-2 transition-transform" id="transferChevron" style="font-size: 0.8rem; transition: transform 0.2s;"></i>
+                            <small>Transferir propiedad</small>
+                        </summary>
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <small class="text-muted d-block mb-3">
+                                Al transferir la propiedad, mantendrás acceso como editor.
+                            </small>
+                            
+                            <div class="row g-2">
+                                <div class="col-8">
+                                    <select class="form-select form-select-sm" id="newOwnerSelectMain">
+                                        <option value="">Seleccionar nuevo propietario...</option>
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <button class="btn btn-sm btn-outline-warning w-100" id="btnConfirmTransferMain">
+                                        <i class="ti ti-transfer me-1"></i>
+                                        Transferir
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-2">
+                                <textarea class="form-control form-control-sm" id="transferReasonMain" rows="1" 
+                                          placeholder="Razón (opcional)"></textarea>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- People with Access (Google Style) -->
+                <div class="mb-4">
+                    <h6 class="mb-3">Personas con acceso</h6>
+                    
+                    <!-- Owner Display -->
+                    <div class="d-flex align-items-center mb-3 p-2">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" 
+                             style="width: 40px; height: 40px; font-weight: 500;">
+                            <span id="ownerInitials">D</span>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-medium" id="modalOwnerName">Cargando...</div>
+                            <small class="text-muted" id="modalOwnerEmail">...</small>
+                        </div>
+                        <span class="text-muted">Propietario</span>
+                    </div>
+                    
+                    <!-- Collaborators List -->
+                    <div id="collaboratorsManagementList">
+                        <p class="text-muted text-center py-3">Cargando agentes...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-primary" id="btnSaveAndClose">
+                    Hecho
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit History Modal -->
+<div class="modal fade" id="editHistoryModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="ti ti-history me-2"></i>
+                    Historial de Cambios
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="editHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Versión</th>
+                                <th>Fecha</th>
+                                <th>Usuario</th>
+                                <th>Cambios</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="6" class="text-center py-3">
+                                    <div class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Cargando...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Review Pending Edits Modal -->
+<div class="modal fade" id="reviewEditsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="ti ti-eye-check me-2"></i>
+                    Revisar Ediciones Pendientes
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="pendingEditsList">
+                    <p class="text-center py-3">
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        Cargando ediciones pendientes...
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Google-Style Sharing Modal */
+#manageCollaboratorsModal .modal-content {
+    border: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    border-radius: 8px;
+}
+
+#manageCollaboratorsModal .modal-body {
+    padding: 1.5rem;
+}
+
+/* Add People Input */
+#addPeopleInput {
+    border-radius: 8px;
+    font-size: 0.95rem;
+    padding: 12px 16px;
+}
+
+#addPeopleInput:focus {
+    border-color: #1a73e8 !important;
+    box-shadow: 0 0 0 0.2rem rgba(26, 115, 232, 0.15) !important;
+}
+
+/* User Dropdown Styles */
+#userDropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1050;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+#userDropdown.show {
+    display: block !important;
+}
+
+.dropdown-user-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 2px;
+    transition: background-color 0.15s;
+}
+
+.dropdown-user-item:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-user-item.active {
+    background-color: #e3f2fd;
+}
+
+.dropdown-user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 8px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* People List Items */
+.person-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    border-radius: 8px;
+    transition: background-color 0.2s;
+}
+
+.person-item:hover {
+    background-color: #f8f9fa;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.person-avatar {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-weight: 500;
+    font-size: 14px;
+    margin-right: 12px;
+}
+
+/* Role Selector */
+.role-selector {
+    border: none;
+    background: transparent;
+    color: #5f6368;
+    font-size: 0.875rem;
+    cursor: pointer;
+    text-align: right;
+    min-width: 80px;
+}
+
+.role-selector:focus {
+    border: 1px solid #1a73e8;
+    border-radius: 4px;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Transfer Ownership */
+details summary {
+    outline: none;
+    list-style: none;
+    padding: 8px 0;
+}
+
+details summary::-webkit-details-marker {
+    display: none;
+}
+
+details[open] summary {
+    margin-bottom: 8px;
+}
+
+details[open] summary #transferChevron {
+    transform: rotate(90deg);
+}
+
+/* Clean spacing */
+.collaborator-item {
+    padding: 8px 0;
+    border: none;
+    border-radius: 0;
+    margin-bottom: 0;
+    transition: all 0.2s;
+}
+
+.collaborator-item:hover {
+    background-color: #f8f9fa;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-radius: 8px;
+}
+
+/* Legacy styles for edit history modal */
+.edit-item {
+    padding: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+}
+
+.edit-item.pending {
+    border-left: 3px solid #ffc107;
+}
+
+.edit-item.approved {
+    border-left: 3px solid #28a745;
+}
+
+.edit-item.rejected {
+    border-left: 3px solid #dc3545;
+}
+
+.changes-list {
+    background-color: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.change-field {
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+}
+
+.old-value {
+    color: #dc3545;
+    text-decoration: line-through;
+}
+
+.new-value {
+    color: #28a745;
+}
+</style>
+
+<script>
+// Set quote ID for the ownership manager
+window.quoteId = '<%= typeof quoteId !== 'undefined' ? quoteId : '' %>';
+</script>
+<script src="/dashboards/admin/sections/quote-ownership.js"></script>
