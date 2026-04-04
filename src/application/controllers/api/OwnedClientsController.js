@@ -90,7 +90,7 @@ class OwnedClientsController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      const userRole = currentUser.role || currentUser.get('role');
+      const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
 
       // Only department_manager and client roles can manage owned clients
       if (!['department_manager', 'client', 'admin', 'superadmin'].includes(userRole)) {
@@ -236,7 +236,7 @@ class OwnedClientsController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      const userRole = currentUser.role || currentUser.get('role');
+      const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
 
       // Build hierarchical query for active clients
       let query;
@@ -291,7 +291,7 @@ class OwnedClientsController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      const userRole = currentUser.role || currentUser.get('role');
+      const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
 
       // Only department_manager and client roles can manage owned clients
       if (!['department_manager', 'client', 'admin', 'superadmin'].includes(userRole)) {
@@ -400,14 +400,31 @@ class OwnedClientsController {
   async createOwnedClient(req, res) {
     try {
       const currentUser = req.user;
+
+      logger.info('createOwnedClient called', {
+        hasUser: !!currentUser,
+        userId: currentUser?.id,
+        userRole: currentUser?.role || currentUser?.get?.('role'),
+        requestBody: Object.keys(req.body || {}),
+      });
+
       if (!currentUser) {
+        logger.warn('createOwnedClient: No user found in request');
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      const userRole = currentUser.role || currentUser.get('role');
+      const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
+      logger.info('User role for createOwnedClient', {
+        userRole,
+        reqUserRole: req.userRole,
+        currentUserRole: currentUser.role,
+        getCurrentRole: currentUser.get?.('role'),
+        allowedRoles: ['department_manager', 'client', 'admin', 'superadmin'],
+      });
 
       // Only specific roles can create owned clients
       if (!['department_manager', 'client', 'admin', 'superadmin'].includes(userRole)) {
+        logger.warn('createOwnedClient: Access denied for role', { userRole });
         return this.sendError(res, 'Access denied', 403);
       }
 
@@ -491,6 +508,8 @@ class OwnedClientsController {
         ownedBy: currentUser.id,
         ownerType: userRole === 'admin' || userRole === 'superadmin' ? 'admin' : userRole,
         createdBy: currentUser.id,
+        // Mark clients created by admin/superadmin as belonging to Amexing
+        clientBelongsTo: userRole === 'admin' || userRole === 'superadmin' ? 'amexing' : undefined,
       };
 
       const client = Client.create(clientData);
@@ -531,7 +550,7 @@ class OwnedClientsController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      const userRole = currentUser.role || currentUser.get('role');
+      const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
 
       // Only specific roles can create owned clients
       if (!['department_manager', 'client', 'admin', 'superadmin'].includes(userRole)) {
@@ -559,6 +578,8 @@ class OwnedClientsController {
         ownedBy: currentUser.id,
         ownerType: userRole === 'admin' || userRole === 'superadmin' ? 'admin' : userRole,
         createdBy: currentUser.id,
+        // Mark clients created by admin/superadmin as belonging to Amexing
+        clientBelongsTo: userRole === 'admin' || userRole === 'superadmin' ? 'amexing' : undefined,
       };
 
       const client = Client.create(clientData);
@@ -602,7 +623,7 @@ class OwnedClientsController {
       }
 
       const { id } = req.params;
-      const userRole = currentUser.role || currentUser.get('role');
+      const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
 
       // Get the client
       const query = this.createClientQuery();
@@ -767,7 +788,7 @@ class OwnedClientsController {
       }
 
       const { id } = req.params;
-      const userRole = currentUser.role || currentUser.get('role');
+      const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
 
       // Get the client
       const query = this.createClientQuery();
