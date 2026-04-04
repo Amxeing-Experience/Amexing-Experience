@@ -18,11 +18,25 @@ class QuoteOwnershipManager {
         this.clientChangeTimestamp = null; // Timestamp when client was changed
         this.deletedCollaboratorIds = new Set(); // Track collaborators deleted during client change
         
+        // Store user role for filtering
+        this.currentUserRole = window.currentUser?.role || window.userRole || '';
+        console.log('[QuoteOwnershipManager] Initialized with user role:', this.currentUserRole);
+        
         this.init();
     }
 
     async init() {
         try {
+            // Skip API calls for new quotes
+            const isNewQuote = !this.quoteId || this.quoteId === 'new';
+            
+            if (isNewQuote) {
+                console.log('New quote detected, skipping ownership/collaborator loading');
+                // Setup event listeners even for new quotes
+                this.setupEventListeners();
+                return;
+            }
+            
             // Restore persisted client change state from sessionStorage
             const savedTimestamp = sessionStorage.getItem(`clientChangeTimestamp_${this.quoteId}`);
             const savedDeletedIds = sessionStorage.getItem(`deletedCollaborators_${this.quoteId}`);
@@ -238,11 +252,21 @@ class QuoteOwnershipManager {
         
         // Store transfer capability for use in consolidated modal
         const userRole = window.currentUser?.role || '';
+        const currentUserId = window.currentUser?.id || window.currentUserData?.id || '';
+        
+        // Check if current user is the creator (when isDefaultOwner is true)
+        const isCreator = this.owner && this.owner.isDefaultOwner && this.owner.id === currentUserId;
+        
         this.canTransfer = (
             (this.userAccess && this.userAccess.role === 'owner' && !this.owner.isPlaceholder) ||
-            (userRole === 'admin' || userRole === 'superadmin') ||
-            (this.owner && this.owner.needsAssignment)
+            (userRole === 'admin' || userRole === 'superadmin' || userRole === 'department_manager' || userRole === 'client') ||
+            (this.owner && this.owner.needsAssignment) ||
+            isCreator // Allow creator to transfer ownership when no formal ownership exists
         );
+        
+        if (isCreator) {
+            console.log('User is the creator of the quote, enabling transfer capability');
+        }
         
         // Add user access info next to owner if applicable
         this.displayUserAccessWithOwner();
@@ -340,15 +364,11 @@ class QuoteOwnershipManager {
         const isOwner = this.userAccess.role === 'owner';
         const isAdmin = userRole === 'admin' || userRole === 'superadmin';
         
-        // Manage agents - only for admins and department managers
+        // Manage agents - available for all users
         const manageBtn = document.getElementById('btnManageCollaborators');
         if (manageBtn) {
-            const canManage = isAdmin || userRole === 'department_manager';
-            if (canManage) {
-                manageBtn.classList.remove('d-none');
-            } else {
-                manageBtn.classList.add('d-none');
-            }
+            // Always show the button - remove any d-none class that might have been added
+            manageBtn.classList.remove('d-none');
         }
         
         // Transfer capability is now handled in the consolidated modal
@@ -596,10 +616,20 @@ class QuoteOwnershipManager {
 
 
     async showCollaboratorsModal() {
+        console.log('showCollaboratorsModal called');
+        
         // Check if quote has a client selected first
         const clientField = document.getElementById('clientId');
-        if (clientField) {
-            const clientValue = clientField.value || clientField.tomselect?.getValue();
+        const userRole = window.currentUser?.role || '';
+        
+        // For department_manager and client roles, the client field is hidden but still has value
+        // Skip validation for these roles or if field is hidden
+        const isHiddenRole = userRole === 'department_manager' || userRole === 'client';
+        
+        if (clientField && !isHiddenRole) {
+            const clientValue = clientField.value || clientField.tomselect?.getValue() || clientField.customSelect?.getValue();
+            console.log('Client value check:', { clientValue, fieldValue: clientField.value });
+            
             if (!clientValue) {
                 this.showToast('Por favor selecciona un cliente antes de gestionar la propiedad', 'warning');
                 clientField.classList.add('is-invalid');
@@ -608,6 +638,10 @@ class QuoteOwnershipManager {
                 clientField.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 return;
             }
+        } else if (isHiddenRole && clientField) {
+            // For hidden roles, try to get the value even if field is invisible
+            const clientValue = clientField.value || clientField.tomselect?.getValue() || clientField.customSelect?.getValue();
+            console.log('Hidden role client value:', { clientValue, userRole });
         }
         
         // Check if quote is saved - if not, auto-save it first
@@ -637,6 +671,10 @@ class QuoteOwnershipManager {
                 
                 // Update UI to edit mode with folio information
                 this.updatePageToEditMode(savedQuote.id, savedQuote.folio);
+                
+                // Reload ownership data now that we have a real quote
+                await this.loadOwnership();
+                await this.loadUserAccess();
                 
                 // Capture the client ID as original since we just saved
                 this.captureOriginalClient();
@@ -722,7 +760,16 @@ class QuoteOwnershipManager {
         }
         
         try {
-            const modal = new bootstrap.Modal(document.getElementById('manageCollaboratorsModal'));
+            const modalElement = document.getElementById('manageCollaboratorsModal');
+            console.log('Modal element:', modalElement);
+            
+            if (!modalElement) {
+                console.error('Modal element not found: manageCollaboratorsModal');
+                this.showToast('Error: Modal no encontrado', 'error');
+                return;
+            }
+            
+            const modal = new bootstrap.Modal(modalElement);
             
             // Always clear collaborators UI first to prevent showing stale data
             const collaboratorsList = document.getElementById('collaboratorsManagementList');
@@ -762,7 +809,7 @@ class QuoteOwnershipManager {
         const ownershipSection = document.getElementById('ownershipTransferSection');
         const userRole = window.currentUser?.role || '';
         const isAdmin = userRole === 'admin' || userRole === 'superadmin';
-        const canManage = isAdmin || userRole === 'department_manager';
+        const canManage = isAdmin || userRole === 'department_manager' || userRole === 'client';
         
         if (this.canTransfer && canManage) {
             if (ownershipSection) {
@@ -900,11 +947,34 @@ class QuoteOwnershipManager {
             } else if (clientField.tomselect) {
                 clientId = clientField.tomselect.getValue();
             } else {
+                // For hidden input or disabled dropdown - just get the value
                 clientId = clientField.value;
             }
         }
         
+        // If we have a clientId from the field, use it (this handles disabled dropdowns)
+        if (clientId) {
+            console.log('Using clientId from field:', clientId);
+        } 
+        // Fallback to currentUserData if no field value
+        else if (window.currentUserData) {
+            const userRole = window.currentUser?.role || window.userRole;
+            if (userRole === 'client' && window.currentUserData.clientId) {
+                clientId = window.currentUserData.clientId;
+                console.log('Using clientId from currentUserData.clientId:', clientId);
+            } else if ((userRole === 'department_manager' || userRole === 'client') && window.currentUserData.id) {
+                clientId = window.currentUserData.id;
+                console.log('Using clientId from currentUserData.id:', clientId);
+            }
+        }
+        
         if (!clientId) {
+            console.error('Cliente requerido - no clientId found', {
+                fieldValue: clientField?.value,
+                fieldExists: !!clientField,
+                userRole: window.currentUser?.role,
+                currentUserData: window.currentUserData
+            });
             throw new Error('Cliente requerido');
         }
         
@@ -1207,7 +1277,7 @@ class QuoteOwnershipManager {
         const transferSection = document.getElementById('ownershipTransferSection');
         if (transferSection) {
             // Show/hide transfer section based on permissions
-            const canTransfer = isOwner || (userAccess && ['admin', 'superadmin'].includes(window.currentUser?.role));
+            const canTransfer = isOwner || (userAccess && ['admin', 'superadmin', 'department_manager', 'client'].includes(window.currentUser?.role));
             transferSection.style.display = canTransfer ? 'block' : 'none';
         }
         
@@ -1979,6 +2049,19 @@ class QuoteOwnershipManager {
         try {
             // Note: Removed loadAvailableUsers loading log for console cleanup
             
+            // Get current user role to determine filtering
+            // Debug: Check all possible sources for user role
+            console.log('[DEBUG] Checking user role sources:', {
+                'window.currentUser': window.currentUser,
+                'window.currentUser?.role': window.currentUser?.role,
+                'window.userRole': window.userRole,
+                'document.body.dataset.userRole': document.body.dataset.userRole
+            });
+            
+            const userRole = this.currentUserRole || window.currentUser?.role || window.userRole || document.body.dataset.userRole || '';
+            const shouldFilterAdmins = userRole === 'client' || userRole === 'department_manager';
+            console.log('User role for filtering:', userRole, 'Should filter admins:', shouldFilterAdmins, 'Stored role:', this.currentUserRole);
+            
             // Use department-filtered endpoint for both ownership transfers and agent additions
             // Get current client ID for context
             let currentClientId = this.originalClientId;
@@ -2109,8 +2192,9 @@ class QuoteOwnershipManager {
                 }
                 
                 // Add Admins (merge with Others under Administradores label)
+                // Only show admin group for admin/superadmin users
                 const administratorsGroup = [...admins, ...others];
-                if (administratorsGroup.length > 0) {
+                if (!shouldFilterAdmins && administratorsGroup.length > 0) {
                     const optgroup = document.createElement('optgroup');
                     optgroup.label = 'Administradores';
                     administratorsGroup.forEach(user => {
@@ -2121,6 +2205,8 @@ class QuoteOwnershipManager {
                         optgroup.appendChild(option);
                     });
                     select.appendChild(optgroup);
+                } else if (shouldFilterAdmins && administratorsGroup.length > 0) {
+                    console.log(`🚫 Filtering out ${administratorsGroup.length} admin users for role: ${userRole}`);
                 }
             }
         } catch (error) {
@@ -2322,6 +2408,19 @@ class QuoteOwnershipManager {
     
     async loadUsersForDropdown() {
         try {
+            // Get current user role to determine filtering
+            // Debug: Check all possible sources for user role
+            console.log('[Dropdown DEBUG] Checking user role sources:', {
+                'window.currentUser': window.currentUser,
+                'window.currentUser?.role': window.currentUser?.role,
+                'window.userRole': window.userRole,
+                'document.body.dataset.userRole': document.body.dataset.userRole
+            });
+            
+            const userRole = this.currentUserRole || window.currentUser?.role || window.userRole || document.body.dataset.userRole || '';
+            const shouldFilterAdmins = userRole === 'client' || userRole === 'department_manager';
+            console.log('[Dropdown] User role for filtering:', userRole, 'Should filter admins:', shouldFilterAdmins, 'Stored role:', this.currentUserRole);
+            
             // Use the same API endpoint as loadAvailableUsers with proper client context
             let currentClientId = this.originalClientId;
             const clientSelect = document.getElementById('clientId');
@@ -2367,16 +2466,46 @@ class QuoteOwnershipManager {
             const users = responseData.data || [];
             
             // Convert API response to dropdown format
-            this.availableUsers = users.map(user => {
-                console.log('Processing user from API:', user);
-                return {
-                    id: user.value || user.id || user.objectId,
-                    firstName: user.firstName || user.label?.split(' ')[0] || 'Unknown',
-                    lastName: user.lastName || user.label?.split(' ').slice(1).join(' ') || '',
-                    email: user.email || `${user.label?.toLowerCase().replace(/\s+/g, '.')}@unknown.com`,
-                    displayName: user.label
-                };
-            });
+            // Filter out admins for non-admin users
+            this.availableUsers = users
+                .filter(user => {
+                    // Log the exact fields for debugging
+                    console.log('Checking user for filtering:', {
+                        name: `${user.firstName} ${user.lastName}`,
+                        role: user.role,
+                        isAdmin: user.isAdmin,
+                        isDepartmentManager: user.isDepartmentManager,
+                        isClient: user.isClient,
+                        username: user.username,
+                        email: user.email
+                    });
+                    
+                    // Filter out admins for client/department_manager users
+                    // Check multiple ways to identify admin users
+                    const isAdminUser = 
+                        user.role === 'admin' || 
+                        user.role === 'superadmin' || 
+                        user.isAdmin === true ||
+                        (user.email && (user.email.includes('admin@') || user.email.includes('superadmin@'))) ||
+                        (user.username && (user.username.includes('admin@') || user.username.includes('superadmin@')));
+                    
+                    if (shouldFilterAdmins && isAdminUser) {
+                        console.log('✅ FILTERING OUT admin user from dropdown:', user.firstName, user.lastName, 'role:', user.role, 'isAdmin:', user.isAdmin, 'email:', user.email);
+                        return false;
+                    }
+                    return true;
+                })
+                .map(user => {
+                    console.log('Processing user from API:', user);
+                    return {
+                        id: user.value || user.id || user.objectId,
+                        firstName: user.firstName || user.label?.split(' ')[0] || 'Unknown',
+                        lastName: user.lastName || user.label?.split(' ').slice(1).join(' ') || '',
+                        email: user.email || `${user.label?.toLowerCase().replace(/\s+/g, '.')}@unknown.com`,
+                        displayName: user.label,
+                        role: user.role // Keep role for potential future use
+                    };
+                });
             
             this.filteredUsers = [...this.availableUsers];
             
@@ -3725,10 +3854,15 @@ class QuoteOwnershipManager {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    // Get quote ID from page
-    const quoteId = window.quoteId || document.querySelector('[data-quote-id]')?.dataset.quoteId;
+    // Get quote ID from page - could be from window, data attribute, or hidden input
+    const quoteId = window.quoteId || 
+                   document.querySelector('[data-quote-id]')?.dataset.quoteId || 
+                   document.getElementById('quoteId')?.value || 
+                   'new';
     
-    if (quoteId) {
-        window.quoteOwnership = new QuoteOwnershipManager(quoteId);
-    }
+    console.log('Initializing QuoteOwnershipManager with quoteId:', quoteId);
+    
+    // Always initialize the manager, even for new quotes
+    // The manager handles both new and existing quotes
+    window.quoteOwnership = new QuoteOwnershipManager(quoteId);
 });

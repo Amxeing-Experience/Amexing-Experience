@@ -530,6 +530,7 @@ class QuoteController {
               lastName: client.get('lastName') || '',
               companyName,
               fullName: companyName || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+              contextualData: client.get('contextualData') || null,
             };
           }
 
@@ -583,9 +584,12 @@ class QuoteController {
               : null,
             status: quote.get('status') || 'quoted',
             contactPerson: quote.get('contactPerson') || '',
+            contactFirstName: quote.get('contactFirstName') || '',
+            contactLastName: quote.get('contactLastName') || '',
             contactEmail: quote.get('contactEmail') || '',
             contactPhone: quote.get('contactPhone') || '',
             notes: quote.get('notes') || '',
+            clientFinalId: quote.get('clientFinalId') || null,
             validUntil: quote.get('validUntil'),
             active: quote.get('active'),
             hasPendingInvoiceRequest, // Add invoice status
@@ -709,6 +713,7 @@ class QuoteController {
             email: client.get('email') || '',
             phone: client.get('phone') || '',
             fullName: client.get('companyName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+            contextualData: client.get('contextualData') || null,
           }
           : null,
         companyClientPtr: companyClientPtr
@@ -735,9 +740,12 @@ class QuoteController {
         numberOfInfants: quote.get('numberOfInfants') || 0,
         preferredLanguage: quote.get('preferredLanguage') || 'es',
         contactPerson: quote.get('contactPerson') || '',
+        contactFirstName: quote.get('contactFirstName') || '',
+        contactLastName: quote.get('contactLastName') || '',
         contactEmail: quote.get('contactEmail') || '',
         contactPhone: quote.get('contactPhone') || '',
         notes: quote.get('notes') || '',
+        clientFinalId: quote.get('clientFinalId') || null,
         status: quote.get('status') || 'quoted',
         validUntil: quote.get('validUntil'),
         serviceItems: quote.get('serviceItems') || {
@@ -3147,6 +3155,7 @@ class QuoteController {
                 fullName: client.get('companyName') || client.get('fullName') || `${client.get('firstName')} ${client.get('lastName')}`,
                 companyName: client.get('companyName'),
                 email: client.get('email'),
+                contextualData: client.get('contextualData') || null,
               };
             }
 

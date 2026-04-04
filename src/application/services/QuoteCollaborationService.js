@@ -798,7 +798,8 @@ class QuoteCollaborationService {
       });
 
       // Direct string comparison like other services do
-      const allowedRoles = ['admin', 'superadmin', 'department_manager'];
+      // Allow client role to add collaborators as well
+      const allowedRoles = ['admin', 'superadmin', 'department_manager', 'client'];
       const hasPermission = role && allowedRoles.includes(role);
 
       logger.info('Role permission check result', {
@@ -850,7 +851,8 @@ class QuoteCollaborationService {
       const role = requestUserRole || dbRole;
 
       // Direct string comparison like other services do
-      const allowedRoles = ['admin', 'superadmin', 'department_manager'];
+      // Allow client role to add collaborators as well
+      const allowedRoles = ['admin', 'superadmin', 'department_manager', 'client'];
       const hasPermission = role && allowedRoles.includes(role);
 
       if (hasPermission) {

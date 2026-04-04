@@ -627,7 +627,8 @@ class QuoteOwnershipService {
 
           const roleName = roleObject && roleObject.get ? roleObject.get('name') : undefined;
           roleToCheck = roleName;
-          hasAdminRole = ['admin', 'superadmin', 'super_admin', 'department_manager'].includes(roleName);
+          // Allow department_manager and client roles to transfer ownership if they are the owner
+          hasAdminRole = ['admin', 'superadmin', 'super_admin', 'department_manager', 'client'].includes(roleName);
 
           logger.info('Checked rolePointer object for admin privileges', {
             quoteId,
@@ -646,7 +647,7 @@ class QuoteOwnershipService {
         }
       } else if (typeof role === 'string' && role) {
         roleToCheck = role;
-        hasAdminRole = ['admin', 'superadmin', 'super_admin'].includes(role);
+        hasAdminRole = ['admin', 'superadmin', 'super_admin', 'department_manager', 'client'].includes(role);
         logger.info('Checked role field (string) for admin privileges', {
           quoteId,
           userId,
@@ -655,7 +656,7 @@ class QuoteOwnershipService {
         });
       } else if (typeof displayRole === 'string' && displayRole) {
         roleToCheck = displayRole;
-        hasAdminRole = ['admin', 'superadmin', 'super_admin'].includes(displayRole);
+        hasAdminRole = ['admin', 'superadmin', 'super_admin', 'department_manager', 'client'].includes(displayRole);
         logger.info('Checked displayRole field (string) for admin privileges', {
           quoteId,
           userId,
@@ -666,7 +667,7 @@ class QuoteOwnershipService {
         // New role system - role is a Parse object
         const roleName = role.get('name');
         roleToCheck = roleName;
-        hasAdminRole = ['admin', 'superadmin', 'super_admin'].includes(roleName);
+        hasAdminRole = ['admin', 'superadmin', 'super_admin', 'department_manager', 'client'].includes(roleName);
         logger.info('Checked role object for admin privileges', {
           quoteId,
           userId,
@@ -972,6 +973,7 @@ class QuoteOwnershipService {
       combinedQuery.equalTo('active', true);
       combinedQuery.equalTo('exists', true);
       combinedQuery.ascending('firstName', 'lastName');
+      combinedQuery.include('roleId'); // Include the Role object data
       combinedQuery.limit(1000); // Reasonable limit
 
       const users = await combinedQuery.find({ useMasterKey: true });
@@ -1027,6 +1029,7 @@ class QuoteOwnershipService {
       query.equalTo('active', true);
       query.equalTo('exists', true);
       query.ascending('firstName', 'lastName');
+      query.include('roleId'); // Include the Role object data
       query.limit(500);
 
       const users = await query.find({ useMasterKey: true });

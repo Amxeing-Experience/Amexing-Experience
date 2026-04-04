@@ -17,6 +17,7 @@
  * @param {array} options - Initial options [{value, text}]
  * @param {array} selected - Pre-selected values
  * @param {string} additionalClasses - Additional CSS classes
+ * @param {boolean} disabled - Disable the dropdown
  *
  * @example
  * include('atoms/common/tom-select', {
@@ -44,6 +45,7 @@ const selectHelpText = typeof helpText !== 'undefined' ? helpText : '';
 const selectOptions = typeof options !== 'undefined' ? options : [];
 const selectSelected = typeof selected !== 'undefined' ? selected : [];
 const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
 %>
 
 <div class="mb-3 <%= selectAdditionalClasses %>">
@@ -55,15 +57,15 @@ const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? addit
     <% } %>
 
     <!-- Hidden input to store actual value -->
-    <input type="hidden" id="<%= selectId %>" name="<%= selectName %>" <% if (selectRequired) { %>required<% } %> />
+    <input type="hidden" id="<%= selectId %>" name="<%= selectName %>" <% if (selectRequired) { %>required<% } %> <% if (selectDisabled) { %>disabled<% } %> />
 
     <!-- Custom dropdown interface -->
     <div class="dropdown position-relative">
-        <div class="form-control dropdown-input-display" 
+        <div class="form-control dropdown-input-display <% if (selectDisabled) { %>disabled<% } %>" 
              id="<%= selectId %>_display"
-             data-bs-toggle="dropdown" 
+             <% if (!selectDisabled) { %>data-bs-toggle="dropdown"<% } %> 
              aria-expanded="false"
-             style="cursor: pointer; display: flex; justify-content: between; align-items: center;">
+             style="cursor: <% if (selectDisabled) { %>not-allowed<% } else { %>pointer<% } %>; display: flex; justify-content: between; align-items: center; <% if (selectDisabled) { %>background-color: #e9ecef; opacity: 1;<% } %>">
             <span class="dropdown-selected-text text-muted"><%= selectPlaceholder %></span>
             <i class="ti ti-chevron-down ms-auto"></i>
         </div>
@@ -113,6 +115,7 @@ const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? addit
     'use strict';
     
     const selectId = '<%= selectId %>';
+    const isDisabled = <%= selectDisabled ? 'true' : 'false' %>;
     const hiddenInput = document.getElementById(selectId);
     const displayElement = document.getElementById(selectId + '_display');
     const searchInput = document.getElementById(selectId + '_search');
@@ -126,7 +129,7 @@ const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? addit
     
     // Initialize component
     function init() {
-        console.log('Initializing custom dropdown for #' + selectId);
+        console.log('Initializing custom dropdown for #' + selectId + (isDisabled ? ' (disabled)' : ''));
         
         // Collect all initial options
         collectOptions();
@@ -181,6 +184,12 @@ const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? addit
     
     // Setup event listeners
     function setupEventListeners() {
+        // Skip event listeners if disabled
+        if (isDisabled) {
+            console.log('Dropdown is disabled, skipping event listeners');
+            return;
+        }
+        
         // Search functionality
         searchInput.addEventListener('input', handleSearch);
         
@@ -314,8 +323,21 @@ const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? addit
     
     // Set value
     function setValue(value) {
+        console.log('[CustomSelect] setValue called:', {
+            value: value,
+            valueType: typeof value,
+            allOptionsCount: allOptions.length,
+            allOptionValues: allOptions.map(opt => ({
+                value: opt.value,
+                type: typeof opt.value,
+                text: opt.text
+            }))
+        });
+        
         const option = allOptions.find(opt => opt.value === value);
+        
         if (option) {
+            console.log('[CustomSelect] Option found:', option);
             currentValue = value;
             hiddenInput.value = value;
             selectedTextSpan.textContent = option.text;
@@ -324,6 +346,13 @@ const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? addit
             // Trigger change event for compatibility
             const changeEvent = new Event('change', { bubbles: true });
             hiddenInput.dispatchEvent(changeEvent);
+        } else {
+            console.log('[CustomSelect] Option NOT found for value:', value);
+            // Try with string comparison
+            const optionStr = allOptions.find(opt => String(opt.value) === String(value));
+            if (optionStr) {
+                console.log('[CustomSelect] Found with string comparison:', optionStr);
+            }
         }
     }
     
@@ -337,9 +366,9 @@ const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? addit
         optionEl.textContent = option.text;
         
         optionsContainer.appendChild(optionEl);
+        // Store all option data, not just value and text
         allOptions.push({
-            value: option.value,
-            text: option.text,
+            ...option,  // Include all properties from the option
             element: optionEl
         });
     }
