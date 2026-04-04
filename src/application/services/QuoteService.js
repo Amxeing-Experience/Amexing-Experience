@@ -250,10 +250,14 @@ class QuoteService {
         'numberOfInfants',
         'preferredLanguage',
         'contactPerson',
+        'contactFirstName',
+        'contactLastName',
         'contactEmail',
         'contactPhone',
         'notes',
         'validUntil',
+        'eventType',
+        'clientFinalId',
       ];
 
       const appliedUpdates = {};
@@ -261,18 +265,50 @@ class QuoteService {
 
       Object.keys(updates).forEach((key) => {
         if (allowedFields.includes(key)) {
-          // Validate status if being updated
-          if (key === 'status' && !this.validStatuses.includes(updates[key])) {
-            throw new Error(`Invalid status. Must be one of: ${this.validStatuses.join(', ')}`);
-          }
+          try {
+            // Validate status if being updated
+            if (key === 'status' && !this.validStatuses.includes(updates[key])) {
+              throw new Error(`Invalid status. Must be one of: ${this.validStatuses.join(', ')}`);
+            }
 
-          // Track if any person field is updated
-          if (['numberOfAdults', 'numberOfChildren', 'numberOfInfants'].includes(key)) {
-            personFieldsUpdated = true;
-          }
+            // Track if any person field is updated
+            if (['numberOfAdults', 'numberOfChildren', 'numberOfInfants'].includes(key)) {
+              personFieldsUpdated = true;
+            }
 
-          quote.set(key, updates[key]);
-          appliedUpdates[key] = updates[key];
+            // Handle clientFinalId as a string (not a pointer)
+            if (key === 'clientFinalId') {
+              // Log the value being processed
+              logger.debug('Processing clientFinalId', {
+                key,
+                value: updates[key],
+                type: typeof updates[key],
+                isUndefined: updates[key] === 'undefined',
+              });
+
+              // Only set if value is provided and not undefined
+              if (updates[key] && updates[key] !== 'undefined' && updates[key] !== undefined) {
+                // Store as string, not pointer
+                quote.set(key, updates[key]);
+                appliedUpdates[key] = updates[key];
+              } else if (updates[key] === null || updates[key] === '') {
+                // Clear the field if explicitly set to null or empty string
+                quote.unset(key);
+                appliedUpdates[key] = null;
+              }
+            } else if (updates[key] !== undefined) {
+              // Skip undefined values for other fields
+              quote.set(key, updates[key]);
+              appliedUpdates[key] = updates[key];
+            }
+          } catch (fieldError) {
+            logger.error('Error processing field in updateQuote', {
+              field: key,
+              value: updates[key],
+              error: fieldError.message,
+            });
+            throw fieldError;
+          }
         }
       });
 

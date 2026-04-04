@@ -575,7 +575,7 @@ class QuoteCollaborationController {
       // Check if user has access to view history
       // Allow admins, department managers, and users with any access to view history
       const userRole = req.userRole || req.user?.role || '';
-      const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'department_manager';
+      const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'department_manager' || userRole === 'client';
 
       if (!isAdmin) {
         const hasAccess = await this.collaborationService.hasAccess(quoteId, userId);
@@ -644,7 +644,7 @@ class QuoteCollaborationController {
 
       // Check if user is owner or admin (can approve edits)
       const userRole = req.userRole || req.user?.role || '';
-      const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'department_manager';
+      const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'department_manager' || userRole === 'client';
 
       if (!isAdmin) {
         const OwnershipService = require('../../services/QuoteOwnershipService');
@@ -763,7 +763,7 @@ class QuoteCollaborationController {
       // Check if user has access
       // Allow admins, department managers, and users with any access to view diffs
       const userRole = req.userRole || req.user?.role || '';
-      const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'department_manager';
+      const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'department_manager' || userRole === 'client';
 
       if (!isAdmin) {
         const hasAccess = await this.collaborationService.hasAccess(quoteId, userId);

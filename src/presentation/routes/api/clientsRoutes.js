@@ -87,10 +87,10 @@ async function validateClientAccess(req, res, next) {
       return next();
     }
 
-    // Client and department_manager can access their own employees
+    // Client and department_manager can access their own employees and sub-clients
     if (['client', 'department_manager'].includes(userRole)) {
-      // For employees endpoints, allow access to their own client
-      if (req.originalUrl.includes('/employees')) {
+      // For employees and sub-clients endpoints, allow access to their own client
+      if (req.originalUrl.includes('/employees') || req.originalUrl.includes('/sub-clients')) {
         const requestedClientId = req.params.clientId;
 
         let userClientId = null;
@@ -787,6 +787,53 @@ router.post('/:id/reset-password', writeOperationsLimiter, async (req, res) => {
  */
 router.get('/:clientId/employees', validateClientAccess, async (req, res) => {
   await clientEmployeesController.getEmployees(req, res);
+});
+
+/**
+ * @swagger
+ * /api/clients/{clientId}/sub-clients:
+ *   get:
+ *     tags:
+ *       - Clients
+ *     summary: Get sub-clients for a specific client
+ *     description: Retrieve Client records where ownedBy points to the specified clientId
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the parent client
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 100
+ *           maximum: 100
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search term for filtering sub-clients
+ *     responses:
+ *       200:
+ *         description: Sub-clients retrieved successfully
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Client not found
+ */
+router.get('/:clientId/sub-clients', validateClientAccess, async (req, res) => {
+  await clientsController.getSubClients(req, res);
 });
 
 /**

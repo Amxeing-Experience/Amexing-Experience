@@ -421,8 +421,8 @@ class QuoteOwnershipController {
       });
     }
 
-    // Check permissions - only admins and department managers can transfer ownership
-    const canManage = ['admin', 'superadmin', 'department_manager'].includes(userRole);
+    // Check permissions - admins, department managers, and clients can transfer ownership
+    const canManage = ['admin', 'superadmin', 'department_manager', 'client'].includes(userRole);
     if (!canManage) {
       logger.warn('User lacks permission to view available owners', {
         userId,
@@ -458,20 +458,82 @@ class QuoteOwnershipController {
       // Handle the users array (could be direct array or result.users)
       const availableOwners = Array.isArray(result) ? result : (result.users || []);
 
+      // For client and department_manager roles, exclude admin/superadmin users
+      let filteredOwners = availableOwners;
+      if (userRole === 'client' || userRole === 'department_manager') {
+        filteredOwners = availableOwners.filter((user) => {
+          // Get the roleId pointer
+          const roleId = user.get('roleId');
+          let roleName = null;
+
+          // If roleId exists and has the Role data (it should be included in the query)
+          if (roleId && typeof roleId.get === 'function') {
+            roleName = roleId.get('name');
+            logger.debug('User role from roleId pointer', {
+              userId: user.id,
+              userName: `${user.get('firstName')} ${user.get('lastName')}`,
+              roleName,
+            });
+          } else {
+            // Fallback to string role field for backward compatibility
+            roleName = user.get('role');
+            if (roleName) {
+              logger.debug('User role from string field', {
+                userId: user.id,
+                userName: `${user.get('firstName')} ${user.get('lastName')}`,
+                roleName,
+              });
+            }
+          }
+
+          // Check if it's an admin role
+          const isAdmin = roleName === 'admin' || roleName === 'superadmin';
+
+          if (isAdmin) {
+            logger.debug('Filtering out admin user', {
+              userId: user.id,
+              userName: `${user.get('firstName')} ${user.get('lastName')}`,
+              roleName,
+            });
+          }
+
+          return !isAdmin;
+        });
+
+        logger.info('Filtered admin users from available owners', {
+          originalCount: availableOwners.length,
+          filteredCount: filteredOwners.length,
+          userRole,
+          quoteId,
+        });
+      }
+
       res.status(200).json({
         success: true,
-        data: availableOwners.map((user) => ({
-          id: user.id,
-          firstName: user.get('firstName'),
-          lastName: user.get('lastName'),
-          email: user.get('email'),
-          role: user.get('role'),
-          username: user.get('username'),
-          isDepartmentManager: user.get('role') === 'department_manager',
-          isClient: user.get('role') === 'client',
-          isAdmin: ['admin', 'superadmin'].includes(user.get('role')),
-        })),
-        total: availableOwners.length,
+        data: filteredOwners.map((user) => {
+          // Get the actual role name from roleId pointer or fallback to role field
+          const roleId = user.get('roleId');
+          let roleName = null;
+
+          if (roleId && typeof roleId.get === 'function') {
+            roleName = roleId.get('name');
+          } else {
+            roleName = user.get('role');
+          }
+
+          return {
+            id: user.id,
+            firstName: user.get('firstName'),
+            lastName: user.get('lastName'),
+            email: user.get('email'),
+            role: roleName, // Send the actual role name
+            username: user.get('username'),
+            isDepartmentManager: roleName === 'department_manager',
+            isClient: roleName === 'client',
+            isAdmin: roleName === 'admin' || roleName === 'superadmin',
+          };
+        }),
+        total: filteredOwners.length,
       });
     } catch (error) {
       logger.error('Failed to get available owners', {
