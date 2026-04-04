@@ -126,6 +126,19 @@ const clientId = locals.clientId || '';
               </ul>
           </div>
           
+          <div class="alert alert-success role-description d-none" id="roleDescriptionDepartmentManager">
+              <strong><i class="ti ti-crown me-1"></i>Manager (Gerente de Agencia):</strong>
+              <p class="mb-2">El gerente de agencia tiene autoridad completa sobre su equipo y operaciones. Sus responsabilidades incluyen:</p>
+              <ul class="mb-0">
+                  <li>Supervisar y gestionar a todos los agentes de la agencia</li>
+                  <li>Crear, editar y eliminar cuentas de agentes</li>
+                  <li>Revisar y aprobar cotizaciones importantes</li>
+                  <li>Gestionar presupuestos y asignaciones de la agencia</li>
+                  <li>Acceso completo a reportes y métricas del equipo</li>
+                  <li>Administrar configuraciones y políticas de la agencia</li>
+              </ul>
+          </div>
+          
           <!-- Phone Field (Optional) -->
           <div class="mb-3">
             <label for="phone" class="form-label">Teléfono de Contacto</label>
@@ -207,14 +220,15 @@ const clientId = locals.clientId || '';
                             <label for="editEmployeeRole" class="form-label fw-semibold">
                                 Rol del Empleado <span class="text-danger">*</span>
                             </label>
-                            <select class="form-select" id="editEmployeeRole" name="role" required>
-                                <option value="client" selected>Agent (Representante de agencia con capacidades de gestión)</option>
+                            <select class="form-select" id="editEmployeeRole" name="role" required readonly disabled>
+                                <option value="client">Agent (Representante de agencia)</option>
+                                <option value="department_manager">Manager (Gerente de Agencia)</option>
                             </select>
-                            <div class="form-text">Selecciona el nivel de acceso para este empleado</div>
+                            <div class="form-text">El rol no puede ser modificado una vez asignado</div>
                         </div>
 
                         <!-- Role description -->
-                        <div class="alert alert-info role-description" id="editRoleDescriptionClient">
+                        <div class="alert alert-info role-description d-none" id="editRoleDescriptionClient">
                             <strong><i class="ti ti-briefcase me-1"></i>Agent:</strong>
                             <p class="mb-2">El agente es responsable de la gestión integral de los servicios de los clientes dentro de su agencia. Entre sus funciones se incluyen:</p>
                             <ul class="mb-0">
@@ -224,6 +238,19 @@ const clientId = locals.clientId || '';
                                 <li>Solicitar, modificar o cancelar servicios</li>
                                 <li>Bloquear o eliminar servicios, según sea necesario</li>
                                 <li>Realizar todas las acciones relacionadas con la administración del servicio</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="alert alert-success role-description d-none" id="editRoleDescriptionDepartmentManager">
+                            <strong><i class="ti ti-crown me-1"></i>Manager (Gerente de Agencia):</strong>
+                            <p class="mb-2">El gerente de agencia tiene autoridad completa sobre su equipo y operaciones. Sus responsabilidades incluyen:</p>
+                            <ul class="mb-0">
+                                <li>Supervisar y gestionar a todos los agentes de la agencia</li>
+                                <li>Crear, editar y eliminar cuentas de agentes</li>
+                                <li>Revisar y aprobar cotizaciones importantes</li>
+                                <li>Gestionar presupuestos y asignaciones de la agencia</li>
+                                <li>Acceso completo a reportes y métricas del equipo</li>
+                                <li>Administrar configuraciones y políticas de la agencia</li>
                             </ul>
                         </div>
                     </div>
@@ -474,17 +501,7 @@ const clientId = locals.clientId || '';
         });
       }
       
-      // Role selection change handler for edit modal
-      const editRoleSelect = document.getElementById('editEmployeeRole');
-      if (editRoleSelect) {
-        editRoleSelect.addEventListener('change', function() {
-          // Since we only have client role now, always show client description
-          const clientDesc = document.getElementById('editRoleDescriptionClient');
-          if (clientDesc) {
-            clientDesc.classList.remove('d-none');
-          }
-        });
-      }
+      // Note: Role selection is disabled in edit modal (read-only)
 
       // Edit employee submit button event listener
       const submitEditBtn = document.getElementById('submitEditEmployee');
@@ -498,10 +515,19 @@ const clientId = locals.clientId || '';
       const roleSelect = document.getElementById('role');
       if (roleSelect) {
         roleSelect.addEventListener('change', function() {
-          // Since we only have client role now, always show client description
+          const selectedRole = this.value;
           const clientDesc = document.getElementById('roleDescriptionClient');
-          if (clientDesc) {
+          const managerDesc = document.getElementById('roleDescriptionDepartmentManager');
+          
+          // Hide all descriptions first
+          if (clientDesc) clientDesc.classList.add('d-none');
+          if (managerDesc) managerDesc.classList.add('d-none');
+          
+          // Show the appropriate description
+          if (selectedRole === 'client' && clientDesc) {
             clientDesc.classList.remove('d-none');
+          } else if (selectedRole === 'department_manager' && managerDesc) {
+            managerDesc.classList.remove('d-none');
           }
         });
 
@@ -751,11 +777,21 @@ const clientId = locals.clientId || '';
         charCountElement.textContent = `${notesTextarea.value.length}/500`;
       }
 
-      // Since we only have client role, always show client description and set role to client
-      document.getElementById('editEmployeeRole').value = 'client';
-      const clientDesc = document.getElementById('editRoleDescriptionClient');
-      if (clientDesc) {
-        clientDesc.classList.remove('d-none');
+      // Show appropriate role description based on employee's role
+      const actualRole = employeeData.role || employeeData.roleId?.name || 'client';
+      document.getElementById('editEmployeeRole').value = actualRole;
+      
+      // Hide all descriptions first
+      const editClientDesc = document.getElementById('editRoleDescriptionClient');
+      const editManagerDesc = document.getElementById('editRoleDescriptionDepartmentManager');
+      if (editClientDesc) editClientDesc.classList.add('d-none');
+      if (editManagerDesc) editManagerDesc.classList.add('d-none');
+      
+      // Show the appropriate description
+      if (actualRole === 'client' && editClientDesc) {
+        editClientDesc.classList.remove('d-none');
+      } else if (actualRole === 'department_manager' && editManagerDesc) {
+        editManagerDesc.classList.remove('d-none');
       }
     }
 
@@ -772,12 +808,11 @@ const clientId = locals.clientId || '';
           return;
         }
 
-        // Get form data
+        // Get form data (role is read-only and not included in updates)
         const formData = {
           firstName: document.getElementById('editEmployeeFirstName').value.trim(),
           lastName: document.getElementById('editEmployeeLastName').value.trim(),
           email: document.getElementById('editEmployeeEmail').value.trim(),
-          role: document.getElementById('editEmployeeRole').value.trim(),
           phone: document.getElementById('editEmployeePhone').value.trim() || undefined,
           notes: document.getElementById('editEmployeeNotes').value.trim() || '',
           active: document.getElementById('editEmployeeActive').checked

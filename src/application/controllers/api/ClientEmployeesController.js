@@ -32,7 +32,7 @@ class ClientEmployeesController {
     this.userService = new UserManagementService();
     this.maxPageSize = 100;
     this.defaultPageSize = 25;
-    this.allowedRoles = ['client', 'employee']; // client = Agent, employee = Employee
+    this.allowedRoles = ['client', 'department_manager']; // client = Agent, department_manager = Manager
   }
 
   /**
@@ -79,6 +79,20 @@ class ClientEmployeesController {
 
       // Get employees from service
       const result = await this.userService.getUsers(currentUser, options);
+
+      // If the current user is a department_manager and the clientId matches their ID,
+      // add them to the team results (since they should see themselves in their team)
+      const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
+      if (currentUserRole === 'department_manager' && currentUser.id === clientId) {
+        const currentUserFormatted = this.transformCurrentUserForTeamView(currentUser);
+
+        // Add current user at the beginning of the results
+        result.users.unshift(currentUserFormatted);
+
+        // Adjust pagination counts to include the current user
+        result.pagination.totalCount += 1;
+        result.pagination.totalPages = Math.ceil(result.pagination.totalCount / result.pagination.limit);
+      }
 
       // Add metadata for frontend consumption
       const response = {
@@ -869,6 +883,58 @@ class ClientEmployeesController {
       .join('');
 
     return password;
+  }
+
+  /**
+   * Transform current user data to match the team member format expected by the frontend.
+   * Adds special flag to identify this as the current user for UI purposes (ME badge).
+   * @param {object} currentUser - Current authenticated user object from Parse.
+   * @returns {object} - Formatted user object matching team member structure.
+   * @example
+   * const formatted = this.transformCurrentUserForTeamView(req.user);
+   * // Returns: { id: 'user123', firstName: 'John', ..., isCurrentUser: true }
+   */
+  transformCurrentUserForTeamView(currentUser) {
+    // Extract user data whether it's a Parse object or plain object
+    const userId = currentUser.get ? currentUser.get('objectId') || currentUser.id : currentUser.id || currentUser.objectId;
+    const firstName = currentUser.get ? currentUser.get('firstName') : currentUser.firstName;
+    const lastName = currentUser.get ? currentUser.get('lastName') : currentUser.lastName;
+    const email = currentUser.get ? currentUser.get('username') || currentUser.get('email') : currentUser.username || currentUser.email;
+    const phone = currentUser.get ? currentUser.get('phone') : currentUser.phone;
+    const active = currentUser.get ? currentUser.get('active') : currentUser.active;
+    const createdAt = currentUser.get ? currentUser.get('createdAt') : currentUser.createdAt;
+    const updatedAt = currentUser.get ? currentUser.get('updatedAt') : currentUser.updatedAt;
+
+    // Get role information
+    let role = 'department_manager'; // Default for current user
+    let roleId = null;
+
+    if (currentUser.get && currentUser.get('roleId')) {
+      roleId = currentUser.get('roleId');
+      if (roleId && roleId.get) {
+        role = roleId.get('name') || role;
+      }
+    } else if (currentUser.role) {
+      ({ role } = currentUser);
+    } else if (currentUser.get && currentUser.get('role')) {
+      role = currentUser.get('role');
+    }
+
+    return {
+      id: userId,
+      firstName: firstName || '',
+      lastName: lastName || '',
+      email: email || '',
+      phone: phone || '',
+      role,
+      roleId,
+      active: active !== false, // Default to true if undefined
+      createdAt: createdAt || new Date(),
+      updatedAt: updatedAt || new Date(),
+      isCurrentUser: true, // Special flag for UI to show ME badge
+      clientId: null, // Department managers don't have clientId
+      notes: 'Department Manager', // Optional description
+    };
   }
 }
 

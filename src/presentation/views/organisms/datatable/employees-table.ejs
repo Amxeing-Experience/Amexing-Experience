@@ -46,7 +46,8 @@ const showActionsColumn = dtShowActions && (canEdit || canDelete) && dtUserRole 
 // Role translations
 const roleLabels = {
   client: 'Agent',
-  employee: 'Empleado'
+  employee: 'Empleado',
+  department_manager: 'Manager'
 };
 %>
 
@@ -263,7 +264,7 @@ function initializeEmployeesDataTable() {
                     
                     // Add "ME" badge if this is the current user
                     const currentUserId = '<%= dtCurrentUserId %>';
-                    const isCurrentUser = currentUserId && row.id === currentUserId;
+                    const isCurrentUser = (currentUserId && row.id === currentUserId) || row.isCurrentUser === true;
                     const meBadge = isCurrentUser ? ' <span class="badge bg-primary ms-2">ME</span>' : '';
                     
                     return `<strong class="text-dark">${fullName}</strong>${meBadge}`;
@@ -280,12 +281,18 @@ function initializeEmployeesDataTable() {
                 render: function(data, type, row) {
                     const roleLabels = {
                         client: 'Agent',
-                        employee: 'Empleado'
+                        employee: 'Empleado',
+                        department_manager: 'Manager'
                     };
                     const role = row.role || row.roleId?.name || 'employee';
                     const roleName = typeof role === 'string' ? role : role.name || 'employee';
                     const roleLabel = roleLabels[roleName] || roleName;
-                    const badgeClass = roleName === 'client' ? 'bg-info' : 'bg-secondary';
+                    let badgeClass = 'bg-secondary';
+                    if (roleName === 'client') {
+                        badgeClass = 'bg-info';
+                    } else if (roleName === 'department_manager') {
+                        badgeClass = 'bg-success';
+                    }
                     return `<span class="badge ${badgeClass}">${roleLabel}</span>`;
                 }
             },
@@ -318,8 +325,12 @@ function initializeEmployeesDataTable() {
                 render: function(data, type, row) {
                     let actions = '<div class="btn-group btn-group-sm" role="group">';
 
+                    // Check if this is the current user
+                    const currentUserId = '<%= dtCurrentUserId %>';
+                    const isCurrentUser = (currentUserId && row.id === currentUserId) || row.isCurrentUser === true;
+
                     <% if (canEdit) { %>
-                    /* Edit button */
+                    /* Edit button - always show */
                     const employeeName = `${row.firstName || ''} ${row.lastName || ''}`.trim() || 'Empleado';
                     actions += `<button type="button"
                                 class="btn btn-primary btn-edit-employee"
@@ -331,34 +342,38 @@ function initializeEmployeesDataTable() {
                                 <i class="ti ti-edit"></i>
                             </button>`;
 
-                    /* Toggle status button */
-                    const statusIcon = row.active ? 'ti-user-off' : 'ti-user-check';
-                    const statusTitle = row.active ? 'Desactivar' : 'Activar';
-                    const statusClass = row.active ? 'btn-warning' : 'btn-success';
+                    /* Toggle status button - hide for current user */
+                    if (!isCurrentUser) {
+                        const statusIcon = row.active ? 'ti-user-off' : 'ti-user-check';
+                        const statusTitle = row.active ? 'Desactivar' : 'Activar';
+                        const statusClass = row.active ? 'btn-warning' : 'btn-success';
 
-                    actions += `<button type="button"
-                                class="btn ${statusClass} btn-toggle-employee-status"
-                                data-employee-id="${row.id}"
-                                data-current-status="${row.active}"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                title="${statusTitle}">
-                                <i class="ti ${statusIcon}"></i>
-                            </button>`;
+                        actions += `<button type="button"
+                                    class="btn ${statusClass} btn-toggle-employee-status"
+                                    data-employee-id="${row.id}"
+                                    data-current-status="${row.active}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="${statusTitle}">
+                                    <i class="ti ${statusIcon}"></i>
+                                </button>`;
+                    }
                     <% } %>
 
                     <% if (canDelete) { %>
-                    /* Delete button */
-                    const employeeNameForDelete = `${row.firstName || ''} ${row.lastName || ''}`.trim() || 'este empleado';
-                    actions += `<button type="button"
-                                class="btn btn-danger btn-delete-employee"
-                                data-employee-id="${row.id}"
-                                data-employee-name="${employeeNameForDelete}"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                title="Eliminar">
-                                <i class="ti ti-trash"></i>
-                            </button>`;
+                    /* Delete button - hide for current user */
+                    if (!isCurrentUser) {
+                        const employeeNameForDelete = `${row.firstName || ''} ${row.lastName || ''}`.trim() || 'este empleado';
+                        actions += `<button type="button"
+                                    class="btn btn-danger btn-delete-employee"
+                                    data-employee-id="${row.id}"
+                                    data-employee-name="${employeeNameForDelete}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Eliminar">
+                                    <i class="ti ti-trash"></i>
+                                </button>`;
+                    }
                     <% } %>
 
                     actions += '</div>';
