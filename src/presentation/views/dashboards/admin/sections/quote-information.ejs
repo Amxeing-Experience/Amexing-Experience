@@ -728,20 +728,57 @@
                 }
                 
                 if (selectedClientId && selectedClientData) {
+                    // Apply same enterprise name extraction logic as initial dropdown
+                    let displayText = selectedClientData.companyName || 
+                                     selectedClientData.fullName || 
+                                     selectedClientData.name || 
+                                     `Cliente ${selectedClientId}`;
                     
-                    // First ensure the option exists in the dropdown
-                    if (!clientTS.getOption(selectedClientId)) {
-                        // Add the client option if it doesn't exist
-                        clientTS.addOption({
-                            value: selectedClientId,
-                            text: selectedClientData.fullName || selectedClientData.name || `Cliente ${selectedClientId}`,
-                            email: selectedClientData.email || ''
-                        });
-                    } else {
+                    // Extract enterprise name from parentheses if present
+                    // Example: "Abercrombie & Kent Mexico (Abercrombie)" -> "Abercrombie"
+                    const parenthesesMatch = displayText.match(/\(([^)]+)\)$/);
+                    if (parenthesesMatch) {
+                        displayText = parenthesesMatch[1];
                     }
                     
-                    // Set the selected value
-                    clientTS.setValue(selectedClientId);
+                    // TomSelect doesn't have updateOption, we need to remove and re-add
+                    // First check if the option already exists
+                    const existingOptions = clientTS.options;
+                    
+                    if (existingOptions && existingOptions[selectedClientId]) {
+                        // Store current value to restore selection
+                        const currentValue = clientTS.getValue();
+                        
+                        // Clear the current selection silently
+                        clientTS.clear(true);
+                        
+                        // Remove the old option
+                        delete clientTS.options[selectedClientId];
+                        
+                        // Add the updated option
+                        clientTS.addOption({
+                            value: selectedClientId,
+                            text: displayText,
+                            email: selectedClientData.email || '',
+                            contactPerson: selectedClientData.contactPerson || '',
+                            phone: selectedClientData.phone || ''
+                        });
+                        
+                        // Restore selection
+                        clientTS.setValue(selectedClientId);
+                    } else {
+                        // Add new option if it doesn't exist
+                        clientTS.addOption({
+                            value: selectedClientId,
+                            text: displayText,
+                            email: selectedClientData.email || '',
+                            contactPerson: selectedClientData.contactPerson || '',
+                            phone: selectedClientData.phone || ''
+                        });
+                        
+                        // Set the selected value
+                        clientTS.setValue(selectedClientId);
+                    }
                 } else {
                     // No client data in quote
                 }
@@ -859,11 +896,12 @@
             if (result.success) {
                 showAlert('quoteInformationAlerts', 'Cotización actualizada exitosamente', 'success');
 
-                // Keep the button disabled for a moment
+                // Redirect to quote detail page with services section (use appropriate dashboard path)
+                const dashboardPathMap = { department_manager: '/dashboard/department_manager', client: '/dashboard/client' };
+                const dashboardPath = dashboardPathMap[userRole] || '/dashboard/admin';
                 setTimeout(() => {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = originalText;
-                }, 2000);
+                    window.location.href = `${dashboardPath}/quotes/${quoteId}?section=services`;
+                }, 1500);
             } else {
                 showAlert('quoteInformationAlerts', result.error || 'Error al actualizar la cotización', 'danger');
                 submitBtn.disabled = false;
@@ -880,6 +918,15 @@
     // Create quote
     async function createQuote(event) {
         event.preventDefault();
+
+        // Defensive check - if quote already exists, update instead
+        const quoteIdField = document.getElementById('quoteId');
+        const existingQuoteId = quoteIdField?.value;
+        
+        if (existingQuoteId && existingQuoteId.trim() !== '' && existingQuoteId !== 'new') {
+            console.warn('createQuote() called but quote already exists, calling updateQuote instead:', existingQuoteId);
+            return updateQuote(existingQuoteId, event);
+        }
 
         const form = document.getElementById('quoteInformationForm');
 
@@ -1001,11 +1048,18 @@
                 saveBtn.addEventListener('click', saveQuickClient);
             }
 
-            // Form submission - use appropriate function based on mode
+            // Form submission - use appropriate function based on current state
             document.getElementById('quoteInformationForm').addEventListener('submit', function(event) {
-                if (isEditMode) {
-                    updateQuote(quoteId, event);
+                // Check current quote ID dynamically (not just initial page load state)
+                const quoteIdField = document.getElementById('quoteId');
+                const currentQuoteId = quoteIdField?.value;
+                const hasExistingQuote = currentQuoteId && currentQuoteId.trim() !== '' && currentQuoteId !== 'new';
+                
+                if (hasExistingQuote) {
+                    console.log('Form submission: Updating existing quote', currentQuoteId);
+                    updateQuote(currentQuoteId, event);
                 } else {
+                    console.log('Form submission: Creating new quote');
                     createQuote(event);
                 }
             });

@@ -257,6 +257,8 @@ class QuoteService {
       ];
 
       const appliedUpdates = {};
+      let personFieldsUpdated = false;
+
       Object.keys(updates).forEach((key) => {
         if (allowedFields.includes(key)) {
           // Validate status if being updated
@@ -264,10 +266,34 @@ class QuoteService {
             throw new Error(`Invalid status. Must be one of: ${this.validStatuses.join(', ')}`);
           }
 
+          // Track if any person field is updated
+          if (['numberOfAdults', 'numberOfChildren', 'numberOfInfants'].includes(key)) {
+            personFieldsUpdated = true;
+          }
+
           quote.set(key, updates[key]);
           appliedUpdates[key] = updates[key];
         }
       });
+
+      // Recalculate numberOfPeople if any individual person field was updated
+      if (personFieldsUpdated) {
+        const adults = parseInt(quote.get('numberOfAdults') || 0, 10);
+        const children = parseInt(quote.get('numberOfChildren') || 0, 10);
+        const infants = parseInt(quote.get('numberOfInfants') || 0, 10);
+        const calculatedTotal = adults + children + infants;
+
+        quote.set('numberOfPeople', calculatedTotal);
+        appliedUpdates.numberOfPeople = calculatedTotal;
+
+        logger.info('QuoteService.updateQuote - Recalculated numberOfPeople', {
+          quoteId: quote.id,
+          adults,
+          children,
+          infants,
+          total: calculatedTotal,
+        });
+      }
 
       // Handle client field updates - DUAL FIELD ARCHITECTURE
       const clientIdNormalized = updates.client || updates.clientId;

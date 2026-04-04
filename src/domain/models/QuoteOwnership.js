@@ -308,22 +308,63 @@ class QuoteOwnership extends BaseModel {
    * @example
    */
   static async transferOwnership(quote, fromOwner, toOwner, reason, transferredBy) {
-    // End current ownership
+    // Find current ownership first
     const currentQuery = new Parse.Query('QuoteOwnership');
     currentQuery.equalTo('quote', quote);
     currentQuery.equalTo('isCurrent', true);
     currentQuery.equalTo('exists', true);
 
+    let currentOwnership = null;
+    let originalEndDate = null;
+    let originalCurrentFlag = null;
+    let newOwnership = null;
+
     try {
-      const currentOwnership = await currentQuery.first({ useMasterKey: true });
-      if (currentOwnership) {
-        currentOwnership.setOwnershipEndDate(new Date());
-        currentOwnership.setIsCurrent(false);
-        await currentOwnership.save(null, { useMasterKey: true });
+      currentOwnership = await currentQuery.first({ useMasterKey: true });
+      
+      // Handle missing ownership records - create initial ownership for fromOwner first
+      if (!currentOwnership) {
+        logger.info('No current ownership found, creating initial ownership for fromOwner', {
+          quoteId: quote.id,
+          fromOwnerId: fromOwner.id,
+          toOwnerId: toOwner.id,
+        });
+
+        // Create initial ownership record for the current owner (fromOwner)
+        const initialOwnership = new QuoteOwnership();
+        initialOwnership.setQuote(quote);
+        initialOwnership.setOwner(fromOwner);
+        initialOwnership.setOwnershipStartDate(new Date());
+        initialOwnership.setIsCurrent(true);
+        initialOwnership.setOwnershipType('initial');
+        initialOwnership.set('active', true);
+        initialOwnership.set('exists', true);
+
+        await initialOwnership.save(null, { useMasterKey: true });
+        currentOwnership = initialOwnership;
+        
+        logger.info('Created initial ownership record', {
+          quoteId: quote.id,
+          initialOwnershipId: currentOwnership.id,
+          fromOwnerId: fromOwner.id,
+        });
       }
 
-      // Create new ownership record
-      const newOwnership = new QuoteOwnership();
+      // Store original values for rollback
+      originalEndDate = currentOwnership.getOwnershipEndDate();
+      originalCurrentFlag = currentOwnership.isCurrent();
+
+      logger.info('Starting ownership transfer transaction', {
+        quoteId: quote.id,
+        currentOwnershipId: currentOwnership.id,
+        fromOwnerId: fromOwner.id,
+        toOwnerId: toOwner.id,
+        reason,
+        hadInitialOwnership: !!currentOwnership,
+      });
+
+      // Step 1: Create new ownership record first (fail fast if validation issues)
+      newOwnership = new QuoteOwnership();
       newOwnership.setQuote(quote);
       newOwnership.setOwner(toOwner);
       newOwnership.setPreviousOwner(fromOwner);
@@ -335,9 +376,17 @@ class QuoteOwnership extends BaseModel {
       newOwnership.set('active', true);
       newOwnership.set('exists', true);
 
+      // Try to save new ownership record
       await newOwnership.save(null, { useMasterKey: true });
+      logger.info('New ownership record created', { newOwnershipId: newOwnership.id });
 
-      logger.info('Transferred quote ownership', {
+      // Step 2: Update current ownership to end it
+      currentOwnership.setOwnershipEndDate(new Date());
+      currentOwnership.setIsCurrent(false);
+      await currentOwnership.save(null, { useMasterKey: true });
+      logger.info('Previous ownership record updated', { currentOwnershipId: currentOwnership.id });
+
+      logger.info('Transferred quote ownership successfully', {
         quoteId: quote.id,
         fromOwnerId: fromOwner.id,
         toOwnerId: toOwner.id,
@@ -347,12 +396,40 @@ class QuoteOwnership extends BaseModel {
 
       return newOwnership;
     } catch (error) {
-      logger.error('Failed to transfer ownership', {
+      logger.error('Ownership transfer failed, initiating rollback', {
         error: error.message,
         quoteId: quote.id,
-        fromOwnerId: fromOwner.id,
-        toOwnerId: toOwner.id,
+        fromOwnerId: fromOwner?.id,
+        toOwnerId: toOwner?.id,
+        newOwnershipId: newOwnership?.id,
+        currentOwnershipId: currentOwnership?.id,
       });
+
+      // Rollback logic
+      try {
+        // If new ownership was created, delete it
+        if (newOwnership && newOwnership.id) {
+          await newOwnership.destroy({ useMasterKey: true });
+          logger.info('Rolled back: deleted new ownership record', { newOwnershipId: newOwnership.id });
+        }
+
+        // If current ownership was modified, restore original values
+        if (currentOwnership && originalEndDate !== undefined && originalCurrentFlag !== undefined) {
+          currentOwnership.set('ownershipEndDate', originalEndDate);
+          currentOwnership.setIsCurrent(originalCurrentFlag);
+          await currentOwnership.save(null, { useMasterKey: true });
+          logger.info('Rolled back: restored previous ownership record', { currentOwnershipId: currentOwnership.id });
+        }
+      } catch (rollbackError) {
+        logger.error('Rollback failed - manual intervention required', {
+          originalError: error.message,
+          rollbackError: rollbackError.message,
+          quoteId: quote.id,
+          newOwnershipId: newOwnership?.id,
+          currentOwnershipId: currentOwnership?.id,
+        });
+      }
+
       throw error;
     }
   }

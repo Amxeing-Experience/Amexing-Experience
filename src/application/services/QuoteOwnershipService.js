@@ -124,128 +124,39 @@ class QuoteOwnershipService {
 
       // Get entities
       const quote = await this.getQuoteById(quoteId);
-      let currentOwnership = await QuoteOwnership.getCurrentOwnership(quote);
       let currentOwner;
 
-      logger.info('Transfer ownership - checking existing ownership', {
-        quoteId,
-        hasOwnership: !!currentOwnership,
-        quoteExists: !!quote,
-      });
-
-      if (!currentOwnership) {
-        // No formal ownership yet, check if we have createdBy
-        const createdBy = quote.getCreatedBy();
-
-        logger.info('No existing ownership, checking createdBy', {
-          quoteId,
-          hasCreatedBy: !!createdBy,
-          createdById: createdBy ? createdBy.id : null,
-        });
-
-        if (!createdBy) {
-          throw new Error('No ownership and no createdBy found for quote');
-        }
-
-        logger.info('Creating initial ownership from createdBy for transfer', {
-          quoteId,
-          createdById: createdBy.id,
-          newOwnerId,
-        });
-
-        // Fetch the createdBy user to ensure we have all attributes
-        if (createdBy.get && createdBy.id) {
-          try {
-            await createdBy.fetch({ useMasterKey: true });
-          } catch (fetchError) {
-            logger.error('Failed to fetch createdBy user', {
-              error: fetchError.message,
-              createdById: createdBy.id,
-              quoteId,
-            });
-          }
-        }
-
-        try {
-          // Validate that we have valid objects before creating ownership
-          if (!quote || !quote.id) {
-            throw new Error('Invalid quote object provided to createInitialOwnership');
-          }
-          if (!createdBy || !createdBy.id) {
-            throw new Error('Invalid createdBy user object provided to createInitialOwnership');
-          }
-
-          logger.info('Creating initial ownership with validated objects', {
-            quoteId: quote.id,
-            createdById: createdBy.id,
-            createdByActive: createdBy.get ? createdBy.get('active') : 'unknown',
-            createdByExists: createdBy.get ? createdBy.get('exists') : 'unknown',
-          });
-
-          // Ensure createdBy has proper Parse pointer structure
-          // The issue is that createdBy doesn't have objectId property
-          if (createdBy && createdBy.id && !createdBy.objectId) {
-            console.log('=== FIXING CREATED BY POINTER ===');
-            console.log('createdBy.id before:', createdBy.id);
-            console.log('createdBy.objectId before:', createdBy.objectId);
-
-            // Set objectId property to match id
-            createdBy.objectId = createdBy.id;
-
-            console.log('createdBy.objectId after:', createdBy.objectId);
-            console.log('=== FIXED CREATED BY POINTER ===');
-          }
-
-          // Create initial ownership record for createdBy user
-          currentOwnership = await QuoteOwnership.createInitialOwnership(quote, createdBy);
-          currentOwner = createdBy;
-
-          logger.info('Successfully created initial ownership', {
-            quoteId,
-            ownershipId: currentOwnership.id,
-            currentOwnerId: currentOwner.id,
-          });
-        } catch (createError) {
-          logger.error('Failed to create initial ownership', {
-            error: createError.message,
-            stack: createError.stack,
-            quoteId,
-            createdById: createdBy ? createdBy.id : 'null',
-            quoteExists: !!quote,
-            createdByExists: !!createdBy,
-            isOwnerRequiredError: createError.message.includes('Owner is required'),
-          });
-
-          // If it's specifically the "Owner is required" validation error,
-          // try a more explicit approach
-          if (createError.message.includes('Owner is required')) {
-            console.log('=== OWNER VALIDATION FAILED DEBUG ===');
-            console.log('createdByType:', typeof createdBy);
-            console.log('createdById:', createdBy ? createdBy.id : null);
-            console.log('createdByClassName:', createdBy ? createdBy.className : null);
-            console.log('hasGetMethod:', !!(createdBy && createdBy.get));
-            console.log('createdBy instanceof Parse.Object:', createdBy instanceof Parse.Object);
-            console.log('createdBy instanceof Parse.User:', createdBy instanceof Parse.User);
-            console.log('createdBy has objectId:', !!createdBy.objectId);
-            console.log('=== END OWNER DEBUG ===');
-
-            logger.error('Owner validation failed - investigating createdBy user object', {
-              createdByType: typeof createdBy,
-              createdById: createdBy ? createdBy.id : null,
-              createdByClassName: createdBy ? createdBy.className : null,
-              hasGetMethod: !!(createdBy && createdBy.get),
-              quoteId,
-            });
-          }
-
-          throw createError;
-        }
-      } else {
+      // Determine current owner (either from ownership record or createdBy)
+      const currentOwnership = await QuoteOwnership.getCurrentOwnership(quote);
+      if (currentOwnership) {
         currentOwner = currentOwnership.getOwner();
-        logger.info('Using existing ownership', {
+        logger.info('Found existing ownership record', {
           quoteId,
           ownershipId: currentOwnership.id,
           currentOwnerId: currentOwner ? currentOwner.id : null,
+        });
+      } else {
+        // No ownership record - use createdBy as current owner
+        currentOwner = quote.getCreatedBy();
+        if (!currentOwner) {
+          throw new Error('No ownership record and no createdBy found for quote');
+        }
+
+        // Fetch the user data
+        try {
+          await currentOwner.fetch({ useMasterKey: true });
+        } catch (fetchError) {
+          logger.error('Failed to fetch current owner (createdBy) user', {
+            error: fetchError.message,
+            ownerId: currentOwner.id,
+            quoteId,
+          });
+        }
+
+        logger.info('Using createdBy as current owner for transfer', {
+          quoteId,
+          currentOwnerId: currentOwner.id,
+          currentOwnerName: `${currentOwner.get('firstName')} ${currentOwner.get('lastName')}`,
         });
       }
       const newOwner = await this.getUserById(newOwnerId);
@@ -283,6 +194,21 @@ class QuoteOwnershipService {
       console.log('Quote saved successfully!');
       console.log('Final verification - Quote Owner after save:', quote.getOwner()?.id);
       console.log('=== QUOTE UPDATE COMPLETED ===');
+
+      // CRITICAL: Validate data consistency after transfer
+      logger.info('Starting post-transfer validation', { quoteId, newOwnerId });
+      try {
+        await this.validateOwnershipConsistency(quoteId, newOwnerId, newOwnership);
+      } catch (validationError) {
+        logger.error('Ownership validation failed after transfer', {
+          error: validationError.message,
+          quoteId,
+          newOwnerId,
+          ownershipId: newOwnership.id,
+        });
+        // Don't fail the transfer, but log the issue for investigation
+        console.warn('⚠️ OWNERSHIP VALIDATION FAILED:', validationError.message);
+      }
 
       // Record edit for ownership transfer
       await QuoteEdit.recordEdit(
@@ -424,8 +350,59 @@ class QuoteOwnershipService {
 
       const ownership = await QuoteOwnership.getCurrentOwnership(quote);
 
-      // If no ownership exists, return createdBy as the default owner
+      // If no formal ownership exists, check Quote.owner field first
       if (!ownership) {
+        logger.info('No formal QuoteOwnership record found, checking Quote.owner field', {
+          quoteId,
+          quoteCreatedAt: quote.get('createdAt'),
+        });
+
+        // PRIORITY 1: Check Quote.owner field (set during ownership transfers)
+        const quoteOwner = quote.getOwner();
+        if (quoteOwner) {
+          logger.info('Found Quote.owner field, using as current owner', {
+            quoteId,
+            ownerId: quoteOwner.id,
+          });
+
+          // Fetch the full owner user data
+          try {
+            await quoteOwner.fetch({ useMasterKey: true });
+
+            logger.info('Successfully fetched Quote.owner data', {
+              quoteId,
+              ownerId: quoteOwner.id,
+              ownerName: `${quoteOwner.get('firstName')} ${quoteOwner.get('lastName')}`,
+            });
+
+            // Return the Quote.owner as current owner
+            return {
+              id: quoteOwner.id,
+              username: quoteOwner.get('username') || '',
+              email: quoteOwner.get('email') || '',
+              firstName: quoteOwner.get('firstName') || 'Usuario',
+              lastName: quoteOwner.get('lastName') || '',
+              ownershipStartDate: quote.get('lastEditedAt') || quote.get('createdAt'), // Use last edit as best guess for ownership date
+              ownershipType: 'quote_owner_field',
+              isFromQuoteField: true, // Indicates this is from Quote.owner field
+              canTransfer: true,
+              needsOwnershipRecord: true, // Suggests creating formal ownership record
+            };
+          } catch (fetchError) {
+            logger.error('Error fetching Quote.owner user data', {
+              error: fetchError.message,
+              quoteId,
+              ownerId: quoteOwner.id,
+            });
+
+            // Continue to next fallback even if fetch failed
+            logger.warn('Quote.owner fetch failed, trying next fallback', { quoteId });
+          }
+        } else {
+          logger.info('No Quote.owner field found, checking createdBy fallback', { quoteId });
+        }
+
+        // PRIORITY 2: Fallback to createdBy if Quote.owner doesn't exist or fetch failed
         const createdBy = quote.getCreatedBy();
 
         if (!createdBy) {
@@ -435,6 +412,7 @@ class QuoteOwnershipService {
               id: quote.id,
               folio: quote.get('folio'),
               createdAt: quote.get('createdAt'),
+              hasOwnerField: !!quoteOwner,
             },
           });
 
@@ -463,10 +441,11 @@ class QuoteOwnershipService {
           });
         }
 
-        logger.info('Using createdBy as default owner for quote', {
+        logger.info('Using createdBy as default owner for quote (final fallback)', {
           quoteId,
           createdById: createdBy.id,
           createdByName: `${createdBy.get('firstName')} ${createdBy.get('lastName')}`,
+          hadQuoteOwner: !!quoteOwner,
         });
 
         // Return createdBy as the current owner without creating ownership record
@@ -895,26 +874,72 @@ class QuoteOwnershipService {
         return [];
       }
 
-      // Get the quote's client (which is the department manager)
-      const client = quote.getClient();
+      // Get the quote's client company (Client table, not AmexingUser)
+      const companyClient = quote.get('companyClientPtr');
+      const legacyClient = quote.getClient(); // AmexingUser for backward compatibility
 
-      if (!client) {
+      if (!companyClient && !legacyClient) {
         logger.warn('Quote has no client selected, cannot determine available owners', { quoteId });
         // Return special indicator that client is required
         return { requiresClient: true, users: [] };
       }
 
-      // Fetch the client to ensure we have all their data
-      await client.fetch({ useMasterKey: true });
+      let departmentManagerId = null;
+      let clientInfo = {};
 
-      // The client IS the department manager
-      const departmentManagerId = client.id;
+      // Priority 1: Use new companyClientPtr (Client table)
+      if (companyClient) {
+        await companyClient.fetch({ useMasterKey: true });
 
-      logger.info('Using quote client as department manager for ownership', {
+        // Find the AmexingUser who owns this Client company
+        const ownerQuery = new Parse.Query('AmexingUser');
+        ownerQuery.equalTo('ownedClients', companyClient);
+        ownerQuery.equalTo('exists', true);
+        const ownerUser = await ownerQuery.first({ useMasterKey: true });
+
+        if (ownerUser) {
+          departmentManagerId = ownerUser.id;
+          clientInfo = {
+            clientId: companyClient.id,
+            clientName: companyClient.get('name') || `${companyClient.get('firstName')} ${companyClient.get('lastName')}`,
+            clientType: 'Client',
+            departmentManagerId: ownerUser.id,
+            departmentManagerName: `${ownerUser.get('firstName')} ${ownerUser.get('lastName')}`,
+          };
+        } else {
+          logger.warn('No owner found for Client company, falling back to legacy client', {
+            quoteId,
+            companyClientId: companyClient.id,
+            companyClientName: companyClient.get('name'),
+          });
+        }
+      }
+
+      // Priority 2: Fallback to legacy client field (AmexingUser)
+      if (!departmentManagerId && legacyClient) {
+        await legacyClient.fetch({ useMasterKey: true });
+        departmentManagerId = legacyClient.id;
+        clientInfo = {
+          clientId: legacyClient.id,
+          clientName: `${legacyClient.get('firstName')} ${legacyClient.get('lastName')}`,
+          clientType: 'AmexingUser',
+          departmentManagerId: legacyClient.id,
+          departmentManagerName: `${legacyClient.get('firstName')} ${legacyClient.get('lastName')}`,
+        };
+      }
+
+      if (!departmentManagerId) {
+        logger.error('Could not determine department manager from quote client data', {
+          quoteId,
+          hasCompanyClient: !!companyClient,
+          hasLegacyClient: !!legacyClient,
+        });
+        return { requiresClient: true, users: [] };
+      }
+
+      logger.info('Determined department manager for ownership', {
         quoteId,
-        clientId: departmentManagerId,
-        clientName: `${client.get('firstName')} ${client.get('lastName')}`,
-        clientRole: client.get('role'),
+        ...clientInfo,
       });
 
       // Build queries for available owners
@@ -1038,6 +1063,180 @@ class QuoteOwnershipService {
         error: error.message,
         data,
       });
+    }
+  }
+
+  /**
+   * Validate ownership data consistency after transfer.
+   * Ensures both Quote.owner field and QuoteOwnership records are correct.
+   * @param {string} quoteId - Quote ID.
+   * @param {string} expectedOwnerId - Expected owner user ID.
+   * @param {object} newOwnership - Newly created QuoteOwnership record.
+   * @returns {Promise<object>} Validation results.
+   * @example
+   */
+  async validateOwnershipConsistency(quoteId, expectedOwnerId, newOwnership) {
+    logger.info('Validating ownership consistency', { quoteId, expectedOwnerId });
+
+    const issues = [];
+    const validation = {
+      quoteId,
+      expectedOwnerId,
+      timestamp: new Date(),
+      isConsistent: true,
+      issues: [],
+      details: {},
+    };
+
+    try {
+      // 1. Re-fetch the quote to get fresh data
+      const freshQuote = await this.getQuoteById(quoteId);
+      if (!freshQuote) {
+        throw new Error('Quote not found during validation');
+      }
+
+      // 2. Check Quote.owner field
+      const quoteOwner = freshQuote.getOwner();
+      const quoteOwnerId = quoteOwner?.id;
+      validation.details.quoteOwnerId = quoteOwnerId;
+
+      if (!quoteOwnerId) {
+        issues.push('Quote.owner field is null after transfer');
+        validation.isConsistent = false;
+      } else if (quoteOwnerId !== expectedOwnerId) {
+        issues.push(`Quote.owner mismatch: expected ${expectedOwnerId}, got ${quoteOwnerId}`);
+        validation.isConsistent = false;
+      } else {
+        logger.info('✅ Quote.owner field validation passed', { quoteId, ownerId: quoteOwnerId });
+      }
+
+      // 3. Check QuoteOwnership record
+      const currentOwnership = await QuoteOwnership.getCurrentOwnership(freshQuote);
+      validation.details.hasOwnershipRecord = !!currentOwnership;
+      validation.details.ownershipId = currentOwnership?.id;
+      validation.details.ownershipOwnerId = currentOwnership?.getOwner()?.id;
+
+      if (!currentOwnership) {
+        issues.push('No current QuoteOwnership record found after transfer');
+        validation.isConsistent = false;
+      } else if (currentOwnership.id !== newOwnership.id) {
+        issues.push(`QuoteOwnership ID mismatch: expected ${newOwnership.id}, got ${currentOwnership.id}`);
+        validation.isConsistent = false;
+      } else {
+        const ownershipOwnerId = currentOwnership.getOwner()?.id;
+        if (!ownershipOwnerId) {
+          issues.push('QuoteOwnership.owner is null after transfer');
+          validation.isConsistent = false;
+        } else if (ownershipOwnerId !== expectedOwnerId) {
+          issues.push(`QuoteOwnership.owner mismatch: expected ${expectedOwnerId}, got ${ownershipOwnerId}`);
+          validation.isConsistent = false;
+        } else {
+          logger.info('✅ QuoteOwnership record validation passed', {
+            quoteId,
+            ownerId: ownershipOwnerId,
+            ownershipId: currentOwnership.id,
+          });
+        }
+      }
+
+      // 4. Cross-validate both sources
+      if (quoteOwnerId && validation.details.ownershipOwnerId && quoteOwnerId !== validation.details.ownershipOwnerId) {
+        issues.push(`Ownership mismatch between Quote.owner (${quoteOwnerId}) and QuoteOwnership.owner (${validation.details.ownershipOwnerId})`);
+        validation.isConsistent = false;
+      }
+
+      validation.issues = issues;
+
+      // 5. Log results
+      if (validation.isConsistent) {
+        logger.info('🎉 Ownership validation PASSED - Data is consistent', {
+          quoteId,
+          expectedOwnerId,
+          quoteOwnerId,
+          ownershipOwnerId: validation.details.ownershipOwnerId,
+        });
+      } else {
+        logger.error('❌ Ownership validation FAILED - Data inconsistency detected', {
+          quoteId,
+          expectedOwnerId,
+          issues,
+          details: validation.details,
+        });
+      }
+
+      return validation;
+    } catch (error) {
+      logger.error('Ownership validation error', {
+        error: error.message,
+        quoteId,
+        expectedOwnerId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Recover and repair ownership state for quotes with inconsistent data.
+   * Creates formal ownership records for quotes that only have createdBy.
+   * @param {string} quoteId - Quote ID to repair.
+   * @returns {Promise<object>} Recovery results.
+   * @example
+   */
+  async recoverOwnershipState(quoteId) {
+    try {
+      const quote = await this.getQuoteById(quoteId);
+      if (!quote) {
+        throw new Error('Quote not found');
+      }
+
+      // Check if formal ownership already exists
+      const existingOwnership = await QuoteOwnership.getCurrentOwnership(quote);
+      if (existingOwnership) {
+        logger.info('Quote already has formal ownership record', {
+          quoteId,
+          ownershipId: existingOwnership.id,
+        });
+        return {
+          recovered: false,
+          reason: 'Already has formal ownership',
+          ownershipId: existingOwnership.id,
+        };
+      }
+
+      // Check if quote has owner field
+      const quoteOwner = quote.getOwner();
+      const createdBy = quote.getCreatedBy();
+
+      const ownerToUse = quoteOwner || createdBy;
+      if (!ownerToUse) {
+        throw new Error('No owner or createdBy found for quote');
+      }
+
+      // Fetch user data
+      await ownerToUse.fetch({ useMasterKey: true });
+
+      // Create formal ownership record
+      const recoveredOwnership = await QuoteOwnership.createInitialOwnership(quote, ownerToUse);
+
+      logger.info('Successfully recovered ownership state', {
+        quoteId,
+        recoveredOwnershipId: recoveredOwnership.id,
+        ownerId: ownerToUse.id,
+        ownerSource: quoteOwner ? 'quote.owner' : 'quote.createdBy',
+      });
+
+      return {
+        recovered: true,
+        ownershipId: recoveredOwnership.id,
+        ownerId: ownerToUse.id,
+        ownerSource: quoteOwner ? 'quote.owner' : 'quote.createdBy',
+      };
+    } catch (error) {
+      logger.error('Failed to recover ownership state', {
+        error: error.message,
+        quoteId,
+      });
+      throw error;
     }
   }
 }

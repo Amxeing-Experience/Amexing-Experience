@@ -620,8 +620,8 @@ class QuoteOwnershipManager {
             this.setButtonLoading('btnManageCollaborators', true, 'Guardando...');
             
             try {
-                const savedQuoteId = await this.saveQuoteInBackground();
-                if (!savedQuoteId) {
+                const savedQuote = await this.saveQuoteInBackground();
+                if (!savedQuote || !savedQuote.id) {
                     this.showToast('Error al guardar la cotización. Revisa los campos requeridos.', 'error');
                     this.setButtonLoading('btnManageCollaborators', false);
                     return;
@@ -629,19 +629,21 @@ class QuoteOwnershipManager {
                 
                 // Update the page state to reflect the saved quote
                 if (quoteIdInput) {
-                    quoteIdInput.value = savedQuoteId;
+                    quoteIdInput.value = savedQuote.id;
                 }
                 
                 // Update this instance's quoteId for API calls
-                this.quoteId = savedQuoteId;
+                this.quoteId = savedQuote.id;
                 
-                // Update UI to edit mode
-                this.updatePageToEditMode(savedQuoteId);
+                // Update UI to edit mode with folio information
+                this.updatePageToEditMode(savedQuote.id, savedQuote.folio);
                 
                 // Capture the client ID as original since we just saved
                 this.captureOriginalClient();
                 
-                this.showToast('Cotización guardada - gestiona colaboradores', 'success');
+                // Show success message with folio
+                const folioText = savedQuote.folio ? ` ${savedQuote.folio}` : '';
+                this.showToast(`📄 Cotización${folioText} creada - gestiona colaboradores`, 'success');
             } catch (error) {
                 console.error('Error auto-saving quote:', error);
                 this.showToast('Error al guardar la cotización. Intenta nuevamente.', 'error');
@@ -937,14 +939,14 @@ class QuoteOwnershipManager {
         const result = await response.json();
         
         if (result.success && result.data) {
-            return result.data.id;
+            return result.data; // Return full quote data including folio
         } else {
             throw new Error(result.error || 'Error al guardar la cotización');
         }
     }
     
     // Update page UI to edit mode after saving
-    updatePageToEditMode(quoteId) {
+    updatePageToEditMode(quoteId, folio = null) {
         // Update the submit button text
         const submitBtn = document.getElementById('createQuoteBtn');
         if (submitBtn) {
@@ -956,6 +958,26 @@ class QuoteOwnershipManager {
             const currentUrl = window.location.href;
             const newUrl = currentUrl.replace(/\/new$/, `/${quoteId}`);
             window.history.replaceState({}, '', newUrl);
+        }
+        
+        // Update page title and header to show folio if available
+        if (folio) {
+            console.log('Updating page title with folio:', folio);
+            
+            // Update document title
+            document.title = `${folio} - Cotización | Amexing Quotes`;
+            
+            // Update page header if it exists
+            const pageTitle = document.querySelector('h1, .page-title, .card-title');
+            if (pageTitle && pageTitle.textContent.includes('Nueva Cotización')) {
+                pageTitle.textContent = `Cotización ${folio}`;
+            }
+            
+            // Update breadcrumb if it exists
+            const breadcrumbActive = document.querySelector('.breadcrumb-item.active');
+            if (breadcrumbActive && breadcrumbActive.textContent.includes('Nueva Cotización')) {
+                breadcrumbActive.textContent = folio;
+            }
         }
     }
     

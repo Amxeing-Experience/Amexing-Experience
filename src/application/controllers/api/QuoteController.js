@@ -146,7 +146,7 @@ class QuoteController {
 
       // 2. Extract fields from request body
       const {
-        client, clientId, contactPerson, contactEmail, contactPhone, notes, eventType, numberOfPeople,
+        client, clientId, contactPerson, contactEmail, contactPhone, notes, eventType,
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
       } = req.body;
 
@@ -249,10 +249,20 @@ class QuoteController {
       quote.set('contactPhone', contactPhone || '');
       quote.set('notes', notes || '');
       quote.set('eventType', eventType || '');
-      quote.set('numberOfPeople', numberOfPeople ? parseInt(numberOfPeople, 10) : 1);
-      quote.set('numberOfAdults', numberOfAdults ? parseInt(numberOfAdults, 10) : 0);
-      quote.set('numberOfChildren', numberOfChildren ? parseInt(numberOfChildren, 10) : 0);
-      quote.set('numberOfInfants', numberOfInfants ? parseInt(numberOfInfants, 10) : 0);
+
+      // Set individual person counts
+      const adultsCount = numberOfAdults ? parseInt(numberOfAdults, 10) : 0;
+      const childrenCount = numberOfChildren ? parseInt(numberOfChildren, 10) : 0;
+      const infantsCount = numberOfInfants ? parseInt(numberOfInfants, 10) : 0;
+
+      quote.set('numberOfAdults', adultsCount);
+      quote.set('numberOfChildren', childrenCount);
+      quote.set('numberOfInfants', infantsCount);
+
+      // Calculate total numberOfPeople as sum of all person types
+      const calculatedTotal = adultsCount + childrenCount + infantsCount;
+      quote.set('numberOfPeople', calculatedTotal);
+
       quote.set('preferredLanguage', preferredLanguage || 'es');
 
       // 9. Set automatic fields
@@ -372,9 +382,20 @@ class QuoteController {
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'desc';
 
-      // Column mapping for sorting (matches frontend columns order)
-      // Columns: client, rate, eventType, numberOfPeople, createdBy, status, actions
-      const columns = ['client', 'rate', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
+      // Column mapping for sorting (must match frontend columns exactly)
+      // Frontend columns depend on user role (admin/superadmin show client column)
+      const isAdminRole = ['admin', 'superadmin'].includes(req.userRole);
+
+      // Build columns array to match frontend table structure
+      let columns;
+      if (isAdminRole) {
+        // With client column: Folio, Cliente, Tipo de Evento, No. Personas, Creado Por, Estatus, Fecha Creación, Última Modificación
+        columns = ['folio', 'client', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
+      } else {
+        // Without client column: Folio, Tipo de Evento, No. Personas, Creado Por, Estatus, Fecha Creación, Última Modificación
+        columns = ['folio', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
+      }
+
       const sortField = columns[sortColumnIndex] || 'createdAt';
 
       // Build base query for all active, existing records with role-based filtering
@@ -382,6 +403,7 @@ class QuoteController {
       baseQuery.equalTo('active', true);
       baseQuery.equalTo('exists', true);
       baseQuery.include('client');
+      baseQuery.include('companyClientPtr');
       baseQuery.include('rate');
       baseQuery.include('createdBy');
 
@@ -440,6 +462,7 @@ class QuoteController {
       const data = await Promise.all(
         quotes.map(async (quote) => {
           const client = quote.get('client');
+          const companyClientPtr = quote.get('companyClientPtr');
           const rate = quote.get('rate');
           const createdBy = quote.get('createdBy');
 
@@ -451,19 +474,51 @@ class QuoteController {
             logger.warn('Error checking pending invoice request', { quoteId: quote.id, error: error.message });
           }
 
+          // Extract company name from all possible sources
+          let companyName = '';
+          let clientData = null;
+
+          if (client) {
+            // Check contextualData first, then direct companyName field
+            const contextualData = client.get('contextualData') || {};
+            companyName = contextualData.companyName
+              || client.get('companyName')
+              || '';
+
+            clientData = {
+              id: client.id,
+              firstName: client.get('firstName') || '',
+              lastName: client.get('lastName') || '',
+              companyName,
+              fullName: companyName || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+            };
+          }
+
+          // If no company name from client, check companyClientPtr
+          if (!companyName && companyClientPtr) {
+            companyName = companyClientPtr.get('name') || '';
+
+            // If we have companyClientPtr but no client, create client data from it
+            if (!clientData) {
+              clientData = {
+                id: companyClientPtr.id,
+                firstName: '',
+                lastName: '',
+                companyName,
+                fullName: companyName,
+              };
+            } else {
+              // Update existing client data with company name from companyClientPtr
+              clientData.companyName = companyName;
+              clientData.fullName = companyName || clientData.fullName;
+            }
+          }
+
           return {
             id: quote.id,
             objectId: quote.id,
             folio: quote.get('folio') || 'N/A',
-            client: client
-              ? {
-                id: client.id,
-                firstName: client.get('firstName') || '',
-                lastName: client.get('lastName') || '',
-                companyName: client.get('companyName') || '',
-                fullName: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
-              }
-              : null,
+            client: clientData,
             rate: rate
               ? {
                 id: rate.id,
@@ -472,7 +527,10 @@ class QuoteController {
               }
               : null,
             eventType: quote.get('eventType') || '',
-            numberOfPeople: quote.get('numberOfPeople') || 1,
+            numberOfPeople: quote.get('numberOfPeople') || 0,
+            numberOfAdults: quote.get('numberOfAdults') || 0,
+            numberOfChildren: quote.get('numberOfChildren') || 0,
+            numberOfInfants: quote.get('numberOfInfants') || 0,
             createdBy: createdBy
               ? {
                 id: createdBy.id,
@@ -609,7 +667,7 @@ class QuoteController {
             companyName: client.get('companyName') || '',
             email: client.get('email') || '',
             phone: client.get('phone') || '',
-            fullName: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+            fullName: client.get('companyName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
           }
           : null,
         companyClientPtr: companyClientPtr
@@ -630,7 +688,7 @@ class QuoteController {
           }
           : null,
         eventType: quote.get('eventType') || '',
-        numberOfPeople: quote.get('numberOfPeople') || 1,
+        numberOfPeople: quote.get('numberOfPeople') || 0,
         numberOfAdults: quote.get('numberOfAdults') || 0,
         numberOfChildren: quote.get('numberOfChildren') || 0,
         numberOfInfants: quote.get('numberOfInfants') || 0,
@@ -1010,7 +1068,7 @@ class QuoteController {
             lastName: clientData.get('lastName') || '',
             companyName: clientData.get('companyName') || '',
             email: clientData.get('email') || '',
-            fullName: `${clientData.get('firstName') || ''} ${clientData.get('lastName') || ''}`.trim(),
+            fullName: clientData.get('companyName') || `${clientData.get('firstName') || ''} ${clientData.get('lastName') || ''}`.trim(),
           }
           : null,
         rate: rateData
@@ -3045,7 +3103,7 @@ class QuoteController {
             if (client) {
               invoiceData.client = {
                 objectId: client.id,
-                fullName: client.get('fullName') || `${client.get('firstName')} ${client.get('lastName')}`,
+                fullName: client.get('companyName') || client.get('fullName') || `${client.get('firstName')} ${client.get('lastName')}`,
                 companyName: client.get('companyName'),
                 email: client.get('email'),
               };
