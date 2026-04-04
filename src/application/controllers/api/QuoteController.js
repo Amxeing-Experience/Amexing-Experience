@@ -5,6 +5,7 @@
 
 const Parse = require('parse/node');
 const Quote = require('../../../domain/models/Quote');
+const QuoteOwnership = require('../../../domain/models/QuoteOwnership');
 const QuoteService = require('../../services/QuoteService');
 const QuoteOwnershipService = require('../../services/QuoteOwnershipService');
 const QuoteCollaborationService = require('../../services/QuoteCollaborationService');
@@ -389,11 +390,11 @@ class QuoteController {
       // Build columns array to match frontend table structure
       let columns;
       if (isAdminRole) {
-        // With client column: Folio, Cliente, Tipo de Evento, No. Personas, Creado Por, Estatus, Fecha Creación, Última Modificación
-        columns = ['folio', 'client', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
+        // With client column: Folio, Mi Rol, Cliente, Tipo de Evento, No. Personas, Creado Por, Estatus, Fecha Creación, Última Modificación
+        columns = ['folio', 'userQuoteRole', 'client', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
       } else {
-        // Without client column: Folio, Tipo de Evento, No. Personas, Creado Por, Estatus, Fecha Creación, Última Modificación
-        columns = ['folio', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
+        // Without client column: Folio, Mi Rol, Tipo de Evento, No. Personas, Creado Por, Estatus, Fecha Creación, Última Modificación
+        columns = ['folio', 'userQuoteRole', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
       }
 
       const sortField = columns[sortColumnIndex] || 'createdAt';
@@ -474,6 +475,44 @@ class QuoteController {
             logger.warn('Error checking pending invoice request', { quoteId: quote.id, error: error.message });
           }
 
+          // Determine user's role for this specific quote
+          let userQuoteRole = 'visualizador'; // Default to viewer
+          let userQuoteRoleSpanish = 'Visualizador';
+
+          try {
+            // Check if user is the owner
+            const currentOwnership = await QuoteOwnership.getCurrentOwnership(quote);
+            const isOwner = currentOwnership && currentOwnership.getOwner()?.id === currentUser.id;
+
+            if (isOwner) {
+              userQuoteRole = 'propietario';
+              userQuoteRoleSpanish = 'Propietario';
+            } else if (createdBy && createdBy.id === currentUser.id) {
+              // Check if user created the quote (legacy ownership)
+              userQuoteRole = 'propietario';
+              userQuoteRoleSpanish = 'Propietario';
+            } else {
+              // Check collaboration access
+              const userAccess = await this.collaborationService.getUserAccess(quote.id, currentUser.id);
+              if (userAccess && userAccess.role) {
+                if (userAccess.role === 'editor') {
+                  userQuoteRole = 'editor';
+                  userQuoteRoleSpanish = 'Editor';
+                } else if (userAccess.role === 'viewer') {
+                  userQuoteRole = 'visualizador';
+                  userQuoteRoleSpanish = 'Visualizador';
+                }
+              }
+            }
+          } catch (roleError) {
+            logger.warn('Error determining user role for quote', {
+              quoteId: quote.id,
+              userId: currentUser.id,
+              error: roleError.message,
+            });
+            // Keep default viewer role on error
+          }
+
           // Extract company name from all possible sources
           let companyName = '';
           let clientData = null;
@@ -518,6 +557,8 @@ class QuoteController {
             id: quote.id,
             objectId: quote.id,
             folio: quote.get('folio') || 'N/A',
+            userQuoteRole, // Add user's role for this quote
+            userQuoteRoleSpanish, // Add Spanish role name
             client: clientData,
             rate: rate
               ? {
@@ -3269,7 +3310,7 @@ class QuoteController {
   /**
    * Send error response.
    * @param {object} res - Express response object.
-   * @param {string} error - Error message.
+   * @param {string} error - Error message to send in response.
    * @param {number} statusCode - HTTP status code.
    * @returns {object} JSON response.
    * @example
