@@ -58,6 +58,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 <thead class="table-light">
                     <tr>
                         <th>Folio</th>
+                        <th class="text-center">Mi Rol</th>
                         <% if (showClientColumn) { %><th>Cliente</th><% } %>
                         <th>Tipo de Evento</th>
                         <th class="text-center">No. Personas</th>
@@ -264,6 +265,16 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
 <!-- Cancel Reservation Modal (same as quote summary) -->
 <!-- Note: Modal HTML will be dynamically generated to match quote summary implementation -->
 
+<style>
+/* Gradient backgrounds for role badges */
+.bg-gradient-purple {
+    background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%) !important;
+}
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important;
+}
+</style>
+
 <script>
 (function() {
     // Wait for DOM and all dependencies to be ready
@@ -371,6 +382,47 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         return `<span class="fw-semibold text-primary">${data || 'N/A'}</span>`;
                     }
                 },
+                {
+                    data: 'userQuoteRoleSpanish',
+                    className: 'text-center',
+                    orderable: false,
+                    render: function(data, type, row) {
+                        const role = row.userQuoteRole || 'visualizador';
+                        const roleText = data || 'Visualizador';
+                        
+                        // Define badge styles and icons for each role
+                        let badgeClass = '';
+                        let icon = '';
+                        let tooltipText = '';
+                        
+                        switch(role) {
+                            case 'propietario':
+                                badgeClass = 'bg-gradient-purple text-white';
+                                icon = '<i class="ti ti-crown me-1"></i>';
+                                tooltipText = 'Eres el propietario de esta cotización';
+                                break;
+                            case 'editor':
+                                badgeClass = 'bg-gradient-primary text-white';
+                                icon = '<i class="ti ti-edit me-1"></i>';
+                                tooltipText = 'Tienes permisos de edición en esta cotización';
+                                break;
+                            case 'visualizador':
+                            default:
+                                badgeClass = 'bg-light text-dark';
+                                icon = '<i class="ti ti-eye me-1"></i>';
+                                tooltipText = 'Tienes permisos de visualización en esta cotización';
+                                break;
+                        }
+                        
+                        return `<span class="badge ${badgeClass} px-2 py-1" 
+                                      style="font-size: 0.75rem; font-weight: 500;"
+                                      data-bs-toggle="tooltip" 
+                                      data-bs-placement="top" 
+                                      title="${tooltipText}">
+                                    ${icon}${roleText}
+                                </span>`;
+                    }
+                },
                 <% if (showClientColumn) { %>
                 {
                     data: 'client',
@@ -441,13 +493,6 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
 
                         // Determine which statuses user can select based on role and current status
                         const isAdmin = ['admin', 'superadmin'].includes(userRole);
-                        const isClient = userRole === 'client';
-                        
-                        // Clients can only view status, not change it
-                        if (isClient) {
-                            const statusObj = allStatuses.find(s => s.value === data) || allStatuses[0];
-                            return `<span class="badge ${statusObj.class} px-3 py-2" style="font-size: 0.75rem;">${statusObj.text}</span>`;
-                        }
                         
                         // Build available statuses based on role
                         let statuses = [];
@@ -648,7 +693,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando Cotizaciones...'
             },
-            order: [[<%= showClientColumn ? 7 : 6 %>, 'desc']], // Sort by updatedAt column by default (most recent first)
+            order: [[<%= showClientColumn ? 8 : 7 %>, 'desc']], // Sort by updatedAt column by default (most recent first) - adjusted for Mi Rol column
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
