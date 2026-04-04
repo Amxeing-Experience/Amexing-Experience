@@ -323,6 +323,14 @@ router.get('/active', async (req, res) => {
 });
 
 /**
+ * GET /api/clients/mixed - Get mixed data (agencies and Amexing direct clients).
+ * Admin/SuperAdmin only endpoint for unified client management.
+ */
+router.get('/mixed', async (req, res) => {
+  await clientsController.getMixedClients(req, res);
+});
+
+/**
  * @swagger
  * /api/clients/quick:
  *   post:

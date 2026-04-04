@@ -1,0 +1,362 @@
+<!--
+Client Form - Reusable form component for client data
+Used across different roles for consistent client creation/editing
+Created by Denisse Maldonado
+
+@param {string} formId - Unique ID for the form
+@param {string} idPrefix - Prefix for field IDs to ensure uniqueness
+@param {boolean} isEdit - Whether this is an edit form (defaults to false)
+
+Usage:
+include('../../organisms/forms/client-form', {
+    formId: 'createClientForm',
+    idPrefix: 'client',
+    isEdit: false
+})
+-->
+
+<%
+const formId = locals.formId || 'editClientForm';
+const idPrefix = locals.idPrefix || 'edit';
+const isEdit = locals.isEdit || true;
+%>
+
+<form id="<%= formId %>">
+    <% if (isEdit) { %>
+        <input type="hidden" id="<%= idPrefix %>Id" name="<%= idPrefix %>Id">
+    <% } %>
+    
+    <!-- Sección: Información del Cliente -->
+    <div class="mb-4">
+        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+            <i class="ti ti-user me-1"></i>
+            Información del Cliente
+        </h6>
+
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../atoms/common/first-name-input', {
+                    name: 'firstName',
+                    id: idPrefix + 'FirstName',
+                    label: 'Nombre',
+                    required: true,
+                    placeholder: 'Ej: Juan',
+                    helpText: 'Primer nombre del cliente'
+                }) %>
+            </div>
+            <div class="col-md-6">
+                <%- include('../../atoms/common/last-name-input', {
+                    name: 'lastName',
+                    id: idPrefix + 'LastName',
+                    label: 'Apellido',
+                    required: true,
+                    placeholder: 'Ej: Pérez',
+                    helpText: 'Apellido(s) del cliente'
+                }) %>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../atoms/common/email-input', {
+                    name: 'email',
+                    id: idPrefix + 'Email',
+                    label: 'Correo Electrónico',
+                    required: false,
+                    placeholder: 'cliente@empresa.com',
+                    helpText: 'Email de contacto principal'
+                }) %>
+            </div>
+            <div class="col-md-6">
+                <%- include('../../atoms/common/phone-input', {
+                    name: 'phone',
+                    id: idPrefix + 'Phone',
+                    label: 'Teléfono',
+                    required: false,
+                    countryCode: 'MX',
+                    placeholder: '999 123 4567',
+                    helpText: 'Número de contacto principal'
+                }) %>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección: Persona de Contacto y Emergencia -->
+    <div class="mb-4">
+        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+            <i class="ti ti-users me-1"></i>
+            Contactos
+        </h6>
+
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../atoms/common/first-name-input', {
+                    name: 'contactFirstName',
+                    id: idPrefix + 'ContactFirstName',
+                    label: 'Nombre de Contacto',
+                    required: false,
+                    placeholder: 'Ej: María',
+                    helpText: 'Nombre de la persona de contacto en la empresa'
+                }) %>
+            </div>
+            <div class="col-md-6">
+                <%- include('../../atoms/common/last-name-input', {
+                    name: 'contactLastName',
+                    id: idPrefix + 'ContactLastName',
+                    label: 'Apellido de Contacto',
+                    required: false,
+                    placeholder: 'Ej: García',
+                    helpText: 'Apellido de la persona de contacto'
+                }) %>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../atoms/common/emergency-contact-input', {
+                    name: 'emergencyContactName',
+                    id: idPrefix + 'EmergencyContactName',
+                    label: 'Contacto de Emergencia',
+                    required: false,
+                    placeholder: 'Ej: Carlos Pérez',
+                    helpText: 'Persona a contactar en caso de emergencia'
+                }) %>
+            </div>
+            <div class="col-md-6">
+                <%- include('../../atoms/common/emergency-phone-input', {
+                    name: 'emergencyContactPhone',
+                    id: idPrefix + 'EmergencyContactPhone',
+                    label: 'Teléfono de Emergencia',
+                    required: false,
+                    countryCode: 'MX',
+                    placeholder: '999 123 4567',
+                    helpText: 'Número disponible 24/7'
+                }) %>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección: Información de la Empresa -->
+    <div class="mb-4">
+        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+            <i class="ti ti-building me-1"></i>
+            Información de la Empresa
+        </h6>
+
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../molecules/common/form-field', {
+                    type: 'select',
+                    name: 'companyType',
+                    id: idPrefix + 'CompanyType',
+                    label: 'Tipo de Empresa',
+                    required: false,
+                    options: [
+                        { value: '', text: 'Seleccione un tipo' },
+                        { value: 'individual', text: 'Persona Física' },
+                        { value: 'corporate', text: 'Persona Moral' },
+                        { value: 'travel_agency', text: 'Agencia de Viajes' },
+                        { value: 'tour_operator', text: 'Tour Operador' },
+                        { value: 'other', text: 'Otro' }
+                    ],
+                    helpText: 'Tipo de organización'
+                }) %>
+            </div>
+            <div class="col-md-6">
+                <%- include('../../atoms/common/rfc-input', {
+                    name: 'taxId',
+                    id: idPrefix + 'TaxId',
+                    label: 'RFC / ID Fiscal',
+                    required: false,
+                    placeholder: 'ABC123456789 o ABCD123456ABC',
+                    helpText: 'Registro Federal de Contribuyentes'
+                }) %>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../atoms/common/url-input', {
+                    name: 'website',
+                    id: idPrefix + 'Website',
+                    label: 'Sitio Web',
+                    required: false,
+                    placeholder: 'https://www.ejemplo.com',
+                    helpText: 'URL completa del sitio web de la empresa'
+                }) %>
+            </div>
+        </div>
+
+        <!-- Sección: Dirección Detallada -->
+        <div class="row">
+            <div class="col-12 mb-2">
+                <h6 class="text-muted small fw-bold">
+                    <i class="ti ti-map-pin me-1"></i>
+                    Dirección Completa
+                </h6>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-3">
+                <%- include('../../atoms/common/street-type-select', {
+                    name: 'streetType',
+                    id: idPrefix + 'StreetType',
+                    label: 'Tipo de Vialidad',
+                    required: false,
+                    helpText: 'Tipo de vía',
+                    value: 'Calle'
+                }) %>
+            </div>
+            <div class="col-md-5">
+                <%- include('../../atoms/common/street-name-input', {
+                    name: 'streetName',
+                    id: idPrefix + 'StreetName',
+                    label: 'Nombre de la Calle',
+                    required: false,
+                    placeholder: 'Ej: Reforma, 60, Insurgentes',
+                    helpText: 'Nombre de la calle'
+                }) %>
+            </div>
+            <div class="col-md-2">
+                <%- include('../../atoms/common/exterior-number-input', {
+                    name: 'exteriorNumber',
+                    id: idPrefix + 'ExteriorNumber',
+                    label: 'No. Exterior',
+                    required: false,
+                    placeholder: '123',
+                    helpText: 'Número exterior'
+                }) %>
+            </div>
+            <div class="col-md-2">
+                <%- include('../../atoms/common/interior-number-input', {
+                    name: 'interiorNumber',
+                    id: idPrefix + 'InteriorNumber',
+                    label: 'No. Interior',
+                    required: false,
+                    placeholder: '4B',
+                    helpText: 'Depto/oficina'
+                }) %>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4">
+                <%- include('../../atoms/common/colonia-input', {
+                    name: 'colonia',
+                    id: idPrefix + 'Colonia',
+                    label: 'Colonia',
+                    required: false,
+                    placeholder: 'Ej: Centro, Roma Norte',
+                    helpText: 'Nombre de la colonia'
+                }) %>
+            </div>
+            <div class="col-md-4">
+                <%- include('../../atoms/common/city-input', {
+                    name: 'city',
+                    id: idPrefix + 'City',
+                    label: 'Ciudad / Municipio',
+                    required: false,
+                    placeholder: 'Ej: Mérida, Guadalajara',
+                    helpText: 'Ciudad o municipio'
+                }) %>
+            </div>
+            <div class="col-md-4">
+                <%- include('../../atoms/common/state-select', {
+                    name: 'state',
+                    id: idPrefix + 'State',
+                    label: 'Estado',
+                    required: false,
+                    helpText: 'Estado o región',
+                    value: ''
+                }) %>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4">
+                <%- include('../../atoms/common/postal-code-input', {
+                    name: 'postalCode',
+                    id: idPrefix + 'PostalCode',
+                    label: 'Código Postal',
+                    required: false,
+                    placeholder: '12345',
+                    helpText: '5 dígitos',
+                    country: 'MX'
+                }) %>
+            </div>
+            <div class="col-md-8">
+                <!-- Spacer -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección: Requerimientos Especiales -->
+    <div class="mb-4">
+        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+            <i class="ti ti-heart me-1"></i>
+            Requerimientos Especiales
+        </h6>
+
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../atoms/common/language-select', {
+                    name: 'preferredLanguage',
+                    id: idPrefix + 'PreferredLanguage',
+                    label: 'Idioma Preferido',
+                    required: false,
+                    helpText: 'Idioma para comunicaciones y servicios',
+                    value: 'es'
+                }) %>
+            </div>
+            <div class="col-md-6">
+                <%- include('../../atoms/common/accessibility-input', {
+                    name: 'accessibilityRequirements',
+                    id: idPrefix + 'AccessibilityRequirements',
+                    label: 'Requerimientos de Accesibilidad',
+                    required: false,
+                    placeholder: 'Ej: Silla de ruedas, bastón, asistencia visual...',
+                    helpText: 'Necesidades especiales de accesibilidad'
+                }) %>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../atoms/common/allergies-input', {
+                    name: 'allergies',
+                    id: idPrefix + 'Allergies',
+                    label: 'Alergias',
+                    required: false,
+                    placeholder: 'Ingrese cada alergia en una línea separada',
+                    helpText: 'Una alergia por línea para mejor organización'
+                }) %>
+            </div>
+            <div class="col-md-6">
+                <%- include('../../atoms/common/dietary-restrictions-input', {
+                    name: 'dietaryRestrictions',
+                    id: idPrefix + 'DietaryRestrictions',
+                    label: 'Restricciones Alimenticias',
+                    required: false,
+                    placeholder: 'Ingrese cada restricción en una línea separada',
+                    helpText: 'Una restricción por línea para mejor organización'
+                }) %>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <%- include('../../molecules/common/form-field', {
+                    type: 'textarea',
+                    name: 'notes',
+                    id: idPrefix + 'Notes',
+                    label: 'Notas Adicionales',
+                    required: false,
+                    placeholder: 'Cualquier información adicional relevante sobre el cliente...',
+                    helpText: 'Información general adicional',
+                    inputAttributes: { rows: '3' }
+                }) %>
+            </div>
+        </div>
+    </div>
+</form>
