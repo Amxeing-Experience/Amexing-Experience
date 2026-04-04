@@ -422,6 +422,57 @@ class QuoteVersioningService {
    * @example
    */
   async canEdit(quoteId, userId) {
+    // Get user first to check role
+    const user = await this.getUserById(userId);
+    if (!user) {
+      logger.warn('canEdit - User not found', { userId, quoteId });
+      return false;
+    }
+
+    // ROLE POINTER FIX: Handle role pointer to get actual role name
+    const rolePointer = user.get('roleId');
+    let roleName = null;
+
+    if (rolePointer && rolePointer.id) {
+      try {
+        // Fetch the role from the Role table
+        await rolePointer.fetch({ useMasterKey: true });
+        roleName = rolePointer.get('name');
+      } catch (roleError) {
+        logger.warn('Failed to fetch user role in canEdit', {
+          userId,
+          quoteId,
+          roleError: roleError.message,
+        });
+      }
+    }
+
+    // Debug user information
+    const userEmail = user.get('email');
+    const userName = `${user.get('firstName')} ${user.get('lastName')}`;
+
+    logger.info('canEdit - User permission check', {
+      userId,
+      rolePointer: rolePointer?.id,
+      roleName,
+      userEmail,
+      userName,
+      quoteId,
+      isAdmin: roleName === 'admin',
+      isSuperAdmin: roleName === 'superadmin',
+    });
+
+    // Admins and SuperAdmins can always edit any quote
+    if (roleName === 'admin' || roleName === 'superadmin') {
+      logger.info('🔓 Admin/SuperAdmin edit permission granted', {
+        userId,
+        roleName,
+        userEmail,
+        quoteId,
+      });
+      return true;
+    }
+
     // Owner can always edit
     const isOwner = await QuoteOwnership.isOwner(quoteId, userId);
     if (isOwner) {
@@ -430,9 +481,7 @@ class QuoteVersioningService {
 
     // Check if user has editor access
     const quote = await this.getQuoteById(quoteId);
-    const user = await this.getUserById(userId);
-
-    if (!quote || !user) {
+    if (!quote) {
       return false;
     }
 
@@ -447,6 +496,34 @@ class QuoteVersioningService {
    * @example
    */
   async canApproveEdits(quoteId, userId) {
+    // Get user to check role
+    const user = await this.getUserById(userId);
+    if (!user) {
+      return false;
+    }
+
+    // ROLE POINTER FIX: Handle role pointer to get actual role name
+    const rolePointer = user.get('roleId');
+    let roleName = null;
+
+    if (rolePointer && rolePointer.id) {
+      try {
+        await rolePointer.fetch({ useMasterKey: true });
+        roleName = rolePointer.get('name');
+      } catch (roleError) {
+        logger.warn('Failed to fetch user role in canApproveEdits', {
+          userId,
+          quoteId,
+          roleError: roleError.message,
+        });
+      }
+    }
+
+    // Admins and SuperAdmins can always approve edits
+    if (roleName === 'admin' || roleName === 'superadmin') {
+      return true;
+    }
+
     return QuoteOwnership.isOwner(quoteId, userId);
   }
 
@@ -458,6 +535,34 @@ class QuoteVersioningService {
    * @example
    */
   async canRestore(quoteId, userId) {
+    // Get user to check role
+    const user = await this.getUserById(userId);
+    if (!user) {
+      return false;
+    }
+
+    // ROLE POINTER FIX: Handle role pointer to get actual role name
+    const rolePointer = user.get('roleId');
+    let roleName = null;
+
+    if (rolePointer && rolePointer.id) {
+      try {
+        await rolePointer.fetch({ useMasterKey: true });
+        roleName = rolePointer.get('name');
+      } catch (roleError) {
+        logger.warn('Failed to fetch user role in canRestore', {
+          userId,
+          quoteId,
+          roleError: roleError.message,
+        });
+      }
+    }
+
+    // Admins and SuperAdmins can always restore versions
+    if (roleName === 'admin' || roleName === 'superadmin') {
+      return true;
+    }
+
     return QuoteOwnership.isOwner(quoteId, userId);
   }
 

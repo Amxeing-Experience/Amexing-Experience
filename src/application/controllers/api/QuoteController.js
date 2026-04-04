@@ -731,9 +731,60 @@ class QuoteController {
       const quoteId = req.params.id;
       const updates = req.body;
 
+      // Debug current user information
+      logger.info('🔍 QuoteController.updateQuote - User check', {
+        userId: currentUser.id,
+        userEmail: currentUser.get('email'),
+        userRole: req.userRole || 'unknown',
+        quoteId,
+        updates: Object.keys(updates),
+      });
+
       // Check if user has permission to edit
-      const canEdit = await this.versioningService.canEdit(quoteId, currentUser.id);
+      let canEdit = await this.versioningService.canEdit(quoteId, currentUser.id);
+
+      // ADMIN FIX: Handle role pointer to get actual role name
+      const rolePointer = currentUser.get('roleId');
+      let roleName = null;
+
+      if (rolePointer && rolePointer.id) {
+        try {
+          // Fetch the role from the Role table
+          await rolePointer.fetch({ useMasterKey: true });
+          roleName = rolePointer.get('name');
+        } catch (roleError) {
+          logger.warn('Failed to fetch user role', {
+            userId: currentUser.id,
+            roleError: roleError.message,
+          });
+        }
+      }
+
+      // Admin override check with proper role name
+      if (!canEdit && (roleName === 'admin' || roleName === 'superadmin')) {
+        logger.info('🔓 Controller-level admin override granted', {
+          userId: currentUser.id,
+          roleName,
+          rolePointerId: rolePointer?.id,
+          quoteId,
+        });
+        canEdit = true;
+      }
+
+      logger.info('🔍 QuoteController.updateQuote - Permission result', {
+        userId: currentUser.id,
+        quoteId,
+        canEdit,
+        userRole: req.userRole || 'unknown',
+      });
+
       if (!canEdit) {
+        logger.warn('🚫 QuoteController.updateQuote - Permission denied', {
+          userId: currentUser.id,
+          userEmail: currentUser.get('email'),
+          userRole: req.userRole || 'unknown',
+          quoteId,
+        });
         return this.sendError(res, 'No tienes permisos para editar esta cotización', 403);
       }
 

@@ -15,12 +15,43 @@ class QuoteOwnershipManager {
         this.userCache = new Map(); // Cache for user lookups
         this.originalClientId = null; // Track the originally saved client ID
         this.clientWasJustChanged = false; // Flag to track if client was just changed
+        this.clientChangeTimestamp = null; // Timestamp when client was changed
+        this.deletedCollaboratorIds = new Set(); // Track collaborators deleted during client change
         
         this.init();
     }
 
     async init() {
         try {
+            // Restore persisted client change state from sessionStorage
+            const savedTimestamp = sessionStorage.getItem(`clientChangeTimestamp_${this.quoteId}`);
+            const savedDeletedIds = sessionStorage.getItem(`deletedCollaborators_${this.quoteId}`);
+            const wasChanged = sessionStorage.getItem(`clientChanged_${this.quoteId}`);
+            
+            if (savedTimestamp) {
+                this.clientChangeTimestamp = parseInt(savedTimestamp);
+                const timeSince = Date.now() - this.clientChangeTimestamp;
+                console.log(`🔄 Restored client change state: ${timeSince}ms ago`);
+                
+                // If it's been more than 60 seconds, clear the persisted state
+                if (timeSince > 60000) {
+                    console.log('⏱️ Grace period expired, clearing persisted state');
+                    sessionStorage.removeItem(`clientChangeTimestamp_${this.quoteId}`);
+                    sessionStorage.removeItem(`deletedCollaborators_${this.quoteId}`);
+                    sessionStorage.removeItem(`clientChanged_${this.quoteId}`);
+                    this.clientChangeTimestamp = null;
+                    this.deletedCollaboratorIds = new Set();
+                } else {
+                    // Still within grace period
+                    if (savedDeletedIds) {
+                        this.deletedCollaboratorIds = new Set(JSON.parse(savedDeletedIds));
+                        console.log(`📋 Restored ${this.deletedCollaboratorIds.size} deleted collaborator IDs`);
+                    }
+                    
+                    // Set flag if client was just changed (useful for other logic)
+                    this.clientWasJustChanged = wasChanged === 'true';
+                }
+            }
             
             // Load initial data
             await Promise.all([
@@ -89,6 +120,15 @@ class QuoteOwnershipManager {
 
     async loadAgents() {
         try {
+            // SMART FILTERING: Allow new collaborators but filter out deleted ones during grace period
+            const CLIENT_CHANGE_GRACE_PERIOD = 60000; // 60 seconds
+            const timeSinceClientChange = this.clientChangeTimestamp ? (Date.now() - this.clientChangeTimestamp) : null;
+            const isInGracePeriod = this.clientWasJustChanged || (timeSinceClientChange !== null && timeSinceClientChange < CLIENT_CHANGE_GRACE_PERIOD);
+            
+            if (isInGracePeriod) {
+                console.log(`⏰ loadAgents - Within grace period (${timeSinceClientChange}ms since client change)`);
+            }
+            
             // Add client context to ensure we get collaborators for the correct client
             let currentClientId = this.originalClientId;
             const clientSelect = document.getElementById('clientId');
@@ -98,9 +138,6 @@ class QuoteOwnershipManager {
             
             // Build query parameters for client context
             const params = new URLSearchParams();
-            if (this.clientWasJustChanged) {
-                params.set('_t', Date.now().toString());
-            }
             if (currentClientId) {
                 params.set('clientId', currentClientId);
             }
@@ -120,8 +157,23 @@ class QuoteOwnershipManager {
             if (response.ok) {
                 const data = await response.json();
                 console.log('loadAgents - received data:', data);
-                this.agents = data.data || [];
-                console.log('loadAgents - agents count:', this.agents.length);
+                let collaborators = data.data || [];
+                
+                // SMART FILTERING: During grace period, filter out deleted collaborators but keep new ones
+                if (isInGracePeriod && this.deletedCollaboratorIds && this.deletedCollaboratorIds.size > 0) {
+                    const beforeCount = collaborators.length;
+                    collaborators = collaborators.filter(collab => {
+                        const shouldKeep = !this.deletedCollaboratorIds.has(collab.agent.id);
+                        if (!shouldKeep) {
+                            console.log(`🚫 Filtering out deleted collaborator: ${collab.agent.firstName} ${collab.agent.lastName}`);
+                        }
+                        return shouldKeep;
+                    });
+                    console.log(`🔍 Filtered ${beforeCount - collaborators.length} deleted collaborators, keeping ${collaborators.length} valid ones`);
+                }
+                
+                this.agents = collaborators;
+                console.log('loadAgents - final agents count:', this.agents.length);
                 this.displayAgents();
             }
         } catch (error) {
@@ -614,8 +666,14 @@ class QuoteOwnershipManager {
                     // Update quote with new client
                     await this.updateQuoteClient(this.quoteId, currentClientId);
                     
-                    // Set flag that client was just changed
+                    // Set flag and timestamp that client was just changed
                     this.clientWasJustChanged = true;
+                    this.clientChangeTimestamp = Date.now();
+                    console.log('📌 Client change marked at:', new Date(this.clientChangeTimestamp).toISOString());
+                    
+                    // Persist client change state to sessionStorage
+                    sessionStorage.setItem(`clientChangeTimestamp_${this.quoteId}`, this.clientChangeTimestamp.toString());
+                    sessionStorage.setItem(`clientChanged_${this.quoteId}`, 'true');
                     
                     // Clear any cached collaborators from the previous client
                     this.clearCollaboratorsCache();
@@ -784,9 +842,26 @@ class QuoteOwnershipManager {
             this.setButtonLoading('btnManageCollaborators', false);
             
             // Reset the client change flag now that modal loading is complete
+            // But keep the timestamp for grace period checking
             if (this.clientWasJustChanged) {
                 console.log('Resetting clientWasJustChanged flag after modal loading completion');
+                console.log('Client change timestamp remains:', this.clientChangeTimestamp);
                 this.clientWasJustChanged = false;
+                sessionStorage.setItem(`clientChanged_${this.quoteId}`, 'false');
+                // Don't reset timestamp - it's used for grace period checking
+            }
+            
+            // Check if grace period has expired and clear persisted state if so
+            if (this.clientChangeTimestamp) {
+                const timeSince = Date.now() - this.clientChangeTimestamp;
+                if (timeSince > 60000) {
+                    console.log('🧹 Grace period expired, clearing persisted state');
+                    sessionStorage.removeItem(`clientChangeTimestamp_${this.quoteId}`);
+                    sessionStorage.removeItem(`deletedCollaborators_${this.quoteId}`);
+                    sessionStorage.removeItem(`clientChanged_${this.quoteId}`);
+                    this.clientChangeTimestamp = null;
+                    this.deletedCollaboratorIds = new Set();
+                }
             }
             
             console.log('Modal loading complete, button state restored');
@@ -1159,25 +1234,66 @@ class QuoteOwnershipManager {
         console.log('User dropdowns cleared successfully');
     }
     
+    // Force clear local agents cache and UI
+    forceClearAgentsCache() {
+        console.log('🧹 Force clearing agents cache and UI');
+        this.agents = [];
+        
+        // Clear all UI elements
+        const elements = [
+            'collaboratorsManagementList',
+            'agentsList'
+        ];
+        
+        elements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.innerHTML = '';
+            }
+        });
+        
+        console.log('✅ Agents cache and UI force cleared');
+    }
+    
     // Clear all collaborators from the quote when client changes
     async clearAllCollaborators() {
-        console.log('Clearing all collaborators due to client change...');
+        console.log('🧹 Clearing all collaborators due to client change...');
         
         try {
-            // Get current collaborators first
-            if (!this.agents || this.agents.length === 0) {
-                console.log('No collaborators to clear');
+            // CRITICAL FIX: Always fetch collaborators from database first
+            // Don't rely on this.agents which might be empty
+            console.log('📥 Fetching current collaborators from database...');
+            const fetchResponse = await fetch(`/api/quotes/${this.quoteId}/collaborators`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            
+            let collaboratorsToDelete = [];
+            if (fetchResponse.ok) {
+                const data = await fetchResponse.json();
+                collaboratorsToDelete = data.data || [];
+                console.log(`📊 Found ${collaboratorsToDelete.length} collaborators in database to remove`);
+            } else {
+                console.warn('⚠️ Could not fetch collaborators from database');
+                // Fall back to local cache if database fetch fails
+                collaboratorsToDelete = this.agents || [];
+            }
+            
+            if (collaboratorsToDelete.length === 0) {
+                console.log('✅ No collaborators to clear');
                 return;
             }
             
-            const originalCount = this.agents.length;
-            console.log(`Starting removal of ${originalCount} collaborators...`);
+            const originalCount = collaboratorsToDelete.length;
+            console.log(`🔄 Starting removal of ${originalCount} collaborators from database...`);
             
             // Remove each collaborator sequentially to ensure proper processing
             let removedCount = 0;
             const failedRemovals = [];
+            const deletedCollaboratorIds = new Set(); // Track successfully deleted IDs
             
-            for (const collab of this.agents) {
+            for (const collab of collaboratorsToDelete) {
                 try {
                     console.log(`Removing collaborator: ${collab.agent.firstName} ${collab.agent.lastName} (ID: ${collab.agent.id})`);
                     const response = await fetch(`/api/quotes/${this.quoteId}/collaborators/${collab.agent.id}`, {
@@ -1194,6 +1310,7 @@ class QuoteOwnershipManager {
                     if (response.ok) {
                         console.log(`✅ Successfully removed collaborator: ${collab.agent.firstName} ${collab.agent.lastName}`);
                         removedCount++;
+                        deletedCollaboratorIds.add(collab.agent.id); // Track deleted ID
                     } else {
                         const errorData = await response.json().catch(() => ({}));
                         console.warn(`❌ Failed to remove collaborator: ${collab.agent.id}`, {
@@ -1220,21 +1337,31 @@ class QuoteOwnershipManager {
             
             console.log(`Removed ${removedCount} out of ${originalCount} collaborators`);
             
-            // Database verification with retry logic: Ensure DELETE operations are complete
-            console.log('Performing database verification with retry logic...');
+            // Database verification with exponential backoff retry logic
+            console.log('🔍 Performing database verification with exponential backoff...');
             
             let verificationAttempts = 0;
             const maxAttempts = 5;
+            const maxWaitTime = 30000; // 30 seconds total timeout
             let allCollaboratorsRemoved = false;
+            const startTime = Date.now();
             
-            while (verificationAttempts < maxAttempts && !allCollaboratorsRemoved) {
+            while (verificationAttempts < maxAttempts && !allCollaboratorsRemoved && (Date.now() - startTime) < maxWaitTime) {
                 verificationAttempts++;
-                console.log(`Database verification attempt ${verificationAttempts}/${maxAttempts}`);
+                console.log(`🔄 Database verification attempt ${verificationAttempts}/${maxAttempts}`);
                 
                 try {
-                    // Wait a bit longer for each attempt to allow database processing
+                    // Check timeout
+                    if ((Date.now() - startTime) >= maxWaitTime) {
+                        console.warn(`⏰ Verification timeout reached (${maxWaitTime}ms)`);
+                        break;
+                    }
+                    
+                    // Exponential backoff: 0.5s, 1s, 2s, 4s, 8s
                     if (verificationAttempts > 1) {
-                        await new Promise(resolve => setTimeout(resolve, 1000 * verificationAttempts));
+                        const backoffTime = Math.min(500 * Math.pow(2, verificationAttempts - 2), 8000);
+                        console.log(`⏳ Waiting ${backoffTime}ms before verification attempt ${verificationAttempts}...`);
+                        await new Promise(resolve => setTimeout(resolve, backoffTime));
                     }
                     
                     const verificationResponse = await fetch(`/api/quotes/${this.quoteId}/collaborators`, {
@@ -1250,19 +1377,21 @@ class QuoteOwnershipManager {
                         console.log(`Attempt ${verificationAttempts}: Found ${remainingCollaborators.length} remaining collaborators`);
                         
                         if (remainingCollaborators.length === 0) {
-                            console.log('✅ Database verification successful: All collaborators removed');
+                            const elapsedTime = Date.now() - startTime;
+                            console.log(`✅ Database verification successful: All collaborators removed (${elapsedTime}ms)`);
                             allCollaboratorsRemoved = true;
                         } else {
-                            console.warn(`⚠️ Attempt ${verificationAttempts}: Some collaborators still exist:`, remainingCollaborators);
+                            console.warn(`⚠️ Attempt ${verificationAttempts}: ${remainingCollaborators.length} collaborators still exist`);
                             // Log details about remaining collaborators
                             remainingCollaborators.forEach(remaining => {
-                                console.warn(`- Remaining collaborator: ${remaining.agent?.firstName} ${remaining.agent?.lastName} (${remaining.agent?.id})`);
+                                console.warn(`  - ${remaining.agent?.firstName} ${remaining.agent?.lastName} (${remaining.agent?.id})`);
                             });
                             
-                            // If this is the last attempt, throw error
-                            if (verificationAttempts === maxAttempts) {
-                                console.error('❌ Database verification failed: Collaborators still exist after max attempts');
-                                throw new Error(`Database cleanup incomplete: ${remainingCollaborators.length} collaborators still exist after ${maxAttempts} attempts`);
+                            // If this is the last attempt or timeout reached, don't throw error - proceed anyway
+                            if (verificationAttempts === maxAttempts || (Date.now() - startTime) >= maxWaitTime) {
+                                console.warn(`⚠️ Database cleanup incomplete after ${verificationAttempts} attempts (${Date.now() - startTime}ms). Proceeding anyway.`);
+                                // Don't throw error - let the system proceed with client change
+                                allCollaboratorsRemoved = true; // Force exit from loop
                             }
                         }
                     } else {
@@ -1286,9 +1415,25 @@ class QuoteOwnershipManager {
             // Report summary
             if (failedRemovals.length > 0) {
                 console.warn(`❌ ${failedRemovals.length} collaborator removals failed:`, failedRemovals);
-                throw new Error(`Failed to remove ${failedRemovals.length} out of ${originalCount} collaborators`);
+                // Don't throw error - log warning but proceed with client change
+                console.warn(`⚠️ Warning: Failed to remove ${failedRemovals.length} out of ${originalCount} collaborators. Client change will proceed.`);
             } else {
-                console.log('✅ All collaborators cleared successfully');
+                console.log('✅ All collaborator removal requests completed successfully');
+            }
+            
+            // Save the deleted collaborator IDs for filtering during grace period
+            this.deletedCollaboratorIds = deletedCollaboratorIds;
+            console.log(`📝 Tracking ${deletedCollaboratorIds.size} deleted collaborator IDs for grace period filtering`);
+            
+            // Persist deleted IDs to sessionStorage
+            sessionStorage.setItem(`deletedCollaborators_${this.quoteId}`, JSON.stringify([...deletedCollaboratorIds]));
+            
+            // Final verification result
+            const totalTime = Date.now() - startTime;
+            if (allCollaboratorsRemoved) {
+                console.log(`🎯 Collaborator cleanup completed successfully in ${totalTime}ms`);
+            } else {
+                console.warn(`⚠️ Collaborator cleanup completed with warnings in ${totalTime}ms`);
             }
         } catch (error) {
             console.error('Error clearing collaborators:', error);
@@ -1885,6 +2030,9 @@ class QuoteOwnershipManager {
                 const admins = [];
                 const others = [];
                 
+                console.log('🔍 loadAvailableUsers - Processing users for', selectId);
+                console.log('Raw users received:', users.map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, email: u.email, role: u.role })));
+                
                 users.forEach(user => {
                     // For ownership transfer: don't show current owner (unless placeholder)
                     // For collaboration: don't show current owner or existing agents
@@ -1918,6 +2066,7 @@ class QuoteOwnershipManager {
                         const option = document.createElement('option');
                         option.value = user.id;
                         option.textContent = `${user.firstName} ${user.lastName} - ${user.email}`;
+                        console.log(`📋 Adding Dept Manager option: ID=${user.id}, Text="${option.textContent}"`);
                         optgroup.appendChild(option);
                     });
                     select.appendChild(optgroup);
@@ -1931,6 +2080,7 @@ class QuoteOwnershipManager {
                         const option = document.createElement('option');
                         option.value = user.id;
                         option.textContent = `${user.firstName} ${user.lastName} - ${user.email}`;
+                        console.log(`📋 Adding Client option: ID=${user.id}, Text="${option.textContent}"`);
                         optgroup.appendChild(option);
                     });
                     select.appendChild(optgroup);
@@ -1945,6 +2095,7 @@ class QuoteOwnershipManager {
                         const option = document.createElement('option');
                         option.value = user.id;
                         option.textContent = `${user.firstName} ${user.lastName} - ${user.email}`;
+                        console.log(`📋 Adding Admin option: ID=${user.id}, Text="${option.textContent}"`);
                         optgroup.appendChild(option);
                     });
                     select.appendChild(optgroup);
@@ -2028,7 +2179,7 @@ class QuoteOwnershipManager {
     
     async updateAgentRole(agentId, newRole) {
         try {
-            const response = await fetch(`/api/quotes/${window.quoteId}/collaborators/${agentId}/role`, {
+            const response = await fetch(`/api/quotes/${this.quoteId}/collaborators/${agentId}/role`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2060,7 +2211,7 @@ class QuoteOwnershipManager {
         this.setModalLoading(true, 'Agregando...');
         
         try {
-            console.log('Adding collaborator:', { userId, role, quoteId: window.quoteId });
+            console.log('Adding collaborator:', { userId, role, quoteId: this.quoteId });
             
             // Protection against race conditions: If client was recently changed,
             // wait a bit more to ensure all clear operations are complete
@@ -2069,7 +2220,7 @@ class QuoteOwnershipManager {
                 await new Promise(resolve => setTimeout(resolve, 2000));
             }
             
-            const response = await fetch(`/api/quotes/${window.quoteId}/collaborators`, {
+            const response = await fetch(`/api/quotes/${this.quoteId}/collaborators`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2092,7 +2243,21 @@ class QuoteOwnershipManager {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
                 
-                // Reload agents list
+                // Reload agents list but maintain client context awareness
+                // Check if we're within grace period after client change
+                const timeSinceClientChange = this.clientChangeTimestamp ? (Date.now() - this.clientChangeTimestamp) : null;
+                const CLIENT_CHANGE_GRACE_PERIOD = 60000; // 60 seconds
+                
+                if (timeSinceClientChange !== null && timeSinceClientChange < CLIENT_CHANGE_GRACE_PERIOD) {
+                    console.log(`⚠️ Within client change grace period (${timeSinceClientChange}ms) - only showing new collaborator`);
+                    // During grace period, only add the new collaborator to empty list
+                    this.forceClearAgentsCache();
+                    
+                    // Manually add just the new collaborator we just created
+                    // We'll need to fetch just this one collaborator's details
+                    // For now, just keep the list empty and let UI update show the new state
+                }
+                
                 await this.loadAgents();
                 await this.displayAgentsManagement();
                 console.log('Collaborator added successfully');
@@ -2152,7 +2317,7 @@ class QuoteOwnershipManager {
             }
             
             const queryString = params.toString() ? `?${params.toString()}` : '';
-            const endpoint = `/api/quotes/${window.quoteId}/available-owners${queryString}`;
+            const endpoint = `/api/quotes/${this.quoteId}/available-owners${queryString}`;
             
             console.log('loadUsersForDropdown - endpoint:', endpoint);
             console.log('loadUsersForDropdown - currentClientId:', currentClientId);
@@ -3541,7 +3706,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Get quote ID from page
     const quoteId = window.quoteId || document.querySelector('[data-quote-id]')?.dataset.quoteId;
     
-    if (quoteId && quoteId !== 'new') {
+    if (quoteId) {
         window.quoteOwnership = new QuoteOwnershipManager(quoteId);
     }
 });

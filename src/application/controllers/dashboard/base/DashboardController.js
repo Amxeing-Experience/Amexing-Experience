@@ -37,7 +37,7 @@ class DashboardController extends BaseController {
         res.locals.user = req.user;
         res.locals.userId = req.user.id;
         res.locals.userName = req.user.name || req.user.username;
-        res.locals.userRole = req.user.role;
+        res.locals.userRole = req.user.role || req.userRole || 'guest';
       }
 
       next();

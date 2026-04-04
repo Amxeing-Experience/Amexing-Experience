@@ -116,14 +116,12 @@ window.currentUser = {
     </div>
 </div>
 
-<!-- Ownership Panel (only show for existing quotes) -->
-<% if (!isNewQuote) { %>
+<!-- Ownership Panel -->
 <div class="row mb-3">
     <div class="col-12">
         <%- include('./sections/quote-ownership', { quoteId: quoteId }) %>
     </div>
 </div>
-<% } %>
 
 <!-- Full-Width Content Area -->
 <div class="row">
