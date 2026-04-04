@@ -1,0 +1,178 @@
+<%
+/**
+ * Accessibility Requirements Input Atom
+ * Textarea for accessibility and special assistance needs
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'accessibilityRequirements')
+ * @param {string} id - Input ID attribute (default: 'accessibilityRequirements')
+ * @param {string} label - Field label text (default: 'Requerimientos de Accesibilidad')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} placeholder - Placeholder text
+ * @param {string} helpText - Help text below field
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string} value - Initial value (default: '')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'accessibilityRequirements';
+const inputId = typeof id !== 'undefined' ? id : 'accessibilityRequirements';
+const inputLabel = typeof label !== 'undefined' ? label : 'Requerimientos de Accesibilidad';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Ej: Silla de ruedas, bastón, perro de servicio, asistencia visual/auditiva...';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Especifique cualquier necesidad de accesibilidad o asistencia especial';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const initialValue = typeof value !== 'undefined' ? value : '';
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-wheelchair text-primary me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <textarea 
+        class="form-control"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        placeholder="<%= inputPlaceholder %>"
+        <%= isRequired ? 'required' : '' %>
+        rows="3"
+        style="resize: vertical;"
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    ><%= initialValue %></textarea>
+    
+    <!-- Quick selection buttons for common requirements -->
+    <div class="mt-2" id="<%= inputId %>-quick-buttons">
+        <small class="text-muted d-block mb-2">Selección rápida:</small>
+        <div class="btn-group btn-group-sm flex-wrap" role="group">
+            <button type="button" class="btn btn-outline-secondary accessibility-quick-btn" data-value="Silla de ruedas">
+                ♿ Silla de ruedas
+            </button>
+            <button type="button" class="btn btn-outline-secondary accessibility-quick-btn" data-value="Bastón/Andador">
+                🦯 Bastón/Andador
+            </button>
+            <button type="button" class="btn btn-outline-secondary accessibility-quick-btn" data-value="Asistencia visual">
+                👁️ Asistencia visual
+            </button>
+            <button type="button" class="btn btn-outline-secondary accessibility-quick-btn" data-value="Asistencia auditiva">
+                👂 Asistencia auditiva
+            </button>
+            <button type="button" class="btn btn-outline-secondary accessibility-quick-btn" data-value="Perro de servicio">
+                🦮 Perro de servicio
+            </button>
+            <button type="button" class="btn btn-outline-secondary accessibility-quick-btn" data-value="Oxígeno portátil">
+                🫁 Oxígeno portátil
+            </button>
+        </div>
+    </div>
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <i class="ti ti-info-circle"></i>
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor especifique los requerimientos de accesibilidad
+    </div>
+</div>
+
+<script>
+(function() {
+    // Enhanced accessibility input with quick selection buttons
+    const accessibilityInput = document.getElementById('<%= inputId %>');
+    const quickButtons = document.querySelectorAll('#<%= inputId %>-quick-buttons .accessibility-quick-btn');
+    
+    if (accessibilityInput) {
+        // Handle quick selection buttons
+        quickButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const value = this.getAttribute('data-value');
+                const currentValue = accessibilityInput.value.trim();
+                
+                // Toggle the value in the textarea
+                if (currentValue.includes(value)) {
+                    // Remove the value
+                    const lines = currentValue.split('\n').filter(line => line.trim() !== value);
+                    accessibilityInput.value = lines.join('\n');
+                    this.classList.remove('btn-primary');
+                    this.classList.add('btn-outline-secondary');
+                } else {
+                    // Add the value
+                    if (currentValue) {
+                        accessibilityInput.value = currentValue + '\n' + value;
+                    } else {
+                        accessibilityInput.value = value;
+                    }
+                    this.classList.remove('btn-outline-secondary');
+                    this.classList.add('btn-primary');
+                }
+                
+                // Trigger input event for validation
+                accessibilityInput.dispatchEvent(new Event('input'));
+            });
+        });
+        
+        // Update button states based on textarea content
+        function updateButtonStates() {
+            const currentValue = accessibilityInput.value;
+            quickButtons.forEach(button => {
+                const value = button.getAttribute('data-value');
+                if (currentValue.includes(value)) {
+                    button.classList.remove('btn-outline-secondary');
+                    button.classList.add('btn-primary');
+                } else {
+                    button.classList.remove('btn-primary');
+                    button.classList.add('btn-outline-secondary');
+                }
+            });
+        }
+        
+        // Validation and button state update on input
+        accessibilityInput.addEventListener('input', function() {
+            updateButtonStates();
+            
+            if (this.value.trim()) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else {
+                this.classList.remove('is-valid');
+                if (<%= isRequired ? 'true' : 'false' %>) {
+                    this.classList.add('is-invalid');
+                } else {
+                    this.classList.remove('is-invalid');
+                }
+            }
+        });
+        
+        // Clean up on blur
+        accessibilityInput.addEventListener('blur', function() {
+            // Remove duplicate lines and empty lines
+            const lines = this.value.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+            
+            // Remove duplicates
+            const unique = [...new Set(lines)];
+            this.value = unique.join('\n');
+            updateButtonStates();
+        });
+        
+        // Initial button state update
+        if (accessibilityInput.value) {
+            updateButtonStates();
+        }
+    }
+})();
+</script>

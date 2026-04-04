@@ -1,8 +1,8 @@
 <%
 /**
- * Tom Select Atom
- * Enhanced select component with search and multi-select capabilities
- * Uses Tom Select library for improved UX over native select
+ * Custom Bootstrap Dropdown Select Component
+ * Clean, reliable dropdown with search functionality
+ * Uses native Bootstrap components for better integration
  *
  * Atomic Design Level: Atom
  * Category: Common Form Components
@@ -11,22 +11,19 @@
  * @param {string} name - Name attribute for form submission
  * @param {boolean} multiple - Enable multi-select (default: false)
  * @param {string} placeholder - Placeholder text
- * @param {number} maxItems - Maximum selectable items (default: null = unlimited)
  * @param {string} label - Field label text
  * @param {boolean} required - Mark field as required
  * @param {string} helpText - Help text below field
  * @param {array} options - Initial options [{value, text}]
  * @param {array} selected - Pre-selected values
  * @param {string} additionalClasses - Additional CSS classes
- * @param {object} tomSelectConfig - Additional Tom Select configuration
+ * @param {boolean} disabled - Disable the dropdown
  *
  * @example
  * include('atoms/common/tom-select', {
  *   id: 'mySelect',
  *   name: 'items',
- *   multiple: true,
- *   placeholder: 'Select items...',
- *   maxItems: 5,
+ *   placeholder: 'Search items...',
  *   label: 'Choose Items',
  *   options: [{value: '1', text: 'Option 1'}]
  * })
@@ -34,7 +31,7 @@
 
 // Required parameters
 if (typeof id === 'undefined') {
-    throw new Error('Tom Select component requires an "id" parameter');
+    throw new Error('Custom Select component requires an "id" parameter');
 }
 
 // Default parameters
@@ -42,36 +39,13 @@ const selectId = id;
 const selectName = typeof name !== 'undefined' ? name : selectId;
 const selectMultiple = typeof multiple !== 'undefined' ? multiple : false;
 const selectPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Seleccionar...';
-const selectMaxItems = typeof maxItems !== 'undefined' ? maxItems : null;
 const selectLabel = typeof label !== 'undefined' ? label : '';
 const selectRequired = typeof required !== 'undefined' ? required : false;
 const selectHelpText = typeof helpText !== 'undefined' ? helpText : '';
 const selectOptions = typeof options !== 'undefined' ? options : [];
 const selectSelected = typeof selected !== 'undefined' ? selected : [];
 const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
-
-// Build Tom Select configuration - all values are server-controlled (no user input)
-const defaultConfig = {
-    plugins: selectMultiple ? ['remove_button'] : [],
-    maxOptions: 1000,
-    hideSelected: selectMultiple,
-    placeholder: selectPlaceholder,
-    maxItems: selectMaxItems !== null ? selectMaxItems : (selectMultiple ? null : 1),
-    highlight: true,
-    searchField: ['text'],
-    valueField: 'value',
-    labelField: 'text',
-    sortField: 'text',
-    closeAfterSelect: !selectMultiple,
-    persist: false
-};
-
-// Merge with custom config
-const customConfig = typeof tomSelectConfig !== 'undefined' ? tomSelectConfig : {};
-const finalConfig = Object.assign({}, defaultConfig, customConfig);
-
-// Generate unique config key for this instance
-const configKey = 'tsconfig_' + selectId.replace(/[^a-zA-Z0-9]/g, '_');
+const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
 %>
 
 <div class="mb-3 <%= selectAdditionalClasses %>">
@@ -82,24 +56,54 @@ const configKey = 'tsconfig_' + selectId.replace(/[^a-zA-Z0-9]/g, '_');
         </label>
     <% } %>
 
-    <select
-        id="<%= selectId %>"
-        name="<%= selectName %>"
-        <% if (selectMultiple) { %>multiple<% } %>
-        <% if (selectRequired) { %>required<% } %>
-        class="form-select"
-        autocomplete="off">
+    <!-- Hidden input to store actual value -->
+    <input type="hidden" id="<%= selectId %>" name="<%= selectName %>" <% if (selectRequired) { %>required<% } %> <% if (selectDisabled) { %>disabled<% } %> />
 
-        <% if (selectOptions && selectOptions.length > 0) { %>
-            <% selectOptions.forEach(function(option) { %>
-                <option
-                    value="<%= option.value %>"
-                    <% if (selectSelected.includes(option.value)) { %>selected<% } %>>
-                    <%= option.text %>
-                </option>
-            <% }); %>
-        <% } %>
-    </select>
+    <!-- Custom dropdown interface -->
+    <div class="dropdown position-relative">
+        <div class="form-control dropdown-input-display <% if (selectDisabled) { %>disabled<% } %>" 
+             id="<%= selectId %>_display"
+             <% if (!selectDisabled) { %>data-bs-toggle="dropdown"<% } %> 
+             aria-expanded="false"
+             style="cursor: <% if (selectDisabled) { %>not-allowed<% } else { %>pointer<% } %>; display: flex; justify-content: between; align-items: center; <% if (selectDisabled) { %>background-color: #e9ecef; opacity: 1;<% } %>">
+            <span class="dropdown-selected-text text-muted"><%= selectPlaceholder %></span>
+            <i class="ti ti-chevron-down ms-auto"></i>
+        </div>
+        
+        <div class="dropdown-menu w-100 p-0" id="<%= selectId %>_menu" style="max-height: 300px; overflow-y: auto;">
+            <!-- Search input -->
+            <div class="p-2 border-bottom position-relative">
+                <input type="text" 
+                       class="form-control form-control-sm" 
+                       id="<%= selectId %>_search"
+                       placeholder="Buscar..." 
+                       autocomplete="off">
+                <!-- Search loader -->
+                <div class="position-absolute top-50 end-0 translate-middle-y me-3 d-none" 
+                     id="<%= selectId %>_search_loader">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Buscando...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Options container -->
+            <div id="<%= selectId %>_options" class="dropdown-options">
+                <% if (selectOptions && selectOptions.length > 0) { %>
+                    <% selectOptions.forEach(function(option) { %>
+                        <a class="dropdown-item dropdown-option" 
+                           href="#" 
+                           data-value="<%= option.value %>"
+                           data-text="<%= option.text %>">
+                            <%= option.text %>
+                        </a>
+                    <% }); %>
+                <% } else { %>
+                    <div class="dropdown-item-text text-muted">No hay opciones disponibles</div>
+                <% } %>
+            </div>
+        </div>
+    </div>
 
     <% if (selectHelpText) { %>
         <div class="form-text"><%= selectHelpText %></div>
@@ -107,49 +111,329 @@ const configKey = 'tsconfig_' + selectId.replace(/[^a-zA-Z0-9]/g, '_');
 </div>
 
 <script>
-// Store config in global namespace temporarily
-// SAFE: All config values are server-controlled (no user input), JSON.stringify ensures valid JSON
-// nosemgrep
-window.<%= configKey %> = <%- JSON.stringify(finalConfig) %>;
-
 (function() {
-    // Wait for Tom Select library to be loaded
-    function initTomSelect() {
-        if (typeof TomSelect === 'undefined') {
-            setTimeout(initTomSelect, 100);
+    'use strict';
+    
+    const selectId = '<%= selectId %>';
+    const isDisabled = <%= selectDisabled ? 'true' : 'false' %>;
+    const hiddenInput = document.getElementById(selectId);
+    const displayElement = document.getElementById(selectId + '_display');
+    const searchInput = document.getElementById(selectId + '_search');
+    const searchLoader = document.getElementById(selectId + '_search_loader');
+    const optionsContainer = document.getElementById(selectId + '_options');
+    const selectedTextSpan = displayElement.querySelector('.dropdown-selected-text');
+    const chevronIcon = displayElement.querySelector('.ti-chevron-down');
+    
+    let allOptions = [];
+    let currentValue = '';
+    
+    // Initialize component
+    function init() {
+        console.log('Initializing custom dropdown for #' + selectId + (isDisabled ? ' (disabled)' : ''));
+        
+        // Collect all initial options
+        collectOptions();
+        
+        // Set initial selected value
+        setInitialValue();
+        
+        // Setup event listeners
+        setupEventListeners();
+        
+        // Dispatch ready event for compatibility
+        const readyEvent = new CustomEvent('tomselect:ready', {
+            detail: { 
+                instance: {
+                    getValue: () => currentValue,
+                    setValue: setValue,
+                    addOption: addOption,
+                    clearOptions: clearOptions,
+                    refreshOptions: refreshOptions,
+                    getOption: getOption,
+                    on: () => {}, // Compatibility stub
+                    open: () => openDropdown(),
+                    close: () => closeDropdown()
+                }
+            }
+        });
+        hiddenInput.dispatchEvent(readyEvent);
+        
+        console.log('Custom dropdown initialized successfully for #' + selectId);
+    }
+    
+    // Collect options from HTML
+    function collectOptions() {
+        const optionElements = optionsContainer.querySelectorAll('.dropdown-option');
+        allOptions = Array.from(optionElements).map(el => ({
+            value: el.dataset.value,
+            text: el.dataset.text,
+            element: el
+        }));
+    }
+    
+    // Set initial selected value
+    function setInitialValue() {
+        <% if (selectSelected && selectSelected.length > 0) { %>
+            const initialValue = '<%= selectSelected[0] %>';
+            const option = allOptions.find(opt => opt.value === initialValue);
+            if (option) {
+                setValue(initialValue);
+            }
+        <% } %>
+    }
+    
+    // Setup event listeners
+    function setupEventListeners() {
+        // Skip event listeners if disabled
+        if (isDisabled) {
+            console.log('Dropdown is disabled, skipping event listeners');
             return;
         }
-
-        const selectElement = document.getElementById('<%= selectId %>');
-        if (!selectElement) {
-            return;
-        }
-
-        // Check if already initialized
-        if (selectElement.tomselect) {
-            return;
-        }
-
-        try {
-            // Get configuration from global namespace (server-side controlled, safe)
-            const config = window.<%= configKey %> || {};
-            const tomSelectInstance = new TomSelect('#<%= selectId %>', config);
-
-            // Store instance reference on the element
-            selectElement.tomselect = tomSelectInstance;
-
-            // Cleanup global config
-            delete window.<%= configKey %>;
-        } catch (error) {
-            console.error('Error initializing Tom Select on #<%= selectId %>:', error);
+        
+        // Search functionality
+        searchInput.addEventListener('input', handleSearch);
+        
+        // Option selection
+        optionsContainer.addEventListener('click', handleOptionClick);
+        
+        // Dropdown toggle
+        displayElement.addEventListener('shown.bs.dropdown', handleDropdownOpen);
+        displayElement.addEventListener('hidden.bs.dropdown', handleDropdownClose);
+        
+        // Keyboard navigation
+        searchInput.addEventListener('keydown', handleKeyDown);
+    }
+    
+    // Debounce timeout for search
+    let searchTimeout;
+    
+    // Show search loader
+    function showSearchLoader() {
+        if (searchLoader) {
+            searchLoader.classList.remove('d-none');
         }
     }
-
+    
+    // Hide search loader
+    function hideSearchLoader() {
+        if (searchLoader) {
+            searchLoader.classList.add('d-none');
+        }
+    }
+    
+    // Handle search input with debouncing for server-side search
+    function handleSearch(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        
+        // Clear existing timeout
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+        
+        // Hide loader if search is cleared
+        if (!searchTerm) {
+            hideSearchLoader();
+        }
+        
+        // For client search dropdown, implement server-side search
+        if (selectId === 'clientId' && window.loadActiveClients) {
+            // Show loader for non-empty searches
+            if (searchTerm) {
+                showSearchLoader();
+            }
+            
+            searchTimeout = setTimeout(async () => {
+                try {
+                    // Call the server-side search function
+                    await window.loadActiveClients(searchTerm);
+                } catch (error) {
+                    console.error('Server-side search error:', error);
+                    // Fallback to local search
+                    performLocalSearch(searchTerm);
+                } finally {
+                    // Always hide loader when done
+                    hideSearchLoader();
+                }
+            }, 300); // 300ms debounce
+        } else {
+            // For other dropdowns, use local search immediately
+            performLocalSearch(searchTerm);
+        }
+    }
+    
+    // Local search function
+    function performLocalSearch(searchTerm) {
+        allOptions.forEach(option => {
+            const matches = option.text.toLowerCase().includes(searchTerm);
+            option.element.style.display = matches ? 'block' : 'none';
+        });
+        
+        // Show "no results" message if no matches
+        const visibleOptions = allOptions.filter(opt => opt.element.style.display !== 'none');
+        showNoResultsMessage(visibleOptions.length === 0 && searchTerm.length > 0);
+    }
+    
+    // Handle option click
+    function handleOptionClick(e) {
+        e.preventDefault();
+        
+        if (e.target.classList.contains('dropdown-option')) {
+            const value = e.target.dataset.value;
+            const text = e.target.dataset.text;
+            
+            setValue(value);
+            closeDropdown();
+        }
+    }
+    
+    // Handle dropdown open
+    function handleDropdownOpen() {
+        chevronIcon.style.transform = 'rotate(180deg)';
+        searchInput.focus();
+        searchInput.value = '';
+        
+        // Hide search loader on open
+        hideSearchLoader();
+        
+        // Reset option visibility
+        allOptions.forEach(option => {
+            option.element.style.display = 'block';
+        });
+        showNoResultsMessage(false);
+    }
+    
+    // Handle dropdown close
+    function handleDropdownClose() {
+        chevronIcon.style.transform = 'rotate(0deg)';
+        
+        // Hide search loader on close and clear any pending search
+        hideSearchLoader();
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+            searchTimeout = null;
+        }
+    }
+    
+    // Handle keyboard navigation
+    function handleKeyDown(e) {
+        if (e.key === 'Escape') {
+            closeDropdown();
+        }
+    }
+    
+    // Set value
+    function setValue(value) {
+        console.log('[CustomSelect] setValue called:', {
+            value: value,
+            valueType: typeof value,
+            allOptionsCount: allOptions.length,
+            allOptionValues: allOptions.map(opt => ({
+                value: opt.value,
+                type: typeof opt.value,
+                text: opt.text
+            }))
+        });
+        
+        const option = allOptions.find(opt => opt.value === value);
+        
+        if (option) {
+            console.log('[CustomSelect] Option found:', option);
+            currentValue = value;
+            hiddenInput.value = value;
+            selectedTextSpan.textContent = option.text;
+            selectedTextSpan.classList.remove('text-muted');
+            
+            // Trigger change event for compatibility
+            const changeEvent = new Event('change', { bubbles: true });
+            hiddenInput.dispatchEvent(changeEvent);
+        } else {
+            console.log('[CustomSelect] Option NOT found for value:', value);
+            // Try with string comparison
+            const optionStr = allOptions.find(opt => String(opt.value) === String(value));
+            if (optionStr) {
+                console.log('[CustomSelect] Found with string comparison:', optionStr);
+            }
+        }
+    }
+    
+    // Add option
+    function addOption(option) {
+        const optionEl = document.createElement('a');
+        optionEl.className = 'dropdown-item dropdown-option';
+        optionEl.href = '#';
+        optionEl.dataset.value = option.value;
+        optionEl.dataset.text = option.text;
+        optionEl.textContent = option.text;
+        
+        optionsContainer.appendChild(optionEl);
+        // Store all option data, not just value and text
+        allOptions.push({
+            ...option,  // Include all properties from the option
+            element: optionEl
+        });
+    }
+    
+    // Clear options
+    function clearOptions() {
+        optionsContainer.innerHTML = '';
+        allOptions = [];
+    }
+    
+    // Get option by value
+    function getOption(value) {
+        return allOptions.find(opt => opt.value === value);
+    }
+    
+    // Refresh options (compatibility method)
+    function refreshOptions() {
+        // Already reactive, no action needed
+    }
+    
+    // Open dropdown
+    function openDropdown() {
+        const dropdown = new bootstrap.Dropdown(displayElement);
+        dropdown.show();
+    }
+    
+    // Close dropdown  
+    function closeDropdown() {
+        const dropdown = bootstrap.Dropdown.getInstance(displayElement);
+        if (dropdown) {
+            dropdown.hide();
+        }
+    }
+    
+    // Show/hide no results message
+    function showNoResultsMessage(show) {
+        let noResultsEl = optionsContainer.querySelector('.no-results-message');
+        
+        if (show && !noResultsEl) {
+            noResultsEl = document.createElement('div');
+            noResultsEl.className = 'dropdown-item-text text-muted no-results-message';
+            noResultsEl.textContent = 'No se encontraron resultados';
+            optionsContainer.appendChild(noResultsEl);
+        } else if (!show && noResultsEl) {
+            noResultsEl.remove();
+        }
+    }
+    
+    // Store reference for external access
+    hiddenInput.customSelect = {
+        getValue: () => currentValue,
+        setValue: setValue,
+        addOption: addOption,
+        clearOptions: clearOptions,
+        getOption: getOption,
+        refreshOptions: refreshOptions,
+        open: openDropdown,
+        close: closeDropdown
+    };
+    
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initTomSelect);
+        document.addEventListener('DOMContentLoaded', init);
     } else {
-        initTomSelect();
+        init();
     }
 })();
 </script>

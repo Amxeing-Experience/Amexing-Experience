@@ -88,12 +88,41 @@ class AuthController {
     } catch (error) {
       logger.error('Error getting OAuth providers for login:', error);
     }
+    // Check for OAuth confirmation data in session
+    const oauthLinkingData = req.session.oauthLinkingData || null;
+
+    // Debug OAuth linking data for troubleshooting
+    if (req.query.oauth_confirmation === 'true') {
+      logger.info('Login page rendered with OAuth confirmation request', {
+        provider: req.query.provider,
+        hasOAuthLinkingData: !!oauthLinkingData,
+        sessionId: req.sessionID,
+        sessionKeys: Object.keys(req.session),
+        oauthDataKeys: oauthLinkingData ? Object.keys(oauthLinkingData) : null,
+        oauthDataTimestamp: oauthLinkingData?.timestamp,
+        debugParam: req.query.debug,
+        hasSessionStore: !!req.session.store,
+        isNewSession: req.session.isNew,
+      });
+
+      if (!oauthLinkingData) {
+        logger.warn('OAuth confirmation requested but no linking data found in session', {
+          provider: req.query.provider,
+          sessionId: req.sessionID,
+          allSessionData: JSON.stringify(req.session, null, 2),
+        });
+      }
+    }
+
     res.render('auth/login', {
       title: 'Login - AmexingWeb',
       error: req.query.error || null,
+      message: req.query.message || null,
+      info: req.query.info || null,
       csrfToken: csrf,
       parseAppId: process.env.PARSE_APP_ID,
       oauthProviders,
+      oauthLinkingData,
     });
   }
 
@@ -115,9 +144,24 @@ class AuthController {
    * // Displays registration form with CSRF token and validation
    */
   async showRegister(req, res) {
+    // Redirect to request access page instead
+    logger.info('Registration request redirected to agency access request page');
+    res.redirect('/auth/request-access');
+  }
+
+  /**
+   * Displays the agency access request page.
+   * Renders the request access view for agencies wanting to join the platform.
+   * @function showRequestAccess
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} - Renders request access view.
+   * @example
+   */
+  async showRequestAccess(req, res) {
     // Ensure session exists
     if (!req.session) {
-      logger.error('No session available in showRegister');
+      logger.error('No session available in showRequestAccess');
       return res.status(500).render('errors/error', {
         title: 'Session Error',
         message: 'Please refresh the page and try again',
@@ -128,17 +172,26 @@ class AuthController {
     if (!req.session.csrfSecret) {
       const uidSafe = require('uid-safe');
       req.session.csrfSecret = await uidSafe(32);
-      logger.warn('CSRF secret was missing in showRegister, generated new one', {
+      logger.warn('CSRF secret was missing in showRequestAccess, generated new one', {
         sessionID: req.session.id,
       });
     }
 
     const csrf = securityMiddlewares.csrfProtection.create(req.session.csrfSecret);
-    res.render('auth/register', {
-      title: 'Register - AmexingWeb',
-      error: req.query.error || null,
+
+    // Configure support email based on environment
+    const supportEmail = process.env.NODE_ENV === 'development'
+      ? 'denisse@meeplab.com'
+      : 'michelle@amexing.com';
+
+    res.render('auth/request-access', {
+      title: 'Solicitud de Acceso - Agencias - Amexing',
       csrfToken: csrf,
-      parseAppId: process.env.PARSE_APP_ID,
+      supportEmail,
+      error: req.query.error || null,
+      oauth_attempted: req.query.oauth_attempted || null,
+      email: req.query.email || null,
+      toast: req.query.toast || null,
     });
   }
 
@@ -757,12 +810,104 @@ class AuthController {
     }
 
     const csrf = securityMiddlewares.csrfProtection.create(req.session.csrfSecret);
+
+    // Determine support email based on environment
+    const supportEmail = process.env.NODE_ENV === 'development'
+      ? 'denisse@meeplab.com'
+      : 'michelle@amexing.com';
+
     res.render('auth/forgot-password', {
       title: 'Forgot Password - AmexingWeb',
       error: req.query.error || null,
       success: req.query.success || null,
       csrfToken: csrf,
+      supportEmail,
     });
+  }
+
+  /**
+   * Processes forgot password form submission and sends reset email.
+   * Validates CSRF token and email, then calls cloud function to send reset email.
+   * @function processForgotPassword
+   * @param {object} req - Express request object with email in body.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} - Redirects with success/error message.
+   * @example
+   * // POST /auth/forgot-password
+   * // Body: { email: 'user@example.com', csrfToken: 'xyz123' }
+   * // Redirects to /auth/forgot-password with success message
+   */
+  async processForgotPassword(req, res) {
+    console.log('🎯 ========== FORGOT PASSWORD REQUEST START ==========');
+    console.log('🎯 DEBUG: processForgotPassword called in authController');
+    console.log('🎯 DEBUG: Request method:', req.method);
+    console.log('🎯 DEBUG: Request body:', JSON.stringify(req.body, null, 2));
+    console.log('🎯 DEBUG: Request route:', req.route?.path);
+    console.log('🎯 DEBUG: Request URL:', req.originalUrl);
+
+    try {
+      const { email } = req.body;
+      console.log('🎯 DEBUG: Extracted email:', email);
+      console.log('🎯 DEBUG: Email type:', typeof email);
+
+      // CSRF validation removed - forgot-password is a public endpoint
+      // Similar to login, it doesn't need CSRF protection since:
+      // 1. User isn't authenticated yet
+      // 2. No session state to protect
+      // 3. Worst case: attacker triggers password reset email (no harm)
+      console.log('🎯 DEBUG: CSRF validation skipped for forgot-password (public endpoint)');
+
+      // Validate email
+      if (!email || typeof email !== 'string') {
+        console.log('🎯 ERROR: Email validation failed - email is:', email);
+        return res.redirect(`/forgot-password?error=${
+          encodeURIComponent('Please provide a valid email address.')}`);
+      }
+
+      console.log('🎯 DEBUG: Email validation passed');
+
+      // Call cloud function to request password reset
+      console.log('🎯 DEBUG: About to call requestPasswordReset cloud function');
+      console.log('🎯 DEBUG: Sending email to cloud function:', email);
+
+      const result = await Parse.Cloud.run('requestPasswordReset', { email });
+
+      console.log('🎯 DEBUG: Cloud function returned successfully');
+      console.log('🎯 DEBUG: Cloud function result:', JSON.stringify(result, null, 2));
+
+      // Always show success message to prevent user enumeration
+      const message = result.message
+        || 'If an account exists with that email, password reset instructions have been sent.';
+
+      // Log the request
+      logger.info('Password reset requested', {
+        email: `${email.substring(0, 3)}***`,
+        sessionID: req.session.id,
+      });
+
+      console.log('🎯 DEBUG: Success message:', message);
+      console.log('🎯 DEBUG: Redirecting to /forgot-password with success');
+      console.log('🎯 ========== FORGOT PASSWORD REQUEST END ==========');
+
+      // Redirect with success message
+      return res.redirect(`/forgot-password?success=${encodeURIComponent(message)}`);
+    } catch (error) {
+      console.log('🎯 ERROR: Exception caught in processForgotPassword');
+      console.log('🎯 ERROR: Error message:', error.message);
+      console.log('🎯 ERROR: Error stack:', error.stack);
+      console.log('🎯 ERROR: Full error object:', error);
+
+      logger.error('Forgot password processing error:', {
+        error: error.message,
+        stack: error.stack,
+      });
+
+      console.log('🎯 ========== FORGOT PASSWORD REQUEST ERROR END ==========');
+
+      // Don't expose specific errors to prevent information disclosure
+      return res.redirect(`/forgot-password?error=${
+        encodeURIComponent('An error occurred. Please try again later.')}`);
+    }
   }
 
   /**
@@ -805,7 +950,7 @@ class AuthController {
     const { token } = req.query;
 
     if (!token) {
-      return res.redirect(`/auth/forgot-password?error=${encodeURIComponent('Invalid or missing reset token')}`);
+      return res.redirect(`/forgot-password?error=${encodeURIComponent('Invalid or missing reset token')}`);
     }
 
     res.render('auth/reset-password', {

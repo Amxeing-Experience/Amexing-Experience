@@ -14,7 +14,7 @@ const logger = require('../../infrastructure/logger');
 const { PermissionContextService } = require('./PermissionContextService');
 const { PermissionInheritanceService } = require('./PermissionInheritanceService');
 const { PermissionAuditService } = require('./PermissionAuditService');
-const { CorporateOAuthService } = require('./CorporateOAuthService');
+const CorporateOAuthService = require('./CorporateOAuthService');
 
 /**
  * Department OAuth Flow Service - Manages department-specific OAuth authentication flows.

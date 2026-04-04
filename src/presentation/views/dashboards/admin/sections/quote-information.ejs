@@ -34,86 +34,70 @@
                     Información del Cliente
                 </h6>
 
+                <% 
+                // Determine if dropdown should be disabled
+                const isRestrictedRole = (typeof userRole !== 'undefined' && (userRole === 'department_manager' || userRole === 'client'));
+                const helpTextMessage = isRestrictedRole 
+                    ? 'Cliente asignado automáticamente según tu rol' 
+                    : 'Selecciona un cliente existente o crea uno nuevo';
+                %>
+
                 <div class="row">
-                    <div class="col-md-12 mb-3">
-                        <% if (typeof userRole !== 'undefined' && (userRole === 'department_manager' || userRole === 'client')) { %>
-                            <!-- Department Manager/Client: Select from their owned clients -->
-                            <%- include('../../../atoms/common/tom-select', {
-                                id: 'clientId',
-                                name: 'clientId',
-                                multiple: false,
-                                placeholder: 'Buscar cliente por nombre',
-                                label: 'Cliente',
-                                required: true,
-                                helpText: 'Selecciona uno de tus clientes o crea uno nuevo',
-                                options: [],
-                                selected: []
-                            }) %>
-                            <!-- <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
-                                <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
-                            </button> -->
-                        <% } else { %>
-                            <!-- Admin/SuperAdmin: Client selection -->
-                            <%- include('../../../atoms/common/tom-select', {
-                                id: 'clientId',
-                                name: 'clientId',
-                                multiple: false,
-                                placeholder: 'Buscar cliente por nombre o empresa',
-                                label: 'Cliente',
-                                required: true,
-                                helpText: 'Selecciona un cliente existente o crea uno nuevo',
-                                options: [],
-                                selected: []
-                            }) %>
-                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
-                                <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
-                            </button>
-                        <% } %>
+                    <div class="col-md-<%= isRestrictedRole ? '12' : '10' %>">
+                        <!-- Client selection - disabled for department_manager/client roles -->
+                        <%- include('../../../atoms/common/tom-select', {
+                            id: 'clientId',
+                            name: 'clientId',
+                            multiple: false,
+                            placeholder: 'Buscar cliente por nombre o empresa',
+                            label: 'Cliente',
+                            required: true,
+                            helpText: helpTextMessage,
+                            options: [],
+                            selected: [],
+                            disabled: isRestrictedRole
+                        }) %>
                     </div>
+                    <% if (!isRestrictedRole) { %>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-outline-primary w-100 px-2 py-2" id="createQuickClientBtn">
+                            <i class="ti ti-plus me-1"></i>Crear Cliente
+                        </button>
+                    </div>
+                    <% } %>
                 </div>
             </div>
-
-            <!-- Sección: Detalles del Evento -->
+                
+            <!-- Ownership and Sharing Controls -->
             <div class="mb-4">
-                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                    <i class="ti ti-calendar-event me-1"></i>
-                    Detalles del Evento
-                </h6>
-
-                <div class="row">
-                    <div class="col-md-8 mb-3">
-                        <label for="eventType" class="form-label">Tipo de Evento / Motivo <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="eventType" name="eventType"
-                               placeholder="Ej: Experiencias para despedida de soltera" required>
-                        <div class="form-text">Describe el tipo de evento o el motivo del viaje</div>
-                        <div class="invalid-feedback">Por favor ingresa el tipo de evento o motivo</div>
+                <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded border">
+                    <!-- Left: Owner Info -->
+                    <div class="d-flex align-items-center">
+                        <div class="badge bg-secondary me-3">
+                            <i class="ti ti-user me-1"></i>
+                            Propietario
+                        </div>
+                        <div>
+                            <div class="fw-medium" id="compactOwnerName">
+                                <div class="placeholder-glow" id="ownerLoader">
+                                    <span class="placeholder col-6 placeholder-sm"></span>
+                                </div>
+                            </div>
+                            <small class="text-muted" id="compactOwnerEmail">
+                                <div class="placeholder-glow" id="ownerEmailLoader">
+                                    <span class="placeholder col-8 placeholder-xs"></span>
+                                </div>
+                            </small>
+                        </div>
                     </div>
-
-                    <div class="col-md-4 mb-3">
-                        <label for="preferredLanguage" class="form-label">Idioma de Preferencia</label>
-                        <select class="form-select" id="preferredLanguage" name="preferredLanguage">
-                            <option value="es">Español</option>
-                            <option value="en">Inglés</option>
-                        </select>
-                    </div>
+                    
+                    <!-- Right: Compartir Button -->
+                    <button type="button" class="btn btn-primary" id="btnManageCollaborators">
+                        <i class="ti ti-user-plus me-1"></i>
+                        Compartir
+                    </button>
                 </div>
-
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label for="numberOfAdults" class="form-label">Número de adultos (12+) <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control quote-people-input" id="numberOfAdults" name="numberOfAdults" min="0" value="0">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="numberOfChildren" class="form-label">Número de niños (3-12)</label>
-                        <input type="number" class="form-control quote-people-input" id="numberOfChildren" name="numberOfChildren" min="0" value="0">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="numberOfInfants" class="form-label">Número de infantes (0-2)</label>
-                        <input type="number" class="form-control quote-people-input" id="numberOfInfants" name="numberOfInfants" min="0" value="0">
-                    </div>
-                </div>
-                <input type="hidden" id="numberOfPeople" name="numberOfPeople" value="0">
-            </div>
 
             <!-- Sección: Información de Contacto -->
             <div class="mb-4">
@@ -128,13 +112,40 @@
                     </div>
                 </div>
 
+                <!-- Final Client Selection -->
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <%- include('../../../atoms/common/tom-select', {
+                            id: 'clientFinalId',
+                            name: 'clientFinalId',
+                            multiple: false,
+                            placeholder: 'Seleccionar cliente final (opcional)',
+                            label: 'Cliente Final',
+                            required: false,
+                            helpText: 'Selecciona un cliente final específico para prellenar la información de contacto',
+                            options: [],
+                            selected: []
+                        }) %>
+                    </div>
+                </div>
+
+                <!-- Contact Name Fields -->
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label for="contactPerson" class="form-label">Persona de Contacto</label>
-                        <input type="text" class="form-control" id="contactPerson" name="contactPerson" placeholder="Nombre completo">
-                        <div class="form-text">Nombre de la persona que recibirá la cotización</div>
+                        <label for="contactFirstName" class="form-label">Nombre</label>
+                        <input type="text" class="form-control" id="contactFirstName" name="contactFirstName" placeholder="Nombre">
+                        <div class="form-text">Nombre de la persona de contacto</div>
                     </div>
 
+                    <div class="col-md-6 mb-3">
+                        <label for="contactLastName" class="form-label">Apellido</label>
+                        <input type="text" class="form-control" id="contactLastName" name="contactLastName" placeholder="Apellido">
+                        <div class="form-text">Apellido de la persona de contacto</div>
+                    </div>
+                </div>
+
+                <!-- Contact Email and Phone -->
+                <div class="row">
                     <div class="col-md-6">
                         <%- include('../../../atoms/common/email-input', {
                             name: 'contactEmail',
@@ -159,6 +170,50 @@
                         }) %>
                     </div>
                 </div>
+            </div>
+
+            <!-- Sección: Detalles del Evento -->
+            <div class="mb-4">
+                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                    <i class="ti ti-calendar-event me-1"></i>
+                    Detalles del Evento
+                </h6>
+
+                <div class="row">
+                    <div class="col-md-8 mb-3">
+                        <label for="eventType" class="form-label">Tipo de Evento / Motivo</label>
+                        <input type="text" class="form-control" id="eventType" name="eventType"
+                               placeholder="Ej: Experiencias para despedida de soltera">
+                        <div class="form-text">Describe el tipo de evento o el motivo del viaje</div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <%- include('../../../atoms/common/language-select', {
+                            id: 'preferredLanguage',
+                            name: 'preferredLanguage',
+                            label: 'Idioma de Preferencia',
+                            required: false,
+                            helpText: 'Idioma preferido para comunicación y documentos',
+                            value: 'es'
+                        }) %>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="numberOfAdults" class="form-label">Número de adultos (12+)</label>
+                        <input type="number" class="form-control quote-people-input" id="numberOfAdults" name="numberOfAdults" min="0" placeholder="0">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="numberOfChildren" class="form-label">Número de niños (3-12)</label>
+                        <input type="number" class="form-control quote-people-input" id="numberOfChildren" name="numberOfChildren" min="0" placeholder="0">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="numberOfInfants" class="form-label">Número de infantes (0-2)</label>
+                        <input type="number" class="form-control quote-people-input" id="numberOfInfants" name="numberOfInfants" min="0" placeholder="0">
+                    </div>
+                </div>
+                <input type="hidden" id="numberOfPeople" name="numberOfPeople" value="0">
             </div>
 
             <!-- Sección: Notas Adicionales -->
@@ -293,6 +348,17 @@
         phone: '<%= typeof user !== "undefined" && user ? user.phone || "" : "" %>',
         clientId: '<%= typeof user !== "undefined" && user ? user.clientId || "" : "" %>'
     };
+    
+    // Make currentUserData available globally for other scripts
+    window.currentUserData = currentUserData;
+    
+    // Also set currentUser if not already set (for compatibility with ownership manager)
+    if (!window.currentUser) {
+        window.currentUser = {
+            role: userRole,
+            id: currentUserData.id
+        };
+    }
 
     // Get JWT token from cookies
     function getAccessToken() {
@@ -306,20 +372,60 @@
         return null;
     }
 
-    // Helper function to wait for Tom Select to be initialized
-    function waitForTomSelect(elementId, maxAttempts = 50) {
+    // Helper function to wait for Custom Select to be initialized  
+    function waitForTomSelect(elementId, maxAttempts = 100) {
         return new Promise((resolve, reject) => {
+            const element = document.getElementById(elementId);
+            
+            // For department_manager and client roles, clientId is just a hidden input
+            if (elementId === 'clientId' && (userRole === 'department_manager' || userRole === 'client')) {
+                // Return a mock object that works like TomSelect for the hidden input
+                resolve({
+                    getValue: () => element.value,
+                    setValue: (val) => { element.value = val; },
+                    addOption: () => {}, // no-op
+                    clearOptions: () => {}, // no-op
+                    options: {},
+                    refreshOptions: () => {} // no-op
+                });
+                return;
+            }
+            
+            // Check if already initialized (support both tomselect and customSelect)
+            if (element && (element.tomselect || element.customSelect)) {
+                resolve(element.tomselect || element.customSelect);
+                return;
+            }
+            
+            // Listen for the ready event
+            const handleReady = (e) => {
+                element.removeEventListener('tomselect:ready', handleReady);
+                clearInterval(checkInterval);
+                resolve(e.detail.instance);
+            };
+            
+            if (element) {
+                element.addEventListener('tomselect:ready', handleReady);
+            }
+            
+            // Also poll as a fallback
             let attempts = 0;
             const checkInterval = setInterval(() => {
-                const element = document.getElementById(elementId);
-                if (element && element.tomselect) {
+                const el = document.getElementById(elementId);
+                if (el && (el.tomselect || el.customSelect)) {
+                    if (element) {
+                        element.removeEventListener('tomselect:ready', handleReady);
+                    }
                     clearInterval(checkInterval);
-                    resolve(element.tomselect);
+                    resolve(el.tomselect || el.customSelect);
                 } else {
                     attempts++;
                     if (attempts >= maxAttempts) {
+                        if (element) {
+                            element.removeEventListener('tomselect:ready', handleReady);
+                        }
                         clearInterval(checkInterval);
-                        reject(new Error(`Tom Select not initialized on #${elementId}`));
+                        reject(new Error(`Custom Select not initialized on #${elementId} after ${maxAttempts} attempts`));
                     }
                 }
             }, 100);
@@ -381,11 +487,16 @@
     // Load current user info for department manager / client role
     async function loadCurrentUserAsClient() {
         try {
+            const clientField = document.getElementById('clientId');
+            if (!clientField) return;
+            
+            let clientUserId = null;
+            let clientName = '';
+            
             // For client role, use the clientId (org owner) instead of current user
             if (userRole === 'client' && currentUserData.clientId) {
-                const clientUserId = currentUserData.clientId;
-                document.getElementById('clientId').value = clientUserId;
-
+                clientUserId = currentUserData.clientId;
+                
                 // Fetch org owner's name from API
                 try {
                     const token = getAccessToken();
@@ -395,55 +506,85 @@
                     if (resp.ok) {
                         const result = await resp.json();
                         const owner = result.data || result;
-                        const ownerName = [owner.firstName, owner.lastName].filter(Boolean).join(' ') || owner.companyName || owner.email || 'Cliente';
-                        document.getElementById('currentUserName').textContent = ownerName;
+                        clientName = [owner.firstName, owner.lastName].filter(Boolean).join(' ') || owner.companyName || owner.email || 'Cliente';
                     } else {
-                        document.getElementById('currentUserName').textContent = 'Cliente';
+                        clientName = 'Cliente';
                     }
                 } catch {
-                    document.getElementById('currentUserName').textContent = 'Cliente';
+                    clientName = 'Cliente';
                 }
-
-                // Auto-fill contact info from current user
-                const fullName = `${currentUserData.firstName || ''} ${currentUserData.lastName || ''}`.trim();
-                if (fullName) document.getElementById('contactPerson').value = fullName;
-                if (currentUserData.email) document.getElementById('contactEmail').value = currentUserData.email;
-                if (currentUserData.phone) document.getElementById('contactPhone').value = currentUserData.phone;
+            } else if (userRole === 'department_manager' && currentUserData.id) {
+                // Department manager: use current user as client
+                clientUserId = currentUserData.id;
+                clientName = currentUserData.name || 
+                            `${currentUserData.firstName || ''} ${currentUserData.lastName || ''}`.trim() || 
+                            currentUserData.email || 
+                            'Usuario actual';
+            } else {
+                console.error('No client ID available for restricted role');
                 return;
             }
-
-            // Department manager: use current user as client
-            if (currentUserData.id) {
-                const displayName = currentUserData.name || currentUserData.email || 'Usuario actual';
-                document.getElementById('currentUserName').textContent = displayName;
-                document.getElementById('clientId').value = currentUserData.id;
-
-                if (currentUserData.firstName || currentUserData.lastName) {
-                    const fullName = `${currentUserData.firstName || ''} ${currentUserData.lastName || ''}`.trim();
-                    if (fullName) document.getElementById('contactPerson').value = fullName;
+            
+            // Set the value in the hidden input
+            clientField.value = clientUserId;
+            
+            // Update the display if using custom dropdown
+            const displayElement = document.getElementById('clientId_display');
+            if (displayElement) {
+                const textSpan = displayElement.querySelector('.dropdown-selected-text');
+                if (textSpan) {
+                    textSpan.textContent = clientName;
+                    textSpan.classList.remove('text-muted');
                 }
-                if (currentUserData.email) document.getElementById('contactEmail').value = currentUserData.email;
-                if (currentUserData.phone) document.getElementById('contactPhone').value = currentUserData.phone;
-            } else {
-                document.getElementById('currentUserName').textContent = 'Usuario no disponible';
+                
+                // Add the option to the dropdown if it doesn't exist
+                const optionsContainer = document.getElementById('clientId_options');
+                if (optionsContainer && !optionsContainer.querySelector(`[data-value="${clientUserId}"]`)) {
+                    const optionHtml = `<a class="dropdown-item dropdown-option" href="#" data-value="${clientUserId}" data-text="${clientName}">${clientName}</a>`;
+                    optionsContainer.innerHTML = optionHtml;
+                }
             }
+            
+            // If the custom dropdown has a setValue method, use it
+            if (clientField.customSelect && clientField.customSelect.setValue) {
+                clientField.customSelect.setValue(clientUserId);
+            }
+            
+            // Auto-fill contact info from current user
+            if (currentUserData.firstName || currentUserData.lastName) {
+                const firstName = currentUserData.firstName || '';
+                const lastName = currentUserData.lastName || '';
+                if (firstName) document.getElementById('contactFirstName').value = firstName;
+                if (lastName) document.getElementById('contactLastName').value = lastName;
+            }
+            if (currentUserData.email) document.getElementById('contactEmail').value = currentUserData.email;
+            if (currentUserData.phone) document.getElementById('contactPhone').value = currentUserData.phone;
+            
         } catch (error) {
-            console.error('Error loading current user:', error);
-            document.getElementById('currentUserName').textContent = 'Error al cargar usuario';
+            console.error('Error loading current user as client:', error);
         }
     }
 
-    // Load active clients for Tom Select
-    async function loadActiveClients() {
+    // Load active clients for Tom Select with optional search
+    // Make this function globally available for the custom dropdown component
+    window.loadActiveClients = async function loadActiveClients(searchTerm = '', page = 1) {
+        // Skip loading clients for department_manager and client roles (they don't see the dropdown)
+        if (userRole === 'department_manager' || userRole === 'client') {
+            return;
+        }
+        
         try {
-            // Use different endpoint based on user role
-            const endpoint = (userRole === 'department_manager' || userRole === 'client') 
-                ? '/api/owned-clients/active' 
-                : '/api/clients/active';
+            const endpoint = '/api/clients/active';
             
-            console.log('🔍 DEBUG: Loading clients from endpoint:', endpoint);
+            // Build query parameters
+            const params = new URLSearchParams();
+            if (searchTerm) params.append('search', searchTerm);
+            params.append('page', page.toString());
+            params.append('limit', '100'); // Get 100 results per search
             
-            const response = await fetch(endpoint, {
+            const url = `${endpoint}${params.toString() ? '?' + params.toString() : ''}`;
+            
+            const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${getAccessToken()}`,
@@ -452,21 +593,69 @@
             });
 
             const result = await response.json();
-            console.log('🔍 DEBUG: Clients API response:', result);
+            
+            console.log('🌐 API Response from /api/clients/active:', {
+                success: result.success,
+                dataStructure: result.data ? Object.keys(result.data) : null,
+                clientsCount: result.data?.clients?.length || result.data?.length || 0,
+                firstClient: result.data?.clients?.[0] || result.data?.[0] || null
+            });
 
             if (result.success && result.data) {
-                console.log('🔍 DEBUG: Number of clients loaded:', result.data.length);
                 const clientTS = await waitForTomSelect('clientId');
 
-                // Clear existing options
-                clientTS.clearOptions();
+                // For server-side search, clear options only on new search (page 1)
+                if (page === 1) {
+                    clientTS.clearOptions();
+                }
 
+                // Handle different response formats
+                const clients = result.data.clients || result.data;
+                
+                console.log('📦 Clients array to process:', {
+                    count: clients.length,
+                    sample: clients.slice(0, 3).map(c => ({
+                        label: c.label,
+                        value: c.value,
+                        email: c.email
+                    }))
+                });
+                
                 // Add client options
-                result.data.forEach(client => {
-                    console.log('🔍 DEBUG: Adding client option:', client);
+                clients.forEach(client => {
+                    console.log('🔍 Processing client for dropdown:', {
+                        raw: client,
+                        label: client.label,
+                        value: client.value,
+                        contactPerson: client.contactPerson
+                    });
+                    
+                    // Smart display logic:
+                    // 1. If label has company name in parentheses, prioritize company name
+                    // 2. If no parentheses but label looks like "FirstName LastName", keep as is
+                    // 3. Otherwise use the full label
+                    let displayText = client.label;
+                    const parenthesesMatch = client.label.match(/^(.+?)\s*\(([^)]+)\)$/);
+                    
+                    if (parenthesesMatch && parenthesesMatch[2]) {
+                        // Has format "Name (Company)" - use company name
+                        displayText = parenthesesMatch[2];
+                        console.log('✅ Using company name from parentheses:', displayText);
+                    } else if (!client.label.includes('(')) {
+                        // No parentheses - likely just the company or person name, use as is
+                        displayText = client.label;
+                        console.log('ℹ️ No parentheses found, using label as-is:', displayText);
+                    }
+                    
+                    console.log('📋 Final display text for client:', {
+                        clientId: client.value,
+                        displayText: displayText,
+                        originalLabel: client.label
+                    });
+                    
                     clientTS.addOption({
                         value: client.value,
-                        text: client.label,
+                        text: displayText,
                         email: client.email,
                         contactPerson: client.contactPerson,
                         phone: client.phone
@@ -475,43 +664,320 @@
 
                 // Refresh to apply changes
                 clientTS.refreshOptions(false);
-                console.log('🔍 DEBUG: Client options loaded and refreshed');
+                
+                // Return pagination info for possible future use
+                return {
+                    hasMore: result.data.pagination?.hasMore || false,
+                    total: result.data.pagination?.total || clients.length
+                };
             } else {
-                console.log('🔍 DEBUG: No client data or API error:', result);
+                console.error('No client data or API error:', result);
+                return { hasMore: false, total: 0 };
             }
         } catch (error) {
             console.error('Error loading clients:', error);
             showAlert('quoteInformationAlerts', 'Error al cargar la lista de clientes', 'danger');
+            return { hasMore: false, total: 0 };
+        }
+    }
+
+    // Load sub-clients (final clients) when a client is selected
+    async function loadClientEmployees(clientId, selectedClientFinalId = null) {
+        try {
+            if (!clientId) {
+                // Clear sub-client dropdown if no client selected
+                const employeeTS = await waitForTomSelect('clientFinalId');
+                employeeTS.clearOptions();
+                employeeTS.addOption({ value: '', text: 'No hay clientes disponibles' });
+                employeeTS.setValue('');
+                return;
+            }
+
+            // Fetch sub-clients for this client
+            const response = await fetch(`/api/clients/${clientId}/sub-clients`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+            
+            console.log('🏢 Sub-clients API Response:', {
+                clientId: clientId,
+                success: result.success,
+                clientsCount: result.data?.clients?.length || 0,
+                clients: result.data?.clients?.map(client => ({
+                    id: client.id,
+                    name: client.name,
+                    companyName: client.companyName,
+                    contactPerson: client.contactPerson,
+                    email: client.email,
+                    phone: client.phone,
+                    preferredLanguage: client.preferredLanguage
+                }))
+            });
+
+            if (result.success && result.data?.clients && result.data.clients.length > 0) {
+                const employeeTS = await waitForTomSelect('clientFinalId');
+                employeeTS.clearOptions();
+                
+                // Add empty option first
+                employeeTS.addOption({ value: '', text: 'Seleccionar cliente final (opcional)' });
+                
+                // Add sub-client options
+                result.data.clients.forEach(client => {
+                    // Build display name - prioritize company name, then contact person, then constructed name
+                    let displayName = client.companyName || 
+                                     client.name || 
+                                     client.contactPerson ||
+                                     `${client.firstName || ''} ${client.lastName || ''}`.trim() || 
+                                     client.email;
+                    
+                    employeeTS.addOption({
+                        value: client.id,
+                        text: displayName,
+                        email: client.email,
+                        contactPerson: client.contactPerson || displayName,
+                        firstName: client.firstName || '',
+                        lastName: client.lastName || '',
+                        phone: client.phone || '',
+                        preferredLanguage: client.preferredLanguage || 'es'
+                    });
+                });
+                
+                employeeTS.refreshOptions(false);
+                
+                // If a specific clientFinalId was provided, set it now
+                if (selectedClientFinalId) {
+                    console.log('🔍 Attempting to set clientFinalId:', {
+                        selectedClientFinalId: selectedClientFinalId,
+                        selectedType: typeof selectedClientFinalId,
+                        availableOptions: result.data.clients.map(c => ({
+                            id: c.id,
+                            idType: typeof c.id,
+                            name: c.name || c.companyName
+                        }))
+                    });
+                    
+                    // Check if the option exists
+                    const optionExists = employeeTS.getOption && employeeTS.getOption(selectedClientFinalId);
+                    console.log('🔍 getOption result:', {
+                        optionExists: !!optionExists,
+                        optionDetails: optionExists
+                    });
+                    
+                    if (optionExists) {
+                        console.log('✅ Option found, setting value...');
+                        employeeTS.setValue(selectedClientFinalId);
+                        
+                        // Verify it was set
+                        setTimeout(() => {
+                            const currentValue = employeeTS.getValue();
+                            console.log('✅ Verification - current value:', currentValue);
+                        }, 100);
+                    } else {
+                        console.log('⚠️ Cliente Final option not found in dropdown');
+                        // Try to find a matching option manually
+                        const manualFind = result.data.clients.find(c => c.id === selectedClientFinalId);
+                        console.log('🔍 Manual find result:', manualFind);
+                    }
+                }
+            } else {
+                // No sub-clients found
+                const employeeTS = await waitForTomSelect('clientFinalId');
+                employeeTS.clearOptions();
+                employeeTS.addOption({ value: '', text: 'No hay clientes disponibles' });
+                employeeTS.setValue('');
+            }
+        } catch (error) {
+            console.error('Error loading sub-clients:', error);
+            // Clear dropdown on error
+            try {
+                const employeeTS = await waitForTomSelect('clientFinalId');
+                employeeTS.clearOptions();
+                employeeTS.addOption({ value: '', text: 'Error al cargar clientes' });
+                employeeTS.setValue('');
+            } catch (e) {
+                console.error('Error clearing sub-client dropdown:', e);
+            }
         }
     }
 
     // Auto-fill contact information when client is selected (admin/superadmin only)
     async function handleClientSelection() {
         try {
-            // Skip if Tom Select element doesn't exist (department_manager case)
-            if (!document.querySelector('#clientId.tomselect')) return;
+            // Get the hidden input element for client
+            const clientInput = document.getElementById('clientId');
+            if (!clientInput) {
+                console.log('Client input not found');
+                return;
+            }
             
-            const clientTS = await waitForTomSelect('clientId');
-
-            clientTS.on('change', function(value) {
+            // Listen for change events on the hidden input
+            clientInput.addEventListener('change', async function(event) {
+                const value = event.target.value;
+                
                 if (value) {
-                    // Get selected option data
-                    const option = this.options[value];
-                    if (option) {
-                        // Auto-fill contact fields
-                        document.getElementById('contactPerson').value = option.contactPerson || '';
-                        document.getElementById('contactEmail').value = option.email || '';
-                        document.getElementById('contactPhone').value = option.phone || '';
+                    // Load employees for the selected client
+                    loadClientEmployees(value);
+                    
+                    try {
+                        // Get the custom select instance to access options
+                        const clientTS = await waitForTomSelect('clientId');
+                        const option = clientTS.options ? clientTS.options[value] : null;
+                        
+                        if (option) {
+                            // Parse contactPerson into first and last name
+                            let firstName = '';
+                            let lastName = '';
+                            
+                            if (option.contactPerson) {
+                                const nameParts = option.contactPerson.trim().split(/\s+/);
+                                if (nameParts.length === 1) {
+                                    firstName = nameParts[0];
+                                } else if (nameParts.length >= 2) {
+                                    firstName = nameParts[0];
+                                    lastName = nameParts.slice(1).join(' ');
+                                }
+                            }
+                            
+                            // Auto-fill contact fields
+                            document.getElementById('contactFirstName').value = firstName;
+                            document.getElementById('contactLastName').value = lastName;
+                            document.getElementById('contactEmail').value = option.email || '';
+                            
+                            // Strip country code from phone if present
+                            let phoneNumber = option.phone || '';
+                            if (phoneNumber.startsWith('52') && phoneNumber.length > 10) {
+                                // Remove Mexico country code
+                                phoneNumber = phoneNumber.substring(2);
+                            } else if (phoneNumber.startsWith('1') && phoneNumber.length === 11) {
+                                // Remove US/Canada country code
+                                phoneNumber = phoneNumber.substring(1);
+                            }
+                            document.getElementById('contactPhone').value = phoneNumber;
+                        }
+                    } catch (error) {
+                        console.error('Error getting client data:', error);
                     }
                 } else {
-                    // Clear contact fields when no client selected
-                    document.getElementById('contactPerson').value = '';
+                    // Clear contact fields and employees when no client selected
+                    document.getElementById('contactFirstName').value = '';
+                    document.getElementById('contactLastName').value = '';
                     document.getElementById('contactEmail').value = '';
                     document.getElementById('contactPhone').value = '';
+                    
+                    // Clear employee dropdown
+                    loadClientEmployees(null);
                 }
             });
         } catch (error) {
             console.error('Error setting up client selection handler:', error);
+        }
+    }
+
+    // Handle employee selection to auto-fill contact fields
+    async function handleEmployeeSelection() {
+        try {
+            console.log('🔧 Setting up Cliente Final selection handler...');
+            
+            // Wait for the hidden input element
+            const employeeInput = document.getElementById('clientFinalId');
+            if (!employeeInput) {
+                console.log('❌ Employee input not found');
+                return;
+            }
+            
+            console.log('✅ Employee input found, adding event listener...');
+
+            // Listen for change events on the hidden input
+            employeeInput.addEventListener('change', async function(event) {
+                console.log('🔄 Cliente Final selection changed:', event.target.value);
+                const value = event.target.value;
+                
+                if (value) {
+                    try {
+                        // Get the custom select instance - try both methods
+                        const employeeInput = document.getElementById('clientFinalId');
+                        let option = null;
+                        
+                        // First try the customSelect property
+                        if (employeeInput.customSelect) {
+                            console.log('📊 Using customSelect property');
+                            option = employeeInput.customSelect.getOption(value);
+                        }
+                        
+                        // If that didn't work, try waitForTomSelect
+                        if (!option) {
+                            const employeeTS = await waitForTomSelect('clientFinalId');
+                            console.log('📊 Using waitForTomSelect, instance:', employeeTS);
+                            console.log('📋 Available options:', employeeTS.options);
+                            option = employeeTS.options ? employeeTS.options[value] : null;
+                        }
+                        
+                        console.log('🎯 Selected option data:', option);
+                        
+                        if (option) {
+                            console.log('🎯 Auto-filling from Cliente Final:', option);
+                            
+                            // Parse name into first and last name
+                            let firstName = '';
+                            let lastName = '';
+                            
+                            // Check if we have separate firstName/lastName in the option
+                            if (option.firstName || option.lastName) {
+                                firstName = option.firstName || '';
+                                lastName = option.lastName || '';
+                            } else if (option.contactPerson) {
+                                // Split contactPerson into parts
+                                const nameParts = option.contactPerson.trim().split(/\s+/);
+                                if (nameParts.length === 1) {
+                                    firstName = nameParts[0];
+                                } else if (nameParts.length === 2) {
+                                    firstName = nameParts[0];
+                                    lastName = nameParts[1];
+                                } else if (nameParts.length > 2) {
+                                    // Handle names with multiple parts
+                                    firstName = nameParts[0];
+                                    lastName = nameParts.slice(1).join(' ');
+                                }
+                            }
+                            
+                            // Auto-fill contact name fields
+                            document.getElementById('contactFirstName').value = firstName;
+                            document.getElementById('contactLastName').value = lastName;
+                            
+                            // Auto-fill email and phone
+                            document.getElementById('contactEmail').value = option.email || '';
+                            
+                            // Strip country code from phone if present
+                            let phoneNumber = option.phone || '';
+                            if (phoneNumber.startsWith('52') && phoneNumber.length > 10) {
+                                // Remove Mexico country code
+                                phoneNumber = phoneNumber.substring(2);
+                            } else if (phoneNumber.startsWith('1') && phoneNumber.length === 11) {
+                                // Remove US/Canada country code
+                                phoneNumber = phoneNumber.substring(1);
+                            }
+                            document.getElementById('contactPhone').value = phoneNumber;
+                            
+                            // Auto-fill preferred language
+                            if (option.preferredLanguage) {
+                                document.getElementById('preferredLanguage').value = option.preferredLanguage;
+                                console.log('✅ Language preference set to:', option.preferredLanguage);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error getting employee data:', error);
+                    }
+                } else {
+                    // Don't clear fields when no employee selected (keep client defaults)
+                }
+            });
+        } catch (error) {
+            console.error('Error setting up employee selection handler:', error);
         }
     }
 
@@ -607,7 +1073,6 @@
     // Load existing quote data
     async function loadQuoteData(quoteId) {
         try {
-            console.log('🔍 DEBUG: Loading quote data for ID:', quoteId);
             const response = await fetch(`/api/quotes/${quoteId}`, {
                 method: 'GET',
                 headers: {
@@ -617,18 +1082,12 @@
             });
 
             const result = await response.json();
-            console.log('🔍 DEBUG: Quote API response:', result);
 
             if (result.success && result.data) {
                 const quote = result.data;
-                console.log('🔍 DEBUG: Quote data:', quote);
-                console.log('🔍 DEBUG: Client data in quote:', quote.client);
 
                 // Handle client population - DUAL FIELD ARCHITECTURE
                 const clientTS = await waitForTomSelect('clientId');
-                console.log('🔍 DEBUG: TomSelect instance ready:', clientTS);
-                console.log('🔍 DEBUG: companyClientPtr in quote:', quote.companyClientPtr);
-                console.log('🔍 DEBUG: client in quote:', quote.client);
                 
                 // Role-based client field prioritization
                 let selectedClientId = null;
@@ -639,46 +1098,115 @@
                     if (quote.client && quote.client.id) {
                         selectedClientId = quote.client.id;
                         selectedClientData = quote.client;
-                        console.log('🔍 DEBUG: Admin role - Using legacy client field:', selectedClientId);
                     } else if (quote.companyClientPtr && quote.companyClientPtr.id) {
                         selectedClientId = quote.companyClientPtr.id;
                         selectedClientData = quote.companyClientPtr;
-                        console.log('🔍 DEBUG: Admin role - Fallback to companyClientPtr:', selectedClientId);
                     }
                 } else {
                     // Hierarchical roles: prioritize companyClientPtr (Client objects)
                     if (quote.companyClientPtr && quote.companyClientPtr.id) {
                         selectedClientId = quote.companyClientPtr.id;
                         selectedClientData = quote.companyClientPtr;
-                        console.log('🔍 DEBUG: Hierarchical role - Using companyClientPtr:', selectedClientId);
                     } else if (quote.client && quote.client.id) {
                         selectedClientId = quote.client.id;
                         selectedClientData = quote.client;
-                        console.log('🔍 DEBUG: Hierarchical role - Fallback to legacy client:', selectedClientId);
                     }
                 }
                 
                 if (selectedClientId && selectedClientData) {
-                    console.log('🔍 DEBUG: Setting client ID:', selectedClientId);
+                    console.log('🔍 Loading quote client data:', {
+                        clientId: selectedClientId,
+                        clientData: selectedClientData,
+                        hasContextualData: !!selectedClientData.contextualData,
+                        contextualCompanyName: selectedClientData.contextualData?.companyName,
+                        directCompanyName: selectedClientData.companyName,
+                        firstName: selectedClientData.firstName,
+                        lastName: selectedClientData.lastName,
+                        fullName: selectedClientData.fullName,
+                        name: selectedClientData.name
+                    });
                     
-                    // First ensure the option exists in the dropdown
-                    if (!clientTS.getOption(selectedClientId)) {
-                        console.log('🔍 DEBUG: Adding missing client option to dropdown');
-                        // Add the client option if it doesn't exist
-                        clientTS.addOption({
-                            value: selectedClientId,
-                            text: selectedClientData.fullName || selectedClientData.name || `Cliente ${selectedClientId}`,
-                            email: selectedClientData.email || ''
-                        });
+                    // Build display text based on available data
+                    let displayText = '';
+                    
+                    // Check if we have contextualData with companyName
+                    if (selectedClientData.contextualData && selectedClientData.contextualData.companyName) {
+                        displayText = selectedClientData.contextualData.companyName;
+                        console.log('✅ Using contextualData.companyName:', displayText);
+                    } else if (selectedClientData.companyName) {
+                        displayText = selectedClientData.companyName;
+                        console.log('✅ Using direct companyName:', displayText);
                     } else {
-                        console.log('🔍 DEBUG: Client option already exists in dropdown');
+                        // Fall back to name fields
+                        const fullName = selectedClientData.fullName || 
+                                       selectedClientData.name || 
+                                       `${selectedClientData.firstName || ''} ${selectedClientData.lastName || ''}`.trim();
+                        displayText = fullName || `Cliente ${selectedClientId}`;
+                        console.log('⚠️ Falling back to person name:', displayText, {
+                            fullName: selectedClientData.fullName,
+                            name: selectedClientData.name,
+                            constructed: `${selectedClientData.firstName || ''} ${selectedClientData.lastName || ''}`.trim()
+                        });
                     }
                     
-                    // Set the selected value
-                    clientTS.setValue(selectedClientId);
-                    console.log('🔍 DEBUG: Client value set to:', selectedClientId);
+                    console.log('📋 Final display text for loaded quote client:', {
+                        clientId: selectedClientId,
+                        displayText: displayText
+                    });
+                    
+                    // TomSelect doesn't have updateOption, we need to remove and re-add
+                    // First check if the option already exists
+                    const existingOptions = clientTS.options;
+                    
+                    if (existingOptions && existingOptions[selectedClientId]) {
+                        // Store current value to restore selection
+                        const currentValue = clientTS.getValue();
+                        
+                        // Clear the current selection silently
+                        clientTS.clear(true);
+                        
+                        // Remove the old option
+                        delete clientTS.options[selectedClientId];
+                        
+                        // Add the updated option
+                        clientTS.addOption({
+                            value: selectedClientId,
+                            text: displayText,
+                            email: selectedClientData.email || '',
+                            contactPerson: selectedClientData.contactPerson || '',
+                            phone: selectedClientData.phone || ''
+                        });
+                        
+                        // Restore selection
+                        clientTS.setValue(selectedClientId);
+                    } else {
+                        // Add new option if it doesn't exist
+                        clientTS.addOption({
+                            value: selectedClientId,
+                            text: displayText,
+                            email: selectedClientData.email || '',
+                            contactPerson: selectedClientData.contactPerson || '',
+                            phone: selectedClientData.phone || ''
+                        });
+                        
+                        // Set the selected value
+                        clientTS.setValue(selectedClientId);
+                    }
                 } else {
-                    console.log('🔍 DEBUG: No client data in quote (neither companyClientPtr nor client)');
+                    // No client data in quote
+                }
+
+                // Load employees for the selected client (to populate the employee dropdown)
+                // Pass the clientFinalId if we have one so it can be selected after loading
+                console.log('🔍 Quote data for Cliente Final:', {
+                    hasClientFinalId: 'clientFinalId' in quote,
+                    clientFinalId: quote.clientFinalId,
+                    clientFinalIdType: typeof quote.clientFinalId,
+                    fullQuote: quote
+                });
+                
+                if (selectedClientId) {
+                    await loadClientEmployees(selectedClientId, quote.clientFinalId || null);
                 }
 
                 // Populate form fields
@@ -689,21 +1217,37 @@
                 if (quote.numberOfPeople) {
                     document.getElementById('numberOfPeople').value = quote.numberOfPeople;
                 }
-                if (quote.numberOfAdults !== undefined) {
+                if (quote.numberOfAdults !== undefined && quote.numberOfAdults !== 0) {
                     document.getElementById('numberOfAdults').value = quote.numberOfAdults;
                 }
-                if (quote.numberOfChildren !== undefined) {
+                if (quote.numberOfChildren !== undefined && quote.numberOfChildren !== 0) {
                     document.getElementById('numberOfChildren').value = quote.numberOfChildren;
                 }
-                if (quote.numberOfInfants !== undefined) {
+                if (quote.numberOfInfants !== undefined && quote.numberOfInfants !== 0) {
                     document.getElementById('numberOfInfants').value = quote.numberOfInfants;
                 }
                 if (quote.preferredLanguage) {
                     document.getElementById('preferredLanguage').value = quote.preferredLanguage;
                 }
 
-                if (quote.contactPerson) {
-                    document.getElementById('contactPerson').value = quote.contactPerson;
+                // Check for separate name fields first, fall back to splitting contactPerson
+                if (quote.contactFirstName || quote.contactLastName) {
+                    // Use separate fields if they exist
+                    document.getElementById('contactFirstName').value = quote.contactFirstName || '';
+                    document.getElementById('contactLastName').value = quote.contactLastName || '';
+                } else if (quote.contactPerson) {
+                    // Fall back to splitting contactPerson for backward compatibility
+                    const nameParts = quote.contactPerson.trim().split(/\s+/);
+                    if (nameParts.length === 1) {
+                        document.getElementById('contactFirstName').value = nameParts[0];
+                        document.getElementById('contactLastName').value = '';
+                    } else if (nameParts.length === 2) {
+                        document.getElementById('contactFirstName').value = nameParts[0];
+                        document.getElementById('contactLastName').value = nameParts[1];
+                    } else if (nameParts.length > 2) {
+                        document.getElementById('contactFirstName').value = nameParts[0];
+                        document.getElementById('contactLastName').value = nameParts.slice(1).join(' ');
+                    }
                 }
 
                 if (quote.contactEmail) {
@@ -711,7 +1255,17 @@
                 }
 
                 if (quote.contactPhone) {
-                    document.getElementById('contactPhone').value = quote.contactPhone;
+                    // Strip country code if present (for Mexico, it's 52)
+                    let phoneNumber = quote.contactPhone;
+                    // Check if phone starts with common country codes and remove them
+                    if (phoneNumber.startsWith('52') && phoneNumber.length > 10) {
+                        // Remove Mexico country code
+                        phoneNumber = phoneNumber.substring(2);
+                    } else if (phoneNumber.startsWith('1') && phoneNumber.length === 11) {
+                        // Remove US/Canada country code
+                        phoneNumber = phoneNumber.substring(1);
+                    }
+                    document.getElementById('contactPhone').value = phoneNumber;
                 }
 
                 if (quote.notes) {
@@ -753,7 +1307,24 @@
             return;
         }
 
+        // Get employee selection if any
+        let clientFinalId = null;
+        try {
+            const employeeTS = await waitForTomSelect('clientFinalId');
+            const value = employeeTS.getValue();
+            // Only set if there's an actual value
+            if (value && value !== '') {
+                clientFinalId = value;
+            }
+        } catch (e) {
+            console.log('Cliente Final dropdown not initialized yet');
+        }
+
         // Get form data
+        const firstName = document.getElementById('contactFirstName').value.trim();
+        const lastName = document.getElementById('contactLastName').value.trim();
+        const contactPerson = [firstName, lastName].filter(n => n).join(' ') || undefined;
+        
         const formData = {
             eventType: document.getElementById('eventType').value.trim() || undefined,
             numberOfPeople: document.getElementById('numberOfPeople').value ? parseInt(document.getElementById('numberOfPeople').value, 10) : undefined,
@@ -761,12 +1332,19 @@
             numberOfChildren: parseInt(document.getElementById('numberOfChildren').value || 0),
             numberOfInfants: parseInt(document.getElementById('numberOfInfants').value || 0),
             preferredLanguage: document.getElementById('preferredLanguage').value || 'es',
-            contactPerson: document.getElementById('contactPerson').value.trim() || undefined,
+            contactPerson: contactPerson,
+            contactFirstName: firstName || undefined,
+            contactLastName: lastName || undefined,
             contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
             contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
             notes: document.getElementById('notes').value.trim() || undefined
         };
 
+        // Only include clientFinalId if it has a value
+        if (clientFinalId) {
+            formData.clientFinalId = clientFinalId;
+        }
+        
         // Include status from global header segmented control if exists
         const checkedStatus = document.querySelector('input[name="quoteStatus"]:checked');
         if (checkedStatus) {
@@ -794,11 +1372,12 @@
             if (result.success) {
                 showAlert('quoteInformationAlerts', 'Cotización actualizada exitosamente', 'success');
 
-                // Keep the button disabled for a moment
+                // Redirect to quote detail page with services section (use appropriate dashboard path)
+                const dashboardPathMap = { department_manager: '/dashboard/department_manager', client: '/dashboard/client' };
+                const dashboardPath = dashboardPathMap[userRole] || '/dashboard/admin';
                 setTimeout(() => {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = originalText;
-                }, 2000);
+                    window.location.href = `${dashboardPath}/quotes/${quoteId}?section=services`;
+                }, 1500);
             } else {
                 showAlert('quoteInformationAlerts', result.error || 'Error al actualizar la cotización', 'danger');
                 submitBtn.disabled = false;
@@ -815,6 +1394,15 @@
     // Create quote
     async function createQuote(event) {
         event.preventDefault();
+
+        // Defensive check - if quote already exists, update instead
+        const quoteIdField = document.getElementById('quoteId');
+        const existingQuoteId = quoteIdField?.value;
+        
+        if (existingQuoteId && existingQuoteId.trim() !== '' && existingQuoteId !== 'new') {
+            console.warn('createQuote() called but quote already exists, calling updateQuote instead:', existingQuoteId);
+            return updateQuote(existingQuoteId, event);
+        }
 
         const form = document.getElementById('quoteInformationForm');
 
@@ -835,7 +1423,24 @@
             return;
         }
 
+        // Get employee selection if any
+        let clientFinalId = null;
+        try {
+            const employeeTS = await waitForTomSelect('clientFinalId');
+            const value = employeeTS.getValue();
+            // Only set if there's an actual value
+            if (value && value !== '') {
+                clientFinalId = value;
+            }
+        } catch (e) {
+            console.log('Cliente Final dropdown not initialized yet');
+        }
+
         // Get form data
+        const firstName = document.getElementById('contactFirstName').value.trim();
+        const lastName = document.getElementById('contactLastName').value.trim();
+        const contactPerson = [firstName, lastName].filter(n => n).join(' ') || undefined;
+        
         const formData = {
             clientId: clientId,
             eventType: document.getElementById('eventType').value.trim() || undefined,
@@ -844,11 +1449,18 @@
             numberOfChildren: parseInt(document.getElementById('numberOfChildren').value || 0),
             numberOfInfants: parseInt(document.getElementById('numberOfInfants').value || 0),
             preferredLanguage: document.getElementById('preferredLanguage').value || 'es',
-            contactPerson: document.getElementById('contactPerson').value.trim() || undefined,
+            contactPerson: contactPerson,
+            contactFirstName: firstName || undefined,
+            contactLastName: lastName || undefined,
             contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
             contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
             notes: document.getElementById('notes').value.trim() || undefined
         };
+
+        // Only include clientFinalId if it has a value
+        if (clientFinalId) {
+            formData.clientFinalId = clientFinalId;
+        }
 
         // Disable submit button
         const submitBtn = document.getElementById('createQuoteBtn');
@@ -896,20 +1508,29 @@
         showPageLoader('quoteInformationCard');
 
         try {
+            // Small delay to ensure Tom Select can initialize
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            // Check if we're in edit mode first
+            const quoteIdInput = document.getElementById('quoteId');
+            const quoteId = quoteIdInput ? quoteIdInput.value : '';
+            const isEditMode = quoteId && quoteId !== '' && quoteId !== 'new';
+            
             // Load active clients for all users (different endpoints based on role)
             await loadActiveClients();
             
             // Setup client selection handler for all users
             await handleClientSelection();
-
-            // Check if we're in edit mode
-            const quoteIdInput = document.getElementById('quoteId');
-            const quoteId = quoteIdInput ? quoteIdInput.value : '';
-            const isEditMode = quoteId && quoteId !== '' && quoteId !== 'new';
+            
+            // Setup employee selection handler
+            await handleEmployeeSelection();
 
             // If edit mode, load quote data
             if (isEditMode) {
                 await loadQuoteData(quoteId);
+            } else if (userRole === 'department_manager' || userRole === 'client') {
+                // For new quotes, ensure clientId is populated for these roles
+                await loadCurrentUserAsClient();
             }
 
             // Auto-sum people fields into hidden numberOfPeople
@@ -933,11 +1554,18 @@
                 saveBtn.addEventListener('click', saveQuickClient);
             }
 
-            // Form submission - use appropriate function based on mode
+            // Form submission - use appropriate function based on current state
             document.getElementById('quoteInformationForm').addEventListener('submit', function(event) {
-                if (isEditMode) {
-                    updateQuote(quoteId, event);
+                // Check current quote ID dynamically (not just initial page load state)
+                const quoteIdField = document.getElementById('quoteId');
+                const currentQuoteId = quoteIdField?.value;
+                const hasExistingQuote = currentQuoteId && currentQuoteId.trim() !== '' && currentQuoteId !== 'new';
+                
+                if (hasExistingQuote) {
+                    console.log('Form submission: Updating existing quote', currentQuoteId);
+                    updateQuote(currentQuoteId, event);
                 } else {
+                    console.log('Form submission: Creating new quote');
                     createQuote(event);
                 }
             });

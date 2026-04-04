@@ -213,9 +213,64 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'client';
                                     <span class="fw-bold text-primary" style="font-size: 1rem;">Total:</span>
                                     <span id="disposicion-total-cost" class="fw-bold text-primary" style="font-size: 1rem;">$0 MXN</span>
                                 </div>
+
+                                <!-- Add to Quote Button (hidden until valid calculation) -->
+                                <div id="disposicion-add-to-quote-wrapper" class="mt-3 pt-3 border-top" style="display: none;">
+                                    <button type="button" class="btn btn-primary w-100" id="addDisposicionToQuoteBtn">
+                                        <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ Add Disposición to Quote Modal ═══════════ -->
+<div class="modal fade" id="addDisposicionToQuoteModal" tabindex="-1" aria-labelledby="addDisposicionToQuoteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addDisposicionToQuoteLabel">
+                    <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3" id="dispQuoteItemName"></p>
+
+                <!-- Create New Quote Option -->
+                <div class="create-new-quote-option mb-3" id="createNewQuoteBtnDisp">
+                    <i class="ti ti-plus me-2"></i>Crear nueva cotización
+                </div>
+
+                <div class="text-muted small mb-2">o seleccionar cotización existente:</div>
+
+                <!-- Search -->
+                <input type="text" class="form-control form-control-sm quote-search-input mb-3"
+                       id="dispQuoteSearchInput" placeholder="Buscar por folio o creador...">
+
+                <!-- Loading -->
+                <div id="dispQuotePickerLoading" class="text-center py-4" style="display: none;">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <div class="text-muted small mt-2">Cargando cotizaciones...</div>
+                </div>
+
+                <!-- Quote List -->
+                <div id="dispQuotePickerList" class="quote-picker-list" style="display: none;"></div>
+
+                <!-- Day Selector -->
+                <div id="dispDaySelector" style="display: none;"></div>
+
+                <!-- Action Loading -->
+                <div id="dispQuoteActionLoading" class="text-center py-4" style="display: none;">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    <div class="text-muted small mt-2">Agregando servicio a disposición...</div>
                 </div>
             </div>
         </div>
@@ -857,6 +912,35 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'client';
             totalCost: totalCost,
             apiCallMade: selectedVehicle && selectedRate ? 'Yes' : 'No'
         });
+
+        // Show/hide add-to-quote button and store calculation data
+        const addToQuoteWrapper = document.getElementById('disposicion-add-to-quote-wrapper');
+        if (addToQuoteWrapper) {
+            if (vehicleCount > 0 && hours > 0 && selectedVehicle && selectedRate && totalCost > 0) {
+                addToQuoteWrapper.style.display = 'block';
+                const selectedVehicleName = $('.vehicle-button.btn-success .fw-bold').text().trim() || '';
+                const selectedRateName = $('.rate-button.btn-primary .fw-bold').text().trim() || '';
+                const selectedVehicleCapacity = parseInt($('.vehicle-button.btn-success').data('capacity')) || 4;
+                const selectedTrunkCapacity = parseInt($('.vehicle-button.btn-success').data('trunk-capacity')) || 2;
+                window._currentDisposicionCalc = {
+                    vehicleName: selectedVehicleName,
+                    vehicleTypeId: selectedVehicle,
+                    vehicleCapacity: selectedVehicleCapacity,
+                    trunkCapacity: selectedTrunkCapacity,
+                    rateName: selectedRateName,
+                    rateId: selectedRate,
+                    hours: hours,
+                    vehicleCount: vehicleCount,
+                    hourlyRate: currentHourlyRate,
+                    totalCost: totalCost,
+                    currency: selectedCurrency,
+                    paymentMethod: selectedPayment,
+                    discountPercent: discountPercent
+                };
+            } else {
+                addToQuoteWrapper.style.display = 'none';
+            }
+        }
     }
     
     // Event handlers
@@ -934,4 +1018,529 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'client';
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     transition: all 0.2s ease;
 }
+
+/* ── Quote picker modal styles ── */
+.create-new-quote-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 16px;
+    border: 2px dashed #0d6efd;
+    border-radius: 8px;
+    color: #0d6efd;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.create-new-quote-option:hover {
+    background: rgba(13, 110, 253, 0.05);
+    border-color: #0a58ca;
+    color: #0a58ca;
+}
+
+.quote-picker-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.quote-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quote-list-item:hover {
+    background: #f8f9fa;
+    border-color: #0d6efd;
+    box-shadow: 0 1px 4px rgba(13, 110, 253, 0.12);
+}
+
+.quote-list-item .quote-folio {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #344767;
+}
+
+.quote-list-item .quote-meta {
+    font-size: 0.75rem;
+    color: #adb5bd;
+}
+
+.quote-list-item .quote-status {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+.quote-search-input {
+    border-radius: 6px;
+}
+
+.quote-picker-empty {
+    text-align: center;
+    padding: 24px 16px;
+    color: #6c757d;
+}
+
+.day-selector-back {
+    font-size: 0.85rem;
+    color: #0d6efd;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+}
+
+.day-selector-back:hover {
+    color: #0a58ca;
+    text-decoration: underline;
+}
+
+.day-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.day-list-item:hover {
+    background: #f8f9fa;
+    border-color: #0d6efd;
+    box-shadow: 0 1px 4px rgba(13, 110, 253, 0.12);
+}
+
+.day-list-item .day-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #344767;
+}
+
+.new-day-date-row {
+    padding: 10px 0;
+}
+
+.disp-quote-alert {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10600;
+    min-width: 320px;
+    max-width: 480px;
+}
 </style>
+
+<!-- Quote Integration Script for A Disposición -->
+<script>
+(function() {
+    // Get current user role for dynamic URLs
+    const currentUserRole = '<%= currentUserRole %>';
+    
+    // ── Move modal to body to escape .dashboard-content overflow ──
+    const dispModal = document.getElementById('addDisposicionToQuoteModal');
+    if (dispModal && dispModal.parentElement !== document.body) {
+        document.body.appendChild(dispModal);
+    }
+
+    // ── Token helper ──
+    function getDispAccessToken() {
+        if (typeof window.getAccessToken === 'function') return window.getAccessToken();
+        const sources = [
+            () => localStorage.getItem('accessToken'),
+            () => sessionStorage.getItem('accessToken'),
+            () => document.querySelector('meta[name="access-token"]')?.content,
+            () => { const m = document.cookie.match(/accessToken=([^;]+)/); return m ? m[1] : null; }
+        ];
+        for (const s of sources) { try { const t = s(); if (t) return t; } catch(e){} }
+        return '';
+    }
+
+    // ── Relative time (Spanish) ──
+    function dispTimeAgo(dateStr) {
+        if (!dateStr) return '';
+        const diff = Date.now() - new Date(dateStr).getTime();
+        const mins = Math.floor(diff/60000);
+        if (mins < 1) return 'hace un momento';
+        if (mins < 60) return 'hace ' + mins + ' min';
+        const hrs = Math.floor(mins/60);
+        if (hrs < 24) return 'hace ' + hrs + (hrs===1?' hora':' horas');
+        const days = Math.floor(hrs/24);
+        if (days < 30) return 'hace ' + days + (days===1?' día':' días');
+        const months = Math.floor(days/30);
+        return 'hace ' + months + (months===1?' mes':' meses');
+    }
+
+    // ── Build subconcept ──
+    function buildDispSubconcept() {
+        const d = window._selectedDisposicion;
+        // Build vehicleTypeName: "VEHICLE - X pax, Y maletas"
+        const capacity = d.vehicleCapacity || 4;
+        const trunkCapacity = d.trunkCapacity || 2;
+        const vehicleTypeName = d.vehicleName + ' - ' + capacity + ' pax, ' + trunkCapacity + ' maletas';
+
+        return {
+            type: 'a-disposicion',
+            concept: 'A Disposición',
+            time: '',
+            endTime: '',
+            vehicleType: d.vehicleTypeId,
+            vehicleTypeName: vehicleTypeName,
+            rateId: d.rateId,
+            unitPrice: d.totalCost,
+            quantity: 1,
+            hours: d.hours,
+            vehicleCount: d.vehicleCount,
+            hourlyPrice: d.hourlyRate,
+            discountPercent: d.discountPercent,
+            total: d.totalCost,
+            persons: 0,
+            transportAdults: 0,
+            transportChildren: 0,
+            transportInfants: 0,
+            selectedSchedule: '',
+            includeInTotal: true,
+            notes: ''
+        };
+    }
+
+    // ── Recalculate totals ──
+    function recalcDispServiceItems(si) {
+        let subtotal = 0;
+        si.days.forEach(day => {
+            let dt = 0;
+            (day.subconcepts || []).forEach(sc => { dt += (sc.total || 0); });
+            day.dayTotal = Math.round(dt * 100) / 100;
+            subtotal += dt;
+        });
+        si.subtotal = Math.round(subtotal * 100) / 100;
+        si.iva = Math.round(subtotal * 0.16 * 100) / 100;
+        si.total = Math.round((si.subtotal + si.iva) * 100) / 100;
+        return si;
+    }
+
+    // ── Open dialog ──
+    function openDispQuoteDialog() {
+        const d = window._selectedDisposicion;
+        const itemName = document.getElementById('dispQuoteItemName');
+        const currSymbol = d.currency === 'USD' ? 'USD' : 'MXN';
+        const priceFormatted = d.totalCost.toLocaleString(d.currency === 'USD' ? 'en-US' : 'es-MX', {
+            minimumFractionDigits: d.currency === 'USD' ? 2 : 0,
+            maximumFractionDigits: d.currency === 'USD' ? 2 : 0
+        });
+        itemName.innerHTML = '<strong>A Disposición: ' + d.vehicleName + ' - ' + d.rateName + '</strong><br>' +
+            '<span class="small">' + d.hours + 'h · ' + d.vehicleCount + ' vehículo(s) · $' + priceFormatted + ' ' + currSymbol + '</span>';
+
+        // Reset state
+        document.getElementById('dispQuotePickerList').style.display = 'none';
+        document.getElementById('dispDaySelector').style.display = 'none';
+        document.getElementById('dispQuoteActionLoading').style.display = 'none';
+        document.getElementById('dispQuotePickerLoading').style.display = 'block';
+        document.getElementById('dispQuoteSearchInput').style.display = '';
+        document.getElementById('dispQuoteSearchInput').value = '';
+        document.getElementById('createNewQuoteBtnDisp').style.display = '';
+
+        const modal = new bootstrap.Modal(document.getElementById('addDisposicionToQuoteModal'));
+        modal.show();
+
+        // Fetch quotes
+        const token = getDispAccessToken();
+        fetch('/api/quotes?start=0&length=100&order[0][column]=7&order[0][dir]=desc', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(r => r.json())
+        .then(res => {
+            const quotes = (res.data || [])
+                .filter(q => q.status !== 'cancelled')
+                .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+            window._dispAllQuotes = quotes;
+            document.getElementById('dispQuotePickerLoading').style.display = 'none';
+            document.getElementById('dispQuotePickerList').style.display = 'block';
+            renderDispQuoteList(quotes);
+        })
+        .catch(() => {
+            document.getElementById('dispQuotePickerLoading').style.display = 'none';
+            document.getElementById('dispQuotePickerList').style.display = 'block';
+            document.getElementById('dispQuotePickerList').innerHTML = '<div class="quote-picker-empty"><i class="ti ti-file-off me-2"></i>Error al cargar cotizaciones</div>';
+        });
+    }
+
+    // ── Render quote list ──
+    function renderDispQuoteList(quotes) {
+        const container = document.getElementById('dispQuotePickerList');
+
+        if (quotes.length === 0) {
+            container.innerHTML = '<div class="quote-picker-empty"><i class="ti ti-file-off me-2"></i>No hay cotizaciones editables</div>';
+            return;
+        }
+
+        container.innerHTML = quotes.map(q => {
+            const creatorName = q.createdByName || (q.createdBy ? q.createdBy.fullName : 'Sin asignar');
+            const serviceCount = q.serviceCount || 0;
+            const updated = dispTimeAgo(q.updatedAt);
+
+            return '<div class="quote-list-item" data-quote-id="' + (q.objectId || q.id) + '">' +
+                '<div class="flex-grow-1">' +
+                    '<div class="quote-folio">' + (q.folio || q.objectId) + '</div>' +
+                    '<div class="quote-meta">' + serviceCount + ' servicios · ' + creatorName +
+                        (updated ? ' · ' + updated : '') + '</div>' +
+                '</div>' +
+                '<span class="quote-status status-' + q.status + '">' + q.status + '</span>' +
+            '</div>';
+        }).join('');
+    }
+
+    // ── Search filter ──
+    document.getElementById('dispQuoteSearchInput')?.addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        document.querySelectorAll('#dispQuotePickerList .quote-list-item').forEach(item => {
+            const text = item.textContent.toLowerCase();
+            item.style.display = text.includes(query) ? '' : 'none';
+        });
+    });
+
+    // ── Quote click → day selector ──
+    document.getElementById('dispQuotePickerList')?.addEventListener('click', function(e) {
+        const item = e.target.closest('.quote-list-item');
+        if (!item) return;
+        showDispDaySelector(item.dataset.quoteId);
+    });
+
+    // ── Day selector ──
+    async function showDispDaySelector(quoteId) {
+        const token = getDispAccessToken();
+
+        document.getElementById('dispQuotePickerList').style.display = 'none';
+        document.getElementById('createNewQuoteBtnDisp').style.display = 'none';
+        document.getElementById('dispQuoteSearchInput').style.display = 'none';
+        document.getElementById('dispQuotePickerLoading').style.display = 'block';
+
+        let daySelector = document.getElementById('dispDaySelector');
+        daySelector.style.display = 'none';
+
+        try {
+            const quoteRes = await fetch('/api/quotes/' + quoteId, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!quoteRes.ok) throw new Error('Error al obtener cotización');
+
+            const quoteData = await quoteRes.json();
+            const quote = quoteData.data || quoteData;
+            window._selectedDispQuote = quote;
+            const days = (quote.serviceItems && quote.serviceItems.days) || [];
+
+            // 0 or 1 days → add directly
+            if (days.length <= 1) {
+                document.getElementById('dispQuotePickerLoading').style.display = 'none';
+                if (days.length === 0) {
+                    if (!quote.serviceItems) quote.serviceItems = { days: [], subtotal: 0, iva: 0, total: 0 };
+                    quote.serviceItems.days = [{ dayNumber: 1, dayTitle: '', subconcepts: [], dayTotal: 0 }];
+                    await addDispToDay(quoteId, 0);
+                } else {
+                    await addDispToDay(quoteId, 0);
+                }
+                return;
+            }
+
+            // 2+ days → show day picker
+            let html = '<div class="day-selector-back mb-3"><i class="ti ti-arrow-left me-1"></i>Volver a cotizaciones</div>';
+            html += '<div class="quote-folio mb-3">' + quote.folio + ' — Seleccionar día</div>';
+
+            html += days.map((day, idx) => {
+                const scCount = (day.subconcepts || []).length;
+                return '<div class="day-list-item" data-quote-id="' + quoteId + '" data-day-index="' + idx + '">' +
+                    '<div class="flex-grow-1">' +
+                        '<div class="day-title">Día ' + day.dayNumber + (day.dayTitle ? ' — ' + day.dayTitle : '') + '</div>' +
+                        '<div class="quote-meta">' + scCount + ' servicios</div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+
+            html += '<div class="new-day-date-row mt-2" data-quote-id="' + quoteId + '">' +
+                '<label class="form-label small text-muted mb-1">Agregar nuevo día:</label>' +
+                '<input type="date" class="form-control form-control-sm new-day-date-input" data-quote-id="' + quoteId + '">' +
+            '</div>';
+
+            daySelector.innerHTML = html;
+            daySelector.style.display = 'block';
+
+        } catch (error) {
+            console.error('Error loading quote days:', error);
+            showDispAlert('danger', error.message);
+            document.getElementById('dispQuotePickerList').style.display = 'block';
+            document.getElementById('createNewQuoteBtnDisp').style.display = '';
+            document.getElementById('dispQuoteSearchInput').style.display = '';
+        } finally {
+            document.getElementById('dispQuotePickerLoading').style.display = 'none';
+        }
+    }
+
+    // ── Day selector events ──
+    document.getElementById('dispDaySelector')?.addEventListener('click', function(e) {
+        const dayItem = e.target.closest('.day-list-item');
+        if (dayItem) {
+            addDispToDay(dayItem.dataset.quoteId, parseInt(dayItem.dataset.dayIndex));
+            return;
+        }
+        if (e.target.closest('.day-selector-back')) {
+            document.getElementById('dispDaySelector').style.display = 'none';
+            document.getElementById('dispQuotePickerList').style.display = 'block';
+            document.getElementById('createNewQuoteBtnDisp').style.display = '';
+            document.getElementById('dispQuoteSearchInput').style.display = '';
+            return;
+        }
+    });
+
+    // ── New day via date picker ──
+    document.getElementById('dispDaySelector')?.addEventListener('change', function(e) {
+        if (e.target.classList.contains('new-day-date-input') && e.target.value) {
+            const quoteId = e.target.dataset.quoteId;
+            const d = new Date(e.target.value + 'T12:00:00');
+            let dayTitle = d.toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
+            dayTitle = dayTitle.charAt(0).toUpperCase() + dayTitle.slice(1);
+            addDispToNewDay(quoteId, dayTitle);
+        }
+    });
+
+    // ── Add to existing day ──
+    async function addDispToDay(quoteId, dayIndex) {
+        const token = getDispAccessToken();
+        const ds = document.getElementById('dispDaySelector');
+        if (ds) ds.style.display = 'none';
+        document.getElementById('dispQuoteActionLoading').style.display = 'block';
+
+        try {
+            const quote = window._selectedDispQuote;
+            const si = quote.serviceItems || { days: [], subtotal: 0, iva: 0, total: 0 };
+            si.days[dayIndex].subconcepts.push(buildDispSubconcept());
+            recalcDispServiceItems(si);
+
+            const r = await fetch('/api/quotes/' + quoteId + '/service-items', {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify(si)
+            });
+            if (!r.ok) throw new Error((await r.json()).error || 'Error');
+
+            bootstrap.Modal.getInstance(document.getElementById('addDisposicionToQuoteModal'))?.hide();
+            showDispAlert('success', 'Servicio a disposición agregado a <strong>' + (quote.folio || quoteId) + '</strong> <a href="/dashboard/' + currentUserRole + '/quotes/' + quoteId + '?section=services" class="alert-link ms-2">Ver cotización</a>');
+        } catch (err) {
+            showDispAlert('danger', err.message);
+            if (ds) ds.style.display = 'block';
+            document.getElementById('dispQuoteActionLoading').style.display = 'none';
+        }
+    }
+
+    // ── Add to new day ──
+    async function addDispToNewDay(quoteId, dayTitle) {
+        const token = getDispAccessToken();
+        const ds = document.getElementById('dispDaySelector');
+        if (ds) ds.style.display = 'none';
+        document.getElementById('dispQuoteActionLoading').style.display = 'block';
+
+        try {
+            const quote = window._selectedDispQuote;
+            const si = quote.serviceItems || { days: [], subtotal: 0, iva: 0, total: 0 };
+            if (!si.days) si.days = [];
+            const sc = buildDispSubconcept();
+            si.days.push({ dayNumber: si.days.length + 1, dayTitle: dayTitle || '', subconcepts: [sc], dayTotal: sc.total });
+            recalcDispServiceItems(si);
+
+            const r = await fetch('/api/quotes/' + quoteId + '/service-items', {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify(si)
+            });
+            if (!r.ok) throw new Error((await r.json()).error || 'Error');
+
+            bootstrap.Modal.getInstance(document.getElementById('addDisposicionToQuoteModal'))?.hide();
+            showDispAlert('success', 'Servicio a disposición agregado a <strong>' + (quote.folio || quoteId) + '</strong> <a href="/dashboard/' + currentUserRole + '/quotes/' + quoteId + '?section=services" class="alert-link ms-2">Ver cotización</a>');
+        } catch (err) {
+            showDispAlert('danger', err.message);
+            if (ds) ds.style.display = 'block';
+            document.getElementById('dispQuoteActionLoading').style.display = 'none';
+        }
+    }
+
+    // ── Create new quote ──
+    document.getElementById('createNewQuoteBtnDisp')?.addEventListener('click', async function() {
+        const token = getDispAccessToken();
+        document.getElementById('dispQuotePickerList').style.display = 'none';
+        document.getElementById('dispQuoteActionLoading').style.display = 'block';
+        document.getElementById('createNewQuoteBtnDisp').style.display = 'none';
+        document.getElementById('dispQuoteSearchInput').style.display = 'none';
+
+        try {
+            const createRes = await fetch('/api/quotes', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'draft' })
+            });
+            if (!createRes.ok) throw new Error((await createRes.json()).error || 'Error al crear cotización');
+            const createData = await createRes.json();
+            const quoteId = createData.data?.objectId || createData.data?.id || createData.objectId;
+
+            const sc = buildDispSubconcept();
+            const si = {
+                days: [{ dayNumber: 1, dayTitle: '', subconcepts: [sc], dayTotal: sc.total }],
+                subtotal: Math.round(sc.total * 100) / 100,
+                iva: Math.round(sc.total * 0.16 * 100) / 100,
+                total: Math.round(sc.total * 1.16 * 100) / 100
+            };
+            const r = await fetch('/api/quotes/' + quoteId + '/service-items', {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify(si)
+            });
+            if (!r.ok) throw new Error((await r.json()).error || 'Error');
+
+            bootstrap.Modal.getInstance(document.getElementById('addDisposicionToQuoteModal'))?.hide();
+            window.location.href = '/dashboard/' + currentUserRole + '/quotes/' + quoteId + '?section=services';
+        } catch (err) {
+            showDispAlert('danger', err.message);
+            document.getElementById('dispQuotePickerList').style.display = 'block';
+            document.getElementById('dispQuoteActionLoading').style.display = 'none';
+            document.getElementById('createNewQuoteBtnDisp').style.display = '';
+            document.getElementById('dispQuoteSearchInput').style.display = '';
+        }
+    });
+
+    // ── Alert helper ──
+    function showDispAlert(type, msg) {
+        document.querySelectorAll('.disp-quote-alert').forEach(el => el.remove());
+        const wrapper = document.createElement('div');
+        wrapper.className = 'disp-quote-alert';
+        wrapper.innerHTML = '<div class="alert alert-' + type + ' alert-dismissible fade show shadow-sm" role="alert">' +
+            msg + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+        document.body.appendChild(wrapper);
+        setTimeout(() => wrapper.remove(), 6000);
+    }
+
+    // ── Reset modal on close ──
+    document.getElementById('addDisposicionToQuoteModal')?.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('dispDaySelector').style.display = 'none';
+        document.getElementById('dispQuoteActionLoading').style.display = 'none';
+    });
+
+    // ── Button click handler ──
+    document.getElementById('addDisposicionToQuoteBtn')?.addEventListener('click', function() {
+        const calc = window._currentDisposicionCalc;
+        if (!calc || !calc.totalCost || calc.totalCost <= 0) return;
+        window._selectedDisposicion = calc;
+        openDispQuoteDialog();
+    });
+})();
+</script>

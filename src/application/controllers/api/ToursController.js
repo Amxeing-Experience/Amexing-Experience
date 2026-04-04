@@ -1381,6 +1381,8 @@ class ToursController {
           exists: tour.get('exists'),
           createdAt: tour.get('createdAt'),
           updatedAt: tour.get('updatedAt'),
+          // Type field for badge display
+          type: tour.get('type') || null,
           // Walking tour pricing fields
           isWalkingTour: tour.get('isWalkingTour') || false,
           walkingPriceSmall: tour.get('walkingPriceSmall') || null,

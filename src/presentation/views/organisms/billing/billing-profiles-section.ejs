@@ -146,7 +146,7 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
                             </div>
                             <div class="col-md-5">
                                 <label for="bp_label" class="form-label fw-semibold">Nombre del Perfil <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="bp_label" placeholder="Ej: Mi Empresa, Personal, NUBA Mexico">
+                                <input type="text" class="form-control" id="bp_label" placeholder="Ej: Perfil Principal, Oficina Central, Sucursal Norte">
                             </div>
                             <div class="col-md-3 d-flex align-items-end">
                                 <div class="form-check mb-2">
@@ -163,9 +163,13 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
                             <h6 class="fw-bold text-success mb-3"><i class="ti ti-building me-2"></i>Datos Fiscales (Mexico)</h6>
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label for="bp_rfc" class="form-label fw-semibold">RFC <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="bp_rfc" placeholder="XAXX010101000" maxlength="13" style="text-transform: uppercase;">
-                                    <div class="form-text">Personas fisicas: 13 caracteres | Personas morales: 12 caracteres</div>
+                                    <%- include('../../atoms/common/rfc-input', {
+                                        name: 'bp_rfc',
+                                        id: 'bp_rfc',
+                                        label: 'RFC',
+                                        required: true,
+                                        helpText: 'Personas físicas: 13 caracteres | Personas morales: 12 caracteres'
+                                    }) %>
                                 </div>
                                 <div class="col-md-6">
                                     <label for="bp_razonSocial" class="form-label fw-semibold">Razon Social <span class="text-danger">*</span></label>
@@ -205,9 +209,13 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
                                     </select>
                                 </div>
                                 <div class="col-md-4">
-                                    <label for="bp_codigoPostal" class="form-label fw-semibold">Codigo Postal <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="bp_codigoPostal" placeholder="12345" maxlength="5">
-                                    <div class="form-text">5 digitos</div>
+                                    <%- include('../../atoms/common/postal-code-input', {
+                                        name: 'bp_codigoPostal',
+                                        id: 'bp_codigoPostal',
+                                        label: 'Código Postal',
+                                        required: true,
+                                        helpText: '5 dígitos para México'
+                                    }) %>
                                 </div>
                             </div>
                         </div>
@@ -230,66 +238,116 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
                         </div>
                     </div>
 
-                    <!-- Direccion -->
+                    <!-- Direccion Fiscal -->
                     <div class="p-3 bg-light rounded mb-4">
                         <h6 class="fw-bold text-primary mb-3"><i class="ti ti-map-pin me-2"></i>Direccion Fiscal</h6>
                         <div class="row g-3">
+                            <!-- Fila 1: Tipo de Vialidad + Nombre de la Calle + Números -->
                             <div class="col-md-3">
-                                <label for="bp_streetType" class="form-label">Tipo de Vialidad</label>
-                                <select class="form-select" id="bp_streetType">
-                                    <option value="Calle">Calle</option>
-                                    <option value="Avenida">Avenida</option>
-                                    <option value="Boulevard">Boulevard</option>
-                                    <option value="Calzada">Calzada</option>
-                                    <option value="Camino">Camino</option>
-                                    <option value="Carretera">Carretera</option>
-                                    <option value="Cerrada">Cerrada</option>
-                                    <option value="Circuito">Circuito</option>
-                                    <option value="Paseo">Paseo</option>
-                                    <option value="Privada">Privada</option>
-                                    <option value="Otro">Otro</option>
-                                </select>
+                                <%- include('../../atoms/common/street-type-select', {
+                                    name: 'bp_streetType',
+                                    id: 'bp_streetType',
+                                    label: 'Tipo de Vialidad'
+                                }) %>
                             </div>
                             <div class="col-md-5">
-                                <label for="bp_streetName" class="form-label">Nombre de la Calle</label>
-                                <input type="text" class="form-control" id="bp_streetName" placeholder="Ej: Reforma, Insurgentes">
+                                <%- include('../../atoms/common/street-name-input', {
+                                    name: 'bp_streetName',
+                                    id: 'bp_streetName',
+                                    label: 'Nombre de la Calle'
+                                }) %>
                             </div>
                             <div class="col-md-2">
-                                <label for="bp_exteriorNumber" class="form-label">No. Exterior</label>
-                                <input type="text" class="form-control" id="bp_exteriorNumber" placeholder="123">
+                                <%- include('../../atoms/common/exterior-number-input', {
+                                    name: 'bp_exteriorNumber',
+                                    id: 'bp_exteriorNumber',
+                                    label: 'No. Exterior'
+                                }) %>
                             </div>
                             <div class="col-md-2">
-                                <label for="bp_interiorNumber" class="form-label">No. Interior</label>
-                                <input type="text" class="form-control" id="bp_interiorNumber" placeholder="4B">
+                                <%- include('../../atoms/common/interior-number-input', {
+                                    name: 'bp_interiorNumber',
+                                    id: 'bp_interiorNumber',
+                                    label: 'No. Interior'
+                                }) %>
                             </div>
+                            <!-- Fila 2: Colonia + Ciudad + Estado (México) -->
                             <div class="col-md-4 billing-colonia-field">
-                                <label for="bp_colonia" class="form-label">Colonia</label>
-                                <input type="text" class="form-control" id="bp_colonia" placeholder="Ej: Juarez, Roma Norte">
+                                <%- include('../../atoms/common/colonia-input', {
+                                    name: 'bp_colonia',
+                                    id: 'bp_colonia',
+                                    label: 'Colonia'
+                                }) %>
                             </div>
                             <div class="col-md-4">
-                                <label for="bp_city" class="form-label">Ciudad / Municipio</label>
-                                <input type="text" class="form-control" id="bp_city" placeholder="Ej: Ciudad de Mexico">
+                                <%- include('../../atoms/common/city-input', {
+                                    name: 'bp_city',
+                                    id: 'bp_city',
+                                    label: 'Ciudad / Municipio'
+                                }) %>
                             </div>
                             <div class="col-md-4">
-                                <label for="bp_state" class="form-label">Estado / Provincia</label>
-                                <input type="text" class="form-control" id="bp_state" placeholder="Ej: CDMX, Jalisco">
+                                <%- include('../../atoms/common/state-select', {
+                                    name: 'bp_state',
+                                    id: 'bp_state',
+                                    label: 'Estado / Provincia'
+                                }) %>
                             </div>
+                            <!-- Código Postal Internacional (no México) -->
                             <div class="col-md-4 billing-intl-postal-field">
-                                <label for="bp_postalCode" class="form-label">Codigo Postal / Zip Code</label>
-                                <input type="text" class="form-control" id="bp_postalCode" placeholder="Codigo postal">
+                                <%- include('../../atoms/common/postal-code-input', {
+                                    name: 'bp_postalCode',
+                                    id: 'bp_postalCode',
+                                    label: 'Codigo Postal / Zip Code',
+                                    helpText: 'Código postal del país seleccionado'
+                                }) %>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Contacto -->
-                    <div class="row g-3 mb-4">
-                        <div class="col-12">
-                            <h6 class="fw-bold text-primary mb-3"><i class="ti ti-mail me-2"></i>Contacto de Facturacion</h6>
-                        </div>
-                        <div class="col-md-8">
-                            <label for="bp_billingEmail" class="form-label fw-semibold">Email para envio de facturas <span class="text-danger">*</span></label>
-                            <input type="email" class="form-control" id="bp_billingEmail" placeholder="facturacion@empresa.com">
-                            <div class="form-text">Si no se especifica, se usara el email principal de la cuenta</div>
+                    <!-- Contacto de Facturacion -->
+                    <div class="p-3 bg-light rounded mb-4">
+                        <h6 class="fw-bold text-primary mb-3"><i class="ti ti-mail me-2"></i>Contacto de Facturacion</h6>
+                        <div class="row g-3">
+                            <!-- Fila 1: Nombre + Apellido -->
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/first-name-input', {
+                                    name: 'bp_firstName',
+                                    id: 'bp_firstName',
+                                    label: 'Nombre',
+                                    required: true,
+                                    helpText: 'Nombre del contacto de facturación'
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/last-name-input', {
+                                    name: 'bp_lastName',
+                                    id: 'bp_lastName',
+                                    label: 'Apellido',
+                                    required: true,
+                                    helpText: 'Apellido del contacto de facturación'
+                                }) %>
+                            </div>
+                            <!-- Fila 2: Teléfono + Email -->
+                            <div class="col-md-4">
+                                <%- include('../../atoms/common/phone-input', {
+                                    name: 'bp_phone',
+                                    id: 'bp_phone',
+                                    label: 'Teléfono',
+                                    required: false,
+                                    helpText: 'Teléfono del contacto de facturación'
+                                }) %>
+                            </div>
+                            <div class="col-md-8">
+                                <%- include('../../atoms/common/email-input', {
+                                    name: 'bp_billingEmail',
+                                    id: 'bp_billingEmail',
+                                    label: 'Email para envío de facturas',
+                                    required: true,
+                                    placeholder: 'facturacion@empresa.com',
+                                    helpText: 'Si no se especifica, se usará el email principal de la cuenta'
+                                }) %>
+                            </div>
                         </div>
                     </div>
 
@@ -482,7 +540,15 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
                 (addressLine2.length > 0 ? '<br>' + addressLine2.join(', ') : '') +
                 '</span></div>';
 
-            // Email
+            // Contact information
+            let contactHtml = '';
+            if (profile.firstName || profile.lastName) {
+                const fullName = (profile.firstName || '') + ' ' + (profile.lastName || '');
+                contactHtml += '<div class="mb-1"><span class="profile-detail-label">Contacto:</span> <span class="profile-detail-value">' + fullName.trim() + '</span></div>';
+            }
+            if (profile.phone) {
+                contactHtml += '<div class="mb-1"><span class="profile-detail-label">Teléfono:</span> <span class="profile-detail-value">' + profile.phone + '</span></div>';
+            }
             const emailHtml = '<div class="mb-1"><span class="profile-detail-label">Email de Facturacion:</span> <span class="profile-detail-value">' + (profile.billingEmail || 'N/A') + '</span></div>';
 
             // Constancia (MX only)
@@ -527,6 +593,7 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
                 '      </div>' +
                 fiscalHtml +
                 addressHtml +
+                contactHtml +
                 emailHtml +
                 constanciaHtml +
                 '      <div class="mt-2">' + docsHtml + '</div>' +
@@ -554,6 +621,26 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
         document.querySelectorAll('.billing-intl-postal-field').forEach(function(el) { el.style.display = isMX ? 'none' : 'block'; });
     };
 
+    // Clear all validation states from form inputs
+    function clearValidationStates() {
+        const form = document.getElementById('billingProfileForm');
+        if (!form) return;
+        
+        // Remove Bootstrap validation classes from all inputs, selects, and textareas
+        const formElements = form.querySelectorAll('input, select, textarea');
+        formElements.forEach(function(element) {
+            element.classList.remove('is-valid', 'is-invalid');
+        });
+        
+        // Hide any validation feedback messages
+        const feedbackElements = form.querySelectorAll('.invalid-feedback, .valid-feedback');
+        feedbackElements.forEach(function(element) {
+            element.style.display = 'none';
+        });
+        
+        console.log('Billing profile validation states cleared');
+    }
+
     // Open modal for create or edit
     window.openBillingProfileModal = async function(profileId) {
         // Reset form
@@ -563,6 +650,10 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
         document.getElementById('bp_constanciaInfo').innerHTML = '';
         document.getElementById('bp_additionalDocsList').innerHTML = '';
         document.getElementById('bp_country').value = 'MX';
+        
+        // Clear validation states to prevent persistence across modal opens
+        clearValidationStates();
+        
         toggleBillingCountryFields();
 
         if (profileId) {
@@ -588,11 +679,15 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
                 document.getElementById('bp_country').value = profile.country || 'MX';
                 document.getElementById('bp_label').value = profile.label || '';
                 document.getElementById('bp_isPrimary').checked = !!profile.isPrimary;
+                // Contact information
+                document.getElementById('bp_firstName').value = profile.firstName || '';
+                document.getElementById('bp_lastName').value = profile.lastName || '';
+                document.getElementById('bp_phone').value = profile.phone || '';
                 document.getElementById('bp_billingEmail').value = profile.emailFacturacion || profile.billingEmail || '';
 
                 // Address
                 document.getElementById('bp_streetType').value = profile.streetType || 'Calle';
-                document.getElementById('bp_streetName').value = profile.street || '';
+                document.getElementById('bp_streetName').value = profile.street || profile.streetName || '';
                 document.getElementById('bp_exteriorNumber').value = profile.exteriorNumber || '';
                 document.getElementById('bp_interiorNumber').value = profile.interiorNumber || '';
                 document.getElementById('bp_colonia').value = profile.colonia || '';
@@ -683,7 +778,12 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
             country: country,
             label: label,
             isPrimary: document.getElementById('bp_isPrimary').checked,
+            // Contact information
+            firstName: document.getElementById('bp_firstName').value.trim(),
+            lastName: document.getElementById('bp_lastName').value.trim(),
+            phone: document.getElementById('bp_phone').value.trim(),
             emailFacturacion: billingEmail,
+            // Address information
             streetType: document.getElementById('bp_streetType').value,
             street: document.getElementById('bp_streetName').value.trim(),
             exteriorNumber: document.getElementById('bp_exteriorNumber').value.trim(),

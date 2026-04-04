@@ -412,10 +412,12 @@ class ServicesController {
           const originQuery = new Parse.Query('Services');
           originQuery.containedIn('originPOI', aeropuertoPOIs);
           originQuery.equalTo('exists', true);
-          if (activeFilter === 'true') {
-            originQuery.equalTo('active', true);
-          } else if (activeFilter === 'false') {
+          // Default to active=true unless explicitly requesting inactive
+          if (activeFilter === 'false') {
             originQuery.equalTo('active', false);
+          } else {
+            // Default behavior: show only active services
+            originQuery.equalTo('active', true);
           }
           originQuery.include('originPOI');
           originQuery.include('originPOI.serviceType');
@@ -427,10 +429,12 @@ class ServicesController {
           const destQuery = new Parse.Query('Services');
           destQuery.containedIn('destinationPOI', aeropuertoPOIs);
           destQuery.equalTo('exists', true);
-          if (activeFilter === 'true') {
-            destQuery.equalTo('active', true);
-          } else if (activeFilter === 'false') {
+          // Default to active=true unless explicitly requesting inactive
+          if (activeFilter === 'false') {
             destQuery.equalTo('active', false);
+          } else {
+            // Default behavior: show only active services
+            destQuery.equalTo('active', true);
           }
           destQuery.include('originPOI');
           destQuery.include('originPOI.serviceType');
@@ -445,10 +449,12 @@ class ServicesController {
           query = new Parse.Query('Services');
           // Apply common filters
           query.equalTo('exists', true);
-          if (activeFilter === 'true') {
-            query.equalTo('active', true);
-          } else if (activeFilter === 'false') {
+          // Default to active=true unless explicitly requesting inactive
+          if (activeFilter === 'false') {
             query.equalTo('active', false);
+          } else {
+            // Default behavior: show only active services
+            query.equalTo('active', true);
           }
           query.include('originPOI');
           query.include('originPOI.serviceType');
@@ -485,10 +491,12 @@ class ServicesController {
           query.include('vehicleType');
           query.include('rate');
 
-          if (activeFilter === 'true') {
-            query.equalTo('active', true);
-          } else if (activeFilter === 'false') {
+          // Default to active=true unless explicitly requesting inactive
+          if (activeFilter === 'false') {
             query.equalTo('active', false);
+          } else {
+            // Default behavior: show only active services
+            query.equalTo('active', true);
           }
 
           // Add aeropuerto constraints if needed
@@ -2210,11 +2218,8 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
+      // Permission check is already handled by middleware (requireRoleLevel)
+      const userRole = req.userRole || currentUser.get?.('role') || currentUser.role;
 
       const {
         originPOI, destinationPOI, vehicleType, rate, note, routeDuration,
@@ -2303,12 +2308,8 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions - use req.userRole from JWT middleware instead of accessing user object directly
+      // Permission check is already handled by middleware (requireRoleLevel)
       const { userRole } = req;
-
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
 
       const { id } = req.params;
       const {
@@ -2411,11 +2412,17 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
+      // Permission check is already handled by middleware (requireRoleLevel)
+      // The middleware already validated the user has the required role level
+      const userRole = req.userRole || currentUser.get?.('role') || currentUser.role;
+
+      logger.info('toggleServiceStatus - User role check', {
+        userId: currentUser.id,
+        reqUserRole: req.userRole,
+        getUserRole: currentUser.get?.('role'),
+        directRole: currentUser.role,
+        finalRole: userRole,
+      });
 
       const { id } = req.params;
       const { active } = req.body;
@@ -2477,11 +2484,8 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
+      // Permission check is already handled by middleware (requireRoleLevel)
+      const userRole = req.userRole || currentUser.get?.('role') || currentUser.role;
 
       const { id } = req.params;
       if (!id) {
@@ -2539,11 +2543,8 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
+      // Permission check is already handled by middleware (requireRoleLevel)
+      const userRole = req.userRole || currentUser.get?.('role') || currentUser.role;
 
       const { id } = req.params;
       const { rateId } = req.body;

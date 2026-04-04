@@ -125,38 +125,50 @@ class CorporateOAuthService {
    * Maps OAuth user to corporate client and creates/updates AmexingUser
    * Implements OAUTH-2-02: Employee Auto-provisioning.
    * @param {object} oauthUserInfo - OAuth user profile.
-   * @param {string} provider - OAuth _provider.
-   * @param _provider
+   * @param {string} provider - OAuth provider.
    * @returns {Promise<object>} - User and client mapping result.
    * @example
    * // OAuth service usage
-   * const result = await ocorporateoauthservice.mapCorporateUser(_provider, authCode);
+   * const result = await ocorporateoauthservice.mapCorporateUser(provider, authCode);
    * // Returns: { success: true, user: {...}, tokens: {...} }
    * // const result = await authService.login(credentials);
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async mapCorporateUser(oauthUserInfo, _provider) {
+  async mapCorporateUser(oauthUserInfo, provider) {
     try {
       const emailDomain = this.extractEmailDomain(oauthUserInfo.email);
 
       // Check if this is a known corporate domain
       const corporateConfig = this.corporateDomains.get(emailDomain);
 
+      // CRITICAL FIX: Only create users for CORPORATE domains
+      // Non-corporate domains should be handled by regular OAuth flow
+      if (!corporateConfig) {
+        logger.info('🏢 OAuth Corporate Check: Domain not in corporate domains', {
+          domain: emailDomain,
+          provider,
+          email: this.maskEmail(oauthUserInfo.email),
+          action: 'Skipping corporate user creation - will check for existing user or redirect to agency request',
+        });
+
+        return { user: null, client: null, isCorporateUser: false };
+      }
+
       let client = null;
 
       if (corporateConfig) {
         // Find or create corporate client
-        client = await this.findOrCreateCorporateClient(emailDomain, corporateConfig, _provider);
+        client = await this.findOrCreateCorporateClient(emailDomain, corporateConfig, provider);
 
         logger.logSecurityEvent('CORPORATE_DOMAIN_DETECTED', null, {
           domain: emailDomain,
-          _provider,
+          provider,
           clientName: corporateConfig.clientName,
         });
       }
 
-      // Create or update AmexingUser
-      const user = await this.createOrUpdateOAuthUser(oauthUserInfo, _provider, corporateConfig);
+      // Create or update AmexingUser (only for corporate domains)
+      const user = await this.createOrUpdateOAuthUser(oauthUserInfo, provider, corporateConfig);
 
       // Create employee relationship if corporate client exists
       if (client) {
@@ -169,13 +181,13 @@ class CorporateOAuthService {
           await PermissionInheritanceService.processCompleteInheritance(
             user,
             oauthUserInfo,
-            _provider,
+            provider,
             corporateConfig
           ); // eslint-disable-line max-len
 
           logger.logSecurityEvent('CORPORATE_PERMISSION_INHERITANCE_COMPLETED', user.id, {
             clientId: client.id,
-            _provider,
+            provider,
             clientName: corporateConfig.clientName,
           });
         } catch (permissionError) {
@@ -215,17 +227,16 @@ class CorporateOAuthService {
    * @param {string} domain - Email _domain.
    * @param _domain
    * @param {object} config - Corporate configuration.
-   * @param {string} provider - OAuth _provider.
-   * @param _provider
+   * @param {string} provider - OAuth provider.
    * @returns {Promise<Parse.Object>} - Client object.
    * @example
    * // OAuth service usage
-   * const result = await ocorporateoauthservice.findOrCreateCorporateClient(_provider, authCode);
+   * const result = await ocorporateoauthservice.findOrCreateCorporateClient(provider, authCode);
    * // Returns: { success: true, user: {...}, tokens: {...} }
    * // const result = await authService.login(credentials);
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async findOrCreateCorporateClient(_domain, config, _provider) {
+  async findOrCreateCorporateClient(_domain, config, provider) {
     try {
       // First, try to find existing client by domain
       const clientQuery = new Parse.Query('Client');
@@ -241,7 +252,7 @@ class CorporateOAuthService {
         client.set('name', config.clientName);
         client.set('corporateDomain', _domain);
         client.set('type', config.type);
-        client.set('primaryOAuthProvider', _provider);
+        client.set('primaryOAuthProvider', provider);
         client.set('oauthEnabled', true);
         client.set('autoProvisionEmployees', config.autoProvisionEmployees);
         client.set('active', true);
@@ -252,7 +263,7 @@ class CorporateOAuthService {
           ssoEnabled: true,
           autoProvisionEmployees: config.autoProvisionEmployees,
           departmentMappingEnabled: !!config.departmentMapping,
-          primaryProvider: provider, // eslint-disable-line no-undef
+          primaryProvider: provider,
           _domain,
         });
 
@@ -260,13 +271,13 @@ class CorporateOAuthService {
 
         logger.logSecurityEvent('CORPORATE_CLIENT_CREATED', null, {
           clientId: client.id,
-          domain, // eslint-disable-line no-undef
-          _provider,
+          domain: _domain,
+          provider,
           name: config.clientName,
         });
       } else {
         // Update existing client OAuth settings
-        client.set('primaryOAuthProvider', _provider);
+        client.set('primaryOAuthProvider', provider);
         client.set('oauthEnabled', true);
         client.set('lastOAuthSync', new Date());
 
@@ -283,8 +294,7 @@ class CorporateOAuthService {
   /**
    * Creates or updates OAuth user in AmexingUser table.
    * @param {object} oauthUserInfo - OAuth user profile.
-   * @param {string} provider - OAuth _provider.
-   * @param _provider
+   * @param {string} provider - OAuth provider.
    * @param {object} corporateConfig - Corporate configuration (optional).
    * @returns {Promise<AmexingUser>} - User object.
    * @example
@@ -292,11 +302,11 @@ class CorporateOAuthService {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   // eslint-disable-next-line complexity
-  async createOrUpdateOAuthUser(oauthUserInfo, _provider, corporateConfig = null) {
+  async createOrUpdateOAuthUser(oauthUserInfo, provider, corporateConfig = null) {
     try {
       // Check if user exists by OAuth ID
       const query = new Parse.Query(AmexingUser);
-      query.equalTo('oauthProvider', _provider);
+      query.equalTo('oauthProvider', provider);
       query.equalTo('oauthId', oauthUserInfo.sub || oauthUserInfo.id);
 
       let user = await query.first({ useMasterKey: true });
@@ -309,7 +319,7 @@ class CorporateOAuthService {
 
         if (user) {
           // Link existing user with OAuth
-          user.set('oauthProvider', _provider);
+          user.set('oauthProvider', provider);
           user.set('oauthId', oauthUserInfo.sub || oauthUserInfo.id);
           user.set('isOAuthUser', true);
         }
@@ -326,7 +336,7 @@ class CorporateOAuthService {
         });
 
         // Set OAuth-specific fields
-        user.set('oauthProvider', _provider);
+        user.set('oauthProvider', provider);
         user.set('oauthId', oauthUserInfo.sub || oauthUserInfo.id);
         user.set('isOAuthUser', true);
         user.set('emailVerified', true); // OAuth providers verify email
@@ -346,7 +356,7 @@ class CorporateOAuthService {
       await user.save(null, { useMasterKey: true });
 
       logger.logSecurityEvent('OAUTH_USER_CREATED_OR_UPDATED', user.id, {
-        provider, // eslint-disable-line no-undef
+        provider,
         email: this.maskEmail(oauthUserInfo.email),
         isCorporateUser: !!corporateConfig,
         isNewUser: !user.existed(),
@@ -563,7 +573,7 @@ class CorporateOAuthService {
     const crypto = require('crypto');
     const algorithm = 'aes-256-gcm';
     // eslint-disable-next-line no-underscore-dangle
-    const _key = Buffer.from(process.env.OAUTH_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY, 'hex');
+    const _key = Buffer.from(process.env.OAUTH_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY, 'base64');
     const iv = crypto.randomBytes(16);
 
     const cipher = crypto.createCipheriv(algorithm, _key, iv);
@@ -640,4 +650,4 @@ class CorporateOAuthService {
   }
 }
 
-module.exports = { CorporateOAuthService };
+module.exports = CorporateOAuthService;

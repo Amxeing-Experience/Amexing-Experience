@@ -437,11 +437,189 @@ class AuthenticationService extends AuthenticationServiceCore {
       return {
         success: true,
         message: 'Password reset link has been sent to your email',
-        resetToken, // Remove this in production
       };
     } catch (error) {
       logger.error('Password reset initiation error:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Requests password reset and sends email to user.
+   * @param {string} email - User email.
+   * @returns {Promise<object>} - Password reset request result.
+   * @example
+   * const result = await authService.requestPasswordReset('user@example.com');
+   * // Always returns success to prevent user enumeration
+   */
+  async requestPasswordReset(email) {
+    console.log('🔐 ========== AuthenticationService.requestPasswordReset START ==========');
+    console.log('🔐 DEBUG: Method called at:', new Date().toISOString());
+    console.log('🔐 DEBUG: Raw email received:', email);
+    console.log('🔐 DEBUG: Email type:', typeof email);
+
+    try {
+      // Normalize email
+      const normalizedEmail = email.toLowerCase().trim();
+
+      console.log('🔐 DEBUG: Normalized email:', normalizedEmail);
+      console.log('🔐 DEBUG: Starting password reset process');
+      console.log('🔐 DEBUG: About to call findUserByEmail');
+
+      // Find user by email
+      const user = await this.findUserByEmail(normalizedEmail);
+
+      console.log('🔐 DEBUG: findUserByEmail returned');
+      console.log('🔐 DEBUG: User found?:', !!user);
+
+      if (user) {
+        console.log('🔐 DEBUG: User details:', {
+          userId: user.id,
+          userEmail: user.get('email'),
+          userActive: user.get('active'),
+          userExists: user.get('exists'),
+          hasPasswordResetToken: !!user.get('passwordResetToken'),
+          passwordResetExpires: user.get('passwordResetExpires'),
+        });
+      } else {
+        console.log('🔐 DEBUG: No user found with email:', normalizedEmail);
+      }
+
+      // Always return success to prevent user enumeration
+      if (!user) {
+        logger.info('🔍 Password reset requested for non-existent email', {
+          email: this.maskEmail(normalizedEmail),
+          message: 'No user found with this email - showing success but not sending email',
+        });
+        console.log('🔐 DEBUG: No user found - returning success to prevent enumeration');
+        console.log('🔐 ========== AuthenticationService.requestPasswordReset END (NO USER) ==========');
+        return {
+          success: true,
+          message: 'If an account exists with that email, password reset instructions have been sent.',
+        };
+      }
+
+      logger.info('✅ Password reset requested for existing user', {
+        userId: user.id,
+        email: this.maskEmail(normalizedEmail),
+        message: 'User found - proceeding with email',
+      });
+
+      // Check if user is active
+      if (!user.get('active')) {
+        console.log('🔐 WARNING: User is inactive - not sending email');
+        logger.warn('Password reset requested for inactive user', {
+          userId: user.id,
+          email: this.maskEmail(normalizedEmail),
+        });
+        console.log('🔐 ========== AuthenticationService.requestPasswordReset END (INACTIVE USER) ==========');
+        return {
+          success: true,
+          message: 'If an account exists with that email, password reset instructions have been sent.',
+        };
+      }
+
+      console.log('🔐 DEBUG: User is active - proceeding with password reset');
+
+      // Generate secure reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+      console.log('🔐 DEBUG: Generated reset token (first 10 chars):', `${resetToken.substring(0, 10)}...`);
+      console.log('🔐 DEBUG: Hashed token (first 10 chars):', `${hashedToken.substring(0, 10)}...`);
+
+      // Set expiration time (1 hour)
+      const resetExpires = new Date();
+      resetExpires.setHours(resetExpires.getHours() + 1);
+
+      console.log('🔐 DEBUG: Token expires at:', resetExpires.toISOString());
+
+      // Save hashed token to user
+      console.log('🔐 DEBUG: Saving reset token to user');
+      user.set('passwordResetToken', hashedToken);
+      user.set('passwordResetExpires', resetExpires);
+      await user.save(null, { useMasterKey: true });
+      console.log('🔐 DEBUG: User saved with reset token');
+
+      // Generate reset URL
+      const baseUrl = process.env.PUBLIC_URL || 'http://localhost:1337';
+      const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
+
+      console.log('🔐 DEBUG: Reset URL generated:', resetUrl);
+
+      // Send password reset email
+      console.log('🔐 DEBUG: Loading EmailService');
+      const emailService = require('./EmailService');
+
+      console.log('🔐 DEBUG: Calling emailService.sendPasswordResetEmail');
+      console.log('🔐 DEBUG: Email params:', {
+        email: normalizedEmail,
+        name: user.get('displayName') || user.get('username') || 'User',
+        resetUrl,
+        hasRecipientUser: !!user,
+        expirationTime: '1 hour',
+      });
+
+      // Use same working approach as quotes - direct sendEmail call
+      console.log('🔐 DEBUG: Using simplified email approach like quotes');
+
+      const emailResult = await emailService.sendEmail({
+        to: normalizedEmail,
+        toName: user.get('displayName') || user.get('username') || 'User',
+        subject: 'Password Reset - Amexing Experience',
+        html: emailService.generatePasswordResetEmailHTML(
+          user.get('displayName') || user.get('username') || 'User',
+          resetUrl
+        ),
+        text: emailService.generatePasswordResetEmailText(
+          user.get('displayName') || user.get('username') || 'User',
+          resetUrl
+        ),
+        tags: ['password-reset', 'security', 'transactional'],
+        notificationType: 'password_reset',
+        recipientUser: user,
+        metadata: {
+          resetRequestedAt: new Date().toISOString(),
+          expirationTime: '1 hour',
+        },
+      });
+
+      console.log('🔐 DEBUG: Email result:', emailResult);
+
+      console.log('🔐 DEBUG: Email sent successfully');
+
+      // Log security event
+      logger.logSecurityEvent('PASSWORD_RESET_REQUESTED', {
+        userId: user.id,
+        email: this.maskEmail(normalizedEmail),
+        ip: 'system',
+      });
+
+      console.log('🔐 DEBUG: Password reset process completed successfully');
+      console.log('🔐 ========== AuthenticationService.requestPasswordReset SUCCESS END ==========');
+
+      return {
+        success: true,
+        message: 'If an account exists with that email, password reset instructions have been sent.',
+      };
+    } catch (error) {
+      console.log('🔐 ERROR: Exception caught in requestPasswordReset');
+      console.log('🔐 ERROR: Error message:', error.message);
+      console.log('🔐 ERROR: Error stack:', error.stack);
+      console.log('🔐 ERROR: Full error object:', error);
+
+      logger.error('Password reset request error:', {
+        error: error.message,
+        email: this.maskEmail(email),
+      });
+
+      console.log('🔐 ========== AuthenticationService.requestPasswordReset ERROR END ==========');
+
+      // Don't expose errors to prevent information disclosure
+      return {
+        success: true,
+        message: 'If an account exists with that email, password reset instructions have been sent.',
+      };
     }
   }
 
@@ -463,8 +641,11 @@ class AuthenticationService extends AuthenticationServiceCore {
    */
   async resetPassword(resetToken, newPassword) {
     try {
+      // Hash the provided token to compare with stored hash
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
       const query = new Parse.Query(AmexingUser);
-      query.equalTo('passwordResetToken', resetToken);
+      query.equalTo('passwordResetToken', hashedToken);
       query.greaterThan('passwordResetExpires', new Date());
 
       const user = await query.first({ useMasterKey: true });
@@ -473,9 +654,23 @@ class AuthenticationService extends AuthenticationServiceCore {
         throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Invalid or expired reset token');
       }
 
-      await user.setPassword(newPassword);
+      // Hash the new password using bcrypt
+      const bcrypt = require('bcrypt');
+      const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
+      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // Update password fields on AmexingUser
+      user.set('password', hashedPassword);
+      user.set('passwordHash', hashedPassword);
+      user.set('passwordChangedAt', new Date());
+      user.set('mustChangePassword', false);
+      user.set('loginAttempts', 0);
+      user.set('lockedUntil', null);
+
+      // Clear reset token fields
       user.unset('passwordResetToken');
       user.unset('passwordResetExpires');
+
       await user.save(null, { useMasterKey: true });
 
       logger.logSecurityEvent('PASSWORD_RESET_COMPLETED', {

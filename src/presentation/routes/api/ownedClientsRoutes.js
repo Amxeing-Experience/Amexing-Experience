@@ -71,6 +71,14 @@ router.get('/active', async (req, res) => {
 });
 
 /**
+ * GET /api/owned-clients/:id - Get a specific owned client by ID.
+ * Used for editing forms requiring client details.
+ */
+router.get('/:id', async (req, res) => {
+  await ownedClientsController.getOwnedClientById(req, res);
+});
+
+/**
  * POST /api/owned-clients - Create a new owned client.
  * Creates a client with ownership assigned to the current user.
  */

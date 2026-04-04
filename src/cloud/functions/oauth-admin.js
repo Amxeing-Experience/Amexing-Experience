@@ -33,7 +33,7 @@ const getAvailableCorporateDomains = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for corporate domain management');
     }
@@ -74,7 +74,7 @@ const addCorporateDomain = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (userRole !== 'superadmin') {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Superadmin access required for domain configuration');
     }
@@ -168,7 +168,7 @@ const getOAuthProviderStatus = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for OAuth provider status');
     }
@@ -222,7 +222,7 @@ const testCorporateDomain = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for domain testing');
     }
@@ -294,7 +294,7 @@ const getOAuthAuditLogs = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
-    const userRole = request.user.get('role');
+    const userRole = request.user.get('role') || 'guest';
     if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for audit logs');
     }

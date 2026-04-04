@@ -1,0 +1,278 @@
+<%
+// URL Input Atom - Website URL validation component
+// Parameters: name, id, label, required, value, placeholder, helpText, containerClass
+
+// Default parameters
+const inputName = typeof name !== 'undefined' ? name : '';
+const inputId = typeof id !== 'undefined' ? id : inputName || 'url_' + Math.random().toString(36).substr(2, 9);
+const inputLabel = typeof label !== 'undefined' ? label : 'Sitio Web';
+const inputRequired = typeof required !== 'undefined' ? required : false;
+const inputValue = typeof value !== 'undefined' ? value : '';
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'https://www.ejemplo.com';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'URL completa del sitio web';
+const inputContainerClass = typeof containerClass !== 'undefined' ? containerClass : '';
+
+// URL pattern for HTML5 validation
+const urlPattern = 'https?://.+';
+%>
+
+<div class="url-input-wrapper mb-3 <%= inputContainerClass %>">
+    <!-- Label -->
+    <label for="<%= inputId %>" class="form-label">
+        <%= inputLabel %>
+        <% if (inputRequired) { %>
+            <span class="text-danger ms-1">*</span>
+        <% } %>
+    </label>
+
+    <!-- URL Input with input group for protocol hint -->
+    <div class="input-group">
+        <span class="input-group-text text-muted">
+            <i class="ti ti-world"></i>
+        </span>
+        <input
+            type="url"
+            class="form-control"
+            id="<%= inputId %>"
+            name="<%= inputName %>"
+            placeholder="<%= inputPlaceholder %>"
+            value="<%= inputValue %>"
+            <% if (inputRequired) { %>required<% } %>
+            pattern="<%= urlPattern %>"
+            autocomplete="url"
+            data-url-input="<%= inputName %>"
+        >
+    </div>
+
+    <!-- Validation Feedback -->
+    <div class="invalid-feedback">
+        Por favor proporciona una URL válida (debe comenzar con http:// o https://)
+    </div>
+
+    <div class="valid-feedback">
+        URL válida
+    </div>
+
+    <!-- Help Text -->
+    <% if (inputHelpText) { %>
+        <div class="form-text text-muted mt-1">
+            <i class="ti ti-info-circle"></i> <%= inputHelpText %>
+        </div>
+    <% } %>
+</div>
+
+<style>
+    .url-input-wrapper .input-group {
+        position: relative;
+    }
+
+    .url-input-wrapper .form-control {
+        transition: all 0.3s ease;
+    }
+
+    .url-input-wrapper .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+
+    .url-input-wrapper .form-control.is-invalid {
+        border-color: #dc3545;
+    }
+
+    .url-input-wrapper .form-control.is-valid {
+        border-color: #198754;
+    }
+
+    .url-input-wrapper .input-group-text {
+        background-color: #f8f9fa;
+        border-right: 0;
+    }
+
+    .url-input-wrapper .form-control {
+        border-left: 0;
+    }
+
+    .url-input-wrapper .input-group:focus-within .input-group-text {
+        border-color: #667eea;
+        color: #667eea;
+    }
+
+    .url-input-wrapper .form-control.is-invalid ~ .invalid-feedback,
+    .url-input-wrapper .form-control.is-valid ~ .valid-feedback {
+        display: block !important;
+    }
+</style>
+
+<script>
+(function() {
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initUrlValidation);
+    } else {
+        initUrlValidation();
+    }
+
+    function initUrlValidation() {
+        const urlInput = document.getElementById('<%= inputId %>');
+        if (!urlInput) return;
+
+        // URL validation regex - more comprehensive than HTML5 pattern
+        const URL_PATTERN = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i;
+        
+        // More strict pattern requiring protocol
+        const STRICT_URL_PATTERN = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/i;
+
+        // Common TLDs for basic validation
+        const COMMON_TLDS = ['com', 'net', 'org', 'edu', 'gov', 'mx', 'es', 'co', 'io', 'dev', 'app', 'info', 'biz', 'travel'];
+
+        // Auto-add protocol on blur if missing
+        urlInput.addEventListener('blur', function() {
+            let value = this.value.trim();
+            
+            if (value && !value.match(/^https?:\/\//i)) {
+                // Check if it looks like a domain
+                if (value.match(/^(www\.)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,}/i)) {
+                    // Auto-prepend https://
+                    this.value = 'https://' + value;
+                    validateUrl();
+                }
+            }
+        });
+
+        // Real-time validation on input
+        urlInput.addEventListener('input', function() {
+            // Allow typing without immediate validation
+            // Just remove validation states while typing
+            if (this.value.length > 0 && this.value.length < 10) {
+                this.classList.remove('is-invalid', 'is-valid');
+                return;
+            }
+            
+            validateUrl();
+        });
+
+        // Validation function
+        function validateUrl() {
+            const value = urlInput.value.trim();
+
+            if (!value && !<%= inputRequired %>) {
+                // Optional field, empty is valid
+                urlInput.classList.remove('is-invalid', 'is-valid');
+                return true;
+            }
+
+            if (!value && <%= inputRequired %>) {
+                // Required field, empty is invalid
+                urlInput.classList.add('is-invalid');
+                urlInput.classList.remove('is-valid');
+                updateInvalidFeedback('Este campo es requerido');
+                return false;
+            }
+
+            // Check for basic URL structure
+            let isValid = false;
+            
+            // First try strict pattern (with protocol)
+            if (STRICT_URL_PATTERN.test(value)) {
+                isValid = true;
+            } else if (URL_PATTERN.test(value)) {
+                // Less strict pattern
+                isValid = true;
+            }
+
+            // Additional validation for common issues
+            if (isValid) {
+                // Check for double dots, double slashes (except after protocol)
+                if (value.match(/\.{2,}/) || value.match(/(?<!:)\/\/+/)) {
+                    isValid = false;
+                    updateInvalidFeedback('La URL contiene caracteres duplicados inválidos');
+                }
+                
+                // Check for spaces (URLs shouldn't have spaces)
+                if (value.match(/\s/)) {
+                    isValid = false;
+                    updateInvalidFeedback('Las URLs no pueden contener espacios');
+                }
+
+                // Validate protocol
+                if (!value.match(/^https?:\/\//i)) {
+                    isValid = false;
+                    updateInvalidFeedback('La URL debe comenzar con http:// o https://');
+                }
+
+                // Check for at least one dot (domain.tld)
+                const urlWithoutProtocol = value.replace(/^https?:\/\//i, '');
+                if (!urlWithoutProtocol.includes('.')) {
+                    isValid = false;
+                    updateInvalidFeedback('Por favor ingresa un dominio válido (ej: ejemplo.com)');
+                }
+            }
+
+            if (isValid) {
+                urlInput.classList.remove('is-invalid');
+                urlInput.classList.add('is-valid');
+            } else {
+                urlInput.classList.add('is-invalid');
+                urlInput.classList.remove('is-valid');
+                
+                // Set default error message if not already set
+                const currentFeedback = urlInput.parentElement.nextElementSibling;
+                if (currentFeedback && currentFeedback.textContent === 'Por favor proporciona una URL válida (debe comenzar con http:// o https://)') {
+                    // Keep default message
+                }
+            }
+
+            return isValid;
+        }
+
+        // Helper function to update invalid feedback message
+        function updateInvalidFeedback(message) {
+            const invalidFeedback = urlInput.closest('.url-input-wrapper').querySelector('.invalid-feedback');
+            if (invalidFeedback) {
+                invalidFeedback.textContent = message;
+            }
+        }
+
+        // Handle paste events
+        urlInput.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                // Clean up pasted URL
+                let value = this.value.trim();
+                
+                // Remove any whitespace
+                value = value.replace(/\s+/g, '');
+                
+                // Ensure lowercase for protocol
+                value = value.replace(/^HTTPS?:\/\//i, (match) => match.toLowerCase());
+                
+                this.value = value;
+                validateUrl();
+            }, 10);
+        });
+
+        // Form submission validation
+        const form = urlInput.closest('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const isValid = validateUrl();
+
+                if (!isValid && (<%= inputRequired %> || urlInput.value)) {
+                    e.preventDefault();
+                    urlInput.focus();
+                    return false;
+                }
+
+                // Clean up URL before submission
+                if (urlInput.value) {
+                    urlInput.value = urlInput.value.trim();
+                }
+            });
+        }
+
+        // Initial validation if there's a value
+        if (urlInput.value) {
+            validateUrl();
+        }
+    }
+})();
+</script>
