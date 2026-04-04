@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Atomic Components</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/icons-sprite.svg">
+    <style>
+        body { padding: 20px; background-color: #f8f9fa; }
+        .test-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="test-container">
+            <h2>🧪 Atomic Components Test</h2>
+            <p>Testing our actual atomic validation components:</p>
+            
+            <form id="atomicTestForm">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4>📧 Email Atomic Component</h4>
+                        <%- include('./atoms/common/email-input', {
+                            name: 'email',
+                            id: 'atomic-email',
+                            label: 'Email Test',
+                            required: false,
+                            placeholder: 'test@example.com',
+                            helpText: 'Real-time email validation'
+                        }) %>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h4>📱 Phone Atomic Component</h4>
+                        <%- include('./atoms/common/phone-input', {
+                            name: 'phone',
+                            id: 'atomic-phone',
+                            label: 'Phone Test',
+                            required: false,
+                            countryCode: 'MX',
+                            placeholder: '999 123 4567',
+                            helpText: 'International phone validation'
+                        }) %>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4>📄 RFC Atomic Component</h4>
+                        <%- include('./atoms/common/rfc-input', {
+                            name: 'rfc',
+                            id: 'atomic-rfc',
+                            label: 'RFC Test',
+                            required: false,
+                            placeholder: 'ABC123456789',
+                            helpText: 'Mexican RFC validation'
+                        }) %>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h4>🌐 URL Atomic Component</h4>
+                        <%- include('./atoms/common/url-input', {
+                            name: 'website',
+                            id: 'atomic-url',
+                            label: 'Website Test',
+                            required: false,
+                            placeholder: 'https://example.com',
+                            helpText: 'URL validation with protocol'
+                        }) %>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Test Atomic Components</button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🧪 Atomic components test page loaded');
+            
+            // Form submission test
+            document.getElementById('atomicTestForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                alert('✅ Atomic components form submission test!');
+            });
+        });
+    </script>
+</body>
+</html>

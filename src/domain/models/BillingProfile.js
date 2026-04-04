@@ -429,6 +429,66 @@ class BillingProfile extends BaseModel {
   }
 
   /**
+   * Get contact first name.
+   * @returns {string} First name of billing contact.
+   * @example
+   * const firstName = profile.getFirstName();
+   */
+  getFirstName() {
+    return this.get('firstName') || '';
+  }
+
+  /**
+   * Set contact first name.
+   * @param {string} firstName - First name of billing contact.
+   * @example
+   * profile.setFirstName('Juan');
+   */
+  setFirstName(firstName) {
+    this.set('firstName', firstName);
+  }
+
+  /**
+   * Get contact last name.
+   * @returns {string} Last name of billing contact.
+   * @example
+   * const lastName = profile.getLastName();
+   */
+  getLastName() {
+    return this.get('lastName') || '';
+  }
+
+  /**
+   * Set contact last name.
+   * @param {string} lastName - Last name of billing contact.
+   * @example
+   * profile.setLastName('Pérez');
+   */
+  setLastName(lastName) {
+    this.set('lastName', lastName);
+  }
+
+  /**
+   * Get contact phone number.
+   * @returns {string} Phone number of billing contact.
+   * @example
+   * const phone = profile.getPhone();
+   */
+  getPhone() {
+    return this.get('phone') || '';
+  }
+
+  /**
+   * Set contact phone number.
+   * @param {string} phone - Phone number of billing contact.
+   * @example
+   * profile.setPhone('+52 55 1234 5678');
+   */
+  setPhone(phone) {
+    this.set('phone', phone);
+  }
+
+  /**
    * Get billing email address.
    * @returns {string} Email for invoicing.
    * @example

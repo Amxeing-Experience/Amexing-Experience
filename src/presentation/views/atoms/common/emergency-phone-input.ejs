@@ -1,0 +1,155 @@
+<%
+/**
+ * Emergency Phone Input Atom
+ * Reusable emergency contact phone field with international support
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'emergencyContactPhone')
+ * @param {string} id - Input ID attribute (default: 'emergencyContactPhone')
+ * @param {string} label - Field label text (default: 'Teléfono de Emergencia')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} countryCode - Default country code (default: 'MX')
+ * @param {string} placeholder - Placeholder text (default: '999 123 4567')
+ * @param {string} helpText - Help text below field (default: 'Número de contacto de emergencia')
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string} value - Initial value (default: '')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'emergencyContactPhone';
+const inputId = typeof id !== 'undefined' ? id : 'emergencyContactPhone';
+const inputLabel = typeof label !== 'undefined' ? label : 'Teléfono de Emergencia';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const defaultCountry = typeof countryCode !== 'undefined' ? countryCode : 'MX';
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : '999 123 4567';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Número de contacto de emergencia (disponible 24/7)';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const initialValue = typeof value !== 'undefined' ? value : '';
+
+// Country codes for common countries
+const countryCodes = {
+    'MX': { code: '+52', pattern: '[0-9]{10}', format: '(999) 123-4567' },
+    'US': { code: '+1', pattern: '[0-9]{10}', format: '(999) 123-4567' },
+    'ES': { code: '+34', pattern: '[0-9]{9}', format: '999 123 456' },
+    'FR': { code: '+33', pattern: '[0-9]{9}', format: '9 99 99 99 99' },
+    'DE': { code: '+49', pattern: '[0-9]{10,11}', format: '999 9999999' }
+};
+
+const selectedCountry = countryCodes[defaultCountry] || countryCodes['MX'];
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-phone-call text-danger me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <div class="input-group">
+        <span class="input-group-text">
+            <img src="https://flagcdn.com/16x12/<%= defaultCountry.toLowerCase() %>.png" 
+                 alt="<%= defaultCountry %>" 
+                 class="me-1">
+            <%= selectedCountry.code %>
+        </span>
+        <input 
+            type="tel"
+            class="form-control"
+            id="<%= inputId %>"
+            name="<%= inputName %>"
+            placeholder="<%= inputPlaceholder %>"
+            value="<%= initialValue %>"
+            <%= isRequired ? 'required' : '' %>
+            pattern="<%= selectedCountry.pattern %>"
+            title="Formato: <%= selectedCountry.format %>"
+            maxlength="15"
+            <% Object.keys(additionalAttributes).forEach(function(key) { %>
+                <%= key %>="<%= additionalAttributes[key] %>"
+            <% }); %>
+        >
+    </div>
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <i class="ti ti-info-circle"></i>
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor ingrese un número de teléfono válido (Formato: <%= selectedCountry.format %>)
+    </div>
+</div>
+
+<script>
+(function() {
+    // Real-time phone number formatting and validation
+    const phoneInput = document.getElementById('<%= inputId %>');
+    
+    if (phoneInput) {
+        let previousValue = '';
+        
+        phoneInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            
+            // Limit to numeric input only
+            if (value.length > 0) {
+                // Format for Mexico (default)
+                <% if (defaultCountry === 'MX') { %>
+                    if (value.length <= 3) {
+                        value = value;
+                    } else if (value.length <= 6) {
+                        value = value.slice(0, 3) + ' ' + value.slice(3);
+                    } else if (value.length <= 10) {
+                        value = value.slice(0, 3) + ' ' + value.slice(3, 6) + ' ' + value.slice(6);
+                    } else {
+                        value = value.slice(0, 10);
+                        value = value.slice(0, 3) + ' ' + value.slice(3, 6) + ' ' + value.slice(6);
+                    }
+                <% } else if (defaultCountry === 'US') { %>
+                    // Format for US: (999) 123-4567
+                    if (value.length <= 3) {
+                        value = '(' + value;
+                    } else if (value.length <= 6) {
+                        value = '(' + value.slice(0, 3) + ') ' + value.slice(3);
+                    } else if (value.length <= 10) {
+                        value = '(' + value.slice(0, 3) + ') ' + value.slice(3, 6) + '-' + value.slice(6);
+                    } else {
+                        value = value.slice(0, 10);
+                        value = '(' + value.slice(0, 3) + ') ' + value.slice(3, 6) + '-' + value.slice(6);
+                    }
+                <% } %>
+                
+                e.target.value = value;
+            }
+            
+            // Validation
+            const cleanValue = value.replace(/\D/g, '');
+            if (cleanValue.length >= 10) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else if (cleanValue.length > 0) {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-valid', 'is-invalid');
+            }
+            
+            previousValue = value;
+        });
+        
+        // Prevent non-numeric input
+        phoneInput.addEventListener('keypress', function(e) {
+            const char = String.fromCharCode(e.which);
+            if (!/[0-9]/.test(char)) {
+                e.preventDefault();
+            }
+        });
+    }
+})();
+</script>

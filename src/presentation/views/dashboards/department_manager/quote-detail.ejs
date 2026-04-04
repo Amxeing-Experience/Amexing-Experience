@@ -15,6 +15,14 @@ const steps = [
 ];
 %>
 
+<script>
+// Make current user info available to all sections
+window.currentUser = {
+    role: '<%= typeof userRole !== "undefined" ? userRole : "department_manager" %>',
+    id: '<%= typeof userId !== "undefined" ? userId : "" %>'
+};
+</script>
+
 <!-- Page Header -->
 <div class="row mb-3">
     <div class="col-12">
@@ -136,6 +144,7 @@ const steps = [
     <div class="col-12">
         <% if (activeSection === 'information') { %>
             <%- include('../admin/sections/quote-information', { quoteId: quoteId, userRole: userRole }) %>
+            <%- include('../admin/sections/quote-ownership', { quoteId: quoteId, userRole: userRole }) %>
         <% } else if (activeSection === 'services') { %>
             <%- include('../admin/sections/quote-services-v2', { quoteId: quoteId, userRole: userRole }) %>
             <%- include('../admin/sections/quote-services-modals') %>

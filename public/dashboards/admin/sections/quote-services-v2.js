@@ -555,7 +555,7 @@ class ItineraryBuilder {
       const tourOverrideCheckbox = document.getElementById('tourOverridePrices');
       if (tourOverrideCheckbox) {
         tourOverrideCheckbox.addEventListener('change', (e) => {
-          console.log('✅ Tour override checkbox changed:', e.target.checked);
+          // Note: Removed checkbox change log for console cleanup
           this.handlePriceOverrideToggle('tour', e.target.checked);
         });
       }
@@ -1035,27 +1035,27 @@ class ItineraryBuilder {
     const tourChildrenField = document.getElementById('tourChildrenQuantity');
     const tourInfantsField = document.getElementById('tourInfantsQuantity');
     
-    if (tourAdultsField) tourAdultsField.value = numberOfAdults;
-    if (tourChildrenField) tourChildrenField.value = numberOfChildren;
-    if (tourInfantsField) tourInfantsField.value = numberOfInfants;
+    if (tourAdultsField) tourAdultsField.value = numberOfAdults || '';
+    if (tourChildrenField) tourChildrenField.value = numberOfChildren || '';
+    if (tourInfantsField) tourInfantsField.value = numberOfInfants || '';
 
     // Walking tour fields
     const walkingAdultsField = document.getElementById('walkingTourAdultsQuantity');
     const walkingChildrenField = document.getElementById('walkingTourChildrenQuantity');
     const walkingInfantsField = document.getElementById('walkingTourInfantsQuantity');
     
-    if (walkingAdultsField) walkingAdultsField.value = numberOfAdults;
-    if (walkingChildrenField) walkingChildrenField.value = numberOfChildren;
-    if (walkingInfantsField) walkingInfantsField.value = numberOfInfants;
+    if (walkingAdultsField) walkingAdultsField.value = numberOfAdults || '';
+    if (walkingChildrenField) walkingChildrenField.value = numberOfChildren || '';
+    if (walkingInfantsField) walkingInfantsField.value = numberOfInfants || '';
 
     // Transport fields
     const transportAdultsField = document.getElementById('transportAdults');
     const transportChildrenField = document.getElementById('transportChildren');
     const transportInfantsField = document.getElementById('transportInfants');
     
-    if (transportAdultsField) transportAdultsField.value = numberOfAdults;
-    if (transportChildrenField) transportChildrenField.value = numberOfChildren;
-    if (transportInfantsField) transportInfantsField.value = numberOfInfants;
+    if (transportAdultsField) transportAdultsField.value = numberOfAdults || '';
+    if (transportChildrenField) transportChildrenField.value = numberOfChildren || '';
+    if (transportInfantsField) transportInfantsField.value = numberOfInfants || '';
 
     // Experience fields (only adults and children)
     const experienceAdultsField = document.getElementById('adultsQuantity');
@@ -1647,7 +1647,7 @@ class ItineraryBuilder {
           field.removeAttribute('readonly'); // Force remove readonly attribute
           field.classList.add('price-override-active');
           field.style.backgroundColor = ''; // Clear gray background
-          console.log(`✅ Enabled editing for ${fieldId}`);
+          // Note: Removed field editing log for console cleanup
         } else {
           // Disable manual editing and restore calculated prices
           field.readOnly = true;
@@ -2655,27 +2655,14 @@ class ItineraryBuilder {
           const walkingChildren = document.getElementById('walkingTourChildrenQuantity')?.value;
           const walkingInfants = document.getElementById('walkingTourInfantsQuantity')?.value;
           
-          console.log('🚶‍♂️ Walking tour form values before collection:', {
-            walkingAdults, walkingChildren, walkingInfants,
-            regularAdults: document.getElementById('tourAdultsQuantity')?.value,
-            regularChildren: document.getElementById('tourChildrenQuantity')?.value,
-            regularInfants: document.getElementById('tourInfantsQuantity')?.value,
-            walkingFormExists: !!document.getElementById('walkingTourAdultsQuantity'),
-            regularFormExists: !!document.getElementById('tourAdultsQuantity')
-          });
+          // Note: Removed verbose walking tour form values log for console cleanup
           
           data.adultsQuantity = parseInt(document.getElementById('walkingTourAdultsQuantity')?.value || 0);
           data.childrenQuantity = parseInt(document.getElementById('walkingTourChildrenQuantity')?.value || 0);
           data.infantsQuantity = parseInt(document.getElementById('walkingTourInfantsQuantity')?.value || 0);
           data.walkingTourPeopleCount = data.adultsQuantity + data.childrenQuantity + data.infantsQuantity || 1;
           
-          // Debug: Check final collected data
-          console.log('🚶‍♂️ Walking tour final collected data:', {
-            adultsQuantity: data.adultsQuantity,
-            childrenQuantity: data.childrenQuantity,
-            infantsQuantity: data.infantsQuantity,
-            walkingTourPeopleCount: data.walkingTourPeopleCount
-          });
+          // Note: Removed walking tour final data log for console cleanup
           
           // Check for price override on walking tours
           const walkingTourOverride = document.getElementById('tourOverridePrices')?.checked;
@@ -3691,13 +3678,13 @@ class ItineraryBuilder {
             && tourContent && !tourContent.classList.contains('d-none')) {
             // Populate the fields
             if (service.adultsQuantity !== undefined) {
-              tourAdultsQuantityField.value = service.adultsQuantity;
+              tourAdultsQuantityField.value = service.adultsQuantity || '';
             }
             if (service.childrenQuantity !== undefined) {
-              tourChildrenQuantityField.value = service.childrenQuantity;
+              tourChildrenQuantityField.value = service.childrenQuantity || '';
             }
             if (service.infantsQuantity !== undefined) {
-              tourInfantsQuantityField.value = service.infantsQuantity;
+              tourInfantsQuantityField.value = service.infantsQuantity || '';
             }
 
             // Restore start/end time fields
@@ -3901,9 +3888,9 @@ class ItineraryBuilder {
           document.getElementById('transportOriginText').value = originSplit.baseName;
 
           // Populate the new people fields for transport
-          document.getElementById('transportAdults').value = service.transportAdults || 0;
-          document.getElementById('transportChildren').value = service.transportChildren || 0;
-          document.getElementById('transportInfants').value = service.transportInfants || 0;
+          document.getElementById('transportAdults').value = service.transportAdults || '';
+          document.getElementById('transportChildren').value = service.transportChildren || '';
+          document.getElementById('transportInfants').value = service.transportInfants || '';
 
           // Restore specific location — from explicit field or extracted from origin/destination
           const specificToRestore = service.specificLocation || extractedSpecificLocation;
@@ -3915,9 +3902,9 @@ class ItineraryBuilder {
           }
 
           // Populate the new people fields for transport
-          document.getElementById('transportAdults').value = service.transportAdults || 0;
-          document.getElementById('transportChildren').value = service.transportChildren || 0;
-          document.getElementById('transportInfants').value = service.transportInfants || 0;
+          document.getElementById('transportAdults').value = service.transportAdults || '';
+          document.getElementById('transportChildren').value = service.transportChildren || '';
+          document.getElementById('transportInfants').value = service.transportInfants || '';
 
           // Flight details (airport)
           if (service.transportType === 'aeropuerto') {
@@ -4504,14 +4491,7 @@ class ItineraryBuilder {
           console.log('🚗 Adding driver tour rate to custom price total:', driverTourRate);
         }
         
-        console.log('💰 Using custom BASE price for tour:', {
-          basePrice: service.customPrice,
-          quantity,
-          duration,
-          includeGuide: service.includeGuide,
-          driverRate: service.includeGuide ? (this.driverTourRateCache?.value || 0) : 0,
-          totalPrice
-        });
+        // Note: Removed verbose custom pricing log for console cleanup
         
         return totalPrice;
       }
@@ -5377,29 +5357,7 @@ class ItineraryBuilder {
         day.subconcepts.forEach((subconcept) => {
           const serviceId = subconcept.id || this.generateId('service');
           
-          // Debug: Log ALL service data coming from backend to detect walking tours
-          console.log('🔍 Backend service data for ID', serviceId + ':', {
-            concept: subconcept.concept,
-            type: subconcept.type,
-            isWalkingTour: subconcept.isWalkingTour,
-            walkingTourFlags: {
-              hasWalkingTourPrice: subconcept.walkingTourPrice !== undefined,
-              hasWalkingTourPeopleCount: subconcept.walkingTourPeopleCount !== undefined,
-              conceptContainsWalking: subconcept.concept && subconcept.concept.toLowerCase().includes('pie'),
-              typeIsTour: subconcept.type === 'tour'
-            },
-            peopleData: {
-              adultsQuantity: subconcept.adultsQuantity,
-              childrenQuantity: subconcept.childrenQuantity,
-              infantsQuantity: subconcept.infantsQuantity,
-              walkingTourPeopleCount: subconcept.walkingTourPeopleCount,
-              transportAdults: subconcept.transportAdults,
-              transportChildren: subconcept.transportChildren,
-              transportInfants: subconcept.transportInfants
-            },
-            allWalkingKeys: Object.keys(subconcept).filter(k => k.toLowerCase().includes('walking')),
-            allPeopleKeys: Object.keys(subconcept).filter(k => k.includes('adult') || k.includes('child') || k.includes('infant'))
-          });
+          // Note: Removed verbose backend service data logging for console cleanup
           const serviceData = {
             id: serviceId,
             dayId: dayData.id,
@@ -5480,36 +5438,13 @@ class ItineraryBuilder {
           
           // Debug: Log what gets stored in services Map for walking tours
           if (subconcept.isWalkingTour || (subconcept.concept && subconcept.concept.toLowerCase().includes('pie'))) {
-            console.log('💾 Storing walking tour in services Map:', {
-              serviceId: serviceId,
-              storedPeopleData: {
-                adultsQuantity: serviceData.adultsQuantity,
-                childrenQuantity: serviceData.childrenQuantity,
-                infantsQuantity: serviceData.infantsQuantity,
-                walkingTourPeopleCount: serviceData.walkingTourPeopleCount
-              },
-              isWalkingTour: serviceData.isWalkingTour,
-              originalBackendData: {
-                adultsQuantity: subconcept.adultsQuantity,
-                childrenQuantity: subconcept.childrenQuantity,
-                infantsQuantity: subconcept.infantsQuantity
-              }
-            });
+            // Note: Removed walking tour storage log for console cleanup
           }
           
           this.services.set(serviceId, serviceData);
           
           // Debug logging for loaded service data
-          if ((subconcept.type === 'tour' || subconcept.type === 'experience') && subconcept.priceOverride) {
-            console.log('📥 Loaded from backend - service price data:', {
-              type: subconcept.type,
-              concept: subconcept.concept,
-              priceOverride: subconcept.priceOverride,
-              customPrice: subconcept.customPrice,
-              customPrices: subconcept.customPrices,
-              unitPrice: subconcept.unitPrice
-            });
-          }
+          // Note: Removed verbose backend service price loading log for console cleanup
 
           // Debug logging for people quantities and schedule loading
           if (subconcept.type === 'experience' && (subconcept.adultsQuantity || subconcept.childrenQuantity || subconcept.adultsNoAlcoholQuantity || subconcept.selectedSchedule)) {
@@ -12020,7 +11955,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const quoteIdElement = document.querySelector('[data-quote-id]');
   if (quoteIdElement) {
     const { quoteId } = quoteIdElement.dataset;
-    console.log('🚀 Initializing ItineraryBuilder for quote:', quoteId);
+    // Note: Removed ItineraryBuilder initialization log for console cleanup
     window.itineraryBuilder = new ItineraryBuilder(quoteId);
     window.itineraryBuilder.init();
   }

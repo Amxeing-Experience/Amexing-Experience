@@ -46,7 +46,8 @@ const showActionsColumn = dtShowActions && (canEdit || canDelete) && dtUserRole 
 // Role translations
 const roleLabels = {
   client: 'Agent',
-  employee: 'Empleado'
+  employee: 'Empleado',
+  department_manager: 'Manager'
 };
 %>
 
@@ -263,7 +264,7 @@ function initializeEmployeesDataTable() {
                     
                     // Add "ME" badge if this is the current user
                     const currentUserId = '<%= dtCurrentUserId %>';
-                    const isCurrentUser = currentUserId && row.id === currentUserId;
+                    const isCurrentUser = (currentUserId && row.id === currentUserId) || row.isCurrentUser === true;
                     const meBadge = isCurrentUser ? ' <span class="badge bg-primary ms-2">ME</span>' : '';
                     
                     return `<strong class="text-dark">${fullName}</strong>${meBadge}`;
@@ -280,12 +281,18 @@ function initializeEmployeesDataTable() {
                 render: function(data, type, row) {
                     const roleLabels = {
                         client: 'Agent',
-                        employee: 'Empleado'
+                        employee: 'Empleado',
+                        department_manager: 'Manager'
                     };
                     const role = row.role || row.roleId?.name || 'employee';
                     const roleName = typeof role === 'string' ? role : role.name || 'employee';
                     const roleLabel = roleLabels[roleName] || roleName;
-                    const badgeClass = roleName === 'client' ? 'bg-info' : 'bg-secondary';
+                    let badgeClass = 'bg-secondary';
+                    if (roleName === 'client') {
+                        badgeClass = 'bg-info';
+                    } else if (roleName === 'department_manager') {
+                        badgeClass = 'bg-success';
+                    }
                     return `<span class="badge ${badgeClass}">${roleLabel}</span>`;
                 }
             },
@@ -318,47 +325,72 @@ function initializeEmployeesDataTable() {
                 render: function(data, type, row) {
                     let actions = '<div class="btn-group btn-group-sm" role="group">';
 
+                    // Check if this is the current user
+                    const currentUserId = '<%= dtCurrentUserId %>';
+                    const isCurrentUser = (currentUserId && row.id === currentUserId) || row.isCurrentUser === true;
+
                     <% if (canEdit) { %>
-                    /* Edit button */
+                    /* Edit button - always show, but different behavior for department_manager */
                     const employeeName = `${row.firstName || ''} ${row.lastName || ''}`.trim() || 'Empleado';
-                    actions += `<button type="button"
-                                class="btn btn-primary btn-edit-employee"
-                                data-employee-id="${row.id}"
-                                data-employee-data="${encodeURIComponent(JSON.stringify(row))}"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                title="Editar ${employeeName}">
-                                <i class="ti ti-edit"></i>
-                            </button>`;
+                    const role = row.role || row.roleId?.name || 'employee';
+                    const roleName = typeof role === 'string' ? role : role.name || 'employee';
+                    
+                    if (roleName === 'department_manager') {
+                        // Department manager gets client edit button
+                        actions += `<button type="button"
+                                    class="btn btn-primary btn-edit-client"
+                                    data-client-id="${row.id}"
+                                    data-client-data="${encodeURIComponent(JSON.stringify(row))}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Editar Cliente">
+                                    <i class="ti ti-edit"></i>
+                                </button>`;
+                    } else {
+                        // Regular employees get employee edit button
+                        actions += `<button type="button"
+                                    class="btn btn-primary btn-edit-employee"
+                                    data-employee-id="${row.id}"
+                                    data-employee-data="${encodeURIComponent(JSON.stringify(row))}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Editar ${employeeName}">
+                                    <i class="ti ti-edit"></i>
+                                </button>`;
+                    }
 
-                    /* Toggle status button */
-                    const statusIcon = row.active ? 'ti-user-off' : 'ti-user-check';
-                    const statusTitle = row.active ? 'Desactivar' : 'Activar';
-                    const statusClass = row.active ? 'btn-warning' : 'btn-success';
+                    /* Toggle status button - hide for current user and department_manager */
+                    if (!isCurrentUser && roleName !== 'department_manager') {
+                        const statusIcon = row.active ? 'ti-user-off' : 'ti-user-check';
+                        const statusTitle = row.active ? 'Desactivar' : 'Activar';
+                        const statusClass = row.active ? 'btn-warning' : 'btn-success';
 
-                    actions += `<button type="button"
-                                class="btn ${statusClass} btn-toggle-employee-status"
-                                data-employee-id="${row.id}"
-                                data-current-status="${row.active}"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                title="${statusTitle}">
-                                <i class="ti ${statusIcon}"></i>
-                            </button>`;
+                        actions += `<button type="button"
+                                    class="btn ${statusClass} btn-toggle-employee-status"
+                                    data-employee-id="${row.id}"
+                                    data-current-status="${row.active}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="${statusTitle}">
+                                    <i class="ti ${statusIcon}"></i>
+                                </button>`;
+                    }
                     <% } %>
 
                     <% if (canDelete) { %>
-                    /* Delete button */
-                    const employeeNameForDelete = `${row.firstName || ''} ${row.lastName || ''}`.trim() || 'este empleado';
-                    actions += `<button type="button"
-                                class="btn btn-danger btn-delete-employee"
-                                data-employee-id="${row.id}"
-                                data-employee-name="${employeeNameForDelete}"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                title="Eliminar">
-                                <i class="ti ti-trash"></i>
-                            </button>`;
+                    /* Delete button - hide for current user and department_manager */
+                    if (!isCurrentUser && roleName !== 'department_manager') {
+                        const employeeNameForDelete = `${row.firstName || ''} ${row.lastName || ''}`.trim() || 'este empleado';
+                        actions += `<button type="button"
+                                    class="btn btn-danger btn-delete-employee"
+                                    data-employee-id="${row.id}"
+                                    data-employee-name="${employeeNameForDelete}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Eliminar">
+                                    <i class="ti ti-trash"></i>
+                                </button>`;
+                    }
                     <% } %>
 
                     actions += '</div>';
@@ -481,6 +513,22 @@ function editEmployee(employeeId, employeeData) {
         detail: {
             employeeId: employeeId,
             employeeData: employeeData
+        }
+    });
+    document.dispatchEvent(editEvent);
+}
+
+/**
+ * Edit client data (for department_manager role)
+ * @param {string} clientId - Client ID
+ * @param {object} clientData - Current client data
+ */
+function editClient(clientId, clientData) {
+    // Trigger custom event that the parent page can listen to
+    const editEvent = new CustomEvent('editClient', {
+        detail: {
+            clientId: clientId,
+            clientData: clientData
         }
     });
     document.dispatchEvent(editEvent);
@@ -699,11 +747,19 @@ function setupEventDelegation() {
 
         if (!target) return;
 
-        // Edit button
+        // Edit employee button
         if (target.classList.contains('btn-edit-employee')) {
             const employeeId = target.getAttribute('data-employee-id');
             const employeeData = JSON.parse(decodeURIComponent(target.getAttribute('data-employee-data')));
             editEmployee(employeeId, employeeData);
+            return;
+        }
+
+        // Edit client button (for department_manager)
+        if (target.classList.contains('btn-edit-client')) {
+            const clientId = target.getAttribute('data-client-id');
+            const clientData = JSON.parse(decodeURIComponent(target.getAttribute('data-client-data')));
+            editClient(clientId, clientData);
             return;
         }
 

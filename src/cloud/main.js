@@ -402,6 +402,76 @@ function registerCloudFunctions() {
       }
     });
 
+    /**
+     * Requests password reset and sends email to user.
+     * Uses secure token generation and prevents user enumeration.
+     * @function requestPasswordReset
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Always returns success to prevent user enumeration.
+     * @example
+     * // Call from client
+     * const result = await Parse.Cloud.run('requestPasswordReset', {
+     *   email: 'john@example.com'
+     * });
+     * // Always returns: { success: true, message: '...' }
+     */
+    Parse.Cloud.define('requestPasswordReset', async (request) => {
+      console.log('☁️ ========== CLOUD FUNCTION: requestPasswordReset START ==========');
+      console.log('☁️ CLOUD: requestPasswordReset called at:', new Date().toISOString());
+      const { params } = request;
+      console.log('☁️ CLOUD: Full params received:', JSON.stringify(params, null, 2));
+
+      const { email } = params;
+      console.log('☁️ CLOUD: Email extracted:', email);
+      console.log('☁️ CLOUD: Email type:', typeof email);
+      console.log('☁️ CLOUD: Email length:', email ? email.length : 'undefined');
+
+      // Validate email parameter
+      if (!email || typeof email !== 'string') {
+        console.log('☁️ ERROR: Email validation failed - missing or invalid type');
+        throw new Parse.Error(Parse.Error.INVALID_PARAMETERS, 'Email is required');
+      }
+
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        console.log('☁️ ERROR: Email format validation failed');
+        throw new Parse.Error(Parse.Error.INVALID_PARAMETERS, 'Invalid email format');
+      }
+
+      console.log('☁️ CLOUD: Email validation passed');
+      console.log('☁️ CLOUD: Calling AuthenticationService.requestPasswordReset');
+
+      try {
+        const result = await AuthenticationService.requestPasswordReset(email);
+        console.log('☁️ CLOUD: AuthenticationService returned successfully');
+        console.log('☁️ CLOUD: Service result:', JSON.stringify(result, null, 2));
+        console.log('☁️ ========== CLOUD FUNCTION: requestPasswordReset SUCCESS END ==========');
+        return result;
+      } catch (error) {
+        console.log('☁️ ERROR: AuthenticationService.requestPasswordReset threw error');
+        console.log('☁️ ERROR: Error message:', error.message);
+        console.log('☁️ ERROR: Error stack:', error.stack);
+        console.log('☁️ ERROR: Full error:', error);
+
+        // Log error but don't expose it to prevent information disclosure
+        logger.error('Password reset request error:', {
+          error: error.message,
+          email: AuthenticationService.prototype.maskEmail
+            ? AuthenticationService.prototype.maskEmail(email) : email,
+        });
+
+        console.log('☁️ CLOUD: Returning generic success to prevent user enumeration');
+        console.log('☁️ ========== CLOUD FUNCTION: requestPasswordReset ERROR END ==========');
+
+        // Always return success to prevent user enumeration
+        return {
+          success: true,
+          message: 'If an account exists with that email, password reset instructions have been sent.',
+        };
+      }
+    });
+
     // OAuth Cloud Functions
     /**
      * Generates an OAuth authorization URL for the specified provider.
@@ -445,16 +515,62 @@ function registerCloudFunctions() {
      */
     Parse.Cloud.define('handleOAuthCallback', async (request) => {
       const { params, ip } = request;
-      const { _provider, code, state } = params;
+      const { provider, code, state } = params;
 
       try {
-        logger.info(`OAuth ${_provider} callback from IP: ${ip}`);
+        logger.info(`OAuth ${provider} callback from IP: ${ip}`);
 
-        const result = await OAuthService.handleCallback(_provider, code, state);
+        const result = await OAuthService.handleCallback(provider, code, state);
+
+        // Handle different OAuth outcomes based on the new business logic
+        if (!result.success || result.requiresLinkingConfirmation || result.requiresAgencyRequest) {
+          // Handle various failure scenarios
+          if (result.error === 'account_deactivated') {
+            // Account is deactivated - return error for redirect handling
+            throw new Parse.Error(Parse.Error.OTHER_CAUSE, JSON.stringify({
+              error: result.error,
+              redirectUrl: result.redirectUrl,
+              message: result.message,
+              toast: true,
+            }));
+          }
+
+          if (result.requiresLinkingConfirmation) {
+            // User exists but needs to confirm OAuth linking
+            throw new Parse.Error(Parse.Error.OTHER_CAUSE, JSON.stringify({
+              requiresLinkingConfirmation: true,
+              existingUser: result.existingUser,
+              oauthInfo: result.oauthInfo,
+              redirectUrl: result.redirectUrl,
+              message: result.message,
+            }));
+          }
+
+          if (result.requiresAgencyRequest) {
+            // New user needs agency access
+            throw new Parse.Error(Parse.Error.OTHER_CAUSE, JSON.stringify({
+              requiresAgencyRequest: true,
+              redirectUrl: result.redirectUrl,
+              message: result.message,
+            }));
+          }
+
+          // Generic error
+          throw new Parse.Error(Parse.Error.OTHER_CAUSE, result.message || 'OAuth authentication failed');
+        }
+
+        // Success - return tokens and user data
         return result;
       } catch (error) {
         logger.error('OAuth callback error:', error);
-        throw error;
+
+        // Re-throw Parse.Error with our custom data
+        if (error instanceof Parse.Error) {
+          throw error;
+        }
+
+        // Handle generic errors
+        throw new Parse.Error(Parse.Error.OTHER_CAUSE, error.message || 'OAuth callback failed');
       }
     });
 
@@ -513,6 +629,34 @@ function registerCloudFunctions() {
         return result;
       } catch (error) {
         logger.error('OAuth account unlinking error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Confirms OAuth account linking after user approval.
+     * Handles the linking confirmation flow when a user approves connecting their OAuth account.
+     * @function confirmOAuthLinking
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to authentication result with user data and tokens.
+     * @example
+     * // Call from OAuth confirmation modal
+     * const result = await Parse.Cloud.run('confirmOAuthLinking', {
+     *   existingUser: { id: 'user123', email: 'user@example.com' },
+     *   oauthInfo: { provider: 'google', providerId: '123', email: 'user@gmail.com' }
+     * });
+     */
+    Parse.Cloud.define('confirmOAuthLinking', async (request) => {
+      const { params, ip } = request;
+      const { existingUser, oauthInfo } = params;
+
+      try {
+        logger.info(`OAuth linking confirmation for user ${existingUser.id} from IP: ${ip}`);
+
+        const result = await OAuthService.confirmOAuthLinking(oauthInfo, existingUser);
+        return result;
+      } catch (error) {
+        logger.error('OAuth linking confirmation error:', error);
         throw error;
       }
     });
@@ -848,6 +992,82 @@ function registerCloudFunctions() {
 
         // Initialize user profile or perform other setup tasks
         // This is where you might create related objects, send welcome emails, etc.
+      }
+    });
+
+    /**
+     * AfterSave trigger for Quote that manages reminder lifecycle.
+     * Automatically creates reminders when status becomes "COTIZADO" and cancels when status changes.
+     * Created by Denisse Maldonado.
+     * @function afterSaveQuote
+     * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
+     * @returns {Promise<void>} - Promise that resolves when reminder operations are complete.
+     */
+    Parse.Cloud.afterSave('Quote', async (request) => {
+      const { object: quote, original } = request;
+
+      try {
+        // Import services dynamically to avoid circular dependencies in cloud code
+        const QuoteReminderService = require('../application/services/QuoteReminderService');
+        const reminderService = new QuoteReminderService();
+
+        const currentStatus = quote.get('status');
+        const previousStatus = original ? original.get('status') : null;
+
+        logger.debug('Quote afterSave hook triggered', {
+          quoteId: quote.id,
+          currentStatus,
+          previousStatus,
+          isNew: !quote.existed(),
+        });
+
+        // Case 1: Quote status changed to "COTIZADO" - create reminder
+        if (currentStatus === 'COTIZADO' && previousStatus !== 'COTIZADO') {
+          logger.info('Quote status changed to COTIZADO, creating reminder', {
+            quoteId: quote.id,
+            folio: quote.get('folio'),
+          });
+
+          await reminderService.createInitialReminder(quote, {
+            initialDelay: 5, // Start reminders 5 days after quoting
+            maxReminders: 6, // Maximum 6 reminders
+            reminderInterval: 5, // Send every 5 days
+          });
+
+          logger.info('Quote reminder created successfully', {
+            quoteId: quote.id,
+            folio: quote.get('folio'),
+          });
+        } else if (previousStatus === 'COTIZADO' && currentStatus !== 'COTIZADO') {
+          // Case 2: Quote status changed away from "COTIZADO" - cancel reminders
+          logger.info('Quote status changed from COTIZADO, cancelling reminders', {
+            quoteId: quote.id,
+            folio: quote.get('folio'),
+            newStatus: currentStatus,
+          });
+
+          const cancelled = await reminderService.cancelRemindersForQuote(
+            quote,
+            `Status changed from COTIZADO to ${currentStatus}`
+          );
+
+          logger.info('Quote reminders cancelled', {
+            quoteId: quote.id,
+            folio: quote.get('folio'),
+            cancelledCount: cancelled,
+          });
+        }
+      } catch (error) {
+        // Log error but don't throw to avoid breaking the save operation
+        logger.error('Error in Quote afterSave reminder hook:', {
+          error: error.message,
+          stack: error.stack,
+          quoteId: quote?.id,
+          folio: quote?.get('folio'),
+        });
+
+        // Optional: Create alert for admin about failed reminder operation
+        // This ensures the quote save succeeds even if reminder creation fails
       }
     });
 
@@ -2012,6 +2232,85 @@ function registerCloudFunctions() {
         return auditResults;
       } catch (error) {
         logger.error('Error in security audit:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Daily background job that processes quote reminders.
+     * Scans for quotes with "COTIZADO" status that have due reminders and sends reminder emails.
+     * Created by Denisse Maldonado.
+     * @function processQuoteReminders
+     * @param {Parse.Cloud.JobRequest} request - The Parse Cloud job request object.
+     * @returns {Promise<object>} - Promise resolving to processing results with statistics.
+     * @example
+     * // Schedule this job daily in Parse Dashboard or via cron
+     * // Returns: { processed: 15, sent: 12, failed: 3, errors: [...] }
+     */
+    Parse.Cloud.job('processQuoteReminders', async (request) => {
+      const { message } = request;
+      message('Starting quote reminders processing...');
+
+      try {
+        // Import services dynamically to avoid circular dependencies
+        const QuoteReminderService = require('../application/services/QuoteReminderService');
+        const reminderService = new QuoteReminderService();
+
+        // Process all due reminders
+        const results = await reminderService.processDueReminders();
+
+        message(`Processed ${results.processed} reminders: ${results.sent} sent, ${results.failed} failed`);
+
+        if (results.errors.length > 0) {
+          message(`Errors: ${results.errors.map((e) => e.error).join(', ')}`);
+        }
+
+        logger.info('Quote reminders job completed', results);
+
+        return {
+          success: true,
+          ...results,
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        logger.error('Error in quote reminders job:', error);
+        message(`Job failed: ${error.message}`);
+        throw error;
+      }
+    });
+
+    /**
+     * Cloud function to manually trigger quote reminder processing.
+     * Created by Denisse Maldonado.
+     * @function triggerQuoteReminders
+     * @param {Parse.Cloud.FunctionRequest} request - The cloud function request.
+     * @returns {Promise<object>} - Promise resolving to job trigger result.
+     */
+    Parse.Cloud.define('triggerQuoteReminders', async (request) => {
+      try {
+        // Validate admin permissions
+        if (!request.user || !request.user.get('isAdmin')) {
+          throw new Error('Admin access required');
+        }
+
+        // Start the reminder processing job
+        await Parse.Cloud.startJob('processQuoteReminders', {
+          triggeredBy: request.user.get('username') || request.user.get('email'),
+          manual: true,
+        });
+
+        logger.info('Quote reminders job triggered manually', {
+          userId: request.user.id,
+          userEmail: request.user.get('email'),
+        });
+
+        return {
+          success: true,
+          message: 'Quote reminders job started successfully',
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        logger.error('Error triggering quote reminders job:', error);
         throw error;
       }
     });

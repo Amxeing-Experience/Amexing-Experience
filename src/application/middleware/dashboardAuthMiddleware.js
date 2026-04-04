@@ -57,6 +57,13 @@ class DashboardAuthMiddleware {
     const sessionToken = req.cookies?.sessionToken;
 
     if (!accessToken && !sessionToken) {
+      logger.info('Dashboard auth: No tokens found, redirecting to login:', {
+        path: currentPath,
+        hasAccessToken: !!accessToken,
+        hasSessionToken: !!sessionToken,
+        allCookies: Object.keys(req.cookies || {}),
+        redirectTo: req.originalUrl,
+      });
       return res.redirect(`/login?returnTo=${encodeURIComponent(req.originalUrl)}`);
     }
 
@@ -72,6 +79,12 @@ class DashboardAuthMiddleware {
     // First check JWT token
     if (accessToken) {
       try {
+        logger.info('Dashboard auth: JWT token found, attempting verification:', {
+          path: currentPath,
+          tokenLength: accessToken.length,
+          tokenStart: `${accessToken.substring(0, 20)}...`,
+        });
+
         const decoded = jwt.verify(accessToken, this.jwtSecret);
         user = {
           id: decoded.userId || 'unknown',
@@ -82,8 +95,20 @@ class DashboardAuthMiddleware {
           organizationId: decoded.organizationId,
           isActive: true,
         };
+
+        logger.info('Dashboard auth: JWT verification successful:', {
+          path: currentPath,
+          userId: user.id,
+          userRole: user.role,
+          username: user.username,
+        });
       } catch (error) {
-        logger.warn('Invalid JWT token:', error.message);
+        logger.warn('Dashboard auth: Invalid JWT token:', {
+          path: currentPath,
+          error: error.message,
+          tokenPresent: !!accessToken,
+          tokenLength: accessToken ? accessToken.length : 0,
+        });
       }
     } else if (sessionToken && req.session && req.session.user) {
       // If no valid JWT user, check session
@@ -135,7 +160,7 @@ class DashboardAuthMiddleware {
       return res.redirect(`/login?returnTo=${encodeURIComponent(req.originalUrl)}`);
     }
 
-    const userRole = req.user.role;
+    const userRole = req.user.role || req.userRole || 'guest';
     // eslint-disable-next-line security/detect-object-injection
     const userLevel = this.roleHierarchy[userRole] || 0;
     // eslint-disable-next-line security/detect-object-injection
@@ -150,7 +175,7 @@ class DashboardAuthMiddleware {
       });
 
       // Instead of error page, redirect to user's own dashboard to prevent loops
-      return res.redirect(`/dashboard/${userRole}`);
+      return res.redirect(`/dashboard/${userRole || 'guest'}`);
     }
 
     next();
@@ -177,10 +202,10 @@ class DashboardAuthMiddleware {
 
     if (!requestedDashboard) {
       // Root dashboard access - redirect to user's default dashboard
-      return res.redirect(`/dashboard/${req.user.role}`);
+      return res.redirect(`/dashboard/${req.user.role || req.userRole || 'guest'}`);
     }
 
-    const userRole = req.user.role;
+    const userRole = req.user.role || req.userRole || 'guest';
     // eslint-disable-next-line security/detect-object-injection
     const allowedDashboards = this.dashboardPermissions[userRole] || [];
 
@@ -191,7 +216,7 @@ class DashboardAuthMiddleware {
         userRole,
         requestedDashboard,
       });
-      return res.redirect(`/dashboard/${userRole}`);
+      return res.redirect(`/dashboard/${userRole || 'guest'}`);
     }
 
     // Allow access if user has permission OR if it's their own dashboard
@@ -204,7 +229,7 @@ class DashboardAuthMiddleware {
         requestedDashboard,
         allowedDashboards,
       });
-      return res.redirect(`/dashboard/${userRole}`);
+      return res.redirect(`/dashboard/${userRole || 'guest'}`);
     }
   };
 

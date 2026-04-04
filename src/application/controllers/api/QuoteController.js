@@ -5,7 +5,11 @@
 
 const Parse = require('parse/node');
 const Quote = require('../../../domain/models/Quote');
+const QuoteOwnership = require('../../../domain/models/QuoteOwnership');
 const QuoteService = require('../../services/QuoteService');
+const QuoteOwnershipService = require('../../services/QuoteOwnershipService');
+const QuoteCollaborationService = require('../../services/QuoteCollaborationService');
+const QuoteVersioningService = require('../../services/QuoteVersioningService');
 const pricingHelper = require('../../utils/pricingHelper');
 const logger = require('../../../infrastructure/logger');
 const FileStorageService = require('../../services/FileStorageService');
@@ -107,6 +111,9 @@ async function batchFetchPrimaryImages(imageClass, pointerField, parentClass, id
 class QuoteController {
   constructor() {
     this.quoteService = new QuoteService();
+    this.ownershipService = new QuoteOwnershipService();
+    this.collaborationService = new QuoteCollaborationService();
+    this.versioningService = new QuoteVersioningService();
   }
 
   /**
@@ -140,7 +147,7 @@ class QuoteController {
 
       // 2. Extract fields from request body
       const {
-        client, clientId, contactPerson, contactEmail, contactPhone, notes, eventType, numberOfPeople,
+        client, clientId, contactPerson, contactEmail, contactPhone, notes, eventType,
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
       } = req.body;
 
@@ -243,10 +250,20 @@ class QuoteController {
       quote.set('contactPhone', contactPhone || '');
       quote.set('notes', notes || '');
       quote.set('eventType', eventType || '');
-      quote.set('numberOfPeople', numberOfPeople ? parseInt(numberOfPeople, 10) : 1);
-      quote.set('numberOfAdults', numberOfAdults ? parseInt(numberOfAdults, 10) : 0);
-      quote.set('numberOfChildren', numberOfChildren ? parseInt(numberOfChildren, 10) : 0);
-      quote.set('numberOfInfants', numberOfInfants ? parseInt(numberOfInfants, 10) : 0);
+
+      // Set individual person counts
+      const adultsCount = numberOfAdults ? parseInt(numberOfAdults, 10) : 0;
+      const childrenCount = numberOfChildren ? parseInt(numberOfChildren, 10) : 0;
+      const infantsCount = numberOfInfants ? parseInt(numberOfInfants, 10) : 0;
+
+      quote.set('numberOfAdults', adultsCount);
+      quote.set('numberOfChildren', childrenCount);
+      quote.set('numberOfInfants', infantsCount);
+
+      // Calculate total numberOfPeople as sum of all person types
+      const calculatedTotal = adultsCount + childrenCount + infantsCount;
+      quote.set('numberOfPeople', calculatedTotal);
+
       quote.set('preferredLanguage', preferredLanguage || 'es');
 
       // 9. Set automatic fields
@@ -283,12 +300,20 @@ class QuoteController {
         },
       });
 
+      // 11a. Initialize ownership for the new quote
+      await this.ownershipService.initializeOwnership(quote.id, currentUser.id);
+
+      // 11b. Set the owner field on the quote
+      quote.set('owner', createdByObj);
+      await quote.save(null, { useMasterKey: true });
+
       // 12. Log success (using Pointer objects - IDs only)
-      logger.info('Quote created successfully', {
+      logger.info('Quote created successfully with ownership', {
         quoteId: quote.id,
         folio,
         clientId: clientObj ? clientObj.objectId : null,
         createdBy: currentUser.id,
+        ownerId: currentUser.id,
         createdByEmail: currentUser.get('email'),
       });
 
@@ -358,9 +383,20 @@ class QuoteController {
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'desc';
 
-      // Column mapping for sorting (matches frontend columns order)
-      // Columns: client, rate, eventType, numberOfPeople, createdBy, status, actions
-      const columns = ['client', 'rate', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
+      // Column mapping for sorting (must match frontend columns exactly)
+      // Frontend columns depend on user role (admin/superadmin show client column)
+      const isAdminRole = ['admin', 'superadmin'].includes(req.userRole);
+
+      // Build columns array to match frontend table structure
+      let columns;
+      if (isAdminRole) {
+        // With client column: Folio, Mi Rol, Cliente, Tipo de Evento, No. Personas, Creado Por, Estatus, Fecha Creación, Última Modificación
+        columns = ['folio', 'userQuoteRole', 'client', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
+      } else {
+        // Without client column: Folio, Mi Rol, Tipo de Evento, No. Personas, Creado Por, Estatus, Fecha Creación, Última Modificación
+        columns = ['folio', 'userQuoteRole', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt', 'updatedAt'];
+      }
+
       const sortField = columns[sortColumnIndex] || 'createdAt';
 
       // Build base query for all active, existing records with role-based filtering
@@ -368,6 +404,7 @@ class QuoteController {
       baseQuery.equalTo('active', true);
       baseQuery.equalTo('exists', true);
       baseQuery.include('client');
+      baseQuery.include('companyClientPtr');
       baseQuery.include('rate');
       baseQuery.include('createdBy');
 
@@ -426,6 +463,7 @@ class QuoteController {
       const data = await Promise.all(
         quotes.map(async (quote) => {
           const client = quote.get('client');
+          const companyClientPtr = quote.get('companyClientPtr');
           const rate = quote.get('rate');
           const createdBy = quote.get('createdBy');
 
@@ -437,19 +475,92 @@ class QuoteController {
             logger.warn('Error checking pending invoice request', { quoteId: quote.id, error: error.message });
           }
 
+          // Determine user's role for this specific quote
+          let userQuoteRole = 'visualizador'; // Default to viewer
+          let userQuoteRoleSpanish = 'Visualizador';
+
+          try {
+            // Check if user is the owner
+            const currentOwnership = await QuoteOwnership.getCurrentOwnership(quote);
+            const isOwner = currentOwnership && currentOwnership.getOwner()?.id === currentUser.id;
+
+            if (isOwner) {
+              userQuoteRole = 'propietario';
+              userQuoteRoleSpanish = 'Propietario';
+            } else if (createdBy && createdBy.id === currentUser.id) {
+              // Check if user created the quote (legacy ownership)
+              userQuoteRole = 'propietario';
+              userQuoteRoleSpanish = 'Propietario';
+            } else {
+              // Check collaboration access
+              const userAccess = await this.collaborationService.getUserAccess(quote.id, currentUser.id);
+              if (userAccess && userAccess.role) {
+                if (userAccess.role === 'editor') {
+                  userQuoteRole = 'editor';
+                  userQuoteRoleSpanish = 'Editor';
+                } else if (userAccess.role === 'viewer') {
+                  userQuoteRole = 'visualizador';
+                  userQuoteRoleSpanish = 'Visualizador';
+                }
+              }
+            }
+          } catch (roleError) {
+            logger.warn('Error determining user role for quote', {
+              quoteId: quote.id,
+              userId: currentUser.id,
+              error: roleError.message,
+            });
+            // Keep default viewer role on error
+          }
+
+          // Extract company name from all possible sources
+          let companyName = '';
+          let clientData = null;
+
+          if (client) {
+            // Check contextualData first, then direct companyName field
+            const contextualData = client.get('contextualData') || {};
+            companyName = contextualData.companyName
+              || client.get('companyName')
+              || '';
+
+            clientData = {
+              id: client.id,
+              firstName: client.get('firstName') || '',
+              lastName: client.get('lastName') || '',
+              companyName,
+              fullName: companyName || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+              contextualData: client.get('contextualData') || null,
+            };
+          }
+
+          // If no company name from client, check companyClientPtr
+          if (!companyName && companyClientPtr) {
+            companyName = companyClientPtr.get('name') || '';
+
+            // If we have companyClientPtr but no client, create client data from it
+            if (!clientData) {
+              clientData = {
+                id: companyClientPtr.id,
+                firstName: '',
+                lastName: '',
+                companyName,
+                fullName: companyName,
+              };
+            } else {
+              // Update existing client data with company name from companyClientPtr
+              clientData.companyName = companyName;
+              clientData.fullName = companyName || clientData.fullName;
+            }
+          }
+
           return {
             id: quote.id,
             objectId: quote.id,
             folio: quote.get('folio') || 'N/A',
-            client: client
-              ? {
-                id: client.id,
-                firstName: client.get('firstName') || '',
-                lastName: client.get('lastName') || '',
-                companyName: client.get('companyName') || '',
-                fullName: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
-              }
-              : null,
+            userQuoteRole, // Add user's role for this quote
+            userQuoteRoleSpanish, // Add Spanish role name
+            client: clientData,
             rate: rate
               ? {
                 id: rate.id,
@@ -458,7 +569,10 @@ class QuoteController {
               }
               : null,
             eventType: quote.get('eventType') || '',
-            numberOfPeople: quote.get('numberOfPeople') || 1,
+            numberOfPeople: quote.get('numberOfPeople') || 0,
+            numberOfAdults: quote.get('numberOfAdults') || 0,
+            numberOfChildren: quote.get('numberOfChildren') || 0,
+            numberOfInfants: quote.get('numberOfInfants') || 0,
             createdBy: createdBy
               ? {
                 id: createdBy.id,
@@ -470,9 +584,12 @@ class QuoteController {
               : null,
             status: quote.get('status') || 'quoted',
             contactPerson: quote.get('contactPerson') || '',
+            contactFirstName: quote.get('contactFirstName') || '',
+            contactLastName: quote.get('contactLastName') || '',
             contactEmail: quote.get('contactEmail') || '',
             contactPhone: quote.get('contactPhone') || '',
             notes: quote.get('notes') || '',
+            clientFinalId: quote.get('clientFinalId') || null,
             validUntil: quote.get('validUntil'),
             active: quote.get('active'),
             hasPendingInvoiceRequest, // Add invoice status
@@ -549,11 +666,21 @@ class QuoteController {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
 
-      // Check access permissions after getting the quote
-      const hasAccess = await this.checkQuoteAccess(currentUser, quote, req.userRole);
+      // Check access permissions after getting the quote using collaboration service
+      const hasAccess = await this.collaborationService.hasAccess(quoteId, currentUser.id);
       if (!hasAccess) {
-        return this.sendError(res, 'No tienes permisos para acceder a esta cotización', 403);
+        // Fallback to original check for backward compatibility
+        const hasLegacyAccess = await this.checkQuoteAccess(currentUser, quote, req.userRole);
+        if (!hasLegacyAccess) {
+          return this.sendError(res, 'No tienes permisos para acceder a esta cotización', 403);
+        }
       }
+
+      // Get user's access details
+      const userAccess = await this.collaborationService.getUserAccess(quoteId, currentUser.id);
+
+      // Get current owner
+      const owner = await this.ownershipService.getCurrentOwner(quoteId);
 
       const client = quote.get('client');
       const companyClientPtr = quote.get('companyClientPtr');
@@ -585,7 +712,8 @@ class QuoteController {
             companyName: client.get('companyName') || '',
             email: client.get('email') || '',
             phone: client.get('phone') || '',
-            fullName: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+            fullName: client.get('companyName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+            contextualData: client.get('contextualData') || null,
           }
           : null,
         companyClientPtr: companyClientPtr
@@ -606,15 +734,18 @@ class QuoteController {
           }
           : null,
         eventType: quote.get('eventType') || '',
-        numberOfPeople: quote.get('numberOfPeople') || 1,
+        numberOfPeople: quote.get('numberOfPeople') || 0,
         numberOfAdults: quote.get('numberOfAdults') || 0,
         numberOfChildren: quote.get('numberOfChildren') || 0,
         numberOfInfants: quote.get('numberOfInfants') || 0,
         preferredLanguage: quote.get('preferredLanguage') || 'es',
         contactPerson: quote.get('contactPerson') || '',
+        contactFirstName: quote.get('contactFirstName') || '',
+        contactLastName: quote.get('contactLastName') || '',
         contactEmail: quote.get('contactEmail') || '',
         contactPhone: quote.get('contactPhone') || '',
         notes: quote.get('notes') || '',
+        clientFinalId: quote.get('clientFinalId') || null,
         status: quote.get('status') || 'quoted',
         validUntil: quote.get('validUntil'),
         serviceItems: quote.get('serviceItems') || {
@@ -635,6 +766,12 @@ class QuoteController {
         active: quote.get('active'),
         createdAt: quote.createdAt,
         updatedAt: quote.updatedAt,
+        // Add ownership and collaboration info
+        owner,
+        userAccess,
+        version: quote.get('version') || 1,
+        collaborationEnabled: quote.isCollaborationEnabled(),
+        requiresApproval: quote.requiresApproval(),
       };
 
       // Batch fetch primary images for tours and experiences in serviceItems
@@ -701,7 +838,74 @@ class QuoteController {
       const quoteId = req.params.id;
       const updates = req.body;
 
-      // Call service
+      // Debug current user information
+      logger.info('🔍 QuoteController.updateQuote - User check', {
+        userId: currentUser.id,
+        userEmail: currentUser.get('email'),
+        userRole: req.userRole || 'unknown',
+        quoteId,
+        updates: Object.keys(updates),
+      });
+
+      // Check if user has permission to edit
+      let canEdit = await this.versioningService.canEdit(quoteId, currentUser.id);
+
+      // ADMIN FIX: Handle role pointer to get actual role name
+      const rolePointer = currentUser.get('roleId');
+      let roleName = null;
+
+      if (rolePointer && rolePointer.id) {
+        try {
+          // Fetch the role from the Role table
+          await rolePointer.fetch({ useMasterKey: true });
+          roleName = rolePointer.get('name');
+        } catch (roleError) {
+          logger.warn('Failed to fetch user role', {
+            userId: currentUser.id,
+            roleError: roleError.message,
+          });
+        }
+      }
+
+      // Admin override check with proper role name
+      if (!canEdit && (roleName === 'admin' || roleName === 'superadmin')) {
+        logger.info('🔓 Controller-level admin override granted', {
+          userId: currentUser.id,
+          roleName,
+          rolePointerId: rolePointer?.id,
+          quoteId,
+        });
+        canEdit = true;
+      }
+
+      logger.info('🔍 QuoteController.updateQuote - Permission result', {
+        userId: currentUser.id,
+        quoteId,
+        canEdit,
+        userRole: req.userRole || 'unknown',
+      });
+
+      if (!canEdit) {
+        logger.warn('🚫 QuoteController.updateQuote - Permission denied', {
+          userId: currentUser.id,
+          userEmail: currentUser.get('email'),
+          userRole: req.userRole || 'unknown',
+          quoteId,
+        });
+        return this.sendError(res, 'No tienes permisos para editar esta cotización', 403);
+      }
+
+      // Track the edit with versioning service
+      const editRecord = await this.versioningService.recordEdit(
+        quoteId,
+        currentUser.id,
+        updates,
+        {
+          description: updates.reason || 'Quote updated',
+        }
+      );
+
+      // Call original service for backward compatibility
       const result = await this.quoteService.updateQuote(
         currentUser,
         quoteId,
@@ -709,6 +913,11 @@ class QuoteController {
         updates.reason || 'Quote updated',
         req.userRole // Pass userRole from JWT middleware
       );
+
+      // Add edit tracking info to result
+      result.editId = editRecord.id;
+      result.version = editRecord.version;
+      result.requiresApproval = editRecord.approvalStatus === 'pending';
 
       return res.json(result);
     } catch (error) {
@@ -908,7 +1117,7 @@ class QuoteController {
             lastName: clientData.get('lastName') || '',
             companyName: clientData.get('companyName') || '',
             email: clientData.get('email') || '',
-            fullName: `${clientData.get('firstName') || ''} ${clientData.get('lastName') || ''}`.trim(),
+            fullName: clientData.get('companyName') || `${clientData.get('firstName') || ''} ${clientData.get('lastName') || ''}`.trim(),
           }
           : null,
         rate: rateData
@@ -2943,9 +3152,10 @@ class QuoteController {
             if (client) {
               invoiceData.client = {
                 objectId: client.id,
-                fullName: client.get('fullName') || `${client.get('firstName')} ${client.get('lastName')}`,
+                fullName: client.get('companyName') || client.get('fullName') || `${client.get('firstName')} ${client.get('lastName')}`,
                 companyName: client.get('companyName'),
                 email: client.get('email'),
+                contextualData: client.get('contextualData') || null,
               };
             }
 
@@ -3109,7 +3319,7 @@ class QuoteController {
   /**
    * Send error response.
    * @param {object} res - Express response object.
-   * @param {string} error - Error message.
+   * @param {string} error - Error message to send in response.
    * @param {number} statusCode - HTTP status code.
    * @returns {object} JSON response.
    * @example

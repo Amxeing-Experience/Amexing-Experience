@@ -3,6 +3,7 @@
  * Owned Clients Management Page
  * Shared view for department_manager and client roles to manage their own clients
  * Created by Denisse Maldonado
+ * VALIDATION UPDATE: Now includes email, phone, RFC, and website validation components
  *
  * Layout Structure (matching main dashboard):
  * - Direct row/column structure (no body-wrapper)
@@ -77,146 +78,11 @@ const currentPath = '/dashboard/clients';
                     </div>
                 </div>
 
-                <form id="createClientForm">
-                    <!-- Sección: Información del Cliente -->
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                            <i class="ti ti-user me-1"></i>
-                            Información del Cliente
-                        </h6>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'text',
-                                    name: 'name',
-                                    id: 'clientName',
-                                    label: 'Nombre del Cliente',
-                                    required: true,
-                                    placeholder: 'Ej: Juan Pérez o ACME Corporation',
-                                    helpText: 'Nombre de la empresa o persona',
-                                    inputAttributes: { maxlength: '200' }
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'email',
-                                    name: 'email',
-                                    id: 'clientEmail',
-                                    label: 'Correo Electrónico',
-                                    required: false,
-                                    placeholder: 'Ej: cliente@empresa.com',
-                                    helpText: 'Email de contacto principal'
-                                }) %>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'text',
-                                    name: 'contactPerson',
-                                    id: 'clientContactPerson',
-                                    label: 'Persona de Contacto',
-                                    required: false,
-                                    placeholder: 'Ej: María García',
-                                    helpText: 'Nombre del contacto principal'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'tel',
-                                    name: 'phone',
-                                    id: 'clientPhone',
-                                    label: 'Teléfono',
-                                    required: false,
-                                    placeholder: 'Ej: +52 999 123 4567',
-                                    helpText: 'Número de contacto'
-                                }) %>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Sección: Información de la Empresa -->
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                            <i class="ti ti-building me-1"></i>
-                            Información de la Empresa
-                        </h6>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'select',
-                                    name: 'companyType',
-                                    id: 'companyType',
-                                    label: 'Tipo de Empresa',
-                                    required: false,
-                                    options: [
-                                        { value: '', label: 'Seleccione un tipo' },
-                                        { value: 'individual', label: 'Persona Física' },
-                                        { value: 'corporate', label: 'Persona Moral' },
-                                        { value: 'travel_agency', label: 'Agencia de Viajes' },
-                                        { value: 'tour_operator', label: 'Tour Operador' },
-                                        { value: 'other', label: 'Otro' }
-                                    ],
-                                    helpText: 'Tipo de organización'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'text',
-                                    name: 'taxId',
-                                    id: 'clientTaxId',
-                                    label: 'RFC / ID Fiscal',
-                                    required: false,
-                                    placeholder: 'Ej: ABC123456789',
-                                    helpText: 'Identificación fiscal'
-                                }) %>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'url',
-                                    name: 'website',
-                                    id: 'clientWebsite',
-                                    label: 'Sitio Web',
-                                    required: false,
-                                    placeholder: 'https://www.ejemplo.com',
-                                    helpText: 'URL del sitio web'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'text',
-                                    name: 'address',
-                                    id: 'clientAddress',
-                                    label: 'Dirección',
-                                    required: false,
-                                    placeholder: 'Ej: Calle 60 #123, Centro, Mérida',
-                                    helpText: 'Dirección física'
-                                }) %>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-12">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'textarea',
-                                    name: 'notes',
-                                    id: 'clientNotes',
-                                    label: 'Notas',
-                                    required: false,
-                                    placeholder: 'Notas adicionales sobre el cliente...',
-                                    helpText: 'Información adicional relevante',
-                                    inputAttributes: { rows: '3' }
-                                }) %>
-                            </div>
-                        </div>
-                    </div>
-                </form>
+                <%- include('../../organisms/forms/client-form', {
+                    formId: 'createClientForm',
+                    idPrefix: 'client',
+                    isEdit: false
+                }) %>
             </div>
 
             <div class="modal-footer">
@@ -263,61 +129,338 @@ const currentPath = '/dashboard/clients';
 
                         <div class="row">
                             <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'text',
-                                    name: 'name',
-                                    id: 'editClientName',
-                                    label: 'Nombre del Cliente',
+                                <%- include('../../atoms/common/first-name-input', {
+                                    name: 'firstName',
+                                    id: 'editClientFirstName',
+                                    label: 'Nombre',
                                     required: true,
-                                    placeholder: 'Ej: Juan Pérez o ACME Corporation',
-                                    helpText: 'Nombre de la empresa o persona',
-                                    inputAttributes: { maxlength: '200' }
+                                    placeholder: 'Ej: Juan',
+                                    helpText: 'Primer nombre del cliente'
                                 }) %>
                             </div>
                             <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'email',
+                                <%- include('../../atoms/common/last-name-input', {
+                                    name: 'lastName',
+                                    id: 'editClientLastName',
+                                    label: 'Apellido',
+                                    required: true,
+                                    placeholder: 'Ej: Pérez',
+                                    helpText: 'Apellido(s) del cliente'
+                                }) %>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/email-input', {
                                     name: 'email',
                                     id: 'editClientEmail',
                                     label: 'Correo Electrónico',
                                     required: false,
-                                    placeholder: 'Ej: cliente@empresa.com',
+                                    placeholder: 'cliente@empresa.com',
                                     helpText: 'Email de contacto principal'
                                 }) %>
                             </div>
-                        </div>
-
-                        <div class="row">
                             <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'text',
-                                    name: 'contactPerson',
-                                    id: 'editClientContactPerson',
-                                    label: 'Persona de Contacto',
-                                    required: false,
-                                    placeholder: 'Ej: María García',
-                                    helpText: 'Nombre del contacto principal'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'tel',
+                                <%- include('../../atoms/common/phone-input', {
                                     name: 'phone',
                                     id: 'editClientPhone',
                                     label: 'Teléfono',
                                     required: false,
-                                    placeholder: 'Ej: +52 999 123 4567',
-                                    helpText: 'Número de contacto'
+                                    countryCode: 'MX',
+                                    placeholder: '999 123 4567',
+                                    helpText: 'Número de contacto principal'
+                                }) %>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Sección: Persona de Contacto y Emergencia -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-users me-1"></i>
+                            Contactos
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/first-name-input', {
+                                    name: 'contactFirstName',
+                                    id: 'editContactFirstName',
+                                    label: 'Nombre de Contacto',
+                                    required: false,
+                                    placeholder: 'Ej: María',
+                                    helpText: 'Nombre de la persona de contacto en la empresa'
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/last-name-input', {
+                                    name: 'contactLastName',
+                                    id: 'editContactLastName',
+                                    label: 'Apellido de Contacto',
+                                    required: false,
+                                    placeholder: 'Ej: García',
+                                    helpText: 'Apellido de la persona de contacto'
                                 }) %>
                             </div>
                         </div>
 
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="form-check form-switch">
+                                <%- include('../../atoms/common/emergency-contact-input', {
+                                    name: 'emergencyContactName',
+                                    id: 'editEmergencyContactName',
+                                    label: 'Contacto de Emergencia',
+                                    required: false,
+                                    placeholder: 'Ej: Carlos Pérez',
+                                    helpText: 'Persona a contactar en caso de emergencia'
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/emergency-phone-input', {
+                                    name: 'emergencyContactPhone',
+                                    id: 'editEmergencyContactPhone',
+                                    label: 'Teléfono de Emergencia',
+                                    required: false,
+                                    countryCode: 'MX',
+                                    placeholder: '999 123 4567',
+                                    helpText: 'Número disponible 24/7'
+                                }) %>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Sección: Información de la Empresa -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-building me-1"></i>
+                            Información de la Empresa
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'select',
+                                    name: 'companyType',
+                                    id: 'editCompanyType',
+                                    label: 'Tipo de Empresa',
+                                    required: false,
+                                    options: [
+                                        { value: '', text: 'Seleccione un tipo' },
+                                        { value: 'individual', text: 'Persona Física' },
+                                        { value: 'corporate', text: 'Persona Moral' },
+                                        { value: 'travel_agency', text: 'Agencia de Viajes' },
+                                        { value: 'tour_operator', text: 'Tour Operador' },
+                                        { value: 'other', text: 'Otro' }
+                                    ],
+                                    helpText: 'Tipo de organización'
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/rfc-input', {
+                                    name: 'taxId',
+                                    id: 'editClientTaxId',
+                                    label: 'RFC / ID Fiscal',
+                                    required: false,
+                                    placeholder: 'ABC123456789 o ABCD123456ABC',
+                                    helpText: 'Registro Federal de Contribuyentes'
+                                }) %>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/url-input', {
+                                    name: 'website',
+                                    id: 'editClientWebsite',
+                                    label: 'Sitio Web',
+                                    required: false,
+                                    placeholder: 'https://www.ejemplo.com',
+                                    helpText: 'URL completa del sitio web de la empresa'
+                                }) %>
+                            </div>
+                        </div>
+
+                        <!-- Sección: Dirección Detallada -->
+                        <div class="row">
+                            <div class="col-12 mb-2">
+                                <h6 class="text-muted small fw-bold">
+                                    <i class="ti ti-map-pin me-1"></i>
+                                    Dirección Completa
+                                </h6>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-3">
+                                <%- include('../../atoms/common/street-type-select', {
+                                    name: 'streetType',
+                                    id: 'editClientStreetType',
+                                    label: 'Tipo de Vialidad',
+                                    required: false,
+                                    helpText: 'Tipo de vía',
+                                    value: ''
+                                }) %>
+                            </div>
+                            <div class="col-md-5">
+                                <%- include('../../atoms/common/street-name-input', {
+                                    name: 'streetName',
+                                    id: 'editClientStreetName',
+                                    label: 'Nombre de la Calle',
+                                    required: false,
+                                    placeholder: 'Ej: Reforma, 60, Insurgentes',
+                                    helpText: 'Nombre de la calle'
+                                }) %>
+                            </div>
+                            <div class="col-md-2">
+                                <%- include('../../atoms/common/exterior-number-input', {
+                                    name: 'exteriorNumber',
+                                    id: 'editClientExteriorNumber',
+                                    label: 'No. Exterior',
+                                    required: false,
+                                    placeholder: '123',
+                                    helpText: 'Número exterior'
+                                }) %>
+                            </div>
+                            <div class="col-md-2">
+                                <%- include('../../atoms/common/interior-number-input', {
+                                    name: 'interiorNumber',
+                                    id: 'editClientInteriorNumber',
+                                    label: 'No. Interior',
+                                    required: false,
+                                    placeholder: '4B',
+                                    helpText: 'Depto/oficina'
+                                }) %>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <%- include('../../atoms/common/colonia-input', {
+                                    name: 'colonia',
+                                    id: 'editClientColonia',
+                                    label: 'Colonia',
+                                    required: false,
+                                    placeholder: 'Ej: Centro, Roma Norte',
+                                    helpText: 'Nombre de la colonia'
+                                }) %>
+                            </div>
+                            <div class="col-md-4">
+                                <%- include('../../atoms/common/city-input', {
+                                    name: 'city',
+                                    id: 'editClientCity',
+                                    label: 'Ciudad / Municipio',
+                                    required: false,
+                                    placeholder: 'Ej: Mérida, Guadalajara',
+                                    helpText: 'Ciudad o municipio'
+                                }) %>
+                            </div>
+                            <div class="col-md-4">
+                                <%- include('../../atoms/common/state-select', {
+                                    name: 'state',
+                                    id: 'editClientState',
+                                    label: 'Estado',
+                                    required: false,
+                                    helpText: 'Estado o región',
+                                    value: ''
+                                }) %>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <%- include('../../atoms/common/postal-code-input', {
+                                    name: 'postalCode',
+                                    id: 'editClientPostalCode',
+                                    label: 'Código Postal',
+                                    required: false,
+                                    placeholder: '12345',
+                                    helpText: '5 dígitos',
+                                    country: 'MX'
+                                }) %>
+                            </div>
+                            <div class="col-md-8">
+                                <!-- Spacer -->
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Sección: Requerimientos Especiales -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-heart me-1"></i>
+                            Requerimientos Especiales
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/language-select', {
+                                    name: 'preferredLanguage',
+                                    id: 'editPreferredLanguage',
+                                    label: 'Idioma Preferido',
+                                    required: false,
+                                    helpText: 'Idioma para comunicaciones y servicios',
+                                    value: ''
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/accessibility-input', {
+                                    name: 'accessibilityRequirements',
+                                    id: 'editAccessibilityRequirements',
+                                    label: 'Requerimientos de Accesibilidad',
+                                    required: false,
+                                    placeholder: 'Ej: Silla de ruedas, bastón, asistencia visual...',
+                                    helpText: 'Necesidades especiales de accesibilidad'
+                                }) %>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/allergies-input', {
+                                    name: 'allergies',
+                                    id: 'editAllergies',
+                                    label: 'Alergias',
+                                    required: false,
+                                    placeholder: 'Ingrese cada alergia en una línea separada',
+                                    helpText: 'Una alergia por línea para mejor organización'
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/dietary-restrictions-input', {
+                                    name: 'dietaryRestrictions',
+                                    id: 'editDietaryRestrictions',
+                                    label: 'Restricciones Alimenticias',
+                                    required: false,
+                                    placeholder: 'Ingrese cada restricción en una línea separada',
+                                    helpText: 'Una restricción por línea para mejor organización'
+                                }) %>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'textarea',
+                                    name: 'notes',
+                                    id: 'editClientNotes',
+                                    label: 'Notas Adicionales',
+                                    required: false,
+                                    placeholder: 'Cualquier información adicional relevante sobre el cliente...',
+                                    helpText: 'Información general adicional',
+                                    inputAttributes: { rows: '3' }
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mt-4">
                                     <input class="form-check-input" type="checkbox" id="editClientActive" name="active">
                                     <label class="form-check-label" for="editClientActive">
-                                        Cliente Activo
+                                        <strong>Cliente Activo</strong>
+                                        <br>
+                                        <small class="text-muted">Desmarque para desactivar temporalmente</small>
                                     </label>
                                 </div>
                             </div>
@@ -380,21 +523,63 @@ async function updateClientCount() {
 
 async function createClient() {
     const form = document.getElementById('createClientForm');
+    
+    // Validate form fields before submission
+    if (!validateClientForm(form)) {
+        return; // Stop submission if validation fails
+    }
+    
+    // Get form data including phone_full from phone input component
     const formData = new FormData(form);
     
+    // Get the full international phone number if available
+    const phoneFullInput = form.querySelector('input[name="phone_full"]');
+    const phoneValue = phoneFullInput ? phoneFullInput.value : formData.get('phone');
+    
+    // Process allergies and dietary restrictions from textareas
+    const allergiesText = formData.get('allergies') || '';
+    const dietaryText = formData.get('dietaryRestrictions') || '';
+    
     const clientData = {
-        name: formData.get('name'),
+        // Names
+        firstName: formData.get('firstName'),
+        lastName: formData.get('lastName'),
+        // Contact info
         email: formData.get('email'),
-        phone: formData.get('phone'),
-        contactPerson: formData.get('contactPerson'),
+        phone: phoneValue, // Use full international format
+        // Contact person
+        contactFirstName: formData.get('contactFirstName'),
+        contactLastName: formData.get('contactLastName'),
+        // Emergency
+        emergencyContactName: formData.get('emergencyContactName'),
+        emergencyContactPhone: formData.get('emergencyContactPhone'),
+        // Company
         companyType: formData.get('companyType'),
         taxId: formData.get('taxId'),
         website: formData.get('website'),
         address: formData.get('address'),
+        // Special requirements
+        preferredLanguage: formData.get('preferredLanguage'),
+        accessibilityRequirements: formData.get('accessibilityRequirements'),
+        allergies: allergiesText,
+        dietaryRestrictions: dietaryText,
         notes: formData.get('notes')
     };
     
+    // Remove empty fields to avoid sending nulls
+    Object.keys(clientData).forEach(key => {
+        if (!clientData[key] || clientData[key].trim() === '') {
+            delete clientData[key];
+        }
+    });
+    
     try {
+        // Show loading state
+        const createBtn = document.getElementById('createClientBtn');
+        const originalText = createBtn.innerHTML;
+        createBtn.innerHTML = '<i class="ti ti-loader-2 fa-spin me-1"></i>Creando...';
+        createBtn.disabled = true;
+        
         const response = await fetch('/api/owned-clients', {
             method: 'POST',
             headers: {
@@ -408,6 +593,10 @@ async function createClient() {
         
         if (response.ok && data.success) {
             showModalAlert('success', 'Cliente creado exitosamente');
+            // Reset form
+            form.reset();
+            // Clear validation states
+            clearFormValidation(form);
             setTimeout(() => {
                 $('#createClientModal').modal('hide');
                 location.reload(); // Reload to refresh the table
@@ -418,7 +607,99 @@ async function createClient() {
     } catch (error) {
         console.error('Error creating client:', error);
         showModalAlert('error', 'Error de conexión al crear el cliente');
+    } finally {
+        // Restore button state
+        const createBtn = document.getElementById('createClientBtn');
+        createBtn.innerHTML = originalText;
+        createBtn.disabled = false;
     }
+}
+
+// Client form validation function
+function validateClientForm(form) {
+    let isValid = true;
+    
+    // Validate required first name field
+    const firstNameInput = form.querySelector('#clientFirstName, #editClientFirstName');
+    if (firstNameInput) {
+        const firstName = firstNameInput.value.trim();
+        if (!firstName) {
+            firstNameInput.classList.add('is-invalid');
+            firstNameInput.focus();
+            isValid = false;
+        } else {
+            firstNameInput.classList.remove('is-invalid');
+            firstNameInput.classList.add('is-valid');
+        }
+    }
+    
+    // Validate required last name field
+    const lastNameInput = form.querySelector('#clientLastName, #editClientLastName');
+    if (lastNameInput) {
+        const lastName = lastNameInput.value.trim();
+        if (!lastName) {
+            lastNameInput.classList.add('is-invalid');
+            if (isValid) lastNameInput.focus();
+            isValid = false;
+        } else {
+            lastNameInput.classList.remove('is-invalid');
+            lastNameInput.classList.add('is-valid');
+        }
+    }
+    
+    // Validate email if provided
+    const emailInput = form.querySelector('#clientEmail, #editClientEmail');
+    if (emailInput && emailInput.value.trim()) {
+        const emailPattern = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{\|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+        if (!emailPattern.test(emailInput.value.trim())) {
+            emailInput.classList.add('is-invalid');
+            isValid = false;
+        }
+    }
+    
+    // Validate phone if provided (phone component handles its own validation)
+    const phoneInput = form.querySelector('#clientPhone, #editClientPhone');
+    if (phoneInput && phoneInput.value.trim()) {
+        // Check if phone component marked it as invalid
+        if (phoneInput.classList.contains('is-invalid')) {
+            isValid = false;
+            phoneInput.focus();
+        }
+    }
+    
+    // Validate RFC if provided (RFC component handles its own validation)
+    const rfcInput = form.querySelector('#clientTaxId, #editClientTaxId');
+    if (rfcInput && rfcInput.value.trim()) {
+        // Check if RFC component marked it as invalid
+        if (rfcInput.classList.contains('is-invalid')) {
+            isValid = false;
+            rfcInput.focus();
+        }
+    }
+    
+    // Validate website if provided (URL component handles its own validation)
+    const websiteInput = form.querySelector('#clientWebsite, #editClientWebsite');
+    if (websiteInput && websiteInput.value.trim()) {
+        // Check if URL component marked it as invalid
+        if (websiteInput.classList.contains('is-invalid')) {
+            isValid = false;
+            websiteInput.focus();
+        }
+    }
+    
+    if (!isValid) {
+        showModalAlert('error', 'Por favor corrige los errores en el formulario antes de continuar');
+    }
+    
+    return isValid;
+}
+
+// Clear form validation states
+function clearFormValidation(form) {
+    const inputs = form.querySelectorAll('.form-control, .form-select');
+    inputs.forEach(input => {
+        input.classList.remove('is-invalid', 'is-valid');
+    });
 }
 
 async function editClient(clientId) {
@@ -435,10 +716,73 @@ async function editClient(clientId) {
             
             // Populate edit form
             document.getElementById('editClientId').value = clientId;
-            document.getElementById('editClientName').value = client.name || '';
+            
+            // Populate name fields
+            document.getElementById('editClientFirstName').value = client.firstName || '';
+            document.getElementById('editClientLastName').value = client.lastName || '';
             document.getElementById('editClientEmail').value = client.email || '';
-            document.getElementById('editClientContactPerson').value = client.contactPerson || '';
             document.getElementById('editClientPhone').value = client.phone || '';
+            
+            // Populate contact person fields
+            document.getElementById('editContactFirstName').value = client.contactFirstName || '';
+            document.getElementById('editContactLastName').value = client.contactLastName || '';
+            
+            // Populate emergency contact
+            document.getElementById('editEmergencyContactName').value = client.emergencyContactName || '';
+            document.getElementById('editEmergencyContactPhone').value = client.emergencyContactPhone || '';
+            
+            // Populate company information fields
+            const companyTypeSelect = document.getElementById('editCompanyType');
+            if (companyTypeSelect) {
+                companyTypeSelect.value = client.companyType || '';
+            }
+            
+            const taxIdInput = document.getElementById('editClientTaxId');
+            if (taxIdInput) {
+                taxIdInput.value = client.taxId || '';
+            }
+            
+            const websiteInput = document.getElementById('editClientWebsite');
+            if (websiteInput) {
+                websiteInput.value = client.website || '';
+            }
+            
+            const addressInput = document.getElementById('editClientAddress');
+            if (addressInput) {
+                addressInput.value = client.address || '';
+            }
+            
+            const notesInput = document.getElementById('editClientNotes');
+            if (notesInput) {
+                notesInput.value = client.notes || '';
+            }
+            
+            // Populate special requirements
+            const langSelect = document.getElementById('editPreferredLanguage');
+            if (langSelect) {
+                langSelect.value = client.preferredLanguage || 'es';
+            }
+            
+            const accessInput = document.getElementById('editAccessibilityRequirements');
+            if (accessInput) {
+                accessInput.value = client.accessibilityRequirements || '';
+            }
+            
+            // Populate allergies and dietary restrictions (arrays to text)
+            const allergiesInput = document.getElementById('editAllergies');
+            if (allergiesInput) {
+                allergiesInput.value = Array.isArray(client.allergies) 
+                    ? client.allergies.join('\n') 
+                    : client.allergies || '';
+            }
+            
+            const dietaryInput = document.getElementById('editDietaryRestrictions');
+            if (dietaryInput) {
+                dietaryInput.value = Array.isArray(client.dietaryRestrictions) 
+                    ? client.dietaryRestrictions.join('\n') 
+                    : client.dietaryRestrictions || '';
+            }
+            
             document.getElementById('editClientActive').checked = client.active !== false;
             
             $('#editClientModal').modal('show');
@@ -454,17 +798,63 @@ async function editClient(clientId) {
 async function updateClient() {
     const clientId = document.getElementById('editClientId').value;
     const form = document.getElementById('editClientForm');
+    
+    // Validate form fields before submission
+    if (!validateClientForm(form)) {
+        return; // Stop submission if validation fails
+    }
+    
     const formData = new FormData(form);
     
+    // Get the full international phone number if available
+    const phoneFullInput = form.querySelector('input[name="phone_full"]');
+    const phoneValue = phoneFullInput ? phoneFullInput.value : formData.get('phone');
+    
+    // Process allergies and dietary restrictions from textareas
+    const allergiesText = formData.get('allergies') || '';
+    const dietaryText = formData.get('dietaryRestrictions') || '';
+    
     const clientData = {
-        name: formData.get('name'),
+        // Names
+        firstName: formData.get('firstName'),
+        lastName: formData.get('lastName'),
+        // Contact info
         email: formData.get('email'),
-        phone: formData.get('phone'),
-        contactPerson: formData.get('contactPerson'),
+        phone: phoneValue, // Use full international format
+        // Contact person
+        contactFirstName: formData.get('contactFirstName'),
+        contactLastName: formData.get('contactLastName'),
+        // Emergency
+        emergencyContactName: formData.get('emergencyContactName'),
+        emergencyContactPhone: formData.get('emergencyContactPhone'),
+        // Company
+        companyType: formData.get('companyType'),
+        taxId: formData.get('taxId'),
+        website: formData.get('website'),
+        address: formData.get('address'),
+        // Special requirements
+        preferredLanguage: formData.get('preferredLanguage'),
+        accessibilityRequirements: formData.get('accessibilityRequirements'),
+        allergies: allergiesText,
+        dietaryRestrictions: dietaryText,
+        notes: formData.get('notes'),
         active: document.getElementById('editClientActive').checked
     };
     
+    // Remove empty fields to avoid sending nulls
+    Object.keys(clientData).forEach(key => {
+        if (key !== 'active' && (!clientData[key] || clientData[key].trim() === '')) {
+            delete clientData[key];
+        }
+    });
+    
     try {
+        // Show loading state
+        const updateBtn = document.getElementById('updateClientBtn');
+        const originalText = updateBtn.innerHTML;
+        updateBtn.innerHTML = '<i class="ti ti-loader-2 fa-spin me-1"></i>Actualizando...';
+        updateBtn.disabled = true;
+        
         const response = await fetch(`/api/owned-clients/${clientId}`, {
             method: 'PUT',
             headers: {
@@ -488,6 +878,11 @@ async function updateClient() {
     } catch (error) {
         console.error('Error updating client:', error);
         showEditModalAlert('error', 'Error de conexión al actualizar el cliente');
+    } finally {
+        // Restore button state
+        const updateBtn = document.getElementById('updateClientBtn');
+        updateBtn.innerHTML = originalText;
+        updateBtn.disabled = false;
     }
 }
 
@@ -548,4 +943,36 @@ function showToast(type, message) {
         alert(message);
     }
 }
+
+// Add event listeners to clear validation states when modals are shown
+document.addEventListener('DOMContentLoaded', function() {
+    const createModal = document.getElementById('createClientModal');
+    const editModal = document.getElementById('editClientModal');
+    
+    if (createModal) {
+        createModal.addEventListener('show.bs.modal', function() {
+            // Clear validation states for create modal
+            setTimeout(function() {
+                const form = document.getElementById('createClientForm');
+                if (form) {
+                    clearFormValidation(form);
+                    console.log('Create client modal validation states cleared');
+                }
+            }, 100); // Small delay to ensure modal content is rendered
+        });
+    }
+    
+    if (editModal) {
+        editModal.addEventListener('show.bs.modal', function() {
+            // Clear validation states for edit modal
+            setTimeout(function() {
+                const form = document.getElementById('editClientForm');
+                if (form) {
+                    clearFormValidation(form);
+                    console.log('Edit client modal validation states cleared');
+                }
+            }, 100); // Small delay to ensure modal content is rendered
+        });
+    }
+});
 </script>

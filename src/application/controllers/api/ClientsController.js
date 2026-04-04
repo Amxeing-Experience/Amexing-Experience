@@ -497,6 +497,187 @@ class ClientsController {
     }
   }
 
+  /**
+   * GET /api/clients/mixed - Get mixed data (agencies and Amexing direct clients).
+   * Only for admin/superadmin roles.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/clients/mixed?type=all|agencies|clients&page=1&limit=25
+   */
+  async getMixedClients(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      // Only admin/superadmin can access mixed data
+      const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
+      if (!['superadmin', 'admin'].includes(currentUserRole)) {
+        return this.sendError(res, 'Access denied. Only Admin or SuperAdmin can access mixed client data.', 403);
+      }
+
+      // Parse query parameters
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      const limit = Math.min(this.maxPageSize, parseInt(req.query.limit, 10) || this.defaultPageSize);
+      const skip = (page - 1) * limit;
+      const type = req.query.type || 'all'; // all, agencies, clients
+      const search = req.query.search?.trim() || '';
+
+      logger.info('getMixedClients called with filters', {
+        type,
+        search,
+        page,
+        limit,
+        userId: currentUser.id,
+      });
+
+      let agencies = [];
+      let directClients = [];
+
+      // Get total counts for pagination metadata
+      let totalAgenciesCount = 0;
+      let totalDirectClientsCount = 0;
+      let paginatedData = [];
+
+      if (type === 'all' || type === 'agencies') {
+        const agencyOptions = {
+          page: 1,
+          limit: 1000,
+          targetRole: 'department_manager',
+          search,
+        };
+
+        const agencyCountResult = await this.userService.getUsers(currentUser, agencyOptions);
+        totalAgenciesCount = agencyCountResult.pagination?.totalCount || 0;
+      }
+
+      if (type === 'all' || type === 'clients') {
+        const Parse = require('parse/node');
+        const Client = require('../../../domain/models/Client');
+
+        const clientCountQuery = new Parse.Query(Client);
+        clientCountQuery.equalTo('clientBelongsTo', 'amexing');
+        clientCountQuery.equalTo('active', true);
+        clientCountQuery.equalTo('exists', true);
+
+        if (search) {
+          clientCountQuery.matches('name', search, 'i');
+        }
+
+        totalDirectClientsCount = await clientCountQuery.count({ useMasterKey: true });
+      }
+
+      const totalCount = totalAgenciesCount + totalDirectClientsCount;
+
+      // Only fetch the data we need for this page
+      if (totalCount > 0) {
+        // For simplicity, we'll load agencies first, then direct clients
+        // This approach works for moderate data sizes
+        const allData = [];
+
+        // Fetch agencies
+        if (type === 'all' || type === 'agencies') {
+          const agencyOptions = {
+            page: 1,
+            limit: totalAgenciesCount, // Get all agencies for now
+            targetRole: 'department_manager',
+            search,
+          };
+
+          const agencyResult = await this.userService.getUsers(currentUser, agencyOptions);
+          agencies = agencyResult.users || [];
+
+          const formattedAgencies = agencies.map((user) => ({
+            id: user.id,
+            type: 'agency',
+            name: user.contextualData?.companyName || `${user.firstName} ${user.lastName}`,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.username,
+            phone: user.phone,
+            companyType: 'travel_agency',
+            active: user.active,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            loginEnabled: true,
+          }));
+
+          allData.push(...formattedAgencies);
+        }
+
+        // Fetch direct clients
+        if (type === 'all' || type === 'clients') {
+          const Parse = require('parse/node');
+          const Client = require('../../../domain/models/Client');
+
+          const clientQuery = new Parse.Query(Client);
+          clientQuery.equalTo('clientBelongsTo', 'amexing');
+          clientQuery.equalTo('active', true);
+          clientQuery.equalTo('exists', true);
+
+          if (search) {
+            clientQuery.matches('name', search, 'i');
+          }
+
+          const clientResults = await clientQuery.find({ useMasterKey: true });
+          directClients = clientResults.map((client) => ({
+            id: client.id,
+            type: 'client',
+            name: client.get('name'),
+            firstName: client.get('firstName'),
+            lastName: client.get('lastName'),
+            email: client.get('email'),
+            phone: client.get('phone'),
+            companyType: client.get('companyType'),
+            active: client.get('active'),
+            createdAt: client.get('createdAt'),
+            updatedAt: client.get('updatedAt'),
+            clientBelongsTo: client.get('clientBelongsTo'),
+          }));
+
+          allData.push(...directClients);
+        }
+
+        // Sort combined data by creation date (newest first)
+        allData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        // Apply pagination
+        paginatedData = allData.slice(skip, skip + limit);
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          users: paginatedData,
+        },
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+        },
+        summary: {
+          totalAgencies: totalAgenciesCount,
+          totalDirectClients: totalDirectClientsCount,
+          totalCombined: totalCount,
+        },
+      });
+    } catch (error) {
+      logger.error('Error in ClientsController.getMixedClients', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+        userRole: req.userRole,
+        queryParams: req.query,
+      });
+
+      this.sendError(res, 'Failed to retrieve mixed client data', 500);
+    }
+  }
+
   // ===== HELPER METHODS =====
 
   /**
@@ -614,13 +795,14 @@ class ClientsController {
   }
 
   /**
-   * GET /api/clients/active - Get active clients for dropdown/selector.
+   * GET /api/clients/active - Get active clients for dropdown/selector with search.
    * Returns simplified client data formatted for Tom Select component.
+   * Supports server-side search for better performance with large datasets.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * GET /api/clients/active
+   * GET /api/clients/active?search=enterprise
    * Response: {success: true, data: [{value: 'id', label: 'Company Name', email: 'email@domain.com', contactPerson: 'John Doe', phone: '+52...'}]}
    */
   async getActiveClients(req, res) {
@@ -630,16 +812,30 @@ class ClientsController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      // Get all active clients with role department_manager
+      // Parse query parameters for search functionality
+      const searchTerm = req.query.search?.trim() || '';
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = Math.min(parseInt(req.query.limit, 10) || 100, this.maxPageSize);
+
+      // Build options for service call
       const options = {
         targetRole: this.clientRole,
-        active: true,
-        exists: true,
-        limit: 1000, // Get all for selector
-        page: 1,
-        sortField: 'lastName',
-        sortDirection: 'asc',
+        filters: {
+          active: true,
+          exists: true,
+        },
+        limit,
+        page,
+        sort: {
+          field: 'lastName',
+          direction: 'asc',
+        },
       };
+
+      // Add search filter if provided
+      if (searchTerm) {
+        options.filters.search = searchTerm;
+      }
 
       const result = await this.userService.getUsers(currentUser, options);
 
@@ -662,10 +858,26 @@ class ClientsController {
 
       logger.info('Active clients retrieved for selector', {
         count: clients.length,
+        searchTerm: searchTerm || 'none',
+        page,
+        limit,
+        totalCount: result.pagination?.total || clients.length,
         requestedBy: currentUser.id,
       });
 
-      this.sendSuccess(res, clients, 'Active clients retrieved successfully');
+      // Include pagination metadata for frontend
+      const response = {
+        clients,
+        pagination: {
+          page,
+          limit,
+          total: result.pagination?.total || clients.length,
+          hasMore: result.pagination?.hasNextPage || false,
+        },
+        searchTerm,
+      };
+
+      this.sendSuccess(res, response, 'Active clients retrieved successfully');
     } catch (error) {
       logger.error('Error in ClientsController.getActiveClients', {
         error: error.message,
@@ -676,6 +888,169 @@ class ClientsController {
       this.sendError(
         res,
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve active clients',
+        500
+      );
+    }
+  }
+
+  /**
+   * GET /api/clients/:clientId/sub-clients - Get sub-clients (Client records owned by this client)
+   * Fetches Client records from the Client table where ownedBy points to the specified clientId
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/clients/abc123/sub-clients
+   * Response: {success: true, data: {clients: [...], total: 5}}
+   */
+  async getSubClients(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      const { clientId } = req.params;
+      if (!clientId) {
+        return this.sendError(res, 'Client ID is required', 400);
+      }
+
+      // Parse query parameters for pagination
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = Math.min(parseInt(req.query.limit, 10) || 100, 100);
+      const searchTerm = req.query.search?.trim() || '';
+
+      logger.info('Fetching sub-clients for client', {
+        clientId,
+        page,
+        limit,
+        searchTerm,
+        requestedBy: currentUser.id,
+      });
+
+      // Query Client table for records where ownedBy points to this clientId
+      const Parse = require('parse/node');
+      const Client = Parse.Object.extend('Client');
+
+      // Set up the ownedBy conditions
+      // ownedBy can be a pointer to AmexingUser, so we check both:
+      // 1. ownedBy.objectId = clientId (direct pointer)
+      // 2. ownedBy.clientId = clientId (user's clientId field points to this client)
+
+      const AmexingUser = Parse.Object.extend('AmexingUser');
+
+      // Query 1: Direct pointer match (ownedBy.objectId = clientId)
+      const directOwnerQuery = new Parse.Query(Client);
+      const ownerPointer = new AmexingUser();
+      ownerPointer.id = clientId;
+      directOwnerQuery.equalTo('ownedBy', ownerPointer);
+      directOwnerQuery.equalTo('active', true);
+      directOwnerQuery.equalTo('exists', true);
+
+      // Query 2: Match users where their clientId field = clientId
+      // First, find all AmexingUsers where clientId = clientId
+      const userQuery = new Parse.Query(AmexingUser);
+      userQuery.equalTo('clientId', clientId);
+      userQuery.equalTo('active', true);
+      userQuery.equalTo('exists', true);
+
+      // Then find Clients where ownedBy matches any of these users
+      const indirectOwnerQuery = new Parse.Query(Client);
+      indirectOwnerQuery.matchesQuery('ownedBy', userQuery);
+      indirectOwnerQuery.equalTo('active', true);
+      indirectOwnerQuery.equalTo('exists', true);
+
+      // Combine both queries with OR
+      const ownerQuery = Parse.Query.or(directOwnerQuery, indirectOwnerQuery);
+
+      // If there's a search term, add search conditions
+      let finalQuery;
+      if (searchTerm) {
+        const searchQueries = [];
+
+        // Search in name field
+        const nameQuery = new Parse.Query(Client);
+        nameQuery.matches('name', searchTerm, 'i');
+        searchQueries.push(nameQuery);
+
+        // Search in email field
+        const emailQuery = new Parse.Query(Client);
+        emailQuery.matches('email', searchTerm, 'i');
+        searchQueries.push(emailQuery);
+
+        // Search in contactPerson field
+        const contactQuery = new Parse.Query(Client);
+        contactQuery.matches('contactPerson', searchTerm, 'i');
+        searchQueries.push(contactQuery);
+
+        // Combine search queries with OR
+        const searchQuery = Parse.Query.or(...searchQueries);
+
+        // We need to apply the search filter to the ownerQuery results
+        // Create a new query that combines both conditions
+        // Use Parse.Query.and to properly combine queries without accessing private properties
+        finalQuery = Parse.Query.and(ownerQuery, searchQuery);
+      } else {
+        // Use the owner query directly
+        finalQuery = ownerQuery;
+      }
+
+      // Apply pagination
+      finalQuery.limit(limit);
+      finalQuery.skip((page - 1) * limit);
+      finalQuery.descending('createdAt');
+
+      // Execute query
+      const clients = await finalQuery.find({ useMasterKey: true });
+      const totalCount = await finalQuery.count({ useMasterKey: true });
+
+      // Transform clients to response format
+      const clientsData = clients.map((client) => ({
+        id: client.id,
+        name: client.get('name') || '',
+        email: client.get('email') || '',
+        phone: client.get('phone') || '',
+        contactPerson: client.get('contactPerson') || '',
+        firstName: client.get('firstName') || '',
+        lastName: client.get('lastName') || '',
+        companyName: client.get('contextualData')?.companyName || client.get('companyName') || '',
+        contextualData: client.get('contextualData') || null,
+        preferredLanguage: client.get('preferredLanguage') || 'es',
+        active: client.get('active'),
+        createdAt: client.get('createdAt'),
+      }));
+
+      logger.info('Sub-clients retrieved successfully', {
+        clientId,
+        count: clientsData.length,
+        totalCount,
+        page,
+        limit,
+        requestedBy: currentUser.id,
+      });
+
+      // Return response
+      this.sendSuccess(res, {
+        clients: clientsData,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+          hasMore: page * limit < totalCount,
+        },
+      }, 'Sub-clients retrieved successfully');
+    } catch (error) {
+      logger.error('Error in ClientsController.getSubClients', {
+        error: error.message,
+        stack: error.stack,
+        clientId: req.params.clientId,
+        userId: req.user?.id,
+      });
+
+      this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve sub-clients',
         500
       );
     }

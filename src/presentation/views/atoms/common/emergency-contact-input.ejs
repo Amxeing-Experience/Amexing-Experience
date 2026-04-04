@@ -1,0 +1,100 @@
+<%
+/**
+ * Emergency Contact Name Input Atom
+ * Reusable emergency contact name field with validation
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} name - Input name attribute (default: 'emergencyContactName')
+ * @param {string} id - Input ID attribute (default: 'emergencyContactName')
+ * @param {string} label - Field label text (default: 'Contacto de Emergencia')
+ * @param {boolean} required - Whether field is required (default: false)
+ * @param {string} placeholder - Placeholder text (default: 'Ej: María García')
+ * @param {string} helpText - Help text below field (default: 'Nombre completo del contacto de emergencia')
+ * @param {object} inputAttributes - Additional input attributes (default: {})
+ * @param {string} value - Initial value (default: '')
+ */
+
+// Component Configuration
+const inputName = typeof name !== 'undefined' ? name : 'emergencyContactName';
+const inputId = typeof id !== 'undefined' ? id : 'emergencyContactName';
+const inputLabel = typeof label !== 'undefined' ? label : 'Contacto de Emergencia';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Ej: María García';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : 'Nombre completo del contacto de emergencia';
+const additionalAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const initialValue = typeof value !== 'undefined' ? value : '';
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <i class="ti ti-alert-circle text-danger me-1"></i>
+        <%= inputLabel %>
+        <% if (isRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    
+    <input 
+        type="text"
+        class="form-control"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        placeholder="<%= inputPlaceholder %>"
+        value="<%= initialValue %>"
+        <%= isRequired ? 'required' : '' %>
+        maxlength="200"
+        pattern="^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s'-]+$"
+        title="Nombre completo del contacto de emergencia"
+        <% Object.keys(additionalAttributes).forEach(function(key) { %>
+            <%= key %>="<%= additionalAttributes[key] %>"
+        <% }); %>
+    >
+    
+    <% if (inputHelpText) { %>
+        <small class="form-text text-muted">
+            <%= inputHelpText %>
+        </small>
+    <% } %>
+    
+    <div class="invalid-feedback">
+        Por favor ingrese un nombre válido para el contacto de emergencia
+    </div>
+</div>
+
+<script>
+(function() {
+    // Real-time validation for emergency contact name
+    const emergencyInput = document.getElementById('<%= inputId %>');
+    
+    if (emergencyInput) {
+        // Auto-capitalize first letter of each word
+        emergencyInput.addEventListener('input', function() {
+            const value = this.value;
+            
+            // Capitalize first letter of each word
+            if (value.length > 0) {
+                this.value = value.replace(/(^|\s)\S/g, l => l.toUpperCase());
+            }
+            
+            // Validate pattern
+            const pattern = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s'-]*$/;
+            if (pattern.test(value) && value.trim().length > 0) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else if (value.trim().length > 0) {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-valid', 'is-invalid');
+            }
+        });
+        
+        emergencyInput.addEventListener('blur', function() {
+            this.value = this.value.trim();
+        });
+    }
+})();
+</script>

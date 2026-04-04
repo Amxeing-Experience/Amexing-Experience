@@ -145,7 +145,7 @@ class RoleAuthorizationService {
     const { throwError = false, context = 'unknown', explicitRole = null } = options;
 
     // Extract user role
-    const userRole = this.extractUserRole(user, explicitRole);
+    const userRole = this.extractUserRole(user, explicitRole) || 'unknown';
 
     // Normalize requiredRoles to array
     const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
@@ -195,7 +195,7 @@ class RoleAuthorizationService {
   hasMinimumRoleLevel(user, minimumLevel, options = {}) {
     const { throwError = false, context = 'unknown' } = options;
 
-    const userRole = this.extractUserRole(user);
+    const userRole = this.extractUserRole(user) || 'unknown';
     const userLevel = this.roleHierarchy[userRole] || 0;
 
     const hasAccess = userLevel >= minimumLevel;
@@ -244,7 +244,7 @@ class RoleAuthorizationService {
   validateOrganizationAccess(user, organization, options = {}) {
     const { throwError = false, context = 'unknown' } = options;
 
-    const userRole = this.extractUserRole(user);
+    const userRole = this.extractUserRole(user) || 'unknown';
     const userOrganization = this.roleOrganizations[userRole];
 
     const hasAccess = userOrganization === organization;
@@ -299,7 +299,7 @@ class RoleAuthorizationService {
    * // Returns: 6 (for admin)
    */
   getUserRoleLevel(user) {
-    const userRole = this.extractUserRole(user);
+    const userRole = this.extractUserRole(user) || 'unknown';
     return this.roleHierarchy[userRole] || 0;
   }
 
@@ -312,7 +312,7 @@ class RoleAuthorizationService {
    * // Returns: 'amexing'
    */
   getUserOrganization(user) {
-    const userRole = this.extractUserRole(user);
+    const userRole = this.extractUserRole(user) || 'unknown';
     return this.roleOrganizations[userRole] || 'external';
   }
 
@@ -327,7 +327,7 @@ class RoleAuthorizationService {
    */
   canManageUser(currentUser, targetUser) {
     const currentLevel = this.getUserRoleLevel(currentUser);
-    const targetRole = this.extractUserRole(targetUser);
+    const targetRole = this.extractUserRole(targetUser) || 'unknown';
     const targetLevel = this.roleHierarchy[targetRole] || 0;
 
     return currentLevel > targetLevel;
