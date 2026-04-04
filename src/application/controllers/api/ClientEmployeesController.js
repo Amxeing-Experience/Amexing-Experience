@@ -80,18 +80,41 @@ class ClientEmployeesController {
       // Get employees from service
       const result = await this.userService.getUsers(currentUser, options);
 
-      // If the current user is a department_manager and the clientId matches their ID,
-      // add them to the team results (since they should see themselves in their team)
       const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
-      if (currentUserRole === 'department_manager' && currentUser.id === clientId) {
-        const currentUserFormatted = this.transformCurrentUserForTeamView(currentUser);
 
-        // Add current user at the beginning of the results
-        result.users.unshift(currentUserFormatted);
+      // Add the department_manager (client owner) to the results when viewed by admin/superadmin
+      // or when the department_manager is viewing their own team
+      const shouldIncludeDepartmentManager = (currentUserRole === 'department_manager' && currentUser.id === clientId)
+        || (['superadmin', 'admin'].includes(currentUserRole));
 
-        // Adjust pagination counts to include the current user
-        result.pagination.totalCount += 1;
-        result.pagination.totalPages = Math.ceil(result.pagination.totalCount / result.pagination.limit);
+      if (shouldIncludeDepartmentManager) {
+        // Get the client (department_manager) user record
+        const Parse = require('parse/node');
+        const clientQuery = new Parse.Query('AmexingUser');
+        clientQuery.equalTo('objectId', clientId);
+        clientQuery.equalTo('active', true);
+        clientQuery.equalTo('exists', true);
+        clientQuery.include('roleId');
+
+        const clientUser = await clientQuery.first({ useMasterKey: true });
+
+        if (clientUser) {
+          // Check if client is already in the results (avoid duplicates)
+          const alreadyIncluded = result.users.some((user) => user.id === clientUser.id);
+
+          if (!alreadyIncluded) {
+            // Transform client user to match the expected format
+            const isCurrentUserFlag = currentUserRole === 'department_manager' && currentUser.id === clientId;
+            const clientUserFormatted = this.transformDepartmentManagerForEmployeeView(clientUser, isCurrentUserFlag);
+
+            // Add client user at the beginning of the results
+            result.users.unshift(clientUserFormatted);
+
+            // Adjust pagination counts to include the client user
+            result.pagination.totalCount += 1;
+            result.pagination.totalPages = Math.ceil(result.pagination.totalCount / result.pagination.limit);
+          }
+        }
       }
 
       // Add metadata for frontend consumption
@@ -934,6 +957,56 @@ class ClientEmployeesController {
       isCurrentUser: true, // Special flag for UI to show ME badge
       clientId: null, // Department managers don't have clientId
       notes: 'Department Manager', // Optional description
+    };
+  }
+
+  /**
+   * Transform department manager (client owner) data to match the employee table format.
+   * Used when admin is viewing client's employees to include the department manager.
+   * @param {object} clientUser - Client user Parse object (department_manager).
+   * @param {boolean} isCurrentUser - Whether this is the current user viewing their own team.
+   * @returns {object} - Formatted user object matching employee table structure.
+   * @example
+   * const formatted = this.transformDepartmentManagerForEmployeeView(clientUser, false);
+   * // Returns: { id: 'user123', firstName: 'John', role: 'department_manager', ... }
+   */
+  transformDepartmentManagerForEmployeeView(clientUser, isCurrentUser = false) {
+    // Extract user data from Parse object
+    const userId = clientUser.get('objectId') || clientUser.id;
+    const firstName = clientUser.get('firstName');
+    const lastName = clientUser.get('lastName');
+    const email = clientUser.get('username') || clientUser.get('email');
+    const phone = clientUser.get('phone');
+    const active = clientUser.get('active');
+    const createdAt = clientUser.get('createdAt');
+    const updatedAt = clientUser.get('updatedAt');
+
+    // Get role information
+    let role = 'department_manager'; // Default role for client
+    let roleId = null;
+
+    const rolePointer = clientUser.get('roleId');
+    if (rolePointer && rolePointer.get) {
+      role = rolePointer.get('name') || role;
+      roleId = rolePointer;
+    } else if (rolePointer && rolePointer.id) {
+      roleId = rolePointer;
+    }
+
+    return {
+      id: userId,
+      firstName: firstName || '',
+      lastName: lastName || '',
+      email: email || '',
+      phone: phone || '',
+      role,
+      roleId,
+      active: active !== false, // Default to true if undefined
+      createdAt: createdAt || new Date(),
+      updatedAt: updatedAt || new Date(),
+      isCurrentUser, // Will be true only when department_manager is viewing their own team
+      clientId: null, // Department managers don't have clientId - they ARE the client
+      notes: isCurrentUser ? 'Department Manager (You)' : 'Department Manager', // Optional description
     };
   }
 }

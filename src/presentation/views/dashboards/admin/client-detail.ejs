@@ -2249,15 +2249,14 @@ function setupExperienceFilters() {
                             </div>
                         </div>
 
-                        <%- include('../../molecules/common/form-field', {
-                            type: 'email',
+                        <%- include('../../atoms/common/email-input', {
                             name: 'email',
                             id: 'editEmployeeEmail',
                             label: 'Email Corporativo',
                             required: true,
                             placeholder: 'empleado@empresa.com',
                             helpText: 'Email corporativo del empleado para acceso al sistema',
-                            inputAttributes: { maxlength: '255' }
+                            maxlength: 255
                         }) %>
                     </div>
 
@@ -3421,6 +3420,16 @@ function setupExperienceFilters() {
         editModal.show();
     });
 
+    // Listen for edit client events from the data table (for department_manager role)
+    document.addEventListener('editClient', function(event) {
+        const { clientId, clientData } = event.detail;
+        
+        // The editClientModal should already be populated with current client data
+        // since this is the client detail page. Just show the modal.
+        const editClientModal = new bootstrap.Modal(document.getElementById('editClientModal'));
+        editClientModal.show();
+    });
+
     // Initialize create employee modal on DOM ready
     document.addEventListener('DOMContentLoaded', function() {
         initializeCreateEmployeeModal();
@@ -3430,9 +3439,46 @@ function setupExperienceFilters() {
         const editModal = document.getElementById('editClientModal');
         if (editModal) {
             editModal.addEventListener('shown.bs.modal', function() {
-                setupLiveValidation();
-                updateSaveButtonState(); // Initial button state check
+                // Legacy validation disabled - atomic components now handle validation
+                // setupLiveValidation();
                 
+                // Clear any existing validation states for clean start
+                // Use timeout to ensure atomic components are fully loaded
+                setTimeout(function() {
+                    const form = document.getElementById('editClientForm');
+                    if (form) {
+                        // Remove all validation classes
+                        form.querySelectorAll('.is-invalid, .is-valid').forEach(el => {
+                            el.classList.remove('is-invalid', 'is-valid');
+                        });
+                        
+                        // Hide all validation feedback messages
+                        form.querySelectorAll('.invalid-feedback, .valid-feedback').forEach(el => {
+                            el.style.display = 'none';
+                        });
+                    }
+                }, 100); // Small delay to ensure atomic components are ready
+                
+                updateSaveButtonState(); // Initial button state check
+            });
+            
+            // Clean up validation states when modal is hidden
+            editModal.addEventListener('hidden.bs.modal', function() {
+                const form = document.getElementById('editClientForm');
+                if (form) {
+                    // Remove all validation classes
+                    form.querySelectorAll('.is-invalid, .is-valid').forEach(el => {
+                        el.classList.remove('is-invalid', 'is-valid');
+                    });
+                    
+                    // Hide all validation feedback messages
+                    form.querySelectorAll('.invalid-feedback, .valid-feedback').forEach(el => {
+                        el.style.display = 'none';
+                    });
+                }
+            });
+            
+            editModal.addEventListener('shown.bs.modal', function() {
                 // Add click event listener to save button
                 const saveButton = document.getElementById('saveClientChanges');
                 if (saveButton) {
@@ -3465,6 +3511,45 @@ function setupExperienceFilters() {
                     
                     // Remove event listener when modal is hidden
                     saveButton.removeEventListener('click', updateClient);
+                }
+            });
+        }
+        
+        // Initialize validation cleanup for employee modal
+        const editEmployeeModal = document.getElementById('editEmployeeModal');
+        if (editEmployeeModal) {
+            editEmployeeModal.addEventListener('shown.bs.modal', function() {
+                // Clear any existing validation states for clean start
+                // Use timeout to ensure atomic components are fully loaded
+                setTimeout(function() {
+                    const form = document.getElementById('editEmployeeForm');
+                    if (form) {
+                        // Remove all validation classes
+                        form.querySelectorAll('.is-invalid, .is-valid').forEach(el => {
+                            el.classList.remove('is-invalid', 'is-valid');
+                        });
+                        
+                        // Hide all validation feedback messages
+                        form.querySelectorAll('.invalid-feedback, .valid-feedback').forEach(el => {
+                            el.style.display = 'none';
+                        });
+                    }
+                }, 100); // Small delay to ensure atomic components are ready
+            });
+            
+            // Clean up validation states when employee modal is hidden
+            editEmployeeModal.addEventListener('hidden.bs.modal', function() {
+                const form = document.getElementById('editEmployeeForm');
+                if (form) {
+                    // Remove all validation classes
+                    form.querySelectorAll('.is-invalid, .is-valid').forEach(el => {
+                        el.classList.remove('is-invalid', 'is-valid');
+                    });
+                    
+                    // Hide all validation feedback messages
+                    form.querySelectorAll('.invalid-feedback, .valid-feedback').forEach(el => {
+                        el.style.display = 'none';
+                    });
                 }
             });
         }
@@ -4207,25 +4292,41 @@ function setupExperienceFilters() {
                             <i class="ti ti-user me-1"></i>Datos del Agente Admin
                         </h6>
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="editFirstName" class="form-label">Nombre <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="editFirstName" name="firstName" 
-                                       value="<%= clientData.firstName %>" required>
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/first-name-input', {
+                                    id: 'editFirstName',
+                                    name: 'firstName',
+                                    value: clientData.firstName || '',
+                                    required: true,
+                                    label: 'Nombre'
+                                }) %>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="editLastName" class="form-label">Apellido <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="editLastName" name="lastName" 
-                                       value="<%= clientData.lastName %>" required>
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/last-name-input', {
+                                    id: 'editLastName',
+                                    name: 'lastName',
+                                    value: clientData.lastName || '',
+                                    required: true,
+                                    label: 'Apellido'
+                                }) %>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="editEmail" class="form-label">Email <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" id="editEmail" name="email" 
-                                       value="<%= clientData.email %>" required>
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/email-input', {
+                                    id: 'editEmail',
+                                    name: 'email',
+                                    value: clientData.email || '',
+                                    required: true,
+                                    label: 'Email'
+                                }) %>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="editPhone" class="form-label">Teléfono</label>
-                                <input type="tel" class="form-control" id="editPhone" name="phone" 
-                                       value="<%= clientData.phone %>">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/phone-input', {
+                                    id: 'editPhone',
+                                    name: 'phone',
+                                    value: clientData.phone || '',
+                                    required: false,
+                                    label: 'Teléfono'
+                                }) %>
                             </div>
                         </div>
                     </div>
@@ -4236,20 +4337,33 @@ function setupExperienceFilters() {
                             <i class="ti ti-building me-1"></i>Información de la Empresa
                         </h6>
                         <div class="row">
-                            <div class="col-md-12 mb-3">
-                                <label for="editCompanyName" class="form-label">Nombre de la Empresa <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="editCompanyName" name="companyName" 
-                                       value="<%= clientData.companyName %>" required>
+                            <div class="col-md-12">
+                                <%- include('../../atoms/form/input-text', {
+                                    id: 'editCompanyName',
+                                    name: 'companyName',
+                                    label: 'Nombre de la Empresa',
+                                    value: clientData.companyName || '',
+                                    required: true,
+                                    placeholder: 'Ej: Empresa SA de CV'
+                                }) %>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="editTaxId" class="form-label">RFC</label>
-                                <input type="text" class="form-control" id="editTaxId" name="taxId" 
-                                       value="<%= clientData.taxId %>">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/rfc-input', {
+                                    id: 'editTaxId',
+                                    name: 'taxId',
+                                    value: clientData.taxId || '',
+                                    required: false,
+                                    label: 'RFC'
+                                }) %>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="editWebsite" class="form-label">Sitio Web</label>
-                                <input type="url" class="form-control" id="editWebsite" name="website" 
-                                       value="<%= clientData.website %>" placeholder="https://ejemplo.com">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/url-input', {
+                                    id: 'editWebsite',
+                                    name: 'website',
+                                    value: clientData.website || '',
+                                    required: false,
+                                    label: 'Sitio Web'
+                                }) %>
                             </div>
                         </div>
                     </div>
@@ -4260,30 +4374,54 @@ function setupExperienceFilters() {
                             <i class="ti ti-map-pin me-1"></i>Dirección Fiscal
                         </h6>
                         <div class="row">
-                            <div class="col-md-12 mb-3">
-                                <label for="editStreet" class="form-label">Calle</label>
-                                <input type="text" class="form-control" id="editStreet" name="addressStreet" 
-                                       value="<%= clientData.addressStreet %>">
+                            <div class="col-md-12">
+                                <%- include('../../atoms/form/input-text', {
+                                    id: 'editStreet',
+                                    name: 'addressStreet',
+                                    label: 'Calle',
+                                    value: clientData.addressStreet || '',
+                                    required: false,
+                                    placeholder: 'Ej: Av. Revolución 123'
+                                }) %>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="editCity" class="form-label">Ciudad</label>
-                                <input type="text" class="form-control" id="editCity" name="addressCity" 
-                                       value="<%= clientData.addressCity %>">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/form/input-text', {
+                                    id: 'editCity',
+                                    name: 'addressCity',
+                                    label: 'Ciudad',
+                                    value: clientData.addressCity || '',
+                                    required: false,
+                                    placeholder: 'Ej: Ciudad de México'
+                                }) %>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="editState" class="form-label">Estado</label>
-                                <input type="text" class="form-control" id="editState" name="addressState" 
-                                       value="<%= clientData.addressState %>">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/form/input-text', {
+                                    id: 'editState',
+                                    name: 'addressState',
+                                    label: 'Estado',
+                                    value: clientData.addressState || '',
+                                    required: false,
+                                    placeholder: 'Ej: Ciudad de México'
+                                }) %>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="editZipCode" class="form-label">Código Postal</label>
-                                <input type="text" class="form-control" id="editZipCode" name="addressZipCode" 
-                                       value="<%= clientData.addressZipCode %>" pattern="[0-9]{5}">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/common/postal-code-input', {
+                                    id: 'editZipCode',
+                                    name: 'addressZipCode',
+                                    value: clientData.addressZipCode || '',
+                                    required: false,
+                                    label: 'Código Postal'
+                                }) %>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="editCountry" class="form-label">País</label>
-                                <input type="text" class="form-control" id="editCountry" name="addressCountry" 
-                                       value="<%= clientData.addressCountry %>" placeholder="México">
+                            <div class="col-md-6">
+                                <%- include('../../atoms/form/input-text', {
+                                    id: 'editCountry',
+                                    name: 'addressCountry',
+                                    label: 'País',
+                                    value: clientData.addressCountry || '',
+                                    required: false,
+                                    placeholder: 'México'
+                                }) %>
                             </div>
                         </div>
                     </div>
@@ -4295,18 +4433,29 @@ function setupExperienceFilters() {
                             <i class="ti ti-notes me-1"></i>Información Adicional
                         </h6>
                         <div class="row">
-                            <div class="col-md-12 mb-3">
-                                <label for="editNotes" class="form-label">Notas</label>
-                                <textarea class="form-control" id="editNotes" name="notes" rows="3" 
-                                          placeholder="Información adicional sobre el cliente..."><%= clientData.notes %></textarea>
+                            <div class="col-md-12">
+                                <%- include('../../atoms/common/textarea', {
+                                    id: 'editNotes',
+                                    name: 'notes',
+                                    value: clientData.notes || '',
+                                    placeholder: 'Información adicional sobre el cliente...',
+                                    rows: 3,
+                                    required: false
+                                }) %>
                             </div>
-                            <div class="col-md-12 mb-3">
-                                <label for="editActive" class="form-label">Estado</label>
-                                <select class="form-select" id="editActive" name="active">
-                                    <option value="true" <%= clientData.active === true ? 'selected' : '' %>>Activo</option>
-                                    <option value="false" <%= clientData.active === false ? 'selected' : '' %>>Inactivo</option>
-                                </select>
-                                <div class="form-text">Cambiar a inactivo deshabilitará el acceso del cliente al sistema</div>
+                            <div class="col-md-12">
+                                <%- include('../../atoms/form/select', {
+                                    id: 'editActive',
+                                    name: 'active',
+                                    label: 'Estado',
+                                    value: clientData.active?.toString() || 'true',
+                                    options: [
+                                        {value: 'true', label: 'Activo'},
+                                        {value: 'false', label: 'Inactivo'}
+                                    ],
+                                    required: false,
+                                    helpText: 'Cambiar a inactivo deshabilitará el acceso del cliente al sistema'
+                                }) %>
                             </div>
                         </div>
                     </div>
