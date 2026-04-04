@@ -146,6 +146,11 @@ class Client extends BaseModel {
     }
     client.set('ownerType', clientData.ownerType || 'admin'); // admin, department_manager, client
 
+    // Client organization classification
+    if (clientData.clientBelongsTo !== undefined) {
+      client.set('clientBelongsTo', clientData.clientBelongsTo);
+    }
+
     // Lifecycle fields - explicitly set defaults since BaseModel doesn't set them automatically
     client.set('active', clientData.active !== undefined ? clientData.active : true);
     client.set('exists', clientData.exists !== undefined ? clientData.exists : true);

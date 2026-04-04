@@ -497,6 +497,187 @@ class ClientsController {
     }
   }
 
+  /**
+   * GET /api/clients/mixed - Get mixed data (agencies and Amexing direct clients).
+   * Only for admin/superadmin roles.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/clients/mixed?type=all|agencies|clients&page=1&limit=25
+   */
+  async getMixedClients(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      // Only admin/superadmin can access mixed data
+      const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
+      if (!['superadmin', 'admin'].includes(currentUserRole)) {
+        return this.sendError(res, 'Access denied. Only Admin or SuperAdmin can access mixed client data.', 403);
+      }
+
+      // Parse query parameters
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      const limit = Math.min(this.maxPageSize, parseInt(req.query.limit, 10) || this.defaultPageSize);
+      const skip = (page - 1) * limit;
+      const type = req.query.type || 'all'; // all, agencies, clients
+      const search = req.query.search?.trim() || '';
+
+      logger.info('getMixedClients called with filters', {
+        type,
+        search,
+        page,
+        limit,
+        userId: currentUser.id,
+      });
+
+      let agencies = [];
+      let directClients = [];
+
+      // Get total counts for pagination metadata
+      let totalAgenciesCount = 0;
+      let totalDirectClientsCount = 0;
+      let paginatedData = [];
+
+      if (type === 'all' || type === 'agencies') {
+        const agencyOptions = {
+          page: 1,
+          limit: 1000,
+          targetRole: 'department_manager',
+          search,
+        };
+
+        const agencyCountResult = await this.userService.getUsers(currentUser, agencyOptions);
+        totalAgenciesCount = agencyCountResult.pagination?.totalCount || 0;
+      }
+
+      if (type === 'all' || type === 'clients') {
+        const Parse = require('parse/node');
+        const Client = require('../../../domain/models/Client');
+
+        const clientCountQuery = new Parse.Query(Client);
+        clientCountQuery.equalTo('clientBelongsTo', 'amexing');
+        clientCountQuery.equalTo('active', true);
+        clientCountQuery.equalTo('exists', true);
+
+        if (search) {
+          clientCountQuery.matches('name', search, 'i');
+        }
+
+        totalDirectClientsCount = await clientCountQuery.count({ useMasterKey: true });
+      }
+
+      const totalCount = totalAgenciesCount + totalDirectClientsCount;
+
+      // Only fetch the data we need for this page
+      if (totalCount > 0) {
+        // For simplicity, we'll load agencies first, then direct clients
+        // This approach works for moderate data sizes
+        const allData = [];
+
+        // Fetch agencies
+        if (type === 'all' || type === 'agencies') {
+          const agencyOptions = {
+            page: 1,
+            limit: totalAgenciesCount, // Get all agencies for now
+            targetRole: 'department_manager',
+            search,
+          };
+
+          const agencyResult = await this.userService.getUsers(currentUser, agencyOptions);
+          agencies = agencyResult.users || [];
+
+          const formattedAgencies = agencies.map((user) => ({
+            id: user.id,
+            type: 'agency',
+            name: user.contextualData?.companyName || `${user.firstName} ${user.lastName}`,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.username,
+            phone: user.phone,
+            companyType: 'travel_agency',
+            active: user.active,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            loginEnabled: true,
+          }));
+
+          allData.push(...formattedAgencies);
+        }
+
+        // Fetch direct clients
+        if (type === 'all' || type === 'clients') {
+          const Parse = require('parse/node');
+          const Client = require('../../../domain/models/Client');
+
+          const clientQuery = new Parse.Query(Client);
+          clientQuery.equalTo('clientBelongsTo', 'amexing');
+          clientQuery.equalTo('active', true);
+          clientQuery.equalTo('exists', true);
+
+          if (search) {
+            clientQuery.matches('name', search, 'i');
+          }
+
+          const clientResults = await clientQuery.find({ useMasterKey: true });
+          directClients = clientResults.map((client) => ({
+            id: client.id,
+            type: 'client',
+            name: client.get('name'),
+            firstName: client.get('firstName'),
+            lastName: client.get('lastName'),
+            email: client.get('email'),
+            phone: client.get('phone'),
+            companyType: client.get('companyType'),
+            active: client.get('active'),
+            createdAt: client.get('createdAt'),
+            updatedAt: client.get('updatedAt'),
+            clientBelongsTo: client.get('clientBelongsTo'),
+          }));
+
+          allData.push(...directClients);
+        }
+
+        // Sort combined data by creation date (newest first)
+        allData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        // Apply pagination
+        paginatedData = allData.slice(skip, skip + limit);
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          users: paginatedData,
+        },
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+        },
+        summary: {
+          totalAgencies: totalAgenciesCount,
+          totalDirectClients: totalDirectClientsCount,
+          totalCombined: totalCount,
+        },
+      });
+    } catch (error) {
+      logger.error('Error in ClientsController.getMixedClients', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+        userRole: req.userRole,
+        queryParams: req.query,
+      });
+
+      this.sendError(res, 'Failed to retrieve mixed client data', 500);
+    }
+  }
+
   // ===== HELPER METHODS =====
 
   /**

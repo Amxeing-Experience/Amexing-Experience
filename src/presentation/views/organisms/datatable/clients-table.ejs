@@ -65,6 +65,28 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     </div>
 
     <div class="card-body">
+        <!-- Client Type Pills Filter -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="btn-group" role="group" aria-label="Client Type Filter" id="clientTypeFilter">
+                    <input type="radio" class="btn-check" name="filterType" id="filterAll" value="all" checked>
+                    <label class="btn btn-orange-pill" for="filterAll">
+                        Todos
+                    </label>
+
+                    <input type="radio" class="btn-check" name="filterType" id="filterAgencies" value="agencies">
+                    <label class="btn btn-orange-pill" for="filterAgencies">
+                        Agencias
+                    </label>
+
+                    <input type="radio" class="btn-check" name="filterType" id="filterClients" value="clients">
+                    <label class="btn btn-orange-pill" for="filterClients">
+                        Clientes
+                    </label>
+                </div>
+            </div>
+        </div>
+        
         <!-- DataTable Container -->
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
@@ -165,6 +187,12 @@ function initializeClientsDataTable(totalCount) {
                 params.append('search', data.search.value);
             }
 
+            // Add current filter type if not 'all'
+            const activeFilter = document.querySelector('input[name="filterType"]:checked');
+            if (activeFilter && activeFilter.value !== 'all') {
+                params.append('type', activeFilter.value);
+            }
+
             fetch(`<%= dtApiEndpoint %>?${params.toString()}`, {
                 method: 'GET',
                 credentials: 'include',
@@ -184,8 +212,9 @@ function initializeClientsDataTable(totalCount) {
                     throw new Error(json.error || 'Failed to load clients');
                 }
 
+
                 // Update total count display
-                const totalCount = json.data?.pagination?.totalCount || 0;
+                const totalCount = json.pagination?.totalCount || 0;
                 document.dispatchEvent(new CustomEvent('clientsTableLoaded', {
                     detail: { count: totalCount }
                 }));
@@ -213,28 +242,23 @@ function initializeClientsDataTable(totalCount) {
         },
         columns: [
             {
-                data: 'companyName',
+                data: 'name',
                 render: function(data, type, row) {
-                    // Get company name from various possible fields, fallback to personal name or email
-                    let displayName = row.companyName || row.organizationName || row.company;
+                    // Handle different data types (agencies vs direct clients)
+                    let displayName = '';
+                    let typeIndicator = '';
                     
-                    if (!displayName) {
-                        // Try to use personal name
-                        const firstName = row.firstName || '';
-                        const lastName = row.lastName || '';
-                        const fullName = `${firstName} ${lastName}`.trim();
-                        
-                        if (fullName) {
-                            displayName = fullName;
-                        } else if (row.email) {
-                            // Use email as last resort
-                            displayName = row.email;
-                        } else {
-                            displayName = 'Cliente';
-                        }
+                    if (row.type === 'agency') {
+                        // For agencies, use company name or personal name
+                        displayName = data || `${row.firstName} ${row.lastName}`.trim() || row.email || 'Agencia';
+                        typeIndicator = '<i class="ti ti-building me-1 text-primary"></i>';
+                    } else {
+                        // For direct clients, use personal name
+                        displayName = data || `${row.firstName} ${row.lastName}`.trim() || row.email || 'Cliente';
+                        typeIndicator = '<i class="ti ti-user me-1 text-success"></i>';
                     }
                     
-                    return `<strong class="text-dark">${displayName}</strong>`;
+                    return `${typeIndicator}<strong class="text-dark">${displayName}</strong>`;
                 }
             },
             {
@@ -246,11 +270,23 @@ function initializeClientsDataTable(totalCount) {
             {
                 data: 'active',
                 render: function(data, type, row) {
+                    let statusBadge = '';
+                    
                     if (data) {
-                        return '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Activo</span>';
+                        statusBadge = '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Activo</span>';
                     } else {
-                        return '<span class="badge bg-danger"><i class="ti ti-x me-1"></i>Inactivo</span>';
+                        statusBadge = '<span class="badge bg-danger"><i class="ti ti-x me-1"></i>Inactivo</span>';
                     }
+                    
+                    // Add type badge
+                    let typeBadge = '';
+                    if (row.type === 'agency') {
+                        typeBadge = '<span class="badge bg-primary ms-1"><i class="ti ti-building me-1"></i>Agencia</span>';
+                    } else {
+                        typeBadge = '<span class="badge bg-info ms-1"><i class="ti ti-user me-1"></i>Cliente</span>';
+                    }
+                    
+                    return statusBadge + typeBadge;
                 }
             },
             {
@@ -272,14 +308,28 @@ function initializeClientsDataTable(totalCount) {
                 render: function(data, type, row) {
                     let actions = '<div class="btn-group btn-group-sm" role="group">';
 
-                    /* View detail button - always visible */
-                    actions += `<a href="/dashboard/admin/clients/${row.id}"
-                                class="btn btn-info"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                title="Ver Detalle">
-                                <i class="ti ti-eye"></i>
-                            </a>`;
+                    /* Different actions based on client type */
+                    if (row.type === 'agency') {
+                        /* View detail button for agencies */
+                        actions += `<a href="/dashboard/admin/clients/${row.id}"
+                                    class="btn btn-info"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Ver Detalle de Agencia">
+                                    <i class="ti ti-eye"></i>
+                                </a>`;
+                    } else {
+                        /* Edit modal button for direct clients */
+                        actions += `<button type="button"
+                                    class="btn btn-info btn-edit-client"
+                                    data-client-id="${row.id}"
+                                    data-client-type="${row.type}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Editar Cliente">
+                                    <i class="ti ti-edit"></i>
+                                </button>`;
+                    }
 
                     <% if (canEdit) { %>
                     /* Toggle status button */
@@ -420,6 +470,19 @@ function showErrorAlert(message) {
 // ============================================================================
 // 4. CLIENT ACTION FUNCTIONS
 // ============================================================================
+
+/**
+ * Edit client - open edit modal and populate with client data
+ * @param {string} clientId - Client ID
+ * @param {string} clientType - Client type (agency or client)
+ */
+function editClient(clientId, clientType) {
+    // Dispatch custom event to parent page to handle modal opening
+    // The parent page (admin/clients.ejs) will handle the modal logic
+    document.dispatchEvent(new CustomEvent('openEditClientModal', {
+        detail: { clientId, clientType }
+    }));
+}
 
 /**
  * Toggle client active status
@@ -604,6 +667,14 @@ function setupEventDelegation() {
             return;
         }
 
+        // Edit button
+        if (target.classList.contains('btn-edit-client')) {
+            const clientId = target.getAttribute('data-client-id');
+            const clientType = target.getAttribute('data-client-type');
+            editClient(clientId, clientType);
+            return;
+        }
+
         // Delete button
         if (target.classList.contains('btn-delete-client')) {
             const clientId = target.getAttribute('data-client-id');
@@ -618,10 +689,27 @@ function setupEventDelegation() {
 // 6. MODULE INITIALIZATION
 // ============================================================================
 
+/**
+ * Setup pill filter event listeners
+ */
+function setupPillFilters() {
+    const filterButtons = document.querySelectorAll('input[name="filterType"]');
+    
+    filterButtons.forEach(button => {
+        button.addEventListener('change', function() {
+            if (this.checked && window.clientsTable) {
+                // Reload the DataTable with new filter
+                window.clientsTable.ajax.reload();
+            }
+        });
+    });
+}
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     loadClientsAndInitializeTable();
     setupEventDelegation();
+    setupPillFilters();
 });
 
 </script>
@@ -665,6 +753,34 @@ document.addEventListener('DOMContentLoaded', function() {
 .badge {
     padding: 0.375rem 0.75rem;
     font-weight: 500;
+}
+
+/* Custom Orange-themed Pills */
+.btn-orange-pill {
+    color: #f76b1c;
+    border: 1px solid #f76b1c;
+    background-color: transparent;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-orange-pill:hover {
+    color: white;
+    background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%);
+    border-color: #f76b1c;
+}
+
+/* Only show active state when actually checked */
+.btn-check:checked + .btn-orange-pill {
+    color: white;
+    background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%) !important;
+    border-color: #f76b1c;
+}
+
+/* Ensure unchecked state is always outline style */
+.btn-check:not(:checked) + .btn-orange-pill {
+    color: #f76b1c !important;
+    border: 1px solid #f76b1c;
+    background-color: transparent !important;
 }
 
 </style>
