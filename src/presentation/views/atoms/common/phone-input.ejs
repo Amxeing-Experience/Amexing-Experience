@@ -343,6 +343,7 @@ const selectedCountry = countries[inputCountryCode] || countries.MX;
             if (!value) {
                 // Empty field - remove all validation states
                 phoneInput.classList.remove('is-invalid', 'is-valid');
+                phoneInput.setCustomValidity(''); // Clear any custom validation message
                 fullNumberInput.value = '';
                 
                 // Return false only if required, true if optional
@@ -355,12 +356,14 @@ const selectedCountry = countries[inputCountryCode] || countries.MX;
             if (isValid) {
                 phoneInput.classList.remove('is-invalid');
                 phoneInput.classList.add('is-valid');
+                phoneInput.setCustomValidity(''); // Clear any custom validation message
                 // Store full international number (E.164 format - digits only, no +)
                 const countryCodeDigits = country.code.replace(/\D/g, '');
                 fullNumberInput.value = countryCodeDigits + value;
             } else {
                 phoneInput.classList.add('is-invalid');
                 phoneInput.classList.remove('is-valid');
+                phoneInput.setCustomValidity('Por favor proporciona un número de teléfono válido');
                 fullNumberInput.value = '';
             }
 
@@ -444,8 +447,9 @@ const selectedCountry = countries[inputCountryCode] || countries.MX;
                 this.value = digitsOnly;
                 validatePhone();
             } else {
-                // Empty field - remove validation states
+                // Empty field - remove validation states and clear custom validation
                 phoneInput.classList.remove('is-invalid', 'is-valid');
+                phoneInput.setCustomValidity(''); // Clear any custom validation message
             }
         });
 
@@ -453,13 +457,11 @@ const selectedCountry = countries[inputCountryCode] || countries.MX;
         const form = phoneInput.closest('form');
         if (form) {
             form.addEventListener('submit', function(e) {
-                const isValid = validatePhone();
-
-                if (!isValid && (<%= inputRequired %> || phoneInput.value)) {
-                    e.preventDefault();
-                    phoneInput.focus();
-                    return false;
-                }
+                // Validate phone before form submission
+                validatePhone();
+                
+                // Let HTML5 validation handle the rest through checkValidity()
+                // No need to prevent submission here since setCustomValidity() will handle it
             });
         }
 

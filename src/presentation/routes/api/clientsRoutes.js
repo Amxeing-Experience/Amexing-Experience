@@ -104,6 +104,19 @@ async function validateClientAccess(req, res, next) {
           userClientId = user.id || (user.get ? user.get('objectId') : user.objectId);
         }
 
+        // 🔍 DEBUG: Log exact values for comparison
+        console.log('🚨 CLIENT ACCESS DEBUG:', {
+          requestedClientId,
+          requestedClientIdType: typeof requestedClientId,
+          userClientId,
+          userClientIdType: typeof userClientId,
+          userRole,
+          userId: user.id || user.get('objectId'),
+          userObject: user.toJSON ? user.toJSON() : user,
+          areEqual: requestedClientId === userClientId,
+          endpoint: req.originalUrl,
+        });
+
         // Check if user is accessing their own client's employees
         if (requestedClientId && userClientId && requestedClientId === userClientId) {
           logger.info('Client access granted (own client employees)', {
@@ -320,6 +333,14 @@ router.get('/', async (req, res) => {
  */
 router.get('/active', async (req, res) => {
   await clientsController.getActiveClients(req, res);
+});
+
+/**
+ * GET /api/clients/amexing-direct - Get direct Amexing clients for dropdowns/selectors
+ * Admin/SuperAdmin only endpoint for getting clients with clientBelongsTo = "amexing"
+ */
+router.get('/amexing-direct', async (req, res) => {
+  await clientsController.getAmexingDirectClients(req, res);
 });
 
 /**

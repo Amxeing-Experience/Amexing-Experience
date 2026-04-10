@@ -147,76 +147,144 @@ class QuoteController {
 
       // 2. Extract fields from request body
       const {
-        client, clientId, contactPerson, contactEmail, contactPhone, notes, eventType,
+        client, clientId, clientType, contactPerson, contactEmail, contactPhone, notes, eventType,
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
       } = req.body;
 
       // Normalize field names (accept both formats)
       const clientIdNormalized = client || clientId;
 
+      // Debug: Log the received request data
+      logger.info('QuoteController.createQuote - Request data received', {
+        clientId,
+        client,
+        clientIdNormalized,
+        clientType,
+        requestBody: req.body,
+        userId: currentUser.id,
+      });
+
       // 3. Handle client field - DUAL FIELD ARCHITECTURE
       if (clientIdNormalized) {
-        try {
-          // 3a. Save as companyClientPtr (Client pointer) for new hierarchical system
-          const companyClientPointer = {
-            __type: 'Pointer',
-            className: 'Client',
-            objectId: clientIdNormalized,
-          };
+        // Check if this is a direct Amexing client quote
+        const isDirectClient = clientType === 'direct';
 
-          // 3b. Find the AmexingUser who owns this Client for backward compatibility
-          const clientQuery = new Parse.Query('Client');
-          const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
-          const ownedByPointer = clientRecord.get('ownedBy');
+        logger.info('QuoteController.createQuote - Processing client logic', {
+          clientIdNormalized,
+          clientType,
+          isDirectClient,
+          userId: currentUser.id,
+        });
 
-          if (ownedByPointer) {
-            // Extract the actual ID from the ownedBy pointer
-            const ownerId = ownedByPointer.id || ownedByPointer.objectId || ownedByPointer;
+        if (isDirectClient) {
+          logger.info('QuoteController.createQuote - Entering DIRECT CLIENT logic branch', {
+            clientId: clientIdNormalized,
+            userId: currentUser.id,
+          });
+          // Direct Amexing client - only set companyClientPtr, leave client null
+          try {
+            // Verify this is actually a direct Amexing client
+            const clientQuery = new Parse.Query('Client');
+            const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+            const clientBelongsTo = clientRecord.get('clientBelongsTo');
 
-            // Role-based logic for client field assignment
-            let clientAmexingUserId;
-            if (req.userRole === 'department_manager') {
-              // Department manager: client field should be the department manager themselves
-              clientAmexingUserId = currentUser.id;
-              logger.info('QuoteController.createQuote - Department manager: setting client to currentUser', {
-                currentUserId: currentUser.id,
-                selectedClientId: clientIdNormalized,
+            if (clientBelongsTo === 'amexing') {
+              // Valid direct Amexing client
+              companyClientObj = {
+                __type: 'Pointer',
+                className: 'Client',
+                objectId: clientIdNormalized,
+              };
+
+              // Leave clientObj null for direct clients
+              clientObj = null;
+
+              logger.info('QuoteController.createQuote - Creating quote for direct Amexing client', {
+                clientId: clientIdNormalized,
+                clientType: 'direct',
               });
             } else {
-              // Client role: client field should be the owner of the selected Client
-              clientAmexingUserId = ownerId;
-              logger.info('QuoteController.createQuote - Client role: setting client to Client owner', {
+              logger.warn('QuoteController.createQuote - Client is not a direct Amexing client', {
                 clientId: clientIdNormalized,
-                ownerId,
+                clientBelongsTo,
+              });
+              return this.sendError(res, 'El cliente seleccionado no es un cliente directo de Amexing', 400);
+            }
+          } catch (error) {
+            logger.error('QuoteController.createQuote - Error verifying direct client', {
+              error: error.message,
+              clientId: clientIdNormalized,
+            });
+            return this.sendError(res, 'Error al verificar el cliente', 500);
+          }
+        } else {
+          logger.info('QuoteController.createQuote - Entering AGENCY CLIENT logic branch', {
+            clientId: clientIdNormalized,
+            userId: currentUser.id,
+          });
+          // Agency client - existing logic
+          try {
+            // 3a. Save as companyClientPtr (Client pointer) for new hierarchical system
+            const companyClientPointer = {
+              __type: 'Pointer',
+              className: 'Client',
+              objectId: clientIdNormalized,
+            };
+
+            // 3b. Find the AmexingUser who owns this Client for backward compatibility
+            const clientQuery = new Parse.Query('Client');
+            const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+            const ownedByPointer = clientRecord.get('ownedBy');
+
+            if (ownedByPointer) {
+              // Extract the actual ID from the ownedBy pointer
+              const ownerId = ownedByPointer.id || ownedByPointer.objectId || ownedByPointer;
+
+              // Role-based logic for client field assignment
+              let clientAmexingUserId;
+              if (req.userRole === 'department_manager') {
+                // Department manager: client field should be the department manager themselves
+                clientAmexingUserId = currentUser.id;
+                logger.info('QuoteController.createQuote - Department manager: setting client to currentUser', {
+                  currentUserId: currentUser.id,
+                  selectedClientId: clientIdNormalized,
+                });
+              } else {
+                // Client role: client field should be the owner of the selected Client
+                clientAmexingUserId = ownerId;
+                logger.info('QuoteController.createQuote - Client role: setting client to Client owner', {
+                  clientId: clientIdNormalized,
+                  ownerId,
+                });
+              }
+
+              // Create AmexingUser pointer for backward compatibility
+              clientObj = {
+                __type: 'Pointer',
+                className: 'AmexingUser',
+                objectId: clientAmexingUserId,
+              };
+
+              // Store both pointers - we'll set them after creating the quote object
+              companyClientObj = companyClientPointer;
+            } else {
+              logger.warn('QuoteController.createQuote - Client has no owner', {
+                clientId: clientIdNormalized,
               });
             }
+          } catch (error) {
+            logger.error('QuoteController.createQuote - Error setting client pointers', {
+              error: error.message,
+              clientId: clientIdNormalized,
+            });
 
-            // Create AmexingUser pointer for backward compatibility
+            // Fallback to old behavior if Client lookup fails
             clientObj = {
               __type: 'Pointer',
               className: 'AmexingUser',
-              objectId: clientAmexingUserId,
+              objectId: clientIdNormalized,
             };
-
-            // Store both pointers - we'll set them after creating the quote object
-            companyClientObj = companyClientPointer;
-          } else {
-            logger.warn('QuoteController.createQuote - Client has no owner', {
-              clientId: clientIdNormalized,
-            });
           }
-        } catch (error) {
-          logger.error('QuoteController.createQuote - Error setting client pointers', {
-            error: error.message,
-            clientId: clientIdNormalized,
-          });
-
-          // Fallback to old behavior if Client lookup fails
-          clientObj = {
-            __type: 'Pointer',
-            className: 'AmexingUser',
-            objectId: clientIdNormalized,
-          };
         }
       }
 
@@ -233,12 +301,24 @@ class QuoteController {
       // 6. Create quote using Quote domain model (extends BaseModel)
       const quote = new Quote();
 
+      // Debug: Log what objects will be set on the quote
+      logger.info('QuoteController.createQuote - Setting quote client fields', {
+        hasClientObj: !!clientObj,
+        clientObj,
+        hasCompanyClientObj: !!companyClientObj,
+        companyClientObj,
+        clientType,
+        userId: currentUser.id,
+      });
+
       // 7. Assign Parse objects (NOT string IDs!) - Using Pointer structure
       if (clientObj) {
         quote.set('client', clientObj); // AmexingUser pointer for backward compatibility
+        logger.info('QuoteController.createQuote - Set client field', { clientObj });
       }
       if (companyClientObj) {
         quote.set('companyClientPtr', companyClientObj); // Client pointer for new hierarchical system
+        logger.info('QuoteController.createQuote - Set companyClientPtr field', { companyClientObj });
       }
       // Note: Rate is no longer set at quote level (v2.0.0+)
       quote.set('createdBy', createdByObj); // Full Pointer object (required)
@@ -265,6 +345,11 @@ class QuoteController {
       quote.set('numberOfPeople', calculatedTotal);
 
       quote.set('preferredLanguage', preferredLanguage || 'es');
+
+      // Set clientType for direct Amexing clients
+      if (clientType === 'direct') {
+        quote.set('clientType', 'direct');
+      }
 
       // 9. Set automatic fields
       quote.set('status', 'quoted');
@@ -704,6 +789,7 @@ class QuoteController {
       const data = {
         id: quote.id,
         folio: quote.get('folio'),
+        clientType: quote.get('clientType') || null,
         client: client
           ? {
             id: client.id,

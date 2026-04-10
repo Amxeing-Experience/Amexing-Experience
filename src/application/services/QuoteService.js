@@ -258,6 +258,7 @@ class QuoteService {
         'validUntil',
         'eventType',
         'clientFinalId',
+        'clientType',
       ];
 
       const appliedUpdates = {};
@@ -333,71 +334,133 @@ class QuoteService {
 
       // Handle client field updates - DUAL FIELD ARCHITECTURE
       const clientIdNormalized = updates.client || updates.clientId;
+      const { clientType } = updates; // Get the clientType from updates
+
+      // Check if this is a direct client update
+      const isDirectClient = clientType === 'direct'
+                            || (quote.get('clientType') === 'direct');
 
       // Log client update for debugging
       logger.info('QuoteService.updateQuote - Client update requested', {
         quoteId: quote.id,
         clientIdNormalized,
         clientIdType: typeof clientIdNormalized,
+        clientType,
+        isDirectClient,
       });
 
       if (clientIdNormalized) {
-        try {
-          console.log('=== AMEXING USER CLIENT UPDATE ===');
-          console.log('Updating quote with AmexingUser ID:', clientIdNormalized);
-
-          // Verify the AmexingUser exists
-          const userQuery = new Parse.Query('AmexingUser');
-          let amexingUser;
-
+        if (isDirectClient) {
+          // Handle Direct Client (Client table)
           try {
-            amexingUser = await userQuery.get(clientIdNormalized, { useMasterKey: true });
-            console.log('✅ AmexingUser found:', {
-              id: amexingUser.id,
-              firstName: amexingUser.get('firstName'),
-              lastName: amexingUser.get('lastName'),
-              email: amexingUser.get('email'),
+            console.log('=== DIRECT CLIENT UPDATE ===');
+            console.log('Updating quote with Direct Client ID:', clientIdNormalized);
+
+            // Verify the Client exists
+            const clientQuery = new Parse.Query('Client');
+            const clientObj = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+
+            console.log('✅ Direct Client found:', {
+              id: clientObj.id,
+              name: clientObj.get('name'),
+              firstName: clientObj.get('firstName'),
+              lastName: clientObj.get('lastName'),
+              email: clientObj.get('email'),
             });
-          } catch (userError) {
-            logger.error('QuoteService.updateQuote - AmexingUser not found', {
+
+            // Set companyClientPtr to the Client object
+            const clientPointer = {
+              __type: 'Pointer',
+              className: 'Client',
+              objectId: clientIdNormalized,
+            };
+            quote.set('companyClientPtr', clientPointer);
+            quote.set('client', null); // Clear AmexingUser field for direct clients
+            quote.set('clientType', 'direct'); // Ensure clientType is set
+
+            appliedUpdates.companyClientPtr = clientIdNormalized;
+            appliedUpdates.client = null;
+            appliedUpdates.clientType = 'direct';
+
+            console.log('✅ DIRECT CLIENT UPDATE SUCCESSFUL:', {
+              quoteId: quote.id,
+              clientId: clientIdNormalized,
+              clientName: clientObj.get('name') || `${clientObj.get('firstName')} ${clientObj.get('lastName')}`,
+              pointer: clientPointer,
+            });
+
+            logger.info('QuoteService.updateQuote - Quote updated with Direct Client', {
+              quoteId: quote.id,
+              clientId: clientIdNormalized,
+              clientType: 'direct',
+            });
+          } catch (clientError) {
+            logger.error('QuoteService.updateQuote - Direct Client not found', {
+              quoteId: quote.id,
+              clientId: clientIdNormalized,
+              error: clientError.message,
+            });
+            throw new Error(`Client not found: ${clientIdNormalized}`);
+          }
+        } else {
+          // Handle Agency Client (AmexingUser table)
+          try {
+            console.log('=== AMEXING USER CLIENT UPDATE ===');
+            console.log('Updating quote with AmexingUser ID:', clientIdNormalized);
+
+            // Verify the AmexingUser exists
+            const userQuery = new Parse.Query('AmexingUser');
+            let amexingUser;
+
+            try {
+              amexingUser = await userQuery.get(clientIdNormalized, { useMasterKey: true });
+              console.log('✅ AmexingUser found:', {
+                id: amexingUser.id,
+                firstName: amexingUser.get('firstName'),
+                lastName: amexingUser.get('lastName'),
+                email: amexingUser.get('email'),
+              });
+            } catch (userError) {
+              logger.error('QuoteService.updateQuote - AmexingUser not found', {
+                quoteId: quote.id,
+                amexingUserId: clientIdNormalized,
+                error: userError.message,
+              });
+              throw new Error(`AmexingUser not found: ${clientIdNormalized}`);
+            }
+
+            // Set client field to point to the AmexingUser
+            const amexingUserPointer = {
+              __type: 'Pointer',
+              className: 'AmexingUser',
+              objectId: clientIdNormalized,
+            };
+            quote.set('client', amexingUserPointer);
+            appliedUpdates.client = clientIdNormalized;
+
+            // Note: Avoiding companyClientPtr due to schema constraints (expects Client class)
+            console.log('Skipping companyClientPtr due to schema mismatch - using client field only');
+
+            console.log('✅ CLIENT UPDATE SUCCESSFUL:', {
               quoteId: quote.id,
               amexingUserId: clientIdNormalized,
-              error: userError.message,
+              amexingUserName: `${amexingUser.get('firstName')} ${amexingUser.get('lastName')}`,
+              pointer: amexingUserPointer,
             });
-            throw new Error(`AmexingUser not found: ${clientIdNormalized}`);
+
+            logger.info('QuoteService.updateQuote - Client updated with AmexingUser', {
+              quoteId: quote.id,
+              amexingUserId: clientIdNormalized,
+              amexingUserEmail: amexingUser.get('email'),
+            });
+          } catch (error) {
+            logger.error('QuoteService.updateQuote - Error setting AmexingUser client', {
+              error: error.message,
+              quoteId: quote.id,
+              amexingUserId: clientIdNormalized,
+            });
+            throw error; // Don't continue if client update fails
           }
-
-          // Set client field to point to the AmexingUser
-          const amexingUserPointer = {
-            __type: 'Pointer',
-            className: 'AmexingUser',
-            objectId: clientIdNormalized,
-          };
-          quote.set('client', amexingUserPointer);
-          appliedUpdates.client = clientIdNormalized;
-
-          // Note: Avoiding companyClientPtr due to schema constraints (expects Client class)
-          console.log('Skipping companyClientPtr due to schema mismatch - using client field only');
-
-          console.log('✅ CLIENT UPDATE SUCCESSFUL:', {
-            quoteId: quote.id,
-            amexingUserId: clientIdNormalized,
-            amexingUserName: `${amexingUser.get('firstName')} ${amexingUser.get('lastName')}`,
-            pointer: amexingUserPointer,
-          });
-
-          logger.info('QuoteService.updateQuote - Client updated with AmexingUser', {
-            quoteId: quote.id,
-            amexingUserId: clientIdNormalized,
-            amexingUserEmail: amexingUser.get('email'),
-          });
-        } catch (error) {
-          logger.error('QuoteService.updateQuote - Error setting AmexingUser client', {
-            error: error.message,
-            quoteId: quote.id,
-            amexingUserId: clientIdNormalized,
-          });
-          throw error; // Don't continue if client update fails
         }
       }
 
