@@ -94,7 +94,7 @@
                 
                 <!-- Direct Client Selection (moved up when in direct mode) -->
                 <div class="row" id="directClientRow" style="display: none;">
-                    <div class="col-md-12">
+                    <div class="col-md-10">
                         <%- include('../../../atoms/common/tom-select', {
                             id: 'directClientId',
                             name: 'directClientId',
@@ -107,6 +107,12 @@
                             selected: [],
                             disabled: false
                         }) %>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-outline-primary w-100 px-2 py-2" id="createQuickDirectClientBtn">
+                            <i class="ti ti-plus me-1"></i>Crear Cliente
+                        </button>
                     </div>
                 </div>
             </div>
@@ -156,7 +162,7 @@
 
                 <!-- Final Client Selection (only shown for agencies) -->
                 <div class="row" id="finalClientRow">
-                    <div class="col-md-12 mb-3">
+                    <div class="col-md-10 mb-3">
                         <%- include('../../../atoms/common/tom-select', {
                             id: 'clientFinalId',
                             name: 'clientFinalId',
@@ -168,6 +174,12 @@
                             options: [],
                             selected: []
                         }) %>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-outline-primary w-100 px-2 py-2" id="createFinalClientBtn">
+                            <i class="ti ti-plus me-1"></i>Crear Cliente
+                        </button>
                     </div>
                 </div>
 
@@ -369,6 +381,320 @@
             </div>
 
             <%- include('../../../atoms/common/modal-loader', { text: 'Creando cliente...' }) %>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Direct Client Creation Modal -->
+<div class="modal fade" id="quickDirectClientModal" tabindex="-1" aria-labelledby="quickDirectClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quickDirectClientModalLabel">
+                    <i class="ti ti-user-plus me-2"></i>Crear Cliente Directo
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alerts Container -->
+                <div id="quickDirectClientModalAlerts"></div>
+
+                <form id="quickDirectClientForm" class="needs-validation" novalidate>
+                    <!-- Sección: Información del Cliente -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-user me-1"></i>
+                            Información del Cliente
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="qdc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="qdc_firstName" name="firstName" required placeholder="Ej: Juan">
+                                <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="qdc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="qdc_lastName" name="lastName" required placeholder="Ej: Pérez">
+                                <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../../atoms/common/email-input', {
+                                    name: 'email',
+                                    id: 'qdc_email',
+                                    label: 'Email',
+                                    required: false,
+                                    placeholder: 'email@ejemplo.com',
+                                    helpText: 'Email de contacto principal',
+                                    containerClass: 'mb-3'
+                                }) %>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <%- include('../../../atoms/common/phone-input', {
+                                    name: 'phone',
+                                    id: 'qdc_phone',
+                                    label: 'Teléfono',
+                                    required: false,
+                                    helpText: 'Número de contacto',
+                                    countryCode: 'MX',
+                                    containerClass: 'mb-3'
+                                }) %>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sección: Información de la Empresa -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-building me-1"></i>
+                            Información de la Empresa
+                        </h6>
+                        
+                        <div class="mb-3">
+                            <label for="qdc_companyName" class="form-label">Nombre de Empresa</label>
+                            <input type="text" class="form-control" id="qdc_companyName" name="companyName" placeholder="Ej: Empresa S.A. de C.V.">
+                            <div class="form-text">Nombre de la empresa del cliente (opcional)</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sección: Persona de Contacto -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-users me-1"></i>
+                            Persona de Contacto <small class="text-muted">(opcional)</small>
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="qdc_contactFirstName" class="form-label">Nombre de Contacto</label>
+                                <input type="text" class="form-control" id="qdc_contactFirstName" name="contactFirstName" placeholder="Ej: María">
+                                <div class="form-text">Si es diferente al cliente principal</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="qdc_contactLastName" class="form-label">Apellido de Contacto</label>
+                                <input type="text" class="form-control" id="qdc_contactLastName" name="contactLastName" placeholder="Ej: García">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sección: Preferencias -->
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-settings me-1"></i>
+                            Preferencias
+                        </h6>
+                        
+                        <%- include('../../../atoms/common/language-select', {
+                            id: 'qdc_preferredLanguage',
+                            name: 'preferredLanguage',
+                            label: 'Idioma de Preferencia',
+                            required: false,
+                            helpText: 'Idioma preferido para comunicación',
+                            value: 'es'
+                        }) %>
+                    </div>
+                    
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <small><strong>Cliente directo:</strong> Este cliente será creado como cliente directo de Amexing. Podrás completar sus datos desde la sección de Clientes más adelante.</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveQuickDirectClientBtn">
+                    <i class="ti ti-check me-1"></i>Crear Cliente
+                </button>
+            </div>
+
+            <%- include('../../../atoms/common/modal-loader', { text: 'Creando cliente directo...' }) %>
+        </div>
+    </div>
+</div>
+
+<!-- Owned Client Creation Modal (for department_manager/client roles) -->
+<div class="modal fade" id="ownedClientModal" tabindex="-1" aria-labelledby="ownedClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ownedClientModalLabel">
+                    <i class="ti ti-user-plus me-2"></i>Crear Cliente Final
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alerts Container -->
+                <div id="ownedClientModalAlerts"></div>
+
+                <form id="ownedClientForm" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="oc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="oc_firstName" name="firstName" required placeholder="Ej: Juan">
+                        <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="oc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="oc_lastName" name="lastName" required placeholder="Ej: Pérez">
+                        <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                    </div>
+
+                    <%- include('../../../atoms/common/email-input', {
+                        name: 'email',
+                        id: 'oc_email',
+                        label: 'Email',
+                        required: false,
+                        placeholder: 'email@ejemplo.com',
+                        helpText: 'Email de contacto del cliente',
+                        containerClass: 'mb-3'
+                    }) %>
+
+                    <div class="mb-3">
+                        <label for="oc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
+                        <input type="text" class="form-control" id="oc_companyName" name="companyName" placeholder="Ej: Empresa S.A. de C.V.">
+                        <div class="form-text">Nombre de la empresa del cliente</div>
+                    </div>
+
+                    <%- include('../../../atoms/common/phone-input', {
+                        name: 'phone',
+                        id: 'oc_phone',
+                        label: 'Teléfono',
+                        required: false,
+                        helpText: 'Número de contacto del cliente',
+                        countryCode: 'MX',
+                        containerClass: 'mb-3'
+                    }) %>
+                    
+                    <%- include('../../../atoms/common/language-select', {
+                        id: 'oc_preferredLanguage',
+                        name: 'preferredLanguage',
+                        label: 'Idioma de Preferencia',
+                        required: false,
+                        helpText: 'Idioma preferido para comunicación',
+                        value: 'es'
+                    }) %>
+
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <small><strong>Cliente final:</strong> Este cliente pertenecerá a tu organización. Podrás completar sus datos desde la sección de Clientes más adelante.</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveOwnedClientBtn">
+                    <i class="ti ti-check me-1"></i>Crear Cliente
+                </button>
+            </div>
+
+            <%- include('../../../atoms/common/modal-loader', { text: 'Creando cliente...' }) %>
+        </div>
+    </div>
+</div>
+
+<!-- Admin Sub-Client Creation Modal (for admin creating sub-clients for selected enterprise) -->
+<div class="modal fade" id="adminSubClientModal" tabindex="-1" aria-labelledby="adminSubClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="adminSubClientModalLabel">
+                    <i class="ti ti-user-plus me-2"></i>Crear Cliente Final para Empresa
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alerts Container -->
+                <div id="adminSubClientModalAlerts"></div>
+
+                <form id="adminSubClientForm" class="needs-validation" novalidate>
+                    <!-- Enterprise Info -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <small><strong>Empresa seleccionada:</strong> <span id="selectedEnterpriseName">No hay empresa seleccionada</span></small>
+                            <br>
+                            <small>Este cliente final pertenecerá a la empresa seleccionada.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="asc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="asc_firstName" name="firstName" required placeholder="Ej: Juan">
+                        <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="asc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="asc_lastName" name="lastName" required placeholder="Ej: Pérez">
+                        <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                    </div>
+
+                    <%- include('../../../atoms/common/email-input', {
+                        name: 'email',
+                        id: 'asc_email',
+                        label: 'Email',
+                        required: false,
+                        placeholder: 'email@ejemplo.com',
+                        helpText: 'Email de contacto del cliente final',
+                        containerClass: 'mb-3'
+                    }) %>
+
+                    <div class="mb-3">
+                        <label for="asc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
+                        <input type="text" class="form-control" id="asc_companyName" name="companyName" placeholder="Ej: Departamento de Ventas S.A.">
+                        <div class="form-text">Nombre específico de la empresa del cliente final</div>
+                    </div>
+
+                    <%- include('../../../atoms/common/phone-input', {
+                        name: 'phone',
+                        id: 'asc_phone',
+                        label: 'Teléfono',
+                        required: false,
+                        helpText: 'Número de contacto del cliente final',
+                        countryCode: 'MX',
+                        containerClass: 'mb-3'
+                    }) %>
+                    
+                    <%- include('../../../atoms/common/language-select', {
+                        id: 'asc_preferredLanguage',
+                        name: 'preferredLanguage',
+                        label: 'Idioma de Preferencia',
+                        required: false,
+                        helpText: 'Idioma preferido para comunicación',
+                        value: 'es'
+                    }) %>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveAdminSubClientBtn">
+                    <i class="ti ti-check me-1"></i>Crear Cliente Final
+                </button>
+            </div>
+
+            <%- include('../../../atoms/common/modal-loader', { text: 'Creando cliente final...' }) %>
         </div>
     </div>
 </div>
@@ -914,14 +1240,44 @@
                                      `${client.firstName || ''} ${client.lastName || ''}`.trim() || 
                                      client.email;
                     
+                    // Ensure firstName and lastName are properly extracted
+                    let firstName = client.firstName || '';
+                    let lastName = client.lastName || '';
+                    
+                    // If no separate firstName/lastName, try to extract from name or contactPerson
+                    if (!firstName && !lastName) {
+                        const nameToSplit = client.name || client.contactPerson || '';
+                        if (nameToSplit) {
+                            const nameParts = nameToSplit.trim().split(/\s+/);
+                            if (nameParts.length === 1) {
+                                firstName = nameParts[0];
+                            } else if (nameParts.length === 2) {
+                                firstName = nameParts[0];
+                                lastName = nameParts[1];
+                            } else if (nameParts.length > 2) {
+                                firstName = nameParts[0];
+                                lastName = nameParts.slice(1).join(' ');
+                            }
+                        }
+                    }
+                    
+                    console.log('🔍 Adding Cliente Final option:', {
+                        clientId: client.id,
+                        displayName,
+                        firstName,
+                        lastName,
+                        originalData: client
+                    });
+                    
                     employeeTS.addOption({
                         value: client.id,
                         text: displayName,
                         email: client.email,
                         contactPerson: client.contactPerson || displayName,
-                        firstName: client.firstName || '',
-                        lastName: client.lastName || '',
+                        firstName: firstName,
+                        lastName: lastName,
                         phone: client.phone || '',
+                        companyName: client.companyName || '',
                         preferredLanguage: client.preferredLanguage || 'es'
                     });
                 });
@@ -1165,6 +1521,11 @@
             employeeInput.addEventListener('change', async function(event) {
                 const value = event.target.value;
                 
+                console.log('🎯 Cliente Final selection changed:', {
+                    newValue: value,
+                    timestamp: new Date().toISOString()
+                });
+                
                 if (value) {
                     try {
                         // Get the custom select instance - try both methods
@@ -1173,25 +1534,42 @@
                         
                         // First try the customSelect property (preferred method)
                         if (employeeInput.customSelect) {
+                            console.log('📊 Using customSelect property for Cliente Final');
                             option = employeeInput.customSelect.getOption(value);
                         }
                         
                         // If that didn't work, try waitForTomSelect (fallback)
                         if (!option) {
+                            console.log('📊 Using waitForTomSelect fallback for Cliente Final');
                             const employeeTS = await waitForTomSelect('clientFinalId');
                             option = employeeTS.options ? employeeTS.options[value] : null;
+                            
+                            // Also try getting option using getOption method
+                            if (!option && employeeTS.getOption) {
+                                option = employeeTS.getOption(value);
+                            }
                         }
                         
+                        console.log('📋 Cliente Final option data:', {
+                            value,
+                            option,
+                            hasFirstName: !!(option?.firstName),
+                            hasLastName: !!(option?.lastName),
+                            hasContactPerson: !!(option?.contactPerson),
+                            hasEmail: !!(option?.email),
+                            hasPhone: !!(option?.phone)
+                        });
+                        
                         if (option) {
-                            
                             // Parse name into first and last name
                             let firstName = '';
                             let lastName = '';
                             
-                            // Check if we have separate firstName/lastName in the option
+                            // Check if we have separate firstName/lastName in the option (preferred)
                             if (option.firstName || option.lastName) {
                                 firstName = option.firstName || '';
                                 lastName = option.lastName || '';
+                                console.log('✅ Using separate firstName/lastName from option');
                             } else if (option.contactPerson) {
                                 // Split contactPerson into parts
                                 const nameParts = option.contactPerson.trim().split(/\s+/);
@@ -1201,11 +1579,31 @@
                                     firstName = nameParts[0];
                                     lastName = nameParts[1];
                                 } else if (nameParts.length > 2) {
-                                    // Handle names with multiple parts
                                     firstName = nameParts[0];
                                     lastName = nameParts.slice(1).join(' ');
                                 }
+                                console.log('✅ Split contactPerson into names');
+                            } else if (option.text) {
+                                // Last resort: split the display text
+                                const nameParts = option.text.trim().split(/\s+/);
+                                if (nameParts.length === 1) {
+                                    firstName = nameParts[0];
+                                } else if (nameParts.length === 2) {
+                                    firstName = nameParts[0];
+                                    lastName = nameParts[1];
+                                } else if (nameParts.length > 2) {
+                                    firstName = nameParts[0];
+                                    lastName = nameParts.slice(1).join(' ');
+                                }
+                                console.log('✅ Split display text into names');
                             }
+                            
+                            console.log('🔄 Auto-filling contact fields with Cliente Final data:', {
+                                firstName,
+                                lastName,
+                                email: option.email || '',
+                                phone: option.phone || ''
+                            });
                             
                             // Auto-fill contact name fields
                             document.getElementById('contactFirstName').value = firstName;
@@ -1225,20 +1623,32 @@
                             }
                             document.getElementById('contactPhone').value = phoneNumber;
                             
-                            // Auto-fill preferred language
-                            if (option.preferredLanguage) {
-                                document.getElementById('preferredLanguage').value = option.preferredLanguage;
+                            // Auto-fill preferred language if available
+                            const languageSelect = document.getElementById('preferredLanguage');
+                            if (languageSelect && option.preferredLanguage) {
+                                languageSelect.value = option.preferredLanguage;
                             }
                             
-                            console.log('✅ Cliente Final contact fields auto-filled successfully');
+                            console.log('✅ Successfully auto-filled all contact fields from Cliente Final');
                         } else {
-                            console.warn('⚠️ Cliente Final option not found for value:', value);
+                            console.warn('⚠️ No option data found for Cliente Final value:', value);
                         }
                     } catch (error) {
-                        console.error('Error getting employee data:', error);
+                        console.error('❌ Error getting Cliente Final data:', error);
                     }
                 } else {
-                    // Don't clear fields when no employee selected (keep client defaults)
+                    console.log('🔄 Clearing contact fields - no Cliente Final selected');
+                    // Clear contact fields when no client selected
+                    document.getElementById('contactFirstName').value = '';
+                    document.getElementById('contactLastName').value = '';
+                    document.getElementById('contactEmail').value = '';
+                    document.getElementById('contactPhone').value = '';
+                    
+                    // Reset preferred language to default
+                    const languageSelect = document.getElementById('preferredLanguage');
+                    if (languageSelect) {
+                        languageSelect.value = 'es';
+                    }
                 }
             });
         } catch (error) {
@@ -1332,6 +1742,303 @@
             showAlert('quickClientModalAlerts', 'Error de conexión al crear el cliente', 'danger');
         } finally {
             hideQuickClientModalLoader('quickClientModal');
+        }
+    }
+    
+    // Open owned client modal (for department_manager/client roles)
+    function openOwnedClientModal() {
+        clearAlerts('ownedClientModalAlerts');
+        document.getElementById('ownedClientForm').reset();
+        document.getElementById('ownedClientForm').classList.remove('was-validated');
+
+        const modal = new bootstrap.Modal(document.getElementById('ownedClientModal'));
+        modal.show();
+    }
+    
+    // Save owned client (for department_manager/client roles)
+    async function saveOwnedClient() {
+        const form = document.getElementById('ownedClientForm');
+
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Get form data
+        const formData = {
+            firstName: document.getElementById('oc_firstName').value.trim(),
+            lastName: document.getElementById('oc_lastName').value.trim(),
+            email: document.getElementById('oc_email').value.trim() || undefined,
+            phone: document.getElementById('oc_phone').value.trim() || undefined,
+            companyName: document.getElementById('oc_companyName').value.trim() || undefined,
+            preferredLanguage: document.getElementById('oc_preferredLanguage').value || 'es'
+        };
+
+        // Show loader
+        showQuickClientModalLoader('ownedClientModal');
+        clearAlerts('ownedClientModalAlerts');
+
+        try {
+            const response = await fetch('/api/owned-clients/quick', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                // Add new client to Cliente Final Tom Select
+                const employeeTS = await waitForTomSelect('clientFinalId');
+
+                employeeTS.addOption({
+                    value: result.data.value,
+                    text: result.data.label,
+                    email: result.data.email || '',
+                    contactPerson: result.data.contactPerson || result.data.label,
+                    phone: result.data.phone || '',
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    preferredLanguage: formData.preferredLanguage
+                });
+
+                // Select the new client
+                employeeTS.setValue(result.data.value);
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('ownedClientModal'));
+                modal.hide();
+
+                // Show success message
+                showAlert('quoteInformationAlerts', 'Cliente final creado exitosamente', 'success');
+            } else {
+                // Handle error cases
+                let errorMessage = result.error || 'Error al crear el cliente';
+                showAlert('ownedClientModalAlerts', errorMessage, 'danger');
+            }
+        } catch (error) {
+            console.error('Error creating owned client:', error);
+            showAlert('ownedClientModalAlerts', 'Error de conexión al crear el cliente', 'danger');
+        } finally {
+            hideQuickClientModalLoader('ownedClientModal');
+        }
+    }
+    
+    // Open admin sub-client modal (for admin creating sub-clients for selected enterprise)
+    function openAdminSubClientModal() {
+        // First, validate that an enterprise is selected
+        const clientIdInput = document.getElementById('clientId');
+        const selectedEnterpriseId = clientIdInput ? clientIdInput.value : null;
+        
+        if (!selectedEnterpriseId) {
+            showAlert('quoteInformationAlerts', 'Por favor selecciona una empresa antes de crear un cliente final', 'warning');
+            return;
+        }
+        
+        // Get the enterprise name for display
+        let enterpriseName = 'Empresa seleccionada';
+        try {
+            const clientTS = clientTomSelect || document.getElementById('clientId')?.customSelect;
+            if (clientTS && clientTS.getOption) {
+                const option = clientTS.getOption(selectedEnterpriseId);
+                if (option && option.text) {
+                    enterpriseName = option.text;
+                }
+            }
+        } catch (error) {
+            console.warn('Could not get enterprise name:', error);
+        }
+        
+        // Update the modal with enterprise information
+        const enterpriseNameSpan = document.getElementById('selectedEnterpriseName');
+        if (enterpriseNameSpan) {
+            enterpriseNameSpan.textContent = enterpriseName;
+        }
+        
+        // Clear form and alerts
+        clearAlerts('adminSubClientModalAlerts');
+        document.getElementById('adminSubClientForm').reset();
+        document.getElementById('adminSubClientForm').classList.remove('was-validated');
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('adminSubClientModal'));
+        modal.show();
+    }
+    
+    // Save admin sub-client (for admin creating sub-clients for selected enterprise)
+    async function saveAdminSubClient() {
+        // Validate that an enterprise is still selected
+        const clientIdInput = document.getElementById('clientId');
+        const selectedEnterpriseId = clientIdInput ? clientIdInput.value : null;
+        
+        if (!selectedEnterpriseId) {
+            showAlert('adminSubClientModalAlerts', 'No hay empresa seleccionada. Por favor selecciona una empresa primero.', 'danger');
+            return;
+        }
+
+        const form = document.getElementById('adminSubClientForm');
+
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Get form data
+        const formData = {
+            firstName: document.getElementById('asc_firstName').value.trim(),
+            lastName: document.getElementById('asc_lastName').value.trim(),
+            email: document.getElementById('asc_email').value.trim() || undefined,
+            phone: document.getElementById('asc_phone').value.trim() || undefined,
+            companyName: document.getElementById('asc_companyName').value.trim() || undefined,
+            preferredLanguage: document.getElementById('asc_preferredLanguage').value || 'es',
+            // Add the enterprise ID as the owner
+            enterpriseId: selectedEnterpriseId
+        };
+
+        // Show loader
+        showQuickClientModalLoader('adminSubClientModal');
+        clearAlerts('adminSubClientModalAlerts');
+
+        try {
+            // Create sub-client for the selected enterprise using the owned-clients endpoint
+            // We'll create a custom endpoint that allows admin to create sub-clients for any enterprise
+            const response = await fetch('/api/owned-clients/admin-create-subclient', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                // Add new client to Cliente Final Tom Select (NOT the main client dropdown)
+                const employeeTS = await waitForTomSelect('clientFinalId');
+
+                employeeTS.addOption({
+                    value: result.data.value,
+                    text: result.data.label,
+                    email: result.data.email || '',
+                    contactPerson: result.data.contactPerson || result.data.label,
+                    phone: result.data.phone || '',
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    companyName: formData.companyName || '',
+                    preferredLanguage: formData.preferredLanguage
+                });
+
+                // Select the new client in the Cliente Final dropdown
+                employeeTS.setValue(result.data.value);
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('adminSubClientModal'));
+                modal.hide();
+
+                // Show success message
+                showAlert('quoteInformationAlerts', 'Cliente final creado exitosamente para la empresa seleccionada', 'success');
+            } else {
+                // Handle error cases
+                let errorMessage = result.error || 'Error al crear el cliente final';
+                showAlert('adminSubClientModalAlerts', errorMessage, 'danger');
+            }
+        } catch (error) {
+            console.error('Error creating admin sub-client:', error);
+            showAlert('adminSubClientModalAlerts', 'Error de conexión al crear el cliente final', 'danger');
+        } finally {
+            hideQuickClientModalLoader('adminSubClientModal');
+        }
+    }
+    
+    // Open quick direct client modal
+    function openQuickDirectClientModal() {
+        clearAlerts('quickDirectClientModalAlerts');
+        document.getElementById('quickDirectClientForm').reset();
+        document.getElementById('quickDirectClientForm').classList.remove('was-validated');
+
+        const modal = new bootstrap.Modal(document.getElementById('quickDirectClientModal'));
+        modal.show();
+    }
+    
+    // Save quick direct client
+    async function saveQuickDirectClient() {
+        const form = document.getElementById('quickDirectClientForm');
+
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Get form data
+        const formData = {
+            firstName: document.getElementById('qdc_firstName').value.trim(),
+            lastName: document.getElementById('qdc_lastName').value.trim(),
+            email: document.getElementById('qdc_email').value.trim() || undefined,
+            phone: document.getElementById('qdc_phone').value.trim() || undefined,
+            companyName: document.getElementById('qdc_companyName').value.trim() || undefined,
+            contactFirstName: document.getElementById('qdc_contactFirstName').value.trim() || undefined,
+            contactLastName: document.getElementById('qdc_contactLastName').value.trim() || undefined,
+            preferredLanguage: document.getElementById('qdc_preferredLanguage').value || 'es'
+        };
+
+        // Show loader
+        showQuickClientModalLoader('quickDirectClientModal');
+        clearAlerts('quickDirectClientModalAlerts');
+
+        try {
+            const response = await fetch('/api/clients/amexing-direct/quick', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                // Add new client to Direct Client Tom Select
+                const directClientTS = await waitForTomSelect('directClientId');
+
+                directClientTS.addOption({
+                    value: result.data.value,
+                    text: result.data.label,
+                    email: result.data.email,
+                    contactPerson: result.data.contactPerson,
+                    phone: result.data.phone,
+                    firstName: result.data.firstName,
+                    lastName: result.data.lastName,
+                    companyName: result.data.companyName,
+                    preferredLanguage: result.data.preferredLanguage
+                });
+
+                // Select the new client
+                directClientTS.setValue(result.data.value);
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('quickDirectClientModal'));
+                modal.hide();
+
+                // Show success message
+                showAlert('quoteInformationAlerts', 'Cliente directo creado exitosamente', 'success');
+            } else {
+                // Handle error cases
+                let errorMessage = result.error || 'Error al crear el cliente directo';
+                showAlert('quickDirectClientModalAlerts', errorMessage, 'danger');
+            }
+        } catch (error) {
+            console.error('Error creating quick direct client:', error);
+            showAlert('quickDirectClientModalAlerts', 'Error de conexión al crear el cliente directo', 'danger');
+        } finally {
+            hideQuickClientModalLoader('quickDirectClientModal');
         }
     }
 
@@ -1530,15 +2237,40 @@
                     fullQuote: quote
                 });
                 
+                // Store clientFinalId for later use after dropdowns are loaded
+                const quoteClientFinalId = quote.clientFinalId || null;
+                
                 if (selectedClientId) {
-                    await loadClientEmployees(selectedClientId, quote.clientFinalId || null);
+                    await loadClientEmployees(selectedClientId, quoteClientFinalId);
                 } else if (userRole === 'department_manager' || userRole === 'client') {
                     // For restricted roles, load sub-clients with their default clientId
                     const clientField = document.getElementById('clientId');
                     if (clientField && clientField.value) {
                         console.log('🚀 Loading sub-clients for restricted role on existing quote:', userRole, 'clientId:', clientField.value);
-                        await loadClientEmployees(clientField.value, quote.clientFinalId || null);
+                        await loadClientEmployees(clientField.value, quoteClientFinalId);
                     }
+                }
+                
+                // Additional retry mechanism for clientFinalId selection
+                if (quoteClientFinalId) {
+                    setTimeout(async () => {
+                        try {
+                            const employeeTS = await waitForTomSelect('clientFinalId');
+                            const currentValue = employeeTS.getValue();
+                            
+                            if (!currentValue || currentValue !== quoteClientFinalId) {
+                                const optionExists = employeeTS.getOption && employeeTS.getOption(quoteClientFinalId);
+                                if (optionExists) {
+                                    employeeTS.setValue(quoteClientFinalId);
+                                    console.log('✅ Successfully set clientFinalId in retry:', quoteClientFinalId);
+                                } else {
+                                    console.warn('⚠️ ClientFinalId option still not found in retry:', quoteClientFinalId);
+                                }
+                            }
+                        } catch (error) {
+                            console.error('❌ Error in clientFinalId retry mechanism:', error);
+                        }
+                    }, 1000); // Wait 1 second for dropdown to fully load
                 }
 
                 // Populate form fields
@@ -2120,6 +2852,46 @@
             }
             if (saveBtn) {
                 saveBtn.addEventListener('click', saveQuickClient);
+            }
+            
+            // Event listeners for direct client buttons
+            const createDirectBtn = document.getElementById('createQuickDirectClientBtn');
+            const saveDirectBtn = document.getElementById('saveQuickDirectClientBtn');
+            
+            if (createDirectBtn) {
+                createDirectBtn.addEventListener('click', openQuickDirectClientModal);
+            }
+            if (saveDirectBtn) {
+                saveDirectBtn.addEventListener('click', saveQuickDirectClient);
+            }
+            
+            // Event listeners for final client button (role-based behavior)
+            const createFinalBtn = document.getElementById('createFinalClientBtn');
+            const saveOwnedBtn = document.getElementById('saveOwnedClientBtn');
+            
+            if (createFinalBtn) {
+                createFinalBtn.addEventListener('click', function() {
+                    // Check user role to determine which modal to open
+                    const userRole = window.currentUserRole || '<%= userRole %>';
+                    
+                    if (userRole === 'admin' || userRole === 'superadmin') {
+                        // Admin/SuperAdmin: Open admin sub-client modal (creates sub-clients for selected enterprise)
+                        openAdminSubClientModal();
+                    } else if (userRole === 'department_manager' || userRole === 'client') {
+                        // Department Manager/Client: Open owned client modal (creates sub-clients for their own organization)
+                        openOwnedClientModal();
+                    }
+                });
+            }
+            
+            if (saveOwnedBtn) {
+                saveOwnedBtn.addEventListener('click', saveOwnedClient);
+            }
+            
+            // Event listeners for admin sub-client button
+            const saveAdminSubBtn = document.getElementById('saveAdminSubClientBtn');
+            if (saveAdminSubBtn) {
+                saveAdminSubBtn.addEventListener('click', saveAdminSubClient);
             }
 
             // Form submission - use appropriate function based on current state

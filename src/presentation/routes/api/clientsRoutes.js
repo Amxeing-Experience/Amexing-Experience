@@ -344,6 +344,14 @@ router.get('/amexing-direct', async (req, res) => {
 });
 
 /**
+ * POST /api/clients/amexing-direct/quick - Create quick direct Amexing client
+ * Admin/SuperAdmin only endpoint for creating direct clients with clientBelongsTo = "amexing"
+ */
+router.post('/amexing-direct/quick', writeOperationsLimiter, async (req, res) => {
+  await clientsController.createQuickDirectClient(req, res);
+});
+
+/**
  * GET /api/clients/mixed - Get mixed data (agencies and Amexing direct clients).
  * Admin/SuperAdmin only endpoint for unified client management.
  */

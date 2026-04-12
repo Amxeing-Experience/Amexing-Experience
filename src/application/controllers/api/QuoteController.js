@@ -147,7 +147,8 @@ class QuoteController {
 
       // 2. Extract fields from request body
       const {
-        client, clientId, clientType, contactPerson, contactEmail, contactPhone, notes, eventType,
+        client, clientId, clientType, clientFinalId, contactPerson, contactEmail, contactPhone,
+        contactFirstName, contactLastName, notes, eventType,
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
       } = req.body;
 
@@ -323,11 +324,58 @@ class QuoteController {
       // Note: Rate is no longer set at quote level (v2.0.0+)
       quote.set('createdBy', createdByObj); // Full Pointer object (required)
 
+      // 7.5. Handle Cliente Final selection and contact data
+      const finalContactData = {
+        contactPerson: contactPerson || '',
+        contactFirstName: contactFirstName || '',
+        contactLastName: contactLastName || '',
+        contactEmail: contactEmail || '',
+        contactPhone: contactPhone || '',
+      };
+
+      // If clientFinalId is provided, fetch the Client data and use it for contact fields
+      if (clientFinalId) {
+        try {
+          const finalClientQuery = new Parse.Query('Client');
+          const finalClientRecord = await finalClientQuery.get(clientFinalId, { useMasterKey: true });
+
+          // Use final client's data for contact fields (unless explicitly overridden)
+          finalContactData.contactFirstName = contactFirstName || finalClientRecord.get('firstName') || finalClientRecord.get('contactFirstName') || '';
+          finalContactData.contactLastName = contactLastName || finalClientRecord.get('lastName') || finalClientRecord.get('contactLastName') || '';
+          finalContactData.contactEmail = contactEmail || finalClientRecord.get('email') || '';
+          finalContactData.contactPhone = contactPhone || finalClientRecord.get('phone') || '';
+
+          // Build contactPerson from final client data if not explicitly provided
+          if (!contactPerson && (finalContactData.contactFirstName || finalContactData.contactLastName)) {
+            finalContactData.contactPerson = `${finalContactData.contactFirstName} ${finalContactData.contactLastName}`.trim();
+          } else if (!contactPerson) {
+            finalContactData.contactPerson = finalClientRecord.get('contactPerson') || finalClientRecord.get('name') || '';
+          }
+
+          // Store clientFinalId in the quote
+          quote.set('clientFinalId', clientFinalId);
+
+          logger.info('QuoteController.createQuote - Using Cliente Final data for contact fields', {
+            clientFinalId,
+            finalContactData,
+            userId: currentUser.id,
+          });
+        } catch (error) {
+          logger.warn('QuoteController.createQuote - Error fetching Cliente Final data, using provided values', {
+            error: error.message,
+            clientFinalId,
+            userId: currentUser.id,
+          });
+        }
+      }
+
       // 8. Set basic fields
       quote.set('folio', folio);
-      quote.set('contactPerson', contactPerson || '');
-      quote.set('contactEmail', contactEmail || '');
-      quote.set('contactPhone', contactPhone || '');
+      quote.set('contactPerson', finalContactData.contactPerson);
+      quote.set('contactFirstName', finalContactData.contactFirstName);
+      quote.set('contactLastName', finalContactData.contactLastName);
+      quote.set('contactEmail', finalContactData.contactEmail);
+      quote.set('contactPhone', finalContactData.contactPhone);
       quote.set('notes', notes || '');
       quote.set('eventType', eventType || '');
 
@@ -990,6 +1038,60 @@ class QuoteController {
           description: updates.reason || 'Quote updated',
         }
       );
+
+      // Handle clientFinalId if it's being updated
+      if (updates.clientFinalId !== undefined) {
+        if (updates.clientFinalId) {
+          // If setting a new clientFinalId, fetch Client data for contact fields
+          try {
+            const finalClientQuery = new Parse.Query('Client');
+            const finalClientRecord = await finalClientQuery.get(updates.clientFinalId, { useMasterKey: true });
+
+            // Update contact fields from Cliente Final data (unless explicitly overridden in updates)
+            if (!updates.contactFirstName && !updates.contactLastName && !updates.contactPerson) {
+              updates.contactFirstName = finalClientRecord.get('firstName') || finalClientRecord.get('contactFirstName') || '';
+              updates.contactLastName = finalClientRecord.get('lastName') || finalClientRecord.get('contactLastName') || '';
+
+              if (!updates.contactPerson) {
+                updates.contactPerson = `${updates.contactFirstName} ${updates.contactLastName}`.trim()
+                                        || finalClientRecord.get('contactPerson') || finalClientRecord.get('name') || '';
+              }
+            }
+
+            if (!updates.contactEmail) {
+              updates.contactEmail = finalClientRecord.get('email') || '';
+            }
+            if (!updates.contactPhone) {
+              updates.contactPhone = finalClientRecord.get('phone') || '';
+            }
+
+            logger.info('QuoteController.updateQuote - Updated contact fields from Cliente Final', {
+              quoteId,
+              clientFinalId: updates.clientFinalId,
+              contactData: {
+                contactFirstName: updates.contactFirstName,
+                contactLastName: updates.contactLastName,
+                contactEmail: updates.contactEmail,
+                contactPhone: updates.contactPhone,
+              },
+              userId: currentUser.id,
+            });
+          } catch (error) {
+            logger.warn('QuoteController.updateQuote - Error fetching Cliente Final data for update', {
+              error: error.message,
+              clientFinalId: updates.clientFinalId,
+              userId: currentUser.id,
+            });
+          }
+        } else {
+          // If clearing clientFinalId, don't automatically clear contact fields
+          // The user might want to keep the contact data
+          logger.info('QuoteController.updateQuote - Clearing clientFinalId', {
+            quoteId,
+            userId: currentUser.id,
+          });
+        }
+      }
 
       // Call original service for backward compatibility
       const result = await this.quoteService.updateQuote(

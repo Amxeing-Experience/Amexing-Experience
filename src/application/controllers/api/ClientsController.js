@@ -1468,6 +1468,147 @@ class ClientsController {
   }
 
   /**
+   * POST /api/clients/amexing-direct/quick - Create quick direct client.
+   * Creates a Client record (not AmexingUser) with clientBelongsTo = "amexing".
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * POST /api/clients/amexing-direct/quick
+   * Body: { firstName: 'John', lastName: 'Doe', email: 'john@example.com' }
+   */
+  async createQuickDirectClient(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      // Only admin/superadmin can create direct Amexing clients
+      const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
+      if (!['superadmin', 'admin'].includes(currentUserRole)) {
+        return this.sendError(res, 'Access denied. Only Admin or SuperAdmin can create direct Amexing clients.', 403);
+      }
+
+      // Get client data from request
+      const {
+        firstName,
+        lastName,
+        email,
+        phone,
+        companyName,
+        contactFirstName,
+        contactLastName,
+        preferredLanguage = 'es',
+      } = req.body;
+
+      // Validate required fields
+      if (!firstName || !lastName) {
+        return this.sendError(res, 'First name and last name are required', 400);
+      }
+
+      const Parse = require('parse/node');
+      const Client = Parse.Object.extend('Client');
+
+      // Create new Client object
+      const newClient = new Client();
+
+      // Set basic info
+      newClient.set('firstName', firstName);
+      newClient.set('lastName', lastName);
+      newClient.set('name', `${firstName} ${lastName}`);
+      newClient.set('fullName', `${firstName} ${lastName}`);
+
+      // Set contact info
+      if (email) {
+        newClient.set('email', email.toLowerCase());
+      }
+      if (phone) {
+        newClient.set('phone', phone);
+      }
+
+      // Set company info
+      if (companyName) {
+        newClient.set('companyName', companyName);
+      }
+
+      // Set contact person info (if different from main client)
+      if (contactFirstName || contactLastName) {
+        const contactPerson = `${contactFirstName || ''} ${contactLastName || ''}`.trim();
+        if (contactPerson) {
+          newClient.set('contactPerson', contactPerson);
+          if (contactFirstName) newClient.set('contactFirstName', contactFirstName);
+          if (contactLastName) newClient.set('contactLastName', contactLastName);
+        }
+      } else {
+        // Use main client as contact person
+        newClient.set('contactPerson', `${firstName} ${lastName}`);
+        newClient.set('contactFirstName', firstName);
+        newClient.set('contactLastName', lastName);
+      }
+
+      // Set preferences
+      newClient.set('preferredLanguage', preferredLanguage);
+
+      // Mark as direct Amexing client
+      newClient.set('clientBelongsTo', 'amexing');
+      newClient.set('active', true);
+      newClient.set('exists', true);
+
+      // Set created by - Client model expects String, not Pointer
+      newClient.set('createdBy', currentUser.id);
+
+      // Save the client
+      const savedClient = await newClient.save(null, { useMasterKey: true });
+
+      // Log the creation
+      logger.info('Quick direct client created successfully', {
+        clientId: savedClient.id,
+        firstName,
+        lastName,
+        companyName,
+        email,
+        createdBy: currentUser.id,
+      });
+
+      // Build display label
+      const label = companyName || `${firstName} ${lastName}`;
+
+      // Return in Tom Select format
+      const response = {
+        value: savedClient.id,
+        label,
+        email: email || '',
+        contactPerson: savedClient.get('contactPerson'),
+        phone: phone || '',
+        firstName,
+        lastName,
+        companyName: companyName || '',
+        preferredLanguage,
+      };
+
+      res.status(201).json({
+        success: true,
+        data: response,
+        message: 'Cliente directo creado exitosamente',
+      });
+    } catch (error) {
+      logger.error('Error in ClientsController.createQuickDirectClient', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+        body: req.body,
+      });
+
+      this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to create direct client',
+        500
+      );
+    }
+  }
+
+  /**
    * POST /api/clients/:id/reset-password - Reset client password.
    * Only SuperAdmin and Admin can reset client passwords.
    * Generates a secure new password and logs the action for audit.
