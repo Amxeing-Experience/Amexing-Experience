@@ -63,14 +63,23 @@ class ExperienceController {
       const columns = ['name', 'description', 'cost', 'updatedAt'];
       const sortField = columns[params.sortColumnIndex] || 'updatedAt';
 
+      // Parse the includeInactive parameter (for admin views)
+      const includeInactive = req.query.includeInactive === 'true';
+
       // Get total records count
-      const totalQuery = this.buildBaseQuery(params.typeFilter, null, null);
+      const totalQuery = this.buildBaseQuery(params.typeFilter, null, null, includeInactive);
       const recordsTotal = await totalQuery.count({ useMasterKey: true });
 
       // Build filtered query (with day-of-week filtering if dayDate provided)
       const filteredQuery = params.searchValue
-        ? this.buildSearchQuery(params.searchValue, params.typeFilter, params.excludeId, params.dayDate)
-        : this.buildBaseQuery(params.typeFilter, params.excludeId, params.dayDate);
+        ? this.buildSearchQuery(
+          params.searchValue,
+          params.typeFilter,
+          params.excludeId,
+          params.dayDate,
+          includeInactive
+        )
+        : this.buildBaseQuery(params.typeFilter, params.excludeId, params.dayDate, includeInactive);
 
       const recordsFiltered = await filteredQuery.count({ useMasterKey: true });
 
@@ -287,6 +296,15 @@ class ExperienceController {
         vehicleType
       );
 
+      // Debug logging
+      logger.info('Experience getById - Returning data', {
+        experienceId,
+        name: data.name,
+        description: data.description ? `${data.description.substring(0, 50)}...` : null,
+        hasServiceItems: !!data.serviceItems,
+        fieldCount: Object.keys(data).length,
+      });
+
       return res.json({
         success: true,
         data,
@@ -336,8 +354,8 @@ class ExperienceController {
       };
     }
 
-    if (!['Experience', 'Provider'].includes(type)) {
-      return { error: 'Type must be Experience or Provider', status: 400 };
+    if (!['Experience', 'Provider', 'Establishment'].includes(type)) {
+      return { error: 'Type must be Experience, Provider, or Establishment', status: 400 };
     }
 
     if (type === 'Provider' && providerType) {
@@ -1591,17 +1609,22 @@ class ExperienceController {
    * @param {string} typeFilter - Type filter (Experience/Provider).
    * @param {string} excludeId - ID to exclude.
    * @param {string} dayDate - Date in YYYY-MM-DD format for day-of-week filtering.
+   * @param {boolean} includeInactive - Whether to include inactive experiences (default: false).
    * @returns {Parse.Query} Base query.
    * @private
    * @example
    */
-  buildBaseQuery(typeFilter, excludeId, dayDate) {
+  buildBaseQuery(typeFilter, excludeId, dayDate, includeInactive = false) {
     const query = new Parse.Query('Experience');
     query.equalTo('exists', true);
-    query.equalTo('active', true);
+
+    // Only filter by active if not including inactive
+    if (!includeInactive) {
+      query.equalTo('active', true);
+    }
     // Only get active records (valid_until IS NULL) - price versioning
     query.doesNotExist('valid_until');
-    if (typeFilter && ['Experience', 'Provider'].includes(typeFilter)) {
+    if (typeFilter && ['Experience', 'Provider', 'Establishment'].includes(typeFilter)) {
       query.equalTo('type', typeFilter);
     }
     if (excludeId) {
@@ -1628,14 +1651,20 @@ class ExperienceController {
    * @param {string} typeFilter - Type filter (Experience/Provider).
    * @param {string} excludeId - ID to exclude.
    * @param {string} dayDate - Date in YYYY-MM-DD format for day-of-week filtering.
+   * @param {boolean} includeInactive - Whether to include inactive experiences (default: false).
    * @returns {Parse.Query} Filtered query.
    * @private
    * @example
    */
-  buildSearchQuery(searchValue, typeFilter, excludeId, dayDate) {
+  buildSearchQuery(searchValue, typeFilter, excludeId, dayDate, includeInactive = false) {
     const nameQuery = new Parse.Query('Experience');
     nameQuery.equalTo('exists', true);
-    nameQuery.equalTo('active', true);
+
+    // Only filter by active if not including inactive
+    if (!includeInactive) {
+      nameQuery.equalTo('active', true);
+    }
+
     // Only get active records (valid_until IS NULL) - price versioning
     nameQuery.doesNotExist('valid_until');
     if (typeFilter) nameQuery.equalTo('type', typeFilter);
@@ -1644,7 +1673,11 @@ class ExperienceController {
 
     const descQuery = new Parse.Query('Experience');
     descQuery.equalTo('exists', true);
-    descQuery.equalTo('active', true);
+
+    // Only filter by active if not including inactive
+    if (!includeInactive) {
+      descQuery.equalTo('active', true);
+    }
     // Only get active records (valid_until IS NULL) - price versioning
     descQuery.doesNotExist('valid_until');
     if (typeFilter) descQuery.equalTo('type', typeFilter);
@@ -1678,9 +1711,9 @@ class ExperienceController {
     const includedTours = experience.get('tours') || [];
     const vehicleType = experience.get('vehicleType');
 
-    // Get experiencias count for providers
+    // Get experiencias count for providers and establishments
     let experienciasCount = 0;
-    if (experience.get('type') === 'Provider') {
+    if (['Provider', 'Establishment'].includes(experience.get('type'))) {
       const ProviderExperiencia = require('../../../domain/models/ProviderExperiencia');
       experienciasCount = await ProviderExperiencia.countByProvider(experience.id);
     }

@@ -41,43 +41,34 @@ const experienceTitle = isNewExperience ? 'Nueva Experiencia' : 'Experiencia';
 <div class="row mt-4">
     <div class="col-12">
         <div class="accordion" id="experienceAccordion">
-            <!-- Information Section -->
-            <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden">
-                <h2 class="accordion-header" id="headingInformation">
-                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseInformation" aria-expanded="true" aria-controls="collapseInformation">
-                        <i class="ti ti-info-circle me-2 fs-5"></i>
-                        <span class="fw-bold">Informacion</span>
+            <!-- Services Section -->
+            <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden" id="servicesAccordionItem">
+                <h2 class="accordion-header" id="headingServices">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseServices"
+                        aria-expanded="true" aria-controls="collapseServices" id="servicesAccordionBtn">
+                        <i class="ti ti-list me-2 fs-5"></i>
+                        <span class="fw-bold">Servicios</span>
                     </button>
                 </h2>
-                <div id="collapseInformation" class="accordion-collapse collapse show" aria-labelledby="headingInformation" data-bs-parent="#experienceAccordion">
+                <div id="collapseServices" class="accordion-collapse collapse show" aria-labelledby="headingServices" data-bs-parent="#experienceAccordion">
                     <div class="accordion-body p-0">
-                        <%- include('./sections/experience-information', { experienceId: experienceId, isNewExperience: isNewExperience, userRole: userRole }) %>
+                        <%- include('./sections/experience-services', { experienceId: experienceId }) %>
+                        <%- include('./sections/experience-services-modals') %>
                     </div>
                 </div>
             </div>
 
-            <!-- Services Section -->
-            <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden" id="servicesAccordionItem">
-                <h2 class="accordion-header" id="headingServices">
-                    <button class="accordion-button collapsed <%= isNewExperience ? 'disabled-accordion' : '' %>" type="button"
-                        data-bs-toggle="<%= isNewExperience ? '' : 'collapse' %>"
-                        data-bs-target="#collapseServices"
-                        aria-expanded="false" aria-controls="collapseServices"
-                        id="servicesAccordionBtn"
-                        <%= isNewExperience ? 'disabled' : '' %>>
-                        <i class="ti ti-list me-2 fs-5"></i>
-                        <span class="fw-bold">Servicios</span>
-                        <% if (isNewExperience) { %>
-                            <span class="badge bg-secondary ms-2"><i class="ti ti-lock me-1"></i>Guarda primero la experiencia</span>
-                        <% } %>
+            <!-- Information Section -->
+            <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden">
+                <h2 class="accordion-header" id="headingInformation">
+                    <button class="accordion-button <%= isNewExperience ? '' : 'collapsed' %>" type="button" data-bs-toggle="collapse" data-bs-target="#collapseInformation" aria-expanded="<%= isNewExperience ? 'true' : 'false' %>" aria-controls="collapseInformation">
+                        <i class="ti ti-info-circle me-2 fs-5"></i>
+                        <span class="fw-bold">Informacion</span>
                     </button>
                 </h2>
-                <div id="collapseServices" class="accordion-collapse collapse" aria-labelledby="headingServices" data-bs-parent="#experienceAccordion">
+                <div id="collapseInformation" class="accordion-collapse collapse <%= isNewExperience ? 'show' : '' %>" aria-labelledby="headingInformation" data-bs-parent="#experienceAccordion">
                     <div class="accordion-body p-0">
-                        <% if (!isNewExperience) { %>
-                            <%- include('./sections/experience-services', { experienceId: experienceId }) %>
-                            <%- include('./sections/experience-services-modals') %>
-                        <% } %>
+                        <%- include('./sections/experience-information', { experienceId: experienceId, isNewExperience: isNewExperience, userRole: userRole }) %>
                     </div>
                 </div>
             </div>
@@ -123,15 +114,32 @@ const experienceTitle = isNewExperience ? 'Nueva Experiencia' : 'Experiencia';
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Set up global access token for services builder
-    const token = document.cookie.split('; ')
-        .find(row => row.startsWith('accessToken='))
-        ?.split('=')[1];
+// CRITICAL: Set up global access token IMMEDIATELY (before DOMContentLoaded)
+// This ensures ExperienceServicesBuilder has access to it
+function getAccessToken() {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'clientAccessToken') {
+            return value;
+        }
+    }
+    return null;
+}
 
+// Make getAccessToken globally available
+window.getAccessToken = getAccessToken;
+
+// Set up global token
+(function() {
+    const token = getAccessToken();
     if (token) {
         window.experienceAccessToken = token;
     }
+})();
+
+document.addEventListener('DOMContentLoaded', function() {
+    // The token is already set globally above
 
     // Load experience name for title
     // Auto-scroll to accordion section header when opened
@@ -148,9 +156,15 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadExperienceName() {
         try {
             const experienceId = '<%= experienceId %>';
-            const accessToken = document.cookie.split('; ')
-                .find(row => row.startsWith('accessToken='))
-                ?.split('=')[1];
+            const accessToken = getAccessToken();
+
+            // Check if access token is available
+            if (!accessToken) {
+                console.warn('⚠️ No access token available for loading experience name');
+                const nameSpan = document.getElementById('experienceNameSpan');
+                if (nameSpan) nameSpan.textContent = experienceId;
+                return;
+            }
 
             const response = await fetch(`/api/experiences/${experienceId}`, {
                 method: 'GET',
@@ -159,6 +173,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json'
                 }
             });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
 
             const result = await response.json();
 
@@ -172,11 +190,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (breadcrumbTitle) breadcrumbTitle.textContent = name;
 
                 document.title = `${name} - AmexingWeb`;
+                
+                console.log('✅ Experience name loaded successfully:', name);
+            } else {
+                throw new Error('Invalid response format or no data received');
             }
         } catch (error) {
-            console.error('Error loading experience name:', error);
+            console.error('❌ Error loading experience name:', error);
+            // Fallback to experience ID
             const nameSpan = document.getElementById('experienceNameSpan');
             if (nameSpan) nameSpan.textContent = '<%= experienceId %>';
+            
+            const breadcrumbTitle = document.getElementById('breadcrumbExperienceTitle');
+            if (breadcrumbTitle) breadcrumbTitle.textContent = '<%= experienceId %>';
         }
     }
     loadExperienceName();

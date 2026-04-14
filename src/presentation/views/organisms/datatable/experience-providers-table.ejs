@@ -23,7 +23,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 %>
 
 <div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%); border: none;">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); border: none;">
         <div class="row align-items-center">
             <div class="col">
                 <h5 class="card-title mb-0 text-white">
@@ -66,7 +66,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 <div class="modal fade" id="quickAddExperienceModal" tabindex="-1" aria-labelledby="quickAddExperienceModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);">
                 <h5 class="modal-title text-white" id="quickAddExperienceModalLabel">
                     <i class="ti ti-plus me-2"></i>Agregar Experiencia Rápida
                 </h5>
@@ -841,7 +841,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             processing: true,
             serverSide: true,
             ajax: {
-                url: apiEndpoint + '?type=Provider', // Filter by Provider type
+                url: apiEndpoint + '?type=Provider&includeInactive=true', // Show all providers in admin
                 type: 'GET',
                 dataSrc: function(json) {
                     return json.data || [];
@@ -903,7 +903,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     render: function(data) {
                         return data
                             ? '<span class="badge bg-success">Activo</span>'
-                            : '<span class="badge bg-secondary">Inactivo</span>';
+                            : '<span class="badge bg-warning">Inactivo</span>';
                     }
                 },
                 ...(showActions ? [{
@@ -1377,7 +1377,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const photosContainer = $(card).find('.photos-preview-container');
             if (experiencia.photos && experiencia.photos.length > 0) {
                 experiencia.photos.forEach((photo, index) => {
-                    
                     // Backend now provides presigned URLs in dataUrl field
                     const photoUrl = photo.dataUrl || photo.url;
                     const fileName = photo.fileName || photo.name || 'image';

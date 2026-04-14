@@ -463,6 +463,60 @@ class FileStorageService {
   }
 
   /**
+   * Check if an S3 object exists.
+   * @param {string} s3Key - S3 object key to check.
+   * @returns {Promise<boolean>} True if object exists, false otherwise.
+   * @example
+   * const exists = await service.objectExists('prod/vehicles/abc123/image.jpg');
+   * if (exists) {
+   *   const url = await service.getPresignedUrl(s3Key);
+   * } else {
+   *   console.log('Object not found in S3');
+   * }
+   */
+  async objectExists(s3Key) {
+    try {
+      const bucket = process.env.S3_BUCKET;
+      const region = getEnvironmentRegion();
+
+      // Validate inputs
+      if (!s3Key || typeof s3Key !== 'string') {
+        logger.warn('Invalid S3 key provided to objectExists', { s3Key });
+        return false;
+      }
+
+      if (!bucket) {
+        throw new Error('S3_BUCKET environment variable not set');
+      }
+
+      // Initialize S3 client
+      const s3 = getS3Client(region);
+
+      // Use headObject to check existence (more efficient than getObject)
+      await s3.headObject({
+        Bucket: bucket,
+        Key: s3Key,
+      }).promise();
+
+      logger.debug('S3 object exists', { s3Key, bucket });
+      return true;
+    } catch (error) {
+      if (error.code === 'NotFound' || error.statusCode === 404) {
+        logger.debug('S3 object not found', { s3Key });
+        return false;
+      }
+
+      // Other errors (permissions, network, etc.)
+      logger.error('Error checking S3 object existence', {
+        error: error.message,
+        code: error.code,
+        s3Key,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * DEPRECATED: Use getPresignedUrl() instead.
    * Kept for backward compatibility with Parse.File references.
    * @deprecated

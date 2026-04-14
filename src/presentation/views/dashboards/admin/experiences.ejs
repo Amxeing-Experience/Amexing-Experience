@@ -18,7 +18,8 @@ const activeSection = typeof section !== 'undefined' ? section : 'experiences';
 // Menu items configuration
 const menuItems = [
     { label: 'Experiencias', icon: 'star', section: 'experiences', href: '/dashboard/admin/experiences' },
-    { label: 'Proveedores', icon: 'building-store', section: 'providers', href: '/dashboard/admin/experiences?section=providers' }
+    { label: 'Proveedores', icon: 'building-store', section: 'providers', href: '/dashboard/admin/experiences?section=providers' },
+    { label: 'Establecimientos', icon: 'building', section: 'establishments', href: '/dashboard/admin/experiences?section=establishments' }
 ];
 %>
 
@@ -85,6 +86,16 @@ const menuItems = [
 
             <%- include('../../organisms/datatable/experience-providers-table', {
                 tableId: 'experience-providers-table',
+                apiEndpoint: '/api/experiences',
+                userRole: currentUserRole,
+                showActions: true
+            }) %>
+
+        <% } else if (activeSection === 'establishments') { %>
+            <!-- Establishments Management Section -->
+
+            <%- include('../../organisms/datatable/experience-establishments-table', {
+                tableId: 'experience-establishments-table',
                 apiEndpoint: '/api/experiences',
                 userRole: currentUserRole,
                 showActions: true
