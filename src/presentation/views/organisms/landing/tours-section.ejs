@@ -30,61 +30,90 @@ Created by Denisse Maldonado
                 </div>
             </div>
 
-            <!-- Experience Grid -->
-            <div class="tours-section__grid">
-                <!-- Catas -->
-                <div class="tours-section__card tours-section__card--catas">
-                    <div class="tours-section__card-image tours-section__card-image--catas"></div>
-                    <div class="tours-section__card-content">
-                        <h3 class="tours-section__card-title">CATAS</h3>
+            <!-- Experience Masonry Grid -->
+            <div class="tours-section__masonry">
+                <!-- Column 1: No offset -->
+                <div class="tours-section__column">
+                    <!-- Catas -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-top-bar"></div>
+                        <div class="tours-section__card-image tours-section__card-image--catas">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">CATAS</h3>
+                        </div>
+                    </div>
+
+                    <!-- Gastronómicas -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-image tours-section__card-image--gastronomicas">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">GASTRONÓMICAS</h3>
+                        </div>
+                        <div class="tours-section__card-bottom-bar"></div>
                     </div>
                 </div>
 
-                <!-- Arte -->
-                <div class="tours-section__card tours-section__card--arte">
-                    <div class="tours-section__card-image tours-section__card-image--arte"></div>
-                    <div class="tours-section__card-content">
-                        <h3 class="tours-section__card-title">ARTE</h3>
+                <!-- Column 2: 80px offset -->
+                <div class="tours-section__column tours-section__column--offset-1">
+                    <!-- Arte -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-top-bar"></div>
+                        <div class="tours-section__card-image tours-section__card-image--arte">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">ARTE</h3>
+                        </div>
+                    </div>
+
+                    <!-- Aventura -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-image tours-section__card-image--aventura">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">AVENTURA</h3>
+                        </div>
+                        <div class="tours-section__card-bottom-bar"></div>
                     </div>
                 </div>
 
-                <!-- Historia y Arquitectura -->
-                <div class="tours-section__card tours-section__card--historia">
-                    <div class="tours-section__card-image tours-section__card-image--historia"></div>
-                    <div class="tours-section__card-content">
-                        <h3 class="tours-section__card-title">HISTORIA Y<br>ARQUITECTURA</h3>
+                <!-- Column 3: 160px offset -->
+                <div class="tours-section__column tours-section__column--offset-2">
+                    <!-- Historia y Arquitectura -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-top-bar"></div>
+                        <div class="tours-section__card-image tours-section__card-image--historia">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">HISTORIA Y<br>ARQUITECTURA</h3>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Gastronómicas -->
-                <div class="tours-section__card tours-section__card--gastronomicas">
-                    <div class="tours-section__card-image tours-section__card-image--gastronomicas"></div>
-                    <div class="tours-section__card-content">
-                        <h3 class="tours-section__card-title">GASTRONÓMICAS</h3>
+                    <!-- Naturaleza -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-image tours-section__card-image--naturaleza">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">NATURALEZA</h3>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Aventura -->
-                <div class="tours-section__card tours-section__card--aventura">
-                    <div class="tours-section__card-image tours-section__card-image--aventura"></div>
-                    <div class="tours-section__card-content">
-                        <h3 class="tours-section__card-title">AVENTURA</h3>
-                    </div>
-                </div>
-
-                <!-- Naturaleza -->
-                <div class="tours-section__card tours-section__card--naturaleza">
-                    <div class="tours-section__card-image tours-section__card-image--naturaleza"></div>
-                    <div class="tours-section__card-content">
-                        <h3 class="tours-section__card-title">NATURALEZA</h3>
-                    </div>
-                </div>
-
-                <!-- De Temporada -->
-                <div class="tours-section__card tours-section__card--temporada">
-                    <div class="tours-section__card-image tours-section__card-image--temporada"></div>
-                    <div class="tours-section__card-content">
-                        <h3 class="tours-section__card-title">DE TEMPORADA</h3>
+                    <!-- De Temporada -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-image tours-section__card-image--temporada">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">DE TEMPORADA</h3>
+                        </div>
+                        <div class="tours-section__card-bottom-bar"></div>
                     </div>
                 </div>
             </div>
@@ -96,9 +125,9 @@ Created by Denisse Maldonado
 <style>
 .tours-section {
     background: #2e2e2e;
-    padding: 6rem 0;
+    padding: 12rem 0 6rem 0; /* Extra top padding to accommodate -150px offset */
     position: relative;
-    overflow: hidden;
+    overflow: visible; /* Allow content to be fully visible */
 }
 
 .tours-section__container {
@@ -180,12 +209,26 @@ Created by Denisse Maldonado
     box-shadow: 0 8px 24px rgba(150, 155, 129, 0.4);
 }
 
-.tours-section__grid {
+.tours-section__masonry {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    grid-template-rows: repeat(4, 150px);
-    gap: 0;
-    height: 600px;
+    grid-template-columns: repeat(3, 1fr);
+    /* gap: 20px; */
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.tours-section__column {
+    display: flex;
+    flex-direction: column;
+    /* gap: 20px; */
+}
+
+.tours-section__column--offset-1 {
+    margin-top: 80px;
+}
+
+.tours-section__column--offset-2 {
+    margin-top: -150px;
 }
 
 .tours-section__card {
@@ -195,6 +238,9 @@ Created by Denisse Maldonado
     cursor: pointer;
     display: flex;
     flex-direction: column;
+    height: 350px;
+    /* border-radius: 4px; */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .tours-section__card-image {
@@ -202,12 +248,58 @@ Created by Denisse Maldonado
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    min-height: 100px;
+    min-height: 200px;
+    position: relative;
+    overflow: hidden;
+}
+
+.tours-section__card-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        /* Dark vignette edges only (no green) */
+        linear-gradient(to bottom, 
+            rgba(0, 0, 0, 0.4) 0%, 
+            rgba(0, 0, 0, 0.1) 20%, 
+            transparent 40%, 
+            rgba(0, 0, 0, 0.1) 80%, 
+            rgba(0, 0, 0, 0.4) 100%),
+        radial-gradient(ellipse at center, 
+            transparent 30%, 
+            rgba(0, 0, 0, 0.3) 100%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Green top bar for first cards only - flows as part of card structure with upward gradient */
+.tours-section__card-top-bar {
+    background: linear-gradient(to top, 
+        rgba(150, 155, 129, 1) 0%,    /* Solid green at bottom */
+        rgba(150, 155, 129, 0.8) 30%,
+        rgba(150, 155, 129, 0.5) 60%,
+        rgba(150, 155, 129, 0.2) 85%,
+        rgba(150, 155, 129, 0) 100%    /* Transparent at top */
+    );
+    height: 80px;
+    width: 100%;
+    flex-shrink: 0; /* Don't shrink this element */
+}
+
+/* Hide bottom bars since we're using content gradient instead */
+.tours-section__card-bottom-bar {
+    display: none;
 }
 
 .tours-section__card:hover {
     transform: scale(1.02);
     z-index: 10;
+}
+
+.tours-section__card:hover .tours-section__card-overlay {
+    opacity: 0.7; /* Reduce gradient on hover for better image visibility */
 }
 
 .tours-section__card-content {
@@ -218,6 +310,21 @@ Created by Denisse Maldonado
     justify-content: center;
     text-align: center;
     min-height: 60px;
+}
+
+/* Add DRAMATIC downward green gradient to last card content areas */
+.tours-section__card:last-child .tours-section__card-content {
+    background: linear-gradient(to bottom,
+        #969b81 0%,                    /* Solid green at top */
+        rgba(150, 155, 129, 0.95) 10%,
+        rgba(150, 155, 129, 0.85) 20%,
+        rgba(150, 155, 129, 0.65) 35%,
+        rgba(150, 155, 129, 0.4) 50%,
+        rgba(150, 155, 129, 0.2) 70%,
+        rgba(150, 155, 129, 0.05) 90%,
+        rgba(150, 155, 129, 0) 100%    /* Completely transparent at bottom */
+    );
+    min-height: 160px; /* Even taller for more dramatic effect */
 }
 
 .tours-section__card-title {
@@ -232,41 +339,7 @@ Created by Denisse Maldonado
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Card Grid Positioning */
-.tours-section__card--catas {
-    grid-column: 1 / 3;
-    grid-row: 1 / 2;
-}
-
-.tours-section__card--arte {
-    grid-column: 1 / 3;
-    grid-row: 2 / 4;
-}
-
-.tours-section__card--historia {
-    grid-column: 3 / 7;
-    grid-row: 1 / 3;
-}
-
-.tours-section__card--gastronomicas {
-    grid-column: 1 / 3;
-    grid-row: 4 / 5;
-}
-
-.tours-section__card--aventura {
-    grid-column: 3 / 5;
-    grid-row: 3 / 5;
-}
-
-.tours-section__card--naturaleza {
-    grid-column: 5 / 7;
-    grid-row: 3 / 4;
-}
-
-.tours-section__card--temporada {
-    grid-column: 5 / 7;
-    grid-row: 4 / 5;
-}
+/* Card Styles */
 
 /* Card Images */
 .tours-section__card-image--catas {
@@ -305,6 +378,10 @@ Created by Denisse Maldonado
 }
 
 @media (max-width: 1024px) {
+    .tours-section {
+        padding: 8rem 0 4rem 0; /* Adjusted for -70px offset */
+    }
+    
     .tours-section__content {
         grid-template-columns: 1fr;
         gap: 3rem;
@@ -315,51 +392,27 @@ Created by Denisse Maldonado
         text-align: center;
     }
     
-    .tours-section__grid {
-        height: 500px;
-        grid-template-columns: repeat(4, 1fr);
-        grid-template-rows: repeat(4, 1fr);
+    .tours-section__masonry {
+        grid-template-columns: repeat(2, 1fr);
+        /* gap: 15px; */
     }
     
-    .tours-section__card--catas {
-        grid-column: 1 / 3;
-        grid-row: 1 / 2;
+    .tours-section__column--offset-1 {
+        margin-top: 40px;
     }
     
-    .tours-section__card--arte {
-        grid-column: 3 / 5;
-        grid-row: 1 / 2;
+    .tours-section__column--offset-2 {
+        margin-top: -70px;
     }
     
-    .tours-section__card--historia {
-        grid-column: 1 / 5;
-        grid-row: 2 / 3;
-    }
-    
-    .tours-section__card--gastronomicas {
-        grid-column: 1 / 3;
-        grid-row: 3 / 4;
-    }
-    
-    .tours-section__card--aventura {
-        grid-column: 3 / 5;
-        grid-row: 3 / 4;
-    }
-    
-    .tours-section__card--naturaleza {
-        grid-column: 1 / 3;
-        grid-row: 4 / 5;
-    }
-    
-    .tours-section__card--temporada {
-        grid-column: 3 / 5;
-        grid-row: 4 / 5;
+    .tours-section__card {
+        height: 250px;
     }
 }
 
 @media (max-width: 768px) {
     .tours-section {
-        padding: 4rem 0;
+        padding: 4rem 0; /* Normal padding - no negative offsets on mobile */
     }
     
     .tours-section__container {
@@ -371,46 +424,18 @@ Created by Denisse Maldonado
         letter-spacing: 2px;
     }
     
-    .tours-section__grid {
-        height: 400px;
-        grid-template-columns: repeat(2, 1fr);
-        grid-template-rows: repeat(4, 1fr);
-        gap: 0.5rem;
+    .tours-section__masonry {
+        grid-template-columns: 1fr;
+        /* gap: 15px; */
     }
     
-    .tours-section__card--catas {
-        grid-column: 1 / 2;
-        grid-row: 1 / 2;
+    .tours-section__column--offset-1,
+    .tours-section__column--offset-2 {
+        margin-top: 0;
     }
     
-    .tours-section__card--arte {
-        grid-column: 2 / 3;
-        grid-row: 1 / 2;
-    }
-    
-    .tours-section__card--historia {
-        grid-column: 1 / 3;
-        grid-row: 2 / 3;
-    }
-    
-    .tours-section__card--gastronomicas {
-        grid-column: 1 / 2;
-        grid-row: 3 / 4;
-    }
-    
-    .tours-section__card--aventura {
-        grid-column: 2 / 3;
-        grid-row: 3 / 4;
-    }
-    
-    .tours-section__card--naturaleza {
-        grid-column: 1 / 2;
-        grid-row: 4 / 5;
-    }
-    
-    .tours-section__card--temporada {
-        grid-column: 2 / 3;
-        grid-row: 4 / 5;
+    .tours-section__card {
+        height: 200px;
     }
     
     .tours-section__card-title {
