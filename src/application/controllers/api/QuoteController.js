@@ -1020,13 +1020,38 @@ class QuoteController {
       });
 
       if (!canEdit) {
-        logger.warn('🚫 QuoteController.updateQuote - Permission denied', {
+        // Enhanced debugging for 403 errors
+        const debugRolePointer = currentUser.get('roleId');
+        let debugRoleName = 'unknown';
+        if (debugRolePointer && debugRolePointer.id) {
+          try {
+            await debugRolePointer.fetch({ useMasterKey: true });
+            debugRoleName = debugRolePointer.get('name');
+          } catch (e) {
+            logger.warn('Failed to fetch role in 403 debug', { error: e.message });
+          }
+        }
+
+        logger.error('🚫 QuoteController.updateQuote - PERMISSION DENIED (403)', {
           userId: currentUser.id,
           userEmail: currentUser.get('email'),
+          userFirstName: currentUser.get('firstName'),
+          userLastName: currentUser.get('lastName'),
           userRole: req.userRole || 'unknown',
+          debugRoleName,
+          rolePointer: debugRolePointer?.id,
           quoteId,
+          updates: Object.keys(updates),
+          hasRoleObject: !!req.roleObject,
+          jwtRole: req.userRole,
+          requestUrl: req.url,
+          requestMethod: req.method,
+          userAgent: req.headers['user-agent'],
+          ip: req.ip || req.connection.remoteAddress,
+          timestamp: new Date().toISOString(),
         });
-        return this.sendError(res, 'No tienes permisos para editar esta cotización', 403);
+
+        return this.sendError(res, `Access denied: You don't have permission to edit this quote. Role: ${roleName || req.userRole || 'unknown'}`, 403);
       }
 
       // Track the edit with versioning service

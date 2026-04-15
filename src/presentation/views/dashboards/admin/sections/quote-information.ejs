@@ -970,15 +970,31 @@
                 clientField.customSelect.setValue(clientUserId);
             }
             
-            // Auto-fill contact info from current user
-            if (currentUserData.firstName || currentUserData.lastName) {
-                const firstName = currentUserData.firstName || '';
-                const lastName = currentUserData.lastName || '';
-                if (firstName) document.getElementById('contactFirstName').value = firstName;
-                if (lastName) document.getElementById('contactLastName').value = lastName;
+            // Auto-fill contact info from current user ONLY if fields are empty (for new quotes)
+            const contactFirstNameField = document.getElementById('contactFirstName');
+            const contactLastNameField = document.getElementById('contactLastName');
+            const contactEmailField = document.getElementById('contactEmail');
+            const contactPhoneField = document.getElementById('contactPhone');
+            
+            // Only fill if the fields are empty (new quote scenario)
+            if (!contactFirstNameField.value && !contactLastNameField.value) {
+                if (currentUserData.firstName || currentUserData.lastName) {
+                    const firstName = currentUserData.firstName || '';
+                    const lastName = currentUserData.lastName || '';
+                    if (firstName && !contactFirstNameField.value) {
+                        contactFirstNameField.value = firstName;
+                    }
+                    if (lastName && !contactLastNameField.value) {
+                        contactLastNameField.value = lastName;
+                    }
+                }
             }
-            if (currentUserData.email) document.getElementById('contactEmail').value = currentUserData.email;
-            if (currentUserData.phone) document.getElementById('contactPhone').value = currentUserData.phone;
+            if (!contactEmailField.value && currentUserData.email) {
+                contactEmailField.value = currentUserData.email;
+            }
+            if (!contactPhoneField.value && currentUserData.phone) {
+                contactPhoneField.value = currentUserData.phone;
+            }
             
             // Load sub-clients for both department_manager and client roles
             if ((userRole === 'department_manager' || userRole === 'client') && clientUserId) {
@@ -2827,10 +2843,24 @@
                 if (userRole === 'department_manager' || userRole === 'client') {
                     console.log('🔧 EDIT MODE - Ensuring client dropdown shows enterprise name for restricted role:', userRole);
                     await loadCurrentUserAsClient();
+                    
+                    // Ensure finalClientRow is visible for restricted roles in edit mode
+                    const finalClientRow = document.getElementById('finalClientRow');
+                    if (finalClientRow) {
+                        finalClientRow.style.display = 'flex';
+                    }
                 }
             } else if (userRole === 'department_manager' || userRole === 'client') {
                 // For new quotes, ensure clientId is populated for these roles
                 await loadCurrentUserAsClient();
+            }
+
+            // Ensure finalClientRow is visible for department_manager and client roles
+            if (userRole === 'department_manager' || userRole === 'client') {
+                const finalClientRow = document.getElementById('finalClientRow');
+                if (finalClientRow) {
+                    finalClientRow.style.display = 'flex';
+                }
             }
 
             // Auto-sum people fields into hidden numberOfPeople

@@ -469,11 +469,106 @@ class QuoteService {
       // If status changed to requested (SOLICITADO), auto-create Reservation
       let reservationData = null;
       if (appliedUpdates.status === 'requested' && currentStatus !== 'requested') {
-        reservationData = await this.createReservationFromQuote(quote, currentUser);
+        logger.info('🚀 Creating reservation for quote status change to REQUESTED', {
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          serviceItems: quote.get('serviceItems'),
+          currentStatus,
+          newStatus: appliedUpdates.status,
+          userId: currentUser.id,
+          userEmail: currentUser.get('email'),
+        });
 
-        // Send confirmation email with PDF (non-blocking)
-        this.sendScheduledConfirmationEmail(quote, currentUser, reservationData)
-          .catch((err) => logger.warn('Failed to send request confirmation email', {
+        // Pre-validation: Check if quote has proper pricing before creating reservation
+        const serviceItems = quote.get('serviceItems') || {};
+        const totalAmount = serviceItems.total || 0;
+
+        logger.info('🔍 DEBUGGING: ServiceItems analysis for quote status change', {
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          serviceItemsRaw: serviceItems,
+          serviceItemsType: typeof serviceItems,
+          serviceItemsKeys: Object.keys(serviceItems),
+          totalAmount,
+          subtotal: serviceItems.subtotal,
+          currency: serviceItems.currency,
+          hasDays: !!serviceItems.days,
+          daysCount: serviceItems.days ? serviceItems.days.length : 0,
+          daysData: serviceItems.days || 'No days data',
+          userId: currentUser.id,
+          userEmail: currentUser.get('email'),
+          timestamp: new Date().toISOString(),
+        });
+
+        if (totalAmount <= 0) {
+          logger.warn('❌ Cannot create reservation for quote with zero value', {
+            quoteId: quote.id,
+            quoteFolio: quote.get('folio'),
+            totalAmount,
+            serviceItemsTotal: serviceItems.total,
+            subtotal: serviceItems.subtotal,
+            currency: serviceItems.currency,
+            serviceItemsComplete: serviceItems,
+            userId: currentUser.id,
+            contactEmail: quote.get('contactEmail'),
+            timestamp: new Date().toISOString(),
+          });
+
+          throw new Error('No se puede solicitar servicios para una cotización sin precio. Por favor, complete la cotización con servicios y precios válidos antes de solicitar.');
+        }
+
+        logger.info('✅ Quote pricing validation passed', {
+          quoteId: quote.id,
+          totalAmount,
+          currency: serviceItems.currency || 'MXN',
+        });
+
+        try {
+          reservationData = await this.createReservationFromQuote(quote, currentUser);
+
+          logger.info('✅ Reservation created successfully', {
+            quoteId: quote.id,
+            reservationData,
+            reservationId: reservationData?.id,
+            reservationFolio: reservationData?.folio,
+          });
+
+          // Send confirmation email with PDF (non-blocking)
+          this.sendRequestedConfirmationEmail(quote, currentUser, reservationData)
+            .then(() => {
+              logger.info('✅ Confirmation email sent successfully', {
+                quoteId: quote.id,
+                reservationId: reservationData?.id,
+                recipientEmail: quote.get('contactEmail'),
+              });
+            })
+            .catch((err) => {
+              logger.error('❌ Failed to send request confirmation email', {
+                error: err.message,
+                quoteId: quote.id,
+                reservationId: reservationData?.id,
+                stack: err.stack,
+              });
+            });
+        } catch (error) {
+          logger.error('❌ Failed to create reservation from quote', {
+            quoteId: quote.id,
+            quoteFolio: quote.get('folio'),
+            error: error.message,
+            stack: error.stack,
+            serviceItems: quote.get('serviceItems'),
+            userId: currentUser.id,
+          });
+          // Re-throw the error so it reaches the frontend
+          throw error;
+        }
+      }
+
+      // If status changed to scheduled (AGENDADO), send schedule confirmation email
+      if (appliedUpdates.status === 'scheduled' && currentStatus !== 'scheduled') {
+        // Send schedule confirmation email (non-blocking)
+        this.sendScheduleConfirmationEmail(quote, currentUser)
+          .catch((err) => logger.warn('Failed to send schedule confirmation email', {
             error: err.message,
             quoteId: quote.id,
           }));
@@ -1072,6 +1167,86 @@ class QuoteService {
    */
   async createReservationFromQuote(quote, currentUser) {
     try {
+      logger.info('🔍 Starting reservation creation process', {
+        quoteId: quote.id,
+        quoteFolio: quote.get('folio'),
+        currentUserId: currentUser?.id,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Validate quote object
+      if (!quote || !quote.id) {
+        logger.error('❌ Invalid quote object provided for reservation creation', {
+          quote,
+          hasQuote: !!quote,
+          hasQuoteId: !!(quote?.id),
+        });
+        throw new Error('Invalid quote object provided');
+      }
+
+      // Validate and log service items
+      const serviceItems = quote.get('serviceItems') || {};
+      const days = serviceItems.days || [];
+
+      logger.info('📊 Service items validation', {
+        quoteId: quote.id,
+        hasServiceItems: !!serviceItems,
+        serviceItemsKeys: Object.keys(serviceItems),
+        serviceItemsTotal: serviceItems.total,
+        hasDays: !!days,
+        daysCount: days.length,
+        daysStructure: days.map((day) => ({
+          dayNumber: day.dayNumber,
+          concept: day.concept,
+          date: day.date,
+          subconceptsCount: (day.subconcepts || []).length,
+          subconcepts: (day.subconcepts || []).map((sub) => ({
+            type: sub.type,
+            concept: sub.concept,
+            price: sub.unitPrice || sub.price,
+            total: sub.total,
+          })),
+        })),
+        rawServiceItems: JSON.stringify(serviceItems, null, 2),
+      });
+
+      // Critical validation: Check if we have service data to create reservation from
+      if (!serviceItems || Object.keys(serviceItems).length === 0) {
+        logger.warn('⚠️ No service items found in quote - cannot create reservation', {
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+        });
+        return null;
+      }
+
+      if (!days || days.length === 0) {
+        logger.warn('⚠️ No service days found in quote - cannot create reservation', {
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          serviceItems,
+        });
+        return null;
+      }
+
+      // Validate that days have subconcepts
+      const totalSubconcepts = days.reduce((total, day) => total + (day.subconcepts || []).length, 0);
+      if (totalSubconcepts === 0) {
+        logger.warn('⚠️ No subconcepts found in any day - cannot create reservation services', {
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          daysCount: days.length,
+          days,
+        });
+        return null;
+      }
+
+      logger.info('✅ Service validation passed', {
+        quoteId: quote.id,
+        totalDays: days.length,
+        totalSubconcepts,
+        totalAmount: serviceItems.total,
+      });
+
       // Idempotency check: skip if an active reservation already exists for this quote
       const existingQuery = new Parse.Query('Reservation');
       existingQuery.equalTo('quotePtr', quote);
@@ -1096,7 +1271,7 @@ class QuoteService {
             await Parse.Object.saveAll(services, { useMasterKey: true });
           }
 
-          logger.info('Reactivated cancelled reservation for quote', {
+          logger.info('♻️ Reactivated cancelled reservation for quote', {
             quoteId: quote.id,
             reservationId: existing.id,
             servicesReactivated: services.length,
@@ -1104,7 +1279,7 @@ class QuoteService {
           return { id: existing.id, folio: existing.get('folio'), servicesCount: services.length };
         }
 
-        logger.info('Reservation already exists for quote, skipping creation', {
+        logger.info('🔄 Reservation already exists for quote, skipping creation', {
           quoteId: quote.id,
           reservationId: existing.id,
         });
@@ -1113,10 +1288,9 @@ class QuoteService {
 
       // Generate new folio format: [SERVICE_MONTH_PREFIX][YEAR][CREATION_MONTH][CONSECUTIVE]
       // Example: ABR20260301 = Service in April 2026, created in March, first quote for April
+      logger.info('🏷️ Generating reservation folio', { quoteId: quote.id });
       const folio = await this.generateReservationFolio(quote);
-
-      const serviceItems = quote.get('serviceItems') || {};
-      const days = serviceItems.days || [];
+      logger.info('✅ Folio generated successfully', { quoteId: quote.id, folio });
 
       // Calculate start/end dates from service days
       let startDate = null;
@@ -1181,12 +1355,57 @@ class QuoteService {
         reservation.set('createdBy', userPointer);
       }
 
-      await reservation.save(null, { useMasterKey: true });
+      logger.info('💾 Saving reservation to database', {
+        quoteId: quote.id,
+        folio,
+        totalAmount: serviceItems.total,
+        currency: serviceItems.currency,
+        hasClient: !!client,
+        hasCurrentUser: !!currentUser,
+      });
+
+      try {
+        await reservation.save(null, { useMasterKey: true });
+        logger.info('✅ Reservation saved successfully', {
+          quoteId: quote.id,
+          reservationId: reservation.id,
+          folio,
+        });
+      } catch (saveError) {
+        logger.error('❌ Failed to save reservation', {
+          quoteId: quote.id,
+          folio,
+          error: saveError.message,
+          stack: saveError.stack,
+          reservationData: {
+            totalAmount: serviceItems.total,
+            currency: serviceItems.currency,
+            numberOfPeople: quote.get('numberOfPeople'),
+            hasClient: !!client,
+            hasCurrentUser: !!currentUser,
+          },
+        });
+        throw saveError;
+      }
 
       // Create ReservationService for each subconcept in each day
       const servicesToSave = [];
+      logger.info('🔧 Creating reservation services', {
+        quoteId: quote.id,
+        reservationId: reservation.id,
+        totalDays: days.length,
+      });
+
       for (const day of days) {
         const subconcepts = day.subconcepts || [];
+        logger.info(`📅 Processing day ${day.dayNumber}`, {
+          quoteId: quote.id,
+          dayNumber: day.dayNumber,
+          concept: day.concept,
+          date: day.date,
+          subconceptsCount: subconcepts.length,
+        });
+
         for (const sub of subconcepts) {
           const resSvc = new ReservationService();
           resSvc.set('reservationPtr', reservation);
@@ -1207,7 +1426,16 @@ class QuoteService {
           resSvc.set('exists', true);
 
           if (day.date) {
-            resSvc.set('serviceDate', new Date(`${day.date}T12:00:00`));
+            try {
+              resSvc.set('serviceDate', new Date(`${day.date}T12:00:00`));
+            } catch (dateError) {
+              logger.warn('⚠️ Invalid date format for service', {
+                quoteId: quote.id,
+                dayNumber: day.dayNumber,
+                originalDate: day.date,
+                error: dateError.message,
+              });
+            }
           }
 
           servicesToSave.push(resSvc);
@@ -1215,10 +1443,43 @@ class QuoteService {
       }
 
       if (servicesToSave.length > 0) {
-        await Parse.Object.saveAll(servicesToSave, { useMasterKey: true });
+        logger.info('💾 Saving reservation services', {
+          quoteId: quote.id,
+          reservationId: reservation.id,
+          servicesCount: servicesToSave.length,
+        });
+
+        try {
+          await Parse.Object.saveAll(servicesToSave, { useMasterKey: true });
+          logger.info('✅ All reservation services saved successfully', {
+            quoteId: quote.id,
+            reservationId: reservation.id,
+            servicesCount: servicesToSave.length,
+          });
+        } catch (servicesError) {
+          logger.error('❌ Failed to save reservation services', {
+            quoteId: quote.id,
+            reservationId: reservation.id,
+            servicesCount: servicesToSave.length,
+            error: servicesError.message,
+            stack: servicesError.stack,
+            firstServiceData: servicesToSave.length > 0 ? {
+              dayNumber: servicesToSave[0].get('dayNumber'),
+              concept: servicesToSave[0].get('concept'),
+              type: servicesToSave[0].get('type'),
+              price: servicesToSave[0].get('price'),
+            } : null,
+          });
+          throw servicesError;
+        }
+      } else {
+        logger.warn('⚠️ No services to save - this should not happen after validation', {
+          quoteId: quote.id,
+          reservationId: reservation.id,
+        });
       }
 
-      logger.info('Reservation created from quote', {
+      logger.info('🎉 Reservation created from quote successfully', {
         quoteId: quote.id,
         quoteFolio: quote.get('folio'),
         reservationId: reservation.id,
@@ -1477,6 +1738,172 @@ class QuoteService {
     });
 
     return results;
+  }
+
+  /**
+   * Send confirmation email when quote status changes to 'requested'.
+   * @param {object} quote - Parse Quote object.
+   * @param {object} currentUser - Parse AmexingUser performing the action.
+   * @param {object} reservationData - Created reservation data (optional).
+   * @returns {Promise<void>}
+   * @example
+   */
+  async sendRequestedConfirmationEmail(quote, currentUser, reservationData) {
+    logger.info('📧 STARTING: sendRequestedConfirmationEmail', {
+      quoteId: quote.id,
+      quoteFolio: quote.get('folio'),
+      hasReservationData: !!reservationData,
+      reservationId: reservationData?.id,
+      reservationFolio: reservationData?.folio,
+      userId: currentUser.id,
+      userEmail: currentUser.get('email'),
+      timestamp: new Date().toISOString(),
+    });
+
+    // eslint-disable-next-line global-require
+    const emailService = require('./EmailService');
+
+    logger.info('📧 Email service availability check', {
+      isAvailable: emailService.isAvailable(),
+      quoteId: quote.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    if (!emailService.isAvailable()) {
+      logger.warn('📧 Email service not available, skipping requested confirmation email', {
+        quoteId: quote.id,
+        emailServiceInitialized: emailService.isInitialized,
+        mailersendClient: !!emailService.mailerSend,
+        nodeEnv: process.env.NODE_ENV,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    const recipientEmail = quote.get('contactEmail')
+      || currentUser.get('email');
+
+    logger.info('📧 Recipient email resolution', {
+      quoteId: quote.id,
+      contactEmail: quote.get('contactEmail'),
+      userEmail: currentUser.get('email'),
+      resolvedEmail: recipientEmail,
+      timestamp: new Date().toISOString(),
+    });
+
+    if (!recipientEmail) {
+      logger.warn('📧 No recipient email for requested confirmation', {
+        quoteId: quote.id,
+        contactEmailFromQuote: quote.get('contactEmail'),
+        emailFromUser: currentUser.get('email'),
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    const recipientName = quote.get('contactPerson')
+      || currentUser.get('fullName')
+      || `${currentUser.get('firstName') || ''} ${currentUser.get('lastName') || ''}`.trim()
+      || currentUser.get('username');
+
+    // Build data for email template
+    const emailData = {
+      recipientName: recipientName || 'Cliente',
+      quoteFolio: quote.get('folio'),
+      quoteId: quote.id,
+      reservationFolio: reservationData?.folio || null,
+      status: 'requested',
+      contactEmail: recipientEmail,
+      eventType: quote.get('eventType') || 'Servicio',
+      validUntil: quote.get('validUntil'),
+      // Include reservation details if available
+      reservationId: reservationData?.id,
+      reservationData,
+    };
+
+    // Try to send the email using available method
+    const result = await emailService.sendQuoteConfirmation(recipientEmail, emailData);
+
+    if (result.success) {
+      logger.info('✅ Requested confirmation email sent successfully', {
+        quoteId: quote.id,
+        quoteFolio: quote.get('folio'),
+        reservationFolio: reservationData?.folio,
+        recipientEmail,
+        recipientName,
+      });
+    } else {
+      logger.error('Failed to send requested confirmation email', {
+        quoteId: quote.id,
+        quoteFolio: quote.get('folio'),
+        recipientEmail,
+        error: result.error,
+      });
+    }
+  }
+
+  /**
+   * Send schedule confirmation email when quote status changes to 'scheduled'.
+   * @param {object} quote - Parse Quote object.
+   * @param {object} currentUser - Parse AmexingUser performing the action.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async sendScheduleConfirmationEmail(quote, currentUser) {
+    // eslint-disable-next-line global-require
+    const emailService = require('./EmailService');
+
+    if (!emailService.isAvailable()) {
+      logger.info('Email service not available, skipping schedule confirmation email', {
+        quoteId: quote.id,
+      });
+      return;
+    }
+
+    const recipientEmail = quote.get('contactEmail')
+      || currentUser.get('email');
+    if (!recipientEmail) {
+      logger.warn('No recipient email for schedule confirmation', { quoteId: quote.id });
+      return;
+    }
+
+    const recipientName = quote.get('contactPerson')
+      || currentUser.get('fullName')
+      || `${currentUser.get('firstName') || ''} ${currentUser.get('lastName') || ''}`.trim()
+      || currentUser.get('username');
+
+    // Build data for email template
+    const emailData = {
+      recipientName: recipientName || 'Cliente',
+      quoteFolio: quote.get('folio') || quote.id,
+      eventType: quote.get('eventType') || 'Evento',
+      numberOfPeople: quote.get('numberOfPeople') || 1,
+      contactEmail: recipientEmail,
+      supportEmail: process.env.SUPPORT_EMAIL || 'soporte@amexing.mx',
+      companyName: 'Amexing',
+    };
+
+    const result = await emailService.sendScheduleConfirmation(
+      recipientEmail,
+      recipientName || 'Cliente',
+      emailData
+    );
+
+    if (result.success) {
+      logger.info('Schedule confirmation email sent successfully', {
+        quoteId: quote.id,
+        quoteFolio: quote.get('folio'),
+        recipientEmail,
+        recipientName,
+      });
+    } else {
+      logger.error('Failed to send schedule confirmation email', {
+        quoteId: quote.id,
+        quoteFolio: quote.get('folio'),
+        recipientEmail,
+        error: result.error,
+      });
+    }
   }
 
   /**
