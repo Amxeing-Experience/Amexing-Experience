@@ -1211,7 +1211,6 @@
             // Fetch sub-clients for this client
             const apiUrl = `/api/clients/${clientId}/sub-clients`;
             console.log('📡 Fetching sub-clients from:', apiUrl);
-            console.log('🔑 Using token:', getAccessToken() ? 'Token present' : 'NO TOKEN!');
             
             const response = await fetch(apiUrl, {
                 method: 'GET',
