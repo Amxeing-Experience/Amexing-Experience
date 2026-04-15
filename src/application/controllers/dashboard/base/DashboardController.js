@@ -88,6 +88,8 @@ class DashboardController extends BaseController {
 
       // Fetch user data from AmexingUser table if needed
       let userName = 'Guest User';
+      let enhancedUser = req.user || {};
+
       if (req.user?.id) {
         try {
           const Parse = require('parse/node');
@@ -98,7 +100,55 @@ class DashboardController extends BaseController {
           if (amexingUser) {
             const firstName = amexingUser.get('firstName') || '';
             const lastName = amexingUser.get('lastName') || '';
+            const contextualData = amexingUser.get('contextualData') || {};
+
             userName = `${firstName} ${lastName}`.trim() || amexingUser.get('email') || req.user.email || 'User';
+
+            // For client role, also fetch organization owner's contextualData
+            let organizationContextualData = contextualData;
+            if (req.user.role === 'client' && req.user.clientId) {
+              try {
+                console.log('🏢 DASHBOARD - Client role detected, fetching organization owner data:', {
+                  userRole: req.user.role,
+                  clientId: req.user.clientId,
+                  currentUserId: req.user.id,
+                });
+
+                const ownerQuery = new Parse.Query('AmexingUser');
+                const organizationOwner = await ownerQuery.get(req.user.clientId, { useMasterKey: true });
+
+                if (organizationOwner) {
+                  const ownerContextualData = organizationOwner.get('contextualData') || {};
+                  console.log('✅ DASHBOARD - Organization owner data found:', {
+                    ownerFirstName: organizationOwner.get('firstName'),
+                    ownerLastName: organizationOwner.get('lastName'),
+                    ownerEmail: organizationOwner.get('email'),
+                    hasOwnerContextualData: !!ownerContextualData,
+                    ownerCompanyName: ownerContextualData.companyName,
+                    fullOwnerContextualData: ownerContextualData,
+                  });
+
+                  // Use organization owner's contextualData instead of current user's
+                  organizationContextualData = ownerContextualData;
+                } else {
+                  console.log('⚠️ DASHBOARD - Organization owner not found for clientId:', req.user.clientId);
+                }
+              } catch (ownerError) {
+                console.log('❌ DASHBOARD - Error fetching organization owner:', {
+                  error: ownerError.message,
+                  clientId: req.user.clientId,
+                });
+              }
+            }
+
+            // Enhance user object with AmexingUser data including contextualData
+            enhancedUser = {
+              ...req.user,
+              firstName,
+              lastName,
+              contextualData: organizationContextualData,
+              phone: amexingUser.get('phone') || req.user.phone || '',
+            };
           } else {
             // Fallback to Parse User data
             userName = req.user?.firstName && req.user?.lastName
@@ -129,16 +179,16 @@ class DashboardController extends BaseController {
 
       const dashboardData = {
         stats,
-        user: req.user || {
+        user: enhancedUser.id ? enhancedUser : {
           id: '',
           role: 'guest',
           email: '',
           clientId: '',
           departmentId: '',
         },
-        userRole: req.user?.role || 'guest',
+        userRole: enhancedUser?.role || req.user?.role || 'guest',
         userName,
-        userId: req.user?.id,
+        userId: enhancedUser?.id || req.user?.id,
         accessToken,
         breadcrumb: this.buildBreadcrumb(req.path, req.user?.role),
         ...additionalData, // Spread additionalData last so it can override defaults

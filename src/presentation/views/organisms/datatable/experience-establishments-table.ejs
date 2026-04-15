@@ -1,0 +1,2844 @@
+<%
+/**
+ * Experience Establishments DataTable Organism
+ * DataTable component for establishments management
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'experience-establishments-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/experiences';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-building me-2"></i>Establecimientos
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Gestión de establecimientos y locales</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createEstablishmentBtn">
+                        <i class="ti ti-plus me-1"></i>Nuevo Establecimiento
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="establishments-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Descripción</th>
+                        <th>Experiencias</th>
+                        <th>Última Actualización</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Add Experience Modal for Establishments -->
+<div class="modal fade" id="quickAddEstablishmentExperienceModal" tabindex="-1" aria-labelledby="quickAddEstablishmentExperienceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);">
+                <h5 class="modal-title text-white" id="quickAddEstablishmentExperienceModalLabel">
+                    <i class="ti ti-plus me-2"></i>Agregar Experiencia Rápida
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Establishment info -->
+                <div class="alert alert-info" role="alert">
+                    <i class="ti ti-info-circle me-2"></i>
+                    <strong>Establecimiento:</strong> <span id="quickAddEstablishmentName"></span>
+                </div>
+
+                <!-- Alert container for modal-specific errors -->
+                <div id="quickAddEstablishmentModalAlerts"></div>
+
+                <form id="quickAddEstablishmentExperienceForm">
+                    <input type="hidden" id="quickAddEstablishmentId">
+                    
+                    <!-- Nombre y Tipo -->
+                    <div class="row mb-3">
+                        <div class="col-md-7">
+                            <label for="quickEstablishmentExperienciaName" class="form-label form-label-sm fw-medium text-success">
+                                Nombre <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="quickEstablishmentExperienciaName" required maxlength="200" 
+                                   placeholder="Ej: Cena Romántica VIP">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="quickEstablishmentExperienciaTipo" class="form-label form-label-sm fw-medium text-success">Tipo</label>
+                            <select class="form-select" id="quickEstablishmentExperienciaTipo">
+                                <option value="">Seleccionar</option>
+                                <option value="Exclusivo">Exclusivo</option>
+                                <option value="Compartido">Compartido</option>
+                                <option value="Privado">Privado</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <label for="quickEstablishmentExperienciaDescription" class="form-label form-label-sm fw-medium text-success">
+                            Descripción <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" id="quickEstablishmentExperienciaDescription" rows="2" required
+                                  placeholder="Descripción detallada de lo que incluye esta experiencia..."></textarea>
+                    </div>
+
+                    <!-- Todos los precios en una fila -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">
+                                Precio Adulto <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="quickEstablishmentExperienciaPrice" required min="0" step="0.01" 
+                                       placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">Precio Adulto Sin Alcohol</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="quickEstablishmentExperienciaPriceNoAlcohol" min="0" step="0.01" 
+                                       placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">Precio Niño</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="quickEstablishmentExperienciaPriceChild" min="0" step="0.01" 
+                                       placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Campos de tiempo -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">Duración (hrs)</label>
+                            <input type="number" class="form-control" id="quickEstablishmentExperienciaDuration" min="0" step="0.5" 
+                                   placeholder="2.5">
+                            <div class="form-text">
+                                <small>Tiempo total experiencia</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">Duración Trayecto (min)</label>
+                            <input type="number" class="form-control" id="quickEstablishmentExperienciaTravelDuration" min="0" step="1" 
+                                   placeholder="60">
+                            <div class="form-text">
+                                <small>Tiempo traslado</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipación (min)</label>
+                            <input type="number" class="form-control" id="quickEstablishmentExperienciaAdvanceTime" min="0" step="1" 
+                                   placeholder="1440">
+                            <div class="form-text">
+                                <small>Ej: 1440 = 24hrs</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Campos de personas -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="quickEstablishmentExperienciaMinPeople" class="form-label form-label-sm fw-medium text-success">Mín. Personas</label>
+                            <input type="number" class="form-control" id="quickEstablishmentExperienciaMinPeople" min="1" step="1" 
+                                   placeholder="1">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="quickEstablishmentExperienciaMaxPeople" class="form-label form-label-sm fw-medium text-success">Máx. Personas</label>
+                            <input type="number" class="form-control" id="quickEstablishmentExperienciaMaxPeople" min="1" step="1" 
+                                   placeholder="10">
+                        </div>
+                    </div>
+
+                    <!-- Incluye y No Incluye en 2 columnas -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <!-- Incluye -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    Incluye <span class="text-muted">(uno por línea)</span>
+                                </label>
+                                <textarea class="form-control" id="quickEstablishmentExperienciaIncludes" 
+                                          rows="4"
+                                          placeholder="Mesa reservada&#10;Menú degustación&#10;Vino de cortesía&#10;Atención personalizada&#10;Ambiente exclusivo"
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-info-circle me-1"></i>Cada elemento en una línea nueva</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <!-- No Incluye -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    No incluye <span class="text-muted">(uno por línea)</span>
+                                </label>
+                                <textarea class="form-control" id="quickEstablishmentExperienciaNotIncludes" 
+                                          rows="4"
+                                          placeholder="Transporte&#10;Propinas&#10;Bebidas adicionales&#10;Extras no mencionados"
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-info-circle me-1"></i>Cada elemento en una línea nueva</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Idiomas disponibles -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            Idiomas disponibles <span class="text-muted">(uno por línea)</span>
+                        </label>
+                        <textarea class="form-control" id="quickEstablishmentExperienciaLanguages" 
+                                  rows="3"
+                                  placeholder="Español&#10;Inglés&#10;Francés&#10;Alemán"
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-world me-1"></i>Escriba cada idioma en una línea nueva • Se mostrarán como lista</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="quickAddEstablishmentExperienceSaveBtn">
+                    <i class="ti ti-check me-1"></i>Guardar Experiencia
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Establishment Creation/Edit Modal -->
+<div class="modal fade" id="establishmentModal" tabindex="-1" aria-labelledby="establishmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);">
+                <h5 class="modal-title text-white" id="establishmentModalLabel">
+                    <i class="ti ti-building me-2"></i><span id="establishmentModalTitle">Crear Nuevo Establecimiento</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="establishmentModalAlerts"></div>
+
+                <form id="establishmentForm">
+                    <input type="hidden" id="establishmentId">
+                    <input type="hidden" id="establishmentType" value="Establishment">
+
+                    <!-- Nombre -->
+                    <div class="mb-3">
+                        <label for="establishmentName" class="form-label">
+                            Nombre del Establecimiento <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="establishmentName" name="name" required maxlength="200" placeholder="Ej: Restaurante Casa de María">
+                        <div class="form-text">Nombre comercial del establecimiento (máximo 200 caracteres)</div>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="mb-3">
+                        <label for="establishmentDescription" class="form-label">
+                            Descripción <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" id="establishmentDescription" name="description" rows="4" required placeholder="Descripción detallada del establecimiento y sus servicios..."></textarea>
+                        <div class="form-text">Descripción completa del establecimiento</div>
+                    </div>
+
+                    <!-- Destino (Optional) -->
+                    <div class="mb-3">
+                        <label for="establishmentDestino" class="form-label">
+                            Destino <small class="text-muted">(Opcional)</small>
+                        </label>
+                        <select class="form-control" id="establishmentDestino" name="destinationPOI">
+                            <option value="">Seleccione un destino...</option>
+                            <!-- Dynamically populated with POI data -->
+                        </select>
+                        <div class="form-text">Punto de interés o destino principal asociado con este establecimiento</div>
+                    </div>
+
+                    <!-- Sección: Experiencias del Establecimiento -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #f59e0b;">
+                            <i class="ti ti-sparkles me-1"></i>
+                            Experiencias del Establecimiento
+                        </h6>
+                        
+                        <div class="alert alert-info" role="alert">
+                            <i class="ti ti-info-circle me-2"></i>
+                            <small>Agregue las diferentes experiencias/servicios que ofrece este establecimiento. Cada experiencia es editable directamente.</small>
+                        </div>
+                        
+                        <!-- Lista de experiencias editables inline -->
+                        <div id="establishmentExperienciasList" class="mb-3">
+                            <div id="noEstablishmentExperienciasMessage" class="text-center text-muted py-3 border rounded bg-light">
+                                <i class="ti ti-package-off fs-4 d-block mb-2"></i>
+                                <p class="mb-0">No hay experiencias agregadas</p>
+                                <small class="text-muted">Use el botón de abajo para agregar la primera experiencia</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Botón para agregar nueva experiencia -->
+                        <button type="button" class="btn btn-sm" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); color: white;" id="addEstablishmentExperienciaBtn">
+                            <i class="ti ti-plus me-1"></i>Agregar Nueva Experiencia
+                        </button>
+                    </div>
+
+                    <!-- Hidden fields for compatibility -->
+                    <input type="hidden" id="establishmentProviderType" name="providerType" value="">
+                    <input type="hidden" id="establishmentDuration" name="duration" value="">
+                    <input type="hidden" id="establishmentMinPeople" name="min_people" value="">
+                    <input type="hidden" id="establishmentCost" name="cost" value="0">
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); color: white;" id="saveEstablishmentBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveEstablishmentButtonText">Crear Establecimiento</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template para experiencia de establecimiento editable inline -->
+<template id="establishmentExperienciaEditableTemplate">
+    <div class="experiencia-editable card mb-3 border-warning border-opacity-25" data-index="" data-id="">
+        <div class="card-body p-3">
+            <!-- Fila principal: Nombre y Tipo -->
+            <div class="row mb-2">
+                <div class="col-md-7">
+                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Nombre <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control experiencia-name-input" required maxlength="200" 
+                           placeholder="Ej: Cena Romántica VIP">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Tipo</label>
+                    <select class="form-select form-select experiencia-tipo-input">
+                        <option value="">Seleccionar</option>
+                        <option value="Exclusivo">Exclusivo</option>
+                        <option value="Compartido">Compartido</option>
+                        <option value="Privado">Privado</option>
+                    </select>
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn w-100" title="Eliminar experiencia">
+                        <i class="ti ti-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Descripción -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Descripción <span class="text-danger">*</span></label>
+                <textarea class="form-control experiencia-description-input" rows="2" required
+                          placeholder="Descripción detallada de lo que incluye esta experiencia..."></textarea>
+            </div>
+            
+            <!-- Todos los precios en una fila -->
+            <div class="row mb-2">
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Precio Adulto <span class="text-danger">*</span></label>
+                    <div class="input-group input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control experiencia-price-input" required min="0" step="0.01" 
+                               placeholder="0.00">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Precio Adulto Sin Alcohol</label>
+                    <div class="input-group input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control experiencia-price-no-alcohol-input" min="0" step="0.01" 
+                               placeholder="0.00">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Precio Niño</label>
+                    <div class="input-group input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control experiencia-price-child-input" min="0" step="0.01" 
+                               placeholder="0.00">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Campos de tiempo en una fila -->
+            <div class="row mb-2">
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Duración (hrs)</label>
+                    <input type="number" class="form-control experiencia-duration-input" min="0" step="0.5" 
+                           placeholder="2.5">
+                    <div class="form-text">
+                        <small>Tiempo total experiencia</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Duración Trayecto (min)</label>
+                    <input type="number" class="form-control experiencia-travel-duration-input" min="0" step="1" 
+                           placeholder="60">
+                    <div class="form-text">
+                        <small>Tiempo traslado</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Tiempo Anticipación (min)</label>
+                    <input type="number" class="form-control experiencia-advance-minutes-input" 
+                           min="0" step="1" placeholder="1440">
+                    <div class="form-text">
+                        <small>Ej: 1440 = 24hrs</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Campos de personas -->
+            <div class="row mb-2">
+                <div class="col-md-6">
+                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Mín. Personas</label>
+                    <input type="number" class="form-control experiencia-min-people-input" min="1" step="1" 
+                           placeholder="1">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Máx. Personas</label>
+                    <input type="number" class="form-control experiencia-max-people-input" min="1" step="1" 
+                           placeholder="10">
+                </div>
+            </div>
+            
+            <!-- Incluye y No Incluye en 2 columnas -->
+            <div class="row">
+                <div class="col-md-6">
+                    <!-- Incluye -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                            Incluye <span class="text-muted">(uno por línea)</span>
+                        </label>
+                        <textarea class="form-control experiencia-includes-input" 
+                                  rows="4"
+                                  placeholder="Cena de 3 tiempos&#10;Bebidas incluidas&#10;Mesa preferencial&#10;Música en vivo&#10;Postres especiales"
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-info-circle me-1"></i>Cada elemento en una línea nueva</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <!-- No Incluye -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                            No incluye <span class="text-muted">(uno por línea)</span>
+                        </label>
+                        <textarea class="form-control experiencia-notincludes-input" 
+                                  rows="4"
+                                  placeholder="Propinas&#10;Transporte al lugar&#10;Bebidas premium&#10;Entretenimiento adicional"
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-alert-circle me-1"></i>Cada exclusión en una línea nueva</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Idiomas disponibles -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                    <i class="ti ti-language me-1"></i>Idiomas disponibles <span class="text-muted">(uno por línea)</span>
+                </label>
+                <textarea class="form-control experiencia-languages-input" 
+                          rows="3"
+                          placeholder="Español&#10;Inglés&#10;Francés"
+                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                <div class="form-text">
+                    <small><i class="ti ti-world me-1"></i>Escriba cada idioma en una línea nueva • Se mostrarán como lista</small>
+                </div>
+            </div>
+            
+            <!-- Disponibilidad compacta -->
+            <div class="availability-section">
+                <!-- Availability Summary View (default) -->
+                <div class="availability-summary">
+                    <label class="form-label form-label-sm fw-medium d-flex justify-content-between align-items-center" style="color: #f59e0b;">
+                        <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
+                        <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Configurar horarios" style="color: #f59e0b;">
+                            <i class="ti ti-settings"></i>
+                        </button>
+                    </label>
+                    <div class="availability-display bg-light border rounded p-2" style="min-height: 35px;">
+                        <small style="color: #f59e0b;">
+                            <i class="ti ti-check-circle me-1"></i>
+                            <span class="availability-status">Disponible todos los días</span>
+                        </small>
+                    </div>
+                </div>
+                
+                <!-- Availability Configuration View (hidden by default) -->
+                <div class="availability-content" style="display: none;">
+                    <label class="form-label form-label-sm fw-medium d-flex justify-content-between align-items-center" style="color: #f59e0b;">
+                        <span>Configurar Disponibilidad</span>
+                        <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Cerrar configuración" style="color: #f59e0b;">
+                            <i class="ti ti-x"></i>
+                        </button>
+                    </label>
+                    <div class="mb-2">
+                        <div class="d-flex gap-1 flex-wrap experiencia-available-days-container">
+                            <button type="button" class="btn btn-outline-warning btn-sm day-btn" data-day="1" data-day-name="Lunes">Lu</button>
+                            <button type="button" class="btn btn-outline-warning btn-sm day-btn" data-day="2" data-day-name="Martes">Ma</button>
+                            <button type="button" class="btn btn-outline-warning btn-sm day-btn" data-day="3" data-day-name="Miércoles">Mi</button>
+                            <button type="button" class="btn btn-outline-warning btn-sm day-btn" data-day="4" data-day-name="Jueves">Ju</button>
+                            <button type="button" class="btn btn-outline-warning btn-sm day-btn" data-day="5" data-day-name="Viernes">Vi</button>
+                            <button type="button" class="btn btn-outline-warning btn-sm day-btn" data-day="6" data-day-name="Sábado">Sa</button>
+                            <button type="button" class="btn btn-outline-warning btn-sm day-btn" data-day="0" data-day-name="Domingo">Do</button>
+                        </div>
+                    </div>
+                    
+                    <div class="experiencia-selected-schedule-days mb-2"></div>
+                    
+                    <div class="experiencia-no-days-selected text-center text-muted py-2 border rounded bg-light" style="font-size: 1rem;">
+                        <i class="ti ti-calendar-off me-1"></i>
+                        <small>Selecciona días para configurar horarios</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Fotos de la experiencia -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                    Fotos <span class="text-muted">(Opcional)</span>
+                </label>
+                <div class="experience-photos-container">
+                    <!-- Photo upload section -->
+                    <div class="row g-2 mb-2 photos-preview-container">
+                        <!-- Uploaded photos will be displayed here -->
+                    </div>
+                    
+                    <!-- Add photo button -->
+                    <div class="d-grid">
+                        <button type="button" class="btn btn-outline-warning btn-sm add-photo-btn">
+                            <i class="ti ti-camera-plus me-1"></i>
+                            Agregar Foto
+                        </button>
+                    </div>
+                    
+                    <!-- Hidden file input -->
+                    <input type="file" 
+                           class="d-none experience-photo-input" 
+                           accept=".jpg,.jpeg,.png,.webp" 
+                           multiple>
+                </div>
+                <div class="form-text">
+                    <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small>
+                </div>
+            </div>
+
+            <!-- Notas (4 campos) -->
+            <div class="row">
+                <div class="col-md-6">
+                    <!-- Notas internas -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                            <i class="ti ti-notes me-1"></i>Notas internas <span class="text-muted">(Uso interno)</span>
+                        </label>
+                        <textarea class="form-control experiencia-internal-notes-input" 
+                                  rows="3"
+                                  placeholder="Notas para uso exclusivo interno del equipo..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-eye-off me-1"></i>Solo visible para el equipo interno</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Notas del proveedor -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                            <i class="ti ti-building me-1"></i>Notas del establecimiento <span class="text-muted">(Del establecimiento)</span>
+                        </label>
+                        <textarea class="form-control experiencia-provider-notes-input" 
+                                  rows="3"
+                                  placeholder="Notas e instrucciones proporcionadas por el establecimiento..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-info-circle me-1"></i>Información del establecimiento</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <!-- Notas de reserva del cliente -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                            <i class="ti ti-user me-1"></i>Notas reserva cliente <span class="text-muted">(Visible cliente)</span>
+                        </label>
+                        <textarea class="form-control experiencia-client-booking-notes-input" 
+                                  rows="3"
+                                  placeholder="Instrucciones y notas visibles para el cliente al reservar..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-eye me-1"></i>Mostrado al cliente durante la reserva</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Notas del equipo -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                            <i class="ti ti-users me-1"></i>Notas del equipo <span class="text-muted">(Operaciones)</span>
+                        </label>
+                        <textarea class="form-control experiencia-team-notes-input" 
+                                  rows="3"
+                                  placeholder="Notas para coordinación y operación del equipo..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-clipboard me-1"></i>Para coordinación operativa</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+(function() {
+    function initEstablishmentsDataTable() {
+        // Check if jQuery and DataTables are available
+        if (typeof $ === 'undefined') {
+            console.log('⏳ jQuery not yet available, retrying...');
+            setTimeout(initEstablishmentsDataTable, 100);
+            return;
+        }
+        
+        if (typeof $.fn.DataTable === 'undefined') {
+            console.log('⏳ DataTables not yet available, retrying...');
+            setTimeout(initEstablishmentsDataTable, 100);
+            return;
+        }
+        
+        console.log('🏢 Initializing Establishments DataTable...');
+
+        // CRITICAL: Track pending requests to prevent race conditions
+        let pendingEstablishmentRequests = {
+            establishment: null,
+            experiences: null
+        };
+        
+        // Modal state tracking to prevent cross-contamination
+        let currentModalState = {
+            mode: null, // 'edit' or 'create'
+            establishmentId: null,
+            isOpen: false,
+            sessionId: null // Unique session ID for each modal opening
+        };
+
+        // Initialize variables (following providers table pattern)
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showActions = <%= dtShowActions %>;
+        const canEdit = <%= canEdit %>;
+        const canDelete = <%= canDelete %>;
+
+        // DataTable initialization with type=Establishment filter
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: apiEndpoint + '?type=Establishment&includeInactive=true', // Show all establishments in admin
+                type: 'GET',
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Error loading establishments:', error);
+                    showErrorAlert('Error al cargar los establecimientos. Por favor, intente nuevamente.');
+                }
+            },
+        columns: [
+            // Nombre
+            {
+                data: 'name',
+                orderable: true,
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        const truncatedName = data.length > 30 ? data.substring(0, 30) + '...' : data;
+                        return `<div class="fw-medium">${truncatedName}</div>`;
+                    }
+                    return data;
+                }
+            },
+            // Descripción
+            {
+                data: 'description',
+                orderable: false,
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        if (!data) return '<span class="text-muted">Sin descripción</span>';
+                        const truncatedDesc = data.length > 50 ? data.substring(0, 50) + '...' : data;
+                        return `<small class="text-muted">${truncatedDesc}</small>`;
+                    }
+                    return data || '';
+                }
+            },
+            // Experiencias count
+            {
+                data: 'experienciasCount',
+                orderable: true,
+                render: function(data) {
+                    return `<span class="badge bg-primary">${data || 0}</span>`;
+                }
+            },
+            // Última actualización
+            {
+                data: 'updatedAt',
+                orderable: true,
+                render: function(data) {
+                    if (!data) return '<span class="text-muted">-</span>';
+                    const date = new Date(data);
+                    const formattedDate = date.toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                    const formattedTime = date.toLocaleTimeString('es-ES', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    return `<small class="text-muted">${formattedDate}<br>${formattedTime}</small>`;
+                }
+            },
+            // Estado
+            {
+                data: 'active',
+                orderable: false,
+                render: function(data) {
+                    return data
+                        ? '<span class="badge bg-success">Activo</span>'
+                        : '<span class="badge bg-warning">Inactivo</span>';
+                }
+            },
+            ...(showActions ? [{
+                data: null,
+                orderable: false,
+                className: 'text-center',
+                render: function(data, type, row) {
+                    let actions = '<div class="btn-group btn-group-sm" role="group">';
+                    
+                    if (canEdit) {
+                        // Edit button - Primary blue (matches providers)
+                        actions += `<button type="button"
+                                        class="btn btn-primary edit-establishment-btn"
+                                        data-id="${row.id}"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Editar Establecimiento">
+                                        <i class="ti ti-edit"></i>
+                                    </button>`;
+
+                        // Add Experience button - Success green (matches providers)  
+                        actions += `<button type="button"
+                                        class="btn btn-success quick-add-establishment-experience-btn"
+                                        data-id="${row.id}"
+                                        data-name="${row.name}"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Agregar Experiencia Rápida">
+                                        <i class="ti ti-plus"></i>
+                                    </button>`;
+
+                        // Manage Images button - Secondary gray (matches providers)
+                        actions += `<button type="button"
+                                        class="btn btn-secondary manage-establishment-images-btn"
+                                        data-id="${row.id}"
+                                        data-name="${row.name}"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Gestionar Imágenes">
+                                        <i class="ti ti-photo"></i>
+                                    </button>`;
+
+                        // Toggle Status button - Warning/Success with archive icons (matches providers)
+                        const statusIcon = row.active ? 'ti-archive' : 'ti-archive-off';
+                        const statusTitle = row.active ? 'Desactivar Establecimiento' : 'Activar Establecimiento';
+                        const statusClass = row.active ? 'btn-warning' : 'btn-success';
+
+                        actions += `<button type="button"
+                                        class="btn ${statusClass} toggle-establishment-status-btn"
+                                        data-id="${row.id}"
+                                        data-current-status="${row.active}"
+                                        data-name="${row.name}"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="${statusTitle}">
+                                        <i class="ti ${statusIcon}"></i>
+                                    </button>`;
+                    }
+
+                    if (canDelete) {
+                        // Delete button - Danger red (matches providers)
+                        actions += `<button type="button"
+                                        class="btn btn-danger delete-establishment-btn"
+                                        data-id="${row.id}"
+                                        data-name="${row.name}"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Eliminar Establecimiento">
+                                        <i class="ti ti-trash"></i>
+                                    </button>`;
+                    }
+
+                    actions += '</div>';
+                    return actions;
+                }
+            }] : [])
+        ],
+        order: [[3, 'desc']], // Order by last updated
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        language: {
+            url: '/assets/vendor/datatables/es-ES.json'
+        },
+        responsive: true,
+        drawCallback: function() {
+            // Initialize tooltips
+            $('[data-bs-toggle="tooltip"]').tooltip();
+            console.log('✅ Establishments DataTable drawn successfully');
+        }
+        });
+
+        // Edit establishment
+        $(`#${tableId}`).on('click', '.edit-establishment-btn', function() {
+            const establishmentId = $(this).data('id');
+            console.log('📝 Edit establishment:', establishmentId);
+            loadEstablishmentData(establishmentId);
+        });
+
+        // Toggle establishment status
+        $(`#${tableId}`).on('click', '.toggle-establishment-status-btn', function() {
+            const establishmentId = $(this).data('id');
+            const establishmentName = $(this).data('name');
+            const currentStatus = $(this).data('current-status');
+            const newStatus = !currentStatus;
+            const actionText = newStatus ? 'activar' : 'desactivar';
+            
+            console.log(`🔄 Toggle establishment ${establishmentId}: ${actionText}`);
+            
+            // Show confirmation
+            if (confirm(`¿Está seguro de que desea ${actionText} este establecimiento?`)) {
+                $.ajax({
+                    url: `${apiEndpoint}/${establishmentId}`,
+                    type: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ active: newStatus }),
+                    success: function(response) {
+                        if (response.success) {
+                            dataTable.ajax.reload(null, false);
+                            showSuccessAlert(`Establecimiento ${actionText}do exitosamente`);
+                        }
+                    },
+                    error: function(xhr) {
+                        const error = xhr.responseJSON?.error || 'Error al cambiar el estado del establecimiento';
+                        showErrorAlert(error);
+                    }
+                });
+            }
+        });
+
+        // Quick add establishment experience
+        $(`#${tableId}`).on('click', '.quick-add-establishment-experience-btn', function() {
+            const establishmentId = $(this).data('id');
+            const establishmentName = $(this).data('name');
+            console.log('➕ Quick add experience for establishment:', establishmentId, establishmentName);
+            openQuickAddEstablishmentExperienceModal(establishmentId, establishmentName);
+        });
+
+        // Manage establishment images
+        $(`#${tableId}`).on('click', '.manage-establishment-images-btn', function() {
+            const establishmentId = $(this).data('id');
+            const establishmentName = $(this).data('name');
+            console.log('📸 Manage images for establishment:', establishmentId, establishmentName);
+            
+            // Open the experience images modal (same as providers)
+            if (typeof window.openExperienceImagesModal === 'function') {
+                window.openExperienceImagesModal(establishmentId, establishmentName);
+            } else {
+                console.error('❌ openExperienceImagesModal function not found');
+                showErrorAlert('Error: Función de gestión de imágenes no disponible');
+            }
+        });
+
+        // Delete establishment
+        $(`#${tableId}`).on('click', '.delete-establishment-btn', function() {
+            const establishmentId = $(this).data('id');
+            const establishmentName = $(this).data('name');
+            console.log('🗑️ Delete establishment:', establishmentId, establishmentName);
+            
+            if (confirm(`¿Está seguro que desea eliminar el establecimiento "${establishmentName}"? Esta acción no se puede deshacer.`)) {
+                // Disable the button to prevent double-clicks
+                const btn = $(this);
+                const originalHtml = btn.html();
+                btn.prop('disabled', true).html('<i class="ti ti-loader"></i>');
+                
+                $.ajax({
+                    url: `/api/experiences/${establishmentId}`,
+                    method: 'DELETE',
+                    success: function(response) {
+                        console.log('✅ Establishment deleted successfully:', response);
+                        dataTable.ajax.reload(null, false);
+                        showSuccessAlert(`Establecimiento "${establishmentName}" eliminado exitosamente`);
+                    },
+                    error: function(xhr) {
+                        console.error('❌ Error deleting establishment:', xhr);
+                        const error = xhr.responseJSON?.error || 'Error al eliminar el establecimiento';
+                        showErrorAlert(error);
+                    },
+                    complete: function() {
+                        // Re-enable button
+                        btn.prop('disabled', false).html(originalHtml);
+                    }
+                });
+            }
+        });
+
+        // Create new establishment
+        $('#createEstablishmentBtn').on('click', function() {
+            console.log('➕ Create new establishment');
+            openEstablishmentModal();
+        });
+
+        // Add new establishment experience
+        $('#addEstablishmentExperienciaBtn').on('click', function() {
+            console.log('➕ Adding new establishment experience');
+            addEstablishmentExperiencia();
+        });
+
+        // CRITICAL: Modal close event listeners to reset state and cancel requests
+        $('#establishmentModal').on('hidden.bs.modal', function() {
+            console.log('🚫 Modal closed - resetting state and cancelling requests');
+            
+            // Cancel any pending requests
+            if (pendingEstablishmentRequests.establishment) {
+                console.log('🚨 Cancelling pending establishment request on modal close');
+                pendingEstablishmentRequests.establishment.abort();
+                pendingEstablishmentRequests.establishment = null;
+            }
+            if (pendingEstablishmentRequests.experiences) {
+                console.log('🚨 Cancelling pending experiences request on modal close');
+                pendingEstablishmentRequests.experiences.abort();
+                pendingEstablishmentRequests.experiences = null;
+            }
+            
+            // Reset modal state
+            currentModalState = {
+                mode: null,
+                establishmentId: null,
+                isOpen: false,
+                sessionId: null
+            };
+            
+            console.log('✅ Modal state reset:', currentModalState);
+        });
+
+        // Event delegation for experience management
+        $(document).on('click', '.delete-experiencia-btn', function() {
+            const experienciaCard = $(this).closest('.experiencia-editable');
+            const index = experienciaCard.data('index');
+            console.log('🗑️ Deleting establishment experience:', index);
+            
+            experienciaCard.fadeOut(300, function() {
+                $(this).remove();
+                updateEstablishmentNoExperienciasMessage();
+            });
+        });
+
+        // Toggle availability configuration
+        $(document).on('click', '.toggle-availability-btn', function(e) {
+            e.preventDefault();
+            const availabilitySection = $(this).closest('.availability-section');
+            const summaryView = availabilitySection.find('.availability-summary');
+            const contentView = availabilitySection.find('.availability-content');
+            
+            summaryView.toggle();
+            contentView.toggle();
+        });
+
+        // Day selection for availability
+        $(document).on('click', '.day-btn', function(e) {
+            e.preventDefault();
+            const button = $(this);
+            const isSelected = button.hasClass('btn-warning');
+            
+            if (isSelected) {
+                button.removeClass('btn-warning').addClass('btn-outline-warning');
+            } else {
+                button.removeClass('btn-outline-warning').addClass('btn-warning');
+            }
+            
+            updateEstablishmentSelectedDays(button.closest('.availability-section'));
+        });
+
+        // Add time slot
+        $(document).on('click', '.add-slot-btn', function(e) {
+            e.preventDefault();
+            const container = $(this).siblings('.time-slots-container');
+            const newSlot = `
+                <div class="time-slot d-flex gap-2 mb-1">
+                    <input type="time" class="form-control form-control-sm start-time" value="09:00">
+                    <span class="align-self-center">a</span>
+                    <input type="time" class="form-control form-control-sm end-time" value="18:00">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-slot-btn">
+                        <i class="ti ti-minus"></i>
+                    </button>
+                </div>
+            `;
+            container.append(newSlot);
+        });
+
+        // Remove time slot
+        $(document).on('click', '.remove-slot-btn', function(e) {
+            e.preventDefault();
+            const timeSlot = $(this).closest('.time-slot');
+            const container = timeSlot.closest('.time-slots-container');
+            
+            if (container.find('.time-slot').length > 1) {
+                timeSlot.remove();
+            } else {
+                showErrorAlert('Debe mantener al menos un horario por día');
+            }
+        });
+
+        // Remove day schedule
+        $(document).on('click', '.remove-day-btn', function(e) {
+            e.preventDefault();
+            const dayNumber = $(this).data('day');
+            const daySchedule = $(this).closest('.day-schedule');
+            const availabilitySection = daySchedule.closest('.availability-section');
+            
+            // Remove the day schedule
+            daySchedule.remove();
+            
+            // Unselect the day button
+            availabilitySection.find(`.day-btn[data-day="${dayNumber}"]`)
+                .removeClass('btn-warning').addClass('btn-outline-warning');
+            
+            // Update display
+            updateEstablishmentSelectedDays(availabilitySection);
+        });
+
+        // Photo upload event handlers
+        $(document).on('click', '.add-photo-btn', function(e) {
+            e.preventDefault();
+            $(this).closest('.experience-photos-container').find('.experience-photo-input').click();
+        });
+
+        $(document).on('change', '.experience-photo-input', function() {
+            const card = $(this).closest('.experiencia-editable');
+            const files = this.files;
+            const previewContainer = card.find('.photos-preview-container');
+            
+            // Process each selected file
+            Array.from(files).forEach(file => {
+                // Validate file type
+                if (!file.type.match(/^image\/(jpeg|jpg|png|webp)$/)) {
+                    showErrorAlert(`La imagen "${file.name}" no tiene un formato válido.`);
+                    return;
+                }
+
+                // Create preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    addEstablishmentPhotoPreview(previewContainer, file, e.target.result);
+                };
+                reader.readAsDataURL(file);
+            });
+            
+            // Clear the input so same file can be selected again
+            $(this).val('');
+        });
+
+        // Remove photo handler
+        $(document).on('click', '.remove-photo-btn', function(e) {
+            e.preventDefault();
+            $(this).closest('.photo-preview').fadeOut(300, function() {
+                $(this).remove();
+            });
+        });
+
+        // Save establishment experience handler
+        $('#quickAddEstablishmentExperienceSaveBtn').on('click', function() {
+        console.log('💾 Saving establishment experience...');
+        
+        const establishmentId = $('#quickAddEstablishmentId').val();
+        const formData = {
+            name: $('#quickEstablishmentExperienciaName').val().trim(),
+            description: $('#quickEstablishmentExperienciaDescription').val().trim(),
+            price: parseFloat($('#quickEstablishmentExperienciaPrice').val()) || 0,
+            price_no_alcohol: parseFloat($('#quickEstablishmentExperienciaPriceNoAlcohol').val()) || null,
+            price_child: parseFloat($('#quickEstablishmentExperienciaPriceChild').val()) || null,
+            duration: parseFloat($('#quickEstablishmentExperienciaDuration').val()) || null,
+            travel_duration: parseInt($('#quickEstablishmentExperienciaTravelDuration').val()) || null,
+            advance_booking_time: parseInt($('#quickEstablishmentExperienciaAdvanceTime').val()) || null,
+            min_people: parseInt($('#quickEstablishmentExperienciaMinPeople').val()) || null,
+            max_people: parseInt($('#quickEstablishmentExperienciaMaxPeople').val()) || null,
+            tipo: $('#quickEstablishmentExperienciaTipo').val() || null
+        };
+        
+        // Process arrays
+        const includes = $('#quickEstablishmentExperienciaIncludes').val().trim();
+        if (includes) {
+            formData.includes = includes.split('\n').filter(item => item.trim()).map(item => item.trim());
+        }
+        
+        const notIncludes = $('#quickEstablishmentExperienciaNotIncludes').val().trim();
+        if (notIncludes) {
+            formData.notincludes = notIncludes.split('\n').filter(item => item.trim()).map(item => item.trim());
+        }
+        
+        const languages = $('#quickEstablishmentExperienciaLanguages').val().trim();
+        if (languages) {
+            formData.languages = languages.split('\n').filter(item => item.trim()).map(item => item.trim());
+        }
+        
+        // Validate required fields
+        if (!formData.name) {
+            showEstablishmentModalError('El nombre es obligatorio');
+            return;
+        }
+        
+        if (!formData.description) {
+            showEstablishmentModalError('La descripción es obligatoria');
+            return;
+        }
+        
+        if (formData.price <= 0) {
+            showEstablishmentModalError('El precio debe ser mayor a 0');
+            return;
+        }
+        
+        // Validate min/max people
+        if (formData.min_people && formData.max_people && formData.min_people > formData.max_people) {
+            showEstablishmentModalError('El mínimo de personas no puede ser mayor al máximo');
+            return;
+        }
+        
+        console.log('📤 Sending establishment experience data:', formData);
+        
+        // Disable save button
+        const saveBtn = $('#quickAddEstablishmentExperienceSaveBtn');
+        const originalText = saveBtn.html();
+        saveBtn.prop('disabled', true).html('<i class="ti ti-loader me-1"></i>Guardando...');
+        
+        // Save via API
+        $.ajax({
+            url: `/api/providers/${establishmentId}/experiencias`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                console.log('✅ Establishment experience saved successfully:', response);
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('quickAddEstablishmentExperienceModal'));
+                modal.hide();
+                
+                // Reload table
+                dataTable.ajax.reload(null, false);
+                
+                // Show success message
+                showSuccessAlert('Experiencia agregada exitosamente');
+            },
+            error: function(xhr) {
+                console.error('❌ Error saving establishment experience:', xhr);
+                const error = xhr.responseJSON?.error || 'Error al guardar la experiencia';
+                showEstablishmentModalError(error);
+            },
+            complete: function() {
+                // Re-enable save button
+                saveBtn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+
+        // Save establishment handler
+        $('#saveEstablishmentBtn').on('click', async function() {
+            console.log('💾 Saving establishment...');
+            
+            // CRITICAL: Validate modal state before saving
+            if (!currentModalState.isOpen) {
+                console.error('🚨 Modal not open - refusing to save');
+                showEstablishmentError('Error: Modal no está abierto. Recargue la página e inténtelo de nuevo.');
+                return;
+            }
+            
+            if (!currentModalState.mode) {
+                console.error('🚨 Invalid modal mode - refusing to save', currentModalState);
+                showEstablishmentError('Error: Modo de modal inválido. Recargue la página e inténtelo de nuevo.');
+                return;
+            }
+            
+            const establishmentId = $('#establishmentId').val();
+            const isEdit = !!establishmentId;
+            
+            // CRITICAL: Enhanced modal state validation using modal state instead of form field
+            if (currentModalState.mode === 'create') {
+                // Creating new establishment - establishmentId should be null in modal state
+                if (currentModalState.establishmentId !== null) {
+                    console.error('🚨 Create mode but modal has establishmentId!', {
+                        modalState: currentModalState,
+                        formEstablishmentId: establishmentId
+                    });
+                    showEstablishmentError('Error: Estado inconsistente en modo crear. Cierre el modal y vuelva a intentarlo.');
+                    return;
+                }
+                console.log('✅ Create mode validation passed');
+            } else if (currentModalState.mode === 'edit') {
+                // Editing existing establishment - modal should have establishmentId
+                if (!currentModalState.establishmentId) {
+                    console.error('🚨 Edit mode but modal has no establishmentId!', {
+                        modalState: currentModalState,
+                        formEstablishmentId: establishmentId
+                    });
+                    showEstablishmentError('Error: Estado inconsistente en modo editar. Cierre el modal y vuelva a intentarlo.');
+                    return;
+                }
+                
+                // Ensure form establishmentId matches modal state for edit operations
+                if (establishmentId !== currentModalState.establishmentId) {
+                    console.error('🚨 Form establishmentId mismatch with modal state!', {
+                        modalEstablishmentId: currentModalState.establishmentId,
+                        formEstablishmentId: establishmentId
+                    });
+                    showEstablishmentError('Error: ID de establecimiento no coincide. Cierre el modal y vuelva a intentarlo.');
+                    return;
+                }
+                console.log('✅ Edit mode validation passed');
+            } else {
+                console.error('🚨 Unknown modal mode!', currentModalState);
+                showEstablishmentError('Error: Modo de modal desconocido. Cierre el modal y vuelva a intentarlo.');
+                return;
+            }
+            
+            const formData = {
+                name: $('#establishmentName').val().trim(),
+                description: $('#establishmentDescription').val().trim(),
+                type: 'Establishment',
+                cost: 0,
+                active: true,
+                exists: true
+            };
+            
+            // Add destinationPOI if selected
+            const destinationPOIId = $('#establishmentDestino').val();
+            if (destinationPOIId && destinationPOIId.trim() !== '') {
+                formData.destinationPOI = destinationPOIId.trim();
+                console.log('📍 Including destinationPOI in form data:', destinationPOIId);
+            }
+
+            // Collect establishment experiences data (save separately, not in main payload)
+            const experienciasData = collectEstablishmentExperienciasData();
+            
+            // CRITICAL SAFETY CHECK: Validate experience ownership
+            if (experienciasData.length > 0) {
+                const suspiciousExperiences = experienciasData.filter(exp => 
+                    exp.id && exp.originalProviderId && exp.originalProviderId !== establishmentId && isEdit
+                );
+                
+                if (suspiciousExperiences.length > 0) {
+                    console.error('🚨 CRITICAL: Cross-establishment experience contamination detected!', {
+                        currentEstablishmentId: establishmentId,
+                        suspiciousExperiences: suspiciousExperiences.map(exp => ({
+                            id: exp.id,
+                            name: exp.name,
+                            originalProviderId: exp.originalProviderId
+                        }))
+                    });
+                    
+                    showEstablishmentError(`ERROR CRÍTICO: Se detectaron experiencias de otros establecimientos. Por favor, recargue la página y vuelva a intentarlo.`);
+                    return;
+                }
+            }
+            
+            // Declare experience arrays in broader scope to avoid ReferenceError
+            let newExps = [];
+            let existingExps = [];
+            
+            // Validate required fields
+            if (!formData.name) {
+                showEstablishmentError('El nombre es obligatorio');
+                return;
+            }
+            
+            if (!formData.description) {
+                showEstablishmentError('La descripción es obligatoria');
+                return;
+            }
+
+            // Validate experiences if any are present
+            for (let i = 0; i < experienciasData.length; i++) {
+                const exp = experienciasData[i];
+                if (!exp.name) {
+                    showEstablishmentError(`La experiencia #${i + 1} debe tener un nombre`);
+                    return;
+                }
+                if (!exp.description) {
+                    showEstablishmentError(`La experiencia #${i + 1} debe tener una descripción`);
+                    return;
+                }
+                if (exp.price <= 0) {
+                    showEstablishmentError(`La experiencia #${i + 1} debe tener un precio mayor a 0`);
+                    return;
+                }
+            }
+            
+            // Check for duplicate names within the same establishment (current form data)
+            const experienceNames = experienciasData.map(exp => exp.name.toLowerCase().trim());
+            const uniqueNames = [...new Set(experienceNames)];
+            if (experienceNames.length !== uniqueNames.length) {
+                showEstablishmentError('No se permiten experiencias con el mismo nombre en el mismo establecimiento');
+                return;
+            }
+
+            // Separate new and existing experiences for proper conflict detection
+            const newExperiences = experienciasData.filter(exp => !exp.id);
+            const existingExperiences = experienciasData.filter(exp => exp.id);
+            
+            console.log('📊 Experience analysis:', {
+                total: experienciasData.length,
+                new: newExperiences.length,
+                existing: existingExperiences.length,
+                isEdit,
+                establishmentId
+            });
+            
+            // Check for conflicts only with new experiences
+            if (newExperiences.length > 0 && isEdit) {
+                console.log('🔍 Checking conflicts for new experiences only...', {
+                    newExperienceNames: newExperiences.map(exp => exp.name)
+                });
+                
+                try {
+                    showEstablishmentInfo('Verificando nombres de experiencias nuevas...');
+                    
+                    const existingResponse = await $.ajax({
+                        url: `/api/providers/${establishmentId}/experiencias`,
+                        type: 'GET'
+                    });
+                    
+                    console.log('📋 Server existing experiences:', existingResponse);
+                    
+                    if (existingResponse.success && existingResponse.data) {
+                        const serverExistingExperiences = existingResponse.data;
+                        const serverExistingNames = serverExistingExperiences.map(exp => exp.name.toLowerCase().trim());
+                        
+                        console.log('📝 Server existing experience names:', serverExistingNames);
+                        
+                        for (const newExp of newExperiences) {
+                            const newExpName = newExp.name.toLowerCase().trim();
+                            if (serverExistingNames.includes(newExpName)) {
+                                console.log('❌ Conflict detected:', newExpName, 'already exists on server');
+                                showEstablishmentError(`Ya existe una experiencia llamada "${newExp.name}" en este establecimiento. Por favor, cambie el nombre.`);
+                                return;
+                            }
+                        }
+                        
+                        console.log('✅ No naming conflicts found for new experiences');
+                        $('#establishmentModalAlerts .alert-info').fadeOut(); // Remove info message
+                    }
+                } catch (error) {
+                    console.error('❌ Error checking existing experiences:', error);
+                    // Show warning but continue - server will handle conflicts
+                    showEstablishmentWarning('No se pudo verificar conflictos de nombres. El servidor validará al guardar.');
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // Give user time to read
+                }
+            } else if (newExperiences.length > 0) {
+                console.log('🆕 Create mode: will check conflicts on server during save');
+            } else {
+                console.log('✅ Only existing experiences being updated - no conflict check needed');
+            }
+            
+            console.log('📤 Sending establishment data:', formData);
+            
+            // Check if there are images to optimize
+            let totalImagesToOptimize = 0;
+            experienciasData.forEach(exp => {
+                if (exp.photos && exp.photos.length > 0) {
+                    exp.photos.forEach(photo => {
+                        if (photo.dataUrl && photo.dataUrl.startsWith('data:')) {
+                            totalImagesToOptimize++;
+                        }
+                    });
+                }
+            });
+            
+            // Disable save button and show appropriate message
+            const saveBtn = $('#saveEstablishmentBtn');
+            const originalText = saveBtn.html();
+            const initialButtonText = totalImagesToOptimize > 0 ? 
+                `<i class="spinner-border spinner-border-sm me-1"></i>Optimizando ${totalImagesToOptimize} imagen${totalImagesToOptimize > 1 ? 'es' : ''}...` : 
+                '<i class="spinner-border spinner-border-sm me-1"></i>Guardando...';
+            
+            saveBtn.prop('disabled', true).html(initialButtonText);
+            
+            // Show optimization progress if needed
+            if (totalImagesToOptimize > 0) {
+                const progressHtml = `
+                    <div id="establishmentOptimizationProgress" class="alert alert-info mb-3" role="alert">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Optimizando...</span>
+                            </div>
+                            <div>
+                                <strong>Optimización de imágenes en progreso</strong><br>
+                                <small>Las imágenes están siendo convertidas a formatos AVIF, WebP y JPEG para mejor rendimiento.</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                if (!$('#establishmentOptimizationProgress').length) {
+                    $('#establishmentModalAlerts').prepend(progressHtml);
+                }
+            }
+            
+            // Choose endpoint based on edit/create
+            const url = isEdit ? `${apiEndpoint}/${establishmentId}` : apiEndpoint;
+            const method = isEdit ? 'PUT' : 'POST';
+            
+            $.ajax({
+                url: url,
+                method: method,
+                contentType: 'application/json',
+                data: JSON.stringify(formData),
+                success: async function(response) {
+                    console.log('✅ Establishment saved successfully:', response);
+                    
+                    // CRITICAL: Prevent establishment ID corruption
+                    const savedEstablishmentId = response.data?.id;
+                    const finalEstablishmentId = savedEstablishmentId || establishmentId;
+                    const action = isEdit ? 'actualizado' : 'creado';
+                    
+                    console.log('🔍 DEBUGGING: Establishment ID Analysis', {
+                        originalEstablishmentId: establishmentId,
+                        responseEstablishmentId: savedEstablishmentId,
+                        finalEstablishmentId,
+                        isEdit,
+                        couldCauseIdCorruption: !finalEstablishmentId || finalEstablishmentId === 'undefined'
+                    });
+                    
+                    // Safety check to prevent ID corruption
+                    if (!finalEstablishmentId || finalEstablishmentId === 'undefined') {
+                        console.error('🚨 CRITICAL: Establishment ID is invalid!', {
+                            originalId: establishmentId,
+                            responseId: savedEstablishmentId,
+                            response: response
+                        });
+                        showEstablishmentError('Error crítico: ID del establecimiento inválido. No se pueden guardar experiencias.');
+                        return;
+                    }
+                    
+                    // Save experiences individually if any exist
+                    if (experienciasData.length > 0) {
+                        console.log('🔍 DEBUGGING: Starting experience save process', {
+                            establishmentId: finalEstablishmentId,
+                            establishmentName: formData.name,
+                            isEdit,
+                            totalExperiences: experienciasData.length,
+                            action: isEdit ? 'UPDATE' : 'CREATE',
+                            timestamp: new Date().toISOString()
+                        });
+                        
+                        console.log(`💾 Saving ${experienciasData.length} experiences for establishment:`, finalEstablishmentId);
+                        
+                        try {
+                            let savedCount = 0;
+                            const totalExperiences = experienciasData.length;
+                            
+                            // Process new and existing experiences separately
+                            newExps = experienciasData.filter(exp => !exp.id);
+                            existingExps = experienciasData.filter(exp => exp.id);
+                            
+                            console.log('🔍 DEBUGGING: Establishment and Experience Data Analysis', {
+                                establishmentId: finalEstablishmentId,
+                                establishmentName: formData.name,
+                                isEdit,
+                                totalExperiences: experienciasData.length,
+                                newExperiences: newExps.length,
+                                existingExperiences: existingExps.length,
+                                newExpNames: newExps.map(exp => exp.name),
+                                existingExpNames: existingExps.map(exp => `${exp.name} (ID: ${exp.id})`),
+                                timestamp: new Date().toISOString()
+                            });
+                            
+                            console.log(`💾 Saving ${newExps.length} new and ${existingExps.length} existing experiences...`);
+                            
+                            // Save new experiences (POST)
+                            for (let i = 0; i < newExps.length; i++) {
+                                const expData = newExps[i];
+                                console.log(`📤 Creating new experience ${i + 1}/${newExps.length}:`, expData.name);
+                                
+                                try {
+                                    // Remove id field for new experiences
+                                    const { id, ...experiencePayload } = expData;
+                                    
+                                    console.log('🔍 DEBUGGING: Creating new experience', {
+                                        establishmentId: finalEstablishmentId,
+                                        experienceName: expData.name,
+                                        url: `/api/providers/${finalEstablishmentId}/experiencias`,
+                                        method: 'POST',
+                                        payloadSample: {
+                                            name: experiencePayload.name,
+                                            description: experiencePayload.description?.substring(0, 50) + '...',
+                                            price: experiencePayload.price
+                                        }
+                                    });
+                                    
+                                    const createResponse = await $.ajax({
+                                        url: `/api/providers/${finalEstablishmentId}/experiencias`,
+                                        method: 'POST',
+                                        contentType: 'application/json',
+                                        data: JSON.stringify(experiencePayload)
+                                    });
+                                    
+                                    console.log('🔍 DEBUGGING: Experience creation response', {
+                                        experienceName: expData.name,
+                                        success: createResponse.success,
+                                        createdId: createResponse.data?.id,
+                                        response: createResponse
+                                    });
+                                    
+                                    savedCount++;
+                                    console.log(`✅ New experience "${expData.name}" created successfully`);
+                                } catch (expError) {
+                                    console.error(`❌ Error creating experience "${expData.name}":`, expError);
+                                    
+                                    let errorMessage = `Error al crear la experiencia "${expData.name}"`;
+                                    
+                                    if (expError.status === 409) {
+                                        errorMessage = `Ya existe una experiencia llamada "${expData.name}" en este establecimiento`;
+                                    } else if (expError.status === 400) {
+                                        errorMessage = `Datos inválidos en la experiencia "${expData.name}". Verifique todos los campos obligatorios.`;
+                                    } else if (expError.responseJSON && expError.responseJSON.error) {
+                                        errorMessage = `Error en "${expData.name}": ${expError.responseJSON.error}`;
+                                    }
+                                    
+                                    throw new Error(errorMessage);
+                                }
+                            }
+                            
+                            // Save existing experiences (PUT) - CRITICAL: Use original provider ID
+                            for (let i = 0; i < existingExps.length; i++) {
+                                const expData = existingExps[i];
+                                console.log(`📤 Updating existing experience ${i + 1}/${existingExps.length}:`, expData.name);
+                                
+                                try {
+                                    // CRITICAL: Validate experience belongs to current establishment
+                                    if (isEdit && expData.originalProviderId && expData.originalProviderId !== finalEstablishmentId) {
+                                        console.error('🚨 SECURITY: Attempt to update experience from different establishment!', {
+                                            experienceId: expData.id,
+                                            experienceName: expData.name,
+                                            originalProviderId: expData.originalProviderId,
+                                            currentEstablishmentId: finalEstablishmentId,
+                                            action: 'BLOCKED'
+                                        });
+                                        throw new Error(`Security violation: Experience "${expData.name}" belongs to different establishment`);
+                                    }
+                                    
+                                    // Keep id for existing experiences
+                                    const experiencePayload = { ...expData };
+                                    
+                                    // CRITICAL FIX: Use original provider ID for existing experiences, not current establishment ID
+                                    const targetProviderId = expData.originalProviderId || finalEstablishmentId;
+                                    
+                                    console.log('🔍 DEBUGGING: Experience update details', {
+                                        experienceId: expData.id,
+                                        experienceName: expData.name,
+                                        originalProviderId: expData.originalProviderId,
+                                        finalEstablishmentId: finalEstablishmentId,
+                                        targetProviderId: targetProviderId,
+                                        isEdit: isEdit
+                                    });
+                                    
+                                    await $.ajax({
+                                        url: `/api/providers/${targetProviderId}/experiencias/${expData.id}`,
+                                        method: 'PUT',
+                                        contentType: 'application/json',
+                                        data: JSON.stringify(experiencePayload)
+                                    });
+                                    
+                                    savedCount++;
+                                    console.log(`✅ Existing experience "${expData.name}" updated successfully`);
+                                } catch (expError) {
+                                    console.error(`❌ Error updating experience "${expData.name}":`, expError);
+                                    
+                                    let errorMessage = `Error al actualizar la experiencia "${expData.name}"`;
+                                    
+                                    if (expError.status === 409) {
+                                        errorMessage = `Conflicto al actualizar "${expData.name}"`;
+                                    } else if (expError.status === 400) {
+                                        errorMessage = `Datos inválidos en la experiencia "${expData.name}". Verifique todos los campos obligatorios.`;
+                                    } else if (expError.responseJSON && expError.responseJSON.error) {
+                                        errorMessage = `Error en "${expData.name}": ${expError.responseJSON.error}`;
+                                    }
+                                    
+                                    throw new Error(errorMessage);
+                                }
+                            }
+                            
+                            console.log(`✅ All experiences saved successfully: ${newExps.length} created, ${existingExps.length} updated`);
+                            
+                            // Update button to show optimization in progress if we had images
+                            if (totalImagesToOptimize > 0) {
+                                saveBtn.html(`<i class="spinner-border spinner-border-sm me-1"></i>Optimizando ${totalImagesToOptimize} imagen${totalImagesToOptimize > 1 ? 'es' : ''}...`);
+                            }
+                            
+                            // Update optimization progress to success if we had images
+                            if (totalImagesToOptimize > 0) {
+                                $('#establishmentOptimizationProgress').removeClass('alert-info').addClass('alert-success');
+                                $('#establishmentOptimizationProgress').html(`
+                                    <div class="d-flex align-items-center">
+                                        <i class="ti ti-check-circle me-2" style="font-size: 1.2rem;"></i>
+                                        <div>
+                                            <strong>Optimización completada</strong><br>
+                                            <small>${totalImagesToOptimize} imagen${totalImagesToOptimize > 1 ? 'es optimizadas' : ' optimizada'} exitosamente.</small>
+                                        </div>
+                                    </div>
+                                `);
+                                
+                                // Wait a bit for user to see the success message
+                                await new Promise(resolve => setTimeout(resolve, 1500));
+                                
+                                $('#establishmentOptimizationProgress').fadeOut(300, function() { 
+                                    $(this).remove(); 
+                                });
+                                
+                                // Re-enable save button after optimization completes
+                                saveBtn.prop('disabled', false).html(originalText);
+                            }
+                            
+                            if (newExps.length > 0 && existingExps.length > 0) {
+                                showSuccessAlert(`Establecimiento ${action} exitosamente: ${newExps.length} experiencia${newExps.length !== 1 ? 's' : ''} creada${newExps.length !== 1 ? 's' : ''}, ${existingExps.length} actualizada${existingExps.length !== 1 ? 's' : ''}`);
+                            } else if (newExps.length > 0) {
+                                showSuccessAlert(`Establecimiento ${action} exitosamente con ${newExps.length} experiencia${newExps.length !== 1 ? 's' : ''} nueva${newExps.length !== 1 ? 's' : ''}`);
+                            } else if (existingExps.length > 0) {
+                                showSuccessAlert(`Establecimiento ${action} exitosamente: ${existingExps.length} experiencia${existingExps.length !== 1 ? 's' : ''} actualizada${existingExps.length !== 1 ? 's' : ''}`);
+                            } else {
+                                showSuccessAlert(`Establecimiento ${action} exitosamente`);
+                            }
+                            
+                        } catch (experienceError) {
+                            console.error('❌ Error saving experiences:', experienceError);
+                            
+                            // Remove optimization progress on error
+                            $('#establishmentOptimizationProgress').fadeOut(300, function() { 
+                                $(this).remove(); 
+                            });
+                            
+                            // Re-enable save button on error
+                            saveBtn.prop('disabled', false).html(originalText);
+                            
+                            // Show specific error message instead of generic one
+                            const specificErrorMessage = experienceError.message || 'Error desconocido al guardar experiencias';
+                            showEstablishmentError(specificErrorMessage);
+                            return; // Don't close modal so user can fix the issue
+                        }
+                    } else {
+                        // No experiences to save, just establishment data
+                        showSuccessAlert(`Establecimiento ${action} exitosamente`);
+                        
+                        // Ensure button is re-enabled (safety check in case of no experiences but somehow had images)
+                        saveBtn.prop('disabled', false).html(originalText);
+                    }
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('establishmentModal'));
+                    modal.hide();
+                    
+                    console.log('🔍 DEBUGGING: About to reload DataTable after establishment save', {
+                        establishmentId: finalEstablishmentId || 'new',
+                        establishmentName: formData.name,
+                        savedExperiences: {
+                            new: newExps?.length || 0,
+                            existing: existingExps?.length || 0
+                        },
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    // Reload table
+                    dataTable.ajax.reload(function(json) {
+                        console.log('🔍 DEBUGGING: DataTable reloaded', {
+                            recordsTotal: json.recordsTotal,
+                            recordsFiltered: json.recordsFiltered,
+                            dataLength: json.data?.length,
+                            firstRecord: json.data?.[0]
+                        });
+                    }, false);
+                },
+                error: function(xhr) {
+                    console.error('❌ Error saving establishment:', xhr);
+                    const error = xhr.responseJSON?.error || 'Error al guardar el establecimiento';
+                    showEstablishmentError(error);
+                },
+                complete: function() {
+                    // Only re-enable save button if there are no images being optimized
+                    if (totalImagesToOptimize === 0) {
+                        // No image optimization needed, re-enable immediately
+                        saveBtn.prop('disabled', false).html(originalText);
+                    }
+                    // If there are images being optimized, button will be re-enabled 
+                    // after optimization completes in the success callback
+                }
+            });
+        });
+
+        // Quick Add Establishment Experience Modal Functions
+        function openQuickAddEstablishmentExperienceModal(establishmentId, establishmentName) {
+        console.log('🏢 Opening quick add modal for establishment:', establishmentId, establishmentName);
+        
+        // Set establishment info
+        $('#quickAddEstablishmentId').val(establishmentId);
+        $('#quickAddEstablishmentName').text(establishmentName);
+        
+        // Clear form
+        $('#quickAddEstablishmentExperienceForm')[0].reset();
+        $('#quickAddEstablishmentModalAlerts').empty();
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('quickAddEstablishmentExperienceModal'));
+        modal.show();
+    }
+
+        // Establishment Experience Management Functions
+        function addEstablishmentExperiencia() {
+            const template = document.getElementById('establishmentExperienciaEditableTemplate');
+            const clone = template.content.cloneNode(true);
+            
+            const experienciaCard = clone.querySelector('.experiencia-editable');
+            const currentIndex = Date.now();
+            experienciaCard.setAttribute('data-index', currentIndex);
+            
+            const container = document.getElementById('establishmentExperienciasList');
+            container.appendChild(clone);
+            
+            updateEstablishmentNoExperienciasMessage();
+            
+            // Scroll to the new experience card
+            setTimeout(() => {
+                experienciaCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        }
+
+        function updateEstablishmentNoExperienciasMessage() {
+            const hasExperiencias = $('#establishmentExperienciasList .experiencia-editable').length > 0;
+            $('#noEstablishmentExperienciasMessage').toggle(!hasExperiencias);
+        }
+
+        function updateEstablishmentSelectedDays(availabilitySection) {
+            const selectedDaysContainer = availabilitySection.find('.experiencia-selected-schedule-days');
+            const noDaysMessage = availabilitySection.find('.experiencia-no-days-selected');
+            const summaryStatus = availabilitySection.find('.availability-status');
+            
+            const selectedButtons = availabilitySection.find('.day-btn.btn-warning');
+            
+            if (selectedButtons.length === 0) {
+                selectedDaysContainer.empty();
+                noDaysMessage.show();
+                summaryStatus.text('Sin horarios configurados');
+                return;
+            }
+            
+            noDaysMessage.hide();
+            
+            // Create schedule containers for selected days
+            selectedDaysContainer.empty();
+            selectedButtons.each(function() {
+                const dayName = $(this).data('day-name');
+                const dayNumber = $(this).data('day');
+                
+                const scheduleHtml = `
+                    <div class="day-schedule mb-3 border rounded p-2" data-day="${dayNumber}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong style="color: #f59e0b;">${dayName}</strong>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-day-btn" data-day="${dayNumber}">
+                                <i class="ti ti-x"></i>
+                            </button>
+                        </div>
+                        <div class="time-slots-container mb-2">
+                            <div class="time-slot d-flex gap-2 mb-1">
+                                <input type="time" class="form-control form-control-sm start-time" value="09:00">
+                                <span class="align-self-center">a</span>
+                                <input type="time" class="form-control form-control-sm end-time" value="18:00">
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-slot-btn">
+                                    <i class="ti ti-minus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-success add-slot-btn">
+                            <i class="ti ti-plus me-1"></i>Agregar Horario
+                        </button>
+                    </div>
+                `;
+                selectedDaysContainer.append(scheduleHtml);
+            });
+            
+            // Update summary
+            if (selectedButtons.length === 7) {
+                summaryStatus.text('Disponible todos los días');
+            } else {
+                const dayNames = selectedButtons.map(function() { 
+                    return $(this).data('day-name'); 
+                }).get().join(', ');
+                summaryStatus.text(`Disponible: ${dayNames}`);
+            }
+        }
+
+        function addEstablishmentPhotoPreview(container, file, dataUrl, photoDataOrMetadata) {
+            const photoId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            
+            
+            // Handle both old format (just metadata) and new format (full photo object)
+            let optimizationMetadata = null;
+            let fullPhotoData = null;
+            
+            if (photoDataOrMetadata) {
+                // If it's an object with any of the expected photo properties, it's the full photo object
+                if (typeof photoDataOrMetadata === 'object' && 
+                    (photoDataOrMetadata.s3Key || 
+                     photoDataOrMetadata.optimizationMetadata !== undefined ||
+                     photoDataOrMetadata.optimizedVariants ||
+                     photoDataOrMetadata.fileName)) {
+                    fullPhotoData = photoDataOrMetadata;
+                    optimizationMetadata = photoDataOrMetadata.optimizationMetadata;
+                } else {
+                    // Otherwise it's just the metadata (for backwards compatibility)
+                    optimizationMetadata = photoDataOrMetadata;
+                }
+            }
+            
+            // Check optimization metadata for format count - ALWAYS show badge
+            let formatBadge = '';
+            let formatInfo = '';
+            let badgeClass = '';
+            let iconClass = '';
+            let tooltipText = '';
+            
+            // Check if it's a new upload (base64 image)
+            if (dataUrl && dataUrl.startsWith('data:')) {
+                formatInfo = 'Nuevo - No guardado';
+                badgeClass = 'bg-warning';
+                iconClass = 'ti-upload';
+                tooltipText = 'Se optimizará al guardar';
+            } 
+            // Check optimization metadata
+            else if (optimizationMetadata && (optimizationMetadata.availableFormats || optimizationMetadata.formats || fullPhotoData?.optimizedVariants)) {
+                // Handle different format data structures (matching experience-images-modal.js)
+                let formatCount = 0;
+                
+                if (fullPhotoData?.optimizedVariants) {
+                    // Count non-null variants from optimizedVariants object
+                    formatCount = Object.keys(fullPhotoData.optimizedVariants).filter(key => 
+                        fullPhotoData.optimizedVariants[key] && key !== 'original'
+                    ).length;
+                } else if (optimizationMetadata.formats && typeof optimizationMetadata.formats === 'object' && !Array.isArray(optimizationMetadata.formats)) {
+                    // Count formats in metadata (object with avif, webp, jpeg keys)
+                    formatCount = Object.keys(optimizationMetadata.formats).filter(key => 
+                        optimizationMetadata.formats[key] && key !== 'original'
+                    ).length;
+                } else if (optimizationMetadata.availableFormats && Array.isArray(optimizationMetadata.availableFormats)) {
+                    // Legacy array format
+                    formatCount = optimizationMetadata.availableFormats.filter(f => f !== 'original').length;
+                }
+                
+                if (formatCount > 0) {
+                    formatInfo = `${formatCount} formatos`;
+                    badgeClass = 'bg-success';
+                    iconClass = 'ti-photo';
+                    
+                    // Generate tooltip with available formats
+                    let availableFormatsList = [];
+                    if (fullPhotoData?.optimizedVariants) {
+                        availableFormatsList = Object.keys(fullPhotoData.optimizedVariants).filter(key => 
+                            fullPhotoData.optimizedVariants[key] && key !== 'original'
+                        );
+                    } else if (optimizationMetadata.formats && typeof optimizationMetadata.formats === 'object' && !Array.isArray(optimizationMetadata.formats)) {
+                        availableFormatsList = Object.keys(optimizationMetadata.formats).filter(key => 
+                            optimizationMetadata.formats[key] && key !== 'original'
+                        );
+                    } else if (optimizationMetadata.availableFormats && Array.isArray(optimizationMetadata.availableFormats)) {
+                        availableFormatsList = optimizationMetadata.availableFormats.filter(f => f !== 'original');
+                    }
+                    
+                    tooltipText = `Optimizado: ${availableFormatsList.join(', ').toUpperCase()}`;
+                } else {
+                    // Has metadata but 0 formats (optimization may have failed or not completed)
+                    formatInfo = '0 formatos';
+                    badgeClass = 'bg-danger';
+                    iconClass = 'ti-x';
+                    tooltipText = 'No hay formatos optimizados disponibles';
+                }
+            } 
+            // No metadata and not base64 (old image without optimization)
+            else {
+                // Check if it's an S3 URL (legacy upload before optimization)
+                if (dataUrl && (dataUrl.includes('amazonaws.com') || dataUrl.includes('http'))) {
+                    formatInfo = 'Heredado - Sin optimización';
+                    badgeClass = 'bg-secondary';
+                    iconClass = 'ti-photo-off';
+                    tooltipText = 'Subido antes de la implementación de optimización. Vuelva a subir para optimizar.';
+                } else {
+                    formatInfo = 'Desconocido';
+                    badgeClass = 'bg-dark';
+                    iconClass = 'ti-question-mark';
+                    tooltipText = 'Formato de imagen desconocido';
+                }
+            }
+            
+            // Always create a badge
+            formatBadge = `
+                <span class="position-absolute top-0 start-0 m-1 badge ${badgeClass}" 
+                      style="font-size: 0.65rem; z-index: 10;"
+                      data-bs-toggle="tooltip" 
+                      data-bs-placement="bottom" 
+                      title="${tooltipText}">
+                    <i class="ti ${iconClass} me-1" style="font-size: 0.7rem;"></i>${formatInfo}
+                </span>
+            `;
+            
+            const fileName = file?.name || fullPhotoData?.fileName || 'imagen';
+            
+            // HTML escape the dataUrl to prevent parameter corruption
+            const escapedDataUrl = dataUrl
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#x27;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            
+            const photoHtml = `
+                <div class="col-6 col-md-4 col-lg-3 photo-preview" 
+                     data-photo-id="${photoId}"
+                     ${fullPhotoData ? `data-photo-full='${JSON.stringify(fullPhotoData).replace(/'/g, '&#39;')}'` : ''}>
+                    <div class="card position-relative">
+                        ${formatBadge}
+                        <img src="${escapedDataUrl}" class="card-img-top" style="height: 120px; object-fit: cover;" alt="${fileName}">
+                        <div class="card-body p-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted text-truncate me-2" title="${fileName}">${fileName}</small>
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-photo-btn" title="Eliminar foto">
+                                    <i class="ti ti-x"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            container.append(photoHtml);
+            
+            
+            // Initialize the new tooltip
+            const newElement = container.find(`[data-photo-id="${photoId}"]`).last();
+            newElement.find('[data-bs-toggle="tooltip"]').tooltip();
+            
+            // Store file data for later upload
+            if (file) {
+                newElement.data('file', file);
+                newElement.data('dataUrl', dataUrl);
+            }
+        }
+
+        function collectEstablishmentExperienciasData() {
+            // CRITICAL: Validate modal state before collecting data
+            if (!currentModalState.isOpen) {
+                console.warn('🚨 Modal not open - refusing to collect experience data');
+                return [];
+            }
+            
+            // CRITICAL: Mode-aware validation - create mode allows null establishmentId, edit mode requires it
+            if (!currentModalState.mode) {
+                console.warn('🚨 No modal mode - refusing to collect experience data', currentModalState);
+                return [];
+            }
+            
+            if (currentModalState.mode === 'edit' && !currentModalState.establishmentId) {
+                console.warn('🚨 Edit mode but no establishmentId - refusing to collect experience data', currentModalState);
+                return [];
+            }
+            
+            console.log('✅ Experience collection validation passed for mode:', currentModalState.mode);
+            
+            const experiencias = [];
+            const experienciaCards = document.querySelectorAll('#establishmentExperienciasList .experiencia-editable');
+            
+            experienciaCards.forEach((card, index) => {
+                const getName = (selector) => card.querySelector(selector)?.value?.trim() || '';
+                const getNumber = (selector) => {
+                    const value = card.querySelector(selector)?.value;
+                    return value ? parseFloat(value) : null;
+                };
+                const getInt = (selector) => {
+                    const value = card.querySelector(selector)?.value;
+                    return value ? parseInt(value) : null;
+                };
+                
+                // Get the experience ID from data-id attribute (empty for new experiences)
+                const experienceId = card.getAttribute('data-id') || '';
+                
+                // CRITICAL: Get original provider ID for existing experiences
+                const originalProviderId = card.getAttribute('data-original-provider-id') || '';
+                
+                // CRITICAL: Defensive validation - check for cross-establishment contamination
+                if (experienceId && originalProviderId && originalProviderId !== currentModalState.establishmentId) {
+                    console.error('🚨 CRITICAL: Cross-establishment contamination detected in data collection!', {
+                        experienceId: experienceId,
+                        originalProviderId: originalProviderId,
+                        currentEstablishmentId: currentModalState.establishmentId,
+                        modalState: currentModalState
+                    });
+                    // Skip this experience to prevent data corruption
+                    console.warn('⚠️ Skipping contaminated experience to protect data integrity');
+                    return; // Skip this iteration
+                }
+                
+                const experiencia = {
+                    id: experienceId,
+                    originalProviderId: originalProviderId, // Track which establishment this experience originally belongs to
+                    name: getName('.experiencia-name-input'),
+                    description: getName('.experiencia-description-input'),
+                    tipo: getName('.experiencia-tipo-input'),
+                    price: getNumber('.experiencia-price-input') || 0,
+                    price_no_alcohol: getNumber('.experiencia-price-no-alcohol-input'),
+                    price_child: getNumber('.experiencia-price-child-input'),
+                    duration: getNumber('.experiencia-duration-input'),
+                    travel_duration: getInt('.experiencia-travel-duration-input'),
+                    advance_booking_time: getInt('.experiencia-advance-minutes-input'),
+                    min_people: getInt('.experiencia-min-people-input'),
+                    max_people: getInt('.experiencia-max-people-input'),
+                    
+                    // Convert strings to arrays (like provider table)
+                    includes: getName('.experiencia-includes-input') ? 
+                        getName('.experiencia-includes-input').split('\n').map(item => item.trim()).filter(item => item.length > 0) : [],
+                    notincludes: getName('.experiencia-notincludes-input') ? 
+                        getName('.experiencia-notincludes-input').split('\n').map(item => item.trim()).filter(item => item.length > 0) : [],
+                    languages: getName('.experiencia-languages-input') ? 
+                        getName('.experiencia-languages-input').split('\n').map(item => item.trim()).filter(item => item.length > 0) : [],
+                    
+                    internal_notes: getName('.experiencia-internal-notes-input'),
+                    client_booking_notes: getName('.experiencia-client-booking-notes-input'),
+                    provider_notes: getName('.experiencia-provider-notes-input'),
+                    team_notes: getName('.experiencia-team-notes-input')
+                };
+
+                // Collect photos with optimization metadata preservation
+                const photoElements = card.querySelectorAll('.photos-preview-container .photo-preview');
+                if (photoElements.length > 0) {
+                    experiencia.photos = [];
+                    photoElements.forEach(photoEl => {
+                        const img = $(photoEl).find('img');
+                        if (img.length > 0) {
+                            const photoElement = $(photoEl);
+                            const photoFullData = photoElement.attr('data-photo-full');
+                            
+                            // If we have full photo data stored, use it (preserves optimization metadata)
+                            if (photoFullData) {
+                                try {
+                                    const fullData = JSON.parse(photoFullData.replace(/&#39;/g, "'"));
+                                    // Update the dataUrl in case the image was refreshed with a new presigned URL
+                                    fullData.dataUrl = img.attr('src');
+                                    experiencia.photos.push(fullData);
+                                } catch (e) {
+                                    console.warn('Failed to parse photo full data, falling back to basic data:', e);
+                                    // Fallback to basic data
+                                    const photoData = photoElement.data('file');
+                                    const dataUrl = photoElement.data('dataUrl') || img.attr('src');
+                                    
+                                    experiencia.photos.push({
+                                        dataUrl: dataUrl,
+                                        fileName: photoData ? photoData.name : 'image.jpg',
+                                        isNew: !!(photoData && dataUrl && dataUrl.startsWith('data:'))
+                                    });
+                                }
+                            } else {
+                                // No full data, use basic data
+                                const photoData = photoElement.data('file');
+                                const dataUrl = photoElement.data('dataUrl') || img.attr('src');
+                                
+                                experiencia.photos.push({
+                                    dataUrl: dataUrl,
+                                    fileName: photoData ? photoData.name : 'image.jpg',
+                                    isNew: !!(photoData && dataUrl && dataUrl.startsWith('data:'))
+                                });
+                            }
+                        }
+                    });
+                }
+                
+                // Collect availability data
+                const availabilitySection = card.querySelector('.availability-section');
+                if (availabilitySection) {
+                    const selectedDays = availabilitySection.querySelectorAll('.day-schedule');
+                    if (selectedDays.length > 0) {
+                        experiencia.availability = [];
+                        selectedDays.forEach(daySchedule => {
+                            const day = daySchedule.getAttribute('data-day');
+                            const timeSlots = daySchedule.querySelectorAll('.time-slot');
+                            timeSlots.forEach(slot => {
+                                const startTime = slot.querySelector('.start-time').value;
+                                const endTime = slot.querySelector('.end-time').value;
+                                if (startTime && endTime) {
+                                    experiencia.availability.push({
+                                        day: parseInt(day),
+                                        start_time: startTime,
+                                        end_time: endTime
+                                    });
+                                }
+                            });
+                        });
+                    }
+                }
+                
+                experiencias.push(experiencia);
+            });
+            
+            return experiencias;
+        }
+
+        function showEstablishmentModalError(message) {
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="ti ti-x me-2"></i>${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        $('#quickAddEstablishmentModalAlerts').html(alertHtml);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            $('#quickAddEstablishmentModalAlerts .alert').fadeOut();
+        }, 5000);
+    }
+
+    function showEstablishmentError(message) {
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="ti ti-x me-2"></i>${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        $('#establishmentModalAlerts').html(alertHtml);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            $('#establishmentModalAlerts .alert').fadeOut();
+        }, 5000);
+    }
+
+    function showEstablishmentInfo(message) {
+        const alertHtml = `
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <i class="ti ti-info-circle me-2"></i>${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        $('#establishmentModalAlerts').html(alertHtml);
+    }
+
+    function showEstablishmentWarning(message) {
+        const alertHtml = `
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="ti ti-alert-triangle me-2"></i>${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        $('#establishmentModalAlerts').html(alertHtml);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            $('#establishmentModalAlerts .alert').fadeOut();
+        }, 3000);
+    }
+
+    // POI Loading and Management Functions
+    async function loadPOIOptions() {
+        try {
+            console.log('🌍 Loading POI options for Destino selectbox...');
+            
+            const response = await fetch('/api/pois/active', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const responseData = await response.json();
+            console.log('📍 POI API Response:', responseData);
+            
+            // Extract POI array from response
+            const poisArray = responseData.success ? responseData.data : responseData;
+            
+            if (!Array.isArray(poisArray)) {
+                console.error('❌ POI API did not return an array:', poisArray);
+                return [];
+            }
+            
+            console.log(`📍 Loaded ${poisArray.length} POIs from API`);
+            
+            // Deduplicate by name - show unique names only
+            const uniquePOIs = poisArray.filter((poi, index, self) => 
+                index === self.findIndex(p => p.label === poi.label)
+            );
+            
+            console.log(`✨ Deduplicated to ${uniquePOIs.length} unique POIs`);
+            return uniquePOIs;
+            
+        } catch (error) {
+            console.error('❌ Error loading POI options:', error);
+            showEstablishmentError('Error al cargar destinos. Inténtelo de nuevo.');
+            return [];
+        }
+    }
+    
+    // Populate Destino selectbox with POI options
+    function populateDestinoSelect(selectId, pois) {
+        const select = document.getElementById(selectId);
+        if (!select) {
+            console.warn('⚠️ Destino select element not found:', selectId);
+            return;
+        }
+        
+        // Clear existing options except the first one
+        select.innerHTML = '<option value="">Seleccione un destino...</option>';
+        
+        // Add POI options
+        pois.forEach(poi => {
+            const option = document.createElement('option');
+            option.value = poi.value;
+            option.textContent = poi.label;
+            option.setAttribute('data-service-type', poi.serviceType?.name || '');
+            select.appendChild(option);
+        });
+        
+        console.log(`✅ Populated ${selectId} with ${pois.length} POI options`);
+    }
+    
+    // Load and populate POI options for establishment modal
+    async function loadEstablishmentDestinoOptions() {
+        const pois = await loadPOIOptions();
+        if (pois.length > 0) {
+            populateDestinoSelect('establishmentDestino', pois);
+        }
+    }
+
+    // Helper function to try to get presigned URL from S3 key
+    async function tryGetPresignedUrl(s3Key) {
+        try {
+            // Try to use a presigned URL API endpoint if available
+            const response = await fetch('/api/s3/presigned-url', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                },
+                body: JSON.stringify({ s3Key: s3Key })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                return data.url;
+            } else {
+                console.warn('Presigned URL API not available, trying alternative approach');
+                // Alternative: try to construct a basic S3 URL (will likely fail due to permissions)
+                if (s3Key && s3Key.includes('experiences/')) {
+                    const bucketName = 'amexing-bucket'; // This should come from config
+                    const region = 'us-east-1'; // This should come from config  
+                    return `https://${bucketName}.s3.${region}.amazonaws.com/${s3Key}`;
+                }
+            }
+        } catch (error) {
+            console.error('Error getting presigned URL:', error);
+        }
+        return null;
+    }
+
+        // Establishment Creation/Edit Modal Functions
+        function openEstablishmentModal(isEdit = false, establishmentId = null) {
+            // CRITICAL: Cancel pending requests when opening modal
+            if (pendingEstablishmentRequests.establishment) {
+                console.log('🚨 Cancelling pending establishment request');
+                pendingEstablishmentRequests.establishment.abort();
+                pendingEstablishmentRequests.establishment = null;
+            }
+            if (pendingEstablishmentRequests.experiences) {
+                console.log('🚨 Cancelling pending experiences request');
+                pendingEstablishmentRequests.experiences.abort();
+                pendingEstablishmentRequests.experiences = null;
+            }
+            
+            // Set modal state with unique session ID
+            const sessionId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            currentModalState = {
+                mode: isEdit ? 'edit' : 'create',
+                establishmentId: establishmentId,
+                isOpen: true,
+                sessionId: sessionId
+            };
+            
+            console.log('🔍 DEBUGGING: Opening modal with state', currentModalState);
+            
+            // Clear any previous modal alerts
+            const alertsContainer = document.getElementById('establishmentModalAlerts');
+            if (alertsContainer) {
+                alertsContainer.innerHTML = '';
+            }
+            
+            // Reset form
+            document.getElementById('establishmentForm').reset();
+            
+            // CRITICAL: Enhanced form reset - explicitly clear fields for create mode
+            if (!isEdit) {
+                $('#establishmentId').val(''); // Ensure no residual ID from previous sessions
+                $('#establishmentDestino').val(''); // Ensure no residual destino from previous sessions
+                console.log('🧹 Cleared establishmentId and destino fields for create mode');
+            }
+            
+            // Clear experiences list - ENHANCED CLEARING
+            const experienciasList = document.getElementById('establishmentExperienciasList');
+            if (experienciasList) {
+                const experienciaCards = experienciasList.querySelectorAll('.experiencia-editable');
+                
+                // Enhanced logging for debugging modal state
+                if (experienciaCards.length > 0) {
+                    console.log('🧹 DEBUGGING: Clearing modal experiences', {
+                        isEdit: isEdit,
+                        experienceCount: experienciaCards.length,
+                        experienceDetails: Array.from(experienciaCards).map(card => ({
+                            id: card.getAttribute('data-id'),
+                            originalProviderId: card.getAttribute('data-original-provider-id'),
+                            name: card.querySelector('.experiencia-name-input')?.value
+                        }))
+                    });
+                }
+                
+                // Force remove all experience cards
+                experienciaCards.forEach(card => {
+                    card.remove();
+                    console.log('🗑️ Removed experience card:', card.getAttribute('data-id'));
+                });
+                
+                // Force clear container as additional safety
+                experienciasList.innerHTML = '';
+                
+                updateEstablishmentNoExperienciasMessage();
+                
+                console.log('✅ Modal experiences cleared completely');
+            }
+            
+            // Update modal title and button text
+            const modalTitle = document.getElementById('establishmentModalTitle');
+            const saveButtonText = document.getElementById('saveEstablishmentButtonText');
+            
+            if (isEdit) {
+                modalTitle.textContent = 'Editar Establecimiento';
+                saveButtonText.textContent = 'Actualizar Establecimiento';
+            } else {
+                modalTitle.textContent = 'Crear Nuevo Establecimiento';
+                saveButtonText.textContent = 'Crear Establecimiento';
+            }
+            
+            // Load POI options for Destino selectbox
+            loadEstablishmentDestinoOptions();
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('establishmentModal'));
+            modal.show();
+        }
+
+        // Make functions globally accessible for button clicks
+        window.openQuickAddEstablishmentExperienceModal = openQuickAddEstablishmentExperienceModal;
+        window.openEstablishmentModal = openEstablishmentModal;
+
+        // Load establishment data for editing
+        function loadEstablishmentData(establishmentId) {
+            console.log('📂 Loading establishment data:', establishmentId);
+            
+            // CRITICAL: Cancel any pending requests to prevent race conditions
+            if (pendingEstablishmentRequests.establishment) {
+                console.log('🚨 Cancelling pending establishment request');
+                pendingEstablishmentRequests.establishment.abort();
+                pendingEstablishmentRequests.establishment = null;
+            }
+            if (pendingEstablishmentRequests.experiences) {
+                console.log('🚨 Cancelling pending experiences request');
+                pendingEstablishmentRequests.experiences.abort();
+                pendingEstablishmentRequests.experiences = null;
+            }
+            
+            openEstablishmentModal(true, establishmentId);
+            
+            // Show loading state in modal
+            $('#establishmentModalAlerts').html(`
+                <div class="alert alert-info">
+                    <i class="spinner-border spinner-border-sm me-2"></i>Cargando datos del establecimiento...
+                </div>
+            `);
+
+            // Track the establishment request
+            pendingEstablishmentRequests.establishment = $.ajax({
+                url: `${apiEndpoint}/${establishmentId}`,
+                type: 'GET',
+                success: function(response) {
+                    // Clear the request reference
+                    pendingEstablishmentRequests.establishment = null;
+                    if (response.success && response.data) {
+                        const establishment = response.data;
+                        
+                        // Populate form fields
+                        $('#establishmentId').val(establishment.id);
+                        $('#establishmentName').val(establishment.name);
+                        $('#establishmentDescription').val(establishment.description || '');
+                        
+                        // Populate destinationPOI field
+                        if (establishment.destinationPOI && establishment.destinationPOI.id) {
+                            $('#establishmentDestino').val(establishment.destinationPOI.id);
+                            console.log('📍 Loaded destinationPOI:', establishment.destinationPOI.name || establishment.destinationPOI.id);
+                        } else {
+                            $('#establishmentDestino').val('');
+                        }
+                        
+                        // Clear loading message
+                        $('#establishmentModalAlerts').html('');
+                        
+                        // Load establishment experiences if any
+                        if (establishment.id) {
+                            loadEstablishmentExperiencias(establishment.id);
+                        }
+                    } else {
+                        showEstablishmentError('Formato de respuesta inválido');
+                    }
+                },
+                error: function(xhr) {
+                    // Clear the request reference
+                    pendingEstablishmentRequests.establishment = null;
+                    
+                    // Only show error if request wasn't aborted (to prevent race condition errors)
+                    if (xhr.statusText !== 'abort') {
+                        showEstablishmentError(xhr.responseJSON?.error || 'Error al cargar el establecimiento');
+                    }
+                }
+            });
+        }
+
+        // Load establishment experiences
+        function loadEstablishmentExperiencias(establishmentId) {
+            if (!establishmentId) return;
+            
+            console.log('📦 Loading establishment experiences:', establishmentId);
+            
+            // CRITICAL: Validate modal state before loading experiences
+            if (currentModalState.mode !== 'edit' || currentModalState.establishmentId !== establishmentId) {
+                console.warn('🚨 Modal state mismatch - skipping experience load', {
+                    requestedEstablishmentId: establishmentId,
+                    currentModalState: currentModalState
+                });
+                return;
+            }
+            
+            // Track the experiences request
+            pendingEstablishmentRequests.experiences = $.ajax({
+                url: `/api/providers/${establishmentId}/experiencias`,
+                type: 'GET',
+                headers: {
+                    'Accept': 'image/avif;q=1.0,image/webp;q=0.9,image/jpeg;q=0.8,image/*;q=0.5,application/json'
+                },
+                success: function(response) {
+                    // Clear the request reference
+                    pendingEstablishmentRequests.experiences = null;
+                    
+                    // CRITICAL: Validate modal state hasn't changed during request
+                    if (currentModalState.mode !== 'edit' || currentModalState.establishmentId !== establishmentId) {
+                        console.warn('🚨 Modal state changed during experience load - ignoring response', {
+                            requestedEstablishmentId: establishmentId,
+                            currentModalState: currentModalState
+                        });
+                        return;
+                    }
+                    
+                    if (response.success && response.data && response.data.length > 0) {
+                        console.log(`✅ Loaded ${response.data.length} experiences`);
+                        
+                        // Clear the no experiences message
+                        const container = document.getElementById('establishmentExperienciasList');
+                        container.innerHTML = '';
+                        
+                        // Render each experience
+                        response.data.forEach((exp, index) => {
+                            renderEstablishmentExperienciaCard(exp, index);
+                        });
+                        
+                        updateEstablishmentNoExperienciasMessage();
+                    } else {
+                        console.log('ℹ️ No experiences found for establishment');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    // Clear the request reference
+                    pendingEstablishmentRequests.experiences = null;
+                    
+                    // Don't log aborted requests as errors (they're intentional cancellations)
+                    if (status === 'abort') {
+                        console.log('🚫 Experience load request aborted (intentional cancellation)');
+                        return;
+                    }
+                    
+                    console.error('❌ Error loading establishment experiences:', { xhr, status, error });
+                    // Not critical - establishment can exist without experiences
+                }
+            });
+        }
+
+        // Render experience card from loaded data
+        function renderEstablishmentExperienciaCard(experiencia, index) {
+            const template = document.getElementById('establishmentExperienciaEditableTemplate');
+            const clone = template.content.cloneNode(true);
+            const card = clone.querySelector('.experiencia-editable');
+            
+            card.setAttribute('data-index', index);
+            card.setAttribute('data-id', experiencia.id || '');
+            
+            // CRITICAL: Store original provider ID to prevent cross-establishment updates
+            if (experiencia.provider && experiencia.provider.id) {
+                card.setAttribute('data-original-provider-id', experiencia.provider.id);
+                console.log('🔍 DEBUGGING: Setting original provider ID', {
+                    experienceId: experiencia.id,
+                    experienceName: experiencia.name,
+                    originalProviderId: experiencia.provider.id
+                });
+            }
+            
+            // Populate form fields
+            card.querySelector('.experiencia-name-input').value = experiencia.name || '';
+            card.querySelector('.experiencia-description-input').value = experiencia.description || '';
+            card.querySelector('.experiencia-tipo-input').value = experiencia.tipo || experiencia.providerType || '';
+            card.querySelector('.experiencia-price-input').value = experiencia.price || '';
+            card.querySelector('.experiencia-price-no-alcohol-input').value = experiencia.price_no_alcohol || '';
+            card.querySelector('.experiencia-price-child-input').value = experiencia.price_child || '';
+            
+            // Handle duration
+            if (experiencia.duration) {
+                const duration = parseFloat(experiencia.duration);
+                card.querySelector('.experiencia-duration-input').value = duration > 24 ? (duration / 60).toFixed(1) : duration;
+            }
+            
+            card.querySelector('.experiencia-travel-duration-input').value = experiencia.travel_duration || '';
+            card.querySelector('.experiencia-advance-minutes-input').value = experiencia.advance_booking_time || '';
+            card.querySelector('.experiencia-min-people-input').value = experiencia.min_people || '';
+            card.querySelector('.experiencia-max-people-input').value = experiencia.max_people || '';
+            card.querySelector('.experiencia-includes-input').value = Array.isArray(experiencia.includes) 
+                ? experiencia.includes.join('\n') 
+                : (experiencia.includes || '');
+            card.querySelector('.experiencia-notincludes-input').value = Array.isArray(experiencia.notincludes) 
+                ? experiencia.notincludes.join('\n') 
+                : (experiencia.notincludes || '');
+            card.querySelector('.experiencia-languages-input').value = Array.isArray(experiencia.languages) 
+                ? experiencia.languages.join('\n') 
+                : (experiencia.languages || '');
+            card.querySelector('.experiencia-internal-notes-input').value = experiencia.internal_notes || '';
+            card.querySelector('.experiencia-client-booking-notes-input').value = experiencia.client_booking_notes || '';
+            card.querySelector('.experiencia-provider-notes-input').value = experiencia.provider_notes || '';
+            card.querySelector('.experiencia-team-notes-input').value = experiencia.team_notes || '';
+            
+            // Handle photos with optimization metadata
+            if (experiencia.photos && experiencia.photos.length > 0) {
+                const photosContainer = card.querySelector('.photos-preview-container');
+                experiencia.photos.forEach((photo, photoIndex) => {
+                    
+                    // Backend provides presigned URLs in dataUrl field
+                    const photoUrl = photo.dataUrl || photo.url;
+                    const fileName = photo.fileName || photo.name || 'image';
+                    
+                    // Check if photoUrl is a raw S3 key instead of a full URL
+                    if (photoUrl && !photoUrl.includes('http') && !photoUrl.startsWith('data:')) {
+                        console.warn(`⚠️ [ESTABLISHMENTS] Photo ${photoIndex} has raw S3 key instead of URL:`, photoUrl);
+                        console.log('📊 [ESTABLISHMENTS] Full photo object:', photo);
+                        
+                        // Fallback: Try to generate presigned URL from S3 key
+                        if (photo.s3Key || photoUrl) {
+                            const s3Key = photo.s3Key || photoUrl;
+                            console.log('🔧 [ESTABLISHMENTS] Attempting to generate presigned URL for S3 key:', s3Key);
+                            
+                            // Try to get presigned URL via API
+                            tryGetPresignedUrl(s3Key).then(presignedUrl => {
+                                if (presignedUrl) {
+                                    console.log('✅ [ESTABLISHMENTS] Generated presigned URL:', presignedUrl);
+                                    // Update the photo object
+                                    photo.dataUrl = presignedUrl;
+                                    photo.url = presignedUrl;
+                                    // Re-add the photo preview with correct URL
+                                    addEstablishmentPhotoPreview($(photosContainer), { name: fileName }, presignedUrl, photo);
+                                }
+                            }).catch(error => {
+                                console.error('❌ [ESTABLISHMENTS] Failed to generate presigned URL:', error);
+                                // Still add the preview but it might not load
+                                addEstablishmentPhotoPreview($(photosContainer), { name: fileName }, photoUrl, photo);
+                            });
+                        } else {
+                            // No S3 key available, add with original URL (will likely fail)
+                            addEstablishmentPhotoPreview($(photosContainer), { name: fileName }, photoUrl, photo);
+                        }
+                    } else if (photoUrl) {
+                        // URL looks good, proceed normally
+                        addEstablishmentPhotoPreview($(photosContainer), { name: fileName }, photoUrl, photo);
+                    }
+                });
+            }
+            
+            // Handle availability
+            if (experiencia.availability && experiencia.availability.length > 0) {
+                const availabilitySection = card.querySelector('.availability-section');
+                populateEstablishmentAvailability($(availabilitySection), experiencia.availability);
+            }
+            
+            // Add to container
+            document.getElementById('establishmentExperienciasList').appendChild(card);
+            updateEstablishmentNoExperienciasMessage();
+        }
+
+        // Populate availability interface from data
+        function populateEstablishmentAvailability(availabilitySection, availability) {
+            if (!availability || availability.length === 0) return;
+            
+            // Group schedules by day
+            const schedulesByDay = {};
+            availability.forEach(schedule => {
+                if (!schedulesByDay[schedule.day]) {
+                    schedulesByDay[schedule.day] = [];
+                }
+                schedulesByDay[schedule.day].push({
+                    start: schedule.start_time,
+                    end: schedule.end_time
+                });
+            });
+            
+            // Select day buttons and update UI
+            Object.keys(schedulesByDay).forEach(day => {
+                const dayButton = availabilitySection.find(`.day-btn[data-day="${day}"]`);
+                if (dayButton.length > 0) {
+                    dayButton.removeClass('btn-outline-warning').addClass('btn-warning');
+                }
+            });
+            
+            // Trigger update to show schedules
+            updateEstablishmentSelectedDays(availabilitySection);
+            
+            // Populate time slots for each day
+            Object.keys(schedulesByDay).forEach(day => {
+                const daySchedule = availabilitySection.find(`.day-schedule[data-day="${day}"]`);
+                if (daySchedule.length > 0) {
+                    const slotsContainer = daySchedule.find('.time-slots-container');
+                    slotsContainer.empty();
+                    
+                    schedulesByDay[day].forEach(slot => {
+                        const slotHtml = `
+                            <div class="time-slot d-flex gap-2 mb-1">
+                                <input type="time" class="form-control form-control-sm start-time" value="${slot.start}">
+                                <span class="align-self-center">a</span>
+                                <input type="time" class="form-control form-control-sm end-time" value="${slot.end}">
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-slot-btn">
+                                    <i class="ti ti-minus"></i>
+                                </button>
+                            </div>
+                        `;
+                        slotsContainer.append(slotHtml);
+                    });
+                }
+            });
+        }
+
+        console.log('✅ Establishments DataTable initialized successfully');
+    }
+
+    // Initialize when DOM is ready or immediately if already loaded
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initEstablishmentsDataTable);
+    } else {
+        initEstablishmentsDataTable();
+    }
+})();
+
+// Global alert functions
+function showSuccessAlert(message) {
+    const alertHtml = `
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="ti ti-check me-2"></i>${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    $('#establishments-content').prepend(alertHtml);
+    setTimeout(() => $('.alert').fadeOut(), 5000);
+}
+
+function showErrorAlert(message) {
+    const alertHtml = `
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="ti ti-x me-2"></i>${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    $('#establishments-content').prepend(alertHtml);
+    setTimeout(() => $('.alert').fadeOut(), 8000);
+}
+
+</script>
+
+<!-- Photo Upload Styling -->
+<style>
+.experience-photos-container {
+    background: #f8f9fa;
+    border: 1px dashed #dee2e6;
+    border-radius: 6px;
+    padding: 12px;
+    transition: border-color 0.2s ease;
+}
+
+.experience-photos-container:hover {
+    border-color: #f59e0b;
+}
+
+.photo-preview {
+    transition: transform 0.2s ease;
+}
+
+.photo-preview:hover {
+    transform: translateY(-2px);
+}
+
+.photo-preview img {
+    transition: opacity 0.2s ease;
+}
+
+.photo-preview:hover img {
+    opacity: 0.9;
+}
+
+.remove-photo-btn {
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.remove-photo-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.add-photo-btn {
+    transition: all 0.2s ease;
+    border-color: #f59e0b !important;
+    color: #f59e0b !important;
+}
+
+.add-photo-btn:hover {
+    background-color: #f59e0b !important;
+    color: white !important;
+    transform: translateY(-1px);
+}
+
+.photos-preview-container:empty + .d-grid .add-photo-btn {
+    border-style: dashed;
+}
+
+/* Format badge styles */
+.photo-preview .badge {
+    backdrop-filter: blur(4px);
+    font-weight: 500;
+    padding: 0.35em 0.5em;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.photo-preview .badge.bg-warning {
+    background-color: rgba(255, 193, 7, 0.9) !important;
+}
+
+.photo-preview .badge.bg-success {
+    background-color: rgba(25, 135, 84, 0.9) !important;
+}
+
+.photo-preview .badge.bg-danger {
+    background-color: rgba(220, 53, 69, 0.9) !important;
+}
+
+.photo-preview .badge.bg-secondary {
+    background-color: rgba(108, 117, 125, 0.9) !important;
+}
+
+.photo-preview .badge.bg-dark {
+    background-color: rgba(33, 37, 41, 0.9) !important;
+}
+
+/* Optimization progress styles */
+#establishmentOptimizationProgress {
+    animation: slideInDown 0.3s ease-out;
+}
+
+@keyframes slideInDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.2em;
+}
+</style>
+
+<!-- Include Experience Images Modal -->
+<%- include('../modal/experience-images-modal.ejs') %>

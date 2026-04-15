@@ -1,0 +1,361 @@
+<%#
+Hero Section Organism - Landing Page
+Full-screen hero section with background image overlay and call-to-action
+Features San Miguel de Allende imagery with luxury transportation
+
+@param {string} title - Main headline text (default: 'Elevamos la experiencia de viaje en San Miguel de Allende')
+@param {string} subtitle - Secondary text (optional)
+@param {string} ctaText - Call-to-action button text (default: 'BOOK NOW')
+@param {string} ctaLink - Call-to-action button link (default: '#book')
+@param {string} backgroundImage - Hero background image URL (optional)
+@param {object} user - Current user session (optional)
+
+@example
+include('organisms/landing/hero-section', {
+    title: 'Elevamos la experiencia de viaje en San Miguel de Allende',
+    ctaText: 'BOOK NOW',
+    ctaLink: '/booking'
+}) %>
+%>
+
+<!-- Custom Fonts CSS -->
+<link rel="stylesheet" href="/css/fonts.css">
+
+<%
+const heroTitle = typeof title !== 'undefined' ? title : 'Elevamos la experiencia de viaje en San Miguel de Allende';
+const heroSubtitle = typeof subtitle !== 'undefined' ? subtitle : '';
+const heroCtaText = typeof ctaText !== 'undefined' ? ctaText : 'BOOK NOW';
+const heroCtaLink = typeof ctaLink !== 'undefined' ? ctaLink : '#book';
+const heroBgImage = typeof backgroundImage !== 'undefined' ? backgroundImage : '/images/hero-san-miguel-tesla.jpg';
+const currentUser = typeof user !== 'undefined' ? user : null;
+%>
+
+<section class="hero-section" id="hero">
+    <div class="hero-section__background">
+        <div class="hero-section__image" style="background-image: url('<%= heroBgImage %>')"></div>
+        <div class="hero-section__overlay"></div>
+        <div class="hero-section__particles"></div>
+    </div>
+    
+    <div class="hero-section__container">
+        <div class="hero-section__content">
+            <div class="hero-section__text">
+                <h1 class="hero-section__title">
+                    <span class="hero-section__title-line">"<%- heroTitle %>"</span>
+                </h1>
+                
+                <% if (heroSubtitle) { %>
+                <p class="hero-section__subtitle"><%= heroSubtitle %></p>
+                <% } %>
+            </div>
+        </div>
+        
+        <div class="hero-section__actions">
+            <%- include('../../atoms/common/premium-button', {
+                text: heroCtaText,
+                href: heroCtaLink,
+                type: 'primary',
+                size: 'large',
+                class: 'hero-section__cta'
+            }) %>
+        </div>
+    </div>
+</section>
+
+<style>
+.hero-section {
+    position: relative;
+    height: 100vh;
+    min-height: 600px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    color: white;
+}
+
+.hero-section__background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -3;
+}
+
+.hero-section__image {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    filter: brightness(0.7) contrast(1.2) saturate(1.1);
+    transition: transform 20s ease;
+}
+
+.hero-section__image:hover {
+    transform: scale(1.05);
+}
+
+.hero-section__overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        135deg, 
+        rgba(0, 0, 0, 0.5) 0%, 
+        rgba(0, 0, 0, 0.3) 50%, 
+        rgba(0, 0, 0, 0.7) 100%
+    );
+    z-index: -2;
+}
+
+.hero-section__particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="stars" patternUnits="userSpaceOnUse" width="100" height="100"><circle cx="25" cy="25" r="0.5" fill="white" opacity="0.3"/><circle cx="75" cy="75" r="0.3" fill="white" opacity="0.4"/><circle cx="10" cy="60" r="0.4" fill="white" opacity="0.2"/><circle cx="90" cy="30" r="0.2" fill="white" opacity="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23stars)"/></svg>') repeat;
+    opacity: 0.6;
+    z-index: -1;
+    animation: sparkle 20s linear infinite;
+}
+
+@keyframes sparkle {
+    0% { transform: translateX(0) translateY(0); }
+    100% { transform: translateX(-100px) translateY(-100px); }
+}
+
+.hero-section__container {
+    max-width: 1400px;
+    width: 100%;
+    height: 100%;
+    padding: 0 2rem;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.hero-section__content {
+    max-width: 1000px;
+    margin: 0 auto;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.hero-section__text {
+    margin-bottom: 3rem;
+}
+
+.hero-section__title {
+    font-family: var(--font-arpona);
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    font-weight: 400;
+    line-height: 1.3;
+    margin-bottom: 1.5rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.5px;
+    font-variant: small-caps;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.hero-section__title-line {
+    display: inline-block;
+    position: relative;
+}
+
+
+.hero-section__subtitle {
+    font-family: 'Montserrat', sans-serif;
+    font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+    font-weight: 300;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.hero-section__actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    padding-bottom: 2rem;
+    margin-top: auto;
+}
+
+.hero-section__cta {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.hero-section__scroll-indicator {
+    margin-top: 1rem;
+}
+
+.hero-section__scroll-link {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.hero-section__scroll-link:hover {
+    color: #DAA520;
+    transform: translateY(-5px);
+}
+
+.hero-section__scroll-text {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 300;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.hero-section__scroll-arrow {
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    60% { transform: translateY(-5px); }
+}
+
+
+@media (max-width: 1024px) {
+    .hero-section__container {
+        padding: 0 1.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .hero-section {
+        min-height: 500px;
+        padding-top: 80px;
+    }
+    
+    .hero-section__container {
+        padding: 0 1rem;
+    }
+    
+    .hero-section__title {
+        font-size: clamp(1.8rem, 6vw, 2.5rem);
+    }
+    
+    .hero-section__subtitle {
+        font-size: 1rem;
+    }
+    
+    .hero-section__image {
+        background-attachment: scroll;
+    }
+    
+    .hero-section__actions {
+        gap: 1.5rem;
+        padding-bottom: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero-section__container {
+        padding: 0 0.75rem;
+    }
+    
+    .hero-section__title {
+        margin-bottom: 1rem;
+    }
+    
+    .hero-section__text {
+        margin-bottom: 2rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-section__particles,
+    .hero-section__image,
+    .hero-section__cta,
+    .hero-section__scroll-arrow {
+        animation: none;
+    }
+    
+    .hero-section__image:hover {
+        transform: none;
+    }
+}
+
+@media (max-height: 600px) {
+    .hero-section {
+        min-height: 500px;
+    }
+    
+    .hero-section__title {
+        font-size: clamp(2rem, 4vw, 3rem);
+        margin-bottom: 1rem;
+    }
+    
+    .hero-section__text {
+        margin-bottom: 2rem;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const scrollLink = document.querySelector('.hero-section__scroll-link[href^="#"]');
+    
+    if (scrollLink) {
+        scrollLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            const targetElement = document.getElementById(targetId);
+            
+            if (targetElement) {
+                const offsetTop = targetElement.offsetTop - 80;
+                window.scrollTo({
+                    top: offsetTop,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    }
+
+    const heroSection = document.getElementById('hero');
+    
+    if (heroSection && 'IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('hero-section--visible');
+                }
+            });
+        }, {
+            threshold: 0.1
+        });
+        
+        observer.observe(heroSection);
+    }
+});
+</script>

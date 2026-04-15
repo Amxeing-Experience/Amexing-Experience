@@ -37,12 +37,36 @@
                 <% 
                 // Determine if dropdown should be disabled
                 const isRestrictedRole = (typeof userRole !== 'undefined' && (userRole === 'department_manager' || userRole === 'client'));
+                const isAdminRole = (typeof userRole !== 'undefined' && (userRole === 'admin' || userRole === 'superadmin'));
                 const helpTextMessage = isRestrictedRole 
                     ? 'Cliente asignado automáticamente según tu rol' 
                     : 'Selecciona un cliente existente o crea uno nuevo';
                 %>
 
-                <div class="row">
+                <% if (isAdminRole) { %>
+                <!-- Client Type Selector - Only visible for admins -->
+                <div class="mb-3">
+                    <div class="btn-group w-100" role="group" aria-label="Tipo de cliente">
+                        <input type="radio" class="btn-check" name="clientTypeSelector" id="clientTypeAgency" value="agency" checked>
+                        <label class="btn btn-outline-primary" for="clientTypeAgency">
+                            <i class="ti ti-building me-1"></i>Agencias
+                        </label>
+                        <input type="radio" class="btn-check" name="clientTypeSelector" id="clientTypeDirect" value="direct">
+                        <label class="btn btn-outline-primary" for="clientTypeDirect">
+                            <i class="ti ti-user-check me-1"></i>Clientes Directos
+                        </label>
+                    </div>
+                    <div class="form-text mt-1">
+                        <small id="clientTypeHelp">
+                            <span class="client-type-agency">Selecciona una agencia o empresa asociada</span>
+                            <span class="client-type-direct" style="display: none;">Selecciona un cliente directo de Amexing</span>
+                        </small>
+                    </div>
+                </div>
+                <% } %>
+
+                <!-- Agency Client Selection (hidden for direct clients) -->
+                <div class="row" id="agencyClientRow">
                     <div class="col-md-<%= isRestrictedRole ? '12' : '10' %>">
                         <!-- Client selection - disabled for department_manager/client roles -->
                         <%- include('../../../atoms/common/tom-select', {
@@ -66,6 +90,30 @@
                         </button>
                     </div>
                     <% } %>
+                </div>
+                
+                <!-- Direct Client Selection (moved up when in direct mode) -->
+                <div class="row" id="directClientRow" style="display: none;">
+                    <div class="col-md-10">
+                        <%- include('../../../atoms/common/tom-select', {
+                            id: 'directClientId',
+                            name: 'directClientId',
+                            multiple: false,
+                            placeholder: 'Buscar cliente directo de Amexing',
+                            label: 'Cliente',
+                            required: true,
+                            helpText: 'Selecciona un cliente directo de Amexing',
+                            options: [],
+                            selected: [],
+                            disabled: false
+                        }) %>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-outline-primary w-100 px-2 py-2" id="createQuickDirectClientBtn">
+                            <i class="ti ti-plus me-1"></i>Crear Cliente
+                        </button>
+                    </div>
                 </div>
             </div>
                 
@@ -112,9 +160,9 @@
                     </div>
                 </div>
 
-                <!-- Final Client Selection -->
-                <div class="row">
-                    <div class="col-md-12 mb-3">
+                <!-- Final Client Selection (only shown for agencies) -->
+                <div class="row" id="finalClientRow">
+                    <div class="col-md-10 mb-3">
                         <%- include('../../../atoms/common/tom-select', {
                             id: 'clientFinalId',
                             name: 'clientFinalId',
@@ -126,6 +174,12 @@
                             options: [],
                             selected: []
                         }) %>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-outline-primary w-100 px-2 py-2" id="createFinalClientBtn">
+                            <i class="ti ti-plus me-1"></i>Crear Cliente
+                        </button>
                     </div>
                 </div>
 
@@ -331,6 +385,320 @@
     </div>
 </div>
 
+<!-- Quick Direct Client Creation Modal -->
+<div class="modal fade" id="quickDirectClientModal" tabindex="-1" aria-labelledby="quickDirectClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quickDirectClientModalLabel">
+                    <i class="ti ti-user-plus me-2"></i>Crear Cliente Directo
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alerts Container -->
+                <div id="quickDirectClientModalAlerts"></div>
+
+                <form id="quickDirectClientForm" class="needs-validation" novalidate>
+                    <!-- Sección: Información del Cliente -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-user me-1"></i>
+                            Información del Cliente
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="qdc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="qdc_firstName" name="firstName" required placeholder="Ej: Juan">
+                                <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="qdc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="qdc_lastName" name="lastName" required placeholder="Ej: Pérez">
+                                <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../../atoms/common/email-input', {
+                                    name: 'email',
+                                    id: 'qdc_email',
+                                    label: 'Email',
+                                    required: false,
+                                    placeholder: 'email@ejemplo.com',
+                                    helpText: 'Email de contacto principal',
+                                    containerClass: 'mb-3'
+                                }) %>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <%- include('../../../atoms/common/phone-input', {
+                                    name: 'phone',
+                                    id: 'qdc_phone',
+                                    label: 'Teléfono',
+                                    required: false,
+                                    helpText: 'Número de contacto',
+                                    countryCode: 'MX',
+                                    containerClass: 'mb-3'
+                                }) %>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sección: Información de la Empresa -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-building me-1"></i>
+                            Información de la Empresa
+                        </h6>
+                        
+                        <div class="mb-3">
+                            <label for="qdc_companyName" class="form-label">Nombre de Empresa</label>
+                            <input type="text" class="form-control" id="qdc_companyName" name="companyName" placeholder="Ej: Empresa S.A. de C.V.">
+                            <div class="form-text">Nombre de la empresa del cliente (opcional)</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sección: Persona de Contacto -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-users me-1"></i>
+                            Persona de Contacto <small class="text-muted">(opcional)</small>
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="qdc_contactFirstName" class="form-label">Nombre de Contacto</label>
+                                <input type="text" class="form-control" id="qdc_contactFirstName" name="contactFirstName" placeholder="Ej: María">
+                                <div class="form-text">Si es diferente al cliente principal</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="qdc_contactLastName" class="form-label">Apellido de Contacto</label>
+                                <input type="text" class="form-control" id="qdc_contactLastName" name="contactLastName" placeholder="Ej: García">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sección: Preferencias -->
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-settings me-1"></i>
+                            Preferencias
+                        </h6>
+                        
+                        <%- include('../../../atoms/common/language-select', {
+                            id: 'qdc_preferredLanguage',
+                            name: 'preferredLanguage',
+                            label: 'Idioma de Preferencia',
+                            required: false,
+                            helpText: 'Idioma preferido para comunicación',
+                            value: 'es'
+                        }) %>
+                    </div>
+                    
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <small><strong>Cliente directo:</strong> Este cliente será creado como cliente directo de Amexing. Podrás completar sus datos desde la sección de Clientes más adelante.</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveQuickDirectClientBtn">
+                    <i class="ti ti-check me-1"></i>Crear Cliente
+                </button>
+            </div>
+
+            <%- include('../../../atoms/common/modal-loader', { text: 'Creando cliente directo...' }) %>
+        </div>
+    </div>
+</div>
+
+<!-- Owned Client Creation Modal (for department_manager/client roles) -->
+<div class="modal fade" id="ownedClientModal" tabindex="-1" aria-labelledby="ownedClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ownedClientModalLabel">
+                    <i class="ti ti-user-plus me-2"></i>Crear Cliente Final
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alerts Container -->
+                <div id="ownedClientModalAlerts"></div>
+
+                <form id="ownedClientForm" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="oc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="oc_firstName" name="firstName" required placeholder="Ej: Juan">
+                        <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="oc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="oc_lastName" name="lastName" required placeholder="Ej: Pérez">
+                        <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                    </div>
+
+                    <%- include('../../../atoms/common/email-input', {
+                        name: 'email',
+                        id: 'oc_email',
+                        label: 'Email',
+                        required: false,
+                        placeholder: 'email@ejemplo.com',
+                        helpText: 'Email de contacto del cliente',
+                        containerClass: 'mb-3'
+                    }) %>
+
+                    <div class="mb-3">
+                        <label for="oc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
+                        <input type="text" class="form-control" id="oc_companyName" name="companyName" placeholder="Ej: Empresa S.A. de C.V.">
+                        <div class="form-text">Nombre de la empresa del cliente</div>
+                    </div>
+
+                    <%- include('../../../atoms/common/phone-input', {
+                        name: 'phone',
+                        id: 'oc_phone',
+                        label: 'Teléfono',
+                        required: false,
+                        helpText: 'Número de contacto del cliente',
+                        countryCode: 'MX',
+                        containerClass: 'mb-3'
+                    }) %>
+                    
+                    <%- include('../../../atoms/common/language-select', {
+                        id: 'oc_preferredLanguage',
+                        name: 'preferredLanguage',
+                        label: 'Idioma de Preferencia',
+                        required: false,
+                        helpText: 'Idioma preferido para comunicación',
+                        value: 'es'
+                    }) %>
+
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <small><strong>Cliente final:</strong> Este cliente pertenecerá a tu organización. Podrás completar sus datos desde la sección de Clientes más adelante.</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveOwnedClientBtn">
+                    <i class="ti ti-check me-1"></i>Crear Cliente
+                </button>
+            </div>
+
+            <%- include('../../../atoms/common/modal-loader', { text: 'Creando cliente...' }) %>
+        </div>
+    </div>
+</div>
+
+<!-- Admin Sub-Client Creation Modal (for admin creating sub-clients for selected enterprise) -->
+<div class="modal fade" id="adminSubClientModal" tabindex="-1" aria-labelledby="adminSubClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="adminSubClientModalLabel">
+                    <i class="ti ti-user-plus me-2"></i>Crear Cliente Final para Empresa
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alerts Container -->
+                <div id="adminSubClientModalAlerts"></div>
+
+                <form id="adminSubClientForm" class="needs-validation" novalidate>
+                    <!-- Enterprise Info -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <small><strong>Empresa seleccionada:</strong> <span id="selectedEnterpriseName">No hay empresa seleccionada</span></small>
+                            <br>
+                            <small>Este cliente final pertenecerá a la empresa seleccionada.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="asc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="asc_firstName" name="firstName" required placeholder="Ej: Juan">
+                        <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="asc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="asc_lastName" name="lastName" required placeholder="Ej: Pérez">
+                        <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                    </div>
+
+                    <%- include('../../../atoms/common/email-input', {
+                        name: 'email',
+                        id: 'asc_email',
+                        label: 'Email',
+                        required: false,
+                        placeholder: 'email@ejemplo.com',
+                        helpText: 'Email de contacto del cliente final',
+                        containerClass: 'mb-3'
+                    }) %>
+
+                    <div class="mb-3">
+                        <label for="asc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
+                        <input type="text" class="form-control" id="asc_companyName" name="companyName" placeholder="Ej: Departamento de Ventas S.A.">
+                        <div class="form-text">Nombre específico de la empresa del cliente final</div>
+                    </div>
+
+                    <%- include('../../../atoms/common/phone-input', {
+                        name: 'phone',
+                        id: 'asc_phone',
+                        label: 'Teléfono',
+                        required: false,
+                        helpText: 'Número de contacto del cliente final',
+                        countryCode: 'MX',
+                        containerClass: 'mb-3'
+                    }) %>
+                    
+                    <%- include('../../../atoms/common/language-select', {
+                        id: 'asc_preferredLanguage',
+                        name: 'preferredLanguage',
+                        label: 'Idioma de Preferencia',
+                        required: false,
+                        helpText: 'Idioma preferido para comunicación',
+                        value: 'es'
+                    }) %>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveAdminSubClientBtn">
+                    <i class="ti ti-check me-1"></i>Crear Cliente Final
+                </button>
+            </div>
+
+            <%- include('../../../atoms/common/modal-loader', { text: 'Creando cliente final...' }) %>
+        </div>
+    </div>
+</div>
+
 <script>
 (function() {
     'use strict';
@@ -346,8 +714,22 @@
         firstName: '<%= typeof user !== "undefined" && user ? user.firstName || "" : "" %>',
         lastName: '<%= typeof user !== "undefined" && user ? user.lastName || "" : "" %>',
         phone: '<%= typeof user !== "undefined" && user ? user.phone || "" : "" %>',
-        clientId: '<%= typeof user !== "undefined" && user ? user.clientId || "" : "" %>'
+        clientId: '<%= typeof user !== "undefined" && user ? user.clientId || "" : "" %>',
+        contextualData: <%-
+            typeof user !== "undefined" && user && user.contextualData 
+                ? JSON.stringify(user.contextualData) 
+                : "{}"
+        %>
     };
+    
+    // 🔍 DEBUG: Log currentUserData to verify contextualData is available
+    console.log('🚀 DEBUG - currentUserData structure:', {
+        userRole,
+        hasContextualData: !!currentUserData.contextualData,
+        contextualDataKeys: Object.keys(currentUserData.contextualData || {}),
+        companyName: currentUserData.contextualData?.companyName,
+        fullUserData: currentUserData
+    });
     
     // Make currentUserData available globally for other scripts
     window.currentUserData = currentUserData;
@@ -487,8 +869,15 @@
     // Load current user info for department manager / client role
     async function loadCurrentUserAsClient() {
         try {
+            console.log('🚀 EXECUTION - loadCurrentUserAsClient called for role:', userRole);
+            
             const clientField = document.getElementById('clientId');
-            if (!clientField) return;
+            if (!clientField) {
+                console.log('❌ EXECUTION - clientId field not found, exiting');
+                return;
+            }
+            
+            console.log('✅ EXECUTION - clientId field found, proceeding with role:', userRole);
             
             let clientUserId = null;
             let clientName = '';
@@ -497,26 +886,34 @@
             if (userRole === 'client' && currentUserData.clientId) {
                 clientUserId = currentUserData.clientId;
                 
-                // Fetch org owner's name from API
-                try {
-                    const token = getAccessToken();
-                    const resp = await fetch(`/api/users/${clientUserId}`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    if (resp.ok) {
-                        const result = await resp.json();
-                        const owner = result.data || result;
-                        clientName = [owner.firstName, owner.lastName].filter(Boolean).join(' ') || owner.companyName || owner.email || 'Cliente';
-                    } else {
-                        clientName = 'Cliente';
-                    }
-                } catch {
-                    clientName = 'Cliente';
-                }
+                // Use enterprise name from currentUserData (now includes organization owner's contextualData)
+                console.log('🔍 CLIENT ROLE - Using enhanced currentUserData:', {
+                    hasContextualData: !!currentUserData.contextualData,
+                    contextualDataCompanyName: currentUserData.contextualData?.companyName,
+                    currentUserDataKeys: Object.keys(currentUserData.contextualData || {}),
+                    source: 'enhanced_currentUserData_with_owner_data'
+                });
+                
+                clientName = currentUserData.contextualData?.companyName ||
+                            `${currentUserData.firstName || ''} ${currentUserData.lastName || ''}`.trim() || 
+                            currentUserData.email || 
+                            'Cliente';
             } else if (userRole === 'department_manager' && currentUserData.id) {
                 // Department manager: use current user as client
                 clientUserId = currentUserData.id;
-                clientName = currentUserData.name || 
+                // Prioritize enterprise name from contextualData for business-focused display
+                console.log('🔍 DEBUG - Department manager data:', {
+                    hasContextualData: !!currentUserData.contextualData,
+                    contextualDataCompanyName: currentUserData.contextualData?.companyName,
+                    currentUserDataName: currentUserData.name,
+                    currentUserDataFirstName: currentUserData.firstName,
+                    currentUserDataLastName: currentUserData.lastName,
+                    currentUserDataEmail: currentUserData.email,
+                    fullCurrentUserData: currentUserData
+                });
+                
+                clientName = currentUserData.contextualData?.companyName ||
+                            currentUserData.name || 
                             `${currentUserData.firstName || ''} ${currentUserData.lastName || ''}`.trim() || 
                             currentUserData.email || 
                             'Usuario actual';
@@ -525,23 +922,46 @@
                 return;
             }
             
+            console.log('📝 EXECUTION - Final clientName determined:', {
+                clientName,
+                clientUserId,
+                userRole
+            });
+            
             // Set the value in the hidden input
             clientField.value = clientUserId;
             
             // Update the display if using custom dropdown
             const displayElement = document.getElementById('clientId_display');
+            console.log('🎯 DROPDOWN - Attempting to update display element:', {
+                displayElementFound: !!displayElement,
+                clientName,
+                clientUserId
+            });
+            
             if (displayElement) {
                 const textSpan = displayElement.querySelector('.dropdown-selected-text');
+                console.log('🎯 DROPDOWN - Text span found:', !!textSpan);
+                
                 if (textSpan) {
+                    const oldText = textSpan.textContent;
                     textSpan.textContent = clientName;
                     textSpan.classList.remove('text-muted');
+                    console.log('✅ DROPDOWN - Text updated:', {
+                        oldText,
+                        newText: clientName,
+                        actualText: textSpan.textContent
+                    });
                 }
                 
                 // Add the option to the dropdown if it doesn't exist
                 const optionsContainer = document.getElementById('clientId_options');
+                console.log('🎯 DROPDOWN - Options container found:', !!optionsContainer);
+                
                 if (optionsContainer && !optionsContainer.querySelector(`[data-value="${clientUserId}"]`)) {
                     const optionHtml = `<a class="dropdown-item dropdown-option" href="#" data-value="${clientUserId}" data-text="${clientName}">${clientName}</a>`;
                     optionsContainer.innerHTML = optionHtml;
+                    console.log('✅ DROPDOWN - Option added to container:', optionHtml);
                 }
             }
             
@@ -550,31 +970,124 @@
                 clientField.customSelect.setValue(clientUserId);
             }
             
-            // Auto-fill contact info from current user
-            if (currentUserData.firstName || currentUserData.lastName) {
-                const firstName = currentUserData.firstName || '';
-                const lastName = currentUserData.lastName || '';
-                if (firstName) document.getElementById('contactFirstName').value = firstName;
-                if (lastName) document.getElementById('contactLastName').value = lastName;
+            // Auto-fill contact info from current user ONLY if fields are empty (for new quotes)
+            const contactFirstNameField = document.getElementById('contactFirstName');
+            const contactLastNameField = document.getElementById('contactLastName');
+            const contactEmailField = document.getElementById('contactEmail');
+            const contactPhoneField = document.getElementById('contactPhone');
+            
+            // Only fill if the fields are empty (new quote scenario)
+            if (!contactFirstNameField.value && !contactLastNameField.value) {
+                if (currentUserData.firstName || currentUserData.lastName) {
+                    const firstName = currentUserData.firstName || '';
+                    const lastName = currentUserData.lastName || '';
+                    if (firstName && !contactFirstNameField.value) {
+                        contactFirstNameField.value = firstName;
+                    }
+                    if (lastName && !contactLastNameField.value) {
+                        contactLastNameField.value = lastName;
+                    }
+                }
             }
-            if (currentUserData.email) document.getElementById('contactEmail').value = currentUserData.email;
-            if (currentUserData.phone) document.getElementById('contactPhone').value = currentUserData.phone;
+            if (!contactEmailField.value && currentUserData.email) {
+                contactEmailField.value = currentUserData.email;
+            }
+            if (!contactPhoneField.value && currentUserData.phone) {
+                contactPhoneField.value = currentUserData.phone;
+            }
+            
+            // Load sub-clients for both department_manager and client roles
+            if ((userRole === 'department_manager' || userRole === 'client') && clientUserId) {
+                console.log('🚀 Loading sub-clients for restricted role:', userRole, 'clientUserId:', clientUserId);
+                await loadClientEmployees(clientUserId);
+            }
             
         } catch (error) {
             console.error('Error loading current user as client:', error);
         }
     }
 
+    // Track current client type (agency or direct)
+    let currentClientType = 'agency';
+    
+    // Load direct Amexing clients into the direct client dropdown  
+    window.loadDirectClients = async function loadDirectClients(searchTerm = '', page = 1) {
+        try {
+            const endpoint = '/api/clients/amexing-direct';
+            
+            // Build query parameters
+            const params = new URLSearchParams();
+            if (searchTerm) params.append('search', searchTerm);
+            params.append('page', page.toString());
+            params.append('limit', '100');
+            
+            const url = `${endpoint}${params.toString() ? '?' + params.toString() : ''}`;
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                const directClientTS = await waitForTomSelect('directClientId');
+                
+                if (page === 1) {
+                    directClientTS.clearOptions();
+                }
+                
+                const clients = result.data.clients || result.data;
+                
+                // Add client options
+                clients.forEach(client => {
+                    directClientTS.addOption({
+                        value: client.value,
+                        text: client.label,
+                        email: client.email,
+                        contactPerson: client.contactPerson,
+                        phone: client.phone,
+                        firstName: client.firstName,
+                        lastName: client.lastName,
+                        companyName: client.companyName,
+                        preferredLanguage: client.preferredLanguage
+                    });
+                });
+                
+                directClientTS.refreshOptions(false);
+                
+                return {
+                    hasMore: result.data.pagination?.hasMore || false,
+                    total: result.data.pagination?.total || clients.length
+                };
+            } else {
+                console.error('No direct client data or API error:', result);
+                return { hasMore: false, total: 0 };
+            }
+        } catch (error) {
+            console.error('Error loading direct clients:', error);
+            showAlert('quoteInformationAlerts', 'Error al cargar clientes directos', 'danger');
+            return { hasMore: false, total: 0 };
+        }
+    }
+    
     // Load active clients for Tom Select with optional search
     // Make this function globally available for the custom dropdown component
-    window.loadActiveClients = async function loadActiveClients(searchTerm = '', page = 1) {
+    window.loadActiveClients = async function loadActiveClients(searchTerm = '', page = 1, clientType = null) {
         // Skip loading clients for department_manager and client roles (they don't see the dropdown)
         if (userRole === 'department_manager' || userRole === 'client') {
             return;
         }
         
+        // Use provided clientType or fall back to current selection
+        const typeToLoad = clientType || currentClientType;
+        
         try {
-            const endpoint = '/api/clients/active';
+            // Choose endpoint based on client type
+            const endpoint = typeToLoad === 'direct' ? '/api/clients/amexing-direct' : '/api/clients/active';
             
             // Build query parameters
             const params = new URLSearchParams();
@@ -684,6 +1197,8 @@
     // Load sub-clients (final clients) when a client is selected
     async function loadClientEmployees(clientId, selectedClientFinalId = null) {
         try {
+            console.log('🔍 loadClientEmployees called with clientId:', clientId, 'selectedClientFinalId:', selectedClientFinalId);
+            
             if (!clientId) {
                 // Clear sub-client dropdown if no client selected
                 const employeeTS = await waitForTomSelect('clientFinalId');
@@ -694,7 +1209,10 @@
             }
 
             // Fetch sub-clients for this client
-            const response = await fetch(`/api/clients/${clientId}/sub-clients`, {
+            const apiUrl = `/api/clients/${clientId}/sub-clients`;
+            console.log('📡 Fetching sub-clients from:', apiUrl);
+            
+            const response = await fetch(apiUrl, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${getAccessToken()}`,
@@ -702,21 +1220,23 @@
                 }
             });
 
+            console.log('📥 Response received:', {
+                ok: response.ok,
+                status: response.status,
+                statusText: response.statusText,
+                url: response.url,
+                headers: Object.fromEntries(response.headers.entries())
+            });
+
             const result = await response.json();
             
-            console.log('🏢 Sub-clients API Response:', {
-                clientId: clientId,
+            console.log('📊 Result data:', {
                 success: result.success,
+                error: result.error,
+                message: result.message,
+                dataStructure: result.data,
                 clientsCount: result.data?.clients?.length || 0,
-                clients: result.data?.clients?.map(client => ({
-                    id: client.id,
-                    name: client.name,
-                    companyName: client.companyName,
-                    contactPerson: client.contactPerson,
-                    email: client.email,
-                    phone: client.phone,
-                    preferredLanguage: client.preferredLanguage
-                }))
+                clients: result.data?.clients || []
             });
 
             if (result.success && result.data?.clients && result.data.clients.length > 0) {
@@ -735,14 +1255,44 @@
                                      `${client.firstName || ''} ${client.lastName || ''}`.trim() || 
                                      client.email;
                     
+                    // Ensure firstName and lastName are properly extracted
+                    let firstName = client.firstName || '';
+                    let lastName = client.lastName || '';
+                    
+                    // If no separate firstName/lastName, try to extract from name or contactPerson
+                    if (!firstName && !lastName) {
+                        const nameToSplit = client.name || client.contactPerson || '';
+                        if (nameToSplit) {
+                            const nameParts = nameToSplit.trim().split(/\s+/);
+                            if (nameParts.length === 1) {
+                                firstName = nameParts[0];
+                            } else if (nameParts.length === 2) {
+                                firstName = nameParts[0];
+                                lastName = nameParts[1];
+                            } else if (nameParts.length > 2) {
+                                firstName = nameParts[0];
+                                lastName = nameParts.slice(1).join(' ');
+                            }
+                        }
+                    }
+                    
+                    console.log('🔍 Adding Cliente Final option:', {
+                        clientId: client.id,
+                        displayName,
+                        firstName,
+                        lastName,
+                        originalData: client
+                    });
+                    
                     employeeTS.addOption({
                         value: client.id,
                         text: displayName,
                         email: client.email,
                         contactPerson: client.contactPerson || displayName,
-                        firstName: client.firstName || '',
-                        lastName: client.lastName || '',
+                        firstName: firstName,
+                        lastName: lastName,
                         phone: client.phone || '',
+                        companyName: client.companyName || '',
                         preferredLanguage: client.preferredLanguage || 'es'
                     });
                 });
@@ -751,48 +1301,40 @@
                 
                 // If a specific clientFinalId was provided, set it now
                 if (selectedClientFinalId) {
-                    console.log('🔍 Attempting to set clientFinalId:', {
-                        selectedClientFinalId: selectedClientFinalId,
-                        selectedType: typeof selectedClientFinalId,
-                        availableOptions: result.data.clients.map(c => ({
-                            id: c.id,
-                            idType: typeof c.id,
-                            name: c.name || c.companyName
-                        }))
-                    });
-                    
-                    // Check if the option exists
+                    // Check if the option exists and set it
                     const optionExists = employeeTS.getOption && employeeTS.getOption(selectedClientFinalId);
-                    console.log('🔍 getOption result:', {
-                        optionExists: !!optionExists,
-                        optionDetails: optionExists
-                    });
                     
                     if (optionExists) {
-                        console.log('✅ Option found, setting value...');
                         employeeTS.setValue(selectedClientFinalId);
-                        
-                        // Verify it was set
-                        setTimeout(() => {
-                            const currentValue = employeeTS.getValue();
-                            console.log('✅ Verification - current value:', currentValue);
-                        }, 100);
                     } else {
-                        console.log('⚠️ Cliente Final option not found in dropdown');
-                        // Try to find a matching option manually
-                        const manualFind = result.data.clients.find(c => c.id === selectedClientFinalId);
-                        console.log('🔍 Manual find result:', manualFind);
+                        console.warn('⚠️ Cliente Final option not found:', selectedClientFinalId);
                     }
                 }
             } else {
                 // No sub-clients found
+                console.log('⚠️ No sub-clients condition triggered:', {
+                    success: result.success,
+                    hasData: !!result.data,
+                    hasClients: !!result.data?.clients,
+                    clientsLength: result.data?.clients?.length,
+                    error: result.error,
+                    message: result.message,
+                    fullResult: result
+                });
+                
                 const employeeTS = await waitForTomSelect('clientFinalId');
                 employeeTS.clearOptions();
                 employeeTS.addOption({ value: '', text: 'No hay clientes disponibles' });
                 employeeTS.setValue('');
             }
         } catch (error) {
-            console.error('Error loading sub-clients:', error);
+            console.error('❌ Error loading sub-clients - Full details:', {
+                error: error,
+                message: error.message,
+                stack: error.stack,
+                clientId: clientId,
+                errorType: error.constructor.name
+            });
             // Clear dropdown on error
             try {
                 const employeeTS = await waitForTomSelect('clientFinalId');
@@ -805,6 +1347,104 @@
         }
     }
 
+    // Handle direct client selection for auto-fill
+    async function handleDirectClientSelection() {
+        try {
+            const directClientInput = document.getElementById('directClientId');
+            if (!directClientInput) {
+                console.log('Direct client input not found');
+                return;
+            }
+            
+            directClientInput.addEventListener('change', async function(event) {
+                console.log('🔄 Direct Client selection changed:', event.target.value);
+                const value = event.target.value;
+                
+                if (value) {
+                    try {
+                        // Get the option data using dual approach like Cliente Final
+                        const directClientInput = document.getElementById('directClientId');
+                        let option = null;
+                        
+                        // First try the customSelect property (preferred method)
+                        if (directClientInput.customSelect) {
+                            console.log('📊 Using customSelect property for direct client');
+                            option = directClientInput.customSelect.getOption(value);
+                        }
+                        
+                        // If that didn't work, try waitForTomSelect (fallback)
+                        if (!option) {
+                            console.log('📊 Using waitForTomSelect fallback for direct client');
+                            const directClientTS = await waitForTomSelect('directClientId');
+                            console.log('📋 Direct client TomSelect instance:', directClientTS);
+                            option = directClientTS.options ? directClientTS.options[value] : null;
+                        }
+                        
+                        console.log('🎯 Direct client option data:', option);
+                        
+                        if (option) {
+                            // Use direct firstName/lastName if available, otherwise parse contactPerson
+                            let firstName = option.firstName || '';
+                            let lastName = option.lastName || '';
+                            
+                            // Fallback to parsing contactPerson if firstName/lastName not available
+                            if (!firstName && !lastName && option.contactPerson) {
+                                const nameParts = option.contactPerson.trim().split(/\s+/);
+                                if (nameParts.length === 1) {
+                                    firstName = nameParts[0];
+                                } else if (nameParts.length >= 2) {
+                                    firstName = nameParts[0];
+                                    lastName = nameParts.slice(1).join(' ');
+                                }
+                            }
+                            
+                            // Auto-fill contact fields
+                            document.getElementById('contactFirstName').value = firstName;
+                            document.getElementById('contactLastName').value = lastName;
+                            document.getElementById('contactEmail').value = option.email || '';
+                            
+                            // Strip country code from phone if present
+                            let phoneNumber = option.phone || '';
+                            if (phoneNumber.startsWith('52') && phoneNumber.length > 10) {
+                                phoneNumber = phoneNumber.substring(2);
+                            } else if (phoneNumber.startsWith('1') && phoneNumber.length === 11) {
+                                phoneNumber = phoneNumber.substring(1);
+                            }
+                            document.getElementById('contactPhone').value = phoneNumber;
+                            
+                            // Auto-fill preferred language
+                            const languageSelect = document.getElementById('preferredLanguage');
+                            if (languageSelect && option.preferredLanguage) {
+                                languageSelect.value = option.preferredLanguage;
+                                console.log('✅ Language preference set to:', option.preferredLanguage);
+                            }
+                            
+                            console.log('✅ Direct client contact fields auto-filled successfully');
+                        } else {
+                            console.warn('⚠️ Direct client option not found for value:', value);
+                        }
+                    } catch (error) {
+                        console.error('Error getting direct client data:', error);
+                    }
+                } else {
+                    // Clear contact fields when no client selected
+                    document.getElementById('contactFirstName').value = '';
+                    document.getElementById('contactLastName').value = '';
+                    document.getElementById('contactEmail').value = '';
+                    document.getElementById('contactPhone').value = '';
+                    
+                    // Reset preferred language to default
+                    const languageSelect = document.getElementById('preferredLanguage');
+                    if (languageSelect) {
+                        languageSelect.value = 'es';
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error setting up direct client selection handler:', error);
+        }
+    }
+    
     // Auto-fill contact information when client is selected (admin/superadmin only)
     async function handleClientSelection() {
         try {
@@ -818,9 +1458,11 @@
             // Listen for change events on the hidden input
             clientInput.addEventListener('change', async function(event) {
                 const value = event.target.value;
+                console.log('🎯 Client dropdown changed, value:', value);
                 
                 if (value) {
                     // Load employees for the selected client
+                    console.log('📞 Calling loadClientEmployees with value:', value);
                     loadClientEmployees(value);
                     
                     try {
@@ -890,12 +1532,14 @@
                 return;
             }
             
-            console.log('✅ Employee input found, adding event listener...');
-
             // Listen for change events on the hidden input
             employeeInput.addEventListener('change', async function(event) {
-                console.log('🔄 Cliente Final selection changed:', event.target.value);
                 const value = event.target.value;
+                
+                console.log('🎯 Cliente Final selection changed:', {
+                    newValue: value,
+                    timestamp: new Date().toISOString()
+                });
                 
                 if (value) {
                     try {
@@ -903,33 +1547,44 @@
                         const employeeInput = document.getElementById('clientFinalId');
                         let option = null;
                         
-                        // First try the customSelect property
+                        // First try the customSelect property (preferred method)
                         if (employeeInput.customSelect) {
-                            console.log('📊 Using customSelect property');
+                            console.log('📊 Using customSelect property for Cliente Final');
                             option = employeeInput.customSelect.getOption(value);
                         }
                         
-                        // If that didn't work, try waitForTomSelect
+                        // If that didn't work, try waitForTomSelect (fallback)
                         if (!option) {
+                            console.log('📊 Using waitForTomSelect fallback for Cliente Final');
                             const employeeTS = await waitForTomSelect('clientFinalId');
-                            console.log('📊 Using waitForTomSelect, instance:', employeeTS);
-                            console.log('📋 Available options:', employeeTS.options);
                             option = employeeTS.options ? employeeTS.options[value] : null;
+                            
+                            // Also try getting option using getOption method
+                            if (!option && employeeTS.getOption) {
+                                option = employeeTS.getOption(value);
+                            }
                         }
                         
-                        console.log('🎯 Selected option data:', option);
+                        console.log('📋 Cliente Final option data:', {
+                            value,
+                            option,
+                            hasFirstName: !!(option?.firstName),
+                            hasLastName: !!(option?.lastName),
+                            hasContactPerson: !!(option?.contactPerson),
+                            hasEmail: !!(option?.email),
+                            hasPhone: !!(option?.phone)
+                        });
                         
                         if (option) {
-                            console.log('🎯 Auto-filling from Cliente Final:', option);
-                            
                             // Parse name into first and last name
                             let firstName = '';
                             let lastName = '';
                             
-                            // Check if we have separate firstName/lastName in the option
+                            // Check if we have separate firstName/lastName in the option (preferred)
                             if (option.firstName || option.lastName) {
                                 firstName = option.firstName || '';
                                 lastName = option.lastName || '';
+                                console.log('✅ Using separate firstName/lastName from option');
                             } else if (option.contactPerson) {
                                 // Split contactPerson into parts
                                 const nameParts = option.contactPerson.trim().split(/\s+/);
@@ -939,11 +1594,31 @@
                                     firstName = nameParts[0];
                                     lastName = nameParts[1];
                                 } else if (nameParts.length > 2) {
-                                    // Handle names with multiple parts
                                     firstName = nameParts[0];
                                     lastName = nameParts.slice(1).join(' ');
                                 }
+                                console.log('✅ Split contactPerson into names');
+                            } else if (option.text) {
+                                // Last resort: split the display text
+                                const nameParts = option.text.trim().split(/\s+/);
+                                if (nameParts.length === 1) {
+                                    firstName = nameParts[0];
+                                } else if (nameParts.length === 2) {
+                                    firstName = nameParts[0];
+                                    lastName = nameParts[1];
+                                } else if (nameParts.length > 2) {
+                                    firstName = nameParts[0];
+                                    lastName = nameParts.slice(1).join(' ');
+                                }
+                                console.log('✅ Split display text into names');
                             }
+                            
+                            console.log('🔄 Auto-filling contact fields with Cliente Final data:', {
+                                firstName,
+                                lastName,
+                                email: option.email || '',
+                                phone: option.phone || ''
+                            });
                             
                             // Auto-fill contact name fields
                             document.getElementById('contactFirstName').value = firstName;
@@ -963,17 +1638,32 @@
                             }
                             document.getElementById('contactPhone').value = phoneNumber;
                             
-                            // Auto-fill preferred language
-                            if (option.preferredLanguage) {
-                                document.getElementById('preferredLanguage').value = option.preferredLanguage;
-                                console.log('✅ Language preference set to:', option.preferredLanguage);
+                            // Auto-fill preferred language if available
+                            const languageSelect = document.getElementById('preferredLanguage');
+                            if (languageSelect && option.preferredLanguage) {
+                                languageSelect.value = option.preferredLanguage;
                             }
+                            
+                            console.log('✅ Successfully auto-filled all contact fields from Cliente Final');
+                        } else {
+                            console.warn('⚠️ No option data found for Cliente Final value:', value);
                         }
                     } catch (error) {
-                        console.error('Error getting employee data:', error);
+                        console.error('❌ Error getting Cliente Final data:', error);
                     }
                 } else {
-                    // Don't clear fields when no employee selected (keep client defaults)
+                    console.log('🔄 Clearing contact fields - no Cliente Final selected');
+                    // Clear contact fields when no client selected
+                    document.getElementById('contactFirstName').value = '';
+                    document.getElementById('contactLastName').value = '';
+                    document.getElementById('contactEmail').value = '';
+                    document.getElementById('contactPhone').value = '';
+                    
+                    // Reset preferred language to default
+                    const languageSelect = document.getElementById('preferredLanguage');
+                    if (languageSelect) {
+                        languageSelect.value = 'es';
+                    }
                 }
             });
         } catch (error) {
@@ -1069,6 +1759,303 @@
             hideQuickClientModalLoader('quickClientModal');
         }
     }
+    
+    // Open owned client modal (for department_manager/client roles)
+    function openOwnedClientModal() {
+        clearAlerts('ownedClientModalAlerts');
+        document.getElementById('ownedClientForm').reset();
+        document.getElementById('ownedClientForm').classList.remove('was-validated');
+
+        const modal = new bootstrap.Modal(document.getElementById('ownedClientModal'));
+        modal.show();
+    }
+    
+    // Save owned client (for department_manager/client roles)
+    async function saveOwnedClient() {
+        const form = document.getElementById('ownedClientForm');
+
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Get form data
+        const formData = {
+            firstName: document.getElementById('oc_firstName').value.trim(),
+            lastName: document.getElementById('oc_lastName').value.trim(),
+            email: document.getElementById('oc_email').value.trim() || undefined,
+            phone: document.getElementById('oc_phone').value.trim() || undefined,
+            companyName: document.getElementById('oc_companyName').value.trim() || undefined,
+            preferredLanguage: document.getElementById('oc_preferredLanguage').value || 'es'
+        };
+
+        // Show loader
+        showQuickClientModalLoader('ownedClientModal');
+        clearAlerts('ownedClientModalAlerts');
+
+        try {
+            const response = await fetch('/api/owned-clients/quick', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                // Add new client to Cliente Final Tom Select
+                const employeeTS = await waitForTomSelect('clientFinalId');
+
+                employeeTS.addOption({
+                    value: result.data.value,
+                    text: result.data.label,
+                    email: result.data.email || '',
+                    contactPerson: result.data.contactPerson || result.data.label,
+                    phone: result.data.phone || '',
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    preferredLanguage: formData.preferredLanguage
+                });
+
+                // Select the new client
+                employeeTS.setValue(result.data.value);
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('ownedClientModal'));
+                modal.hide();
+
+                // Show success message
+                showAlert('quoteInformationAlerts', 'Cliente final creado exitosamente', 'success');
+            } else {
+                // Handle error cases
+                let errorMessage = result.error || 'Error al crear el cliente';
+                showAlert('ownedClientModalAlerts', errorMessage, 'danger');
+            }
+        } catch (error) {
+            console.error('Error creating owned client:', error);
+            showAlert('ownedClientModalAlerts', 'Error de conexión al crear el cliente', 'danger');
+        } finally {
+            hideQuickClientModalLoader('ownedClientModal');
+        }
+    }
+    
+    // Open admin sub-client modal (for admin creating sub-clients for selected enterprise)
+    function openAdminSubClientModal() {
+        // First, validate that an enterprise is selected
+        const clientIdInput = document.getElementById('clientId');
+        const selectedEnterpriseId = clientIdInput ? clientIdInput.value : null;
+        
+        if (!selectedEnterpriseId) {
+            showAlert('quoteInformationAlerts', 'Por favor selecciona una empresa antes de crear un cliente final', 'warning');
+            return;
+        }
+        
+        // Get the enterprise name for display
+        let enterpriseName = 'Empresa seleccionada';
+        try {
+            const clientTS = clientTomSelect || document.getElementById('clientId')?.customSelect;
+            if (clientTS && clientTS.getOption) {
+                const option = clientTS.getOption(selectedEnterpriseId);
+                if (option && option.text) {
+                    enterpriseName = option.text;
+                }
+            }
+        } catch (error) {
+            console.warn('Could not get enterprise name:', error);
+        }
+        
+        // Update the modal with enterprise information
+        const enterpriseNameSpan = document.getElementById('selectedEnterpriseName');
+        if (enterpriseNameSpan) {
+            enterpriseNameSpan.textContent = enterpriseName;
+        }
+        
+        // Clear form and alerts
+        clearAlerts('adminSubClientModalAlerts');
+        document.getElementById('adminSubClientForm').reset();
+        document.getElementById('adminSubClientForm').classList.remove('was-validated');
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('adminSubClientModal'));
+        modal.show();
+    }
+    
+    // Save admin sub-client (for admin creating sub-clients for selected enterprise)
+    async function saveAdminSubClient() {
+        // Validate that an enterprise is still selected
+        const clientIdInput = document.getElementById('clientId');
+        const selectedEnterpriseId = clientIdInput ? clientIdInput.value : null;
+        
+        if (!selectedEnterpriseId) {
+            showAlert('adminSubClientModalAlerts', 'No hay empresa seleccionada. Por favor selecciona una empresa primero.', 'danger');
+            return;
+        }
+
+        const form = document.getElementById('adminSubClientForm');
+
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Get form data
+        const formData = {
+            firstName: document.getElementById('asc_firstName').value.trim(),
+            lastName: document.getElementById('asc_lastName').value.trim(),
+            email: document.getElementById('asc_email').value.trim() || undefined,
+            phone: document.getElementById('asc_phone').value.trim() || undefined,
+            companyName: document.getElementById('asc_companyName').value.trim() || undefined,
+            preferredLanguage: document.getElementById('asc_preferredLanguage').value || 'es',
+            // Add the enterprise ID as the owner
+            enterpriseId: selectedEnterpriseId
+        };
+
+        // Show loader
+        showQuickClientModalLoader('adminSubClientModal');
+        clearAlerts('adminSubClientModalAlerts');
+
+        try {
+            // Create sub-client for the selected enterprise using the owned-clients endpoint
+            // We'll create a custom endpoint that allows admin to create sub-clients for any enterprise
+            const response = await fetch('/api/owned-clients/admin-create-subclient', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                // Add new client to Cliente Final Tom Select (NOT the main client dropdown)
+                const employeeTS = await waitForTomSelect('clientFinalId');
+
+                employeeTS.addOption({
+                    value: result.data.value,
+                    text: result.data.label,
+                    email: result.data.email || '',
+                    contactPerson: result.data.contactPerson || result.data.label,
+                    phone: result.data.phone || '',
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    companyName: formData.companyName || '',
+                    preferredLanguage: formData.preferredLanguage
+                });
+
+                // Select the new client in the Cliente Final dropdown
+                employeeTS.setValue(result.data.value);
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('adminSubClientModal'));
+                modal.hide();
+
+                // Show success message
+                showAlert('quoteInformationAlerts', 'Cliente final creado exitosamente para la empresa seleccionada', 'success');
+            } else {
+                // Handle error cases
+                let errorMessage = result.error || 'Error al crear el cliente final';
+                showAlert('adminSubClientModalAlerts', errorMessage, 'danger');
+            }
+        } catch (error) {
+            console.error('Error creating admin sub-client:', error);
+            showAlert('adminSubClientModalAlerts', 'Error de conexión al crear el cliente final', 'danger');
+        } finally {
+            hideQuickClientModalLoader('adminSubClientModal');
+        }
+    }
+    
+    // Open quick direct client modal
+    function openQuickDirectClientModal() {
+        clearAlerts('quickDirectClientModalAlerts');
+        document.getElementById('quickDirectClientForm').reset();
+        document.getElementById('quickDirectClientForm').classList.remove('was-validated');
+
+        const modal = new bootstrap.Modal(document.getElementById('quickDirectClientModal'));
+        modal.show();
+    }
+    
+    // Save quick direct client
+    async function saveQuickDirectClient() {
+        const form = document.getElementById('quickDirectClientForm');
+
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Get form data
+        const formData = {
+            firstName: document.getElementById('qdc_firstName').value.trim(),
+            lastName: document.getElementById('qdc_lastName').value.trim(),
+            email: document.getElementById('qdc_email').value.trim() || undefined,
+            phone: document.getElementById('qdc_phone').value.trim() || undefined,
+            companyName: document.getElementById('qdc_companyName').value.trim() || undefined,
+            contactFirstName: document.getElementById('qdc_contactFirstName').value.trim() || undefined,
+            contactLastName: document.getElementById('qdc_contactLastName').value.trim() || undefined,
+            preferredLanguage: document.getElementById('qdc_preferredLanguage').value || 'es'
+        };
+
+        // Show loader
+        showQuickClientModalLoader('quickDirectClientModal');
+        clearAlerts('quickDirectClientModalAlerts');
+
+        try {
+            const response = await fetch('/api/clients/amexing-direct/quick', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                // Add new client to Direct Client Tom Select
+                const directClientTS = await waitForTomSelect('directClientId');
+
+                directClientTS.addOption({
+                    value: result.data.value,
+                    text: result.data.label,
+                    email: result.data.email,
+                    contactPerson: result.data.contactPerson,
+                    phone: result.data.phone,
+                    firstName: result.data.firstName,
+                    lastName: result.data.lastName,
+                    companyName: result.data.companyName,
+                    preferredLanguage: result.data.preferredLanguage
+                });
+
+                // Select the new client
+                directClientTS.setValue(result.data.value);
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('quickDirectClientModal'));
+                modal.hide();
+
+                // Show success message
+                showAlert('quoteInformationAlerts', 'Cliente directo creado exitosamente', 'success');
+            } else {
+                // Handle error cases
+                let errorMessage = result.error || 'Error al crear el cliente directo';
+                showAlert('quickDirectClientModalAlerts', errorMessage, 'danger');
+            }
+        } catch (error) {
+            console.error('Error creating quick direct client:', error);
+            showAlert('quickDirectClientModalAlerts', 'Error de conexión al crear el cliente directo', 'danger');
+        } finally {
+            hideQuickClientModalLoader('quickDirectClientModal');
+        }
+    }
 
     // Load existing quote data
     async function loadQuoteData(quoteId) {
@@ -1086,21 +2073,81 @@
             if (result.success && result.data) {
                 const quote = result.data;
 
+                // Check if this is a direct client quote
+                // Primary: Check clientType field
+                // Fallback: Check if has companyClientPtr but no client (for older quotes)
+                const isDirectClient = quote.clientType === 'direct' || 
+                                     (quote.companyClientPtr && !quote.client);
+                
+                // If admin user and direct client quote, switch the UI to direct mode
+                if ((userRole === 'admin' || userRole === 'superadmin') && isDirectClient) {
+                    const directRadio = document.getElementById('clientTypeDirect');
+                    if (directRadio) {
+                        directRadio.checked = true;
+                        currentClientType = 'direct';
+                        
+                        // Update help text visibility
+                        document.querySelectorAll('.client-type-agency').forEach(el => {
+                            el.style.display = 'none';
+                        });
+                        document.querySelectorAll('.client-type-direct').forEach(el => {
+                            el.style.display = 'inline';
+                        });
+                        
+                        // Load direct clients before setting the value
+                        await loadActiveClients('', 1, 'direct');
+                    }
+                }
+
                 // Handle client population - DUAL FIELD ARCHITECTURE
-                const clientTS = await waitForTomSelect('clientId');
+                // Get the correct client field based on quote type
+                let clientTS;
+                if (isDirectClient && (userRole === 'admin' || userRole === 'superadmin')) {
+                    // For direct client quotes, populate the directClientId field
+                    clientTS = await waitForTomSelect('directClientId');
+                    
+                    // Also make sure the direct client row is visible
+                    const directClientRow = document.getElementById('directClientRow');
+                    if (directClientRow) {
+                        directClientRow.style.display = 'flex';
+                    }
+                    
+                    // Hide the agency client row
+                    const agencyClientRow = document.getElementById('agencyClientRow');
+                    if (agencyClientRow) {
+                        agencyClientRow.style.display = 'none';
+                    }
+                    
+                    // Hide the final client row for direct clients
+                    const finalClientRow = document.getElementById('finalClientRow');
+                    if (finalClientRow) {
+                        finalClientRow.style.display = 'none';
+                    }
+                } else {
+                    // For agency quotes, use the regular clientId field
+                    clientTS = await waitForTomSelect('clientId');
+                }
                 
                 // Role-based client field prioritization
                 let selectedClientId = null;
                 let selectedClientData = null;
                 
                 if (userRole === 'admin' || userRole === 'superadmin') {
-                    // Admin/superadmin: prioritize legacy client field (AmexingUser objects)
-                    if (quote.client && quote.client.id) {
-                        selectedClientId = quote.client.id;
-                        selectedClientData = quote.client;
-                    } else if (quote.companyClientPtr && quote.companyClientPtr.id) {
-                        selectedClientId = quote.companyClientPtr.id;
-                        selectedClientData = quote.companyClientPtr;
+                    if (isDirectClient) {
+                        // For direct client quotes, use companyClientPtr
+                        if (quote.companyClientPtr && quote.companyClientPtr.id) {
+                            selectedClientId = quote.companyClientPtr.id;
+                            selectedClientData = quote.companyClientPtr;
+                        }
+                    } else {
+                        // For agency quotes, prioritize client field
+                        if (quote.client && quote.client.id) {
+                            selectedClientId = quote.client.id;
+                            selectedClientData = quote.client;
+                        } else if (quote.companyClientPtr && quote.companyClientPtr.id) {
+                            selectedClientId = quote.companyClientPtr.id;
+                            selectedClientData = quote.companyClientPtr;
+                        }
                     }
                 } else {
                     // Hierarchical roles: prioritize companyClientPtr (Client objects)
@@ -1205,8 +2252,40 @@
                     fullQuote: quote
                 });
                 
+                // Store clientFinalId for later use after dropdowns are loaded
+                const quoteClientFinalId = quote.clientFinalId || null;
+                
                 if (selectedClientId) {
-                    await loadClientEmployees(selectedClientId, quote.clientFinalId || null);
+                    await loadClientEmployees(selectedClientId, quoteClientFinalId);
+                } else if (userRole === 'department_manager' || userRole === 'client') {
+                    // For restricted roles, load sub-clients with their default clientId
+                    const clientField = document.getElementById('clientId');
+                    if (clientField && clientField.value) {
+                        console.log('🚀 Loading sub-clients for restricted role on existing quote:', userRole, 'clientId:', clientField.value);
+                        await loadClientEmployees(clientField.value, quoteClientFinalId);
+                    }
+                }
+                
+                // Additional retry mechanism for clientFinalId selection
+                if (quoteClientFinalId) {
+                    setTimeout(async () => {
+                        try {
+                            const employeeTS = await waitForTomSelect('clientFinalId');
+                            const currentValue = employeeTS.getValue();
+                            
+                            if (!currentValue || currentValue !== quoteClientFinalId) {
+                                const optionExists = employeeTS.getOption && employeeTS.getOption(quoteClientFinalId);
+                                if (optionExists) {
+                                    employeeTS.setValue(quoteClientFinalId);
+                                    console.log('✅ Successfully set clientFinalId in retry:', quoteClientFinalId);
+                                } else {
+                                    console.warn('⚠️ ClientFinalId option still not found in retry:', quoteClientFinalId);
+                                }
+                            }
+                        } catch (error) {
+                            console.error('❌ Error in clientFinalId retry mechanism:', error);
+                        }
+                    }, 1000); // Wait 1 second for dropdown to fully load
                 }
 
                 // Populate form fields
@@ -1290,6 +2369,13 @@
 
         const form = document.getElementById('quoteInformationForm');
 
+        // Trigger phone validation before form validation
+        const phoneInput = document.getElementById('contactPhone');
+        if (phoneInput) {
+            // Trigger blur to ensure phone validation runs
+            phoneInput.dispatchEvent(new Event('blur'));
+        }
+
         // Validate form
         if (!form.checkValidity()) {
             form.classList.add('was-validated');
@@ -1298,13 +2384,26 @@
 
         clearAlerts('quoteInformationAlerts');
 
-        // Get client ID - all user roles now use TomSelect
-        const clientTS = await waitForTomSelect('clientId');
-        const clientId = clientTS.getValue();
-
-        if (!clientId) {
-            showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
-            return;
+        // Get client ID based on current mode
+        let clientId;
+        if (currentClientType === 'direct' && (userRole === 'admin' || userRole === 'superadmin')) {
+            // For direct clients, use the directClientId field
+            const directClientTS = await waitForTomSelect('directClientId');
+            clientId = directClientTS.getValue();
+            
+            if (!clientId) {
+                showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente directo', 'danger');
+                return;
+            }
+        } else {
+            // For agencies, use the regular clientId field
+            const clientTS = await waitForTomSelect('clientId');
+            clientId = clientTS.getValue();
+            
+            if (!clientId) {
+                showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
+                return;
+            }
         }
 
         // Get employee selection if any
@@ -1326,6 +2425,7 @@
         const contactPerson = [firstName, lastName].filter(n => n).join(' ') || undefined;
         
         const formData = {
+            clientId: clientId,  // Include clientId for update
             eventType: document.getElementById('eventType').value.trim() || undefined,
             numberOfPeople: document.getElementById('numberOfPeople').value ? parseInt(document.getElementById('numberOfPeople').value, 10) : undefined,
             numberOfAdults: parseInt(document.getElementById('numberOfAdults').value || 0),
@@ -1343,6 +2443,14 @@
         // Only include clientFinalId if it has a value
         if (clientFinalId) {
             formData.clientFinalId = clientFinalId;
+        }
+        
+        // Include clientType for admin users updating direct client quotes
+        if (userRole === 'admin' || userRole === 'superadmin') {
+            const directRadio = document.getElementById('clientTypeDirect');
+            if (directRadio && directRadio.checked) {
+                formData.clientType = 'direct';
+            }
         }
         
         // Include status from global header segmented control if exists
@@ -1406,6 +2514,13 @@
 
         const form = document.getElementById('quoteInformationForm');
 
+        // Trigger phone validation before form validation
+        const phoneInput = document.getElementById('contactPhone');
+        if (phoneInput) {
+            // Trigger blur to ensure phone validation runs
+            phoneInput.dispatchEvent(new Event('blur'));
+        }
+
         // Validate form
         if (!form.checkValidity()) {
             form.classList.add('was-validated');
@@ -1414,13 +2529,26 @@
 
         clearAlerts('quoteInformationAlerts');
 
-        // Get client ID - all user roles now use TomSelect
-        const clientTS = await waitForTomSelect('clientId');
-        const clientId = clientTS.getValue();
-
-        if (!clientId) {
-            showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
-            return;
+        // Get client ID based on current mode
+        let clientId;
+        if (currentClientType === 'direct' && (userRole === 'admin' || userRole === 'superadmin')) {
+            // For direct clients, use the directClientId field
+            const directClientTS = await waitForTomSelect('directClientId');
+            clientId = directClientTS.getValue();
+            
+            if (!clientId) {
+                showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente directo', 'danger');
+                return;
+            }
+        } else {
+            // For agencies, use the regular clientId field
+            const clientTS = await waitForTomSelect('clientId');
+            clientId = clientTS.getValue();
+            
+            if (!clientId) {
+                showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
+                return;
+            }
         }
 
         // Get employee selection if any
@@ -1461,6 +2589,23 @@
         if (clientFinalId) {
             formData.clientFinalId = clientFinalId;
         }
+        
+        // Include clientType for admin users creating direct client quotes
+        if (userRole === 'admin' || userRole === 'superadmin') {
+            const directRadio = document.getElementById('clientTypeDirect');
+            if (directRadio && directRadio.checked) {
+                formData.clientType = 'direct';
+            }
+        }
+
+        // Debug: Log the form data being sent
+        console.log('🚀 Creating quote with form data:', {
+            clientId: formData.clientId,
+            clientType: formData.clientType,
+            currentClientType: currentClientType,
+            isDirectMode: currentClientType === 'direct',
+            fullFormData: formData
+        });
 
         // Disable submit button
         const submitBtn = document.getElementById('createQuoteBtn');
@@ -1502,6 +2647,164 @@
         }
     }
 
+    // Handle client type selector changes (for admin users)
+    function setupClientTypeSelector(isEditMode = false) {
+        const agencyRadio = document.getElementById('clientTypeAgency');
+        const directRadio = document.getElementById('clientTypeDirect');
+        
+        if (!agencyRadio || !directRadio) {
+            // Not an admin user, no selector present
+            return;
+        }
+        
+        // If editing existing quote, disable the selector
+        if (isEditMode) {
+            agencyRadio.disabled = true;
+            directRadio.disabled = true;
+            
+            // Add help text explaining why it's disabled
+            const selectorGroup = agencyRadio.closest('.btn-group');
+            if (selectorGroup) {
+                // Check if help text already exists
+                let helpText = selectorGroup.parentElement.querySelector('.client-type-disabled-help');
+                if (!helpText) {
+                    helpText = document.createElement('small');
+                    helpText.className = 'text-muted d-block mt-1 client-type-disabled-help';
+                    helpText.innerHTML = '<i class="ti ti-info-circle me-1"></i>El tipo de cliente no se puede cambiar después de crear la cotización';
+                    selectorGroup.parentElement.appendChild(helpText);
+                }
+            }
+            
+            // Style the labels to look disabled
+            const labels = selectorGroup?.querySelectorAll('label');
+            labels?.forEach(label => {
+                label.style.opacity = '0.6';
+                label.style.cursor = 'not-allowed';
+            });
+        }
+        
+        // Handle radio button changes
+        [agencyRadio, directRadio].forEach(radio => {
+            radio.addEventListener('change', async (e) => {
+                if (!e.target.checked) return;
+                
+                const newType = e.target.value;
+                if (newType === currentClientType) return; // No change
+                
+                currentClientType = newType;
+                
+                // Update help text visibility
+                document.querySelectorAll('.client-type-agency').forEach(el => {
+                    el.style.display = newType === 'agency' ? 'inline' : 'none';
+                });
+                document.querySelectorAll('.client-type-direct').forEach(el => {
+                    el.style.display = newType === 'direct' ? 'inline' : 'none';
+                });
+                
+                // Show/hide appropriate rows
+                const agencyClientRow = document.getElementById('agencyClientRow');
+                const directClientRow = document.getElementById('directClientRow');
+                const finalClientRow = document.getElementById('finalClientRow');
+                
+                if (newType === 'direct') {
+                    // Hide agency client row, show direct client row
+                    agencyClientRow.style.display = 'none';
+                    directClientRow.style.display = 'flex';
+                    finalClientRow.style.display = 'none';
+                    
+                    // Make clientId not required, directClientId required
+                    const clientSelect = document.getElementById('clientId');
+                    if (clientSelect) {
+                        clientSelect.removeAttribute('required');
+                        const clientWrapper = clientSelect.closest('.mb-3');
+                        if (clientWrapper) {
+                            const label = clientWrapper.querySelector('label');
+                            if (label) {
+                                label.innerHTML = label.innerHTML.replace(' <span class="text-danger">*</span>', '');
+                            }
+                        }
+                    }
+                    
+                    // Clear and load direct clients
+                    try {
+                        const directClientTS = await waitForTomSelect('directClientId');
+                        if (directClientTS.clear) {
+                            directClientTS.clear();
+                        } else if (directClientTS.setValue) {
+                            directClientTS.setValue('');
+                        }
+                        directClientTS.clearOptions();
+                        
+                        // Load direct Amexing clients
+                        await loadDirectClients('', 1);
+                    } catch (e) {
+                        console.log('Direct client dropdown not ready:', e);
+                    }
+                    
+                } else {
+                    // Show agency client row, hide direct client row
+                    agencyClientRow.style.display = 'flex';
+                    directClientRow.style.display = 'none';
+                    finalClientRow.style.display = 'flex';
+                    
+                    // Make clientId required again
+                    const clientSelect = document.getElementById('clientId');
+                    if (clientSelect) {
+                        clientSelect.setAttribute('required', 'required');
+                        const clientWrapper = clientSelect.closest('.mb-3');
+                        if (clientWrapper) {
+                            const label = clientWrapper.querySelector('label');
+                            if (label && !label.innerHTML.includes('text-danger')) {
+                                label.innerHTML = label.innerHTML.replace('Cliente', 'Cliente <span class="text-danger">*</span>');
+                            }
+                        }
+                    }
+                    
+                    // Clear and reload agency clients
+                    try {
+                        const clientTS = await waitForTomSelect('clientId');
+                        if (clientTS.clear) {
+                            clientTS.clear();
+                        } else if (clientTS.setValue) {
+                            clientTS.setValue('');
+                        }
+                        clientTS.clearOptions();
+                    
+                        // Clear sub-clients too
+                        try {
+                            const employeeTS = await waitForTomSelect('clientFinalId');
+                            if (employeeTS.clear) {
+                                employeeTS.clear();
+                            } else if (employeeTS.setValue) {
+                                employeeTS.setValue('');
+                            }
+                            employeeTS.clearOptions();
+                        } catch (e) {
+                            // Sub-client dropdown might not be initialized
+                        }
+                        
+                        // Load agency clients
+                        await loadActiveClients('', 1, 'agency');
+                    } catch (e) {
+                        console.log('Client dropdown not ready:', e);
+                    }
+                }
+                
+                // Clear contact fields
+                document.getElementById('contactFirstName').value = '';
+                document.getElementById('contactLastName').value = '';
+                document.getElementById('contactEmail').value = '';
+                document.getElementById('contactPhone').value = '';
+                
+                // Reset preferred language to default
+                const languageSelect = document.getElementById('preferredLanguage');
+                if (languageSelect) {
+                    languageSelect.value = 'es';
+                }
+            });
+        });
+    }
+
     // Initialize when DOM is ready
     document.addEventListener('DOMContentLoaded', async function() {
         // Show loader immediately
@@ -1516,11 +2819,17 @@
             const quoteId = quoteIdInput ? quoteIdInput.value : '';
             const isEditMode = quoteId && quoteId !== '' && quoteId !== 'new';
             
+            // Setup client type selector for admin users (pass edit mode flag)
+            setupClientTypeSelector(isEditMode);
+            
             // Load active clients for all users (different endpoints based on role)
             await loadActiveClients();
             
             // Setup client selection handler for all users
             await handleClientSelection();
+            
+            // Setup direct client selection handler
+            await handleDirectClientSelection();
             
             // Setup employee selection handler
             await handleEmployeeSelection();
@@ -1528,9 +2837,29 @@
             // If edit mode, load quote data
             if (isEditMode) {
                 await loadQuoteData(quoteId);
+                
+                // After loading quote data, also set current user as client for restricted roles
+                if (userRole === 'department_manager' || userRole === 'client') {
+                    console.log('🔧 EDIT MODE - Ensuring client dropdown shows enterprise name for restricted role:', userRole);
+                    await loadCurrentUserAsClient();
+                    
+                    // Ensure finalClientRow is visible for restricted roles in edit mode
+                    const finalClientRow = document.getElementById('finalClientRow');
+                    if (finalClientRow) {
+                        finalClientRow.style.display = 'flex';
+                    }
+                }
             } else if (userRole === 'department_manager' || userRole === 'client') {
                 // For new quotes, ensure clientId is populated for these roles
                 await loadCurrentUserAsClient();
+            }
+
+            // Ensure finalClientRow is visible for department_manager and client roles
+            if (userRole === 'department_manager' || userRole === 'client') {
+                const finalClientRow = document.getElementById('finalClientRow');
+                if (finalClientRow) {
+                    finalClientRow.style.display = 'flex';
+                }
             }
 
             // Auto-sum people fields into hidden numberOfPeople
@@ -1552,6 +2881,46 @@
             }
             if (saveBtn) {
                 saveBtn.addEventListener('click', saveQuickClient);
+            }
+            
+            // Event listeners for direct client buttons
+            const createDirectBtn = document.getElementById('createQuickDirectClientBtn');
+            const saveDirectBtn = document.getElementById('saveQuickDirectClientBtn');
+            
+            if (createDirectBtn) {
+                createDirectBtn.addEventListener('click', openQuickDirectClientModal);
+            }
+            if (saveDirectBtn) {
+                saveDirectBtn.addEventListener('click', saveQuickDirectClient);
+            }
+            
+            // Event listeners for final client button (role-based behavior)
+            const createFinalBtn = document.getElementById('createFinalClientBtn');
+            const saveOwnedBtn = document.getElementById('saveOwnedClientBtn');
+            
+            if (createFinalBtn) {
+                createFinalBtn.addEventListener('click', function() {
+                    // Check user role to determine which modal to open
+                    const userRole = window.currentUserRole || '<%= userRole %>';
+                    
+                    if (userRole === 'admin' || userRole === 'superadmin') {
+                        // Admin/SuperAdmin: Open admin sub-client modal (creates sub-clients for selected enterprise)
+                        openAdminSubClientModal();
+                    } else if (userRole === 'department_manager' || userRole === 'client') {
+                        // Department Manager/Client: Open owned client modal (creates sub-clients for their own organization)
+                        openOwnedClientModal();
+                    }
+                });
+            }
+            
+            if (saveOwnedBtn) {
+                saveOwnedBtn.addEventListener('click', saveOwnedClient);
+            }
+            
+            // Event listeners for admin sub-client button
+            const saveAdminSubBtn = document.getElementById('saveAdminSubClientBtn');
+            if (saveAdminSubBtn) {
+                saveAdminSubBtn.addEventListener('click', saveAdminSubClient);
             }
 
             // Form submission - use appropriate function based on current state

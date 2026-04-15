@@ -147,76 +147,145 @@ class QuoteController {
 
       // 2. Extract fields from request body
       const {
-        client, clientId, contactPerson, contactEmail, contactPhone, notes, eventType,
+        client, clientId, clientType, clientFinalId, contactPerson, contactEmail, contactPhone,
+        contactFirstName, contactLastName, notes, eventType,
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
       } = req.body;
 
       // Normalize field names (accept both formats)
       const clientIdNormalized = client || clientId;
 
+      // Debug: Log the received request data
+      logger.info('QuoteController.createQuote - Request data received', {
+        clientId,
+        client,
+        clientIdNormalized,
+        clientType,
+        requestBody: req.body,
+        userId: currentUser.id,
+      });
+
       // 3. Handle client field - DUAL FIELD ARCHITECTURE
       if (clientIdNormalized) {
-        try {
-          // 3a. Save as companyClientPtr (Client pointer) for new hierarchical system
-          const companyClientPointer = {
-            __type: 'Pointer',
-            className: 'Client',
-            objectId: clientIdNormalized,
-          };
+        // Check if this is a direct Amexing client quote
+        const isDirectClient = clientType === 'direct';
 
-          // 3b. Find the AmexingUser who owns this Client for backward compatibility
-          const clientQuery = new Parse.Query('Client');
-          const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
-          const ownedByPointer = clientRecord.get('ownedBy');
+        logger.info('QuoteController.createQuote - Processing client logic', {
+          clientIdNormalized,
+          clientType,
+          isDirectClient,
+          userId: currentUser.id,
+        });
 
-          if (ownedByPointer) {
-            // Extract the actual ID from the ownedBy pointer
-            const ownerId = ownedByPointer.id || ownedByPointer.objectId || ownedByPointer;
+        if (isDirectClient) {
+          logger.info('QuoteController.createQuote - Entering DIRECT CLIENT logic branch', {
+            clientId: clientIdNormalized,
+            userId: currentUser.id,
+          });
+          // Direct Amexing client - only set companyClientPtr, leave client null
+          try {
+            // Verify this is actually a direct Amexing client
+            const clientQuery = new Parse.Query('Client');
+            const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+            const clientBelongsTo = clientRecord.get('clientBelongsTo');
 
-            // Role-based logic for client field assignment
-            let clientAmexingUserId;
-            if (req.userRole === 'department_manager') {
-              // Department manager: client field should be the department manager themselves
-              clientAmexingUserId = currentUser.id;
-              logger.info('QuoteController.createQuote - Department manager: setting client to currentUser', {
-                currentUserId: currentUser.id,
-                selectedClientId: clientIdNormalized,
+            if (clientBelongsTo === 'amexing') {
+              // Valid direct Amexing client
+              companyClientObj = {
+                __type: 'Pointer',
+                className: 'Client',
+                objectId: clientIdNormalized,
+              };
+
+              // Leave clientObj null for direct clients
+              clientObj = null;
+
+              logger.info('QuoteController.createQuote - Creating quote for direct Amexing client', {
+                clientId: clientIdNormalized,
+                clientType: 'direct',
               });
             } else {
-              // Client role: client field should be the owner of the selected Client
-              clientAmexingUserId = ownerId;
-              logger.info('QuoteController.createQuote - Client role: setting client to Client owner', {
+              logger.warn('QuoteController.createQuote - Client is not a direct Amexing client', {
                 clientId: clientIdNormalized,
-                ownerId,
+                clientBelongsTo,
+              });
+              return this.sendError(res, 'El cliente seleccionado no es un cliente directo de Amexing', 400);
+            }
+          } catch (error) {
+            logger.error('QuoteController.createQuote - Error verifying direct client', {
+              error: error.message,
+              clientId: clientIdNormalized,
+            });
+            return this.sendError(res, 'Error al verificar el cliente', 500);
+          }
+        } else {
+          logger.info('QuoteController.createQuote - Entering AGENCY CLIENT logic branch', {
+            clientId: clientIdNormalized,
+            userId: currentUser.id,
+          });
+          // Agency client - existing logic
+          try {
+            // 3a. Save as companyClientPtr (Client pointer) for new hierarchical system
+            const companyClientPointer = {
+              __type: 'Pointer',
+              className: 'Client',
+              objectId: clientIdNormalized,
+            };
+
+            // 3b. Find the AmexingUser who owns this Client for backward compatibility
+            const clientQuery = new Parse.Query('Client');
+            const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+            const ownedByPointer = clientRecord.get('ownedBy');
+
+            if (ownedByPointer) {
+              // Extract the actual ID from the ownedBy pointer
+              const ownerId = ownedByPointer.id || ownedByPointer.objectId || ownedByPointer;
+
+              // Role-based logic for client field assignment
+              let clientAmexingUserId;
+              if (req.userRole === 'department_manager') {
+                // Department manager: client field should be the department manager themselves
+                clientAmexingUserId = currentUser.id;
+                logger.info('QuoteController.createQuote - Department manager: setting client to currentUser', {
+                  currentUserId: currentUser.id,
+                  selectedClientId: clientIdNormalized,
+                });
+              } else {
+                // Client role: client field should be the owner of the selected Client
+                clientAmexingUserId = ownerId;
+                logger.info('QuoteController.createQuote - Client role: setting client to Client owner', {
+                  clientId: clientIdNormalized,
+                  ownerId,
+                });
+              }
+
+              // Create AmexingUser pointer for backward compatibility
+              clientObj = {
+                __type: 'Pointer',
+                className: 'AmexingUser',
+                objectId: clientAmexingUserId,
+              };
+
+              // Store both pointers - we'll set them after creating the quote object
+              companyClientObj = companyClientPointer;
+            } else {
+              logger.warn('QuoteController.createQuote - Client has no owner', {
+                clientId: clientIdNormalized,
               });
             }
+          } catch (error) {
+            logger.error('QuoteController.createQuote - Error setting client pointers', {
+              error: error.message,
+              clientId: clientIdNormalized,
+            });
 
-            // Create AmexingUser pointer for backward compatibility
+            // Fallback to old behavior if Client lookup fails
             clientObj = {
               __type: 'Pointer',
               className: 'AmexingUser',
-              objectId: clientAmexingUserId,
+              objectId: clientIdNormalized,
             };
-
-            // Store both pointers - we'll set them after creating the quote object
-            companyClientObj = companyClientPointer;
-          } else {
-            logger.warn('QuoteController.createQuote - Client has no owner', {
-              clientId: clientIdNormalized,
-            });
           }
-        } catch (error) {
-          logger.error('QuoteController.createQuote - Error setting client pointers', {
-            error: error.message,
-            clientId: clientIdNormalized,
-          });
-
-          // Fallback to old behavior if Client lookup fails
-          clientObj = {
-            __type: 'Pointer',
-            className: 'AmexingUser',
-            objectId: clientIdNormalized,
-          };
         }
       }
 
@@ -233,21 +302,80 @@ class QuoteController {
       // 6. Create quote using Quote domain model (extends BaseModel)
       const quote = new Quote();
 
+      // Debug: Log what objects will be set on the quote
+      logger.info('QuoteController.createQuote - Setting quote client fields', {
+        hasClientObj: !!clientObj,
+        clientObj,
+        hasCompanyClientObj: !!companyClientObj,
+        companyClientObj,
+        clientType,
+        userId: currentUser.id,
+      });
+
       // 7. Assign Parse objects (NOT string IDs!) - Using Pointer structure
       if (clientObj) {
         quote.set('client', clientObj); // AmexingUser pointer for backward compatibility
+        logger.info('QuoteController.createQuote - Set client field', { clientObj });
       }
       if (companyClientObj) {
         quote.set('companyClientPtr', companyClientObj); // Client pointer for new hierarchical system
+        logger.info('QuoteController.createQuote - Set companyClientPtr field', { companyClientObj });
       }
       // Note: Rate is no longer set at quote level (v2.0.0+)
       quote.set('createdBy', createdByObj); // Full Pointer object (required)
 
+      // 7.5. Handle Cliente Final selection and contact data
+      const finalContactData = {
+        contactPerson: contactPerson || '',
+        contactFirstName: contactFirstName || '',
+        contactLastName: contactLastName || '',
+        contactEmail: contactEmail || '',
+        contactPhone: contactPhone || '',
+      };
+
+      // If clientFinalId is provided, fetch the Client data and use it for contact fields
+      if (clientFinalId) {
+        try {
+          const finalClientQuery = new Parse.Query('Client');
+          const finalClientRecord = await finalClientQuery.get(clientFinalId, { useMasterKey: true });
+
+          // Use final client's data for contact fields (unless explicitly overridden)
+          finalContactData.contactFirstName = contactFirstName || finalClientRecord.get('firstName') || finalClientRecord.get('contactFirstName') || '';
+          finalContactData.contactLastName = contactLastName || finalClientRecord.get('lastName') || finalClientRecord.get('contactLastName') || '';
+          finalContactData.contactEmail = contactEmail || finalClientRecord.get('email') || '';
+          finalContactData.contactPhone = contactPhone || finalClientRecord.get('phone') || '';
+
+          // Build contactPerson from final client data if not explicitly provided
+          if (!contactPerson && (finalContactData.contactFirstName || finalContactData.contactLastName)) {
+            finalContactData.contactPerson = `${finalContactData.contactFirstName} ${finalContactData.contactLastName}`.trim();
+          } else if (!contactPerson) {
+            finalContactData.contactPerson = finalClientRecord.get('contactPerson') || finalClientRecord.get('name') || '';
+          }
+
+          // Store clientFinalId in the quote
+          quote.set('clientFinalId', clientFinalId);
+
+          logger.info('QuoteController.createQuote - Using Cliente Final data for contact fields', {
+            clientFinalId,
+            finalContactData,
+            userId: currentUser.id,
+          });
+        } catch (error) {
+          logger.warn('QuoteController.createQuote - Error fetching Cliente Final data, using provided values', {
+            error: error.message,
+            clientFinalId,
+            userId: currentUser.id,
+          });
+        }
+      }
+
       // 8. Set basic fields
       quote.set('folio', folio);
-      quote.set('contactPerson', contactPerson || '');
-      quote.set('contactEmail', contactEmail || '');
-      quote.set('contactPhone', contactPhone || '');
+      quote.set('contactPerson', finalContactData.contactPerson);
+      quote.set('contactFirstName', finalContactData.contactFirstName);
+      quote.set('contactLastName', finalContactData.contactLastName);
+      quote.set('contactEmail', finalContactData.contactEmail);
+      quote.set('contactPhone', finalContactData.contactPhone);
       quote.set('notes', notes || '');
       quote.set('eventType', eventType || '');
 
@@ -265,6 +393,11 @@ class QuoteController {
       quote.set('numberOfPeople', calculatedTotal);
 
       quote.set('preferredLanguage', preferredLanguage || 'es');
+
+      // Set clientType for direct Amexing clients
+      if (clientType === 'direct') {
+        quote.set('clientType', 'direct');
+      }
 
       // 9. Set automatic fields
       quote.set('status', 'quoted');
@@ -704,6 +837,7 @@ class QuoteController {
       const data = {
         id: quote.id,
         folio: quote.get('folio'),
+        clientType: quote.get('clientType') || null,
         client: client
           ? {
             id: client.id,
@@ -886,13 +1020,38 @@ class QuoteController {
       });
 
       if (!canEdit) {
-        logger.warn('🚫 QuoteController.updateQuote - Permission denied', {
+        // Enhanced debugging for 403 errors
+        const debugRolePointer = currentUser.get('roleId');
+        let debugRoleName = 'unknown';
+        if (debugRolePointer && debugRolePointer.id) {
+          try {
+            await debugRolePointer.fetch({ useMasterKey: true });
+            debugRoleName = debugRolePointer.get('name');
+          } catch (e) {
+            logger.warn('Failed to fetch role in 403 debug', { error: e.message });
+          }
+        }
+
+        logger.error('🚫 QuoteController.updateQuote - PERMISSION DENIED (403)', {
           userId: currentUser.id,
           userEmail: currentUser.get('email'),
+          userFirstName: currentUser.get('firstName'),
+          userLastName: currentUser.get('lastName'),
           userRole: req.userRole || 'unknown',
+          debugRoleName,
+          rolePointer: debugRolePointer?.id,
           quoteId,
+          updates: Object.keys(updates),
+          hasRoleObject: !!req.roleObject,
+          jwtRole: req.userRole,
+          requestUrl: req.url,
+          requestMethod: req.method,
+          userAgent: req.headers['user-agent'],
+          ip: req.ip || req.connection.remoteAddress,
+          timestamp: new Date().toISOString(),
         });
-        return this.sendError(res, 'No tienes permisos para editar esta cotización', 403);
+
+        return this.sendError(res, `Access denied: You don't have permission to edit this quote. Role: ${roleName || req.userRole || 'unknown'}`, 403);
       }
 
       // Track the edit with versioning service
@@ -904,6 +1063,60 @@ class QuoteController {
           description: updates.reason || 'Quote updated',
         }
       );
+
+      // Handle clientFinalId if it's being updated
+      if (updates.clientFinalId !== undefined) {
+        if (updates.clientFinalId) {
+          // If setting a new clientFinalId, fetch Client data for contact fields
+          try {
+            const finalClientQuery = new Parse.Query('Client');
+            const finalClientRecord = await finalClientQuery.get(updates.clientFinalId, { useMasterKey: true });
+
+            // Update contact fields from Cliente Final data (unless explicitly overridden in updates)
+            if (!updates.contactFirstName && !updates.contactLastName && !updates.contactPerson) {
+              updates.contactFirstName = finalClientRecord.get('firstName') || finalClientRecord.get('contactFirstName') || '';
+              updates.contactLastName = finalClientRecord.get('lastName') || finalClientRecord.get('contactLastName') || '';
+
+              if (!updates.contactPerson) {
+                updates.contactPerson = `${updates.contactFirstName} ${updates.contactLastName}`.trim()
+                                        || finalClientRecord.get('contactPerson') || finalClientRecord.get('name') || '';
+              }
+            }
+
+            if (!updates.contactEmail) {
+              updates.contactEmail = finalClientRecord.get('email') || '';
+            }
+            if (!updates.contactPhone) {
+              updates.contactPhone = finalClientRecord.get('phone') || '';
+            }
+
+            logger.info('QuoteController.updateQuote - Updated contact fields from Cliente Final', {
+              quoteId,
+              clientFinalId: updates.clientFinalId,
+              contactData: {
+                contactFirstName: updates.contactFirstName,
+                contactLastName: updates.contactLastName,
+                contactEmail: updates.contactEmail,
+                contactPhone: updates.contactPhone,
+              },
+              userId: currentUser.id,
+            });
+          } catch (error) {
+            logger.warn('QuoteController.updateQuote - Error fetching Cliente Final data for update', {
+              error: error.message,
+              clientFinalId: updates.clientFinalId,
+              userId: currentUser.id,
+            });
+          }
+        } else {
+          // If clearing clientFinalId, don't automatically clear contact fields
+          // The user might want to keep the contact data
+          logger.info('QuoteController.updateQuote - Clearing clientFinalId', {
+            quoteId,
+            userId: currentUser.id,
+          });
+        }
+      }
 
       // Call original service for backward compatibility
       const result = await this.quoteService.updateQuote(

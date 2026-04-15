@@ -36,12 +36,19 @@ const logger = require('../../infrastructure/logger');
  */
 const authenticateToken = async (req, res, next) => {
   try {
-    // Extract token from cookies (preferred) or Authorization header
+    // Extract token from multiple sources (in order of preference)
+    // 1. httpOnly accessToken cookie (most secure)
     let token = req.cookies?.accessToken;
 
+    // 2. Authorization header (for API calls)
     if (!token) {
       const authHeader = req.headers.authorization;
       token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    }
+
+    // 3. clientAccessToken cookie (JavaScript accessible, fallback)
+    if (!token) {
+      token = req.cookies?.clientAccessToken;
     }
 
     if (!token) {
@@ -333,8 +340,13 @@ const requireRoleLevel = (minimumLevel) => async (req, res, next) => {
       userLevel = roleLevelMap[req.userRole] || 0;
     }
 
-    logger.info('Role level check:', {
+    // Enhanced logging for quote update debugging
+    const isQuoteUpdate = req.method === 'PUT' && req.url.includes('/api/quotes/');
+    const logLevel = isQuoteUpdate ? 'error' : 'info'; // Use error level for quote updates to ensure visibility
+
+    logger[logLevel]('🔐 JWT Role level check:', {
       userId: req.userId,
+      userEmail: req.user?.get ? req.user.get('email') : 'unknown',
       userLevel,
       requiredLevel: minimumLevel,
       userRole: req.userRole,
@@ -343,6 +355,9 @@ const requireRoleLevel = (minimumLevel) => async (req, res, next) => {
       roleObjectClass: req.roleObject ? req.roleObject.className : 'N/A',
       method: req.method,
       url: req.url,
+      willPass: userLevel >= minimumLevel,
+      isQuoteUpdate,
+      timestamp: new Date().toISOString(),
     });
 
     if (userLevel < minimumLevel) {

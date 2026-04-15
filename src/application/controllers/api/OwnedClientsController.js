@@ -609,6 +609,118 @@ class OwnedClientsController {
   }
 
   /**
+   * POST /api/owned-clients/admin-create-subclient - Create sub-client for selected enterprise (admin only).
+   * Allows admin to create sub-clients belonging to any enterprise.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * POST /api/owned-clients/admin-create-subclient
+   * Body: { firstName: 'John', lastName: 'Doe', enterpriseId: 'abc123' }
+   */
+  async adminCreateSubClient(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
+
+      // Only admin/superadmin can use this endpoint
+      if (!['admin', 'superadmin'].includes(userRole)) {
+        return this.sendError(res, 'Access denied. Only admin users can create sub-clients for enterprises.', 403);
+      }
+
+      const {
+        firstName, lastName, email, phone, companyName,
+        preferredLanguage = 'es', enterpriseId,
+      } = req.body;
+
+      // Validate required fields
+      if (!firstName || !lastName || !enterpriseId) {
+        return this.sendError(res, 'firstName, lastName, and enterpriseId are required', 400);
+      }
+
+      // Validate that the enterprise exists and is an AmexingUser (not a Client)
+      const AmexingUserClass = Parse.Object.extend('AmexingUser');
+      try {
+        const enterpriseQuery = new Parse.Query(AmexingUserClass);
+        await enterpriseQuery.get(enterpriseId, { useMasterKey: true });
+      } catch (error) {
+        return this.sendError(res, 'Enterprise not found or invalid', 404);
+      }
+
+      // Create the sub-client using the Client model
+
+      // Combine names
+      const name = `${firstName} ${lastName}`.trim();
+      const contactPerson = name; // Use the main client as contact person
+
+      // Create client data
+      const clientData = {
+        name,
+        firstName,
+        lastName,
+        email: email || '',
+        phone: phone || '',
+        contactPerson,
+        contactFirstName: firstName,
+        contactLastName: lastName,
+        companyName: companyName || '',
+        preferredLanguage,
+        ownerType: 'amexing_user',
+        ownedBy: enterpriseId, // Set the enterprise as owner
+        active: true,
+        exists: true,
+        createdBy: currentUser.id,
+      };
+
+      const client = Client.create(clientData);
+      await client.save(null, { useMasterKey: true });
+
+      logger.info('Admin created sub-client for enterprise', {
+        clientId: client.id,
+        enterpriseId,
+        adminId: currentUser.id,
+        clientName: name,
+      });
+
+      // Return in Tom Select format
+      const response = {
+        value: client.id,
+        label: companyName || name,
+        email: email || '',
+        contactPerson,
+        phone: phone || '',
+        firstName,
+        lastName,
+        companyName: companyName || '',
+        preferredLanguage,
+      };
+
+      res.status(201).json({
+        success: true,
+        data: response,
+        message: 'Sub-client created successfully for enterprise',
+      });
+    } catch (error) {
+      logger.error('Error in OwnedClientsController.adminCreateSubClient', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+        body: req.body,
+      });
+
+      this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to create sub-client',
+        500
+      );
+    }
+  }
+
+  /**
    * PUT /api/owned-clients/:id - Update an owned client.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.

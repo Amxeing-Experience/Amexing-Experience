@@ -1,0 +1,563 @@
+<%#
+Landing Page Navigation Organism
+Premium navigation bar for the Amexing Experience landing page
+Features transparent overlay design with smooth transitions
+
+@param {object} user - Current user session (optional)
+@param {string} currentPage - Current page identifier (optional)
+@param {boolean} transparent - Whether nav should be transparent (default: true)
+@param {object} companyInfo - Company information object (optional)
+
+@example
+include('organisms/landing/landing-navigation', {
+    user: user,
+    currentPage: 'home',
+    transparent: true
+})
+%>
+
+<!-- Custom Fonts CSS -->
+<link rel="stylesheet" href="/css/fonts.css">
+
+<%
+const isTransparent = typeof transparent !== 'undefined' ? transparent : true;
+const currentUser = typeof user !== 'undefined' ? user : null;
+const activePage = typeof currentPage !== 'undefined' ? currentPage : 'home';
+const company = typeof companyInfo !== 'undefined' ? companyInfo : {
+    name: 'AMEXING',
+    tagline: 'Experience'
+};
+%>
+
+<nav class="landing-nav <%= isTransparent ? 'landing-nav--transparent' : '' %>" id="landingNav">
+    <div class="landing-nav__container">
+        <div class="landing-nav__menu" id="landingNavMenu">
+            <ul class="landing-nav__list">
+                <li class="landing-nav__item">
+                    <a href="/nosotros" class="landing-nav__link <%= activePage === 'about' ? 'landing-nav__link--active' : '' %>">
+                        NOSOTROS
+                    </a>
+                </li>
+                <li class="landing-nav__item">
+                    <a href="/servicios" class="landing-nav__link <%= activePage === 'services' ? 'landing-nav__link--active' : '' %>">
+                        SERVICIOS
+                    </a>
+                </li>
+                <li class="landing-nav__item">
+                    <a href="/nuestra-flota" class="landing-nav__link <%= activePage === 'fleet' ? 'landing-nav__link--active' : '' %>">
+                        NUESTRA FLOTA
+                    </a>
+                </li>
+                <li class="landing-nav__item landing-nav__item--logo">
+                    <a href="/" class="landing-nav__logo">
+                        <img src="/images/logos/light_white_amexing.png" alt="AMEXING EXPERIENCE" class="landing-nav__logo-img">
+                    </a>
+                </li>
+                <li class="landing-nav__item">
+                    <a href="/contacto" class="landing-nav__link <%= activePage === 'contact' ? 'landing-nav__link--active' : '' %>">
+                        CONTACTO
+                    </a>
+                </li>
+                <li class="landing-nav__item landing-nav__item--actions">
+                    <a href="/contacto#book" class="landing-nav__book-btn">
+                        BOOK NOW
+                    </a>
+                </li>
+                <li class="landing-nav__item landing-nav__item--user">
+                    <a href="<%= currentUser ? '/dashboard' : '/login' %>" class="landing-nav__user-icon" aria-label="<%= currentUser ? 'Dashboard' : 'Login' %>">
+                        <img src="/images/icons/sesion.png" alt="User Session" class="landing-nav__user-icon-img">
+                    </a>
+                </li>
+                <li class="landing-nav__item landing-nav__item--language">
+                    <div class="landing-nav__language-switcher">
+                        <button class="landing-nav__language-btn" id="languageBtn" aria-label="Change Language">
+                            <img src="/images/icons/spanish.png" alt="Spanish" class="landing-nav__language-icon" id="currentLanguageIcon">
+                        </button>
+                        <div class="landing-nav__language-dropdown" id="languageDropdown">
+                            <a href="#" class="landing-nav__language-option" data-lang="es">
+                                <img src="/images/icons/spanish.png" alt="Español" class="landing-nav__language-option-icon">
+                                <span>Español</span>
+                            </a>
+                            <a href="#" class="landing-nav__language-option" data-lang="en">
+                                <img src="/images/icons/english.png" alt="English" class="landing-nav__language-option-icon">
+                                <span>English</span>
+                            </a>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+    </div>
+</nav>
+
+<style>
+.landing-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding: 1.5rem 0;
+    transition: all 0.3s ease;
+    background: #2e2e2d;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.landing-nav--transparent {
+    background: #2e2e2d;
+}
+
+.landing-nav--solid {
+    background: #2e2e2d;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.landing-nav__container {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.landing-nav__brand {
+    flex-shrink: 0;
+}
+
+.landing-nav__logo {
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    transition: opacity 0.3s ease;
+}
+
+.landing-nav__logo:hover {
+    opacity: 0.8;
+}
+
+.landing-nav__logo-img {
+    height: 35px;
+    width: auto;
+    display: block;
+}
+
+.landing-nav__menu {
+    width: 100%;
+}
+
+.landing-nav__list {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.landing-nav__item {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.landing-nav__item--logo {
+    margin: 0 1.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.landing-nav__link {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.9);
+    font-family: var(--font-myriad);
+    font-size: 0.75rem;
+    font-weight: 400;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 0.5rem 0;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.landing-nav__link::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 1px;
+    background: #B8860B;
+    transition: width 0.3s ease;
+}
+
+.landing-nav__link:hover::after,
+.landing-nav__link--active::after {
+    width: 100%;
+}
+
+.landing-nav__link:hover {
+    color: #B8860B;
+}
+
+.landing-nav__item--actions {
+    margin-left: 0.5rem;
+}
+
+.landing-nav__item--language {
+    margin-left: 0.5rem;
+    position: relative;
+}
+
+.landing-nav__item--user {
+    margin-left: 0.5rem;
+}
+
+.landing-nav__book-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.1rem 1.5rem;
+    background: #969b81;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    font-family: var(--font-myriad);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.landing-nav__book-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #B8860B;
+    color: #B8860B;
+}
+
+.landing-nav__user-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    transition: all 0.3s ease;
+}
+
+.landing-nav__user-icon-img {
+    width: 24px;
+    height: 24px;
+    transition: all 0.3s ease;
+    opacity: 0.9;
+}
+
+.landing-nav__user-icon:hover .landing-nav__user-icon-img {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.landing-nav__language-switcher {
+    position: relative;
+}
+
+.landing-nav__language-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 25px;
+    height: 25px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+}
+
+.landing-nav__language-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.landing-nav__language-icon {
+    width: 25px;
+    height: 25px;
+    transition: all 0.3s ease;
+    opacity: 0.9;
+}
+
+.landing-nav__language-btn:hover .landing-nav__language-icon {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.landing-nav__language-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 8px;
+    padding: 0.5rem 0;
+    min-width: 120px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+    z-index: 1001;
+    margin-top: 0.5rem;
+}
+
+.landing-nav__language-dropdown--open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.landing-nav__language-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.9);
+    font-family: var(--font-myriad);
+    font-size: 0.75rem;
+    font-weight: 300;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+}
+
+.landing-nav__language-option:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #B8860B;
+}
+
+.landing-nav__language-option-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.landing-nav__toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 1rem;
+}
+
+.landing-nav__toggle-line {
+    width: 100%;
+    height: 2px;
+    background: white;
+    margin: 3px 0;
+    transition: 0.3s;
+    transform-origin: center;
+}
+
+.landing-nav__toggle--active .landing-nav__toggle-line:nth-child(1) {
+    transform: rotate(45deg) translate(6px, 6px);
+}
+
+.landing-nav__toggle--active .landing-nav__toggle-line:nth-child(2) {
+    opacity: 0;
+}
+
+.landing-nav__toggle--active .landing-nav__toggle-line:nth-child(3) {
+    transform: rotate(-45deg) translate(6px, -6px);
+}
+
+@media (max-width: 1024px) {
+    .landing-nav__container {
+        padding: 0 1.5rem;
+    }
+    
+    .landing-nav__list {
+        gap: 1.5rem;
+    }
+    
+    .landing-nav__auth-text {
+        display: inline;
+    }
+}
+
+@media (max-width: 768px) {
+    .landing-nav__container {
+        padding: 0 1rem;
+    }
+    
+    .landing-nav__menu {
+        position: fixed;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.95);
+        backdrop-filter: blur(20px);
+        transform: translateY(-100%);
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+        padding: 2rem 0;
+    }
+    
+    .landing-nav__menu--open {
+        transform: translateY(0);
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    .landing-nav__list {
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+    }
+    
+    .landing-nav__toggle {
+        display: flex;
+    }
+    
+    .landing-nav__actions {
+        gap: 0.5rem;
+    }
+    
+    .landing-nav__auth-text {
+        display: none;
+    }
+    
+    .landing-nav__logo-img {
+        height: 32px;
+    }
+    
+    .landing-nav__cta {
+        transform: scale(0.9);
+    }
+}
+
+@media (max-width: 480px) {
+    .landing-nav__container {
+        padding: 0 0.75rem;
+    }
+    
+    .landing-nav__logo-img {
+        height: 28px;
+    }
+    
+    .landing-nav__item--logo {
+        margin: 0 1.5rem;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const nav = document.getElementById('landingNav');
+    const navToggle = document.getElementById('landingNavToggle');
+    const navMenu = document.getElementById('landingNavMenu');
+    
+    // Language Switcher
+    const languageBtn = document.getElementById('languageBtn');
+    const languageDropdown = document.getElementById('languageDropdown');
+    const currentLanguageIcon = document.getElementById('currentLanguageIcon');
+    const languageOptions = document.querySelectorAll('.landing-nav__language-option');
+
+    // Initialize language from localStorage or default to Spanish
+    let currentLanguage = localStorage.getItem('preferredLanguage') || 'es';
+    updateLanguageIcon(currentLanguage);
+
+    // Language switcher functionality
+    if (languageBtn && languageDropdown) {
+        languageBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            languageDropdown.classList.toggle('landing-nav__language-dropdown--open');
+        });
+
+        // Language option selection
+        languageOptions.forEach(option => {
+            option.addEventListener('click', function(e) {
+                e.preventDefault();
+                const selectedLang = this.getAttribute('data-lang');
+                
+                // Update current language
+                currentLanguage = selectedLang;
+                localStorage.setItem('preferredLanguage', selectedLang);
+                
+                // Update icon
+                updateLanguageIcon(selectedLang);
+                
+                // Close dropdown
+                languageDropdown.classList.remove('landing-nav__language-dropdown--open');
+                
+                // Here you can add actual language switching logic
+                // For example: window.location.href = `/${selectedLang}${window.location.pathname}`;
+                console.log('Language changed to:', selectedLang);
+            });
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!languageBtn.contains(e.target) && !languageDropdown.contains(e.target)) {
+                languageDropdown.classList.remove('landing-nav__language-dropdown--open');
+            }
+        });
+    }
+
+    function updateLanguageIcon(lang) {
+        if (currentLanguageIcon) {
+            const iconPath = lang === 'es' ? '/images/icons/spanish.png' : '/images/icons/english.png';
+            const altText = lang === 'es' ? 'Spanish' : 'English';
+            
+            currentLanguageIcon.src = iconPath;
+            currentLanguageIcon.alt = altText;
+        }
+    }
+
+    if (navToggle && navMenu) {
+        navToggle.addEventListener('click', function() {
+            navMenu.classList.toggle('landing-nav__menu--open');
+            navToggle.classList.toggle('landing-nav__toggle--active');
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!nav.contains(e.target)) {
+                navMenu.classList.remove('landing-nav__menu--open');
+                navToggle.classList.remove('landing-nav__toggle--active');
+            }
+        });
+    }
+
+    window.addEventListener('scroll', function() {
+        if (window.scrollY > 50) {
+            nav.classList.remove('landing-nav--transparent');
+            nav.classList.add('landing-nav--solid');
+        } else {
+            nav.classList.remove('landing-nav--solid');
+            nav.classList.add('landing-nav--transparent');
+        }
+    });
+
+    // Close mobile menu when clicking navigation links
+    const navLinks = document.querySelectorAll('.landing-nav__link');
+    navLinks.forEach(link => {
+        link.addEventListener('click', function() {
+            if (navMenu && navMenu.classList.contains('landing-nav__menu--open')) {
+                navMenu.classList.remove('landing-nav__menu--open');
+                if (navToggle) navToggle.classList.remove('landing-nav__toggle--active');
+            }
+        });
+    });
+});
+</script>

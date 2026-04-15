@@ -5,11 +5,17 @@ const homeController = require('../../application/controllers/homeController');
 const authController = require('../../application/controllers/authController');
 const dashboardAuth = require('../../application/middleware/dashboardAuthMiddleware');
 
-// Home page - redirect to login until landing page is implemented
-router.get('/', (req, res) => res.redirect('/login'));
+// Home page - Amexing Experience Landing Page
+router.get('/', homeController.index.bind(homeController));
 
-// About page
-router.get('/about', homeController.about);
+// Landing pages - Spanish routes for navigation
+router.get('/nosotros', homeController.nosotros.bind(homeController));
+router.get('/servicios', homeController.servicios.bind(homeController));
+router.get('/nuestra-flota', homeController.fleet.bind(homeController));
+router.get('/contacto', homeController.contacto.bind(homeController));
+
+// About page (English - keep for backwards compatibility)
+router.get('/about', homeController.about.bind(homeController));
 
 // Auth pages
 router.get('/login', dashboardAuth.redirectIfAuthenticated, authController.showLogin);
