@@ -1,0 +1,407 @@
+<%#
+Historia Section Organism - Landing Page
+Our History section introducing Amexing Experience company background
+
+Created by Denisse Maldonado
+%>
+
+<section class="historia-section">
+    <div class="historia-section__container">
+        <div class="historia-section__content">
+            <div class="historia-section__header">
+                <div class="historia-section__icon">
+                    <img src="/images/heart_black.png" alt="Heart Icon" class="historia-section__heart-icon">
+                </div>
+                
+                <div class="historia-section__title-wrapper">
+                    <hr class="historia-section__line historia-section__line--left">
+                    <h2 class="historia-section__title">
+                        <span class="large-letter">N</span>uestra <span class="large-letter">H</span>istoria
+                    </h2>
+                    <hr class="historia-section__line historia-section__line--right">
+                </div>
+            </div>
+            
+            <div class="historia-section__timeline">
+                <div class="timeline">
+                    <!-- 1998 Composition -->
+                    <div class="timeline__composition timeline__composition--1998">
+                        <div class="timeline__image-container">
+                            <img src="/images/heart_black.png" alt="1998 Historical Photo 1" class="timeline__image timeline__image--large">
+                            <img src="/images/heart_black.png" alt="1998 Historical Photo 2" class="timeline__image timeline__image--overlay">
+                        </div>
+                        <div class="timeline__year-label">1998</div>
+                        <div class="timeline__text-content">
+                            <p class="timeline__subtitle">LOREM IPSUM DOLOR</p>
+                            <p class="timeline__description">
+                                Sit amet, consectetur adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 1996 Composition -->
+                    <div class="timeline__composition timeline__composition--1996">
+                        <div class="timeline__image-container">
+                            <img src="/images/heart_black.png" alt="1996 Historical Photo" class="timeline__image timeline__image--portrait">
+                        </div>
+                        <div class="timeline__year-label">1996</div>
+                        <div class="timeline__text-content">
+                            <p class="timeline__subtitle">LOREM IPSUM DOLOR</p>
+                            <p class="timeline__description">
+                                Sit amet, consectetur adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 1985 Composition -->
+                    <div class="timeline__composition timeline__composition--1985">
+                        <div class="timeline__image-container">
+                            <img src="/images/heart_black.png" alt="1985 Group Photo" class="timeline__image timeline__image--wide">
+                            <img src="/images/heart_black.png" alt="1985 Vehicle Photo" class="timeline__image timeline__image--small">
+                        </div>
+                        <div class="timeline__year-label">1985</div>
+                        <div class="timeline__text-content">
+                            <p class="timeline__subtitle">LOREM IPSUM DOLOR</p>
+                            <p class="timeline__description">
+                                Sit amet, consectetur adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+.historia-section {
+    padding: 6rem 0;
+    background: #eff0ec;
+    position: relative;
+}
+
+.historia-section__container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 3rem;
+}
+
+.historia-section__content {
+    text-align: center;
+}
+
+.historia-section__icon {
+    margin-bottom: 2rem;
+}
+
+.historia-section__heart-icon {
+    width: 60px;
+    height: auto;
+    opacity: 0.8;
+}
+
+.historia-section__title-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2rem;
+    gap: 2rem;
+}
+
+.historia-section__line {
+    flex: 1;
+    height: 1px;
+    border: none;
+    background: #666666;
+    max-width: 200px;
+}
+
+.historia-section__title {
+    font-family: var(--font-arpona);
+    font-size: 3rem;
+    font-weight: 300;
+    color: #333333;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin: 0;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.historia-section__title::first-letter {
+    font-size: 4rem;
+    font-weight: 400;
+    line-height: 1;
+}
+
+.large-letter {
+    font-size: 4rem;
+    font-weight: 400;
+    line-height: 1;
+    vertical-align: baseline;
+}
+
+.historia-section__header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.historia-section__timeline {
+    position: relative;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.timeline {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6rem;
+}
+
+.timeline__composition {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: center;
+    min-height: 400px;
+}
+
+.timeline__composition--1998 {
+    grid-template-areas: "images content";
+}
+
+.timeline__composition--1996 {
+    grid-template-areas: "content images";
+}
+
+.timeline__composition--1985 {
+    grid-template-areas: "content images";
+}
+
+.timeline__image-container {
+    position: relative;
+    grid-area: images;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    height: 300px;
+}
+
+.timeline__composition--1998 .timeline__image-container {
+    grid-template-rows: 1fr 1fr;
+}
+
+.timeline__composition--1996 .timeline__image-container {
+    grid-template-columns: 1fr;
+    justify-items: center;
+}
+
+.timeline__composition--1985 .timeline__image-container {
+    grid-template-rows: 2fr 1fr;
+}
+
+.timeline__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.timeline__image--large {
+    grid-column: 1 / -1;
+    grid-row: 1;
+}
+
+.timeline__image--overlay {
+    grid-column: 2;
+    grid-row: 2;
+    z-index: 2;
+    transform: translateY(-20px);
+}
+
+.timeline__image--portrait {
+    width: 250px;
+    height: 300px;
+    justify-self: center;
+}
+
+.timeline__image--wide {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    height: 200px;
+}
+
+.timeline__image--small {
+    grid-column: 2;
+    grid-row: 2;
+    height: 120px;
+    transform: translateY(-30px);
+}
+
+.timeline__text-content {
+    grid-area: content;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.timeline__year-label {
+    font-family: var(--font-arpona);
+    font-size: 5rem;
+    font-weight: 300;
+    color: rgba(102, 102, 102, 0.3);
+    line-height: 0.8;
+    margin-bottom: 1rem;
+    position: absolute;
+    z-index: 1;
+}
+
+.timeline__composition--1998 .timeline__year-label {
+    top: -1rem;
+    left: -2rem;
+}
+
+.timeline__composition--1996 .timeline__year-label {
+    top: -1rem;
+    right: -2rem;
+}
+
+.timeline__composition--1985 .timeline__year-label {
+    top: -1rem;
+    right: -2rem;
+}
+
+.timeline__subtitle {
+    font-family: var(--font-myriad);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #666666;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+}
+
+.timeline__description {
+    font-family: var(--font-myriad);
+    font-size: 1rem;
+    line-height: 1.7;
+    color: #666666;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .historia-section {
+        padding: 4rem 0;
+    }
+    
+    .historia-section__container {
+        padding: 0 1.5rem;
+    }
+    
+    .historia-section__icon {
+        margin-bottom: 1.5rem;
+    }
+    
+    .historia-section__heart-icon {
+        width: 45px;
+    }
+    
+    .historia-section__title-wrapper {
+        gap: 1rem;
+        margin-bottom: 3rem;
+    }
+    
+    .historia-section__line {
+        max-width: 100px;
+    }
+    
+    .historia-section__title {
+        font-size: 2.2rem;
+        letter-spacing: 2px;
+    }
+    
+    .historia-section__title::first-letter {
+        font-size: 3rem;
+    }
+    
+    .historia-section__timeline {
+        padding: 0 1rem;
+    }
+    
+    .timeline {
+        gap: 4rem;
+    }
+    
+    .timeline__composition {
+        grid-template-columns: 1fr;
+        grid-template-areas: 
+            "content"
+            "images";
+        gap: 2rem;
+        min-height: auto;
+    }
+    
+    .timeline__composition--1998,
+    .timeline__composition--1996,
+    .timeline__composition--1985 {
+        grid-template-areas: 
+            "content"
+            "images";
+    }
+    
+    .timeline__image-container {
+        height: auto;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+        gap: 1rem;
+    }
+    
+    .timeline__image--large,
+    .timeline__image--overlay,
+    .timeline__image--wide,
+    .timeline__image--small {
+        grid-column: 1;
+        grid-row: auto;
+        transform: none;
+        height: 200px;
+    }
+    
+    .timeline__image--portrait {
+        width: 100%;
+        height: 250px;
+        justify-self: stretch;
+    }
+    
+    .timeline__text-content {
+        padding: 1rem 0;
+        text-align: center;
+    }
+    
+    .timeline__year-label {
+        font-size: 3.5rem;
+        position: static;
+        text-align: center;
+        margin-bottom: 1rem;
+        color: rgba(102, 102, 102, 0.5);
+    }
+}
+
+@media (max-width: 480px) {
+    .historia-section__title {
+        font-size: 1.8rem;
+    }
+    
+    .historia-section__title::first-letter {
+        font-size: 2.4rem;
+    }
+    
+    .historia-section__line {
+        max-width: 50px;
+    }
+}
+</style>

@@ -1,0 +1,113 @@
+<%#
+Team Section Organism - Landing Page
+Nuestro Equipo section showcasing the Amexing Experience team
+
+Created by Denisse Maldonado
+%>
+
+<section class="team-section">
+    <div class="team-section__container">
+        <div class="team-section__overlay">
+            <div class="team-section__title-banner">
+                <h2 class="team-section__title">
+                    <span class="large-letter">N</span>uestro 
+                    <span class="large-letter">E</span>quipo
+                </h2>
+            </div>
+        </div>
+        <div class="team-section__image-wrapper">
+            <img src="/images/contacto_header.png" alt="Nuestro Equipo Amexing Experience" class="team-section__image">
+        </div>
+    </div>
+</section>
+
+<style>
+.team-section {
+    padding: 4rem 0;
+    background: #ffffff;
+    position: relative;
+}
+
+.team-section__container {
+    width: 100%;
+    margin: 0 auto;
+    padding: 0;
+}
+
+.team-section__image-wrapper {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+}
+
+.team-section__image {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+}
+
+.team-section__overlay {
+    display: flex;
+    justify-content: center;
+    margin-bottom: -50px;
+    position: relative;
+    z-index: 10;
+}
+
+.team-section__title-banner {
+    background: #969b81;
+    padding: 1rem 3rem;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.team-section__title {
+    font-family: var(--font-arpona);
+    font-size: 3rem;
+    font-weight: 300;
+    color: #ffffff;
+    text-align: center;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.large-letter {
+    font-size: 4rem;
+    font-weight: 400;
+    line-height: 1;
+    vertical-align: baseline;
+}
+
+@media (max-width: 768px) {
+    .team-section {
+        padding: 3rem 0;
+    }
+    
+    .team-section__container {
+        padding: 0 1rem;
+    }
+    
+    .team-section__title {
+        font-size: 2.5rem;
+        letter-spacing: 2px;
+    }
+    
+    .large-letter {
+        font-size: 3rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .team-section__title {
+        font-size: 2rem;
+        letter-spacing: 1px;
+    }
+    
+    .large-letter {
+        font-size: 2.5rem;
+    }
+}
+</style>

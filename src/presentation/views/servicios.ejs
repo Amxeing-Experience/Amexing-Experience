@@ -40,59 +40,16 @@ Created by Denisse Maldonado
         
         .page-hero {
             position: relative;
-            min-height: 400px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, rgba(46, 46, 45, 0.9), rgba(46, 46, 45, 0.7)), url('/images/hero-background.jpg');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            color: white;
-            text-align: center;
+            width: 100%;
+            height: auto;
             margin-top: 80px;
         }
 
-        .page-hero__container {
-            max-width: 1200px;
+        .page-hero__image {
             width: 100%;
-            padding: 0 2rem;
-            margin: 0 auto;
-        }
-
-        .page-hero__content {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .page-hero__title {
-            font-family: var(--font-arpona);
-            font-size: clamp(3rem, 6vw, 5rem);
-            font-weight: 400;
-            margin-bottom: 1.5rem;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-            letter-spacing: 2px;
-            font-variant: small-caps;
-        }
-
-        .page-hero__subtitle {
-            font-family: 'Montserrat', sans-serif;
-            font-size: clamp(1.1rem, 2vw, 1.3rem);
-            font-weight: 300;
-            line-height: 1.6;
-            color: rgba(255, 255, 255, 0.9);
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-        }
-
-        @media (max-width: 768px) {
-            .page-hero {
-                min-height: 300px;
-                background-attachment: scroll;
-            }
-            
-            .page-hero__container {
-                padding: 0 1rem;
-            }
+            height: auto;
+            display: block;
+            object-fit: cover;
         }
     </style>
 </head>
@@ -107,22 +64,17 @@ Created by Denisse Maldonado
 
     <%# Page Hero Section %>
     <section class="page-hero">
-        <div class="page-hero__container">
-            <div class="page-hero__content">
-                <h1 class="page-hero__title">Servicios</h1>
-                <p class="page-hero__subtitle">Experiencias premium de transporte y turismo</p>
-            </div>
-        </div>
+        <img src="/images/hero-services.png" alt="Servicios Amexing Experience" class="page-hero__image">
     </section>
 
-    <%# Services Section %>
-    <%- include('organisms/landing/services-section') %>
+    <%# Transporte Section %>
+    <%- include('organisms/landing/transporte-section') %>
 
-    <%# Experience Section %>
-    <%- include('organisms/landing/experience-section') %>
+    <%# Tours Section %>
+    <%- include('organisms/landing/tours-section') %>
 
-    <%# Testimonials Section %>
-    <%- include('organisms/landing/testimonials-section') %>
+    <%# Eventos Section %>
+    <%- include('organisms/landing/eventos-section') %>
 
     <%# Footer %>
     <%- include('organisms/landing/landing-footer', {
