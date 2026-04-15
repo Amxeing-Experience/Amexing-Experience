@@ -887,7 +887,7 @@ class QuoteCollaborationService {
       }
 
       // First check the role passed from the request (from JWT middleware)
-      const allowedRoles = ['admin', 'superadmin', 'department_manager'];
+      const allowedRoles = ['admin', 'superadmin', 'department_manager', 'client'];
 
       if (requestUserRole) {
         const hasRequestRolePermission = allowedRoles.includes(requestUserRole);

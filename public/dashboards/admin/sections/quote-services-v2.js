@@ -775,7 +775,17 @@ class ItineraryBuilder {
       if (!this.hasUnsavedChanges && !this._saveInProgress) {
         const quoteId = document.querySelector('[data-quote-id]')?.getAttribute('data-quote-id');
         if (quoteId) {
-          window.location.href = `/dashboard/admin/quotes/${quoteId}?section=summary`;
+          // Detect dashboard context to construct correct URL
+          const currentPath = window.location.pathname;
+          let dashboardType = 'admin'; // default
+          
+          if (currentPath.includes('/dashboard/client/')) {
+            dashboardType = 'client';
+          } else if (currentPath.includes('/dashboard/department_manager/')) {
+            dashboardType = 'department_manager';
+          }
+          
+          window.location.href = `/dashboard/${dashboardType}/quotes/${quoteId}?section=summary`;
         }
       }
     });
@@ -10192,6 +10202,21 @@ class ItineraryBuilder {
       console.error('Error parsing success response:', e);
       // If parsing fails but status is ok, consider it successful
       result = { success: true };
+    }
+
+    // Dispatch event for successful service items update
+    if (result.success) {
+      const event = new CustomEvent('serviceItemsUpdated', { 
+        detail: { 
+          quoteId: this.quoteId,
+          serviceItems: serviceItemsData,
+          total: serviceItemsData.total,
+          subtotal: serviceItemsData.subtotal,
+          currency: serviceItemsData.currency
+        } 
+      });
+      document.dispatchEvent(event);
+      console.log('📡 Dispatched serviceItemsUpdated event', { total: serviceItemsData.total });
     }
 
     return result;

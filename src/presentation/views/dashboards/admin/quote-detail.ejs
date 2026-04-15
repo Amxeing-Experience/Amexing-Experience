@@ -141,19 +141,69 @@ window.currentUser = {
     </div>
 </div>
 
-<!-- Confirm Schedule Modal -->
+<!-- Confirm Request Modal -->
 <% if (!isNewQuote) { %>
+<div class="modal fade" id="confirmRequestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="position: relative;">
+            <div class="modal-header border-0 pb-2">
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                        <i class="ti ti-send text-primary" style="font-size: 1.5rem;"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0">Solicitar Servicios</h5>
+                        <small class="text-muted">Confirmación requerida</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-0">
+                <div class="alert alert-info bg-opacity-10 border-0">
+                    <div class="d-flex">
+                        <i class="ti ti-info-circle text-info me-2 mt-1 flex-shrink-0"></i>
+                        <div>
+                            <strong>¿Deseas solicitar estos servicios?</strong>
+                            <p class="mb-0 mt-1">Se creará automáticamente una reservación con todos los servicios de esta cotización.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex align-items-center text-muted mb-0">
+                    <i class="ti ti-mail me-2"></i>
+                    <small>Se enviará confirmación a: <strong id="requestEmailAddress"></strong></small>
+                </div>
+            </div>
+            <!-- Loading overlay inside modal -->
+            <div id="requestLoadingOverlay" style="display:none; position:absolute; inset:0; background:rgba(255,255,255,0.95); z-index:10; border-radius:0.5rem;">
+                <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <h6 class="text-muted mb-1">Procesando solicitud...</h6>
+                    <small class="text-muted">Creando reservación...</small>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmRequestBtn">
+                    <i class="ti ti-send me-1"></i>Confirmar Solicitud
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Schedule Modal -->
 <div class="modal fade" id="confirmScheduleModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content" style="position: relative;">
             <div class="modal-header border-0 pb-0">
-                <h6 class="modal-title fw-bold">Confirmar reserva</h6>
+                <h6 class="modal-title fw-bold">Confirmar Agendamiento</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body pt-2">
-                <p>¿Confirmar esta cotización y reservar tu fecha?</p>
+                <p>¿Confirmar que la reservación ha sido agendada?</p>
                 <p class="mb-0 text-muted" style="font-size: 0.85rem;" id="scheduleEmailNote" style="display:none;">
-                    <i class="ti ti-mail me-1"></i>Se enviará un correo de confirmación a <strong id="scheduleEmailAddress"></strong>
+                    <i class="ti ti-mail me-1"></i>Se enviará confirmación de agenda a <strong id="scheduleEmailAddress"></strong>
                 </p>
             </div>
             <!-- Loading overlay inside modal -->
@@ -454,6 +504,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Status segmented control change handler
     let currentStatus = 'requested';
     const scheduleModal = new bootstrap.Modal(document.getElementById('confirmScheduleModal'));
+    const requestModal = new bootstrap.Modal(document.getElementById('confirmRequestModal'));
 
     function revertStatus(previousStatus) {
         currentStatus = previousStatus;
@@ -482,25 +533,36 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             if (result.success) {
                 showScheduleLoader(false);
-                if (newStatus === 'scheduled') {
+                
+                // Show reservation created notification for "requested" status
+                if (newStatus === 'requested' && result.data?.reservation) {
+                    const resData = result.data.reservation;
+                    const toast = document.createElement('div');
+                    toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
+                    toast.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+                    toast.innerHTML = `
+                        <strong><i class="ti ti-check me-1"></i>Reservación creada exitosamente</strong>
+                        <p class="mb-1 mt-1">Folio: ${resData.folio} (${resData.servicesCount || 0} servicios)</p>
+                        <a href="/dashboard/admin/bookings/${resData.id}" class="btn btn-sm btn-success">Ver Reservación</a>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 10000);
+                } else if (newStatus === 'scheduled') {
                     document.querySelectorAll('.quote-status-seg').forEach(seg => {
                         if (seg.dataset.status !== 'scheduled') seg.classList.add('disabled');
                     });
-                    // Show reservation link if one was created
-                    if (result.data?.reservation) {
-                        const resData = result.data.reservation;
-                        const toast = document.createElement('div');
-                        toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
-                        toast.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
-                        toast.innerHTML = `
-                            <strong><i class="ti ti-check me-1"></i>Reservación creada</strong>
-                            <p class="mb-1 mt-1">Folio: ${resData.folio} (${resData.servicesCount} servicios)</p>
-                            <a href="/dashboard/admin/bookings/${resData.id}" class="btn btn-sm btn-success">Ver Reservación</a>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        `;
-                        document.body.appendChild(toast);
-                        setTimeout(() => toast.remove(), 10000);
-                    }
+                    // Show scheduled confirmation
+                    const toast = document.createElement('div');
+                    toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
+                    toast.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+                    toast.innerHTML = `
+                        <strong><i class="ti ti-check me-1"></i>Reservación agendada exitosamente</strong>
+                        <p class="mb-0 mt-1">La reservación ha sido confirmada y agendada.</p>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 8000);
                 }
             } else {
                 showScheduleLoader(false);
@@ -521,7 +583,38 @@ document.addEventListener('DOMContentLoaded', function() {
             const previousStatus = currentStatus;
             currentStatus = newStatus;
 
-            if (newStatus === 'scheduled') {
+            if (newStatus === 'requested') {
+                // Update email in modal from current form value
+                const email = document.getElementById('contactEmail')?.value?.trim() || window._quoteCreatedByEmail || '';
+                const emailAddr = document.getElementById('requestEmailAddress');
+                if (email && emailAddr) {
+                    emailAddr.textContent = email;
+                }
+                // Show confirmation modal
+                requestModal.show();
+
+                // Confirm button
+                const confirmBtn = document.getElementById('confirmRequestBtn');
+                const handler = () => {
+                    requestModal.hide();
+                    applyStatusChange(newStatus, previousStatus);
+                    confirmBtn.removeEventListener('click', handler);
+                };
+                confirmBtn.addEventListener('click', handler);
+
+                // On modal dismiss (cancel or X), revert
+                document.getElementById('confirmRequestModal').addEventListener('hidden.bs.modal', function onHidden() {
+                    if (currentStatus === 'requested') {
+                        // Only revert if the confirm button wasn't clicked
+                        const overlay = document.getElementById('requestLoadingOverlay');
+                        if (!overlay || overlay.style.display === 'none') {
+                            // Not processing — revert
+                            revertStatus(previousStatus);
+                        }
+                    }
+                    this.removeEventListener('hidden.bs.modal', onHidden);
+                });
+            } else if (newStatus === 'scheduled') {
                 // Update email in modal from current form value
                 const email = document.getElementById('contactEmail')?.value?.trim() || window._quoteCreatedByEmail || '';
                 const emailNote = document.getElementById('scheduleEmailNote');
