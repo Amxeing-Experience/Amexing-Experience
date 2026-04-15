@@ -1,0 +1,180 @@
+<%#
+Colaboraciones Section Organism - Landing Page
+Partnership collaborations section with 4-column layout
+
+Created by Denisse Maldonado
+%>
+
+<section class="colaboraciones-section">
+    <div class="colaboraciones-section__container">
+        <div class="colaboraciones-section__grid">
+            <div class="colaboraciones-section__title-column">
+                <h2 class="colaboraciones-section__title">
+                    Colaboraciones
+                </h2>
+            </div>
+            
+            <div class="colaboraciones-section__logo-column">
+                <div class="colaboraciones-section__logo">
+                    <img src="/images/travelworld.png" alt="Travel World Partnership" class="colaboraciones-section__image">
+                </div>
+                <p class="colaboraciones-section__description">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.
+                </p>
+            </div>
+            
+            <div class="colaboraciones-section__logo-column">
+                <div class="colaboraciones-section__logo">
+                    <img src="/images/force.png" alt="Force Partnership" class="colaboraciones-section__image">
+                </div>
+                <p class="colaboraciones-section__description">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.
+                </p>
+            </div>
+            
+            <div class="colaboraciones-section__logo-column">
+                <div class="colaboraciones-section__logo">
+                    <img src="/images/tesla.png" alt="Tesla Partnership" class="colaboraciones-section__image">
+                </div>
+                <p class="colaboraciones-section__description">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+.colaboraciones-section {
+    padding: 4rem 0;
+    background: #d5d5d5;
+}
+
+.colaboraciones-section__container {
+    max-width: 1200px;
+    margin: 2rem 5rem;
+    padding: 3rem;
+    background: #d5d5d5ff;
+    border: 0.5px solid #000000;
+    position: relative;
+}
+
+.colaboraciones-section__container::before {
+    content: '';
+    position: absolute;
+    top: -0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: -0.5rem;
+    border: 0.5px solid #000000;
+    pointer-events: none;
+}
+
+.colaboraciones-section__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+.colaboraciones-section__title-column {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    height:100%
+}
+
+.colaboraciones-section__title {
+    font-family: var(--font-arpona);
+    font-size: 1.8rem;
+    font-weight: 300;
+    color: #333333;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.large-letter {
+    font-size: 2.4rem;
+    font-weight: 400;
+    line-height: 1;
+    vertical-align: baseline;
+}
+
+.colaboraciones-section__logo-column {
+    text-align: center;
+}
+
+.colaboraciones-section__logo {
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 80px;
+}
+
+.colaboraciones-section__image {
+    max-width: 100%;
+    max-height: 80px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+.colaboraciones-section__description {
+    font-family: var(--font-myriad);
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #333333;
+    margin: 0;
+    text-align: justify;
+}
+
+@media (max-width: 768px) {
+    .colaboraciones-section {
+        padding: 3rem 0;
+    }
+    
+    .colaboraciones-section__container {
+        margin: 0 1rem;
+        padding: 2rem;
+    }
+    
+    .colaboraciones-section__grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .colaboraciones-section__title-column {
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+    
+    .colaboraciones-section__title {
+        font-size: 1.6rem;
+    }
+    
+    .large-letter {
+    font-size: 4rem;
+    font-weight: 400;
+    line-height: 1;
+    vertical-align: baseline;
+}
+    
+    .colaboraciones-section__logo {
+        min-height: 60px;
+    }
+    
+    .colaboraciones-section__image {
+        max-height: 60px;
+    }
+    
+    .colaboraciones-section__description {
+        font-size: 0.8rem;
+        text-align: center;
+    }
+}
+</style>
