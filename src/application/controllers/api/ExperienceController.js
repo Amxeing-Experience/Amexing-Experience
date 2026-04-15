@@ -89,6 +89,7 @@ class ExperienceController {
       filteredQuery.include('vehicleType');
       filteredQuery.include('tours');
       filteredQuery.include('tours.destinationPOI');
+      filteredQuery.include('destinationPOI');
       filteredQuery.skip(params.start);
       filteredQuery.limit(params.length);
 
@@ -638,6 +639,7 @@ class ExperienceController {
       client_booking_notes: clientBookingNotes,
       provider_notes: providerNotes,
       team_notes: teamNotes,
+      destinationPOI,
     } = data;
 
     const Experience = Parse.Object.extend('Experience');
@@ -700,6 +702,13 @@ class ExperienceController {
     experienceObj.set('cost', parseFloat(cost));
     experienceObj.set('active', true);
     experienceObj.set('exists', true);
+
+    // Handle destinationPOI pointer relationship
+    if (destinationPOI && destinationPOI.trim() !== '') {
+      const poiPointer = new Parse.Object('POI');
+      poiPointer.id = destinationPOI.trim();
+      experienceObj.set('destinationPOI', poiPointer);
+    }
 
     return experienceObj;
   }
@@ -873,6 +882,7 @@ class ExperienceController {
       client_booking_notes: clientBookingNotes,
       provider_notes: providerNotes,
       team_notes: teamNotes,
+      destinationPOI,
     } = data;
 
     if (name !== undefined) {
@@ -1081,6 +1091,19 @@ class ExperienceController {
 
     if (active !== undefined) {
       experienceObj.set('active', active);
+    }
+
+    // Handle destinationPOI pointer relationship updates
+    if (destinationPOI !== undefined) {
+      if (destinationPOI === null || destinationPOI === '') {
+        // Remove destinationPOI pointer
+        experienceObj.unset('destinationPOI');
+      } else {
+        // Set destinationPOI pointer
+        const poiPointer = new Parse.Object('POI');
+        poiPointer.id = destinationPOI.trim();
+        experienceObj.set('destinationPOI', poiPointer);
+      }
     }
 
     // Return cost change info if there was a cost change, otherwise null

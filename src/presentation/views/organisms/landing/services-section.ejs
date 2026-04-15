@@ -1,0 +1,121 @@
+<%#
+Services Section Organism - Landing Page
+Showcases the main services offered by Amexing Experience
+Features transport, tours, and premium experience offerings
+
+Created by Denisse Maldonado
+%>
+
+<section class="services-section" id="services">
+    <div class="services-section__container">
+        <div class="services-section__header">
+            <h2 class="services-section__title">Nuestros Servicios</h2>
+            <p class="services-section__subtitle">
+                Experiencias premium diseñadas para superar tus expectativas
+            </p>
+        </div>
+
+        <div class="services-section__grid">
+            <div class="services-section__service">
+                <div class="services-section__service-icon">
+                    <i class="fas fa-car"></i>
+                </div>
+                <h3 class="services-section__service-title">Transporte Ejecutivo</h3>
+                <p class="services-section__service-description">
+                    Flota Tesla premium para traslados seguros y elegantes en San Miguel de Allende
+                </p>
+            </div>
+
+            <div class="services-section__service">
+                <div class="services-section__service-icon">
+                    <i class="fas fa-route"></i>
+                </div>
+                <h3 class="services-section__service-title">Tours Personalizados</h3>
+                <p class="services-section__service-description">
+                    Experiencias únicas adaptadas a tus intereses y preferencias
+                </p>
+            </div>
+
+            <div class="services-section__service">
+                <div class="services-section__service-icon">
+                    <i class="fas fa-utensils"></i>
+                </div>
+                <h3 class="services-section__service-title">Experiencias Gastronómicas</h3>
+                <p class="services-section__service-description">
+                    Descubre los sabores auténticos de la región con guías locales expertos
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+.services-section {
+    padding: 4rem 0;
+    background: white;
+}
+
+.services-section__container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.services-section__header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.services-section__title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 300;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.services-section__subtitle {
+    font-size: 1.2rem;
+    color: #5a6c7d;
+}
+
+.services-section__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.services-section__service {
+    text-align: center;
+    padding: 2rem;
+    border-radius: 16px;
+    background: rgba(184, 134, 11, 0.05);
+}
+
+.services-section__service-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #B8860B, #DAA520);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem auto;
+    font-size: 2rem;
+    color: white;
+}
+
+.services-section__service-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.services-section__service-description {
+    font-size: 1rem;
+    color: #5a6c7d;
+    line-height: 1.6;
+}
+</style>

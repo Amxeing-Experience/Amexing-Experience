@@ -286,6 +286,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <div class="form-text">Descripción completa del establecimiento</div>
                     </div>
 
+                    <!-- Destino (Optional) -->
+                    <div class="mb-3">
+                        <label for="establishmentDestino" class="form-label">
+                            Destino <small class="text-muted">(Opcional)</small>
+                        </label>
+                        <select class="form-control" id="establishmentDestino" name="destinationPOI">
+                            <option value="">Seleccione un destino...</option>
+                            <!-- Dynamically populated with POI data -->
+                        </select>
+                        <div class="form-text">Punto de interés o destino principal asociado con este establecimiento</div>
+                    </div>
+
                     <!-- Sección: Experiencias del Establecimiento -->
                     <div class="mb-4">
                         <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #f59e0b;">
@@ -1254,6 +1266,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 active: true,
                 exists: true
             };
+            
+            // Add destinationPOI if selected
+            const destinationPOIId = $('#establishmentDestino').val();
+            if (destinationPOIId && destinationPOIId.trim() !== '') {
+                formData.destinationPOI = destinationPOIId.trim();
+                console.log('📍 Including destinationPOI in form data:', destinationPOIId);
+            }
 
             // Collect establishment experiences data (save separately, not in main payload)
             const experienciasData = collectEstablishmentExperienciasData();
@@ -2178,6 +2197,81 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         }, 3000);
     }
 
+    // POI Loading and Management Functions
+    async function loadPOIOptions() {
+        try {
+            console.log('🌍 Loading POI options for Destino selectbox...');
+            
+            const response = await fetch('/api/pois/active', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const responseData = await response.json();
+            console.log('📍 POI API Response:', responseData);
+            
+            // Extract POI array from response
+            const poisArray = responseData.success ? responseData.data : responseData;
+            
+            if (!Array.isArray(poisArray)) {
+                console.error('❌ POI API did not return an array:', poisArray);
+                return [];
+            }
+            
+            console.log(`📍 Loaded ${poisArray.length} POIs from API`);
+            
+            // Deduplicate by name - show unique names only
+            const uniquePOIs = poisArray.filter((poi, index, self) => 
+                index === self.findIndex(p => p.label === poi.label)
+            );
+            
+            console.log(`✨ Deduplicated to ${uniquePOIs.length} unique POIs`);
+            return uniquePOIs;
+            
+        } catch (error) {
+            console.error('❌ Error loading POI options:', error);
+            showEstablishmentError('Error al cargar destinos. Inténtelo de nuevo.');
+            return [];
+        }
+    }
+    
+    // Populate Destino selectbox with POI options
+    function populateDestinoSelect(selectId, pois) {
+        const select = document.getElementById(selectId);
+        if (!select) {
+            console.warn('⚠️ Destino select element not found:', selectId);
+            return;
+        }
+        
+        // Clear existing options except the first one
+        select.innerHTML = '<option value="">Seleccione un destino...</option>';
+        
+        // Add POI options
+        pois.forEach(poi => {
+            const option = document.createElement('option');
+            option.value = poi.value;
+            option.textContent = poi.label;
+            option.setAttribute('data-service-type', poi.serviceType?.name || '');
+            select.appendChild(option);
+        });
+        
+        console.log(`✅ Populated ${selectId} with ${pois.length} POI options`);
+    }
+    
+    // Load and populate POI options for establishment modal
+    async function loadEstablishmentDestinoOptions() {
+        const pois = await loadPOIOptions();
+        if (pois.length > 0) {
+            populateDestinoSelect('establishmentDestino', pois);
+        }
+    }
+
     // Helper function to try to get presigned URL from S3 key
     async function tryGetPresignedUrl(s3Key) {
         try {
@@ -2243,10 +2337,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Reset form
             document.getElementById('establishmentForm').reset();
             
-            // CRITICAL: Enhanced form reset - explicitly clear establishmentId for create mode
+            // CRITICAL: Enhanced form reset - explicitly clear fields for create mode
             if (!isEdit) {
                 $('#establishmentId').val(''); // Ensure no residual ID from previous sessions
-                console.log('🧹 Cleared establishmentId field for create mode');
+                $('#establishmentDestino').val(''); // Ensure no residual destino from previous sessions
+                console.log('🧹 Cleared establishmentId and destino fields for create mode');
             }
             
             // Clear experiences list - ENHANCED CLEARING
@@ -2292,6 +2387,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 modalTitle.textContent = 'Crear Nuevo Establecimiento';
                 saveButtonText.textContent = 'Crear Establecimiento';
             }
+            
+            // Load POI options for Destino selectbox
+            loadEstablishmentDestinoOptions();
             
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('establishmentModal'));
@@ -2341,6 +2439,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#establishmentId').val(establishment.id);
                         $('#establishmentName').val(establishment.name);
                         $('#establishmentDescription').val(establishment.description || '');
+                        
+                        // Populate destinationPOI field
+                        if (establishment.destinationPOI && establishment.destinationPOI.id) {
+                            $('#establishmentDestino').val(establishment.destinationPOI.id);
+                            console.log('📍 Loaded destinationPOI:', establishment.destinationPOI.name || establishment.destinationPOI.id);
+                        } else {
+                            $('#establishmentDestino').val('');
+                        }
                         
                         // Clear loading message
                         $('#establishmentModalAlerts').html('');

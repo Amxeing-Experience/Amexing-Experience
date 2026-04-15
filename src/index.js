@@ -34,6 +34,7 @@ const path = require('path');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const methodOverride = require('method-override');
+const expressLayouts = require('express-ejs-layouts');
 
 // Infrastructure
 const logger = require('./infrastructure/logger');
@@ -72,6 +73,8 @@ if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging')
 // View engine setup
 app.set('views', path.join(__dirname, 'presentation', 'views'));
 app.set('view engine', 'ejs');
+app.use(expressLayouts);
+app.set('layout', false); // Disable default layout, pages will specify their own
 
 // VERY FIRST REQUEST LOGGER - Log ALL requests to see what's happening
 app.use((req, res, next) => {

@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const logger = require('../../infrastructure/logger');
 
 const router = express.Router();
@@ -340,6 +341,96 @@ router.use('/forms', formRoutes);
 const DebugController = require('../../application/controllers/api/DebugController');
 
 router.post('/debug/load-vehicle-images-call', DebugController.logLoadVehicleImagesCall);
+
+// Contact form endpoint (public, no authentication required)
+/**
+ * @swagger
+ * /api/contact:
+ *   post:
+ *     tags:
+ *       - Contact
+ *     summary: Submit contact form
+ *     description: |
+ *       Submit contact form with user information and message.
+ *       Sends email notification to configured recipients.
+ *
+ *       **Public Endpoint** - No authentication required
+ *       **Rate Limited:** 10 requests per hour per IP
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - message
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 100
+ *                 description: Full name
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address
+ *               phone:
+ *                 type: string
+ *                 maxLength: 20
+ *                 description: Phone number (optional)
+ *               company:
+ *                 type: string
+ *                 maxLength: 100
+ *                 description: Company name (optional)
+ *               subject:
+ *                 type: string
+ *                 maxLength: 200
+ *                 description: Message subject (optional)
+ *               message:
+ *                 type: string
+ *                 minLength: 10
+ *                 maxLength: 2000
+ *                 description: Message content
+ *     responses:
+ *       200:
+ *         description: Contact form submitted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Validation error
+ *       429:
+ *         description: Rate limit exceeded
+ *       500:
+ *         description: Server error
+ */
+// Create specific rate limiter for contact form
+const contactRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // 10 submissions per hour per IP
+  message: 'Too many contact form submissions. Please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.warn(`Contact form rate limit exceeded for IP: ${req.ip}`);
+    res.status(429).json({
+      success: false,
+      error: 'Rate limit exceeded',
+      message: 'Too many contact form submissions. Please try again later.',
+      retryAfter: Math.ceil(req.rateLimit.resetTime / 1000),
+    });
+  },
+});
+
+router.post('/contact', contactRateLimiter, apiController.submitContactForm);
 
 // PUBLIC ROUTES - No authentication required (must be before router.use(authenticateToken))
 

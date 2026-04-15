@@ -1,0 +1,617 @@
+<%#
+Recognition Section Organism - Landing Page
+Awards and recognition section featuring TripAdvisor Travelers' Choice Awards
+and other industry certifications and achievements
+
+@param {string} title - Section title (default: 'RECONOCIMIENTOS')
+@param {array} awards - Array of awards and certifications
+@param {boolean} showStats - Whether to show additional statistics
+@param {object} mainAward - Featured award (TripAdvisor)
+
+@example
+include('organisms/landing/recognition-section', {
+    title: 'RECONOCIMIENTOS',
+    showStats: true
+}) %>
+
+Created by Denisse Maldonado
+%>
+
+<%
+const sectionTitle = typeof title !== 'undefined' ? title : 'RECONOCIMIENTOS';
+const showStatsEnabled = typeof showStats !== 'undefined' ? showStats : true;
+
+const featuredAward = typeof mainAward !== 'undefined' ? mainAward : {
+    name: 'TripAdvisor Travelers\' Choice Awards',
+    year: '2025',
+    description: 'Reconocimiento a la excelencia en servicio turístico',
+    logo: '/images/tripadvisor-travelers-choice-2025.svg',
+    rating: '5.0',
+    reviews: '150+'
+};
+
+const awardsList = typeof awards !== 'undefined' ? awards : [
+    {
+        icon: 'fas fa-certificate',
+        name: 'Certificación de Calidad Turística',
+        issuer: 'SECTUR',
+        year: '2024',
+        description: 'Cumplimiento de estándares de calidad en servicios turísticos'
+    },
+    {
+        icon: 'fas fa-shield-alt',
+        name: 'Certificación de Seguridad',
+        issuer: 'AMESTUR',
+        year: '2024',
+        description: 'Protocolos de seguridad y higiene certificados'
+    },
+    {
+        icon: 'fas fa-leaf',
+        name: 'Turismo Sustentable',
+        issuer: 'EarthCheck',
+        year: '2024',
+        description: 'Compromiso con prácticas ambientalmente responsables'
+    },
+    {
+        icon: 'fas fa-star',
+        name: 'Empresa Líder',
+        issuer: 'Cámara de Comercio',
+        year: '2023',
+        description: 'Reconocimiento como empresa líder en turismo regional'
+    }
+];
+
+const recognitionStats = {
+    years: '30+',
+    certification: '15+',
+    awards: '8+',
+    rating: '5.0'
+};
+%>
+
+<section class="recognition-section" id="recognition">
+    <div class="recognition-section__container">
+        <div class="recognition-section__header">
+            <h2 class="recognition-section__title"><%= sectionTitle %></h2>
+            <p class="recognition-section__subtitle">
+                Nuestro compromiso con la excelencia ha sido reconocido por las principales organizaciones del sector turístico
+            </p>
+        </div>
+
+        <div class="recognition-section__content">
+            <%# Featured Award - TripAdvisor %>
+            <div class="recognition-section__featured">
+                <div class="recognition-section__award recognition-section__award--featured">
+                    <div class="recognition-section__award-badge">
+                        <div class="recognition-section__award-logo">
+                            <img src="<%= featuredAward.logo %>" 
+                                 alt="<%= featuredAward.name %>" 
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
+                            <div class="recognition-section__award-fallback" style="display: none;">
+                                <div class="recognition-section__tripadvisor-badge">
+                                    <div class="recognition-section__tripadvisor-icon">
+                                        <i class="fab fa-tripadvisor"></i>
+                                    </div>
+                                    <div class="recognition-section__tripadvisor-text">
+                                        <div class="recognition-section__tripadvisor-title">Travelers' Choice</div>
+                                        <div class="recognition-section__tripadvisor-subtitle">Awards</div>
+                                        <div class="recognition-section__tripadvisor-year"><%= featuredAward.year %></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="recognition-section__award-info">
+                            <h3 class="recognition-section__award-title"><%= featuredAward.name %></h3>
+                            <p class="recognition-section__award-description"><%= featuredAward.description %></p>
+                            
+                            <div class="recognition-section__award-metrics">
+                                <div class="recognition-section__metric">
+                                    <span class="recognition-section__metric-value"><%= featuredAward.rating %></span>
+                                    <span class="recognition-section__metric-label">Rating</span>
+                                </div>
+                                <div class="recognition-section__metric">
+                                    <span class="recognition-section__metric-value"><%= featuredAward.reviews %></span>
+                                    <span class="recognition-section__metric-label">Reviews</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <%# Additional Awards Grid %>
+            <div class="recognition-section__grid">
+                <% awardsList.forEach(function(award, index) { %>
+                <div class="recognition-section__award" data-aos="fade-up" data-aos-delay="<%= index * 100 %>">
+                    <div class="recognition-section__award-icon">
+                        <i class="<%= award.icon %>"></i>
+                    </div>
+                    <div class="recognition-section__award-content">
+                        <h4 class="recognition-section__award-name"><%= award.name %></h4>
+                        <div class="recognition-section__award-issuer"><%= award.issuer %> · <%= award.year %></div>
+                        <p class="recognition-section__award-desc"><%= award.description %></p>
+                    </div>
+                </div>
+                <% }); %>
+            </div>
+
+            <% if (showStatsEnabled) { %>
+            <div class="recognition-section__stats">
+                <div class="recognition-section__stat">
+                    <div class="recognition-section__stat-number"><%= recognitionStats.years %></div>
+                    <div class="recognition-section__stat-label">Años de Trayectoria</div>
+                </div>
+                <div class="recognition-section__stat">
+                    <div class="recognition-section__stat-number"><%= recognitionStats.certification %></div>
+                    <div class="recognition-section__stat-label">Certificaciones</div>
+                </div>
+                <div class="recognition-section__stat">
+                    <div class="recognition-section__stat-number"><%= recognitionStats.awards %></div>
+                    <div class="recognition-section__stat-label">Reconocimientos</div>
+                </div>
+                <div class="recognition-section__stat">
+                    <div class="recognition-section__stat-number"><%= recognitionStats.rating %></div>
+                    <div class="recognition-section__stat-label">Calificación Promedio</div>
+                </div>
+            </div>
+            <% } %>
+        </div>
+    </div>
+</section>
+
+<style>
+.recognition-section {
+    padding: 6rem 0;
+    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+    color: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.recognition-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="awards-pattern" patternUnits="userSpaceOnUse" width="100" height="100"><path d="M50 10 L60 40 L90 40 L70 60 L80 90 L50 70 L20 90 L30 60 L10 40 L40 40 Z" fill="none" stroke="white" stroke-width="0.5" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23awards-pattern)"/></svg>') repeat;
+    pointer-events: none;
+}
+
+.recognition-section__container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+.recognition-section__header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.recognition-section__title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-bottom: 1.5rem;
+    position: relative;
+    display: inline-block;
+}
+
+.recognition-section__title::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 3px;
+    background: linear-gradient(90deg, #B8860B, #DAA520);
+    border-radius: 2px;
+}
+
+.recognition-section__subtitle {
+    font-family: 'Montserrat', sans-serif;
+    font-size: clamp(1rem, 2.5vw, 1.2rem);
+    font-weight: 300;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.recognition-section__content {
+    display: flex;
+    flex-direction: column;
+    gap: 4rem;
+}
+
+.recognition-section__featured {
+    display: flex;
+    justify-content: center;
+}
+
+.recognition-section__award--featured {
+    max-width: 600px;
+    width: 100%;
+}
+
+.recognition-section__award-badge {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 24px;
+    padding: 3rem;
+    text-align: center;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+    transition: all 0.4s ease;
+}
+
+.recognition-section__award-badge:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3);
+    border-color: rgba(184, 134, 11, 0.4);
+}
+
+.recognition-section__award-logo {
+    margin-bottom: 2rem;
+}
+
+.recognition-section__award-logo img {
+    max-width: 200px;
+    max-height: 120px;
+    object-fit: contain;
+}
+
+.recognition-section__tripadvisor-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    color: #00AA6C;
+    max-width: 200px;
+    margin: 0 auto;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.recognition-section__tripadvisor-icon {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+}
+
+.recognition-section__tripadvisor-text {
+    text-align: center;
+    color: #333;
+}
+
+.recognition-section__tripadvisor-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.recognition-section__tripadvisor-subtitle {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1rem;
+    font-weight: 400;
+    margin-bottom: 0.5rem;
+}
+
+.recognition-section__tripadvisor-year {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #B8860B;
+}
+
+.recognition-section__award-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: white;
+}
+
+.recognition-section__award-description {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 300;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 2rem;
+}
+
+.recognition-section__award-metrics {
+    display: flex;
+    justify-content: center;
+    gap: 3rem;
+}
+
+.recognition-section__metric {
+    text-align: center;
+}
+
+.recognition-section__metric-value {
+    display: block;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #DAA520;
+    margin-bottom: 0.25rem;
+}
+
+.recognition-section__metric-label {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.recognition-section__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.recognition-section__award {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    padding: 2rem;
+    transition: all 0.4s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.recognition-section__award::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.6s ease;
+}
+
+.recognition-section__award:hover::before {
+    left: 100%;
+}
+
+.recognition-section__award:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    border-color: rgba(184, 134, 11, 0.4);
+}
+
+.recognition-section__award-icon {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #B8860B, #DAA520);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    color: white;
+    box-shadow: 0 4px 16px rgba(184, 134, 11, 0.3);
+}
+
+.recognition-section__award-content {
+    position: relative;
+    z-index: 1;
+}
+
+.recognition-section__award-name {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 0.5rem;
+}
+
+.recognition-section__award-issuer {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #DAA520;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.recognition-section__award-desc {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 300;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+}
+
+.recognition-section__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+    padding-top: 3rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.recognition-section__stat {
+    text-align: center;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: all 0.3s ease;
+}
+
+.recognition-section__stat:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.recognition-section__stat-number {
+    font-family: 'Montserrat', sans-serif;
+    font-size: clamp(1.8rem, 3vw, 2.5rem);
+    font-weight: 700;
+    color: #DAA520;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.recognition-section__stat-label {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+@media (max-width: 1024px) {
+    .recognition-section {
+        padding: 4rem 0;
+    }
+    
+    .recognition-section__container {
+        padding: 0 1.5rem;
+    }
+    
+    .recognition-section__award-metrics {
+        gap: 2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .recognition-section {
+        padding: 3rem 0;
+    }
+    
+    .recognition-section__container {
+        padding: 0 1rem;
+    }
+    
+    .recognition-section__award-badge {
+        padding: 2rem;
+    }
+    
+    .recognition-section__grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .recognition-section__stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .recognition-section__award-metrics {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .recognition-section__award-badge {
+        padding: 1.5rem;
+    }
+    
+    .recognition-section__award {
+        padding: 1.5rem;
+    }
+    
+    .recognition-section__stats {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .recognition-section__stat {
+        padding: 1rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .recognition-section__award,
+    .recognition-section__award-badge,
+    .recognition-section__stat {
+        transition: none;
+    }
+    
+    .recognition-section__award:hover,
+    .recognition-section__award-badge:hover,
+    .recognition-section__stat:hover {
+        transform: none;
+    }
+}
+
+@media print {
+    .recognition-section {
+        background: white;
+        color: black;
+        padding: 2rem 0;
+    }
+    
+    .recognition-section::before {
+        display: none;
+    }
+    
+    .recognition-section__award,
+    .recognition-section__award-badge,
+    .recognition-section__stat {
+        background: white;
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const recognitionSection = document.querySelector('.recognition-section');
+    
+    if (recognitionSection && 'IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('recognition-section--visible');
+                    
+                    // Animate awards
+                    const awards = entry.target.querySelectorAll('.recognition-section__award');
+                    awards.forEach((award, index) => {
+                        setTimeout(() => {
+                            award.style.opacity = '1';
+                            award.style.transform = 'translateY(0)';
+                        }, index * 100);
+                    });
+                }
+            });
+        }, {
+            threshold: 0.2
+        });
+        
+        observer.observe(recognitionSection);
+    }
+    
+    // Initial styles for animation
+    const awards = document.querySelectorAll('.recognition-section__award');
+    awards.forEach(award => {
+        award.style.opacity = '0';
+        award.style.transform = 'translateY(30px)';
+        award.style.transition = 'all 0.6s ease';
+    });
+});
+</script>

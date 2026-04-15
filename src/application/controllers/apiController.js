@@ -271,6 +271,118 @@ class ApiController {
       });
     }
   }
+
+  /**
+   * Handles contact form submissions and sends notification emails.
+   * Validates form data, processes the submission through ContactFormService,
+   * and returns appropriate response to the client.
+   * @function submitContactForm
+   * @param {object} req - Express request object with contact form data in body.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} - JSON response with submission status.
+   * @example
+   * // POST /api/contact
+   * // Body: { name: 'John Doe', email: 'john@example.com', message: 'Hello' }
+   * // Response: { success: true, message: 'Contact form submitted successfully' }
+   */
+  async submitContactForm(req, res) {
+    try {
+      const {
+        name, email, phone, company, subject, message,
+      } = req.body;
+
+      // Basic validation
+      if (!name || !email || !message) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields',
+          message: 'Name, email, and message are required.',
+        });
+      }
+
+      // Email format validation
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(email)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid email format',
+          message: 'Please provide a valid email address.',
+        });
+      }
+
+      // Length validations
+      if (name.length < 2 || name.length > 100) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid name length',
+          message: 'Name must be between 2 and 100 characters.',
+        });
+      }
+
+      if (message.length < 10 || message.length > 2000) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid message length',
+          message: 'Message must be between 10 and 2000 characters.',
+        });
+      }
+
+      // Import ContactFormService
+      const ContactFormService = require('../services/ContactFormService');
+      const contactFormService = new ContactFormService();
+
+      // Process the contact form submission
+      const result = await contactFormService.processContactForm({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone?.trim() || null,
+        company: company?.trim() || null,
+        subject: subject?.trim() || null,
+        message: message.trim(),
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date(),
+      });
+
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          error: result.error || 'Failed to process contact form',
+          message: 'There was an error processing your contact form. Please try again later.',
+        });
+      }
+
+      // Log successful submission
+      logger.info('Contact form submitted successfully', {
+        name,
+        email: email.toLowerCase(),
+        company: company || null,
+        subject: subject || null,
+        messageLength: message.length,
+        ip: req.ip,
+        emailSent: result.emailSent,
+        messageId: result.messageId,
+      });
+
+      res.json({
+        success: true,
+        message: 'Thank you for your message! We will get back to you soon.',
+      });
+    } catch (error) {
+      logger.error('Error processing contact form:', {
+        error: error.message,
+        stack: error.stack,
+        body: req.body,
+        ip: req.ip,
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'Internal Server Error',
+        message: 'There was an error processing your contact form. Please try again later.',
+      });
+    }
+  }
 }
 
 module.exports = new ApiController();

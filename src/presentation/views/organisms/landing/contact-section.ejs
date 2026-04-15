@@ -1,0 +1,513 @@
+<%#
+Contact Section Organism - Landing Page
+Contact form and information section matching reference design
+
+Created by Denisse Maldonado
+%>
+
+<section class="contact-section" id="contact">
+    <div class="contact-section__container">
+        <div class="contact-section__content">
+            <!-- Left Side: Contact Form -->
+            <div class="contact-section__form-container">
+                <h2 class="contact-section__form-title">Ponte en contacto</h2>
+                
+                <form class="contact-section__form" id="contactForm">
+                    <!-- Form Status Messages -->
+                    <div class="contact-form__status" id="contactFormStatus" style="display: none;"></div>
+                    
+                    <div class="contact-section__form-row">
+                        <div class="contact-section__form-group">
+                            <input type="email" 
+                                   name="email" 
+                                   class="contact-section__input" 
+                                   placeholder="Email" 
+                                   required>
+                        </div>
+                        <div class="contact-section__form-group">
+                            <input type="tel" 
+                                   name="phone" 
+                                   class="contact-section__input" 
+                                   placeholder="Teléfono">
+                        </div>
+                    </div>
+                    
+                    <div class="contact-section__form-row">
+                        <div class="contact-section__form-group">
+                            <input type="text" 
+                                   name="firstName" 
+                                   class="contact-section__input" 
+                                   placeholder="Nombre" 
+                                   required>
+                        </div>
+                        <div class="contact-section__form-group">
+                            <input type="text" 
+                                   name="lastName" 
+                                   class="contact-section__input" 
+                                   placeholder="Apellido" 
+                                   required>
+                        </div>
+                    </div>
+                    
+                    <div class="contact-section__form-group contact-section__form-group--full">
+                        <input type="text" 
+                               name="company" 
+                               class="contact-section__input" 
+                               placeholder="Empresa (opcional)">
+                    </div>
+                    
+                    <div class="contact-section__form-group contact-section__form-group--full">
+                        <input type="text" 
+                               name="subject" 
+                               class="contact-section__input" 
+                               placeholder="Título del mensaje">
+                    </div>
+                    
+                    <div class="contact-section__form-group contact-section__form-group--full">
+                        <textarea name="message" 
+                                  class="contact-section__textarea" 
+                                  placeholder="Mensaje" 
+                                  rows="5" 
+                                  required 
+                                  minlength="10"
+                                  maxlength="2000"></textarea>
+                    </div>
+                    
+                    <button type="submit" class="contact-section__submit" id="contactSubmitBtn">
+                        <span class="contact-submit__text">SEND MESSAGE</span>
+                        <span class="contact-submit__loading" style="display: none;">
+                            <svg class="contact-submit__spinner" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="32" stroke-dashoffset="32">
+                                    <animate attributeName="stroke-dasharray" dur="2s" values="0 32;16 16;0 32;0 32" repeatCount="indefinite"/>
+                                    <animate attributeName="stroke-dashoffset" dur="2s" values="0;-16;-32;-32" repeatCount="indefinite"/>
+                                </circle>
+                            </svg>
+                            ENVIANDO...
+                        </span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Right Side: Contact Information Cards -->
+            <div class="contact-section__info">
+                <div class="contact-section__info-card">
+                    <img src="/images/g12086.png" alt="Phone" class="contact-section__info-icon">
+                    <div class="contact-section__info-content">
+                        <h3 class="contact-section__info-label">Oficina:</h3>
+                        <p class="contact-section__info-value">+52 (415) 167 39 90</p>
+                    </div>
+                </div>
+                
+                <div class="contact-section__info-card">
+                    <img src="/images/g12110.png" alt="Emergency" class="contact-section__info-icon">
+                    <div class="contact-section__info-content">
+                        <h3 class="contact-section__info-label">Solo para emergencias:</h3>
+                        <p class="contact-section__info-value">+52 (415) 153 50 67</p>
+                    </div>
+                </div>
+                
+                <div class="contact-section__info-card">
+                    <img src="/images/g12098.png" alt="Hours" class="contact-section__info-icon">
+                    <div class="contact-section__info-content">
+                        <h3 class="contact-section__info-label">Horarios de Oficina:</h3>
+                        <p class="contact-section__info-value">Lunes a Sábado<br>de las 08:00 hrs a las 15:00 hrs (CDT)</p>
+                    </div>
+                </div>
+                
+                <div class="contact-section__info-card">
+                    <img src="/images/g12136.png" alt="Email" class="contact-section__info-icon">
+                    <div class="contact-section__info-content">
+                        <h3 class="contact-section__info-label">Email:</h3>
+                        <p class="contact-section__info-value">contact@amexing.com</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+.contact-section {
+    padding: 4rem 0;
+    background: #f8f9fa;
+}
+
+.contact-section__container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.contact-section__content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: start;
+}
+
+/* Left Side - Contact Form */
+.contact-section__form-container {
+    /* background: white; */
+    /* padding: 2rem; */
+    border-radius: 16px;
+    /* box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); */
+}
+
+.contact-section__form-title {
+    font-family: var(--font-myriad), sans-serif;
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: #333;
+    margin-bottom: 2rem;
+    line-height: 1.2;
+}
+
+.contact-section__form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.contact-section__form-group {
+    margin-bottom: 1rem;
+}
+
+.contact-section__form-group--full {
+    grid-column: 1 / -1;
+}
+
+.contact-section__input,
+.contact-section__textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9rem;
+    background: #f8f9fa;
+    transition: border-color 0.3s ease;
+    box-sizing: border-box;
+}
+
+.contact-section__input:focus,
+.contact-section__textarea:focus {
+    outline: none;
+    border-color: #B8860B;
+    background: white;
+}
+
+.contact-section__textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.contact-section__submit {
+    background: #333;
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 4px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 1rem;
+}
+
+.contact-section__submit:hover {
+    background: #555;
+    transform: translateY(-1px);
+}
+
+.contact-section__submit:disabled {
+    background: #999;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Form Status Messages */
+.contact-form__status {
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.contact-form__status--success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.contact-form__status--error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Submit Button Loading State */
+.contact-submit__text,
+.contact-submit__loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.contact-submit__spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Right Side - Contact Information Cards */
+.contact-section__info {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.contact-section__info-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+}
+
+.contact-section__info-icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    object-fit: contain;
+}
+
+.contact-section__info-content {
+    flex: 1;
+}
+
+.contact-section__info-label {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 0.5rem 0;
+}
+
+.contact-section__info-value {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 400;
+    color: #666;
+    margin: 0;
+    line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+    .contact-section__content {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .contact-section__form-row {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .contact-section__container {
+        padding: 0 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .contact-section {
+        padding: 2rem 0;
+    }
+    
+    .contact-section__form-container {
+        padding: 1.5rem;
+    }
+    
+    .contact-section__form-title {
+        font-size: 1.5rem;
+    }
+    
+    .contact-section__info-card {
+        padding: 1rem;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const contactForm = document.getElementById('contactForm');
+    const statusDiv = document.getElementById('contactFormStatus');
+    const submitBtn = document.getElementById('contactSubmitBtn');
+    const submitText = submitBtn.querySelector('.contact-submit__text');
+    const submitLoading = submitBtn.querySelector('.contact-submit__loading');
+
+    if (!contactForm) return;
+
+    // Form submission handler
+    contactForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        // Get form data
+        const formData = new FormData(contactForm);
+        const data = {
+            name: `${formData.get('firstName')} ${formData.get('lastName')}`.trim(),
+            email: formData.get('email'),
+            phone: formData.get('phone') || null,
+            company: formData.get('company') || null,
+            subject: formData.get('subject') || null,
+            message: formData.get('message')
+        };
+
+        // Basic client-side validation
+        if (!data.name || !data.email || !data.message) {
+            showMessage('Por favor complete todos los campos requeridos.', 'error');
+            return;
+        }
+
+        if (data.message.length < 10) {
+            showMessage('El mensaje debe tener al menos 10 caracteres.', 'error');
+            return;
+        }
+
+        if (data.message.length > 2000) {
+            showMessage('El mensaje no puede exceder los 2000 caracteres.', 'error');
+            return;
+        }
+
+        // Email format validation
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(data.email)) {
+            showMessage('Por favor ingrese una dirección de email válida.', 'error');
+            return;
+        }
+
+        // Set loading state
+        setLoadingState(true);
+
+        try {
+            // Submit form data
+            const response = await fetch('/api/contact', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                // Success
+                showMessage(result.message || '¡Gracias por su mensaje! Nos pondremos en contacto pronto.', 'success');
+                contactForm.reset();
+                
+                // Scroll to status message
+                statusDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                // Auto-hide success message after 10 seconds
+                setTimeout(() => {
+                    hideMessage();
+                }, 10000);
+            } else {
+                // Error from server
+                showMessage(result.message || 'Hubo un error al enviar su mensaje. Por favor intente nuevamente.', 'error');
+            }
+        } catch (error) {
+            console.error('Contact form error:', error);
+            showMessage('Hubo un error de conexión. Por favor verifique su conexión a internet e intente nuevamente.', 'error');
+        } finally {
+            setLoadingState(false);
+        }
+    });
+
+    // Show status message
+    function showMessage(message, type) {
+        statusDiv.textContent = message;
+        statusDiv.className = `contact-form__status contact-form__status--${type}`;
+        statusDiv.style.display = 'block';
+    }
+
+    // Hide status message
+    function hideMessage() {
+        statusDiv.style.display = 'none';
+        statusDiv.textContent = '';
+        statusDiv.className = 'contact-form__status';
+    }
+
+    // Set loading state
+    function setLoadingState(loading) {
+        submitBtn.disabled = loading;
+        
+        if (loading) {
+            submitText.style.display = 'none';
+            submitLoading.style.display = 'inline-flex';
+        } else {
+            submitText.style.display = 'inline-flex';
+            submitLoading.style.display = 'none';
+        }
+    }
+
+    // Character counter for textarea (optional enhancement)
+    const messageTextarea = contactForm.querySelector('textarea[name="message"]');
+    if (messageTextarea) {
+        const maxLength = 2000;
+        
+        // Create character counter element
+        const counterDiv = document.createElement('div');
+        counterDiv.style.cssText = 'font-size: 0.8rem; color: #666; text-align: right; margin-top: 0.25rem;';
+        messageTextarea.parentNode.appendChild(counterDiv);
+        
+        // Update counter on input
+        function updateCounter() {
+            const remaining = maxLength - messageTextarea.value.length;
+            counterDiv.textContent = `${messageTextarea.value.length}/${maxLength} caracteres`;
+            
+            if (remaining < 100) {
+                counterDiv.style.color = remaining < 0 ? '#dc3545' : '#fd7e14';
+            } else {
+                counterDiv.style.color = '#666';
+            }
+        }
+        
+        messageTextarea.addEventListener('input', updateCounter);
+        updateCounter(); // Initial count
+    }
+
+    // Form validation styling
+    const inputs = contactForm.querySelectorAll('input, textarea');
+    inputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            if (this.hasAttribute('required') && !this.value.trim()) {
+                this.style.borderColor = '#dc3545';
+            } else if (this.type === 'email' && this.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.value)) {
+                this.style.borderColor = '#dc3545';
+            } else {
+                this.style.borderColor = '#ddd';
+            }
+        });
+
+        input.addEventListener('input', function() {
+            // Remove error styling when user starts typing
+            if (this.style.borderColor === 'rgb(220, 53, 69)') { // #dc3545 in rgb
+                this.style.borderColor = '#ddd';
+            }
+        });
+    });
+});
+</script>

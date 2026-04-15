@@ -1,0 +1,262 @@
+<%#
+Contacto (Contact) Page
+Contact page with contact information and booking functionality
+
+@param {string} title - Page title
+@param {object} user - Current user session (optional)
+@param {object} seo - SEO meta data
+@param {object} company - Company information
+@param {string} currentPage - Current page identifier
+
+Created by Denisse Maldonado
+%>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    
+    <%# Google Fonts %>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
+    
+    <%# Font Awesome Icons %>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <%# Custom Fonts CSS %>
+    <link rel="stylesheet" href="/css/fonts.css">
+    
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #333;
+        }
+        
+        /* Page Hero Image Section - Clean team photo */
+        .page-hero-image {
+            position: relative;
+            min-height: 520px;
+            background: url('/images/contacto_header.png');
+            background-size: cover;
+            background-position: center;
+            margin-top: 80px;
+        }
+
+        /* Page Hero Banner Section - Green banner with content */
+        .page-hero-banner {
+            background: #869B81;
+            color: white;
+            padding: 2rem 0;
+        }
+
+        .page-hero-banner__container {
+            max-width: 1200px;
+            width: 100%;
+            padding: 0 2rem;
+            margin: 0 auto;
+        }
+
+        .page-hero-banner__content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .page-hero-banner__left {
+            flex: 1;
+        }
+
+        .page-hero-banner__title {
+            font-family: var(--font-myriad), sans-serif;
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 300;
+            margin: 0;
+            letter-spacing: 8px;
+            font-variant: small-caps;
+            text-transform: uppercase;
+            line-height: 1.1;
+            font-feature-settings: "smcp" 1;
+            text-shadow: none;
+        }
+
+        .page-hero-banner__title::first-letter {
+            font-size: 1.3em;
+            font-weight: 400;
+            margin-right: 2px;
+        }
+
+        .page-hero-banner__right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 1rem;
+        }
+
+        .page-hero-banner__follow-text {
+            font-family: var(--font-myriad), sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: 1px;
+        }
+
+        .page-hero-banner__social-icons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .page-hero-banner__social-link {
+            /* width: 56px;
+            height: 56px; */
+            /* background: rgba(255, 255, 255, 0.9); */
+            /* border-radius: 50%; */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            /* box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); */
+        }
+
+        .page-hero-banner__social-link:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .page-hero-banner__social-icon {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+        }
+
+        @media (max-width: 768px) {
+            .page-hero-image {
+                min-height: 300px;
+                background-attachment: scroll;
+            }
+            
+            .page-hero-banner__container {
+                padding: 0 1rem;
+            }
+
+            .page-hero-banner__content {
+                flex-direction: column;
+                align-items: center;
+                gap: 1.5rem;
+                text-align: center;
+            }
+
+            .page-hero-banner__left {
+                flex: none;
+            }
+
+            .page-hero-banner__title {
+                font-size: clamp(2.5rem, 10vw, 4rem);
+                text-align: center;
+            }
+
+            .page-hero-banner__right {
+                align-items: center;
+            }
+
+            .page-hero-banner__follow-text {
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .page-hero-image {
+                min-height: 250px;
+            }
+            
+            .page-hero-banner {
+                padding: 1.5rem 0;
+            }
+
+            .page-hero-banner__container {
+                padding: 0 1rem;
+            }
+
+            .page-hero-banner__title {
+                font-size: clamp(2rem, 12vw, 3rem);
+                letter-spacing: 2px;
+            }
+
+            .page-hero-banner__follow-text {
+                font-size: 0.9rem;
+            }
+
+            .page-hero-banner__social-link {
+                width: 35px;
+                height: 35px;
+            }
+
+            .page-hero-banner__social-icon {
+                width: 20px;
+                height: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%# Navigation %>
+    <%- include('organisms/landing/landing-navigation', {
+        user: typeof user !== 'undefined' ? user : null,
+        currentPage: typeof currentPage !== 'undefined' ? currentPage : 'contact',
+        transparent: false,
+        companyInfo: typeof company !== 'undefined' ? company : null
+    }) %>
+
+    <%# Page Hero Image Section %>
+    <section class="page-hero-image">
+    </section>
+
+    <%# Page Hero Banner Section %>
+    <section class="page-hero-banner">
+        <div class="page-hero-banner__container">
+            <div class="page-hero-banner__content">
+                <div class="page-hero-banner__left">
+                    <h1 class="page-hero-banner__title">CONTACTO</h1>
+                </div>
+                <div class="page-hero-banner__right">
+                    <p class="page-hero-banner__follow-text">FOLLOW US ON</p>
+                    <div class="page-hero-banner__social-icons">
+                        <a href="https://facebook.com/amexingexperience" 
+                           target="_blank" 
+                           rel="noopener noreferrer" 
+                           class="page-hero-banner__social-link"
+                           aria-label="Facebook">
+                            <img src="/images/facebook_blanco.png" alt="Facebook" class="page-hero-banner__social-icon">
+                        </a>
+                        <a href="https://instagram.com/amexingexperience" 
+                           target="_blank" 
+                           rel="noopener noreferrer" 
+                           class="page-hero-banner__social-link"
+                           aria-label="Instagram">
+                            <img src="/images/instagram_blanco.png" alt="Instagram" class="page-hero-banner__social-icon">
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <%# Contact Section %>
+    <%- include('organisms/landing/contact-section', {
+        companyInfo: typeof company !== 'undefined' ? company : null
+    }) %>
+
+    <%# Footer %>
+    <%- include('organisms/landing/landing-footer', {
+        companyInfo: typeof company !== 'undefined' ? company : null
+    }) %>
+</body>
+</html>
