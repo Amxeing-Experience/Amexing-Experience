@@ -95,6 +95,14 @@ router.post('/quick', writeOperationsLimiter, async (req, res) => {
 });
 
 /**
+ * POST /api/owned-clients/admin-create-subclient - Create sub-client for selected enterprise (admin only).
+ * Used for admin to create sub-clients belonging to any enterprise.
+ */
+router.post('/admin-create-subclient', writeOperationsLimiter, async (req, res) => {
+  await ownedClientsController.adminCreateSubClient(req, res);
+});
+
+/**
  * PUT /api/owned-clients/:id - Update an owned client.
  * Only the owner or admins can update.
  */

@@ -17,12 +17,66 @@ class QuoteOwnershipManager {
         this.clientWasJustChanged = false; // Flag to track if client was just changed
         this.clientChangeTimestamp = null; // Timestamp when client was changed
         this.deletedCollaboratorIds = new Set(); // Track collaborators deleted during client change
+        this.savedQuoteData = null; // Store quote data for clientType checking
+        this.dataLoaded = false; // Track when initial data loading is complete
+        this.dataLoadingPromise = null; // Store the loading promise to await if needed
         
         // Store user role for filtering
         this.currentUserRole = window.currentUser?.role || window.userRole || '';
         console.log('[QuoteOwnershipManager] Initialized with user role:', this.currentUserRole);
         
         this.init();
+    }
+
+    /**
+     * Check if the current form is in direct client mode
+     * @returns {boolean} true if direct client mode is active
+     */
+    isDirectClientMode() {
+        // First, check if we have saved quote data with clientType
+        if (this.savedQuoteData && this.savedQuoteData.clientType === 'direct') {
+            console.log('✅ Direct client mode detected from saved quote data:', this.savedQuoteData.clientType);
+            return true;
+        }
+        
+        // IMPORTANT: Also check if quote has companyClientPtr but no client (indicates direct client)
+        if (this.savedQuoteData && this.savedQuoteData.companyClientPtr && !this.savedQuoteData.client) {
+            console.log('✅ Direct client mode detected from data structure (has companyClientPtr, no client)');
+            return true;
+        }
+        
+        // Check if the direct client radio button is checked
+        const directRadio = document.getElementById('clientTypeDirect');
+        if (directRadio && directRadio.checked) {
+            console.log('✅ Direct client mode detected from radio button');
+            return true;
+        }
+        
+        // Check if the direct client row is visible
+        const directClientRow = document.getElementById('directClientRow');
+        if (directClientRow && directClientRow.style.display !== 'none') {
+            console.log('✅ Direct client mode detected from directClientRow visibility');
+            return true;
+        }
+        
+        // Check if the agency client row is hidden (indicates direct mode)
+        const agencyClientRow = document.getElementById('agencyClientRow');
+        if (agencyClientRow && agencyClientRow.style.display === 'none') {
+            console.log('✅ Direct client mode detected from agencyClientRow hidden');
+            return true;
+        }
+        
+        console.log('❌ Not in direct client mode - all checks failed:', {
+            savedQuoteData: this.savedQuoteData,
+            clientType: this.savedQuoteData?.clientType,
+            hasCompanyClientPtr: !!this.savedQuoteData?.companyClientPtr,
+            hasClient: !!this.savedQuoteData?.client,
+            directRadioChecked: directRadio?.checked,
+            directClientRowDisplay: directClientRow?.style.display,
+            agencyClientRowDisplay: agencyClientRow?.style.display
+        });
+        
+        return false;
     }
 
     async init() {
@@ -34,6 +88,7 @@ class QuoteOwnershipManager {
                 console.log('New quote detected, skipping ownership/collaborator loading');
                 // Setup event listeners even for new quotes
                 this.setupEventListeners();
+                this.dataLoaded = true; // Mark as loaded for new quotes
                 return;
             }
             
@@ -68,11 +123,16 @@ class QuoteOwnershipManager {
             }
             
             // Load initial data
-            await Promise.all([
+            this.dataLoadingPromise = Promise.all([
                 this.loadOwnership(),
+                this.loadQuoteData(),
                 this.loadUserAccess(),
                 this.loadAgents()
             ]);
+            
+            await this.dataLoadingPromise;
+            this.dataLoaded = true;
+            console.log('Initial data loading complete, dataLoaded:', this.dataLoaded);
             
             // Capture the originally saved client ID when page loads
             this.captureOriginalClient();
@@ -95,7 +155,7 @@ class QuoteOwnershipManager {
             console.log('Loading ownership data for quote:', this.quoteId);
             const response = await fetch(`/api/quotes/${this.quoteId}/ownership`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
             
@@ -114,11 +174,39 @@ class QuoteOwnershipManager {
         }
     }
 
+    async loadQuoteData() {
+        try {
+            console.log('📊 Loading quote data for clientType check:', this.quoteId);
+            const response = await fetch(`/api/quotes/${this.quoteId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.getAccessToken()}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.savedQuoteData = data.data;
+                console.log('📊 Quote data loaded successfully:', { 
+                    clientType: this.savedQuoteData?.clientType,
+                    hasClient: !!this.savedQuoteData?.client,
+                    hasCompanyClientPtr: !!this.savedQuoteData?.companyClientPtr,
+                    fullData: this.savedQuoteData
+                });
+            } else {
+                console.error('❌ Failed to load quote data:', response.status);
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+            }
+        } catch (error) {
+            console.error('❌ Error loading quote data:', error);
+        }
+    }
+
     async loadUserAccess() {
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/access`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
             
@@ -164,7 +252,7 @@ class QuoteOwnershipManager {
             
             const response = await fetch(endpoint, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
             
@@ -199,7 +287,7 @@ class QuoteOwnershipManager {
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/edits/pending`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
             
@@ -618,6 +706,13 @@ class QuoteOwnershipManager {
     async showCollaboratorsModal() {
         console.log('showCollaboratorsModal called');
         
+        // Wait for initial data to load if still loading
+        if (!this.dataLoaded && this.dataLoadingPromise) {
+            console.log('Waiting for initial data to load before opening modal...');
+            await this.dataLoadingPromise;
+            console.log('Data loaded, proceeding with modal');
+        }
+        
         // Check if quote has a client selected first
         const clientField = document.getElementById('clientId');
         const userRole = window.currentUser?.role || '';
@@ -626,7 +721,23 @@ class QuoteOwnershipManager {
         // Skip validation for these roles or if field is hidden
         const isHiddenRole = userRole === 'department_manager' || userRole === 'client';
         
-        if (clientField && !isHiddenRole) {
+        // Check if this is a direct client quote by looking at the UI state
+        const isDirectClientMode = this.isDirectClientMode();
+        
+        // Debug logging
+        console.log('🔍 showCollaboratorsModal validation check:', {
+            isDirectClientMode,
+            savedQuoteData: this.savedQuoteData,
+            clientType: this.savedQuoteData?.clientType,
+            dataLoaded: this.dataLoaded,
+            clientFieldExists: !!clientField,
+            isHiddenRole,
+            userRole,
+            directRadioChecked: document.getElementById('clientTypeDirect')?.checked,
+            directClientRowVisible: document.getElementById('directClientRow')?.style.display
+        });
+        
+        if (clientField && !isHiddenRole && !isDirectClientMode) {
             const clientValue = clientField.value || clientField.tomselect?.getValue() || clientField.customSelect?.getValue();
             console.log('Client value check:', { clientValue, fieldValue: clientField.value });
             
@@ -637,6 +748,21 @@ class QuoteOwnershipManager {
                 // Scroll to client field if needed
                 clientField.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 return;
+            }
+        } else if (isDirectClientMode) {
+            // For direct client mode, check the directClientId field instead
+            const directClientField = document.getElementById('directClientId');
+            if (directClientField) {
+                const directClientValue = directClientField.value || directClientField.tomselect?.getValue() || directClientField.customSelect?.getValue();
+                console.log('Direct client value check:', { directClientValue, isDirectClientMode });
+                
+                if (!directClientValue) {
+                    this.showToast('Por favor selecciona un cliente directo antes de gestionar la propiedad', 'warning');
+                    directClientField.classList.add('is-invalid');
+                    directClientField.focus();
+                    directClientField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                }
             }
         } else if (isHiddenRole && clientField) {
             // For hidden roles, try to get the value even if field is invisible
@@ -936,43 +1062,57 @@ class QuoteOwnershipManager {
             return null;
         }
         
-        // Get client ID using the same method as the original functions
-        const clientField = document.getElementById('clientId');
+        // Get client ID - handle both agency and direct client modes
         let clientId = null;
+        const userRole = window.currentUser?.role || window.userRole;
+        const isDirectClientMode = this.isDirectClientMode();
         
-        if (clientField) {
-            // Check for custom dropdown first, then Tom Select
-            if (clientField.customSelect) {
-                clientId = clientField.customSelect.getValue();
-            } else if (clientField.tomselect) {
-                clientId = clientField.tomselect.getValue();
-            } else {
-                // For hidden input or disabled dropdown - just get the value
-                clientId = clientField.value;
+        if (isDirectClientMode) {
+            // For direct client mode, get the directClientId
+            const directClientField = document.getElementById('directClientId');
+            if (directClientField) {
+                if (directClientField.customSelect) {
+                    clientId = directClientField.customSelect.getValue();
+                } else if (directClientField.tomselect) {
+                    clientId = directClientField.tomselect.getValue();
+                } else {
+                    clientId = directClientField.value;
+                }
             }
-        }
-        
-        // If we have a clientId from the field, use it (this handles disabled dropdowns)
-        if (clientId) {
-            console.log('Using clientId from field:', clientId);
-        } 
-        // Fallback to currentUserData if no field value
-        else if (window.currentUserData) {
-            const userRole = window.currentUser?.role || window.userRole;
-            if (userRole === 'client' && window.currentUserData.clientId) {
-                clientId = window.currentUserData.clientId;
-                console.log('Using clientId from currentUserData.clientId:', clientId);
-            } else if ((userRole === 'department_manager' || userRole === 'client') && window.currentUserData.id) {
-                clientId = window.currentUserData.id;
-                console.log('Using clientId from currentUserData.id:', clientId);
+            console.log('Direct client mode - using directClientId:', clientId);
+        } else {
+            // For agency mode, get the regular clientId
+            const clientField = document.getElementById('clientId');
+            if (clientField) {
+                // Check for custom dropdown first, then Tom Select
+                if (clientField.customSelect) {
+                    clientId = clientField.customSelect.getValue();
+                } else if (clientField.tomselect) {
+                    clientId = clientField.tomselect.getValue();
+                } else {
+                    // For hidden input or disabled dropdown - just get the value
+                    clientId = clientField.value;
+                }
             }
+            
+            // Fallback to currentUserData for restricted roles
+            if (!clientId && window.currentUserData) {
+                if (userRole === 'client' && window.currentUserData.clientId) {
+                    clientId = window.currentUserData.clientId;
+                    console.log('Using clientId from currentUserData.clientId:', clientId);
+                } else if ((userRole === 'department_manager' || userRole === 'client') && window.currentUserData.id) {
+                    clientId = window.currentUserData.id;
+                    console.log('Using clientId from currentUserData.id:', clientId);
+                }
+            }
+            console.log('Agency mode - using clientId:', clientId);
         }
         
         if (!clientId) {
             console.error('Cliente requerido - no clientId found', {
-                fieldValue: clientField?.value,
-                fieldExists: !!clientField,
-                userRole: window.currentUser?.role,
+                isDirectClientMode,
+                fieldExists: isDirectClientMode ? !!document.getElementById('directClientId') : !!document.getElementById('clientId'),
+                userRole,
                 currentUserData: window.currentUserData
             });
             throw new Error('Cliente requerido');
@@ -993,6 +1133,12 @@ class QuoteOwnershipManager {
             contactPhone: document.getElementById('contactPhone')?.value?.trim() || undefined,
             notes: document.getElementById('notes')?.value?.trim() || undefined
         };
+        
+        // Include clientType for direct client quotes
+        if (isDirectClientMode && (userRole === 'admin' || userRole === 'superadmin')) {
+            formData.clientType = 'direct';
+            console.log('Added clientType: direct to formData');
+        }
         
         // Get access token
         const accessToken = this.getAccessToken();
@@ -1357,7 +1503,7 @@ class QuoteOwnershipManager {
             console.log('📥 Fetching current collaborators from database...');
             const fetchResponse = await fetch(`/api/quotes/${this.quoteId}/collaborators`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
             
@@ -1392,7 +1538,7 @@ class QuoteOwnershipManager {
                         method: 'DELETE',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            'Authorization': `Bearer ${this.getAccessToken()}`
                         },
                         body: JSON.stringify({
                             reason: 'Client changed - removing previous client collaborators'
@@ -1458,7 +1604,7 @@ class QuoteOwnershipManager {
                     
                     const verificationResponse = await fetch(`/api/quotes/${this.quoteId}/collaborators`, {
                         headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            'Authorization': `Bearer ${this.getAccessToken()}`
                         }
                     });
                     
@@ -1548,7 +1694,7 @@ class QuoteOwnershipManager {
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/edits`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
             
@@ -2059,8 +2205,9 @@ class QuoteOwnershipManager {
             });
             
             const userRole = this.currentUserRole || window.currentUser?.role || window.userRole || document.body.dataset.userRole || '';
-            const shouldFilterAdmins = userRole === 'client' || userRole === 'department_manager';
-            console.log('User role for filtering:', userRole, 'Should filter admins:', shouldFilterAdmins, 'Stored role:', this.currentUserRole);
+            const isDirectClientQuote = this.isDirectClientMode();
+            const shouldFilterAdmins = !isDirectClientQuote && (userRole === 'client' || userRole === 'department_manager');
+            console.log('User role for filtering:', userRole, 'Direct client quote:', isDirectClientQuote, 'Should filter admins:', shouldFilterAdmins, 'Stored role:', this.currentUserRole);
             
             // Use department-filtered endpoint for both ownership transfers and agent additions
             // Get current client ID for context
@@ -2087,7 +2234,7 @@ class QuoteOwnershipManager {
             
             const response = await fetch(endpoint, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
             
@@ -2291,7 +2438,7 @@ class QuoteOwnershipManager {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + localStorage.getItem('token')
+                    'Authorization': 'Bearer ' + this.getAccessToken()
                 },
                 body: JSON.stringify({ role: newRole })
             });
@@ -2332,7 +2479,7 @@ class QuoteOwnershipManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + localStorage.getItem('token')
+                    'Authorization': 'Bearer ' + this.getAccessToken()
                 },
                 body: JSON.stringify({
                     userId: userId,
@@ -2418,8 +2565,9 @@ class QuoteOwnershipManager {
             });
             
             const userRole = this.currentUserRole || window.currentUser?.role || window.userRole || document.body.dataset.userRole || '';
-            const shouldFilterAdmins = userRole === 'client' || userRole === 'department_manager';
-            console.log('[Dropdown] User role for filtering:', userRole, 'Should filter admins:', shouldFilterAdmins, 'Stored role:', this.currentUserRole);
+            const isDirectClientQuote = this.isDirectClientMode();
+            const shouldFilterAdmins = !isDirectClientQuote && (userRole === 'client' || userRole === 'department_manager');
+            console.log('[Dropdown] User role for filtering:', userRole, 'Direct client quote:', isDirectClientQuote, 'Should filter admins:', shouldFilterAdmins, 'Stored role:', this.currentUserRole);
             
             // Use the same API endpoint as loadAvailableUsers with proper client context
             let currentClientId = this.originalClientId;
@@ -2443,10 +2591,30 @@ class QuoteOwnershipManager {
             console.log('loadUsersForDropdown - endpoint:', endpoint);
             console.log('loadUsersForDropdown - currentClientId:', currentClientId);
             
+            const token = this.getAccessToken();
+            
+            console.log('🔐 AUTH DEBUG - loadUsersForDropdown request (FIXED):', {
+                endpoint,
+                hasToken: !!token,
+                tokenStart: token ? token.substring(0, 10) + '...' : 'NO_TOKEN',
+                tokenLength: token ? token.length : 0,
+                userRole: window.currentUser?.role || 'unknown',
+                userId: window.currentUser?.id || 'unknown',
+                currentClientId,
+                tokenSource: 'cookies_via_getAccessToken'
+            });
+            
             const response = await fetch(endpoint, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${token}`
                 }
+            });
+            
+            console.log('🔐 AUTH DEBUG - loadUsersForDropdown response:', {
+                ok: response.ok,
+                status: response.status,
+                statusText: response.statusText,
+                url: response.url
             });
             
             if (!response.ok) {
@@ -2907,7 +3075,7 @@ class QuoteOwnershipManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 },
                 body: JSON.stringify({
                     newOwnerId,
@@ -3013,7 +3181,7 @@ class QuoteOwnershipManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 },
                 body: JSON.stringify({
                     agentId,
@@ -3097,7 +3265,7 @@ class QuoteOwnershipManager {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 },
                 body: JSON.stringify({
                     reason: 'Removed by owner/admin'
@@ -3148,7 +3316,7 @@ class QuoteOwnershipManager {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 },
                 body: JSON.stringify({ role: newRole })
             });
@@ -3182,7 +3350,7 @@ class QuoteOwnershipManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 },
                 body: JSON.stringify({ comment: '' })
             });
@@ -3215,7 +3383,7 @@ class QuoteOwnershipManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 },
                 body: JSON.stringify({ reason })
             });
@@ -3708,7 +3876,7 @@ class QuoteOwnershipManager {
             // Try to get user info from available users endpoint (which we know exists)
             const response = await fetch(`/api/quotes/${this.quoteId}/available-owners`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
             

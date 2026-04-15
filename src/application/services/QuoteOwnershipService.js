@@ -878,110 +878,191 @@ class QuoteOwnershipService {
       // Get the quote's client company (Client table, not AmexingUser)
       const companyClient = quote.get('companyClientPtr');
       const legacyClient = quote.getClient(); // AmexingUser for backward compatibility
+      const clientType = quote.get('clientType'); // Check if this is a direct client quote
 
-      if (!companyClient && !legacyClient) {
-        logger.warn('Quote has no client selected, cannot determine available owners', { quoteId });
+      // For direct client quotes (clientType = "direct"), only companyClientPtr is required
+      // For agency quotes, either companyClient or legacyClient is required
+      const isDirectClient = clientType === 'direct';
+      const hasValidClient = companyClient || legacyClient;
+
+      if (!hasValidClient) {
+        logger.warn('Quote has no client selected, cannot determine available owners', {
+          quoteId,
+          isDirectClient,
+          hasCompanyClient: !!companyClient,
+          hasLegacyClient: !!legacyClient,
+        });
         // Return special indicator that client is required
         return { requiresClient: true, users: [] };
       }
 
+      // Log what type of client we're working with
+      logger.info('Processing quote client for ownership', {
+        quoteId,
+        clientType: isDirectClient ? 'direct' : 'agency',
+        hasCompanyClient: !!companyClient,
+        hasLegacyClient: !!legacyClient,
+      });
+
       let departmentManagerId = null;
       let clientInfo = {};
 
-      // Priority 1: Use new companyClientPtr (Client table)
-      if (companyClient) {
-        await companyClient.fetch({ useMasterKey: true });
-
-        // Find the AmexingUser who owns this Client company
-        const ownerQuery = new Parse.Query('AmexingUser');
-        ownerQuery.equalTo('ownedClients', companyClient);
-        ownerQuery.equalTo('exists', true);
-        const ownerUser = await ownerQuery.first({ useMasterKey: true });
-
-        if (ownerUser) {
-          departmentManagerId = ownerUser.id;
+      // For direct client quotes, we don't need a department manager
+      if (isDirectClient) {
+        logger.info('Direct client quote - skipping department manager lookup', {
+          quoteId,
+          clientType: 'direct',
+        });
+        // Set clientInfo for logging purposes
+        if (companyClient) {
+          await companyClient.fetch({ useMasterKey: true });
           clientInfo = {
             clientId: companyClient.id,
             clientName: companyClient.get('name') || `${companyClient.get('firstName')} ${companyClient.get('lastName')}`,
-            clientType: 'Client',
-            departmentManagerId: ownerUser.id,
-            departmentManagerName: `${ownerUser.get('firstName')} ${ownerUser.get('lastName')}`,
+            clientType: 'Direct Client',
           };
-        } else {
-          logger.warn('No owner found for Client company, falling back to legacy client', {
+        }
+      } else {
+        // For agency quotes, find the department manager
+        // Priority 1: Use new companyClientPtr (Client table)
+        if (companyClient) {
+          await companyClient.fetch({ useMasterKey: true });
+
+          // Find the AmexingUser who owns this Client company
+          const ownerQuery = new Parse.Query('AmexingUser');
+          ownerQuery.equalTo('ownedClients', companyClient);
+          ownerQuery.equalTo('exists', true);
+          const ownerUser = await ownerQuery.first({ useMasterKey: true });
+
+          if (ownerUser) {
+            departmentManagerId = ownerUser.id;
+            clientInfo = {
+              clientId: companyClient.id,
+              clientName: companyClient.get('name') || `${companyClient.get('firstName')} ${companyClient.get('lastName')}`,
+              clientType: 'Client',
+              departmentManagerId: ownerUser.id,
+              departmentManagerName: `${ownerUser.get('firstName')} ${ownerUser.get('lastName')}`,
+            };
+          } else {
+            logger.warn('No owner found for Client company, falling back to legacy client', {
+              quoteId,
+              companyClientId: companyClient.id,
+              companyClientName: companyClient.get('name'),
+            });
+          }
+        }
+
+        // Priority 2: Fallback to legacy client field (AmexingUser)
+        if (!departmentManagerId && legacyClient) {
+          await legacyClient.fetch({ useMasterKey: true });
+          departmentManagerId = legacyClient.id;
+          clientInfo = {
+            clientId: legacyClient.id,
+            clientName: `${legacyClient.get('firstName')} ${legacyClient.get('lastName')}`,
+            clientType: 'AmexingUser',
+            departmentManagerId: legacyClient.id,
+            departmentManagerName: `${legacyClient.get('firstName')} ${legacyClient.get('lastName')}`,
+          };
+        }
+
+        // Only require department manager for agency quotes
+        if (!departmentManagerId) {
+          logger.error('Could not determine department manager from quote client data', {
             quoteId,
-            companyClientId: companyClient.id,
-            companyClientName: companyClient.get('name'),
+            hasCompanyClient: !!companyClient,
+            hasLegacyClient: !!legacyClient,
           });
+          return { requiresClient: true, users: [] };
         }
       }
 
-      // Priority 2: Fallback to legacy client field (AmexingUser)
-      if (!departmentManagerId && legacyClient) {
-        await legacyClient.fetch({ useMasterKey: true });
-        departmentManagerId = legacyClient.id;
-        clientInfo = {
-          clientId: legacyClient.id,
-          clientName: `${legacyClient.get('firstName')} ${legacyClient.get('lastName')}`,
-          clientType: 'AmexingUser',
-          departmentManagerId: legacyClient.id,
-          departmentManagerName: `${legacyClient.get('firstName')} ${legacyClient.get('lastName')}`,
-        };
-      }
+      // Handle different logic for direct client vs agency quotes
+      let users = [];
 
-      if (!departmentManagerId) {
-        logger.error('Could not determine department manager from quote client data', {
+      if (isDirectClient) {
+        // For direct client quotes, only return admin and superadmin users
+        logger.info('Processing direct client quote - only including admin/superadmin users', {
           quoteId,
-          hasCompanyClient: !!companyClient,
-          hasLegacyClient: !!legacyClient,
+          clientType: 'direct',
         });
-        return { requiresClient: true, users: [] };
+
+        // Create subquery to find Role records with admin names
+        const adminRoleQuery = new Parse.Query('Role');
+        adminRoleQuery.containedIn('name', ['admin', 'superadmin']);
+
+        // Query users who have roleId pointing to admin roles
+        const adminQuery = new Parse.Query('AmexingUser');
+        adminQuery.matchesQuery('roleId', adminRoleQuery);
+        adminQuery.equalTo('active', true);
+        adminQuery.equalTo('exists', true);
+        adminQuery.ascending('firstName', 'lastName');
+        adminQuery.include('roleId'); // Include the Role object data
+        adminQuery.limit(1000); // Reasonable limit
+
+        users = await adminQuery.find({ useMasterKey: true });
+
+        logger.info('Found admin/superadmin users for direct client quote', {
+          quoteId,
+          userCount: users.length,
+        });
+      } else {
+        // For agency quotes, use existing logic (department manager + agents + admins)
+        logger.info('Processing agency quote - including department manager, agents, and admins', {
+          quoteId,
+          departmentManagerId,
+          ...clientInfo,
+        });
+
+        // Build queries for available owners
+        const queries = [];
+
+        // 1. Get the department manager themselves (the selected client)
+        if (departmentManagerId) {
+          const managerQuery = new Parse.Query('AmexingUser');
+          managerQuery.equalTo('objectId', departmentManagerId);
+          queries.push(managerQuery);
+
+          // 2. Get all client role users (agents) related to this department manager
+          // These are users with role='client' and clientId=departmentManagerId
+          const agentsQuery = new Parse.Query('AmexingUser');
+          agentsQuery.equalTo('role', 'client');
+          agentsQuery.equalTo('clientId', departmentManagerId);
+          queries.push(agentsQuery);
+        }
+
+        // 3. Always include admins for oversight
+        // Create subquery to find Role records with admin names
+        const adminRoleQuery = new Parse.Query('Role');
+        adminRoleQuery.containedIn('name', ['admin', 'superadmin']);
+
+        // Query users who have roleId pointing to admin roles
+        const adminQuery = new Parse.Query('AmexingUser');
+        adminQuery.matchesQuery('roleId', adminRoleQuery);
+        queries.push(adminQuery);
+
+        // Combine queries with OR
+        const combinedQuery = Parse.Query.or(...queries);
+        combinedQuery.equalTo('active', true);
+        combinedQuery.equalTo('exists', true);
+        combinedQuery.ascending('firstName', 'lastName');
+        combinedQuery.include('roleId'); // Include the Role object data
+        combinedQuery.limit(1000); // Reasonable limit
+
+        users = await combinedQuery.find({ useMasterKey: true });
+
+        logger.info('Found available owners for agency quote', {
+          quoteId,
+          departmentManagerId,
+          userCount: users.length,
+        });
       }
 
-      logger.info('Determined department manager for ownership', {
+      // Final logging
+      logger.info('Available owners query completed', {
         quoteId,
-        ...clientInfo,
-      });
-
-      // Build queries for available owners
-      const queries = [];
-
-      // 1. Get the department manager themselves (the selected client)
-      const managerQuery = new Parse.Query('AmexingUser');
-      managerQuery.equalTo('objectId', departmentManagerId);
-      queries.push(managerQuery);
-
-      // 2. Get all client role users (agents) related to this department manager
-      // These are users with role='client' and clientId=departmentManagerId
-      const agentsQuery = new Parse.Query('AmexingUser');
-      agentsQuery.equalTo('role', 'client');
-      agentsQuery.equalTo('clientId', departmentManagerId);
-      queries.push(agentsQuery);
-
-      // 3. Always include admins for oversight
-      // Create subquery to find Role records with admin names
-      const adminRoleQuery = new Parse.Query('Role');
-      adminRoleQuery.containedIn('name', ['admin', 'superadmin']);
-
-      // Query users who have roleId pointing to admin roles
-      const adminQuery = new Parse.Query('AmexingUser');
-      adminQuery.matchesQuery('roleId', adminRoleQuery);
-      queries.push(adminQuery);
-
-      // Combine queries with OR
-      const combinedQuery = Parse.Query.or(...queries);
-      combinedQuery.equalTo('active', true);
-      combinedQuery.equalTo('exists', true);
-      combinedQuery.ascending('firstName', 'lastName');
-      combinedQuery.include('roleId'); // Include the Role object data
-      combinedQuery.limit(1000); // Reasonable limit
-
-      const users = await combinedQuery.find({ useMasterKey: true });
-
-      logger.info('Found available owners for quote', {
-        quoteId,
-        departmentManagerId,
+        isDirectClient,
         userCount: users.length,
+        departmentManagerId: isDirectClient ? 'N/A (direct client)' : departmentManagerId,
       });
 
       return users;

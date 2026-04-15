@@ -124,19 +124,37 @@ window.currentUser = {
                 <div class="col-md-8">
                     <div class="timeline-wrapper">
                         <div class="timeline-compact">
-                            <div class="timeline-item active" data-status="quoted">
-                                <div class="timeline-dot"><i class="ti ti-file-text"></i></div>
-                                <span>Cotizado</span>
+                            <!-- Main timeline flow -->
+                            <div class="timeline-main-flow">
+                                <div class="timeline-item active" data-status="quoted">
+                                    <div class="timeline-dot"><i class="ti ti-file-text"></i></div>
+                                    <span>Cotizado</span>
+                                </div>
+                                <div class="timeline-line"></div>
+                                <div class="timeline-item" data-status="requested">
+                                    <div class="timeline-dot"><i class="ti ti-clock"></i></div>
+                                    <span>Solicitado</span>
+                                </div>
+                                <div class="timeline-line"></div>
+                                <div class="timeline-item" data-status="scheduled">
+                                    <div class="timeline-dot"><i class="ti ti-check"></i></div>
+                                    <span>Agendado</span>
+                                </div>
                             </div>
-                            <div class="timeline-line"></div>
-                            <div class="timeline-item" data-status="requested">
-                                <div class="timeline-dot"><i class="ti ti-clock"></i></div>
-                                <span>Solicitado</span>
-                            </div>
-                            <div class="timeline-line"></div>
-                            <div class="timeline-item" data-status="scheduled">
-                                <div class="timeline-dot"><i class="ti ti-check"></i></div>
-                                <span>Agendado</span>
+                            
+                            <!-- Alternative status branches -->
+                            <div class="timeline-branches">
+                                <div class="timeline-branch-connector"></div>
+                                <div class="timeline-branch-items">
+                                    <div class="timeline-item timeline-branch" data-status="hold">
+                                        <div class="timeline-dot"><i class="ti ti-lock"></i></div>
+                                        <span>Bloqueado</span>
+                                    </div>
+                                    <div class="timeline-item timeline-branch" data-status="rejected">
+                                        <div class="timeline-dot"><i class="ti ti-x"></i></div>
+                                        <span>Rechazado</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -472,11 +490,43 @@ window.currentUser = {
 
 .timeline-compact {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    gap: 0.75rem;
     padding: 1rem 0;
+    position: relative;
+}
+
+.timeline-main-flow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.timeline-branches {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+    margin-top: 0.5rem;
+}
+
+.timeline-branch-connector {
+    width: 2px;
+    height: 30px;
+    background: #dee2e6;
+    position: absolute;
+    left: 50%;
+    top: -30px;
+    transform: translateX(-50%);
+}
+
+.timeline-branch-items {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
 }
 
 .timeline-item {
@@ -531,6 +581,46 @@ window.currentUser = {
     color: #198754 !important;
 }
 
+/* Branch timeline items styling */
+.timeline-branch {
+    opacity: 0.6;
+    transition: all 0.3s ease;
+}
+
+.timeline-branch[data-status="hold"] .timeline-dot {
+    background: #ffc107 !important;
+    border-color: #ffc107 !important;
+    color: white !important;
+}
+
+.timeline-branch[data-status="hold"].active {
+    opacity: 1;
+}
+
+.timeline-branch[data-status="hold"].active .timeline-dot {
+    box-shadow: 0 2px 6px rgba(255, 193, 7, 0.4) !important;
+}
+
+.timeline-branch[data-status="rejected"] .timeline-dot {
+    background: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: white !important;
+}
+
+.timeline-branch[data-status="rejected"].active {
+    opacity: 1;
+}
+
+.timeline-branch[data-status="rejected"].active .timeline-dot {
+    box-shadow: 0 2px 6px rgba(220, 53, 69, 0.4) !important;
+}
+
+/* When hold or rejected is active, dim main timeline */
+.timeline-hold-active .timeline-main-flow .timeline-item:not(.completed),
+.timeline-rejected-active .timeline-main-flow .timeline-item:not(.completed) {
+    opacity: 0.5;
+}
+
 /* Action styling */
 .status-action .btn {
     white-space: nowrap;
@@ -567,6 +657,18 @@ window.currentUser = {
     
     .timeline-compact {
         justify-content: space-between;
+    }
+    
+    .timeline-branches {
+        margin-top: 0.75rem;
+    }
+    
+    .timeline-branch-connector {
+        display: none;
+    }
+    
+    .timeline-branch-items {
+        gap: 1rem;
     }
 }
 
@@ -613,9 +715,102 @@ window.currentUser = {
 @media (max-width: 767.98px) {
     .quote-status-control { align-items: stretch; margin-top: 0.5rem; }
 }
+
+/* Client Timeline - Disable Interactions */
+.timeline-item {
+    pointer-events: none !important;
+    cursor: default !important;
+    user-select: none !important;
+}
+
+.timeline-dot {
+    pointer-events: none !important;
+    cursor: default !important;
+}
 </style>
 
 <script>
+// Function to check quote pricing and show/hide request button with appropriate messaging
+async function checkQuotePricingAndShowButton() {
+    const requestBtn = document.getElementById('requestServiceBtn');
+    const actionHint = document.getElementById('actionHint');
+    
+    try {
+        // Fetch current quote data to check pricing
+        const response = await fetch(`/api/quotes/<%= quoteId %>`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            const quote = result.data;
+            const serviceItems = quote.serviceItems || {};
+            const total = serviceItems.total || 0;
+            
+            if (total > 0) {
+                // Quote has pricing - show the button normally
+                if (requestBtn) {
+                    requestBtn.style.display = 'inline-block';
+                    requestBtn.disabled = false;
+                    requestBtn.innerHTML = '<i class="ti ti-check-circle"></i> Solicitar Servicios';
+                    requestBtn.className = 'btn btn-primary w-100';
+                    requestBtn.title = `Solicitar servicios por $${total.toLocaleString()} ${serviceItems.currency || 'MXN'}`;
+                }
+                if (actionHint) {
+                    actionHint.style.display = 'block';
+                    actionHint.innerHTML = `💡 Haz clic para solicitar servicios por $${total.toLocaleString()} ${serviceItems.currency || 'MXN'}`;
+                    actionHint.className = 'text-success text-center d-block mt-1';
+                }
+            } else {
+                // Quote has zero value - show disabled button with warning
+                if (requestBtn) {
+                    requestBtn.style.display = 'inline-block';
+                    requestBtn.disabled = true;
+                    requestBtn.innerHTML = '<i class="ti ti-alert-triangle"></i> Completar Cotización';
+                    requestBtn.className = 'btn btn-outline-warning w-100';
+                    requestBtn.title = 'Esta cotización no tiene servicios con precio. Agrega servicios antes de solicitar.';
+                }
+                if (actionHint) {
+                    actionHint.style.display = 'block';
+                    actionHint.innerHTML = '⚠️ <strong>Cotización sin precio:</strong> Agrega servicios con precios válidos antes de solicitar.';
+                    actionHint.className = 'text-warning text-center d-block mt-1';
+                }
+            }
+        } else {
+            // Error fetching quote - show generic disabled state
+            if (requestBtn) {
+                requestBtn.style.display = 'inline-block';
+                requestBtn.disabled = true;
+                requestBtn.innerHTML = '<i class="ti ti-alert-circle"></i> Error al Cargar';
+                requestBtn.className = 'btn btn-outline-danger w-100';
+            }
+            if (actionHint) {
+                actionHint.style.display = 'block';
+                actionHint.innerHTML = '❌ Error al verificar el estado de la cotización';
+                actionHint.className = 'text-danger text-center d-block mt-1';
+            }
+        }
+    } catch (error) {
+        console.error('Error checking quote pricing:', error);
+        // Error fetching - show generic disabled state  
+        if (requestBtn) {
+            requestBtn.style.display = 'inline-block';
+            requestBtn.disabled = true;
+            requestBtn.innerHTML = '<i class="ti ti-alert-circle"></i> Error de Conexión';
+            requestBtn.className = 'btn btn-outline-danger w-100';
+        }
+        if (actionHint) {
+            actionHint.style.display = 'block';
+            actionHint.innerHTML = '🌐 Error de conexión. Intenta recargar la página.';
+            actionHint.className = 'text-danger text-center d-block mt-1';
+        }
+    }
+}
+
 // Global function to update status display - available for dev panel
 function updateStatusDisplay(status) {
     const statusInfo = {
@@ -670,9 +865,15 @@ function updateStatusDisplay(status) {
         item.classList.remove('active', 'completed');
     });
     
+    // Remove special timeline classes
+    const timelineCompact = document.querySelector('.timeline-compact');
+    if (timelineCompact) {
+        timelineCompact.classList.remove('timeline-hold-active', 'timeline-rejected-active');
+    }
+    
     // Mark completed and active steps according to NEW REQUIREMENTS:
     // COTIZADO -> SOLICITADO -> AGENDADO (normal flow)
-    // BLOQUEADO, RECHAZADO = administrative states (don't affect timeline)
+    // BLOQUEADO, RECHAZADO = administrative states (branch from main flow)
     
     if (['hold', 'rejected'].includes(status)) {
         // For administrative states (BLOQUEADO, RECHAZADO):
@@ -688,7 +889,17 @@ function updateStatusDisplay(status) {
             quotedItem.style.color = '#198754';
         }
         
-        // Reset other items to default
+        // Activate the specific branch item
+        const branchItem = document.querySelector(`.timeline-branch[data-status="${status}"]`);
+        if (branchItem) {
+            branchItem.classList.add('active');
+            // Add class to timeline for dimming main flow
+            if (timelineCompact) {
+                timelineCompact.classList.add(`timeline-${status}-active`);
+            }
+        }
+        
+        // Reset other main flow items to default
         ['requested', 'scheduled'].forEach(s => {
             const item = document.querySelector(`.timeline-item[data-status="${s}"]`);
             const dot = item?.querySelector('.timeline-dot');
@@ -744,12 +955,8 @@ function updateStatusDisplay(status) {
     const actionHint = document.getElementById('actionHint');
     
     if (status === 'quoted') {
-        // Show the button for requesting services
-        if (requestBtn) {
-            requestBtn.style.display = 'inline-block';
-            requestBtn.disabled = false;
-        }
-        if (actionHint) actionHint.style.display = 'block';
+        // Check quote pricing before showing request button
+        checkQuotePricingAndShowButton();
     } else {
         // Hide the button for other statuses
         if (requestBtn) requestBtn.style.display = 'none';
@@ -761,6 +968,22 @@ function updateStatusDisplay(status) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Listen for service items updates to refresh pricing validation
+    document.addEventListener('serviceItemsUpdated', function(event) {
+        console.log('🔄 Service items updated, refreshing pricing validation', event.detail);
+        
+        // Only refresh if this is our quote
+        if (event.detail.quoteId === '<%= quoteId %>') {
+            // Wait a moment for the UI to update, then refresh validation
+            setTimeout(() => {
+                if (window.currentQuoteStatus === 'quoted') {
+                    console.log('✅ Refreshing pricing validation for button state');
+                    checkQuotePricingAndShowButton();
+                }
+            }, 500);
+        }
+    });
+
     // Set up global access token for itinerary builder
     const token = document.cookie.split('; ')
         .find(row => row.startsWith('accessToken='))
@@ -901,12 +1124,18 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmBtn.disabled = true;
         
         try {
+            console.log('🚀 Starting quote status change request...', {
+                quoteId: '<%= quoteId %>',
+                timestamp: new Date().toISOString(),
+                hasToken: !!(localStorage.getItem('accessToken') || localStorage.getItem('token'))
+            });
+
             // Call API to update status to requested
             const response = await fetch(`/api/quotes/<%= quoteId %>`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({
                     status: 'requested',
@@ -914,7 +1143,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             });
             
+            console.log('📡 API Response received:', {
+                status: response.status,
+                ok: response.ok,
+                statusText: response.statusText,
+                timestamp: new Date().toISOString()
+            });
+            
             const result = await response.json();
+            
+            console.log('📊 API Response data:', {
+                result,
+                success: result.success,
+                hasReservation: !!result.reservation,
+                reservationId: result.reservation?.id,
+                reservationFolio: result.reservation?.folio,
+                error: result.error,
+                timestamp: new Date().toISOString()
+            });
             
             if (result.success) {
                 // Hide modal
@@ -947,23 +1193,58 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(result.error || 'Error al solicitar servicios');
             }
         } catch (error) {
-            console.error('Error requesting services:', error);
+            console.error('❌ Error requesting services:', {
+                error: error.message,
+                stack: error.stack,
+                timestamp: new Date().toISOString(),
+                quoteId: '<%= quoteId %>',
+                userAgent: navigator.userAgent
+            });
             
             // Hide modal and overlay
             overlay.style.display = 'none';
             requestModal.hide();
             
-            // Show error message
+            // Determine if this is a specific business logic error
+            let errorMessage = error.message || 'Error al procesar la solicitud. Por favor intenta nuevamente.';
+            let errorDetails = '';
+            
+            // Check for specific error patterns
+            if (error.message && error.message.includes('sin precio')) {
+                errorMessage = 'La cotización necesita servicios con precio válido';
+                errorDetails = 'Por favor, asegúrate de que todos los servicios tengan precios antes de solicitar.';
+            } else if (error.message && error.message.includes('401')) {
+                errorMessage = 'Sesión expirada';
+                errorDetails = 'Por favor, inicia sesión nuevamente.';
+            } else if (error.message && error.message.includes('403')) {
+                errorMessage = 'Sin permisos suficientes';
+                errorDetails = 'No tienes autorización para realizar esta acción.';
+            } else if (error.message && error.message.includes('500')) {
+                errorMessage = 'Error interno del servidor';
+                errorDetails = 'Por favor, contacta al soporte técnico.';
+            }
+            
+            // Show enhanced error message
             const alert = document.createElement('div');
             alert.className = 'alert alert-danger alert-dismissible fade show position-fixed';
-            alert.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+            alert.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 450px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
             alert.innerHTML = `
-                <strong><i class="ti ti-alert-circle me-1"></i>Error</strong>
-                <p class="mb-0 mt-1">${error.message || 'Error al procesar la solicitud. Por favor intenta nuevamente.'}</p>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                <div class="d-flex">
+                    <i class="ti ti-alert-circle me-2 mt-1 flex-shrink-0"></i>
+                    <div class="w-100">
+                        <strong>Error al solicitar servicios</strong>
+                        <p class="mb-1 mt-1">${errorMessage}</p>
+                        ${errorDetails ? `<small class="text-muted">${errorDetails}</small>` : ''}
+                        <details class="mt-2">
+                            <summary class="text-muted" style="cursor: pointer; font-size: 0.875rem;">Detalles técnicos</summary>
+                            <pre class="text-muted mt-1" style="font-size: 0.75rem; white-space: pre-wrap;">${error.message}</pre>
+                        </details>
+                    </div>
+                    <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="alert"></button>
+                </div>
             `;
             document.body.appendChild(alert);
-            setTimeout(() => alert.remove(), 6000);
+            setTimeout(() => alert.remove(), 10000);
         } finally {
             confirmBtn.disabled = false;
         }
@@ -971,6 +1252,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     <% } %>
 });
+
+// Unified token retrieval function
+function getAuthToken() {
+    // Try different possible token keys in localStorage (used by different parts of the app)
+    const possibleKeys = ['accessToken', 'authToken', 'token'];
+    for (const key of possibleKeys) {
+        const token = localStorage.getItem(key);
+        if (token) {
+            console.log(`🔑 Found auth token in localStorage['${key}']`);
+            return token;
+        }
+    }
+    
+    // Fallback to cookies
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (['authToken', 'accessToken', 'token'].includes(name)) {
+            console.log(`🔑 Found auth token in cookie['${name}']`);
+            return value;
+        }
+    }
+    
+    console.warn('🚫 No authentication token found in localStorage or cookies');
+    return null;
+}
 
 // DEV PANEL: Function to change status for testing (makes real API calls)
 async function changeDevStatus(status) {
@@ -982,12 +1289,25 @@ async function changeDevStatus(status) {
     activeBtn.innerHTML = '<i class="ti ti-loader-2 ti-spin"></i> Updating...';
     
     try {
+        const authToken = getAuthToken();
+        if (!authToken) {
+            throw new Error('No authentication token found. Please refresh the page and try again.');
+        }
+
+        console.log('🔄 Attempting quote status update:', {
+            quoteId: '<%= quoteId %>',
+            currentStatus: '<%= typeof quote !== "undefined" ? quote.status : "unknown" %>',
+            newStatus: status,
+            hasToken: !!authToken,
+            tokenLength: authToken.length
+        });
+
         // Make real API call to update the quote status
         const response = await fetch(`/api/quotes/<%= quoteId %>`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify({
                 status: status,
@@ -995,8 +1315,25 @@ async function changeDevStatus(status) {
             })
         });
         
+        console.log('📡 Response received:', {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries())
+        });
+
         const result = await response.json();
         
+        console.log('📄 Response body:', result);
+        
+        if (!response.ok) {
+            console.error('❌ HTTP Error:', {
+                status: response.status,
+                statusText: response.statusText,
+                url: response.url
+            });
+            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${result.message || result.error || 'Failed to update status'}`);
+        }
+
         if (result.success) {
             // Update the display with the new status
             updateStatusDisplay(status);
@@ -1017,11 +1354,30 @@ async function changeDevStatus(status) {
                 window.location.reload();
             }, 1500);
         } else {
-            throw new Error(result.message || 'Failed to update status');
+            console.error('❌ API Error:', {
+                success: result.success,
+                message: result.message,
+                error: result.error,
+                fullResponse: result
+            });
+            throw new Error(result.message || result.error || 'Failed to update status');
         }
     } catch (error) {
-        console.error(`🛠️ DEV ERROR: Failed to change status to ${status}:`, error);
+        console.error(`🛠️ DEV ERROR: Failed to change status to ${status}:`, {
+            error: error.message,
+            stack: error.stack,
+            quoteId: '<%= quoteId %>',
+            status: status,
+            token: getAuthToken() ? 'Present' : 'Missing'
+        });
         console.error(`Failed to update status: ${error.message}`);
+        
+        // Show user-friendly error
+        if (error.message.includes('token')) {
+            alert('Authentication error. Please refresh the page and try again.');
+        } else {
+            alert(`Error updating quote status: ${error.message}`);
+        }
     } finally {
         // Restore button state
         activeBtn.disabled = false;

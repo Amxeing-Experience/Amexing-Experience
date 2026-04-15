@@ -44,52 +44,128 @@ window.currentUser = {
                     </ol>
                 </nav>
             </div>
-            <% if (!isNewQuote) { %>
-            <div class="quote-status-control" id="quoteStatusControl">
-                <!-- Available Actions Section -->
-                <div class="quote-status-section available-actions">
-                    <div class="quote-status-header">
-                        <span class="quote-status-title">Acciones Disponibles</span>
-                        <span class="quote-status-hint">Puedes cambiar entre estos estados</span>
-                    </div>
-                    <div class="quote-status-segments">
-                        <label class="quote-status-seg" data-status="quoted">
-                            <input type="radio" name="quoteStatus" value="quoted">
-                            <span class="quote-status-seg-label"><i class="ti ti-file-text me-1"></i>Cotizado</span>
-                        </label>
-                        <label class="quote-status-seg" data-status="requested">
-                            <input type="radio" name="quoteStatus" value="requested">
-                            <span class="quote-status-seg-label"><i class="ti ti-clock me-1"></i>Solicitado</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <!-- Admin Only States Section -->
-                <div class="quote-status-section admin-only-states mt-3">
-                    <div class="quote-status-header">
-                        <span class="quote-status-title text-muted">Estados Administrativos</span>
-                        <span class="quote-status-hint text-muted">Solo administradores pueden establecer</span>
-                    </div>
-                    <div class="quote-status-segments disabled-section">
-                        <label class="quote-status-seg disabled" data-status="hold">
-                            <input type="radio" name="quoteStatus" value="hold" disabled>
-                            <span class="quote-status-seg-label"><i class="ti ti-lock me-1"></i>Bloqueado</span>
-                        </label>
-                        <label class="quote-status-seg disabled" data-status="scheduled">
-                            <input type="radio" name="quoteStatus" value="scheduled" disabled>
-                            <span class="quote-status-seg-label"><i class="ti ti-check me-1"></i>Agendado</span>
-                        </label>
-                        <label class="quote-status-seg disabled" data-status="rejected">
-                            <input type="radio" name="quoteStatus" value="rejected" disabled>
-                            <span class="quote-status-seg-label"><i class="ti ti-x me-1"></i>Rechazado</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <% } %>
         </div>
     </div>
 </div>
+
+<!-- Status Component Full Width -->
+<% if (!isNewQuote) { %>
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="quote-status-compact" id="quoteStatusCompact">
+            <!-- Status Header -->
+            <div class="status-header-row">
+                <span class="status-header-label">ESTADO ACTUAL</span>
+            </div>
+            
+            <!-- Two Column Layout -->
+            <div class="row g-3">
+                <!-- Left Column: Status + Action -->
+                <div class="col-md-4">
+                    <div class="status-card">
+                        <div class="status-card-body" id="currentStatusCard">
+                            <i class="ti ti-file-text status-icon text-info"></i>
+                            <div class="status-text">
+                                <span class="status-name">COTIZADO</span>
+                                <p class="status-desc">Cotización del departamento lista para revisión</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="status-action mt-2" id="statusAction">
+                        <button type="button" class="btn btn-primary w-100" id="requestServiceBtn" style="display:none;">
+                            <i class="ti ti-send me-1"></i>Solicitar Servicios
+                        </button>
+                        <small class="text-muted text-center d-block mt-1" id="actionHint" style="display:none;">
+                            Confirma para crear la reservación
+                        </small>
+                        
+                        <!-- DEV PANEL (Only in Development) -->
+                        <% if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') { %>
+                        <div class="dev-panel mt-3 p-2 border rounded bg-light" id="devPanel">
+                            <small class="text-muted d-block text-center mb-2 fw-bold">🛠️ DEV PANEL</small>
+                            <div class="row g-1">
+                                <div class="col-6">
+                                    <button type="button" class="btn btn-info btn-sm w-100" data-status="quoted">
+                                        <i class="ti ti-file-text"></i> COTIZADO
+                                    </button>
+                                </div>
+                                <div class="col-6">
+                                    <button type="button" class="btn btn-primary btn-sm w-100" data-status="requested">
+                                        <i class="ti ti-clock"></i> SOLICITADO
+                                    </button>
+                                </div>
+                                <div class="col-6">
+                                    <button type="button" class="btn btn-warning btn-sm w-100" data-status="hold">
+                                        <i class="ti ti-lock"></i> BLOQUEADO
+                                    </button>
+                                </div>
+                                <div class="col-6">
+                                    <button type="button" class="btn btn-success btn-sm w-100" data-status="scheduled">
+                                        <i class="ti ti-check"></i> AGENDADO
+                                    </button>
+                                </div>
+                                <div class="col-12">
+                                    <button type="button" class="btn btn-danger btn-sm w-100" data-status="rejected">
+                                        <i class="ti ti-x"></i> RECHAZADO
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2" id="toggleDevPanel">
+                                <i class="ti ti-eye-off"></i> Ocultar Panel
+                            </button>
+                        </div>
+                        <button type="button" class="btn btn-outline-info btn-sm w-100 mt-2" id="showDevPanel" style="display:none;">
+                            <i class="ti ti-settings"></i> Mostrar Panel DEV
+                        </button>
+                        <% } %>
+                    </div>
+                </div>
+                
+                <!-- Right Column: Timeline -->
+                <div class="col-md-8">
+                    <div class="timeline-wrapper">
+                        <div class="timeline-compact">
+                            <!-- Main timeline flow -->
+                            <div class="timeline-main-flow">
+                                <div class="timeline-item active" data-status="quoted">
+                                    <div class="timeline-dot"><i class="ti ti-file-text"></i></div>
+                                    <span>Cotizado</span>
+                                </div>
+                                <div class="timeline-line"></div>
+                                <div class="timeline-item" data-status="requested">
+                                    <div class="timeline-dot"><i class="ti ti-clock"></i></div>
+                                    <span>Solicitado</span>
+                                </div>
+                                <div class="timeline-line"></div>
+                                <div class="timeline-item" data-status="scheduled">
+                                    <div class="timeline-dot"><i class="ti ti-check"></i></div>
+                                    <span>Agendado</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Alternative status branches -->
+                            <div class="timeline-branches">
+                                <div class="timeline-branch-connector"></div>
+                                <div class="timeline-branch-items">
+                                    <div class="timeline-item timeline-branch" data-status="hold">
+                                        <div class="timeline-dot"><i class="ti ti-lock"></i></div>
+                                        <span>Bloqueado</span>
+                                    </div>
+                                    <div class="timeline-item timeline-branch" data-status="rejected">
+                                        <div class="timeline-dot"><i class="ti ti-x"></i></div>
+                                        <span>Rechazado</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<% } %>
 
 <!-- Department Access Alert -->
 <% if (!isNewQuote) { %>
@@ -158,19 +234,69 @@ window.currentUser = {
     </div>
 </div>
 
-<!-- Confirm Schedule Modal -->
+<!-- Confirm Request Modal -->
 <% if (!isNewQuote) { %>
+<div class="modal fade" id="confirmRequestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="position: relative;">
+            <div class="modal-header border-0 pb-2">
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                        <i class="ti ti-send text-primary" style="font-size: 1.5rem;"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0">Solicitar Servicios</h5>
+                        <small class="text-muted">Confirmación requerida</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-0">
+                <div class="alert alert-info bg-opacity-10 border-0">
+                    <div class="d-flex">
+                        <i class="ti ti-info-circle text-info me-2 mt-1 flex-shrink-0"></i>
+                        <div>
+                            <strong>¿Deseas solicitar estos servicios?</strong>
+                            <p class="mb-0 mt-1">Se creará automáticamente una reservación con todos los servicios de esta cotización.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex align-items-center text-muted mb-0">
+                    <i class="ti ti-mail me-2"></i>
+                    <small>Se enviará confirmación a: <strong id="requestEmailAddress"></strong></small>
+                </div>
+            </div>
+            <!-- Loading overlay inside modal -->
+            <div id="requestLoadingOverlay" style="display:none; position:absolute; inset:0; background:rgba(255,255,255,0.95); z-index:10; border-radius:0.5rem;">
+                <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <h6 class="text-muted mb-1">Procesando solicitud...</h6>
+                    <small class="text-muted">Creando reservación...</small>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmRequestBtn">
+                    <i class="ti ti-send me-1"></i>Confirmar Solicitud
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Schedule Modal -->
 <div class="modal fade" id="confirmScheduleModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content" style="position: relative;">
             <div class="modal-header border-0 pb-0">
-                <h6 class="modal-title fw-bold">Confirmar reserva</h6>
+                <h6 class="modal-title fw-bold">Confirmar Agendamiento</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body pt-2">
-                <p>¿Confirmar esta cotización y reservar tu fecha?</p>
+                <p>¿Confirmar que la reservación ha sido agendada?</p>
                 <p class="mb-0 text-muted" style="font-size: 0.85rem;" id="scheduleEmailNote" style="display:none;">
-                    <i class="ti ti-mail me-1"></i>Se enviará un correo de confirmación a <strong id="scheduleEmailAddress"></strong>
+                    <i class="ti ti-mail me-1"></i>Se enviará confirmación de agenda a <strong id="scheduleEmailAddress"></strong>
                 </p>
             </div>
             <!-- Loading overlay inside modal -->
@@ -437,10 +563,673 @@ window.currentUser = {
 @media (max-width: 767.98px) {
     .quote-status-control { align-items: stretch; margin-top: 0.5rem; }
 }
+
+/* Compact status layout */
+.quote-status-compact {
+    background: #ffffff;
+    border-radius: 0.5rem;
+    padding: 0.875rem;
+    border: 1px solid #e9ecef;
+}
+
+/* Status Header */
+.status-header-row {
+    margin-bottom: 0.875rem;
+}
+
+.status-header-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #6c757d;
+    letter-spacing: 0.5px;
+}
+
+/* Status Card */
+.status-card {
+    flex: 0 0 auto;
+}
+
+.status-card-body {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f8f9fa;
+    padding: 0.625rem 0.875rem;
+    border-radius: 0.375rem;
+    border: 1px solid #e9ecef;
+}
+
+.status-card-body .status-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.status-text {
+    flex: 1;
+}
+
+.status-card-body .status-name {
+    font-weight: 700;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.25px;
+    display: block;
+    margin-bottom: 0.125rem;
+}
+
+.status-card-body .status-desc {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #6c757d;
+    line-height: 1.2;
+}
+
+/* Timeline Wrapper */
+.timeline-wrapper {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0;
+}
+
+.timeline-compact {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1rem 0;
+    position: relative;
+}
+
+.timeline-main-flow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.timeline-branches {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+    margin-top: 0.5rem;
+}
+
+.timeline-branch-connector {
+    width: 2px;
+    height: 30px;
+    background: #dee2e6;
+    position: absolute;
+    left: 50%;
+    top: -30px;
+    transform: translateX(-50%);
+}
+
+.timeline-branch-items {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+.timeline-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #6c757d;
+    font-size: 0.875rem;
+    font-weight: 500;
+    pointer-events: none !important;
+    cursor: default !important;
+    user-select: none !important;
+}
+
+.timeline-dot {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    pointer-events: none !important;
+    cursor: default !important;
+}
+
+.timeline-line {
+    width: 3rem;
+    height: 2px;
+    background: #dee2e6;
+    margin: 0 -0.25rem;
+}
+
+.timeline-item.active .timeline-dot {
+    background: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: white !important;
+    box-shadow: 0 2px 6px rgba(13,110,253,0.3) !important;
+}
+
+.timeline-item.active {
+    color: #0d6efd !important;
+    font-weight: 600 !important;
+}
+
+.timeline-item.completed .timeline-dot {
+    background: #198754 !important;
+    border-color: #198754 !important;
+    color: white !important;
+}
+
+.timeline-item.completed {
+    color: #198754 !important;
+}
+
+/* Branch timeline items styling */
+.timeline-branch {
+    opacity: 0.6;
+    transition: all 0.3s ease;
+}
+
+.timeline-branch[data-status="hold"] .timeline-dot {
+    background: #ffc107 !important;
+    border-color: #ffc107 !important;
+    color: white !important;
+}
+
+.timeline-branch[data-status="hold"].active {
+    opacity: 1;
+}
+
+.timeline-branch[data-status="hold"].active .timeline-dot {
+    box-shadow: 0 2px 6px rgba(255, 193, 7, 0.4) !important;
+}
+
+.timeline-branch[data-status="rejected"] .timeline-dot {
+    background: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: white !important;
+}
+
+.timeline-branch[data-status="rejected"].active {
+    opacity: 1;
+}
+
+.timeline-branch[data-status="rejected"].active .timeline-dot {
+    box-shadow: 0 2px 6px rgba(220, 53, 69, 0.4) !important;
+}
+
+/* When hold or rejected is active, dim main timeline */
+.timeline-hold-active .timeline-main-flow .timeline-item:not(.completed),
+.timeline-rejected-active .timeline-main-flow .timeline-item:not(.completed) {
+    opacity: 0.5;
+}
+
+/* Action styling */
+.status-action {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.status-action .btn {
+    white-space: nowrap;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+.status-action small {
+    font-size: 0.6875rem;
+    color: #6c757d;
+    line-height: 1.1;
+}
+
+/* DEV PANEL Styles */
+.dev-panel {
+    border: 2px dashed #dee2e6 !important;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+}
+
+.dev-panel .btn.active {
+    transform: scale(0.95);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    opacity: 0.8;
+}
+
+.dev-panel small {
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 767px) {
+    .quote-status-compact {
+        padding: 0.75rem;
+    }
+    
+    .quote-status-compact .row {
+        flex-direction: column;
+    }
+    
+    .status-card-body {
+        align-items: flex-start;
+        padding: 0.75rem;
+    }
+    
+    .timeline-wrapper {
+        padding: 0.75rem 0;
+        border-top: 1px solid #f0f0f0;
+        margin-top: 0.5rem;
+    }
+    
+    .timeline-compact {
+        justify-content: space-between;
+    }
+    
+    .timeline-branches {
+        margin-top: 0.75rem;
+    }
+    
+    .timeline-branch-connector {
+        display: none;
+    }
+    
+    .timeline-branch-items {
+        gap: 1rem;
+    }
+}
 </style>
 
 <script>
+// Function to check quote pricing and show/hide request button with appropriate messaging
+async function checkQuotePricingAndShowButton() {
+    const requestBtn = document.getElementById('requestServiceBtn');
+    const actionHint = document.getElementById('actionHint');
+    
+    try {
+        // Fetch current quote data to check pricing
+        const response = await fetch(`/api/quotes/<%= quoteId %>`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            const quote = result.data;
+            const serviceItems = quote.serviceItems || {};
+            const total = serviceItems.total || 0;
+            
+            if (total > 0) {
+                // Quote has pricing - show the button normally
+                if (requestBtn) {
+                    requestBtn.style.display = 'inline-block';
+                    requestBtn.disabled = false;
+                    requestBtn.innerHTML = '<i class="ti ti-send me-1"></i>Solicitar Servicios';
+                    requestBtn.className = 'btn btn-primary w-100';
+                    requestBtn.title = `Solicitar servicios por $${total.toLocaleString()} ${serviceItems.currency || 'MXN'}`;
+                }
+                if (actionHint) {
+                    actionHint.style.display = 'block';
+                    actionHint.innerHTML = `💡 Haz clic para solicitar servicios por $${total.toLocaleString()} ${serviceItems.currency || 'MXN'}`;
+                    actionHint.className = 'text-success text-center d-block mt-1';
+                }
+            } else {
+                // Quote has zero value - show disabled button with warning
+                if (requestBtn) {
+                    requestBtn.style.display = 'inline-block';
+                    requestBtn.disabled = true;
+                    requestBtn.innerHTML = '<i class="ti ti-alert-triangle me-1"></i>Completar Cotización';
+                    requestBtn.className = 'btn btn-outline-warning w-100';
+                    requestBtn.title = 'Esta cotización no tiene servicios con precio. Agrega servicios antes de solicitar.';
+                }
+                if (actionHint) {
+                    actionHint.style.display = 'block';
+                    actionHint.innerHTML = '⚠️ <strong>Cotización sin precio:</strong> Agrega servicios con precios válidos antes de solicitar.';
+                    actionHint.className = 'text-warning text-center d-block mt-1';
+                }
+            }
+        } else {
+            // Error fetching quote - show generic disabled state
+            if (requestBtn) {
+                requestBtn.style.display = 'inline-block';
+                requestBtn.disabled = true;
+                requestBtn.innerHTML = '<i class="ti ti-alert-circle me-1"></i>Error al Cargar';
+                requestBtn.className = 'btn btn-outline-danger w-100';
+            }
+            if (actionHint) {
+                actionHint.style.display = 'block';
+                actionHint.innerHTML = '❌ Error al verificar el estado de la cotización';
+                actionHint.className = 'text-danger text-center d-block mt-1';
+            }
+        }
+    } catch (error) {
+        console.error('Error checking quote pricing:', error);
+        // Error fetching - show generic disabled state  
+        if (requestBtn) {
+            requestBtn.style.display = 'inline-block';
+            requestBtn.disabled = true;
+            requestBtn.innerHTML = '<i class="ti ti-alert-circle me-1"></i>Error de Conexión';
+            requestBtn.className = 'btn btn-outline-danger w-100';
+        }
+        if (actionHint) {
+            actionHint.style.display = 'block';
+            actionHint.innerHTML = '🌐 Error de conexión. Intenta recargar la página.';
+            actionHint.className = 'text-danger text-center d-block mt-1';
+        }
+    }
+}
+
+// Global function to update status display - available for dev panel
+function updateStatusDisplay(status) {
+    const statusInfo = {
+        'quoted': {
+            icon: 'ti-file-text',
+            text: 'COTIZADO',
+            description: 'Cotización del departamento lista para revisión',
+            color: 'info'
+        },
+        'requested': {
+            icon: 'ti-clock',
+            text: 'SOLICITADO',
+            description: 'Servicios solicitados y reservación creada',
+            color: 'primary'
+        },
+        'hold': {
+            icon: 'ti-lock',
+            text: 'BLOQUEADO',
+            description: 'En espera - Requiere atención administrativa',
+            color: 'warning'
+        },
+        'scheduled': {
+            icon: 'ti-check',
+            text: 'AGENDADO',
+            description: 'Reservación confirmada y agendada',
+            color: 'success'
+        },
+        'rejected': {
+            icon: 'ti-x',
+            text: 'RECHAZADO',
+            description: 'Cotización rechazada',
+            color: 'danger'
+        }
+    };
+
+    const info = statusInfo[status] || statusInfo['quoted'];
+    
+    // Update current status card
+    const statusCard = document.getElementById('currentStatusCard');
+    if (statusCard) {
+        statusCard.innerHTML = `
+            <i class="ti ${info.icon} status-icon text-${info.color}"></i>
+            <div class="status-text">
+                <span class="status-name">${info.text}</span>
+                <p class="status-desc">${info.description}</p>
+            </div>
+        `;
+    }
+    
+    // Update timeline progress
+    document.querySelectorAll('.timeline-item').forEach(item => {
+        item.classList.remove('active', 'completed');
+    });
+    
+    // Remove special timeline classes
+    const timelineCompact = document.querySelector('.timeline-compact');
+    if (timelineCompact) {
+        timelineCompact.classList.remove('timeline-hold-active', 'timeline-rejected-active');
+    }
+    
+    // Mark completed and active steps according to NEW REQUIREMENTS:
+    // COTIZADO -> SOLICITADO -> AGENDADO (normal flow)
+    // BLOQUEADO, RECHAZADO = administrative states (branch from main flow)
+    
+    if (['hold', 'rejected'].includes(status)) {
+        // For administrative states (BLOQUEADO, RECHAZADO):
+        // Show COTIZADO as completed (since it was the last normal state)
+        const quotedItem = document.querySelector('.timeline-item[data-status="quoted"]');
+        const quotedDot = quotedItem?.querySelector('.timeline-dot');
+        if (quotedItem && quotedDot) {
+            quotedItem.classList.add('completed');
+            // Force completed styling for COTIZADO only
+            quotedDot.style.background = '#198754';
+            quotedDot.style.borderColor = '#198754';
+            quotedDot.style.color = 'white';
+            quotedItem.style.color = '#198754';
+        }
+        
+        // Activate the specific branch item
+        const branchItem = document.querySelector(`.timeline-branch[data-status="${status}"]`);
+        if (branchItem) {
+            branchItem.classList.add('active');
+            // Add class to timeline for dimming main flow
+            if (timelineCompact) {
+                timelineCompact.classList.add(`timeline-${status}-active`);
+            }
+        }
+        
+        // Reset other main flow items to default
+        ['requested', 'scheduled'].forEach(s => {
+            const item = document.querySelector(`.timeline-item[data-status="${s}"]`);
+            const dot = item?.querySelector('.timeline-dot');
+            if (item && dot) {
+                dot.style.background = '#f8f9fa';
+                dot.style.borderColor = '#dee2e6';
+                dot.style.color = '#6c757d';
+                dot.style.boxShadow = 'none';
+                item.style.color = '#6c757d';
+                item.style.fontWeight = '500';
+            }
+        });
+    } else {
+        // For normal workflow states
+        const statusOrder = ['quoted', 'requested', 'scheduled'];
+        const currentIndex = statusOrder.indexOf(status);
+        
+        statusOrder.forEach((s, index) => {
+            const item = document.querySelector(`.timeline-item[data-status="${s}"]`);
+            const dot = item?.querySelector('.timeline-dot');
+            if (item && dot) {
+                if (index < currentIndex) {
+                    item.classList.add('completed');
+                    // Force completed styling
+                    dot.style.background = '#198754';
+                    dot.style.borderColor = '#198754';
+                    dot.style.color = 'white';
+                    item.style.color = '#198754';
+                } else if (index === currentIndex) {
+                    item.classList.add('active');
+                    // Force active styling
+                    dot.style.background = '#0d6efd';
+                    dot.style.borderColor = '#0d6efd';
+                    dot.style.color = 'white';
+                    dot.style.boxShadow = '0 2px 6px rgba(13,110,253,0.3)';
+                    item.style.color = '#0d6efd';
+                    item.style.fontWeight = '600';
+                } else {
+                    // Reset to default styling
+                    dot.style.background = '#f8f9fa';
+                    dot.style.borderColor = '#dee2e6';
+                    dot.style.color = '#6c757d';
+                    dot.style.boxShadow = 'none';
+                    item.style.color = '#6c757d';
+                    item.style.fontWeight = '500';
+                }
+            }
+        });
+    }
+    
+    // Show/hide action button based on status
+    const requestBtn = document.getElementById('requestServiceBtn');
+    const actionHint = document.getElementById('actionHint');
+    
+    if (status === 'quoted') {
+        // Check quote pricing before showing request button
+        checkQuotePricingAndShowButton();
+    } else {
+        // Hide the button for other statuses
+        if (requestBtn) requestBtn.style.display = 'none';
+        if (actionHint) actionHint.style.display = 'none';
+    }
+    
+    // Store current status
+    window.currentQuoteStatus = status;
+}
+
+// Unified token retrieval function
+function getAuthToken() {
+    // Try different possible token keys in localStorage (used by different parts of the app)
+    const possibleKeys = ['accessToken', 'authToken', 'token'];
+    for (const key of possibleKeys) {
+        const token = localStorage.getItem(key);
+        if (token) {
+            console.log(`🔑 Found auth token in localStorage['${key}']`);
+            return token;
+        }
+    }
+    
+    // Fallback to cookies
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (['authToken', 'accessToken', 'token'].includes(name)) {
+            console.log(`🔑 Found auth token in cookie['${name}']`);
+            return value;
+        }
+    }
+    
+    console.warn('🚫 No authentication token found in localStorage or cookies');
+    return null;
+}
+
+// DEV PANEL: Function to change status for testing (makes real API calls)
+async function changeDevStatus(status) {
+    const activeBtn = document.querySelector(`[data-status="${status}"]`);
+    const originalText = activeBtn.innerHTML;
+    
+    // Show loading state
+    activeBtn.disabled = true;
+    activeBtn.innerHTML = '<i class="ti ti-loader-2 ti-spin"></i> Updating...';
+    
+    try {
+        const authToken = getAuthToken();
+        if (!authToken) {
+            throw new Error('No authentication token found. Please refresh the page and try again.');
+        }
+
+        console.log('🔄 Attempting quote status update:', {
+            quoteId: '<%= quoteId %>',
+            currentStatus: '<%= typeof quote !== "undefined" ? quote.status : "unknown" %>',
+            newStatus: status,
+            hasToken: !!authToken,
+            tokenLength: authToken.length
+        });
+
+        // Make real API call to update the quote status
+        const response = await fetch(`/api/quotes/<%= quoteId %>`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                status: status,
+                reason: `DEV: Status changed to ${status}`
+            })
+        });
+        
+        console.log('📡 Response received:', {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries())
+        });
+
+        const result = await response.json();
+        
+        console.log('📄 Response body:', result);
+        
+        if (!response.ok) {
+            console.error('❌ HTTP Error:', {
+                status: response.status,
+                statusText: response.statusText,
+                url: response.url
+            });
+            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${result.message || result.error || 'Failed to update status'}`);
+        }
+
+        if (result.success) {
+            // Update the display with the new status
+            updateStatusDisplay(status);
+            
+            // Highlight the active button
+            document.querySelectorAll('[data-status]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            activeBtn.classList.add('active');
+            
+            console.log(`🛠️ DEV: Status successfully changed to ${status}`);
+            
+            // Reload page after a short delay to reflect all changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            console.error('❌ API Error:', {
+                success: result.success,
+                message: result.message,
+                error: result.error,
+                fullResponse: result
+            });
+            throw new Error(result.message || result.error || 'Failed to update status');
+        }
+    } catch (error) {
+        console.error(`🛠️ DEV ERROR: Failed to change status to ${status}:`, {
+            error: error.message,
+            stack: error.stack,
+            quoteId: '<%= quoteId %>',
+            status: status,
+            token: getAuthToken() ? 'Present' : 'Missing'
+        });
+        
+        // Show user-friendly error
+        if (error.message.includes('token')) {
+            alert('Authentication error. Please refresh the page and try again.');
+        } else {
+            alert(`Error updating quote status: ${error.message}`);
+        }
+    } finally {
+        // Restore button state
+        activeBtn.disabled = false;
+        activeBtn.innerHTML = originalText;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Listen for service items updates to refresh pricing validation
+    document.addEventListener('serviceItemsUpdated', function(event) {
+        console.log('🔄 Service items updated, refreshing pricing validation', event.detail);
+        
+        // Only refresh if this is our quote
+        if (event.detail.quoteId === '<%= quoteId %>') {
+            // Wait a moment for the UI to update, then refresh validation
+            setTimeout(() => {
+                if (window.currentQuoteStatus === 'quoted') {
+                    console.log('✅ Refreshing pricing validation for button state');
+                    checkQuotePricingAndShowButton();
+                }
+            }, 500);
+        }
+    });
+
     // Set up global access token for itinerary builder
     const token = document.cookie.split('; ')
         .find(row => row.startsWith('accessToken='))
@@ -494,14 +1283,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 document.title = quoteTitleWithFolio + ' - AmexingWeb';
 
-                // Set status segmented control
-                const statusRadio = document.querySelector(`input[name="quoteStatus"][value="${result.data.status}"]`);
-                if (statusRadio) statusRadio.checked = true;
-                if (result.data.status === 'scheduled') {
-                    document.querySelectorAll('.quote-status-seg').forEach(seg => {
-                        if (seg.dataset.status !== 'scheduled') seg.classList.add('disabled');
-                    });
-                }
+                // Update status display for department manager view
+                updateStatusDisplay(result.data.status);
                 // Store createdBy email for fallback in Agendado confirmation
                 window._quoteCreatedByEmail = result.data.createdBy?.email || '';
             }
@@ -515,10 +1298,114 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     loadQuoteFolio();
+    
+    // Initialize DEV Panel (only if it exists)
+    const devPanel = document.getElementById('devPanel');
+    
+    if (devPanel) {
+        console.log('🛠️ DEV PANEL: Initialized in development environment');
+        
+        // Add event listeners for all status buttons
+        document.querySelectorAll('[data-status]').forEach(button => {
+            button.addEventListener('click', function() {
+                const status = this.getAttribute('data-status');
+                changeDevStatus(status);
+            });
+        });
+        
+        // Toggle dev panel visibility
+        const toggleBtn = document.getElementById('toggleDevPanel');
+        const showBtn = document.getElementById('showDevPanel');
+        
+        toggleBtn?.addEventListener('click', function() {
+            devPanel.style.display = 'none';
+            showBtn.style.display = 'block';
+        });
+        
+        showBtn?.addEventListener('click', function() {
+            devPanel.style.display = 'block';
+            showBtn.style.display = 'none';
+        });
+        
+        // Set initial active button (quoted)
+        document.querySelector('[data-status="quoted"]')?.classList.add('active');
+    } else {
+        console.log('🚀 PRODUCTION: Dev panel disabled');
+    }
+
+    // Initialize modals
+    const scheduleModal = new bootstrap.Modal(document.getElementById('confirmScheduleModal'));
+    const requestModal = new bootstrap.Modal(document.getElementById('confirmRequestModal'));
+
+    // Handle request services button click
+    document.getElementById('requestServiceBtn')?.addEventListener('click', function() {
+        // Show modal for confirmation
+        requestModal.show();
+    });
+    
+    // Handle modal confirmation
+    document.getElementById('confirmRequestBtn')?.addEventListener('click', async function() {
+        const btn = document.getElementById('requestServiceBtn');
+        const confirmBtn = this;
+        const originalText = btn.innerHTML;
+        const overlay = document.getElementById('requestLoadingOverlay');
+        
+        // Show loading overlay in modal
+        overlay.style.display = 'flex';
+        confirmBtn.disabled = true;
+        
+        try {
+            // Call API to update status to requested
+            const response = await fetch(`/api/quotes/<%= quoteId %>`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    status: 'requested',
+                    reason: 'Departamento solicitó los servicios'
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Hide modal and update display
+                requestModal.hide();
+                overlay.style.display = 'none';
+                updateStatusDisplay('requested');
+                
+                // Show success message and reload
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                throw new Error(result.error || 'Error al solicitar servicios');
+            }
+        } catch (error) {
+            console.error('Error requesting services:', error);
+            overlay.style.display = 'none';
+            requestModal.hide();
+            
+            // Show error message with actual server error
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+            alertDiv.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+            alertDiv.innerHTML = `
+                <strong><i class="ti ti-alert-circle me-1"></i>Error</strong>
+                <p class="mb-0 mt-1">${error.message || 'Error al procesar la solicitud. Por favor intenta nuevamente.'}</p>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alertDiv);
+            setTimeout(() => alertDiv.remove(), 6000);
+        } finally {
+            confirmBtn.disabled = false;
+        }
+    });
 
     // Status segmented control change handler
     let currentStatus = 'requested';
-    const scheduleModal = new bootstrap.Modal(document.getElementById('confirmScheduleModal'));
 
     function revertStatus(previousStatus) {
         currentStatus = previousStatus;
@@ -547,25 +1434,36 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             if (result.success) {
                 showScheduleLoader(false);
-                if (newStatus === 'scheduled') {
+                
+                // Show reservation created notification for "requested" status
+                if (newStatus === 'requested' && result.data?.reservation) {
+                    const resData = result.data.reservation;
+                    const toast = document.createElement('div');
+                    toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
+                    toast.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+                    toast.innerHTML = `
+                        <strong><i class="ti ti-check me-1"></i>Reservación creada exitosamente</strong>
+                        <p class="mb-1 mt-1">Folio: ${resData.folio} (${resData.servicesCount || 0} servicios)</p>
+                        <a href="/dashboard/department_manager/bookings/${resData.id}" class="btn btn-sm btn-success">Ver Reservación</a>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 10000);
+                } else if (newStatus === 'scheduled') {
                     document.querySelectorAll('.quote-status-seg').forEach(seg => {
                         if (seg.dataset.status !== 'scheduled') seg.classList.add('disabled');
                     });
-                    // Show reservation link if one was created
-                    if (result.data?.reservation) {
-                        const resData = result.data.reservation;
-                        const toast = document.createElement('div');
-                        toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
-                        toast.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
-                        toast.innerHTML = `
-                            <strong><i class="ti ti-check me-1"></i>Reservación creada</strong>
-                            <p class="mb-1 mt-1">Folio: ${resData.folio} (${resData.servicesCount} servicios)</p>
-                            <a href="/dashboard/department_manager/bookings/${resData.id}" class="btn btn-sm btn-success">Ver Reservación</a>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        `;
-                        document.body.appendChild(toast);
-                        setTimeout(() => toast.remove(), 10000);
-                    }
+                    // Show scheduled confirmation
+                    const toast = document.createElement('div');
+                    toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
+                    toast.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+                    toast.innerHTML = `
+                        <strong><i class="ti ti-check me-1"></i>Reservación agendada exitosamente</strong>
+                        <p class="mb-0 mt-1">La reservación ha sido confirmada y agendada.</p>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 8000);
                 }
             } else {
                 showScheduleLoader(false);
@@ -586,7 +1484,38 @@ document.addEventListener('DOMContentLoaded', function() {
             const previousStatus = currentStatus;
             currentStatus = newStatus;
 
-            if (newStatus === 'scheduled') {
+            if (newStatus === 'requested') {
+                // Update email in modal from current form value
+                const email = document.getElementById('contactEmail')?.value?.trim() || window._quoteCreatedByEmail || '';
+                const emailAddr = document.getElementById('requestEmailAddress');
+                if (email && emailAddr) {
+                    emailAddr.textContent = email;
+                }
+                // Show confirmation modal
+                requestModal.show();
+
+                // Confirm button
+                const confirmBtn = document.getElementById('confirmRequestBtn');
+                const handler = () => {
+                    requestModal.hide();
+                    applyStatusChange(newStatus, previousStatus);
+                    confirmBtn.removeEventListener('click', handler);
+                };
+                confirmBtn.addEventListener('click', handler);
+
+                // On modal dismiss (cancel or X), revert
+                document.getElementById('confirmRequestModal').addEventListener('hidden.bs.modal', function onHidden() {
+                    if (currentStatus === 'requested') {
+                        // Only revert if the confirm button wasn't clicked
+                        const overlay = document.getElementById('requestLoadingOverlay');
+                        if (!overlay || overlay.style.display === 'none') {
+                            // Not processing — revert
+                            revertStatus(previousStatus);
+                        }
+                    }
+                    this.removeEventListener('hidden.bs.modal', onHidden);
+                });
+            } else if (newStatus === 'scheduled') {
                 // Update email in modal from current form value
                 const email = document.getElementById('contactEmail')?.value?.trim() || window._quoteCreatedByEmail || '';
                 const emailNote = document.getElementById('scheduleEmailNote');

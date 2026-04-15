@@ -473,19 +473,85 @@ class QuoteVersioningService {
       return true;
     }
 
+    // Client role check - clients can edit quotes for their organization
+    if (roleName === 'client') {
+      const quote = await this.getQuoteById(quoteId);
+      if (quote) {
+        const clientPtr = quote.get('client');
+        const userClientId = user.get('clientId') || user.id;
+
+        logger.info('🔍 Client role authorization check', {
+          userId,
+          roleName,
+          userEmail,
+          quoteId,
+          userClientId,
+          quoteClientPtr: clientPtr?.id,
+          quoteClientExists: !!clientPtr,
+          matchesClient: clientPtr?.id === userClientId,
+        });
+
+        // Allow if quote belongs to client's organization
+        if (clientPtr && clientPtr.id === userClientId) {
+          logger.info('🔓 Client edit permission granted for own organization quote', {
+            userId,
+            roleName,
+            userEmail,
+            quoteId,
+            clientId: userClientId,
+          });
+          return true;
+        }
+        logger.warn('🚫 Client edit permission denied - quote not owned by client organization', {
+          userId,
+          roleName,
+          userEmail,
+          quoteId,
+          userClientId,
+          quoteClientPtr: clientPtr?.id,
+        });
+      } else {
+        logger.warn('🚫 Client edit permission denied - quote not found', {
+          userId,
+          roleName,
+          userEmail,
+          quoteId,
+        });
+      }
+    }
+
     // Owner can always edit
     const isOwner = await QuoteOwnership.isOwner(quoteId, userId);
     if (isOwner) {
+      logger.info('🔓 Quote ownership edit permission granted', {
+        userId,
+        roleName,
+        userEmail,
+        quoteId,
+      });
       return true;
     }
 
     // Check if user has editor access
     const quote = await this.getQuoteById(quoteId);
     if (!quote) {
+      logger.warn('canEdit - Quote not found', { userId, quoteId });
       return false;
     }
 
-    return QuoteAccess.hasAccess(quote, user, QuoteAccess.ROLES.EDITOR);
+    const hasEditorAccess = await QuoteAccess.hasAccess(quote, user, QuoteAccess.ROLES.EDITOR);
+
+    logger.info('🔍 Final canEdit result', {
+      userId,
+      roleName,
+      userEmail,
+      quoteId,
+      isOwner,
+      hasEditorAccess,
+      finalResult: hasEditorAccess,
+    });
+
+    return hasEditorAccess;
   }
 
   /**
