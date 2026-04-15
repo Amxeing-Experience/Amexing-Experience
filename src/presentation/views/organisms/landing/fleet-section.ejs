@@ -1,0 +1,121 @@
+<%#
+Fleet Section Organism - Landing Page
+Showcases the Tesla fleet and premium vehicle offerings
+
+Created by Denisse Maldonado
+%>
+
+<section class="fleet-section" id="fleet">
+    <div class="fleet-section__container">
+        <div class="fleet-section__header">
+            <h2 class="fleet-section__title">Nuestra Flota Tesla</h2>
+            <p class="fleet-section__subtitle">
+                Vehículos de lujo con tecnología avanzada para tu comodidad y seguridad
+            </p>
+        </div>
+
+        <div class="fleet-section__content">
+            <div class="fleet-section__feature">
+                <div class="fleet-section__feature-icon">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <h3 class="fleet-section__feature-title">100% Eléctrico</h3>
+                <p class="fleet-section__feature-description">
+                    Tecnología Tesla para una experiencia silenciosa y sostenible
+                </p>
+            </div>
+
+            <div class="fleet-section__feature">
+                <div class="fleet-section__feature-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h3 class="fleet-section__feature-title">Seguridad Premium</h3>
+                <p class="fleet-section__feature-description">
+                    Sistemas de seguridad avanzados y conductores certificados
+                </p>
+            </div>
+
+            <div class="fleet-section__feature">
+                <div class="fleet-section__feature-icon">
+                    <i class="fas fa-wifi"></i>
+                </div>
+                <h3 class="fleet-section__feature-title">Conectividad Total</h3>
+                <p class="fleet-section__feature-description">
+                    WiFi gratuito y sistemas de entretenimiento de última generación
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+.fleet-section {
+    padding: 4rem 0;
+    background: #f8f9fa;
+}
+
+.fleet-section__container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.fleet-section__header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.fleet-section__title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 300;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.fleet-section__subtitle {
+    font-size: 1.2rem;
+    color: #5a6c7d;
+}
+
+.fleet-section__content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.fleet-section__feature {
+    text-align: center;
+    padding: 2rem;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.fleet-section__feature-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #B8860B, #DAA520);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem auto;
+    font-size: 2rem;
+    color: white;
+}
+
+.fleet-section__feature-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.fleet-section__feature-description {
+    font-size: 1rem;
+    color: #5a6c7d;
+    line-height: 1.6;
+}
+</style>

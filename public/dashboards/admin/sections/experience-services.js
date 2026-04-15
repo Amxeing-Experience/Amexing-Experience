@@ -8,6 +8,7 @@
 
 class ExperienceServicesBuilder {
   constructor(experienceId) {
+    console.log('🚀 ExperienceServicesBuilder constructor called with experienceId:', experienceId);
     this.experienceId = experienceId;
     this.services = new Map();
     this.currentServiceId = null;
@@ -47,16 +48,36 @@ class ExperienceServicesBuilder {
   }
 
   getAccessToken() {
+    // First check for globally set token (set by experience-detail.ejs)
     if (window.experienceAccessToken) {
-      document.cookie = `accessToken=${window.experienceAccessToken}; path=/; SameSite=Lax`;
+      console.log('🔑 Using global experienceAccessToken');
       return window.experienceAccessToken;
     }
+    
+    // Fallback: Look for clientAccessToken cookie (non-httpOnly)
     const cookies = document.cookie.split(';');
     for (const cookie of cookies) {
       const [name, value] = cookie.trim().split('=');
-      if (name === 'accessToken') return value;
+      if (name === 'clientAccessToken') {
+        console.log('🔑 Found clientAccessToken in cookies');
+        return value;
+      }
+      // Also check for accessToken (legacy)
+      if (name === 'accessToken') {
+        console.log('🔑 Found accessToken in cookies (legacy)');
+        return value;
+      }
     }
-    return localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken') || null;
+    
+    // Last resort: Check localStorage/sessionStorage
+    const storageToken = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+    if (storageToken) {
+      console.log('🔑 Found token in storage');
+      return storageToken;
+    }
+    
+    console.warn('⚠️ No access token found in any location');
+    return null;
   }
 
   generateId(prefix = 'svc') {
@@ -66,6 +87,11 @@ class ExperienceServicesBuilder {
   async init() {
     try {
       await this.loadExperienceData();
+      
+      // Load temporarily stored services for new experiences
+      if (this.experienceId === 'new') {
+        this.loadTemporaryServices();
+      }
 
       await Promise.all([
         this.loadVehicles(),
@@ -247,32 +273,95 @@ class ExperienceServicesBuilder {
   // =====================
 
   async loadExperienceData() {
+    console.log('🔍 loadExperienceData called for experience:', this.experienceId);
+    
     try {
-      const accessToken = this.getAccessToken();
-      if (!accessToken) return;
+      // Skip loading for new experiences - they don't have existing service data
+      if (this.experienceId === 'new') {
+        console.log('📝 New experience - skipping service data load');
+        return;
+      }
 
+      const accessToken = this.getAccessToken();
+      console.log('🔑 Access token:', accessToken ? 'Found' : 'NOT FOUND');
+      
+      if (!accessToken) {
+        console.error('❌ No access token available - cannot load experience data');
+        return;
+      }
+
+      console.log(`📡 Fetching experience data from: /api/experiences/${this.experienceId}`);
       const response = await fetch(`/api/experiences/${this.experienceId}`, {
         headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       });
 
+      console.log('📊 Response status:', response.status);
+      
       if (response.ok) {
         const result = await response.json();
+        console.log('✅ API Response received:', {
+          success: result.success,
+          hasData: !!result.data,
+          hasServiceItems: !!(result.data && result.data.serviceItems),
+          serviceItemsCount: result.data && result.data.serviceItems && result.data.serviceItems.subconcepts ? 
+                           result.data.serviceItems.subconcepts.length : 0
+        });
+        
         if (result.success && result.data && result.data.serviceItems) {
+          console.log('🎯 Found serviceItems - calling processServiceItems');
           this.processServiceItems(result.data.serviceItems);
+        } else {
+          console.log('⚠️ No serviceItems found in response');
+          if (result.data) {
+            console.log('Available fields:', Object.keys(result.data));
+          }
+        }
+      } else {
+        console.error('❌ API request failed with status:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Error loading experience data:', error);
+    }
+  }
+
+  loadTemporaryServices() {
+    try {
+      const tempData = localStorage.getItem('tempExperienceServices');
+      if (tempData) {
+        const serviceData = JSON.parse(tempData);
+        if (serviceData.services && serviceData.services.length > 0) {
+          this.services.clear();
+          serviceData.services.forEach(service => {
+            this.services.set(service.id, service);
+          });
+          console.log('Loaded temporary services:', serviceData.services.length);
         }
       }
     } catch (error) {
-      console.error('Error loading experience data:', error);
+      console.error('Error loading temporary services:', error);
     }
   }
 
   processServiceItems(serviceItemsData) {
-    if (!serviceItemsData || !serviceItemsData.subconcepts) return;
+    console.log('🔍 processServiceItems called with:', serviceItemsData);
+    
+    if (!serviceItemsData || !serviceItemsData.subconcepts) {
+      console.log('⚠️ No serviceItemsData or subconcepts to process');
+      return;
+    }
 
+    console.log(`📦 Processing ${serviceItemsData.subconcepts.length} services from API`);
     this.services.clear();
 
-    serviceItemsData.subconcepts.forEach((sub) => {
+    serviceItemsData.subconcepts.forEach((sub, index) => {
       const serviceId = sub.id || this.generateId('svc');
+      console.log(`🎯 Processing service ${index + 1}/${serviceItemsData.subconcepts.length}:`, {
+        id: serviceId,
+        type: sub.type,
+        concept: sub.concept,
+        experienceId: sub.experienceId
+      });
+      
       this.services.set(serviceId, {
         id: serviceId,
         type: sub.type || 'other',
@@ -311,6 +400,31 @@ class ExperienceServicesBuilder {
         clientNotes: sub.clientNotes || '',
       });
     });
+    
+    console.log(`✅ Finished processing services. Total in Map: ${this.services.size}`);
+    console.log('🎨 Calling renderServices() to display them in UI...');
+    
+    // CRITICAL FIX: Render the services after processing them!
+    this.renderServices();
+    
+    // Also update the summary to reflect the loaded services
+    console.log('🔍 Checking if updateSummary method exists...');
+    console.log('Available methods on this:', Object.getOwnPropertyNames(Object.getPrototypeOf(this)));
+    
+    if (typeof this.updateSummary === 'function') {
+      try {
+        console.log('✅ Calling updateSummary...');
+        this.updateSummary();
+      } catch (error) {
+        console.warn('⚠️ Error executing updateSummary:', error);
+      }
+    } else {
+      console.warn('⚠️ updateSummary method not found on this object, skipping summary update');
+      console.log('this.constructor.name:', this.constructor.name);
+      console.log('typeof this.updateSummary:', typeof this.updateSummary);
+    }
+    
+    console.log('✅ Services should now be visible in the Services section');
   }
 
   async loadVehicles() {
@@ -2178,6 +2292,35 @@ class ExperienceServicesBuilder {
     });
   }
 
+  updateSummary() {
+    try {
+      // Update services count
+      const totalServices = this.services.size;
+      const servicesCountElements = document.querySelectorAll('[data-services-count]');
+      servicesCountElements.forEach(el => {
+        el.textContent = totalServices;
+      });
+
+      // Update total pricing if summary section exists
+      let totalPrice = 0;
+      this.services.forEach(service => {
+        const servicePrice = this.calculateServicePrice ? this.calculateServicePrice(service) : 0;
+        if (typeof servicePrice === 'number') {
+          totalPrice += servicePrice;
+        }
+      });
+
+      const totalPriceElements = document.querySelectorAll('[data-total-price]');
+      totalPriceElements.forEach(el => {
+        el.textContent = `$${totalPrice.toFixed(2)}`;
+      });
+
+      console.log(`📊 Summary updated - Services: ${totalServices}, Total Price: $${totalPrice.toFixed(2)}`);
+    } catch (error) {
+      console.warn('⚠️ Error updating summary:', error);
+    }
+  }
+
   renderServiceItem(service) {
     const typeLabels = {
       experience: 'Experiencia',
@@ -2444,6 +2587,13 @@ class ExperienceServicesBuilder {
   }
 
   async saveToBackend() {
+    // For new experiences, store services temporarily in localStorage
+    if (this.experienceId === 'new') {
+      const serviceData = this.getTemporaryServiceData();
+      localStorage.setItem('tempExperienceServices', JSON.stringify(serviceData));
+      return; // Skip API call for new experiences
+    }
+
     const subtotal = this.calculateSubtotal();
     const iva = Math.round(subtotal * 0.16 * 100) / 100;
     const total = Math.round((subtotal + iva) * 100) / 100;
@@ -2511,9 +2661,163 @@ class ExperienceServicesBuilder {
     }
   }
 
+  getTemporaryServiceData() {
+    const subtotal = this.calculateSubtotal();
+    const iva = Math.round(subtotal * 0.16 * 100) / 100;
+    const total = Math.round((subtotal + iva) * 100) / 100;
+
+    const services = Array.from(this.services.values()).map(service => ({
+      ...service,
+      calculatedPrice: this.calculateServicePrice(service)
+    }));
+
+    const tempData = {
+      services,
+      subtotal,
+      iva,
+      total,
+      timestamp: Date.now()
+    };
+
+    console.log('🔍 Storing temporary service data:', {
+      servicesCount: services.length,
+      subtotal,
+      total,
+      data: tempData
+    });
+
+    return tempData;
+  }
+
+  // Static method to transfer temporary services to a new experience
+  static async transferTemporaryServices(newExperienceId, accessToken) {
+    try {
+      console.log('🔍 Services Transfer Debug - Starting transfer to experience:', newExperienceId);
+      
+      const tempData = localStorage.getItem('tempExperienceServices');
+      if (!tempData) {
+        console.log('🔍 Services Transfer Debug - No temporary data found');
+        return;
+      }
+
+      const serviceData = JSON.parse(tempData);
+      console.log('🔍 Services Transfer Debug - Parsed temporary data:', serviceData);
+      
+      if (!serviceData.services || serviceData.services.length === 0) {
+        console.log('🔍 Services Transfer Debug - No services to transfer');
+        return;
+      }
+      
+      console.log('🔍 Services Transfer Debug - Found', serviceData.services.length, 'services to transfer');
+
+      // Convert temporary services to the format expected by the API
+      const subconcepts = serviceData.services.map(service => ({
+        type: service.type || 'other',
+        concept: service.concept || service.name,
+        time: service.startTime || null,
+        endTime: service.endTime || null,
+        vehicleId: service.vehicleId || null,
+        vehicleType: service.vehicleType || null,
+        vehicleTypeName: service.vehicleTypeName || null,
+        unitPrice: service.calculatedPrice || 0,
+        quantity: service.quantity || 1,
+        notes: service.notes || '',
+        hours: null,
+        total: (service.calculatedPrice || 0) * (service.quantity || 1),
+        experienceId: service.experienceId || null,
+        tourId: service.tourId || null,
+        rateId: service.rateId || null,
+        hotelName: service.hotelName || null,
+        adultsQuantity: service.adultsQuantity || null,
+        childrenQuantity: service.childrenQuantity || null,
+        adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity || null,
+        selectedSchedule: service.selectedSchedule || null,
+        adultPrice: service.adultPrice || null,
+        childPrice: service.childPrice || null,
+        noAlcoholPrice: service.noAlcoholPrice || null,
+        includeGuide: service.includeGuide || false,
+        includeGreeter: service.includeGreeter || false,
+        greeterInVehicle: service.greeterInVehicle || false,
+        waitingTimeHours: service.waitingTimeHours || 0,
+        transportType: service.transportType || null,
+        directionType: service.directionType || null,
+        tripType: service.tripType || null,
+        originName: service.originName || null,
+        destinationName: service.destinationName || null,
+        rateName: service.rateName || null,
+        isWalkingTour: service.isWalkingTour || false,
+        languages: service.languages || '',
+        clientNotes: service.clientNotes || '',
+      }));
+
+      const serviceItemsData = {
+        subconcepts,
+        subtotal: serviceData.subtotal,
+        iva: serviceData.iva,
+        total: serviceData.total
+      };
+
+      console.log('🔍 Services Transfer Debug - Service items data to send:', {
+        url: `/api/experiences/${newExperienceId}/service-items`,
+        data: serviceItemsData,
+        subconceptsCount: subconcepts.length
+      });
+
+      const response = await fetch(`/api/experiences/${newExperienceId}/service-items`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(serviceItemsData),
+      });
+
+      console.log('🔍 Services Transfer Debug - API Response:', {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText
+      });
+
+      if (response.ok) {
+        // Clear temporary data after successful transfer
+        localStorage.removeItem('tempExperienceServices');
+        console.log('✅ Successfully transferred temporary services to experience:', newExperienceId);
+      } else {
+        const errorData = await response.text();
+        console.error('❌ Failed to transfer temporary services:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error transferring temporary services:', error);
+    }
+  }
+
   updateSaveStatus(status) {
     const indicator = document.getElementById('saveStatusIndicator');
     if (!indicator) return;
+    
+    // For new experiences, show different status messages
+    if (this.experienceId === 'new') {
+      switch (status) {
+        case 'saving':
+          indicator.innerHTML = '<i class="ti ti-device-floppy text-warning"></i> <small class="text-warning">Guardando temporalmente...</small>';
+          break;
+        case 'saved':
+          indicator.innerHTML = '<i class="ti ti-check text-success"></i> <small class="text-success">Servicios guardados temporalmente</small>';
+          break;
+        case 'unsaved':
+          indicator.innerHTML = '<i class="ti ti-clock text-muted"></i> <small class="text-muted">Cambios sin guardar</small>';
+          break;
+        case 'error':
+          indicator.innerHTML = '<i class="ti ti-alert-triangle text-danger"></i> <small class="text-danger">Error al guardar</small>';
+          break;
+      }
+      return;
+    }
 
     const statusMap = {
       saved: '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Guardado</span>',
@@ -3096,12 +3400,15 @@ class ExperienceServicesBuilder {
   }
 }
 
+// Make the class globally available
+window.ExperienceServicesBuilder = ExperienceServicesBuilder;
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.querySelector('[data-experience-id]');
   if (container) {
     const experienceId = container.dataset.experienceId;
-    if (experienceId && experienceId !== 'new') {
+    if (experienceId) {
       new ExperienceServicesBuilder(experienceId);
     }
   }

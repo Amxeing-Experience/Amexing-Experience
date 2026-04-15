@@ -1,0 +1,1147 @@
+<%#
+Amexing Experience - Premium Landing Page
+Main landing page showcasing luxury transportation and experience services
+in San Miguel de Allende with Tesla fleet and premium service offerings
+
+@param {string} title - Page title (optional)
+@param {object} user - Current user session (optional)
+@param {object} seo - SEO meta data (optional)
+@param {object} company - Company information (optional)
+
+Created by Denisse Maldonado
+%>
+
+<!DOCTYPE html>
+<html lang="es" prefix="og: http://ogp.me/ns#">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <%# Page Title & SEO %>
+    <% 
+    const pageTitle = typeof title !== 'undefined' ? title : 'Amexing Experience - Transporte Premium en San Miguel de Allende';
+    const seoData = typeof seo !== 'undefined' ? seo : {
+        description: 'Experiencia de transporte premium en San Miguel de Allende con flota Tesla y 30 años de experiencia. Servicios de lujo, tours exclusivos y atención personalizada.',
+        keywords: 'transporte premium, San Miguel de Allende, Tesla, tours, experiencias de lujo, transporte ejecutivo',
+        author: 'Amexing Experience'
+    };
+    const companyInfo = typeof company !== 'undefined' ? company : {
+        name: 'Amexing Experience',
+        tagline: 'Elevamos la experiencia de viaje',
+        phone: '+52 (415) 152-7890',
+        email: 'info@amexing.com',
+        address: 'San Miguel de Allende, Guanajuato, México'
+    };
+    %>
+    
+    <title><%= pageTitle %></title>
+    <meta name="description" content="<%= seoData.description %>">
+    <meta name="keywords" content="<%= seoData.keywords %>">
+    <meta name="author" content="<%= seoData.author %>">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://amexing.com/">
+    
+    <%# Open Graph Meta Tags %>
+    <meta property="og:title" content="<%= pageTitle %>">
+    <meta property="og:description" content="<%= seoData.description %>">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://amexing.com/">
+    <meta property="og:image" content="https://amexing.com/images/og-hero-san-miguel.jpg">
+    <meta property="og:site_name" content="<%= companyInfo.name %>">
+    <meta property="og:locale" content="es_MX">
+    
+    <%# Twitter Card Meta Tags %>
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<%= pageTitle %>">
+    <meta name="twitter:description" content="<%= seoData.description %>">
+    <meta name="twitter:image" content="https://amexing.com/images/og-hero-san-miguel.jpg">
+    
+    <%# Favicon %>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    
+    <%# Google Fonts %>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
+    
+    <%# Font Awesome Icons %>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    
+    <%# Custom Fonts (Arpona and Myriad Pro) %>
+    <link rel="stylesheet" href="/css/fonts.css">
+    
+    <%# Base Landing Page Styles %>
+    <style>
+        /* CSS Reset & Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+            font-size: 16px;
+        }
+        
+        body {
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            overflow-x: hidden;
+            background-color: #000;
+        }
+        
+        /* Smooth Scrolling */
+        @media (prefers-reduced-motion: no-preference) {
+            html {
+                scroll-behavior: smooth;
+            }
+        }
+        
+        /* Loading Animation */
+        .page-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+        
+        .page-loader--hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .loader-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(184, 134, 11, 0.3);
+            border-top: 3px solid #B8860B;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Page Content */
+        .landing-page {
+            position: relative;
+        }
+        
+        /* Scroll to Top Button */
+        .scroll-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #B8860B, #DAA520);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 15px rgba(184, 134, 11, 0.3);
+        }
+        
+        .scroll-to-top--visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .scroll-to-top:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(184, 134, 11, 0.5);
+        }
+        
+        /* Accessibility */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        /* Focus Styles */
+        *:focus {
+            outline: 2px solid #DAA520;
+            outline-offset: 2px;
+        }
+        
+        /* High Contrast Mode */
+        @media (prefers-contrast: high) {
+            .premium-btn,
+            .landing-nav__link,
+            .scroll-to-top {
+                border: 2px solid currentColor;
+            }
+        }
+        
+        /* Experience Section Styles */
+        .experience-section {
+            padding: 6rem 0;
+            background: #eaeaeaff;
+            text-align: center;
+        }
+        
+        .experience-section__container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .experience-section__heart {
+            width: 60px;
+            height: auto;
+            margin: 3rem auto 0 auto;
+            display: block;
+        }
+        
+        .experience-section__title {
+            font-family: var(--font-myriad);
+            font-weight: 700;
+            font-size: clamp(1rem, 2vw, 1.2rem);
+            color: #2e2e2d;
+            margin-bottom: 0.5rem;
+            line-height: 1.7;
+        }
+        
+        .experience-section__description {
+            font-family: var(--font-myriad);
+            font-weight: 300;
+            font-size: clamp(1rem, 2vw, 1.2rem);
+            line-height: 1.7;
+            color: #666;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Reconocimientos Section Styles */
+        .reconocimientos-section {
+            padding: 4rem 0;
+            background: #2e2e2d;
+            text-align: center;
+        }
+        
+        .reconocimientos-section__container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .reconocimientos-section__title {
+            font-family: var(--font-myriad);
+            font-weight: 400;
+            font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+            color: #969b81;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+        }
+        
+        .reconocimientos-section__award {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .reconocimientos-section__image {
+            margin-top: 3rem;
+            max-width: 150px;
+            height: auto;
+            border-radius: 50%;
+        }
+
+        .reconocimientos-section__hr {
+            color: #969b81;
+        }
+
+        /* Testimonios Section Styles */
+        .testimonios-section {
+            padding: 6rem 0;
+            background: white;
+            text-align: center;
+        }
+        
+        .testimonios-section__container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .testimonios-section__title {
+            font-family: var(--font-myriad);
+            font-weight: 400;
+            font-size: clamp(1.8rem, 3vw, 2.5rem);
+            color: white;
+            background: rgba(150, 155, 129, 1.0);
+            padding: 1rem 3rem;
+            margin: 0 auto 4rem auto;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            display: inline-block;
+        }
+        
+        .testimonios-section__slider {
+            position: relative;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .testimonios-section__slider-container {
+            overflow: hidden;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .testimonios-section__slides {
+            display: flex;
+            transition: transform 0.5s ease-in-out;
+        }
+        
+        .testimonios-section__slide {
+            min-width: 100%;
+            padding: 2rem;
+            background: white;
+        }
+        
+        .testimonios-section__card {
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: left;
+        }
+        
+        .testimonios-section__rating {
+            margin-bottom: 1rem;
+            height: 20px;
+        }
+        
+        .testimonios-section__rating img {
+            height: 100%;
+            width: auto;
+        }
+        
+        .testimonios-section__text {
+            font-family: var(--font-myriad);
+            font-weight: 400;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 1rem;
+            quotes: """ """;
+        }
+        
+        .testimonios-section__text::before {
+            content: open-quote;
+            font-size: 1.5em;
+            color: #969b81;
+            margin-right: 0.2em;
+        }
+        
+        .testimonios-section__text::after {
+            content: close-quote;
+            font-size: 1.5em;
+            color: #969b81;
+            margin-left: 0.2em;
+        }
+        
+        .testimonios-section__attribution {
+            font-family: var(--font-myriad);
+            font-weight: 300;
+            font-size: 0.9rem;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .testimonios-section__date {
+            font-weight: 400;
+            color: #999;
+        }
+        
+        .testimonios-section__navigation {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+        
+        .testimonios-section__nav-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid rgba(150, 155, 129, 0.8);
+            background: white;
+            color: rgba(150, 155, 129, 0.8);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            pointer-events: all;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .testimonios-section__nav-btn:hover {
+            background: rgba(150, 155, 129, 0.8);
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .testimonios-section__nav-btn--prev {
+            left: -25px;
+        }
+        
+        .testimonios-section__nav-btn--next {
+            right: -25px;
+        }
+        
+        .testimonios-section__indicators {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        
+        .testimonios-section__indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: none;
+            background: #ddd;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .testimonios-section__indicator--active {
+            background: rgba(150, 155, 129, 0.8);
+            transform: scale(1.2);
+        }
+        
+        .testimonios-section__indicator:hover {
+            background: rgba(150, 155, 129, 0.6);
+        }
+
+        /* Home Page Specific Styles */
+        .home-overview {
+            padding: 6rem 0;
+            background: white;
+        }
+        
+        .home-overview__container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .home-overview__content {
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .home-overview__title {
+            font-family: var(--font-arpona);
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 400;
+            margin-bottom: 2rem;
+            color: #2e2e2d;
+            font-variant: small-caps;
+        }
+        
+        .home-overview__description {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: #666;
+            margin-bottom: 3rem;
+        }
+        
+        .home-overview__features {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 3rem;
+            flex-wrap: wrap;
+        }
+        
+        .home-overview__feature {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #B8860B;
+            font-weight: 500;
+        }
+        
+        .home-overview__feature i {
+            font-size: 1.2rem;
+        }
+        
+        .home-overview__actions {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .home-overview__btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            background: #B8860B;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            border-radius: 4px;
+        }
+        
+        .home-overview__btn:hover {
+            background: #DAA520;
+            transform: translateY(-2px);
+        }
+        
+        .home-overview__btn--secondary {
+            background: transparent;
+            color: #B8860B;
+            border: 2px solid #B8860B;
+        }
+        
+        .home-overview__btn--secondary:hover {
+            background: #B8860B;
+            color: white;
+        }
+        
+        .testimonials-preview {
+            padding: 6rem 0;
+            background: #f8f9fa;
+        }
+        
+        .testimonials-preview__container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .testimonials-preview__title {
+            font-family: var(--font-arpona);
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 400;
+            margin-bottom: 3rem;
+            color: #2e2e2d;
+            text-align: center;
+            font-variant: small-caps;
+        }
+        
+        .testimonials-preview__cta {
+            text-align: center;
+            margin-top: 3rem;
+        }
+        
+        .testimonials-preview__link {
+            color: #B8860B;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .testimonials-preview__link:hover {
+            color: #DAA520;
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .experience-section {
+                padding: 4rem 0;
+            }
+            
+            .experience-section__heart {
+                width: 50px;
+                margin-bottom: 2rem;
+            }
+            
+            .experience-section__title {
+                margin-bottom: 1.5rem;
+            }
+            
+            .reconocimientos-section {
+                padding: 3rem 0;
+            }
+            
+            .reconocimientos-section__image {
+                max-width: 200px;
+            }
+            
+            .testimonios-section {
+                padding: 4rem 0;
+            }
+            
+            .testimonios-section__title {
+                margin-bottom: 3rem;
+            }
+            
+            .testimonios-section__nav-btn--prev {
+                left: -15px;
+            }
+            
+            .testimonios-section__nav-btn--next {
+                right: -15px;
+            }
+            
+            .testimonios-section__slide {
+                padding: 2rem 1rem;
+            }
+            
+            .home-overview {
+                padding: 4rem 0;
+            }
+            
+            .home-overview__features {
+                flex-direction: column;
+                align-items: center;
+                gap: 1rem;
+            }
+            
+            .home-overview__actions {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .testimonials-preview {
+                padding: 4rem 0;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            .landing-nav,
+            .scroll-to-top,
+            .page-loader {
+                display: none !important;
+            }
+            
+            body {
+                background: white !important;
+                color: black !important;
+            }
+        }
+    </style>
+    
+    <%# Structured Data - JSON-LD %>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "TouristBusinessService",
+        "name": "<%= companyInfo.name %>",
+        "description": "<%= seoData.description %>",
+        "url": "https://amexing.com",
+        "telephone": "<%= companyInfo.phone %>",
+        "email": "<%= companyInfo.email %>",
+        "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "San Miguel de Allende",
+            "addressRegion": "Guanajuato",
+            "addressCountry": "MX"
+        },
+        "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": "20.9154",
+            "longitude": "-100.7455"
+        },
+        "serviceType": ["Transportation", "Tours", "Premium Experiences"],
+        "areaServed": {
+            "@type": "City",
+            "name": "San Miguel de Allende"
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "5.0",
+            "reviewCount": "150+"
+        }
+    }
+    </script>
+</head>
+
+<body>
+    <%# Page Loader %>
+    <div class="page-loader" id="pageLoader">
+        <div class="loader-spinner"></div>
+    </div>
+
+    <%# Skip to Main Content - Accessibility %>
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+
+    <div class="landing-page">
+        <%# Navigation %>
+        <%- include('organisms/landing/landing-navigation', {
+            user: typeof user !== 'undefined' ? user : null,
+            currentPage: 'home',
+            transparent: true,
+            companyInfo: typeof company !== 'undefined' ? company : null
+        }) %>
+
+        <%# Main Content %>
+        <main id="main-content">
+            <%# Hero Section %>
+            <%- include('organisms/landing/hero-section', {
+                title: 'Elevamos la experiencia de viaje<br>en San Miguel de Allende',
+                backgroundImage: '/images/hero-background.jpg',
+                ctaText: 'BOOK NOW',
+                ctaLink: '/contacto#book',
+                user: typeof user !== 'undefined' ? user : null
+            }) %>
+
+            <%# Experience Section %>
+            <section id="experience" class="experience-section">
+                <div class="experience-section__container">
+                    <h2 class="experience-section__title">Con 30 años de experiencia,</h2>
+                    <p class="experience-section__description">
+                        ofrecemos una manera segura, cálida y elegante de vivir San Miguel de Allende. 
+                        Nuestra esencia local, junto con un servicio de lujo y una atención genuinamente 
+                        cercana, nos permite brindar a cada cliente la confianza de estar en manos expertas 
+                        y disfrutar el destino con absoluta tranquilidad y confianza.
+                    </p>
+                    <img src="/images/heart_black.png" alt="Corazón Amexing Experience" class="experience-section__heart">
+                </div>
+            </section>
+
+            <%# Reconocimientos Section %>
+            <section id="reconocimientos" class="reconocimientos-section">
+                <div class="reconocimientos-section__container">
+                    <hr class="reconocimientos-section__hr">
+                    <h2 class="reconocimientos-section__title">RECONOCIMIENTOS</h2>
+                    <hr class="reconocimientos-section__hr">
+                    <div class="reconocimientos-section__award">
+                        <img src="/images/trip_advisor.png" alt="TripAdvisor Travelers' Choice Awards 2025" class="reconocimientos-section__image">
+                    </div>
+                </div>
+            </section>
+
+            <%# Testimonios Section %>
+            <section id="testimonios" class="testimonios-section">
+                <div class="testimonios-section__container">
+                    <h2 class="testimonios-section__title">TESTIMONIOS</h2>
+                    <div class="testimonios-section__slider">
+                        <div class="testimonios-section__slider-container">
+                            <div class="testimonios-section__slides" id="testimonialSlides">
+                                <!-- Testimonials will be dynamically inserted here -->
+                            </div>
+                        </div>
+                        <div class="testimonios-section__navigation">
+                            <button class="testimonios-section__nav-btn testimonios-section__nav-btn--prev" aria-label="Anterior testimonio">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button class="testimonios-section__nav-btn testimonios-section__nav-btn--next" aria-label="Siguiente testimonio">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        <div class="testimonios-section__indicators" id="testimonialIndicators">
+                            <!-- Indicators will be dynamically generated -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <%# Footer %>
+        <%- include('organisms/landing/landing-footer', {
+            companyInfo: typeof company !== 'undefined' ? company : null
+        }) %>
+
+        <%# Scroll to Top Button %>
+        <button class="scroll-to-top" id="scrollToTop" aria-label="Volver arriba">
+            <i class="fas fa-chevron-up" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <%# Landing Page JavaScript %>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Page Loader
+        const pageLoader = document.getElementById('pageLoader');
+        const scrollToTop = document.getElementById('scrollToTop');
+        
+        // Hide loader after page load
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                pageLoader.classList.add('page-loader--hidden');
+                setTimeout(function() {
+                    pageLoader.style.display = 'none';
+                }, 500);
+            }, 500);
+        });
+        
+        // Scroll to Top Button
+        window.addEventListener('scroll', function() {
+            if (window.pageYOffset > 300) {
+                scrollToTop.classList.add('scroll-to-top--visible');
+            } else {
+                scrollToTop.classList.remove('scroll-to-top--visible');
+            }
+        });
+        
+        scrollToTop.addEventListener('click', function() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+        
+        // Smooth Scroll for All Anchor Links
+        const anchorLinks = document.querySelectorAll('a[href^="#"]');
+        anchorLinks.forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                const targetId = this.getAttribute('href').substring(1);
+                const targetElement = document.getElementById(targetId);
+                
+                if (targetElement) {
+                    e.preventDefault();
+                    const offsetTop = targetElement.offsetTop - 80;
+                    window.scrollTo({
+                        top: offsetTop,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+        
+        // Intersection Observer for Animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+        
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('section--visible');
+                }
+            });
+        }, observerOptions);
+        
+        // Observe all main sections
+        const sections = document.querySelectorAll('section[id]');
+        sections.forEach(function(section) {
+            observer.observe(section);
+        });
+        
+        // Contact Form Handler (if needed)
+        const contactForm = document.getElementById('contactForm');
+        if (contactForm) {
+            contactForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                // Add form submission logic here
+                console.log('Contact form submitted');
+            });
+        }
+        
+        // Booking Form Handler (if needed)
+        const bookingForm = document.getElementById('bookingForm');
+        if (bookingForm) {
+            bookingForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                // Add booking form logic here
+                console.log('Booking form submitted');
+            });
+        }
+        
+        // Analytics Tracking
+        function trackEvent(eventName, eventData) {
+            if (typeof gtag !== 'undefined') {
+                gtag('event', eventName, eventData);
+            }
+            // Add other analytics tracking here
+        }
+        
+        // Track CTA clicks
+        const ctaButtons = document.querySelectorAll('.premium-btn, .hero-section__cta');
+        ctaButtons.forEach(function(button) {
+            button.addEventListener('click', function() {
+                trackEvent('cta_click', {
+                    button_text: this.textContent.trim(),
+                    page_location: window.location.href
+                });
+            });
+        });
+        
+        // Performance Monitoring
+        if ('performance' in window) {
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    const perfData = performance.timing;
+                    const loadTime = perfData.loadEventEnd - perfData.navigationStart;
+                    
+                    trackEvent('page_load_time', {
+                        load_time: loadTime,
+                        page_type: 'landing_page'
+                    });
+                }, 1000);
+            });
+        }
+        
+        // Testimonios Slider Functionality
+        function initTestimoniosSlider() {
+            const slider = document.querySelector('.testimonios-section__slides');
+            const prevBtn = document.querySelector('.testimonios-section__nav-btn--prev');
+            const nextBtn = document.querySelector('.testimonios-section__nav-btn--next');
+            const indicators = document.querySelectorAll('.testimonios-section__indicator');
+            
+            if (!slider) return;
+            
+            let currentSlide = 0;
+            const totalSlides = document.querySelectorAll('.testimonios-section__slide').length;
+            
+            function updateSlider() {
+                const translateX = -currentSlide * 100;
+                slider.style.transform = `translateX(${translateX}%)`;
+                
+                // Update indicators
+                indicators.forEach((indicator, index) => {
+                    indicator.classList.toggle('testimonios-section__indicator--active', index === currentSlide);
+                });
+            }
+            
+            function nextSlide() {
+                currentSlide = (currentSlide + 1) % totalSlides;
+                updateSlider();
+            }
+            
+            function prevSlide() {
+                currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+                updateSlider();
+            }
+            
+            function goToSlide(slideIndex) {
+                currentSlide = slideIndex;
+                updateSlider();
+            }
+            
+            // Event listeners
+            if (nextBtn) nextBtn.addEventListener('click', nextSlide);
+            if (prevBtn) prevBtn.addEventListener('click', prevSlide);
+            
+            indicators.forEach((indicator, index) => {
+                indicator.addEventListener('click', () => goToSlide(index));
+            });
+            
+            // Auto-slide (optional)
+            let autoSlideInterval;
+            function startAutoSlide() {
+                autoSlideInterval = setInterval(nextSlide, 5000);
+            }
+            
+            function stopAutoSlide() {
+                clearInterval(autoSlideInterval);
+            }
+            
+            // Start auto-slide
+            startAutoSlide();
+            
+            // Pause auto-slide on hover
+            const testimoniosSection = document.querySelector('.testimonios-section');
+            if (testimoniosSection) {
+                testimoniosSection.addEventListener('mouseenter', stopAutoSlide);
+                testimoniosSection.addEventListener('mouseleave', startAutoSlide);
+            }
+            
+            // Touch/swipe support for mobile
+            let startX = 0;
+            let currentX = 0;
+            let isDragging = false;
+            
+            slider.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+                isDragging = true;
+                stopAutoSlide();
+            });
+            
+            slider.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                currentX = e.touches[0].clientX;
+            });
+            
+            slider.addEventListener('touchend', () => {
+                if (!isDragging) return;
+                isDragging = false;
+                
+                const diffX = startX - currentX;
+                const threshold = 50;
+                
+                if (Math.abs(diffX) > threshold) {
+                    if (diffX > 0) {
+                        nextSlide();
+                    } else {
+                        prevSlide();
+                    }
+                }
+                
+                startAutoSlide();
+            });
+        }
+        
+        // Initialize testimonios slider when DOM is loaded
+        initTestimoniosSlider();
+        
+        // Testimonials Data (from TripAdvisor API)
+        const testimonialData = {
+            "data": [
+                {
+                    "id": 1054943083,
+                    "lang": "en",
+                    "rating": 5,
+                    "rating_image_url": "https://www.tripadvisor.com/img/cdsi/img2/ratings/traveler/s5.0-66827-5.svg",
+                    "text": "Angelica and her team are AMAZING. So easy and accommodating and fabulous follow up and assistance even when we returned to the US. Will you again and often. Highly recommend.",
+                    "title": "A Fabulous Experience",
+                    "published_date": "2026-03-31T22:49:10Z",
+                    "user": {
+                        "username": "lisapY2377ZG"
+                    }
+                },
+                {
+                    "id": 1054009617,
+                    "lang": "en",
+                    "rating": 5,
+                    "rating_image_url": "https://www.tripadvisor.com/img/cdsi/img2/ratings/traveler/s5.0-66827-5.svg",
+                    "text": "We've had a number of great experiences with Angelica Tours in San Miguel over the years. Michelle, the manager is wonderful. Their team is incredibly reliable - drivers are always friendly, professional, and right on time.",
+                    "title": "Great experience",
+                    "published_date": "2026-03-23T16:12:04Z",
+                    "user": {
+                        "username": "11tonya"
+                    }
+                },
+                {
+                    "id": 1053767833,
+                    "lang": "en",
+                    "rating": 5,
+                    "rating_image_url": "https://www.tripadvisor.com/img/cdsi/img2/ratings/traveler/s5.0-66827-5.svg",
+                    "text": "Angelica Tours in San Miguel is among the best ever. Angelica has led me and also friends of mine over the years through San Miguel and Guanajuato. She is amazing.",
+                    "title": "We have been with Angelica",
+                    "published_date": "2026-03-21T16:15:19Z",
+                    "user": {
+                        "username": "conniefB1715DQ"
+                    }
+                },
+                {
+                    "id": 1053341083,
+                    "lang": "en",
+                    "rating": 5,
+                    "rating_image_url": "https://www.tripadvisor.com/img/cdsi/img2/ratings/traveler/s5.0-66827-5.svg",
+                    "text": "We have used Angelica Tours for at least 20 years to drive us between our house in San Miguel and local airports. They have been very reliable, prompt and courteous.",
+                    "title": "Always use Angelica Tours",
+                    "published_date": "2026-03-17T12:54:43Z",
+                    "user": {
+                        "username": "343vivienneh"
+                    }
+                },
+                {
+                    "id": 1052022013,
+                    "lang": "en",
+                    "rating": 5,
+                    "rating_image_url": "https://www.tripadvisor.com/img/cdsi/img2/ratings/traveler/s5.0-66827-5.svg",
+                    "text": "Michelle was very responsive, planned well and the drivers, especially Luis, were kind, gracious and very courteous. They also knew the area well and offered suggestions for places to go.",
+                    "title": "Wonderful experience",
+                    "published_date": "2026-03-05T11:17:20Z",
+                    "user": {
+                        "username": "S4300BFbethh"
+                    }
+                }
+            ]
+        };
+        
+        // Function to format date
+        function formatTestimonialDate(dateStr) {
+            const date = new Date(dateStr);
+            const options = { year: 'numeric', month: 'short', day: 'numeric' };
+            return date.toLocaleDateString('en-US', options);
+        }
+        
+        // Function to create testimonial card HTML
+        function createTestimonialCard(testimonial) {
+            const formattedDate = formatTestimonialDate(testimonial.published_date);
+            return `
+                <div class="testimonios-section__slide">
+                    <div class="testimonios-section__card">
+                        <div class="testimonios-section__rating">
+                            <img src="${testimonial.rating_image_url}" alt="${testimonial.rating} star rating" />
+                        </div>
+                        <p class="testimonios-section__text">${testimonial.text}</p>
+                        <div class="testimonios-section__attribution">
+                            Review by TripAdvisor Traveler <span class="testimonios-section__date">${formattedDate}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Function to populate testimonials
+        function populateTestimonials() {
+            const slidesContainer = document.getElementById('testimonialSlides');
+            const indicatorsContainer = document.getElementById('testimonialIndicators');
+            
+            if (!slidesContainer || !indicatorsContainer) return;
+            
+            // Clear existing content
+            slidesContainer.innerHTML = '';
+            indicatorsContainer.innerHTML = '';
+            
+            // Add testimonial cards
+            testimonialData.data.forEach((testimonial, index) => {
+                slidesContainer.innerHTML += createTestimonialCard(testimonial);
+                
+                // Add indicator
+                const indicator = document.createElement('button');
+                indicator.className = `testimonios-section__indicator ${index === 0 ? 'testimonios-section__indicator--active' : ''}`;
+                indicator.setAttribute('data-slide', index);
+                indicatorsContainer.appendChild(indicator);
+            });
+            
+            // Re-initialize the slider after adding content
+            initTestimoniosSlider();
+        }
+        
+        // Populate testimonials on page load
+        populateTestimonials();
+    });
+    </script>
+
+    <%# Google Analytics (if enabled) %>
+    <% if (typeof process !== 'undefined' && process.env.GOOGLE_ANALYTICS_ID) { %>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=<%= process.env.GOOGLE_ANALYTICS_ID %>"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '<%= process.env.GOOGLE_ANALYTICS_ID %>');
+    </script>
+    <% } %>
+</body>
+</html>

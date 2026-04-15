@@ -1,0 +1,530 @@
+<%#
+Experience Section Organism - Landing Page
+"Con 30 años de experiencia" section showcasing company heritage and values
+Features elegant typography and professional presentation
+
+@param {string} title - Section title (optional)
+@param {string} description - Main description text (optional)
+@param {object} stats - Company statistics (optional)
+@param {array} values - Company values/features (optional)
+
+@example
+include('organisms/landing/experience-section', {
+    title: 'Con 30 años de experiencia',
+    stats: { clients: '5000+', trips: '50000+', satisfaction: '99%' }
+}) %>
+
+<%
+const sectionTitle = typeof title !== 'undefined' ? title : 'Con 30 años de experiencia';
+const sectionDescription = typeof description !== 'undefined' ? description : 'ofrecemos una manera segura, cálida y elegante de vivir San Miguel de Allende. Nuestra esencia local, junto con un servicio de lujo y una atención genuinamente cercana, nos permite brindar a cada cliente la confianza de estar en manos expertas y disfrutar del destino con absoluta tranquilidad y confianza.';
+
+const companyStats = typeof stats !== 'undefined' ? stats : {
+    experience: '30+',
+    clients: '5000+',
+    trips: '50000+',
+    satisfaction: '99%'
+};
+
+const companyValues = typeof values !== 'undefined' ? values : [
+    {
+        icon: 'fas fa-shield-alt',
+        title: 'Seguridad Premium',
+        description: 'Flota Tesla con tecnología de seguridad avanzada y conductores certificados.'
+    },
+    {
+        icon: 'fas fa-heart',
+        title: 'Atención Personalizada',
+        description: 'Servicio genuinamente cercano adaptado a las necesidades de cada cliente.'
+    },
+    {
+        icon: 'fas fa-map-marked-alt',
+        title: 'Conocimiento Local',
+        description: 'Experiencia profunda de San Miguel de Allende y sus alrededores.'
+    },
+    {
+        icon: 'fas fa-gem',
+        title: 'Lujo y Elegancia',
+        description: 'Experiencias exclusivas con los más altos estándares de calidad.'
+    }
+];
+%>
+
+<section class="experience-section">
+    <div class="experience-section__container">
+        <div class="experience-section__content">
+            <div class="experience-section__text">
+                <h2 class="experience-section__title">
+                    <%= sectionTitle %>
+                </h2>
+                
+                <div class="experience-section__description">
+                    <p class="experience-section__paragraph">
+                        <%= sectionDescription %>
+                    </p>
+                </div>
+                
+                <div class="experience-section__stats">
+                    <div class="experience-section__stat">
+                        <div class="experience-section__stat-number"><%= companyStats.experience %></div>
+                        <div class="experience-section__stat-label">Años de Experiencia</div>
+                    </div>
+                    <div class="experience-section__stat">
+                        <div class="experience-section__stat-number"><%= companyStats.clients %></div>
+                        <div class="experience-section__stat-label">Clientes Satisfechos</div>
+                    </div>
+                    <div class="experience-section__stat">
+                        <div class="experience-section__stat-number"><%= companyStats.trips %></div>
+                        <div class="experience-section__stat-label">Viajes Realizados</div>
+                    </div>
+                    <div class="experience-section__stat">
+                        <div class="experience-section__stat-number"><%= companyStats.satisfaction %></div>
+                        <div class="experience-section__stat-label">Satisfacción</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="experience-section__decoration">
+            <div class="experience-section__ornament">
+                <svg viewBox="0 0 100 50" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M10 25 L50 10 L90 25 L50 40 Z" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          stroke-width="1" 
+                          opacity="0.3"/>
+                    <circle cx="50" cy="25" r="3" fill="currentColor"/>
+                    <circle cx="20" cy="30" r="1.5" fill="currentColor" opacity="0.6"/>
+                    <circle cx="80" cy="20" r="1.5" fill="currentColor" opacity="0.6"/>
+                </svg>
+            </div>
+        </div>
+        
+        <div class="experience-section__values">
+            <div class="experience-section__values-grid">
+                <% companyValues.forEach(function(value, index) { %>
+                <div class="experience-section__value" data-aos="fade-up" data-aos-delay="<%= index * 100 %>">
+                    <div class="experience-section__value-icon">
+                        <i class="<%= value.icon %>"></i>
+                    </div>
+                    <div class="experience-section__value-content">
+                        <h3 class="experience-section__value-title"><%= value.title %></h3>
+                        <p class="experience-section__value-description"><%= value.description %></p>
+                    </div>
+                </div>
+                <% }); %>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+.experience-section {
+    padding: 6rem 0;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.experience-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" patternUnits="userSpaceOnUse" width="100" height="100"><circle cx="50" cy="50" r="0.5" fill="%23000" opacity="0.02"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+    pointer-events: none;
+}
+
+.experience-section__container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+.experience-section__content {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.experience-section__title {
+    font-family: 'Montserrat', serif;
+    font-size: clamp(2.5rem, 4vw, 3.5rem);
+    font-weight: 300;
+    color: #2c3e50;
+    margin-bottom: 2rem;
+    position: relative;
+    display: inline-block;
+}
+
+.experience-section__title::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 2px;
+    background: linear-gradient(90deg, #B8860B, #DAA520);
+}
+
+.experience-section__description {
+    max-width: 800px;
+    margin: 0 auto 3rem auto;
+}
+
+.experience-section__paragraph {
+    font-family: 'Montserrat', sans-serif;
+    font-size: clamp(1.1rem, 2.5vw, 1.3rem);
+    font-weight: 300;
+    line-height: 1.8;
+    color: #34495e;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.experience-section__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+    max-width: 1000px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.experience-section__stat {
+    text-align: center;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.experience-section__stat:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.experience-section__stat-number {
+    font-family: 'Montserrat', sans-serif;
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 700;
+    color: #B8860B;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.experience-section__stat-label {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #5a6c7d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.experience-section__decoration {
+    display: flex;
+    justify-content: center;
+    margin: 4rem 0;
+}
+
+.experience-section__ornament {
+    width: 150px;
+    height: 75px;
+    color: #B8860B;
+    opacity: 0.7;
+}
+
+.experience-section__ornament svg {
+    width: 100%;
+    height: 100%;
+}
+
+.experience-section__values {
+    margin-top: 5rem;
+}
+
+.experience-section__values-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.experience-section__value {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.4s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.experience-section__value::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(184, 134, 11, 0.1), transparent);
+    transition: left 0.6s ease;
+}
+
+.experience-section__value:hover::before {
+    left: 100%;
+}
+
+.experience-section__value:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
+    border-color: rgba(184, 134, 11, 0.3);
+}
+
+.experience-section__value-icon {
+    flex-shrink: 0;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #B8860B, #DAA520);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 16px rgba(184, 134, 11, 0.3);
+}
+
+.experience-section__value-content {
+    flex: 1;
+}
+
+.experience-section__value-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.75rem;
+}
+
+.experience-section__value-description {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 400;
+    line-height: 1.6;
+    color: #5a6c7d;
+    margin: 0;
+}
+
+/* Animation Classes */
+.experience-section--visible .experience-section__stat {
+    animation: fadeInUp 0.6s ease forwards;
+}
+
+.experience-section--visible .experience-section__value {
+    animation: fadeInUp 0.8s ease forwards;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Counter Animation */
+.experience-section__stat-number {
+    opacity: 0;
+}
+
+.experience-section--visible .experience-section__stat-number {
+    animation: countUp 2s ease forwards;
+}
+
+@keyframes countUp {
+    from {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@media (max-width: 1024px) {
+    .experience-section {
+        padding: 4rem 0;
+    }
+    
+    .experience-section__container {
+        padding: 0 1.5rem;
+    }
+    
+    .experience-section__stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+    
+    .experience-section__values-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .experience-section {
+        padding: 3rem 0;
+    }
+    
+    .experience-section__container {
+        padding: 0 1rem;
+    }
+    
+    .experience-section__stats {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .experience-section__stat {
+        padding: 1rem;
+    }
+    
+    .experience-section__value {
+        padding: 1.5rem;
+        gap: 1rem;
+    }
+    
+    .experience-section__value-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 1.25rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .experience-section__value {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+    
+    .experience-section__value-icon {
+        align-self: center;
+    }
+    
+    .experience-section__ornament {
+        width: 100px;
+        height: 50px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .experience-section__stat,
+    .experience-section__value,
+    .experience-section__stat-number {
+        animation: none;
+    }
+    
+    .experience-section__value:hover,
+    .experience-section__stat:hover {
+        transform: none;
+    }
+}
+
+@media print {
+    .experience-section {
+        background: white;
+        padding: 2rem 0;
+    }
+    
+    .experience-section__stat,
+    .experience-section__value {
+        background: white;
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const experienceSection = document.querySelector('.experience-section');
+    const stats = document.querySelectorAll('.experience-section__stat-number');
+    
+    // Intersection Observer for section visibility
+    const sectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('experience-section--visible');
+                
+                // Animate counters when section becomes visible
+                animateCounters();
+                
+                // Only observe once
+                sectionObserver.unobserve(entry.target);
+            }
+        });
+    }, {
+        threshold: 0.3
+    });
+    
+    if (experienceSection) {
+        sectionObserver.observe(experienceSection);
+    }
+    
+    function animateCounters() {
+        stats.forEach(stat => {
+            const finalValue = stat.textContent;
+            const isPercentage = finalValue.includes('%');
+            const isPlus = finalValue.includes('+');
+            const numericValue = parseInt(finalValue.replace(/[^\d]/g, ''));
+            
+            let currentValue = 0;
+            const increment = numericValue / 60; // 60 frames for smooth animation
+            const duration = 2000; // 2 seconds
+            
+            const timer = setInterval(() => {
+                currentValue += increment;
+                
+                if (currentValue >= numericValue) {
+                    currentValue = numericValue;
+                    clearInterval(timer);
+                }
+                
+                let displayValue = Math.floor(currentValue);
+                
+                if (isPercentage) {
+                    displayValue += '%';
+                } else if (isPlus) {
+                    if (numericValue >= 1000) {
+                        displayValue = (displayValue / 1000).toFixed(0) + 'k+';
+                    } else {
+                        displayValue += '+';
+                    }
+                }
+                
+                stat.textContent = displayValue;
+            }, duration / 60);
+        });
+    }
+});
+</script>

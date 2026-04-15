@@ -1165,7 +1165,7 @@ const isClient = dtUserRole === 'client';
             processing: true,
             serverSide: true,
             ajax: {
-                url: apiEndpoint + '?type=Experience',
+                url: apiEndpoint + '?type=Experience&includeInactive=true',
                 type: 'GET',
                 dataSrc: function(json) {
                     return json.data || [];
@@ -1209,10 +1209,13 @@ const isClient = dtUserRole === 'client';
                 {
                     data: 'active',
                     orderable: false,
-                    render: function(data) {
-                        return data
-                            ? '<span class="badge bg-success">Activa</span>'
-                            : '<span class="badge bg-secondary">Inactiva</span>';
+                    render: function(data, type, row) {
+                        // Show active/inactive status with clear visual indicator
+                        if (data === true || data === 'true') {
+                            return '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Activa</span>';
+                        } else {
+                            return '<span class="badge bg-warning text-dark"><i class="ti ti-x me-1"></i>Inactiva</span>';
+                        }
                     }
                 },
                 // 7. Acciones

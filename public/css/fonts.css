@@ -1,0 +1,152 @@
+/**
+ * Custom Fonts - ARPONA and Myriad Pro
+ * Font definitions for the Amexing Experience platform
+ * 
+ * Created by Denisse Maldonado
+ */
+
+/* ARPONA Font Family */
+@font-face {
+    font-family: 'Arpona';
+    src: url('../fonts/Arpona Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Arpona';
+    src: url('../fonts/Arpona Medium.otf') format('opentype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Arpona';
+    src: url('../fonts/Arpona Light.otf') format('opentype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Arpona';
+    src: url('../fonts/Arpona Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Myriad Pro Font Family */
+@font-face {
+    font-family: 'Myriad Pro';
+    src: url('../fonts/MyriadPro-Light.otf') format('opentype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Myriad Pro';
+    src: url('../fonts/MyriadPro-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Myriad Pro';
+    src: url('../fonts/MyriadPro-Semibold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Myriad Pro';
+    src: url('../fonts/MyriadPro-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* CSS Custom Properties for Easy Usage */
+:root {
+    --font-arpona: 'Arpona', 'Helvetica Neue', Arial, sans-serif;
+    --font-myriad: 'Myriad Pro', 'Helvetica Neue', Arial, sans-serif;
+    --font-fallback: 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Font Utility Classes */
+.font-arpona {
+    font-family: var(--font-arpona);
+}
+
+.font-arpona-regular {
+    font-family: var(--font-arpona);
+    font-weight: 400;
+}
+
+.font-arpona-medium {
+    font-family: var(--font-arpona);
+    font-weight: 500;
+}
+
+.font-myriad {
+    font-family: var(--font-myriad);
+}
+
+.font-myriad-light {
+    font-family: var(--font-myriad);
+    font-weight: 300;
+}
+
+.font-myriad-regular {
+    font-family: var(--font-myriad);
+    font-weight: 400;
+}
+
+.font-myriad-semibold {
+    font-family: var(--font-myriad);
+    font-weight: 600;
+}
+
+.font-myriad-bold {
+    font-family: var(--font-myriad);
+    font-weight: 700;
+}
+
+/* Versalitas (Small Caps) Effect */
+.versalitas,
+.font-versalitas {
+    font-variant: small-caps;
+    letter-spacing: 0.1em;
+}
+
+.versalitas-alt {
+    text-transform: uppercase;
+    font-size: 0.9em;
+    letter-spacing: 0.15em;
+}
+
+/* Weight Helper Classes */
+.fw-light {
+    font-weight: 300;
+}
+
+.fw-regular {
+    font-weight: 400;
+}
+
+.fw-medium {
+    font-weight: 500;
+}
+
+.fw-semibold {
+    font-weight: 600;
+}
+
+.fw-bold {
+    font-weight: 700;
+}

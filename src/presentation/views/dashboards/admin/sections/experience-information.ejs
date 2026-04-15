@@ -66,7 +66,8 @@
                         Precios
                     </h6>
                     <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <!-- Adult Prices Row -->
+                        <div class="col-md-6 mb-3">
                             <label for="experienceCost" class="form-label">Precio Adulto <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
@@ -74,18 +75,28 @@
                             </div>
                             <div class="invalid-feedback" id="cost-error"></div>
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 mb-3">
                             <label for="experiencePriceNoAlcohol" class="form-label">Precio Sin Alcohol</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 <input type="number" class="form-control" id="experiencePriceNoAlcohol" name="price_no_alcohol" min="0" step="0.01" placeholder="0.00">
                             </div>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label for="experiencePriceChild" class="form-label">Precio Nino</label>
+                    </div>
+                    <div class="row">
+                        <!-- Child Prices Row -->
+                        <div class="col-md-6 mb-3">
+                            <label for="experiencePriceChild" class="form-label">Precio Niño (3-12)</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 <input type="number" class="form-control" id="experiencePriceChild" name="price_child" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="experiencePriceInfant" class="form-label">Precio Infante (0-2)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experiencePriceInfant" name="price_infant" min="0" step="0.01" placeholder="0.00">
                             </div>
                         </div>
                     </div>
@@ -315,8 +326,8 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const accessToken = window.experienceAccessToken || document.cookie.split('; ')
-        .find(row => row.startsWith('accessToken='))?.split('=')[1] || '';
+    // Note: accessToken is now fetched fresh in each function that needs it
+    // to ensure we always have the latest valid token
     const experienceId = document.getElementById('experienceId').value;
     const isNew = experienceId === 'new';
 
@@ -325,11 +336,39 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Photos state
     const pendingPhotoFiles = [];
+    
+    // Real-time value capture to avoid timing issues
+    let capturedFormValues = {
+        name: '',
+        description: '',
+        cost: 0,
+        includes: '',
+        notincludes: '',
+        languages: ''
+    };
 
     // Initialize
     init();
 
     async function init() {
+        // Add debug mode indicator if active
+        if (isDebugMode()) {
+            const debugIndicator = document.createElement('div');
+            debugIndicator.style.cssText = 'position: fixed; top: 70px; right: 10px; z-index: 9999; background: #ffc107; color: black; padding: 10px; border-radius: 5px; font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.2);';
+            debugIndicator.innerHTML = `
+                🔍 Debug Mode Active
+                <button class="btn btn-sm btn-dark ms-2" onclick="showDebugLogs()">Logs</button>
+                <button class="btn btn-sm btn-danger ms-1" onclick="localStorage.setItem('experienceDebugMode', 'false'); location.reload();">X</button>
+            `;
+            document.body.appendChild(debugIndicator);
+            
+            debugLog('Debug Mode Activated', { 
+                page: 'experience-information',
+                isNew: isNew,
+                experienceId: experienceId || 'new'
+            });
+        }
+        
         setupEventListeners();
         setupImageUpload();
         setupPhotoUpload();
@@ -340,6 +379,85 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setupEventListeners() {
         document.getElementById('saveExperienceInfoBtn').addEventListener('click', saveExperience);
+        
+        // Capture form values in real-time to avoid timing issues
+        // Use specific form ID to guarantee correct element targeting
+        const nameInput = document.querySelector('#experienceInformationForm #experienceName');
+        const descriptionTextarea = document.querySelector('#experienceInformationForm #experienceDescription');
+        const costInput = document.querySelector('#experienceInformationForm #experienceCost');
+        const includesTextarea = document.querySelector('#experienceInformationForm #experienceIncludes');
+        const notincludesTextarea = document.querySelector('#experienceInformationForm #experienceNotIncludes');
+        const languagesTextarea = document.querySelector('#experienceInformationForm #experienceLanguages');
+        
+        // Debug element selection
+        debugLog('Element Selection Debug', {
+            nameInputFound: !!nameInput,
+            descriptionTextareaFound: !!descriptionTextarea,
+            costInputFound: !!costInput,
+            includesTextareaFound: !!includesTextarea,
+            notincludesTextareaFound: !!notincludesTextarea,
+            languagesTextareaFound: !!languagesTextarea,
+            descriptionTagName: descriptionTextarea ? descriptionTextarea.tagName : 'null',
+            descriptionFormParent: descriptionTextarea ? descriptionTextarea.closest('form')?.id : 'no form',
+            allDescriptionElements: document.querySelectorAll('[id="experienceDescription"]').length
+        });
+        
+        if (nameInput) {
+            nameInput.addEventListener('input', (e) => {
+                capturedFormValues.name = e.target.value;
+                debugLog('Real-time Capture - Name', { value: e.target.value });
+            });
+            // Initialize with current value
+            capturedFormValues.name = nameInput.value;
+        }
+        
+        if (descriptionTextarea) {
+            descriptionTextarea.addEventListener('input', (e) => {
+                capturedFormValues.description = e.target.value;
+                debugLog('Real-time Capture - Description', { value: e.target.value });
+            });
+            // Initialize with current value
+            capturedFormValues.description = descriptionTextarea.value;
+        }
+        
+        if (costInput) {
+            costInput.addEventListener('input', (e) => {
+                capturedFormValues.cost = parseFloat(e.target.value) || 0;
+                debugLog('Real-time Capture - Cost', { value: e.target.value });
+            });
+            // Initialize with current value
+            capturedFormValues.cost = parseFloat(costInput.value) || 0;
+        }
+
+        if (includesTextarea) {
+            includesTextarea.addEventListener('input', (e) => {
+                capturedFormValues.includes = e.target.value;
+                debugLog('Real-time Capture - Includes', { value: e.target.value });
+            });
+            // Initialize with current value
+            capturedFormValues.includes = includesTextarea.value;
+        }
+
+        if (notincludesTextarea) {
+            notincludesTextarea.addEventListener('input', (e) => {
+                capturedFormValues.notincludes = e.target.value;
+                debugLog('Real-time Capture - Not Includes', { value: e.target.value });
+            });
+            // Initialize with current value
+            capturedFormValues.notincludes = notincludesTextarea.value;
+        }
+
+        if (languagesTextarea) {
+            languagesTextarea.addEventListener('input', (e) => {
+                capturedFormValues.languages = e.target.value;
+                debugLog('Real-time Capture - Languages', { value: e.target.value });
+            });
+            // Initialize with current value
+            capturedFormValues.languages = languagesTextarea.value;
+        }
+
+        // Setup numeric validation for all number inputs
+        setupNumericValidation();
 
         document.querySelectorAll('#availableDaysContainer .day-btn').forEach(btn => {
             btn.addEventListener('click', function() {
@@ -359,6 +477,340 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateNoDaysMessage();
             });
         });
+    }
+
+    function setupNumericValidation() {
+        // Define all numeric input fields with their validation rules
+        const numericFields = [
+            // Price fields (allow decimals)
+            { id: 'experienceCost', required: true, allowDecimals: true, min: 0, name: 'Precio Adulto' },
+            { id: 'experiencePriceNoAlcohol', required: false, allowDecimals: true, min: 0, name: 'Precio Sin Alcohol' },
+            { id: 'experiencePriceChild', required: false, allowDecimals: true, min: 0, name: 'Precio Niño' },
+            { id: 'experiencePriceInfant', required: false, allowDecimals: true, min: 0, name: 'Precio Infante' },
+            
+            // Time fields (duration allows decimals, others are integers)
+            { id: 'experienceDuration', required: false, allowDecimals: true, min: 0, name: 'Duración' },
+            { id: 'experienceTravelDuration', required: false, allowDecimals: false, min: 0, name: 'Duración Trayecto' },
+            { id: 'experienceAdvanceMinutes', required: false, allowDecimals: false, min: 0, name: 'Anticipación' },
+            
+            // Capacity fields (integers only)
+            { id: 'experienceMinPeople', required: false, allowDecimals: false, min: 1, name: 'Mín. Personas' },
+            { id: 'experienceMaxPeople', required: false, allowDecimals: false, min: 1, name: 'Máx. Personas' }
+        ];
+
+        numericFields.forEach(field => {
+            const input = document.getElementById(field.id);
+            if (!input) return;
+
+            // Add keydown event listener to prevent invalid characters (better browser support than keypress)
+            input.addEventListener('keydown', function(e) {
+                preventInvalidInput(e, field.allowDecimals);
+            });
+
+            // Add input event listener for real-time validation and cleanup
+            input.addEventListener('input', function(e) {
+                // First clean any invalid characters (handles paste, drag-drop, etc.)
+                cleanNumericInput(e.target, field.allowDecimals);
+                // Then validate the field
+                validateNumericField(e.target, field);
+                
+                // For capacity fields, also trigger validation on the related field
+                triggerCapacityCrossValidation(field.id);
+            });
+
+            // Add paste event listener to handle pasted content
+            input.addEventListener('paste', function(e) {
+                // Allow the paste to happen, then clean it up
+                setTimeout(() => {
+                    cleanNumericInput(e.target, field.allowDecimals);
+                }, 0);
+            });
+
+            // Add blur event listener for final validation
+            input.addEventListener('blur', function(e) {
+                validateNumericField(e.target, field);
+                
+                // For capacity fields, also trigger validation on the related field
+                triggerCapacityCrossValidation(field.id);
+            });
+
+            // Set input mode for better mobile experience
+            input.setAttribute('inputmode', field.allowDecimals ? 'decimal' : 'numeric');
+        });
+    }
+
+    function preventInvalidInput(event, allowDecimals) {
+        const keyCode = event.keyCode || event.which;
+        const char = String.fromCharCode(keyCode);
+        const currentValue = event.target.value;
+        
+        // Allow: backspace, delete, tab, escape, enter, arrow keys
+        if ([8, 9, 27, 13, 46, 35, 36, 37, 38, 39, 40].indexOf(keyCode) !== -1 ||
+            // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z (specific key combinations only)
+            (event.ctrlKey && [65, 67, 86, 88, 90].indexOf(keyCode) !== -1) ||
+            // Allow: Cmd+A, Cmd+C, Cmd+V, Cmd+X, Cmd+Z on Mac
+            (event.metaKey && [65, 67, 86, 88, 90].indexOf(keyCode) !== -1) ||
+            // Allow: F1-F12
+            (keyCode >= 112 && keyCode <= 123)) {
+            return;
+        }
+        
+        // Allow numbers: regular keyboard (48-57) and numpad (96-105)
+        const isNumber = (keyCode >= 48 && keyCode <= 57) || (keyCode >= 96 && keyCode <= 105);
+        
+        // Allow decimal point if allowed and not already present
+        const isDecimalPoint = allowDecimals && (char === '.' || char === ',' || keyCode === 188 || keyCode === 190) && 
+                               currentValue.indexOf('.') === -1 && currentValue.indexOf(',') === -1;
+        
+        // If not number or decimal point, prevent the input
+        if (!isNumber && !isDecimalPoint) {
+            event.preventDefault();
+            return;
+        }
+        
+        // Prevent shift+number combinations that produce symbols
+        if (event.shiftKey && isNumber) {
+            event.preventDefault();
+        }
+    }
+
+    function cleanNumericInput(input, allowDecimals) {
+        const currentValue = input.value;
+        let cleanedValue = currentValue;
+        const cursorPosition = input.selectionStart;
+        
+        if (allowDecimals) {
+            // Allow digits and one decimal point only
+            cleanedValue = currentValue.replace(/[^0-9.]/g, '');
+            
+            // Ensure only one decimal point
+            const decimalIndex = cleanedValue.indexOf('.');
+            if (decimalIndex !== -1) {
+                cleanedValue = cleanedValue.substring(0, decimalIndex + 1) + 
+                              cleanedValue.substring(decimalIndex + 1).replace(/\./g, '');
+            }
+        } else {
+            // Allow only digits
+            cleanedValue = currentValue.replace(/[^0-9]/g, '');
+        }
+        
+        // Update value if it changed
+        if (cleanedValue !== currentValue) {
+            input.value = cleanedValue;
+            
+            // Try to restore cursor position
+            const newCursorPosition = Math.min(cursorPosition, cleanedValue.length);
+            setTimeout(() => {
+                input.setSelectionRange(newCursorPosition, newCursorPosition);
+            }, 0);
+            
+            // Trigger validation after cleaning
+            const fieldConfig = getFieldConfig(input.id);
+            if (fieldConfig) {
+                validateNumericField(input, fieldConfig);
+            }
+        }
+    }
+
+    function getFieldConfig(inputId) {
+        const fieldConfigs = [
+            { id: 'experienceCost', required: true, allowDecimals: true, min: 0, name: 'Precio Adulto' },
+            { id: 'experiencePriceNoAlcohol', required: false, allowDecimals: true, min: 0, name: 'Precio Sin Alcohol' },
+            { id: 'experiencePriceChild', required: false, allowDecimals: true, min: 0, name: 'Precio Niño' },
+            { id: 'experiencePriceInfant', required: false, allowDecimals: true, min: 0, name: 'Precio Infante' },
+            { id: 'experienceDuration', required: false, allowDecimals: true, min: 0, name: 'Duración' },
+            { id: 'experienceTravelDuration', required: false, allowDecimals: false, min: 0, name: 'Duración Trayecto' },
+            { id: 'experienceAdvanceMinutes', required: false, allowDecimals: false, min: 0, name: 'Anticipación' },
+            { id: 'experienceMinPeople', required: false, allowDecimals: false, min: 1, name: 'Mín. Personas' },
+            { id: 'experienceMaxPeople', required: false, allowDecimals: false, min: 1, name: 'Máx. Personas' }
+        ];
+        
+        return fieldConfigs.find(config => config.id === inputId);
+    }
+
+    function validateNumericField(input, fieldConfig) {
+        const value = input.value.trim();
+        const numericValue = parseFloat(value);
+        let isValid = true;
+        let errorMessage = '';
+
+        // Clear previous validation state
+        clearFieldValidation(input);
+
+        // Check if required field is empty
+        if (fieldConfig.required && (value === '' || isNaN(numericValue))) {
+            isValid = false;
+            errorMessage = `${fieldConfig.name} es requerido`;
+        }
+        // Check if optional field has invalid numeric value (but not empty)
+        else if (value !== '' && (isNaN(numericValue) || !isFinite(numericValue))) {
+            isValid = false;
+            errorMessage = `${fieldConfig.name} debe ser un número válido`;
+        }
+        // Check minimum value constraint
+        else if (value !== '' && !isNaN(numericValue) && numericValue < fieldConfig.min) {
+            isValid = false;
+            errorMessage = `${fieldConfig.name} debe ser mayor o igual a ${fieldConfig.min}`;
+        }
+        // Check decimal constraint
+        else if (value !== '' && !isNaN(numericValue) && !fieldConfig.allowDecimals && numericValue % 1 !== 0) {
+            isValid = false;
+            errorMessage = `${fieldConfig.name} debe ser un número entero`;
+        }
+
+        // Apply validation styling for individual field validation
+        if (!isValid) {
+            showFieldValidation(input, errorMessage, 'error');
+        } else if (value !== '') {
+            showFieldValidation(input, '', 'success');
+        }
+
+        // For capacity fields, also validate the min/max relationship
+        if (isValid && (fieldConfig.id === 'experienceMinPeople' || fieldConfig.id === 'experienceMaxPeople')) {
+            const relationshipValid = validateCapacityRelationship();
+            if (!relationshipValid) {
+                isValid = false;
+            }
+        }
+
+        return isValid;
+    }
+
+    function showFieldValidation(input, message, type) {
+        input.classList.remove('is-valid', 'is-invalid');
+        
+        if (type === 'error') {
+            input.classList.add('is-invalid');
+            // Find or create error display element
+            let errorDiv = input.parentNode.querySelector('.invalid-feedback');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.className = 'invalid-feedback';
+                input.parentNode.appendChild(errorDiv);
+            }
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        } else if (type === 'success') {
+            input.classList.add('is-valid');
+        }
+    }
+
+    function clearFieldValidation(input) {
+        input.classList.remove('is-valid', 'is-invalid');
+        const errorDiv = input.parentNode.querySelector('.invalid-feedback');
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
+    }
+
+    function validateCapacityRelationship() {
+        const minPeopleInput = document.getElementById('experienceMinPeople');
+        const maxPeopleInput = document.getElementById('experienceMaxPeople');
+        
+        if (!minPeopleInput || !maxPeopleInput) {
+            return true; // If inputs don't exist, consider valid
+        }
+
+        const minValue = minPeopleInput.value.trim();
+        const maxValue = maxPeopleInput.value.trim();
+        
+        // Only validate relationship if both fields have values
+        if (minValue === '' || maxValue === '') {
+            return true; // Allow empty fields
+        }
+
+        const minPeople = parseInt(minValue, 10);
+        const maxPeople = parseInt(maxValue, 10);
+        
+        // Check if both are valid numbers
+        if (isNaN(minPeople) || isNaN(maxPeople)) {
+            return true; // Let individual field validation handle invalid numbers
+        }
+
+        // Check if min > max
+        if (minPeople > maxPeople) {
+            // Show error on min field
+            showFieldValidation(minPeopleInput, `Min. Personas no puede ser mayor que Max. Personas (${maxPeople})`, 'error');
+            
+            // Show error on max field
+            showFieldValidation(maxPeopleInput, `Max. Personas no puede ser menor que Min. Personas (${minPeople})`, 'error');
+            
+            return false;
+        }
+
+        return true;
+    }
+
+    function triggerCapacityCrossValidation(changedFieldId) {
+        // Only trigger cross-validation for capacity fields
+        if (changedFieldId !== 'experienceMinPeople' && changedFieldId !== 'experienceMaxPeople') {
+            return;
+        }
+
+        const minPeopleInput = document.getElementById('experienceMinPeople');
+        const maxPeopleInput = document.getElementById('experienceMaxPeople');
+        
+        if (!minPeopleInput || !maxPeopleInput) {
+            return;
+        }
+
+        // Get the field configs for both capacity fields
+        const minFieldConfig = getFieldConfig('experienceMinPeople');
+        const maxFieldConfig = getFieldConfig('experienceMaxPeople');
+        
+        if (!minFieldConfig || !maxFieldConfig) {
+            return;
+        }
+
+        // If min field changed, also validate max field (but don't show success on max if it has no value)
+        if (changedFieldId === 'experienceMinPeople' && maxPeopleInput.value.trim() !== '') {
+            // Clear any previous relationship errors on max field first
+            clearFieldValidation(maxPeopleInput);
+            // Re-validate max field which will trigger relationship validation
+            validateNumericField(maxPeopleInput, maxFieldConfig);
+        }
+        
+        // If max field changed, also validate min field (but don't show success on min if it has no value)  
+        if (changedFieldId === 'experienceMaxPeople' && minPeopleInput.value.trim() !== '') {
+            // Clear any previous relationship errors on min field first
+            clearFieldValidation(minPeopleInput);
+            // Re-validate min field which will trigger relationship validation
+            validateNumericField(minPeopleInput, minFieldConfig);
+        }
+    }
+
+    function validateAllNumericFields() {
+        const numericFields = [
+            { id: 'experienceCost', required: true, allowDecimals: true, min: 0, name: 'Precio Adulto' },
+            { id: 'experiencePriceNoAlcohol', required: false, allowDecimals: true, min: 0, name: 'Precio Sin Alcohol' },
+            { id: 'experiencePriceChild', required: false, allowDecimals: true, min: 0, name: 'Precio Niño' },
+            { id: 'experiencePriceInfant', required: false, allowDecimals: true, min: 0, name: 'Precio Infante' },
+            { id: 'experienceDuration', required: false, allowDecimals: true, min: 0, name: 'Duración' },
+            { id: 'experienceTravelDuration', required: false, allowDecimals: false, min: 0, name: 'Duración Trayecto' },
+            { id: 'experienceAdvanceMinutes', required: false, allowDecimals: false, min: 0, name: 'Anticipación' },
+            { id: 'experienceMinPeople', required: false, allowDecimals: false, min: 1, name: 'Mín. Personas' },
+            { id: 'experienceMaxPeople', required: false, allowDecimals: false, min: 1, name: 'Máx. Personas' }
+        ];
+
+        let allValid = true;
+
+        numericFields.forEach(field => {
+            const input = document.getElementById(field.id);
+            if (input) {
+                const isValid = validateNumericField(input, field);
+                if (!isValid) {
+                    allValid = false;
+                }
+            }
+        });
+
+        // Also validate capacity relationship
+        const capacityRelationshipValid = validateCapacityRelationship();
+        if (!capacityRelationshipValid) {
+            allValid = false;
+        }
+
+        return allValid;
     }
 
     function setupImageUpload() {
@@ -575,27 +1027,80 @@ document.addEventListener('DOMContentLoaded', function() {
         return text ? text.split('\n').map(l => l.trim()).filter(l => l) : [];
     }
 
+    function stringToArray(text) {
+        const trimmedText = (text || '').trim();
+        return trimmedText ? trimmedText.split('\n').map(l => l.trim()).filter(l => l) : [];
+    }
+
+
+    // Show debug logs in a modal
+    window.showDebugLogs = function() {
+        const logs = JSON.parse(localStorage.getItem('experienceDebugLogs') || '[]');
+        const modal = document.createElement('div');
+        modal.innerHTML = `
+            <div class="modal fade show" style="display: block; background: rgba(0,0,0,0.5);">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Debug Logs</h5>
+                            <button type="button" class="btn-close" onclick="this.closest('.modal').remove()"></button>
+                        </div>
+                        <div class="modal-body" style="max-height: 500px; overflow-y: auto;">
+                            <button class="btn btn-danger btn-sm mb-3" onclick="localStorage.removeItem('experienceDebugLogs'); this.closest('.modal').remove();">Clear Logs</button>
+                            <pre style="font-size: 11px;">${JSON.stringify(logs, null, 2)}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    };
 
     async function loadExperienceData() {
         try {
+            // Get access token using simple working pattern
+            const accessToken = getAccessToken();
+            
+            debugLog('Load Experience Data - Starting', { 
+                experienceId,
+                hasAccessToken: !!accessToken 
+            });
+            
+            if (!accessToken) {
+                showAlert('Error de autenticación. Por favor, recarga la página.', 'danger');
+                return;
+            }
+            
             const response = await fetch(`/api/experiences/${experienceId}`, {
                 headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
             });
             const result = await response.json();
+            
+            // Simple error checking
 
             if (!result.success || !result.data) {
                 showAlert('Error al cargar datos de la experiencia', 'danger');
                 return;
             }
 
+
             const data = result.data;
 
-            // Basic fields
-            document.getElementById('experienceName').value = data.name || '';
-            document.getElementById('experienceDescription').value = data.description || '';
-            document.getElementById('experienceCost').value = data.cost || '';
+            // Basic fields - use specific form ID to guarantee correct element targeting
+            document.querySelector('#experienceInformationForm #experienceName').value = data.name || '';
+            document.querySelector('#experienceInformationForm #experienceDescription').value = data.description || '';
+            document.querySelector('#experienceInformationForm #experienceCost').value = data.cost || '';
+            
+            debugLog('Load Experience Data - Fields Populated', {
+                name: document.querySelector('#experienceInformationForm #experienceName').value,
+                description: document.querySelector('#experienceInformationForm #experienceDescription').value,
+                cost: document.querySelector('#experienceInformationForm #experienceCost').value,
+                nameFieldExists: !!document.querySelector('#experienceInformationForm #experienceName'),
+                descriptionFieldExists: !!document.querySelector('#experienceInformationForm #experienceDescription')
+            });
             document.getElementById('experiencePriceNoAlcohol').value = data.price_no_alcohol || '';
             document.getElementById('experiencePriceChild').value = data.price_child || '';
+            document.getElementById('experiencePriceInfant').value = data.price_infant || '';
             document.getElementById('experienceDuration').value = data.duration || '';
             document.getElementById('experienceTravelDuration').value = data.travel_duration || '';
             document.getElementById('experienceAdvanceMinutes').value = data.advance_minutes || '';
@@ -603,15 +1108,98 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('experienceMaxPeople').value = data.max_people || '';
 
             // Includes / NotIncludes / Languages (arrays to textarea)
-            if (data.includes && data.includes.length > 0) {
-                document.getElementById('experienceIncludes').value = data.includes.join('\n');
-            }
-            if (data.notincludes && data.notincludes.length > 0) {
-                document.getElementById('experienceNotIncludes').value = data.notincludes.join('\n');
-            }
-            if (data.languages && data.languages.length > 0) {
-                document.getElementById('experienceLanguages').value = data.languages.join('\n');
-            }
+            console.log('🔍 Loading textarea fields - API Response data:', { 
+                includes: data.includes, 
+                includesType: typeof data.includes,
+                includesIsArray: Array.isArray(data.includes),
+                notincludes: data.notincludes, 
+                notincludesType: typeof data.notincludes,
+                notincludesIsArray: Array.isArray(data.notincludes),
+                languages: data.languages,
+                languagesType: typeof data.languages,
+                languagesIsArray: Array.isArray(data.languages)
+            });
+
+            // Get textarea elements from the form specifically (avoid modal duplicates)
+            const includesEl = document.querySelector('#experienceInformationForm #experienceIncludes');
+            const notincludesEl = document.querySelector('#experienceInformationForm #experienceNotIncludes'); 
+            const languagesEl = document.querySelector('#experienceInformationForm #experienceLanguages');
+
+            console.log('🔍 Textarea elements found:', {
+                includesEl: !!includesEl,
+                notincludesEl: !!notincludesEl,
+                languagesEl: !!languagesEl
+            });
+
+            // Debug: Verify we're targeting the FORM elements, not modal elements
+            console.log('🔍 Element verification - ensuring we target form elements not modals:', {
+                includesElReadonly: includesEl?.readOnly,
+                includesElParentForm: includesEl?.closest('form')?.id,
+                notincludesElReadonly: notincludesEl?.readOnly,
+                notincludesElParentForm: notincludesEl?.closest('form')?.id,
+                languagesElReadonly: languagesEl?.readOnly,
+                languagesElParentForm: languagesEl?.closest('form')?.id
+            });
+
+            // Store textarea data for later population - maybe something is clearing it after our setTimeout
+            const textareaData = {
+                includes: Array.isArray(data.includes) ? data.includes.join('\n') : '',
+                notincludes: Array.isArray(data.notincludes) ? data.notincludes.join('\n') : '',
+                languages: Array.isArray(data.languages) ? data.languages.join('\n') : ''
+            };
+
+            // Define the population function
+            const populateTextareas = () => {
+                console.log('🕐 Attempting textarea population with data:', textareaData);
+                
+                // Get fresh element references each time - use form-specific selectors to avoid modal duplicates
+                const includesEl = document.querySelector('#experienceInformationForm #experienceIncludes');
+                const notincludesEl = document.querySelector('#experienceInformationForm #experienceNotIncludes'); 
+                const languagesEl = document.querySelector('#experienceInformationForm #experienceLanguages');
+                
+                console.log('🔍 Fresh textarea elements found:', {
+                    includesEl: !!includesEl,
+                    notincludesEl: !!notincludesEl,
+                    languagesEl: !!languagesEl
+                });
+                
+                if (includesEl) {
+                    includesEl.value = textareaData.includes; // Set value even if empty string
+                    includesEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    includesEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    // Force focus and blur to trigger any validation
+                    includesEl.focus();
+                    includesEl.blur();
+                    console.log('✅ Populated experienceIncludes (maintaining original height):', includesEl.value);
+                }
+                
+                if (notincludesEl) {
+                    notincludesEl.value = textareaData.notincludes; // Set value even if empty string
+                    notincludesEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    notincludesEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    notincludesEl.focus();
+                    notincludesEl.blur();
+                    console.log('✅ Populated experienceNotIncludes (maintaining original height):', notincludesEl.value);
+                }
+                
+                if (languagesEl) {
+                    languagesEl.value = textareaData.languages; // Set value even if empty string
+                    languagesEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    languagesEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    languagesEl.focus();
+                    languagesEl.blur();
+                    console.log('✅ Populated experienceLanguages (maintaining original height):', languagesEl.value);
+                }
+            };
+
+            // Try multiple times with increasing delays to overcome any interference
+            setTimeout(populateTextareas, 50);   // First try - fast
+            setTimeout(populateTextareas, 200);  // Second try - after potential interference
+            setTimeout(populateTextareas, 500);  // Third try - after everything settles
+            setTimeout(populateTextareas, 1000); // Final try - very late
+            
+            // Also try immediately (in case timing isn't the issue)
+            populateTextareas();
 
             // Notes
             document.getElementById('experienceInternalNotes').value = data.internal_notes || '';
@@ -693,14 +1281,188 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Debug mode helper functions
+    function isDebugMode() {
+        return new URLSearchParams(window.location.search).get('debug') === 'true' || 
+               localStorage.getItem('experienceDebugMode') === 'true';
+    }
+
+    function debugLog(label, data) {
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            label,
+            data
+        };
+        
+        console.log(`🔍 ${label}:`, data);
+        
+        // Store in localStorage for persistence
+        if (isDebugMode()) {
+            const logs = JSON.parse(localStorage.getItem('experienceDebugLogs') || '[]');
+            logs.push(logEntry);
+            // Keep only last 50 logs
+            if (logs.length > 50) logs.shift();
+            localStorage.setItem('experienceDebugLogs', JSON.stringify(logs));
+        }
+    }
+
+    // Debug log viewer function for persistent debugging
+    function showDebugLogs() {
+        const logs = JSON.parse(localStorage.getItem('experienceDebugLogs') || '[]');
+        const servicesLogs = logs.filter(log => log.label.includes('Services Transfer'));
+        
+        console.group('🔍 Experience Services Transfer Debug Logs');
+        console.log('Total logs:', logs.length, 'Services transfer logs:', servicesLogs.length);
+        
+        servicesLogs.forEach((log, index) => {
+            console.log(`${index + 1}. [${log.timestamp}] ${log.label}:`, log.data);
+        });
+        
+        console.groupEnd();
+        
+        // Also show in alert if requested
+        if (servicesLogs.length > 0) {
+            const lastLog = servicesLogs[servicesLogs.length - 1];
+            const summary = `Last services log: ${lastLog.label} at ${new Date(lastLog.timestamp).toLocaleTimeString()}`;
+            showAlert(`Debug: ${summary}. Check console for full logs.`, 'info');
+        } else {
+            showAlert('No services transfer logs found in debug history.', 'info');
+        }
+    }
+    
+    // Make debug viewer available globally
+    window.showDebugLogs = showDebugLogs;
+
+    // Check user authorization for services transfer
+    async function checkServiceTransferAuthorization(accessToken) {
+        try {
+            // Test if user can access service items endpoint by making a GET request
+            const response = await fetch(`/api/experiences/test/service-items`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            debugLog('Authorization Check - Service Items Endpoint', {
+                status: response.status,
+                statusText: response.statusText,
+                hasAuth: response.status !== 401,
+                hasPermission: response.status !== 403,
+                canAccess: response.status === 404 || response.status === 200, // 404 means endpoint exists but experience doesn't, which is fine
+            });
+            
+            return response.status !== 401 && response.status !== 403;
+        } catch (error) {
+            debugLog('Authorization Check - Failed', { error: error.message });
+            return false;
+        }
+    }
+
+    // Get JWT token from cookies - use clientAccessToken (non-httpOnly cookie)
+    function getAccessToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'clientAccessToken') {
+                return value;
+            }
+        }
+        return null;
+    }
+
     async function saveExperience() {
-        const name = document.getElementById('experienceName').value.trim();
-        const description = document.getElementById('experienceDescription').value.trim();
-        const cost = parseFloat(document.getElementById('experienceCost').value) || 0;
+        // Get access token using simple working pattern
+        const accessToken = getAccessToken();
+        
+        if (!accessToken) {
+            showAlert('Error de autenticación. Por favor, recarga la página e intenta nuevamente.', 'danger');
+            debugLog('Save Experience - Auth Error', { hasToken: false });
+            return;
+        }
+
+        // Debug services state at start of save
+        const tempServicesCheck = localStorage.getItem('tempExperienceServices');
+        debugLog('Save Experience - Initial Services Check', {
+            hasTemporaryServices: !!tempServicesCheck,
+            servicesData: tempServicesCheck ? JSON.parse(tempServicesCheck) : null,
+            experienceId: experienceId
+        });
+
+        // Enhanced debugging - check element existence first
+        // Use specific form ID to guarantee correct element targeting
+        const nameElement = document.querySelector('#experienceInformationForm #experienceName');
+        const descriptionElement = document.querySelector('#experienceInformationForm #experienceDescription');
+        const costElement = document.querySelector('#experienceInformationForm #experienceCost');
+
+        debugLog('Save Experience - Element Check', {
+            nameElementExists: !!nameElement,
+            descriptionElementExists: !!descriptionElement,
+            costElementExists: !!costElement,
+            descriptionElementType: descriptionElement ? descriptionElement.tagName : 'null',
+            descriptionElementValue: descriptionElement ? descriptionElement.value : 'no element',
+            descriptionElementTextContent: descriptionElement ? descriptionElement.textContent : 'no element',
+            descriptionElementInnerHTML: descriptionElement ? descriptionElement.innerHTML : 'no element'
+        });
+
+        if (!nameElement || !descriptionElement || !costElement) {
+            showAlert('Error: No se pudieron encontrar los campos del formulario', 'danger');
+            debugLog('Save Experience - Missing Elements Error', {
+                nameElement: !!nameElement,
+                descriptionElement: !!descriptionElement,
+                costElement: !!costElement
+            });
+            return;
+        }
+
+        // Use a small delay to ensure DOM is fully updated
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Try multiple methods to get the values
+        const directName = nameElement.value;
+        const directDescription = descriptionElement.value;
+        const directCost = costElement.value;
+        
+        // Force update the values by triggering change events
+        nameElement.dispatchEvent(new Event('change', { bubbles: true }));
+        descriptionElement.dispatchEvent(new Event('change', { bubbles: true }));
+        costElement.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        // Use captured values as primary source, with direct reading as fallback
+        const name = (capturedFormValues.name || directName || '').trim();
+        const description = (capturedFormValues.description || directDescription || '').trim();
+        const cost = parseFloat(capturedFormValues.cost || directCost) || 0;
+
+        debugLog('Save Experience - Form Data', {
+            name,
+            description,
+            cost,
+            nameLength: name.length,
+            descriptionLength: description.length,
+            hasAccessToken: !!accessToken,
+            tokenLength: accessToken.length,
+            // Additional debugging info
+            capturedName: capturedFormValues.name,
+            capturedDescription: capturedFormValues.description,
+            capturedCost: capturedFormValues.cost,
+            directName: directName,
+            directDescription: directDescription,
+            directCost: directCost,
+            rawNameValue: nameElement.value,
+            rawDescriptionValue: descriptionElement.value,
+            rawCostValue: costElement.value
+        });
 
         if (!name) { showAlert('El nombre es requerido', 'warning'); return; }
         if (!description) { showAlert('La descripcion es requerida', 'warning'); return; }
         if (cost < 0) { showAlert('El costo debe ser mayor o igual a 0', 'warning'); return; }
+        
+        // Validate all numeric fields before saving
+        if (!validateAllNumericFields()) {
+            showAlert('Por favor, corrige los errores en los campos numericos antes de guardar', 'warning');
+            return;
+        }
 
         const saveBtn = document.getElementById('saveExperienceInfoBtn');
         const saveText = document.getElementById('saveButtonText');
@@ -747,14 +1509,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 cost,
                 price_no_alcohol: parseFloat(document.getElementById('experiencePriceNoAlcohol').value) || null,
                 price_child: parseFloat(document.getElementById('experiencePriceChild').value) || null,
+                price_infant: parseFloat(document.getElementById('experiencePriceInfant').value) || null,
                 duration: parseFloat(document.getElementById('experienceDuration').value) || null,
                 travel_duration: parseInt(document.getElementById('experienceTravelDuration').value) || null,
                 advance_minutes: parseInt(document.getElementById('experienceAdvanceMinutes').value) || null,
                 min_people: parseInt(document.getElementById('experienceMinPeople').value) || null,
                 max_people: parseInt(document.getElementById('experienceMaxPeople').value) || null,
-                includes: textareaToArray('experienceIncludes'),
-                notincludes: textareaToArray('experienceNotIncludes'),
-                languages: textareaToArray('experienceLanguages'),
+                includes: stringToArray(capturedFormValues.includes) || textareaToArray('experienceIncludes'),
+                notincludes: stringToArray(capturedFormValues.notincludes) || textareaToArray('experienceNotIncludes'),
+                languages: stringToArray(capturedFormValues.languages) || textareaToArray('experienceLanguages'),
                 internal_notes: document.getElementById('experienceInternalNotes').value.trim() || null,
                 client_booking_notes: document.getElementById('experienceClientBookingNotes').value.trim() || null,
                 provider_notes: document.getElementById('experienceProviderNotes').value.trim() || null,
@@ -765,6 +1528,23 @@ document.addEventListener('DOMContentLoaded', function() {
             if (window._mainImageRemoved) {
                 body.mainImage = '';
             }
+
+            debugLog('Save Experience - Request Body', {
+                url: isNew ? '/api/experiences' : `/api/experiences/${experienceId}`,
+                method: isNew ? 'POST' : 'PUT',
+                body: body,
+                bodyStringified: JSON.stringify(body, null, 2),
+                capturedTextareas: {
+                    includes: capturedFormValues.includes,
+                    notincludes: capturedFormValues.notincludes,
+                    languages: capturedFormValues.languages
+                },
+                finalArrays: {
+                    includes: body.includes,
+                    notincludes: body.notincludes,
+                    languages: body.languages
+                }
+            });
 
             const url = isNew ? '/api/experiences' : `/api/experiences/${experienceId}`;
             const method = isNew ? 'POST' : 'PUT';
@@ -780,7 +1560,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const result = await response.json();
 
+            // Store access token if provided in response
+            if (result.accessToken) {
+                localStorage.setItem('accessToken', result.accessToken);
+                debugLog('Save Experience - Token Stored', { tokenStored: true });
+            }
+
+            debugLog('Save Experience - Server Response', {
+                status: response.status,
+                success: result.success,
+                result: result,
+                isNew: isNew,
+                hasData: !!result.data,
+                dataId: result.data?.id
+            });
+
             if (!result.success) {
+                console.error('❌ Save Experience Failed:', result);
                 showAlert(result.error || 'Error al guardar', 'danger');
                 return;
             }
@@ -819,9 +1615,175 @@ document.addEventListener('DOMContentLoaded', function() {
             showAlert(isNew ? 'Experiencia creada exitosamente' : 'Cambios guardados exitosamente', 'success');
 
             if (isNew && result.data && result.data.id) {
-                setTimeout(() => {
-                    window.location.href = `/dashboard/admin/experiences/${result.data.id}`;
-                }, 800);
+                debugLog('Services Transfer - Starting', { experienceId: result.data.id });
+                
+                // Check if temporary services exist
+                const tempServicesData = localStorage.getItem('tempExperienceServices');
+                debugLog('Services Transfer - Temporary Services Check', {
+                    exists: !!tempServicesData,
+                    data: tempServicesData ? JSON.parse(tempServicesData) : null
+                });
+                
+                
+                let servicesTransferSuccessful = true;
+                
+                // Check authorization before attempting transfer
+                const hasAuthorization = await checkServiceTransferAuthorization(accessToken);
+                
+                if (!hasAuthorization) {
+                    showAlert('No tienes permisos para transferir servicios. Contacta al administrador.', 'warning');
+                    saveText.innerHTML = `<i class="ti ti-check me-1"></i>Guardado (sin servicios)`;
+                    return;
+                }
+
+                // Transfer temporary services if they exist
+                if (window.ExperienceServicesBuilder && typeof ExperienceServicesBuilder.transferTemporaryServices === 'function') {
+                    if (tempServicesData) {
+                        try {
+                            debugLog('Services Transfer - Initiating Transfer', {
+                                experienceId: result.data.id,
+                                hasAccessToken: !!accessToken,
+                                tempServicesSize: tempServicesData.length,
+                                tempServicesPreview: tempServicesData.substring(0, 100) + '...'
+                            });
+                            
+                            // Show transfer in progress
+                            saveText.innerHTML = `<i class="ti ti-spinner spinner-border spinner-border-sm me-1"></i>Transfiriendo servicios...`;
+                            
+                            // Add timeout to catch hanging transfers
+                            const transferPromise = ExperienceServicesBuilder.transferTemporaryServices(result.data.id, accessToken);
+                            const timeoutPromise = new Promise((_, reject) => {
+                                setTimeout(() => reject(new Error('Transfer timeout after 30 seconds')), 30000);
+                            });
+                            
+                            await Promise.race([transferPromise, timeoutPromise]);
+                            
+                            debugLog('Services Transfer - Success', { experienceId: result.data.id });
+                            saveText.innerHTML = `<i class="ti ti-check me-1"></i>Completado`;
+                        } catch (error) {
+                            debugLog('Services Transfer - Failed', { 
+                                error: error.message,
+                                errorStack: error.stack,
+                                experienceId: result.data.id,
+                                accessToken: accessToken ? 'EXISTS' : 'MISSING'
+                            });
+                            servicesTransferSuccessful = false;
+                            showAlert('Experiencia creada, pero hubo un error al transferir los servicios. Por favor, agrega los servicios manualmente.', 'warning');
+                            saveText.innerHTML = `<i class="ti ti-check me-1"></i>Guardado (sin servicios)`;
+                        }
+                    } else {
+                        debugLog('Services Transfer - No Services to Transfer', { 
+                            localStorageKeys: Object.keys(localStorage).filter(key => key.includes('temp') || key.includes('service'))
+                        });
+                    }
+                } else {
+                    debugLog('Services Transfer - Builder Not Available', {
+                        hasWindow: !!(window),
+                        windowExperienceKeys: Object.keys(window).filter(key => key.toLowerCase().includes('experience')),
+                        scriptTags: document.querySelectorAll('script[src*="experience-services"]').length,
+                        allScriptTags: Array.from(document.querySelectorAll('script[src]')).map(s => s.src).filter(src => src.includes('experience'))
+                    });
+                    
+                    // Try to wait and retry if script isn't loaded yet
+                    debugLog('Services Transfer - Attempting Script Load Retry', {});
+                    let retryCount = 0;
+                    const maxRetries = 5;
+                    
+                    const checkBuilderInterval = setInterval(() => {
+                        retryCount++;
+                        debugLog('Services Transfer - Retry Attempt', { 
+                            attempt: retryCount,
+                            hasBuilder: !!(window.ExperienceServicesBuilder),
+                            hasTransferFunction: !!(window.ExperienceServicesBuilder && typeof ExperienceServicesBuilder.transferTemporaryServices === 'function')
+                        });
+                        
+                        if (window.ExperienceServicesBuilder && typeof ExperienceServicesBuilder.transferTemporaryServices === 'function') {
+                            clearInterval(checkBuilderInterval);
+                            debugLog('Services Transfer - Builder Now Available, Starting Transfer', {});
+                            
+                            if (tempServicesData) {
+                                saveText.innerHTML = `<i class="ti ti-spinner spinner-border spinner-border-sm me-1"></i>Transfiriendo servicios (intento ${retryCount})...`;
+                                
+                                ExperienceServicesBuilder.transferTemporaryServices(result.data.id, accessToken)
+                                    .then(() => {
+                                        debugLog('Services Transfer - Delayed Success', { retryAttempt: retryCount });
+                                        saveText.innerHTML = `<i class="ti ti-check me-1"></i>Completado`;
+                                        showAlert('Servicios transferidos exitosamente', 'success');
+                                    })
+                                    .catch((error) => {
+                                        debugLog('Services Transfer - Delayed Failed', { 
+                                            error: error.message,
+                                            retryAttempt: retryCount
+                                        });
+                                        showAlert('Error al transferir servicios. Por favor, agrega los servicios manualmente.', 'warning');
+                                        saveText.innerHTML = `<i class="ti ti-check me-1"></i>Guardado (sin servicios)`;
+                                    });
+                            }
+                        } else if (retryCount >= maxRetries) {
+                            clearInterval(checkBuilderInterval);
+                            debugLog('Services Transfer - Retry Failed', { maxAttemptsReached: retryCount });
+                            showAlert('No se pudo cargar el sistema de servicios. Agrega los servicios manualmente.', 'warning');
+                        }
+                    }, 1000); // Check every second
+                }
+                
+                // Check if debug mode is active
+                if (isDebugMode()) {
+                    debugLog('Debug Mode - Redirect Prevented', { 
+                        wouldRedirectTo: `/dashboard/admin/experiences/${result.data.id}` 
+                    });
+                    
+                    // Show debug info instead of redirecting
+                    showAlert(`Debug Mode: Redirect prevented. Would redirect to: /dashboard/admin/experiences/${result.data.id}`, 'info');
+                    
+                    // Add button to manually redirect
+                    const debugPanel = document.createElement('div');
+                    debugPanel.className = 'alert alert-info mt-3';
+                    
+                    // Get services transfer status for debug display
+                    const servicesInfo = tempServicesData ? 
+                        `Services found: ${JSON.parse(tempServicesData).services?.length || 0}` : 
+                        'No services to transfer';
+                    
+                    debugPanel.innerHTML = `
+                        <h6>🔍 Debug Mode Active - Services Transfer</h6>
+                        <p><strong>Experience ID:</strong> ${result.data.id}</p>
+                        <p><strong>Services Status:</strong> ${servicesInfo}</p>
+                        <p><strong>Transfer Result:</strong> ${servicesTransferSuccessful ? '✅ Success' : '❌ Failed'}</p>
+                        <div class="mt-3">
+                            <button class="btn btn-info btn-sm" onclick="showDebugLogs()">
+                                📋 View Debug Logs
+                            </button>
+                            <button class="btn btn-primary btn-sm ms-2" onclick="window.location.href='/dashboard/admin/experiences/${result.data.id}'">
+                                ➡️ Go to Experience
+                            </button>
+                            <button class="btn btn-secondary btn-sm ms-2" onclick="localStorage.setItem('experienceDebugMode', 'false'); location.reload();">
+                                ❌ Disable Debug
+                            </button>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">Debug logs are saved in localStorage and available after page reload.</small>
+                        </div>
+                    `;
+                    // Find a suitable container for the debug panel
+                    const container = document.querySelector('.experience-information-card') || 
+                                    document.querySelector('.card-body') || 
+                                    document.querySelector('.container') ||
+                                    document.body;
+                    
+                    if (container) {
+                        container.appendChild(debugPanel);
+                    } else {
+                        // Fallback: create alert
+                        showAlert(`🔍 Debug: Experience created (${result.data.id}). Services: ${servicesInfo}. Transfer: ${servicesTransferSuccessful ? 'Success' : 'Failed'}`, 'info');
+                    }
+                } else {
+                    // Normal redirect
+                    setTimeout(() => {
+                        debugLog('Redirecting to Experience Detail', {});
+                        window.location.href = `/dashboard/admin/experiences/${result.data.id}`;
+                    }, servicesTransferSuccessful ? 1200 : 2000);
+                }
             }
         } catch (error) {
             console.error('Error saving experience:', error);
@@ -836,6 +1798,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function uploadMainImage(expId, file) {
         try {
+            // Get fresh access token
+            const accessToken = getAccessToken();
+            
             // Delete old primary image if it exists
             if (window._mainImageId) {
                 try {
@@ -871,6 +1836,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function uploadPhoto(expId, file) {
         try {
+            // Get fresh access token
+            const accessToken = getAccessToken();
+            
             const formData = new FormData();
             formData.append('image', file);
 

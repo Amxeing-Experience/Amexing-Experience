@@ -36,12 +36,19 @@ const logger = require('../../infrastructure/logger');
  */
 const authenticateToken = async (req, res, next) => {
   try {
-    // Extract token from cookies (preferred) or Authorization header
+    // Extract token from multiple sources (in order of preference)
+    // 1. httpOnly accessToken cookie (most secure)
     let token = req.cookies?.accessToken;
 
+    // 2. Authorization header (for API calls)
     if (!token) {
       const authHeader = req.headers.authorization;
       token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    }
+
+    // 3. clientAccessToken cookie (JavaScript accessible, fallback)
+    if (!token) {
+      token = req.cookies?.clientAccessToken;
     }
 
     if (!token) {
