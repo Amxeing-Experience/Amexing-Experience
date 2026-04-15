@@ -175,6 +175,16 @@ Created by Denisse Maldonado
             box-shadow: 0 6px 20px rgba(184, 134, 11, 0.5);
         }
         
+        .scroll-to-top__arrow {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-style: solid;
+            border-width: 2px 2px 0 0;
+            border-color: currentColor;
+            transform: rotate(-45deg);
+        }
+        
         /* Accessibility */
         .sr-only {
             position: absolute;
@@ -421,6 +431,23 @@ Created by Denisse Maldonado
         
         .testimonios-section__nav-btn--next {
             right: -25px;
+        }
+        
+        .testimonios-section__nav-arrow {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-style: solid;
+            border-width: 2px 2px 0 0;
+            border-color: currentColor;
+        }
+        
+        .testimonios-section__nav-arrow--left {
+            transform: rotate(-135deg);
+        }
+        
+        .testimonios-section__nav-arrow--right {
+            transform: rotate(45deg);
         }
         
         .testimonios-section__indicators {
@@ -757,10 +784,10 @@ Created by Denisse Maldonado
                         </div>
                         <div class="testimonios-section__navigation">
                             <button class="testimonios-section__nav-btn testimonios-section__nav-btn--prev" aria-label="Anterior testimonio">
-                                <i class="fas fa-chevron-left"></i>
+                                <span class="testimonios-section__nav-arrow testimonios-section__nav-arrow--left"></span>
                             </button>
                             <button class="testimonios-section__nav-btn testimonios-section__nav-btn--next" aria-label="Siguiente testimonio">
-                                <i class="fas fa-chevron-right"></i>
+                                <span class="testimonios-section__nav-arrow testimonios-section__nav-arrow--right"></span>
                             </button>
                         </div>
                         <div class="testimonios-section__indicators" id="testimonialIndicators">
@@ -778,7 +805,7 @@ Created by Denisse Maldonado
 
         <%# Scroll to Top Button %>
         <button class="scroll-to-top" id="scrollToTop" aria-label="Volver arriba">
-            <i class="fas fa-chevron-up" aria-hidden="true"></i>
+            <span class="scroll-to-top__arrow" aria-hidden="true"></span>
         </button>
     </div>
 
