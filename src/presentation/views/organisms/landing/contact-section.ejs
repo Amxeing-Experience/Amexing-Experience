@@ -28,7 +28,10 @@ Created by Denisse Maldonado
                             <input type="tel" 
                                    name="phone" 
                                    class="contact-section__input" 
-                                   placeholder="Teléfono">
+                                   placeholder="Teléfono"
+                                   pattern="[0-9]*"
+                                   inputmode="numeric"
+                                   id="phoneInput">
                         </div>
                     </div>
                     
@@ -355,8 +358,42 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitBtn = document.getElementById('contactSubmitBtn');
     const submitText = submitBtn.querySelector('.contact-submit__text');
     const submitLoading = submitBtn.querySelector('.contact-submit__loading');
+    const phoneInput = document.getElementById('phoneInput');
 
     if (!contactForm) return;
+
+    // Phone number validation - only allow numbers
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function(e) {
+            // Remove any non-numeric characters
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+
+        // Prevent non-numeric key presses
+        phoneInput.addEventListener('keypress', function(e) {
+            const charCode = (e.which) ? e.which : e.keyCode;
+            // Allow backspace, delete, tab, escape, enter
+            if (charCode === 8 || charCode === 9 || charCode === 27 || charCode === 13) {
+                return true;
+            }
+            // Ensure that it is a number and stop the keypress
+            if (charCode < 48 || charCode > 57) {
+                e.preventDefault();
+                return false;
+            }
+            return true;
+        });
+
+        // Handle paste events
+        phoneInput.addEventListener('paste', function(e) {
+            e.preventDefault();
+            const pastedData = (e.clipboardData || window.clipboardData).getData('text');
+            const numericData = pastedData.replace(/[^0-9]/g, '');
+            if (numericData) {
+                this.value = numericData;
+            }
+        });
+    }
 
     // Form submission handler
     contactForm.addEventListener('submit', async function(e) {
