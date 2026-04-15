@@ -440,6 +440,15 @@ router.post('/login', async (req, res) => {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
+      // Also set a non-httpOnly cookie for client-side JavaScript access
+      // This is less secure but necessary for client-side API calls
+      res.cookie('clientAccessToken', accessToken, {
+        httpOnly: false, // Allow JavaScript access
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 8 * 60 * 60 * 1000, // 8 hours
+      });
+
       logger.info('JWT tokens created for user', {
         userId: authenticatedUser.id,
         role: authenticatedUser.role,
@@ -489,7 +498,7 @@ router.post('/login', async (req, res) => {
         });
       }
 
-      // For web API calls: return JSON without tokens (cookies only)
+      // For web API calls: return JSON with token for localStorage
       return res.json({
         success: true,
         user: {
@@ -498,6 +507,7 @@ router.post('/login', async (req, res) => {
           role: authenticatedUser.role,
           name: authenticatedUser.name,
         },
+        accessToken, // Include token for localStorage storage
         message: 'Login successful',
       });
     }
@@ -627,6 +637,14 @@ router.post('/register', async (req, res) => {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax', // Match session cookie configuration
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // Also set a non-httpOnly cookie for client-side JavaScript access
+    res.cookie('clientAccessToken', result.tokens.accessToken, {
+      httpOnly: false, // Allow JavaScript access
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
 
     // Handle different response types for registration

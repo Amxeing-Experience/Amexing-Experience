@@ -1,0 +1,198 @@
+<%#
+Premium Button Atom - Landing Page Style
+A luxury-styled call-to-action button for the Amexing Experience landing page
+Supports primary (BOOK NOW) and secondary button variations
+
+@param {string} text - Button text content
+@param {string} href - Button link destination (optional)
+@param {string} type - Button type: 'primary', 'secondary', 'outline' (default: 'primary')
+@param {string} size - Button size: 'small', 'medium', 'large' (default: 'medium')
+@param {string} onclick - JavaScript onclick handler (optional)
+@param {string} target - Link target attribute (optional)
+@param {string} class - Additional CSS classes (optional)
+@param {boolean} disabled - Whether button is disabled (default: false)
+@param {string} icon - Icon name to display before text (optional)
+
+@example
+include('atoms/common/premium-button', {
+    text: 'BOOK NOW',
+    href: '/book',
+    type: 'primary',
+    size: 'large'
+})
+%>
+
+<!-- Custom Fonts CSS -->
+<link rel="stylesheet" href="/css/fonts.css">
+
+<%
+const buttonText = typeof text !== 'undefined' ? text : 'Button';
+const buttonHref = typeof href !== 'undefined' ? href : '#';
+const buttonType = typeof type !== 'undefined' ? type : 'primary';
+const buttonSize = typeof size !== 'undefined' ? size : 'medium';
+const buttonOnclick = typeof onclick !== 'undefined' ? onclick : '';
+const buttonTarget = typeof target !== 'undefined' ? target : '';
+const additionalClass = locals.class || '';
+const isDisabled = typeof disabled !== 'undefined' ? disabled : false;
+const buttonIcon = typeof icon !== 'undefined' ? icon : '';
+
+const baseClasses = 'premium-btn';
+const typeClasses = {
+    'primary': 'premium-btn--primary',
+    'secondary': 'premium-btn--secondary',
+    'outline': 'premium-btn--outline'
+};
+const sizeClasses = {
+    'small': 'premium-btn--small',
+    'medium': 'premium-btn--medium', 
+    'large': 'premium-btn--large'
+};
+
+const fullClass = [
+    baseClasses,
+    typeClasses[buttonType] || typeClasses.primary,
+    sizeClasses[buttonSize] || sizeClasses.medium,
+    additionalClass,
+    isDisabled ? 'premium-btn--disabled' : ''
+].filter(Boolean).join(' ');
+%>
+
+<% if (buttonHref && buttonHref !== '#') { %>
+<a href="<%= buttonHref %>" 
+   class="<%= fullClass %>"
+   <% if (buttonTarget) { %>target="<%= buttonTarget %>"<% } %>
+   <% if (buttonOnclick) { %>onclick="<%= buttonOnclick %>"<% } %>
+   <% if (isDisabled) { %>aria-disabled="true" tabindex="-1"<% } %>
+   role="button">
+    <% if (buttonIcon) { %>
+        <i class="premium-btn__icon <%= buttonIcon %>" aria-hidden="true"></i>
+    <% } %>
+    <span class="premium-btn__text"><%= buttonText %></span>
+</a>
+<% } else { %>
+<button type="button" 
+        class="<%= fullClass %>"
+        <% if (buttonOnclick) { %>onclick="<%= buttonOnclick %>"<% } %>
+        <% if (isDisabled) { %>disabled<% } %>>
+    <% if (buttonIcon) { %>
+        <i class="premium-btn__icon <%= buttonIcon %>" aria-hidden="true"></i>
+    <% } %>
+    <span class="premium-btn__text"><%= buttonText %></span>
+</button>
+<% } %>
+
+<style>
+.premium-btn {
+    padding: 0.1rem 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-family: var(--font-myriad);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden; 
+    white-space: nowrap;
+}
+
+
+.premium-btn--primary {
+    background: rgba(150, 155, 129, 0.6);
+    color: black;
+    box-shadow: 0 4px 15px rgba(150, 155, 129, 0.3);
+}
+
+.premium-btn--primary:hover {
+    /*background: rgba(255, 255, 255, 0.1);
+    border-color: #B8860B;
+    color: #B8860B;
+    opacity: 1;
+    box-shadow: 0 6px 20px rgba(150, 155, 129, 0.5);*/
+    transform: translateY(-2px);
+}
+
+.premium-btn--secondary {
+    background: linear-gradient(135deg, #4A4A4A 0%, #2C2C2C 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(74, 74, 74, 0.3);
+}
+
+.premium-btn--secondary:hover {
+    background: linear-gradient(135deg, #2C2C2C 0%, #1A1A1A 100%);
+    box-shadow: 0 6px 20px rgba(74, 74, 74, 0.5);
+    transform: translateY(-2px);
+}
+
+.premium-btn--outline {
+    background: transparent;
+    color: #B8860B;
+    border: 2px solid #B8860B;
+    box-shadow: none;
+}
+
+.premium-btn--outline:hover {
+    background: #B8860B;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(184, 134, 11, 0.3);
+}
+
+.premium-btn--small {
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    min-height: 32px;
+}
+
+.premium-btn--medium {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.875rem;
+    min-height: 40px;
+}
+
+.premium-btn--large {
+    padding: 0.6rem 1.5rem;
+    font-size: 21px;
+    min-height: 48px;
+}
+
+.premium-btn--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.premium-btn__icon {
+    margin-right: 0.5rem;
+    font-size: 1.2em;
+}
+
+.premium-btn__text {
+    position: relative;
+    z-index: 1;
+}
+
+@media (max-width: 768px) {
+    .premium-btn--large {
+        padding: 0.875rem 1.75rem;
+        font-size: 0.9rem;
+    }
+    
+    .premium-btn--medium {
+        padding: 0.6rem 1.25rem;
+        font-size: 0.8rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .premium-btn,
+    .premium-btn::before {
+        transition: none;
+    }
+}
+</style>

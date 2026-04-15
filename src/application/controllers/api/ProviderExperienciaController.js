@@ -321,15 +321,15 @@ class ProviderExperienciaController {
 
       const { providerId } = req.params;
 
-      // Verify provider exists
+      // Verify provider or establishment exists
       const providerQuery = new Parse.Query('Experience');
       providerQuery.equalTo('objectId', providerId);
-      providerQuery.equalTo('type', 'Provider');
+      providerQuery.containedIn('type', ['Provider', 'Establishment']); // Accept both types
       providerQuery.equalTo('exists', true);
 
       const provider = await providerQuery.first({ useMasterKey: true });
       if (!provider) {
-        return this.sendError(res, 'Provider not found', 404);
+        return this.sendError(res, 'Provider or establishment not found', 404);
       }
 
       // Get experiencias for this provider
@@ -434,9 +434,9 @@ class ProviderExperienciaController {
         return this.sendError(res, 'Experiencia not found', 404);
       }
 
-      // Verify it belongs to the specified provider
+      // Verify it belongs to the specified provider/establishment
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
+        return this.sendError(res, 'Experiencia does not belong to this provider/establishment', 403);
       }
 
       return res.json({
@@ -501,27 +501,27 @@ class ProviderExperienciaController {
         return this.sendError(res, 'Name and description are required', 400);
       }
 
-      // Verify provider exists
+      // Verify provider/establishment exists
       const providerQuery = new Parse.Query('Experience');
       providerQuery.equalTo('objectId', providerId);
-      providerQuery.equalTo('type', 'Provider');
+      providerQuery.containedIn('type', ['Provider', 'Establishment']);
       providerQuery.equalTo('exists', true);
 
       const provider = await providerQuery.first({ useMasterKey: true });
       if (!provider) {
-        return this.sendError(res, 'Provider not found', 404);
+        return this.sendError(res, 'Provider/Establishment not found', 404);
       }
 
       // Check experiencias limit
       const count = await ProviderExperiencia.countByProvider(providerId);
       if (count >= this.maxExperienciasPerProvider) {
-        return this.sendError(res, `Maximum ${this.maxExperienciasPerProvider} experiencias per provider`, 400);
+        return this.sendError(res, `Maximum ${this.maxExperienciasPerProvider} experiencias per ${provider.get('type').toLowerCase()}`, 400);
       }
 
-      // Check name uniqueness for this provider
+      // Check name uniqueness for this provider/establishment
       const isUnique = await ProviderExperiencia.isNameUnique(providerId, name);
       if (!isUnique) {
-        return this.sendError(res, 'An experiencia with this name already exists for this provider', 409);
+        return this.sendError(res, `An experiencia with this name already exists for this ${provider.get('type').toLowerCase()}`, 409);
       }
 
       // Create new experiencia
@@ -708,9 +708,9 @@ class ProviderExperienciaController {
         return this.sendError(res, 'Experiencia not found', 404);
       }
 
-      // Verify it belongs to the specified provider
+      // Verify it belongs to the specified provider/establishment
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
+        return this.sendError(res, 'Experiencia does not belong to this provider/establishment', 403);
       }
 
       // Update fields
@@ -719,7 +719,7 @@ class ProviderExperienciaController {
         if (name !== experiencia.getName()) {
           const isUnique = await ProviderExperiencia.isNameUnique(providerId, name, id);
           if (!isUnique) {
-            return this.sendError(res, 'An experiencia with this name already exists for this provider', 409);
+            return this.sendError(res, 'An experiencia with this name already exists for this provider/establishment', 409);
           }
         }
         experiencia.setName(name);
@@ -794,8 +794,34 @@ class ProviderExperienciaController {
             username: req.user.get('username'),
           };
 
-          const processedPhotos = await this.processPhotosForOptimization(photos, providerId, userContext);
-          experiencia.set('photos', processedPhotos);
+          try {
+            logger.info('Processing photos for optimization', {
+              experienciaId: id,
+              providerId,
+              photoCount: photos.length,
+              hasNewPhotos: photos.some((p) => p.dataUrl && p.dataUrl.startsWith('data:')),
+              userId: req.user.id,
+            });
+
+            const processedPhotos = await this.processPhotosForOptimization(photos, providerId, userContext);
+            experiencia.set('photos', processedPhotos);
+
+            logger.info('Photos processed successfully', {
+              experienciaId: id,
+              processedCount: processedPhotos.length,
+            });
+          } catch (photoError) {
+            logger.error('Photo processing failed, using original photos', {
+              experienciaId: id,
+              providerId,
+              error: photoError.message,
+              stack: photoError.stack,
+              photoCount: photos.length,
+            });
+
+            // Graceful fallback: use original photos without optimization
+            experiencia.set('photos', photos);
+          }
         } else if (photos === null) {
           experiencia.set('photos', []);
         }
@@ -832,18 +858,45 @@ class ProviderExperienciaController {
       }
 
       // Validate experiencia before saving
+      logger.info('Validating experiencia before save', {
+        experienciaId: id,
+        providerId,
+        name: experiencia.getName(),
+        hasProvider: !!experiencia.getProvider(),
+        hasDescription: !!experiencia.getDescription(),
+        price: experiencia.getPrice(),
+      });
+
       const validation = experiencia.validateExplicitly();
       if (!validation.valid) {
-        return this.sendError(res, validation.errors.join(', '), 400);
+        logger.error('Experiencia validation failed', {
+          experienciaId: id,
+          providerId,
+          validationErrors: validation.errors,
+          experienciaData: {
+            name: experiencia.getName(),
+            description: experiencia.getDescription()?.substring(0, 100),
+            price: experiencia.getPrice(),
+            hasProvider: !!experiencia.getProvider(),
+          },
+        });
+        return this.sendError(res, `Validation failed: ${validation.errors.join(', ')}`, 400);
       }
 
       // Save
+      logger.info('Attempting to save experiencia', {
+        experienciaId: id,
+        providerId,
+        name: experiencia.getName(),
+      });
+
       await experiencia.save(null, { useMasterKey: true });
 
-      logger.info('Provider experiencia updated', {
+      logger.info('Provider experiencia updated successfully', {
         providerId,
         experienciaId: id,
-        updates: req.body,
+        name: experiencia.getName(),
+        updates: Object.keys(req.body),
         userId: req.user.id,
       });
 
@@ -855,12 +908,24 @@ class ProviderExperienciaController {
     } catch (error) {
       logger.error('Error in ProviderExperienciaController.updateExperiencia', {
         error: error.message,
+        stack: error.stack,
+        code: error.code,
         providerId: req.params.providerId,
         experienciaId: req.params.id,
         userId: req.user?.id,
+        requestBody: {
+          name: req.body.name,
+          hasPhotos: Array.isArray(req.body.photos) && req.body.photos.length > 0,
+          photoCount: Array.isArray(req.body.photos) ? req.body.photos.length : 0,
+        },
       });
 
-      return this.sendError(res, 'Failed to update experiencia', 500);
+      // Return specific error message in development mode
+      const errorMessage = process.env.NODE_ENV === 'development'
+        ? `Failed to update experiencia: ${error.message}`
+        : 'Failed to update experiencia';
+
+      return this.sendError(res, errorMessage, 500);
     }
   }
 
@@ -892,9 +957,9 @@ class ProviderExperienciaController {
         return this.sendError(res, 'Experiencia not found', 404);
       }
 
-      // Verify it belongs to the specified provider
+      // Verify it belongs to the specified provider/establishment
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
+        return this.sendError(res, 'Experiencia does not belong to this provider/establishment', 403);
       }
 
       // Soft delete
@@ -1021,6 +1086,13 @@ class ProviderExperienciaController {
             const uniqueFileName = `${timestamp}-${randomString}.${extension}`;
 
             // Use server optimization service to upload and optimize
+            logger.debug('Attempting image optimization', {
+              providerId,
+              fileName: originalFileName,
+              bufferSize: buffer.length,
+              mimeType,
+            });
+
             const optimizationResult = await this.serverOptimizationService.uploadOptimizedImage(
               buffer,
               uniqueFileName,
@@ -1119,15 +1191,72 @@ class ProviderExperienciaController {
             processedPhoto.dataUrl = imageData.url;
             processedPhoto.optimizationMetadata = imageData.metadata || photo.optimizationMetadata;
           } catch (optimizationError) {
-            logger.warn('Optimization service failed, falling back to regular presigned URL', {
+            logger.warn('Optimization service failed, attempting fallbacks', {
               experienciaId: experiencia.id,
               s3Key: photo.s3Key,
               error: optimizationError.message,
             });
-            // Fallback to regular presigned URL
-            const presignedUrl = await this.fileStorageService.getPresignedUrl(photo.s3Key);
-            processedPhoto.url = presignedUrl;
-            processedPhoto.dataUrl = presignedUrl;
+
+            // Try to fallback to existing optimized variants first
+            let fallbackUrl = null;
+            if (photo.optimizedVariants) {
+              // Try AVIF, WebP, JPEG in order of preference
+              const preferredFormats = ['avif', 'webp', 'jpeg'];
+              for (const format of preferredFormats) {
+                if (photo.optimizedVariants[format]?.s3Key) {
+                  try {
+                    // Check if the optimized variant exists and generate presigned URL
+                    const variantKey = photo.optimizedVariants[format].s3Key;
+                    const exists = await this.fileStorageService.objectExists(variantKey);
+                    if (exists) {
+                      fallbackUrl = await this.fileStorageService.getPresignedUrl(variantKey);
+                      logger.info(`Using ${format} variant as fallback`, {
+                        experienciaId: experiencia.id,
+                        variantKey,
+                      });
+                      break;
+                    }
+                  } catch (variantError) {
+                    logger.debug(`Failed to check ${format} variant`, {
+                      experienciaId: experiencia.id,
+                      variantKey: photo.optimizedVariants[format].s3Key,
+                      error: variantError.message,
+                    });
+                  }
+                }
+              }
+            }
+
+            if (fallbackUrl) {
+              processedPhoto.url = fallbackUrl;
+              processedPhoto.dataUrl = fallbackUrl;
+            } else {
+              // Final fallback: try original S3 key if it exists
+              try {
+                const originalExists = await this.fileStorageService.objectExists(photo.s3Key);
+                if (originalExists) {
+                  const presignedUrl = await this.fileStorageService.getPresignedUrl(photo.s3Key);
+                  processedPhoto.url = presignedUrl;
+                  processedPhoto.dataUrl = presignedUrl;
+                } else {
+                  // S3 object doesn't exist - use placeholder
+                  logger.error('S3 object not found, using placeholder', {
+                    experienciaId: experiencia.id,
+                    s3Key: photo.s3Key,
+                  });
+                  processedPhoto.url = '/images/placeholder-image.svg';
+                  processedPhoto.dataUrl = '/images/placeholder-image.svg';
+                }
+              } catch (existsError) {
+                logger.error('Failed to check S3 object existence, using placeholder', {
+                  experienciaId: experiencia.id,
+                  s3Key: photo.s3Key,
+                  error: existsError.message,
+                });
+                processedPhoto.url = '/images/placeholder-image.svg';
+                processedPhoto.dataUrl = '/images/placeholder-image.svg';
+              }
+            }
           }
         } else if (photo.dataUrl && photo.dataUrl.includes('amazonaws.com')) {
           // Handle legacy presigned URLs (might be expired)

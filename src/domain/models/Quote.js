@@ -87,6 +87,26 @@ class Quote extends BaseModel {
   }
 
   /**
+   * Get clientType.
+   * @returns {string} Client type - "direct" for direct Amexing clients, undefined for agencies.
+   * @example
+   * const clientType = quote.getClientType();
+   */
+  getClientType() {
+    return this.get('clientType');
+  }
+
+  /**
+   * Set clientType.
+   * @param {string} clientType - Client type ("direct" for direct Amexing clients).
+   * @example
+   * quote.setClientType('direct');
+   */
+  setClientType(clientType) {
+    this.set('clientType', clientType);
+  }
+
+  /**
    * Get folio.
    * @returns {string} Quote folio number.
    * @example

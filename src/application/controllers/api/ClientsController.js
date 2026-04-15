@@ -894,6 +894,154 @@ class ClientsController {
   }
 
   /**
+   * GET /api/clients/amexing-direct - Get direct Amexing clients for dropdown/selector
+   * Returns Client records where clientBelongsTo = "amexing"
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/clients/amexing-direct?search=company
+   * Response: {success: true, data: {clients: [...], pagination: {...}}}
+   */
+  async getAmexingDirectClients(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      // Only admin/superadmin can access direct Amexing clients
+      const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
+      if (!['superadmin', 'admin'].includes(currentUserRole)) {
+        return this.sendError(res, 'Access denied. Only Admin or SuperAdmin can access direct Amexing clients.', 403);
+      }
+
+      // Parse query parameters for search functionality
+      const searchTerm = req.query.search?.trim() || '';
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = Math.min(parseInt(req.query.limit, 10) || 100, this.maxPageSize);
+      const skip = (page - 1) * limit;
+
+      // Query Client table for records where clientBelongsTo = "amexing"
+      const Parse = require('parse/node');
+      const Client = Parse.Object.extend('Client');
+
+      let query;
+
+      // Add search filter if provided
+      if (searchTerm) {
+        const searchQueries = [];
+
+        // Search in name
+        const nameQuery = new Parse.Query(Client);
+        nameQuery.matches('name', searchTerm, 'i');
+        searchQueries.push(nameQuery);
+
+        // Search in companyName (if exists as separate field)
+        const companyQuery = new Parse.Query(Client);
+        companyQuery.matches('companyName', searchTerm, 'i');
+        searchQueries.push(companyQuery);
+
+        // Search in contactPerson
+        const contactQuery = new Parse.Query(Client);
+        contactQuery.matches('contactPerson', searchTerm, 'i');
+        searchQueries.push(contactQuery);
+
+        // Search in email
+        const emailQuery = new Parse.Query(Client);
+        emailQuery.matches('email', searchTerm, 'i');
+        searchQueries.push(emailQuery);
+
+        // Combine search queries with OR
+        query = Parse.Query.or(...searchQueries);
+        query.equalTo('clientBelongsTo', 'amexing');
+        query.equalTo('active', true);
+        query.equalTo('exists', true);
+      } else {
+        // Create basic query without search
+        query = new Parse.Query(Client);
+        query.equalTo('clientBelongsTo', 'amexing');
+        query.equalTo('active', true);
+        query.equalTo('exists', true);
+      }
+
+      // Get total count for pagination
+      const totalCount = await query.count({ useMasterKey: true });
+
+      // Apply pagination
+      query.limit(limit);
+      query.skip(skip);
+      query.ascending('name');
+
+      // Fetch clients
+      const clients = await query.find({ useMasterKey: true });
+
+      // Transform to Tom Select format
+      const formattedClients = clients.map((client) => {
+        const name = client.get('name') || '';
+        const companyName = client.get('companyName') || '';
+        const contactPerson = client.get('contactPerson') || '';
+        const firstName = client.get('firstName') || '';
+        const lastName = client.get('lastName') || '';
+
+        // Build display label - prioritize company name, then constructed name
+        let label = companyName || name;
+        if (!label) {
+          const fullName = contactPerson || `${firstName} ${lastName}`.trim();
+          label = fullName || 'Cliente Sin Nombre';
+        }
+
+        return {
+          value: client.id,
+          label,
+          email: client.get('email') || '',
+          contactPerson: contactPerson || `${firstName} ${lastName}`.trim(),
+          phone: client.get('phone') || '',
+          firstName,
+          lastName,
+          companyName,
+          preferredLanguage: client.get('preferredLanguage') || 'es',
+        };
+      });
+
+      logger.info('Direct Amexing clients retrieved for selector', {
+        count: formattedClients.length,
+        searchTerm: searchTerm || 'none',
+        page,
+        limit,
+        totalCount,
+        requestedBy: currentUser.id,
+      });
+
+      // Include pagination metadata for frontend
+      const response = {
+        clients: formattedClients,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          hasMore: skip + limit < totalCount,
+        },
+        searchTerm,
+      };
+
+      this.sendSuccess(res, response, 'Direct Amexing clients retrieved successfully');
+    } catch (error) {
+      logger.error('Error in ClientsController.getAmexingDirectClients', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+      });
+
+      this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve direct Amexing clients',
+        500
+      );
+    }
+  }
+
+  /**
    * GET /api/clients/:clientId/sub-clients - Get sub-clients (Client records owned by this client)
    * Fetches Client records from the Client table where ownedBy points to the specified clientId
    * @param {object} req - Express request object.
@@ -928,6 +1076,29 @@ class ClientsController {
         requestedBy: currentUser.id,
       });
 
+      // Detect if this is a department_manager requesting sub-clients
+      const isDepartmentManager = currentUser.get && currentUser.get('role') === 'department_manager';
+      const requestingOwnSubClients = isDepartmentManager && clientId === currentUser.id;
+      const requestingClientSubClients = isDepartmentManager && clientId !== currentUser.id;
+
+      console.log('=== SUB-CLIENTS REQUEST CONTEXT ===', {
+        isDepartmentManager,
+        requestingOwnSubClients,
+        requestingClientSubClients,
+        clientId,
+        currentUserId: currentUser.id,
+        userRole: currentUser.get ? currentUser.get('role') : 'unknown',
+      });
+
+      logger.info('Request context analysis', {
+        isDepartmentManager,
+        requestingOwnSubClients,
+        requestingClientSubClients,
+        clientId,
+        currentUserId: currentUser.id,
+        userRole: currentUser.get ? currentUser.get('role') : 'unknown',
+      });
+
       // Query Client table for records where ownedBy points to this clientId
       const Parse = require('parse/node');
       const Client = Parse.Object.extend('Client');
@@ -943,9 +1114,67 @@ class ClientsController {
       const directOwnerQuery = new Parse.Query(Client);
       const ownerPointer = new AmexingUser();
       ownerPointer.id = clientId;
+
+      // DEBUG: Log the pointer being created
+      logger.info('DEBUG: getSubClients - Query 1 setup', {
+        clientId,
+        ownerPointerId: ownerPointer.id,
+        ownerPointerClassName: ownerPointer.className,
+        requestedBy: currentUser.id,
+        userRole: currentUser.get ? currentUser.get('role') : 'unknown',
+      });
+
       directOwnerQuery.equalTo('ownedBy', ownerPointer);
       directOwnerQuery.equalTo('active', true);
       directOwnerQuery.equalTo('exists', true);
+
+      // DEBUG: Execute Query 1 separately to see results
+      const directResults = await directOwnerQuery.find({ useMasterKey: true });
+      console.log('=== QUERY 1 (DIRECT OWNER) RESULTS ===', {
+        count: directResults.length,
+        clientId,
+        foundClients: directResults.map((c) => ({
+          id: c.id,
+          name: c.get('name'),
+          ownedById: c.get('ownedBy')?.id,
+        })),
+      });
+      logger.info('DEBUG: Query 1 (direct owner) results', {
+        count: directResults.length,
+        clientId,
+        foundClients: directResults.map((c) => ({
+          id: c.id,
+          name: c.get('name'),
+          ownedById: c.get('ownedBy')?.id,
+        })),
+      });
+
+      // DEBUG: Also check without active/exists filters to see if data exists at all
+      const debugQuery = new Parse.Query(Client);
+      debugQuery.equalTo('ownedBy', ownerPointer);
+      const allOwnedClients = await debugQuery.find({ useMasterKey: true });
+      console.log('=== ALL CLIENTS OWNED (NO FILTERS) ===', {
+        clientId,
+        totalCount: allOwnedClients.length,
+        clients: allOwnedClients.map((c) => ({
+          id: c.id,
+          name: c.get('name'),
+          active: c.get('active'),
+          exists: c.get('exists'),
+          ownedById: c.get('ownedBy')?.id,
+        })),
+      });
+      logger.info('DEBUG: ALL Clients owned by this user (no filters)', {
+        clientId,
+        totalCount: allOwnedClients.length,
+        clients: allOwnedClients.map((c) => ({
+          id: c.id,
+          name: c.get('name'),
+          active: c.get('active'),
+          exists: c.get('exists'),
+          ownedById: c.get('ownedBy')?.id,
+        })),
+      });
 
       // Query 2: Match users where their clientId field = clientId
       // First, find all AmexingUsers where clientId = clientId
@@ -954,11 +1183,47 @@ class ClientsController {
       userQuery.equalTo('active', true);
       userQuery.equalTo('exists', true);
 
+      // DEBUG: Check if any users match this clientId
+      const matchingUsers = await userQuery.find({ useMasterKey: true });
+      logger.info('DEBUG: Users with matching clientId', {
+        clientId,
+        userCount: matchingUsers.length,
+        userIds: matchingUsers.map((u) => u.id),
+      });
+
       // Then find Clients where ownedBy matches any of these users
       const indirectOwnerQuery = new Parse.Query(Client);
       indirectOwnerQuery.matchesQuery('ownedBy', userQuery);
       indirectOwnerQuery.equalTo('active', true);
       indirectOwnerQuery.equalTo('exists', true);
+
+      // DEBUG: Execute Query 2 separately
+      const indirectResults = await indirectOwnerQuery.find({ useMasterKey: true });
+      logger.info('DEBUG: Query 2 (indirect owner) results', {
+        count: indirectResults.length,
+        clientId,
+        foundClients: indirectResults.map((c) => ({
+          id: c.id,
+          name: c.get('name'),
+          ownedById: c.get('ownedBy')?.id,
+        })),
+      });
+
+      // DEBUG: Query summary before combination
+      console.log('=== QUERY SUMMARY BEFORE COMBINATION ===', {
+        directResultsCount: directResults.length,
+        indirectResultsCount: indirectResults.length,
+        isDepartmentManager,
+        requestingClientSubClients,
+        totalResultsBeforeCombination: directResults.length + indirectResults.length,
+      });
+      logger.info('DEBUG: Query summary before combination', {
+        directResultsCount: directResults.length,
+        indirectResultsCount: indirectResults.length,
+        isDepartmentManager,
+        requestingClientSubClients,
+        totalResultsBeforeCombination: directResults.length + indirectResults.length,
+      });
 
       // Combine both queries with OR
       const ownerQuery = Parse.Query.or(directOwnerQuery, indirectOwnerQuery);
@@ -1003,6 +1268,24 @@ class ClientsController {
       // Execute query
       const clients = await finalQuery.find({ useMasterKey: true });
       const totalCount = await finalQuery.count({ useMasterKey: true });
+
+      // DEBUG: Log final results
+      console.log('=== FINAL QUERY RESULTS ===', {
+        clientId,
+        finalResultsCount: clients.length,
+        totalCount,
+        isDepartmentManager,
+        requestingClientSubClients,
+        clientNames: clients.map((c) => c.get('name') || c.get('companyName') || 'unnamed'),
+      });
+      logger.info('DEBUG: Final query results', {
+        clientId,
+        finalResultsCount: clients.length,
+        totalCount,
+        isDepartmentManager,
+        requestingClientSubClients,
+        clientNames: clients.map((c) => c.get('name') || c.get('companyName') || 'unnamed'),
+      });
 
       // Transform clients to response format
       const clientsData = clients.map((client) => ({
@@ -1179,6 +1462,147 @@ class ClientsController {
       this.sendError(
         res,
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to create quick client',
+        500
+      );
+    }
+  }
+
+  /**
+   * POST /api/clients/amexing-direct/quick - Create quick direct client.
+   * Creates a Client record (not AmexingUser) with clientBelongsTo = "amexing".
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * POST /api/clients/amexing-direct/quick
+   * Body: { firstName: 'John', lastName: 'Doe', email: 'john@example.com' }
+   */
+  async createQuickDirectClient(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      // Only admin/superadmin can create direct Amexing clients
+      const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
+      if (!['superadmin', 'admin'].includes(currentUserRole)) {
+        return this.sendError(res, 'Access denied. Only Admin or SuperAdmin can create direct Amexing clients.', 403);
+      }
+
+      // Get client data from request
+      const {
+        firstName,
+        lastName,
+        email,
+        phone,
+        companyName,
+        contactFirstName,
+        contactLastName,
+        preferredLanguage = 'es',
+      } = req.body;
+
+      // Validate required fields
+      if (!firstName || !lastName) {
+        return this.sendError(res, 'First name and last name are required', 400);
+      }
+
+      const Parse = require('parse/node');
+      const Client = Parse.Object.extend('Client');
+
+      // Create new Client object
+      const newClient = new Client();
+
+      // Set basic info
+      newClient.set('firstName', firstName);
+      newClient.set('lastName', lastName);
+      newClient.set('name', `${firstName} ${lastName}`);
+      newClient.set('fullName', `${firstName} ${lastName}`);
+
+      // Set contact info
+      if (email) {
+        newClient.set('email', email.toLowerCase());
+      }
+      if (phone) {
+        newClient.set('phone', phone);
+      }
+
+      // Set company info
+      if (companyName) {
+        newClient.set('companyName', companyName);
+      }
+
+      // Set contact person info (if different from main client)
+      if (contactFirstName || contactLastName) {
+        const contactPerson = `${contactFirstName || ''} ${contactLastName || ''}`.trim();
+        if (contactPerson) {
+          newClient.set('contactPerson', contactPerson);
+          if (contactFirstName) newClient.set('contactFirstName', contactFirstName);
+          if (contactLastName) newClient.set('contactLastName', contactLastName);
+        }
+      } else {
+        // Use main client as contact person
+        newClient.set('contactPerson', `${firstName} ${lastName}`);
+        newClient.set('contactFirstName', firstName);
+        newClient.set('contactLastName', lastName);
+      }
+
+      // Set preferences
+      newClient.set('preferredLanguage', preferredLanguage);
+
+      // Mark as direct Amexing client
+      newClient.set('clientBelongsTo', 'amexing');
+      newClient.set('active', true);
+      newClient.set('exists', true);
+
+      // Set created by - Client model expects String, not Pointer
+      newClient.set('createdBy', currentUser.id);
+
+      // Save the client
+      const savedClient = await newClient.save(null, { useMasterKey: true });
+
+      // Log the creation
+      logger.info('Quick direct client created successfully', {
+        clientId: savedClient.id,
+        firstName,
+        lastName,
+        companyName,
+        email,
+        createdBy: currentUser.id,
+      });
+
+      // Build display label
+      const label = companyName || `${firstName} ${lastName}`;
+
+      // Return in Tom Select format
+      const response = {
+        value: savedClient.id,
+        label,
+        email: email || '',
+        contactPerson: savedClient.get('contactPerson'),
+        phone: phone || '',
+        firstName,
+        lastName,
+        companyName: companyName || '',
+        preferredLanguage,
+      };
+
+      res.status(201).json({
+        success: true,
+        data: response,
+        message: 'Cliente directo creado exitosamente',
+      });
+    } catch (error) {
+      logger.error('Error in ClientsController.createQuickDirectClient', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+        body: req.body,
+      });
+
+      this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to create direct client',
         500
       );
     }

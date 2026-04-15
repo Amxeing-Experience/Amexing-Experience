@@ -508,7 +508,7 @@ async function updateClientCount() {
     try {
         const response = await fetch('/api/owned-clients?limit=1', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
             }
         });
         
@@ -584,7 +584,7 @@ async function createClient() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
             },
             body: JSON.stringify(clientData)
         });
@@ -706,7 +706,7 @@ async function editClient(clientId) {
     try {
         const response = await fetch(`/api/owned-clients/${clientId}`, {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
             }
         });
         
@@ -859,7 +859,7 @@ async function updateClient() {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
             },
             body: JSON.stringify(clientData)
         });
@@ -892,7 +892,7 @@ async function deleteClient(clientId, clientName) {
             const response = await fetch(`/api/owned-clients/${clientId}`, {
                 method: 'DELETE',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
                 }
             });
             
