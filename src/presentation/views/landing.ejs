@@ -631,20 +631,51 @@ Created by Denisse Maldonado
                 padding: 4rem 0;
             }
             
+            .testimonios-section__container {
+                padding: 0 1rem;
+            }
+            
             .testimonios-section__title {
                 margin-bottom: 3rem;
             }
             
-            .testimonios-section__nav-btn--prev {
-                left: -15px;
+            .testimonios-section__slider {
+                margin: 0;
             }
             
-            .testimonios-section__nav-btn--next {
-                right: -15px;
-            }
             
             .testimonios-section__slide {
                 padding: 2rem 1rem;
+            }
+            
+            /* Mobile testimonios navigation fixes */
+            .testimonios-section__navigation {
+                position: static;
+                top: auto;
+                width: auto;
+                display: flex;
+                justify-content: center;
+                gap: 2rem;
+                margin-top: 1rem;
+                transform: none;
+            }
+            
+            .testimonios-section__nav-btn {
+                position: static;
+                width: 40px;
+                height: 40px;
+                left: auto;
+                right: auto;
+            }
+            
+            .testimonios-section__nav-btn--prev,
+            .testimonios-section__nav-btn--next {
+                left: auto;
+                right: auto;
+            }
+            
+            .testimonios-section__indicators {
+                margin-top: 1rem;
             }
             
             .home-overview {
@@ -664,6 +695,40 @@ Created by Denisse Maldonado
             
             .testimonials-preview {
                 padding: 4rem 0;
+            }
+        }
+
+        /* Enhanced Mobile Styles - Small screens */
+        @media (max-width: 480px) {
+            .testimonios-section {
+                padding: 3rem 0;
+            }
+            
+            .testimonios-section__container {
+                padding: 0 0.75rem;
+            }
+            
+            .testimonios-section__slide {
+                padding: 1.5rem 0.75rem;
+            }
+            
+            .testimonios-section__nav-btn {
+                width: 35px;
+                height: 35px;
+            }
+            
+            .testimonios-section__navigation {
+                gap: 1.5rem;
+            }
+            
+            .testimonios-section__indicator {
+                width: 10px;
+                height: 10px;
+            }
+            
+            .testimonios-section__text {
+                font-size: 1rem;
+                line-height: 1.5;
             }
         }
 

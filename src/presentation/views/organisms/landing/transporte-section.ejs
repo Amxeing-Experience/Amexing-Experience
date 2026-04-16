@@ -89,6 +89,8 @@ Created by Denisse Maldonado
     pointer-events: none;
 }
 
+/* Remove this - we'll add border to panels instead */
+
 .transporte-section__header {
     display: flex;
     justify-content: center;
@@ -122,7 +124,7 @@ Created by Denisse Maldonado
     display: grid;
     grid-template-columns: 2fr 1fr;
     height: 300px;
-    background: #ffffff;
+    background: #969b81;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
@@ -144,9 +146,10 @@ Created by Denisse Maldonado
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 2rem;
     text-align: center;
     position: relative;
+    border: 1px solid #ffffff;
+    margin: 8px;
 }
 
 .transporte-section__icon {
@@ -178,7 +181,7 @@ Created by Denisse Maldonado
     border-radius: 0;
     font-family: var(--font-myriad);
     font-size: 0.9rem;
-    font-weight: 500;
+    font-weight: 700;
     letter-spacing: 1px;
     text-transform: uppercase;
     text-decoration: none;
@@ -191,14 +194,30 @@ Created by Denisse Maldonado
     transform: translateY(-1px);
 }
 
+/* Tablet styles */
+@media (max-width: 1024px) {
+    .transporte-section__container {
+        margin: 2rem 2rem;
+    }
+    
+    .transporte-section__services {
+        padding: 3rem 4rem;
+    }
+}
+
 @media (max-width: 768px) {
     .transporte-section {
         padding: 3rem 0;
     }
     
     .transporte-section__container {
-        margin: 0 1rem;
+        margin: 1rem;
         padding: 0;
+    }
+    
+    .transporte-section__services {
+        padding: 3rem 2rem;
+        gap: 2rem;
     }
     
     .transporte-section__service {
@@ -212,11 +231,14 @@ Created by Denisse Maldonado
     
     .transporte-section__panel {
         padding: 2rem 1rem;
+        border: 1px solid #ffffff;
+        margin: 6px;
     }
     
     .transporte-section__title {
         font-size: 1.5rem;
         letter-spacing: 2px;
+        padding: 1rem 2rem;
     }
     
     .transporte-section__service-title {
