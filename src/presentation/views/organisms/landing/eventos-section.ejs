@@ -1,0 +1,385 @@
+<%#
+Eventos Section Organism - Landing Page
+Corporate events and group services showcase with sophisticated background design
+
+Created by Denisse Maldonado
+%>
+
+<section class="eventos-section">
+    <div class="eventos-section__container">
+        <hr>
+        <hr>
+        <div class="eventos-section__content">
+            <!-- Service Cards Grid -->
+            <div class="eventos-section__services">
+                <!-- Logística para Grupos -->
+                <div class="eventos-section__service">
+                    <div class="eventos-section__image-container">
+                        <img src="/images/grupos.png" alt="Logística para Grupos" class="eventos-section__image">
+                    </div>
+                    <div class="eventos-section__overlay">
+                        <h3 class="eventos-section__service-title">
+                            <span class="large-letter-smaller">L</span>ogística<br>para <span class="large-letter-smaller">G</span>rupos
+                        </h3>
+                    </div>
+                </div>
+
+                <!-- Eventos Especiales -->
+                <div class="eventos-section__service">
+                    <div class="eventos-section__image-container">
+                        <img src="/images/especiales.png" alt="Eventos Especiales" class="eventos-section__image">
+                    </div>
+                    <div class="eventos-section__overlay">
+                        <h3 class="eventos-section__service-title">
+                            <span class="large-letter-smaller">E</span>ventos<br><span class="large-letter-smaller">E</span>speciales
+                        </h3>
+                    </div>
+                </div>
+
+                <!-- Experiencias VIP -->
+                <div class="eventos-section__service">
+                    <div class="eventos-section__image-container">
+                        <img src="/images/vip.png" alt="Experiencias VIP" class="eventos-section__image">
+                    </div>
+                    <div class="eventos-section__overlay">
+                        <h3 class="eventos-section__service-title">
+                            <span class="large-letter-smaller">E</span>xperiencias<br>VIP
+                        </h3>
+                    </div>
+                </div>
+
+                <!-- Viajes de Incentivo -->
+                <div class="eventos-section__service">
+                    <div class="eventos-section__image-container">
+                        <img src="/images/incentivo.png" alt="Viajes de Incentivo" class="eventos-section__image">
+                    </div>
+                    <div class="eventos-section__overlay">
+                        <h3 class="eventos-section__service-title">
+                            <span class="large-letter-smaller">V</span>iajes de<br><span class="large-letter-smaller">I</span>ncentivo
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="eventos-section__sidebar">
+                <div class="eventos-section__sidebar-content">
+                    <h2 class="eventos-section__title">
+                        <span class="large-letter">E</span>ventos
+                    </h2>
+                    
+                    <div class="eventos-section__description">
+                        <p class="eventos-section__paragraph">
+                            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud.
+                        </p>
+                        
+                        <p class="eventos-section__paragraph">
+                            Sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
+                        </p>
+                    </div>
+                    
+                    <a href="/contacto" class="eventos-section__book-btn">BOOK NOW</a>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <hr>
+    </div>
+</section>
+
+<style>
+.eventos-section {
+    padding: 0;
+    background: url('/images/back_eventos.png') center center;
+    background-size: cover;
+    /* background-attachment: fixed; */
+    position: relative;
+    min-height: 600px;
+}
+
+.eventos-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.3);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.eventos-section__container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+    position: relative;
+    z-index: 2;
+}
+
+.eventos-section__content {
+    margin: 2rem 0;
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 3rem;
+    align-items: start;
+}
+
+.eventos-section hr {
+    border: none;
+    height: 1px;
+    background-color: #000000;
+    /* margin: 1rem 0; */
+    width: 100%;
+}
+
+.eventos-section__services {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+.eventos-section__service {
+    height: 450px;
+    /* border: 2px solid #000000; */
+    background: #ffffff;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.eventos-section__service:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.eventos-section__image-container {
+    flex: 1;
+    overflow: hidden;
+}
+
+.eventos-section__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.eventos-section__overlay {
+    background: #2e2e2d;
+    padding: 1rem;
+    text-align: center;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.eventos-section__service-title {
+    font-family: var(--font-arpona);
+    font-size: 1rem;
+    font-weight: 300;
+    color: #ffffff;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin: 0;
+    line-height: 1.2;
+    text-align: center;
+}
+
+.eventos-section__sidebar {
+    /* background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2); */
+    padding: 0;
+    height: fit-content;
+}
+
+.eventos-section__sidebar-content {
+    /* padding: 3rem 2.5rem; */
+}
+
+.eventos-section__title {
+    font-family: var(--font-arpona);
+    font-size: 2.5rem;
+    font-weight: 300;
+    color: #2c3e50;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin: 0 0 2rem 0;
+    line-height: 1.2;
+}
+
+.eventos-section__description {
+    margin-bottom: 2.5rem;
+}
+
+.eventos-section__paragraph {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.7;
+    color: #5a6c7d;
+    margin-bottom: 1.5rem;
+    text-align: justify;
+}
+
+.eventos-section__paragraph:last-child {
+    margin-bottom: 0;
+}
+
+.eventos-section__book-btn {
+    background: #969b81;
+    color: #ffffff;
+    padding: 1rem 3rem;
+    border: none;
+    border-radius: 0;
+    font-family: var(--font-myriad);
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: inline-block;
+    box-shadow: 0 4px 16px rgba(150, 155, 129, 0.3);
+}
+
+.eventos-section__book-btn:hover {
+    background: #8a8f7a;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(150, 155, 129, 0.4);
+}
+
+.large-letter {
+    font-size: 4rem;
+    font-weight: 400;
+    line-height: 1;
+    vertical-align: baseline;
+}
+
+.large-letter-smaller {
+    font-size: 1.5rem;
+    font-weight: 400;
+    line-height: 1;
+    vertical-align: baseline;
+}
+
+@media (max-width: 1024px) {
+    .eventos-section__content {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+    }
+    
+    .eventos-section__sidebar {
+        order: -1;
+        margin-bottom: 2rem;
+    }
+    
+    .eventos-section__services {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    
+    .eventos-section__service {
+        height: 240px;
+    }
+}
+
+@media (max-width: 768px) {
+    .eventos-section {
+        background-attachment: scroll;
+        min-height: auto;
+    }
+    
+    .eventos-section__container {
+        padding: 2rem 1rem;
+        max-width: 100%;
+    }
+    
+    .eventos-section__content {
+        margin: 1rem 0;
+    }
+    
+    .eventos-section__services {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .eventos-section__service {
+        height: 200px;
+    }
+    
+    .eventos-section__overlay {
+        padding: 1.5rem 1rem;
+        min-height: 60px;
+    }
+    
+    .eventos-section__service-title {
+        font-size: 1rem;
+    }
+    
+    .eventos-section__sidebar {
+        text-align: center;
+    }
+    
+    .eventos-section__sidebar-content {
+        padding: 0;
+    }
+    
+    .eventos-section__title {
+        font-size: 2rem;
+        letter-spacing: 2px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .eventos-section__description {
+        margin-bottom: 2rem;
+    }
+    
+    .eventos-section__paragraph {
+        font-size: 0.95rem;
+        text-align: left;
+    }
+    
+    .eventos-section__book-btn {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.85rem;
+        width: auto;
+        max-width: 100%;
+        text-align: center;
+        display: inline-block;
+        box-sizing: border-box;
+    }
+}
+
+@media (max-width: 480px) {
+    .eventos-section__container {
+        padding: 1.5rem 0.75rem;
+    }
+    
+    .eventos-section__service {
+        height: 180px;
+    }
+    
+    .eventos-section__overlay {
+        padding: 1rem;
+    }
+    
+    .eventos-section__service-title {
+        font-size: 0.9rem;
+    }
+    
+    .eventos-section__title {
+        font-size: 1.5rem;
+    }
+    
+    .eventos-section__book-btn {
+        padding: 0.625rem 1rem;
+        font-size: 0.8rem;
+    }
+}
+</style>

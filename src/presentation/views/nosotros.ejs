@@ -34,65 +34,15 @@ Created by Denisse Maldonado
             font-family: 'Montserrat', sans-serif;
             margin: 0;
             padding: 0;
-            background: #000;
+            background: #fff;
             color: #333;
+            padding-top: 80px; /* Account for fixed navigation */
         }
         
-        .page-hero {
-            position: relative;
-            min-height: 400px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, rgba(46, 46, 45, 0.9), rgba(46, 46, 45, 0.7)), url('/images/hero-background.jpg');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            color: white;
-            text-align: center;
-            margin-top: 80px;
-        }
-
-        .page-hero__container {
-            max-width: 1200px;
+        .white-spacer {
+            background: #ffffff;
+            height: 4rem;
             width: 100%;
-            padding: 0 2rem;
-            margin: 0 auto;
-        }
-
-        .page-hero__content {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .page-hero__title {
-            font-family: var(--font-arpona);
-            font-size: clamp(3rem, 6vw, 5rem);
-            font-weight: 400;
-            margin-bottom: 1.5rem;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-            letter-spacing: 2px;
-            font-variant: small-caps;
-        }
-
-        .page-hero__subtitle {
-            font-family: 'Montserrat', sans-serif;
-            font-size: clamp(1.1rem, 2vw, 1.3rem);
-            font-weight: 300;
-            line-height: 1.6;
-            color: rgba(255, 255, 255, 0.9);
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-        }
-
-        @media (max-width: 768px) {
-            .page-hero {
-                min-height: 300px;
-                background-attachment: scroll;
-            }
-            
-            .page-hero__container {
-                padding: 0 1rem;
-            }
         }
     </style>
 </head>
@@ -105,21 +55,23 @@ Created by Denisse Maldonado
         companyInfo: typeof company !== 'undefined' ? company : null
     }) %>
 
-    <%# Page Hero Section %>
-    <section class="page-hero">
-        <div class="page-hero__container">
-            <div class="page-hero__content">
-                <h1 class="page-hero__title">Nosotros</h1>
-                <p class="page-hero__subtitle">30 años de experiencia creando momentos inolvidables</p>
-            </div>
-        </div>
-    </section>
+    <%# Historia Section %>
+    <%- include('organisms/landing/historia-section') %>
 
     <%# About Section %>
     <%- include('organisms/landing/about-section') %>
 
-    <%# Recognition Section %>
-    <%- include('organisms/landing/recognition-section') %>
+    <%# Team Section %>
+    <%- include('organisms/landing/team-section') %>
+
+    <%# Colaboraciones Section %>
+    <%- include('organisms/landing/colaboraciones-section') %>
+
+    <%# Certificaciones Section %>
+    <%- include('organisms/landing/certificaciones-section') %>
+
+    <%# Afiliaciones Section %>
+    <%- include('organisms/landing/afiliaciones-section') %>
 
     <%# Footer %>
     <%- include('organisms/landing/landing-footer', {

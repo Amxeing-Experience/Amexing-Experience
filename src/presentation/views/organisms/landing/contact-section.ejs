@@ -185,19 +185,44 @@ Created by Denisse Maldonado
     width: 100%;
     padding: 0.75rem;
     border: 1px solid #ddd;
-    border-radius: 4px;
+    border-radius: 12px;
     font-family: 'Montserrat', sans-serif;
     font-size: 0.9rem;
-    background: #f8f9fa;
+    background: #f5f5f2;
     transition: border-color 0.3s ease;
     box-sizing: border-box;
+}
+
+/* Placeholder text styling */
+.contact-section__input::placeholder,
+.contact-section__textarea::placeholder {
+    color: #969b81;
+    opacity: 1; /* Firefox compatibility */
+}
+
+/* Browser-specific placeholder support */
+.contact-section__input::-webkit-input-placeholder,
+.contact-section__textarea::-webkit-input-placeholder {
+    color: #969b81;
+}
+
+.contact-section__input::-moz-placeholder,
+.contact-section__textarea::-moz-placeholder {
+    color: #969b81;
+    opacity: 1;
+}
+
+.contact-section__input:-ms-input-placeholder,
+.contact-section__textarea:-ms-input-placeholder {
+    color: #969b81;
 }
 
 .contact-section__input:focus,
 .contact-section__textarea:focus {
     outline: none;
-    border-color: #B8860B;
-    background: white;
+    border-color: #969b81;
+    background: #ffffff;
+    transition: all 0.3s ease;
 }
 
 .contact-section__textarea {

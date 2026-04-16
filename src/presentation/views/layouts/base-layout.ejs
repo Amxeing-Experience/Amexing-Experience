@@ -178,6 +178,15 @@ const bodyClass = typeof pageClass !== 'undefined' ? pageClass : '';
             box-shadow: 0 6px 20px rgba(184, 134, 11, 0.5);
         }
         
+        .scroll-to-top__arrow {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-style: solid;
+            border-width: 2px 2px 0 0;
+            border-color: currentColor;
+            transform: rotate(-45deg);
+        }
         /* Accessibility */
         .sr-only {
             position: absolute;
@@ -277,7 +286,7 @@ const bodyClass = typeof pageClass !== 'undefined' ? pageClass : '';
 
         <%# Scroll to Top Button %>
         <button class="scroll-to-top" id="scrollToTop" aria-label="Volver arriba">
-            <i class="fas fa-chevron-up" aria-hidden="true"></i>
+            <span class="scroll-to-top__arrow" aria-hidden="true"></span>
         </button>
     </div>
 

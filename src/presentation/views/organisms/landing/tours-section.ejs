@@ -1,0 +1,672 @@
+<%#
+Tours Section Organism - Landing Page
+Tours and experiences showcase with sophisticated masonry grid layout
+
+Created by Denisse Maldonado
+%>
+
+<section class="tours-section">
+    <div class="tours-section__container">
+        <div class="tours-section__content">
+            <!-- Left Sidebar -->
+            <div class="tours-section__sidebar">
+                <div class="tours-section__sidebar-content">
+                    <hr>
+                    <h2 class="tours-section__title">
+                        <span class="large-letter">T</span>ours y<br><span class="large-letter">E</span>xperiencias
+                    </h2>
+                    
+                    <div class="tours-section__description">
+                        <p class="tours-section__paragraph">
+                            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud.
+                        </p>
+                        
+                        <p class="tours-section__paragraph">
+                            Sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
+                        </p>
+                    </div>
+                    
+                    <a href="/contacto" class="tours-section__book-btn">BOOK NOW</a>
+                </div>
+            </div>
+
+            <!-- Experience Masonry Grid -->
+            <div class="tours-section__masonry">
+                <!-- Column 1: No offset -->
+                <div class="tours-section__column">
+                    <!-- Catas -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-top-bar"></div>
+                        <div class="tours-section__card-image tours-section__card-image--catas">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">CATAS</h3>
+                        </div>
+                    </div>
+
+                    <!-- Gastronómicas -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-image tours-section__card-image--gastronomicas">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">GASTRONÓMICAS</h3>
+                        </div>
+                        <div class="tours-section__card-bottom-bar"></div>
+                    </div>
+                </div>
+
+                <!-- Column 2: 80px offset -->
+                <div class="tours-section__column tours-section__column--offset-1">
+                    <!-- Arte -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-top-bar"></div>
+                        <div class="tours-section__card-image tours-section__card-image--arte">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">ARTE</h3>
+                        </div>
+                    </div>
+
+                    <!-- Aventura -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-image tours-section__card-image--aventura">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">AVENTURA</h3>
+                        </div>
+                        <div class="tours-section__card-bottom-bar"></div>
+                    </div>
+                </div>
+
+                <!-- Column 3: 160px offset -->
+                <div class="tours-section__column tours-section__column--offset-2">
+                    <!-- Historia y Arquitectura -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-top-bar"></div>
+                        <div class="tours-section__card-image tours-section__card-image--historia">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">HISTORIA Y<br>ARQUITECTURA</h3>
+                        </div>
+                    </div>
+
+                    <!-- Naturaleza -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-image tours-section__card-image--naturaleza">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">NATURALEZA</h3>
+                        </div>
+                    </div>
+
+                    <!-- De Temporada -->
+                    <div class="tours-section__card">
+                        <div class="tours-section__card-image tours-section__card-image--temporada">
+                            <div class="tours-section__card-overlay"></div>
+                        </div>
+                        <div class="tours-section__card-content">
+                            <h3 class="tours-section__card-title">DE TEMPORADA</h3>
+                        </div>
+                        <div class="tours-section__card-bottom-bar"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <hr>
+    </div>
+</section>
+
+<style>
+.tours-section {
+    background: #2e2e2e;
+    padding: 12rem 0 6rem 0; /* Extra top padding to accommodate -150px offset */
+    position: relative;
+    overflow: visible; /* Allow content to be fully visible */
+}
+
+.tours-section__container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    position: relative;
+}
+
+.tours-section__content {
+    display: grid;
+    grid-template-columns: minmax(300px, 400px) 1fr;
+    gap: 4rem;
+    align-items: start;
+    min-height: 600px;
+}
+
+.tours-section__sidebar {
+    padding: 2rem 0;
+    height: fit-content;
+    position: sticky;
+    top: 2rem;
+}
+
+.tours-section__sidebar-content {
+    color: #ffffff;
+}
+
+.tours-section__title {
+    font-family: var(--font-arpona);
+    font-size: 3rem;
+    font-weight: 300;
+    color: #ffffff;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin: 0 0 2rem 0;
+    line-height: 1.2;
+}
+
+.tours-section__description {
+    margin-bottom: 3rem;
+}
+
+.tours-section__paragraph {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.7;
+    color: #ffffff;
+    margin-bottom: 1.5rem;
+    text-align: justify;
+}
+
+.tours-section__paragraph:last-child {
+    margin-bottom: 0;
+}
+
+.tours-section__book-btn {
+    background: #969b81;
+    color: #ffffff;
+    padding: 1rem 3rem;
+    border: none;
+    border-radius: 0;
+    font-family: var(--font-myriad);
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: inline-block;
+    box-shadow: 0 4px 16px rgba(150, 155, 129, 0.3);
+}
+
+.tours-section__book-btn:hover {
+    background: #8a8f7a;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(150, 155, 129, 0.4);
+}
+
+.tours-section__masonry {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    /* gap: 20px; */
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.tours-section__column {
+    display: flex;
+    flex-direction: column;
+    /* gap: 20px; */
+}
+
+.tours-section__column--offset-1 {
+    margin-top: 80px;
+}
+
+.tours-section__column--offset-2 {
+    margin-top: -150px;
+}
+
+.tours-section__card {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    height: 350px;
+    /* border-radius: 4px; */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.tours-section__card-image {
+    flex: 1;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 200px;
+    position: relative;
+    overflow: hidden;
+}
+
+.tours-section__card-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        /* Dark vignette edges only (no green) */
+        linear-gradient(to bottom, 
+            rgba(0, 0, 0, 0.4) 0%, 
+            rgba(0, 0, 0, 0.1) 20%, 
+            transparent 40%, 
+            rgba(0, 0, 0, 0.1) 80%, 
+            rgba(0, 0, 0, 0.4) 100%),
+        radial-gradient(ellipse at center, 
+            transparent 30%, 
+            rgba(0, 0, 0, 0.3) 100%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Green top bar for first cards only - flows as part of card structure with upward gradient */
+.tours-section__card-top-bar {
+    background: linear-gradient(to top, 
+        rgba(150, 155, 129, 1) 0%,    /* Solid green at bottom */
+        rgba(150, 155, 129, 0.8) 30%,
+        rgba(150, 155, 129, 0.5) 60%,
+        rgba(150, 155, 129, 0.2) 85%,
+        rgba(150, 155, 129, 0) 100%    /* Transparent at top */
+    );
+    height: 80px;
+    width: 100%;
+    flex-shrink: 0; /* Don't shrink this element */
+    position: relative;
+    z-index: 1;
+}
+
+/* Hide bottom bars since we're using content gradient instead */
+.tours-section__card-bottom-bar {
+    display: none;
+}
+
+.tours-section__card:hover {
+    transform: scale(1.02);
+    z-index: 10;
+}
+
+.tours-section__card:hover .tours-section__card-overlay {
+    opacity: 0.7; /* Reduce gradient on hover for better image visibility */
+}
+
+.tours-section__card-content {
+    background: #969b81;
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    text-align: center;
+    min-height: 70px;
+    position: relative;
+    z-index: 5;
+    flex-shrink: 0;
+}
+
+/* Add DRAMATIC downward green gradient to last card content areas */
+.tours-section__card:last-child .tours-section__card-content {
+    background: linear-gradient(to bottom,
+        #969b81 0%,                    /* Solid green at top */
+        rgba(150, 155, 129, 0.95) 10%,
+        rgba(150, 155, 129, 0.85) 20%,
+        rgba(150, 155, 129, 0.65) 35%,
+        rgba(150, 155, 129, 0.4) 50%,
+        rgba(150, 155, 129, 0.2) 70%,
+        rgba(150, 155, 129, 0.05) 90%,
+        rgba(150, 155, 129, 0) 100%    /* Completely transparent at bottom */
+    );
+    min-height: 160px; /* Even taller for more dramatic effect */
+    padding-top: 2rem; /* Add extra padding to position title correctly */
+    justify-content: flex-start; /* Position title at top for gradient cards */
+}
+
+.tours-section__card-title {
+    font-family: var(--font-arpona), 'Montserrat', Arial, sans-serif;
+    font-size: 1.2rem;
+    font-weight: 300;
+    color: #ffffff !important;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin: 0;
+    padding: 0;
+    line-height: 1.2;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    position: relative;
+    z-index: 10;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Desktop: Add margin-bottom for titles in cards with top bars */
+@media (min-width: 769px) {
+    .tours-section__card:has(.tours-section__card-top-bar) .tours-section__card-title {
+        margin-bottom: 50px;
+    }
+    
+    /* Fallback for browsers that don't support :has() */
+    .tours-section__card .tours-section__card-top-bar + .tours-section__card-image + .tours-section__card-content .tours-section__card-title {
+        margin-bottom: 50px;
+    }
+}
+
+/* Card Styles */
+
+/* Card Images */
+.tours-section__card-image--catas {
+    background-image: url('/images/7.png');
+}
+
+.tours-section__card-image--arte {
+    background-image: url('/images/4.png');
+}
+
+.tours-section__card-image--historia {
+    background-image: url('/images/3.png');
+}
+
+.tours-section__card-image--gastronomicas {
+    background-image: url('/images/6.png');
+}
+
+.tours-section__card-image--aventura {
+    background-image: url('/images/5.png');
+}
+
+.tours-section__card-image--naturaleza {
+    background-image: url('/images/2.png');
+}
+
+.tours-section__card-image--temporada {
+    background-image: url('/images/1.png');
+}
+
+.large-letter {
+    font-size: 4rem;
+    font-weight: 400;
+    line-height: 1;
+    vertical-align: baseline;
+}
+
+/* iPad-specific clean grid layout */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .tours-section {
+        padding: 6rem 0 4rem 0;
+    }
+    
+    .tours-section__content {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+    }
+    
+    .tours-section__sidebar {
+        position: static;
+        text-align: center;
+        padding: 0 2rem;
+    }
+    
+    .tours-section__masonry {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(4, auto);
+        gap: 1.5rem;
+        padding: 0 1.5rem;
+        max-width: none;
+        margin: 0;
+    }
+    
+    .tours-section__column {
+        display: contents;
+    }
+    
+    /* Remove all offsets for clean grid */
+    .tours-section__column--offset-1,
+    .tours-section__column--offset-2 {
+        margin-top: 0;
+    }
+    
+    .tours-section__card {
+        height: 280px;
+        overflow: hidden;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Hide gradient bars for cleaner iPad experience */
+    .tours-section__card-top-bar,
+    .tours-section__card-bottom-bar {
+        display: none;
+    }
+    
+    /* Remove overlay gradients */
+    .tours-section__card-overlay {
+        display: none;
+    }
+    
+    /* Simplify card content */
+    .tours-section__card-content {
+        background: #969b81;
+        padding: 1.5rem;
+        min-height: 80px;
+        justify-content: center;
+    }
+    
+    /* Remove gradient from last cards */
+    .tours-section__card:last-child .tours-section__card-content {
+        background: #969b81;
+        min-height: 80px;
+        padding: 1.5rem;
+    }
+    
+    .tours-section__card-image {
+        height: 200px;
+        min-height: 200px;
+    }
+    
+    .tours-section__card-title {
+        font-size: 1rem;
+        font-weight: 500;
+        margin-bottom: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .tours-section {
+        padding: 4rem 0; /* Normal padding - no negative offsets on mobile */
+    }
+    
+    .tours-section__container {
+        padding: 0;
+    }
+    
+    .tours-section__content {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .tours-section__sidebar {
+        order: -1;
+        margin-bottom: 1rem;
+        padding: 1rem 1.5rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .tours-section__sidebar hr {
+        margin-left: 0;
+        margin-right: 0;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .tours-section__title {
+        font-size: 2.5rem;
+        letter-spacing: 2px;
+    }
+    
+    .tours-section__masonry {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding: 0;
+        margin: 0;
+        max-width: none !important;
+        width: 100%;
+    }
+    
+    .tours-section__column {
+        width: 100%;
+        display: contents;
+    }
+    
+    .tours-section__column--offset-1,
+    .tours-section__column--offset-2 {
+        margin-top: 0;
+    }
+    
+    /* Simplify cards for mobile */
+    .tours-section__card {
+        height: auto;
+        min-height: 280px;
+        margin: 0 1rem 0 1rem;
+        overflow: hidden; /* Clean edges */
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+    }
+    
+    /* Hide all gradient bars on mobile */
+    .tours-section__card-top-bar,
+    .tours-section__card-bottom-bar {
+        display: none !important;
+    }
+    
+    /* Remove overlay gradients on mobile */
+    .tours-section__card-overlay {
+        display: none !important;
+    }
+    
+    /* Simplify card image */
+    .tours-section__card-image {
+        height: 200px;
+        min-height: 200px;
+    }
+    
+    /* Simplify content area */
+    .tours-section__card-content {
+        background: #969b81;
+        padding: 1.5rem 1rem;
+        min-height: 80px;
+        justify-content: center !important;
+    }
+    
+    /* Remove gradient from last cards on mobile */
+    .tours-section__card:last-child .tours-section__card-content {
+        background: #969b81 !important; /* Solid color, no gradient */
+        min-height: 80px;
+        padding: 1.5rem 1rem !important;
+        justify-content: center !important;
+    }
+    
+    .tours-section__card-title {
+        font-size: 1rem !important;
+        letter-spacing: 0.5px !important;
+        font-weight: 600 !important;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+        z-index: 10 !important;
+        color: #ffffff !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* No hover effects on mobile */
+    .tours-section__card:hover {
+        transform: none;
+    }
+    
+    .tours-section__book-btn {
+        width: auto;
+        max-width: 100%;
+        text-align: center;
+        padding: 0.75rem 1.5rem;
+        font-size: 0.9rem;
+        display: inline-block;
+        box-sizing: border-box;
+    }
+    
+    .tours-section__paragraph {
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .tours-section__container {
+        padding: 0;
+    }
+    
+    .tours-section__sidebar {
+        padding: 1rem 1.25rem;
+    }
+    
+    .tours-section__card {
+        min-height: 240px;
+        margin: 0 0.75rem 0 0.75rem;
+        border-radius: 6px;
+    }
+    
+    .tours-section__card-image {
+        height: 160px;
+        min-height: 160px;
+    }
+    
+    .tours-section__title {
+        font-size: 2rem;
+    }
+    
+    .tours-section__paragraph {
+        font-size: 0.9rem;
+    }
+    
+    .tours-section__book-btn {
+        padding: 0.625rem 1rem;
+        font-size: 0.85rem;
+    }
+    
+    .tours-section__card-title {
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+        z-index: 10 !important;
+        color: #ffffff !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    .tours-section__card-content {
+        padding: 1rem;
+        min-height: 60px;
+    }
+    
+    .tours-section__card:last-child .tours-section__card-content {
+        background: #969b81 !important;
+        min-height: 60px;
+        padding: 1rem;
+    }
+}
+</style>

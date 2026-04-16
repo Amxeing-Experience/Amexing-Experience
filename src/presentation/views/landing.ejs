@@ -175,6 +175,15 @@ Created by Denisse Maldonado
             box-shadow: 0 6px 20px rgba(184, 134, 11, 0.5);
         }
         
+        .scroll-to-top__arrow {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-style: solid;
+            border-width: 2px 2px 0 0;
+            border-color: currentColor;
+            transform: rotate(-45deg);
+        }
         /* Accessibility */
         .sr-only {
             position: absolute;
@@ -423,6 +432,22 @@ Created by Denisse Maldonado
             right: -25px;
         }
         
+        .testimonios-section__nav-arrow {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-style: solid;
+            border-width: 2px 2px 0 0;
+            border-color: currentColor;
+        }
+        
+        .testimonios-section__nav-arrow--left {
+            transform: rotate(-135deg);
+        }
+        
+        .testimonios-section__nav-arrow--right {
+            transform: rotate(45deg);
+        }
         .testimonios-section__indicators {
             display: flex;
             justify-content: center;
@@ -604,22 +629,50 @@ Created by Denisse Maldonado
                 padding: 4rem 0;
             }
             
+            .testimonios-section__container {
+                padding: 0 1rem;
+            }
             .testimonios-section__title {
                 margin-bottom: 3rem;
             }
             
-            .testimonios-section__nav-btn--prev {
-                left: -15px;
-            }
-            
-            .testimonios-section__nav-btn--next {
-                right: -15px;
+            .testimonios-section__slider {
+                margin: 0;
             }
             
             .testimonios-section__slide {
                 padding: 2rem 1rem;
             }
             
+            /* Mobile testimonios navigation fixes */
+            .testimonios-section__navigation {
+                position: static;
+                top: auto;
+                width: auto;
+                display: flex;
+                justify-content: center;
+                gap: 2rem;
+                margin-top: 1rem;
+                transform: none;
+            }
+            
+            .testimonios-section__nav-btn {
+                position: static;
+                width: 40px;
+                height: 40px;
+                left: auto;
+                right: auto;
+            }
+            
+            .testimonios-section__nav-btn--prev,
+            .testimonios-section__nav-btn--next {
+                left: auto;
+                right: auto;
+            }
+            
+            .testimonios-section__indicators {
+                margin-top: 1rem;
+            }
             .home-overview {
                 padding: 4rem 0;
             }
@@ -640,6 +693,39 @@ Created by Denisse Maldonado
             }
         }
 
+        /* Enhanced Mobile Styles - Small screens */
+        @media (max-width: 480px) {
+            .testimonios-section {
+                padding: 3rem 0;
+            }
+            
+            .testimonios-section__container {
+                padding: 0 0.75rem;
+            }
+            
+            .testimonios-section__slide {
+                padding: 1.5rem 0.75rem;
+            }
+            
+            .testimonios-section__nav-btn {
+                width: 35px;
+                height: 35px;
+            }
+            
+            .testimonios-section__navigation {
+                gap: 1.5rem;
+            }
+            
+            .testimonios-section__indicator {
+                width: 10px;
+                height: 10px;
+            }
+            
+            .testimonios-section__text {
+                font-size: 1rem;
+                line-height: 1.5;
+            }
+        }
         /* Print Styles */
         @media print {
             .landing-nav,
@@ -757,10 +843,10 @@ Created by Denisse Maldonado
                         </div>
                         <div class="testimonios-section__navigation">
                             <button class="testimonios-section__nav-btn testimonios-section__nav-btn--prev" aria-label="Anterior testimonio">
-                                <i class="fas fa-chevron-left"></i>
+                                <span class="testimonios-section__nav-arrow testimonios-section__nav-arrow--left"></span>
                             </button>
                             <button class="testimonios-section__nav-btn testimonios-section__nav-btn--next" aria-label="Siguiente testimonio">
-                                <i class="fas fa-chevron-right"></i>
+                                <span class="testimonios-section__nav-arrow testimonios-section__nav-arrow--right"></span>
                             </button>
                         </div>
                         <div class="testimonios-section__indicators" id="testimonialIndicators">
@@ -778,7 +864,7 @@ Created by Denisse Maldonado
 
         <%# Scroll to Top Button %>
         <button class="scroll-to-top" id="scrollToTop" aria-label="Volver arriba">
-            <i class="fas fa-chevron-up" aria-hidden="true"></i>
+            <span class="scroll-to-top__arrow" aria-hidden="true"></span>
         </button>
     </div>
 

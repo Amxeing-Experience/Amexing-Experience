@@ -1,42 +1,86 @@
 <%#
 About Section Organism - Landing Page
-About Amexing Experience section with company story and values
+Mission, Vision and Values section for Amexing Experience
 
 Created by Denisse Maldonado
 %>
 
-<section class="about-section" id="about">
-    <div class="about-section__container">
-        <div class="about-section__header">
-            <h2 class="about-section__title">Acerca de Nosotros</h2>
-            <p class="about-section__subtitle">
-                Más de 30 años creando experiencias inolvidables en San Miguel de Allende
-            </p>
-        </div>
-
-        <div class="about-section__content">
-            <p class="about-section__description">
-                Desde 1994, Amexing Experience ha sido sinónimo de excelencia en el turismo de lujo 
-                en San Miguel de Allende. Nuestra pasión por brindar experiencias auténticas y 
-                personalizadas nos ha convertido en el socio de confianza para viajeros exigentes 
-                que buscan lo mejor de México.
-            </p>
-            
-            <div class="about-section__values">
-                <div class="about-section__value">
-                    <h3 class="about-section__value-title">Nuestra Misión</h3>
-                    <p class="about-section__value-description">
-                        Crear experiencias de viaje excepcionales que conecten a nuestros huéspedes 
-                        con la cultura, historia y belleza de San Miguel de Allende.
+<section class="mvv-section" id="about">
+    <div class="mvv-section__container">
+        <div class="mvv-section__decorative-wrapper">
+            <div class="mvv-section__grid">
+                <%# Mission Card %>
+                <div class="mvv-section__card mvv-section__card--mission">
+                    <h2 class="mvv-section__title">Misión</h2>
+                    <p class="mvv-section__text">
+                        Ofrecer una forma excepcional de<br>
+                        vivir San Miguel de Allende, a<br>
+                        través de experiencias definidas<br>
+                        por la calidez, la confianza, la<br>
+                        elegancia y una hospitalidad<br>
+                        profundamente local.
                     </p>
                 </div>
                 
-                <div class="about-section__value">
-                    <h3 class="about-section__value-title">Nuestra Visión</h3>
-                    <p class="about-section__value-description">
-                        Ser reconocidos como la empresa líder en turismo premium en México, 
-                        estableciendo nuevos estándares de calidad y servicio personalizado.
+                <%# Vision Card %>
+                <div class="mvv-section__card mvv-section__card--vision">
+                    <h2 class="mvv-section__title">Visión</h2>
+                    <p class="mvv-section__text">
+                        Ser reconocidos por ofrecer la<br>
+                        forma más confiable, refinada y<br>
+                        auténtica de descubrir San Miguel<br>
+                        de Allende, con un servicio definido<br>
+                        por la excelencia, la calidez y el<br>
+                        conocimiento local.
                     </p>
+                </div>
+                
+                <%# Values Card %>
+                <div class="mvv-section__card mvv-section__card--values">
+                    <%# Hearts positioned outside card borders %>
+                    <img src="/images/heart_green.png" alt="" class="mvv-section__heart mvv-section__heart--valores-left">
+                    <img src="/images/heart_green.png" alt="" class="mvv-section__heart mvv-section__heart--valores-right">
+                    <%# Lines extending outward from hearts %>
+                    <div class="mvv-section__heart-line mvv-section__heart-line--left"></div>
+                    <div class="mvv-section__heart-line mvv-section__heart-line--right"></div>
+                    <h2 class="mvv-section__title">Valores</h2>
+                    
+                    <div class="mvv-section__values-list">
+                        <div class="mvv-section__value-item">
+                            <h3 class="mvv-section__value-title">Excelencia</h3>
+                            <p class="mvv-section__value-text">Cuidamos cada detalle para ofrecer una experiencia impecable.</p>
+                        </div>
+                        
+                        <div class="mvv-section__value-item">
+                            <h3 class="mvv-section__value-title">Calidez</h3>
+                            <p class="mvv-section__value-text">Recibimos a cada cliente con cercanía y hospitalidad genuina.</p>
+                        </div>
+                        
+                        <div class="mvv-section__value-item">
+                            <h3 class="mvv-section__value-title">Seguridad y confianza</h3>
+                            <p class="mvv-section__value-text">Brindamos tranquilidad a través de un servicio profesional y responsable.</p>
+                        </div>
+                        
+                        <div class="mvv-section__value-item">
+                            <h3 class="mvv-section__value-title">Esencia local</h3>
+                            <p class="mvv-section__value-text">Compartimos San Miguel de Allende desde el conocimiento y el orgullo de<br>pertenecer a este destino.</p>
+                        </div>
+                        
+                        <div class="mvv-section__value-item">
+                            <h3 class="mvv-section__value-title">Atención personalizada</h3>
+                            <p class="mvv-section__value-text">Diseñamos cada experiencia con sensibilidad, dedicación y cuidado.</p>
+                        </div>
+                        
+                        <div class="mvv-section__value-item">
+                            <h3 class="mvv-section__value-title">Profesionalismo</h3>
+                            <p class="mvv-section__value-text">Actuamos con discreción, puntualidad y compromiso.</p>
+                        </div>
+                        
+                        <div class="mvv-section__value-item">
+                            <h3 class="mvv-section__value-title">Sostenibilidad</h3>
+                            <p class="mvv-section__value-text">Apostamos por una movilidad más consciente con opciones híbridas y eléctricas.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -44,72 +88,227 @@ Created by Denisse Maldonado
 </section>
 
 <style>
-.about-section {
-    padding: 4rem 0;
-    background: white;
+.mvv-section {
+    padding: 6rem 0;
+    background: #2e2e2d;
+    position: relative;
+    overflow: visible;
 }
 
-.about-section__container {
-    max-width: 1200px;
+.mvv-section__container {
+    max-width: 900px;
     margin: 0 auto;
-    padding: 0 2rem;
+    padding: 0 3rem;
 }
 
-.about-section__header {
-    text-align: center;
-    margin-bottom: 3rem;
+.mvv-section__decorative-wrapper {
+    position: relative;
+    padding: 60px 40px;
 }
 
-.about-section__title {
-    font-family: 'Montserrat', sans-serif;
-    font-size: 2.5rem;
-    font-weight: 300;
-    color: #2c3e50;
-    margin-bottom: 1rem;
-}
-
-.about-section__subtitle {
-    font-size: 1.2rem;
-    color: #5a6c7d;
-}
-
-.about-section__content {
-    max-width: 800px;
-    margin: 0 auto;
-}
-
-.about-section__description {
-    font-size: 1.1rem;
-    line-height: 1.8;
-    color: #34495e;
-    text-align: center;
-    margin-bottom: 3rem;
-}
-
-.about-section__values {
+.mvv-section__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.5rem;
 }
 
-.about-section__value {
+.mvv-section__card {
+    position: relative;
+    padding: 4rem 3rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: #2e2e2d;
     text-align: center;
-    padding: 2rem;
-    background: rgba(184, 134, 11, 0.05);
-    border-radius: 16px;
+    min-height: 280px;
 }
 
-.about-section__value-title {
-    font-family: 'Montserrat', sans-serif;
-    font-size: 1.5rem;
+.mvv-section__card--mission,
+.mvv-section__card--vision {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.mvv-section__card--values {
+    grid-column: 1 / -1;
+    padding: 3rem 4rem;
+}
+
+.mvv-section__heart {
+    position: absolute;
+    width: 50px;
+    height: auto;
+    opacity: 0.6;
+}
+
+.mvv-section__heart--valores-left {
+    position: absolute;
+    top: -50px;
+    left: -100px;
+}
+
+.mvv-section__heart--valores-right {
+    position: absolute;
+    top: -50px;
+    right: -100px;
+}
+
+.mvv-section__heart-line {
+    position: absolute;
+    top: -25px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.3);
+    z-index: 1;
+}
+
+.mvv-section__heart-line--left {
+    left: -33%;
+    width: 20%;
+}
+
+.mvv-section__heart-line--right {
+    right: -33%;
+    width: 20%;
+}
+
+.mvv-section__title {
+    font-family: var(--font-arpona);
+    font-size: 3rem;
+    font-weight: 300;
+    color: #ffffff;
+    margin-bottom: 2rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+.mvv-section__title::first-letter {
+    font-size: 4rem;
+    font-weight: 400;
+    line-height: 1;
+}
+
+
+.mvv-section__text {
+    font-family: var(--font-myriad);
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0;
+}
+
+.mvv-section__values-list {
+    max-width: 900px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.mvv-section__value-item {
+    margin-bottom: 1.8rem;
+}
+
+.mvv-section__value-title {
+    font-family: var(--font-myriad);
+    font-size: 1.3rem;
+    font-weight: 500;
+    color: #ffffff;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+.mvv-section__value-title::first-letter {
+    font-size: 1.8rem;
     font-weight: 600;
-    color: #B8860B;
-    margin-bottom: 1rem;
+    line-height: 1;
 }
 
-.about-section__value-description {
+.mvv-section__value-text {
+    font-family: var(--font-myriad);
     font-size: 1rem;
-    color: #5a6c7d;
+    color: rgba(255, 255, 255, 0.8);
     line-height: 1.6;
+    display: block;
+}
+
+/* Hide hearts and lines on non-desktop devices */
+@media (max-width: 1024px) {
+    .mvv-section__heart--valores-left,
+    .mvv-section__heart--valores-right,
+    .mvv-section__heart-line--left,
+    .mvv-section__heart-line--right {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .mvv-section {
+        padding: 4rem 0;
+    }
+    
+    .mvv-section__container {
+        padding: 0 1.5rem;
+    }
+    
+    .mvv-section__decorative-wrapper {
+        padding: 40px 20px;
+    }
+    
+    .mvv-section__grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .mvv-section__card {
+        padding: 3rem 2rem;
+        min-height: auto;
+    }
+    
+    .mvv-section__card--values {
+        padding: 3rem 2rem;
+    }
+    
+    .mvv-section__title {
+        font-size: 2.5rem;
+        letter-spacing: 2px;
+    }
+    
+    .mvv-section__heart {
+        width: 35px;
+    }
+    
+    .mvv-section__value-title {
+        font-size: 1.1rem;
+    }
+    
+    .mvv-section__value-text {
+        font-size: 0.95rem;
+    }
+    
+    .mvv-section__text {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .mvv-section__decorative-wrapper {
+        padding: 30px 15px;
+    }
+    
+    .mvv-section__title {
+        font-size: 2rem;
+    }
+    
+    .mvv-section__card {
+        padding: 2.5rem 1.5rem;
+    }
+    
+    .mvv-section__heart {
+        width: 30px;
+    }
+    
+    .mvv-section__text br {
+        display: none;
+    }
 }
 </style>
