@@ -292,10 +292,16 @@ Created by Denisse Maldonado
 @media (max-width: 768px) {
     .eventos-section {
         background-attachment: scroll;
+        min-height: auto;
     }
     
     .eventos-section__container {
-        padding: 3rem 1.5rem;
+        padding: 2rem 1rem;
+        max-width: 100%;
+    }
+    
+    .eventos-section__content {
+        margin: 1rem 0;
     }
     
     .eventos-section__services {
@@ -309,32 +315,50 @@ Created by Denisse Maldonado
     
     .eventos-section__overlay {
         padding: 1.5rem 1rem;
+        min-height: 60px;
     }
     
     .eventos-section__service-title {
         font-size: 1rem;
     }
     
+    .eventos-section__sidebar {
+        text-align: center;
+    }
+    
     .eventos-section__sidebar-content {
-        padding: 2rem 1.5rem;
+        padding: 0;
     }
     
     .eventos-section__title {
         font-size: 2rem;
         letter-spacing: 2px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .eventos-section__description {
+        margin-bottom: 2rem;
+    }
+    
+    .eventos-section__paragraph {
+        font-size: 0.95rem;
+        text-align: left;
     }
     
     .eventos-section__book-btn {
-        padding: 0.875rem 2rem;
-        font-size: 0.9rem;
-        width: 100%;
+        padding: 0.75rem 1.5rem;
+        font-size: 0.85rem;
+        width: auto;
+        max-width: 100%;
         text-align: center;
+        display: inline-block;
+        box-sizing: border-box;
     }
 }
 
 @media (max-width: 480px) {
     .eventos-section__container {
-        padding: 2rem 1rem;
+        padding: 1.5rem 0.75rem;
     }
     
     .eventos-section__service {
@@ -351,6 +375,11 @@ Created by Denisse Maldonado
     
     .eventos-section__title {
         font-size: 1.5rem;
+    }
+    
+    .eventos-section__book-btn {
+        padding: 0.625rem 1rem;
+        font-size: 0.8rem;
     }
 }
 </style>

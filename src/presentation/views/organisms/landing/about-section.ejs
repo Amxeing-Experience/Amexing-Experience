@@ -231,6 +231,16 @@ Created by Denisse Maldonado
     display: block;
 }
 
+/* Hide hearts and lines on non-desktop devices */
+@media (max-width: 1024px) {
+    .mvv-section__heart--valores-left,
+    .mvv-section__heart--valores-right,
+    .mvv-section__heart-line--left,
+    .mvv-section__heart-line--right {
+        display: none;
+    }
+}
+
 @media (max-width: 768px) {
     .mvv-section {
         padding: 4rem 0;
