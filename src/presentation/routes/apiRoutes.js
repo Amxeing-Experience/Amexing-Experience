@@ -1244,4 +1244,93 @@ router.get(
   clientPricesController.getProgressUpdates // No auth middleware for SSE
 );
 
+/**
+ * @swagger
+ * /api/reviews/tripadvisor:
+ *   get:
+ *     tags:
+ *       - Reviews
+ *     summary: Get TripAdvisor reviews
+ *     description: |
+ *       Fetch customer reviews from TripAdvisor API.
+ *
+ *       **Public Endpoint** - No authentication required
+ *       **Cached** - Results are cached for 1 hour to minimize API calls
+ *
+ *     parameters:
+ *       - in: query
+ *         name: language
+ *         schema:
+ *           type: string
+ *           enum: [es, en]
+ *           default: es
+ *         description: Language for reviews (Spanish or English)
+ *       - in: query
+ *         name: count
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 10
+ *           default: 5
+ *         description: Number of reviews to return
+ *     responses:
+ *       200:
+ *         description: Reviews fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 reviews:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       location:
+ *                         type: string
+ *                       rating:
+ *                         type: integer
+ *                       text:
+ *                         type: string
+ *                       timeAgo:
+ *                         type: string
+ *                       platform:
+ *                         type: string
+ *                       verified:
+ *                         type: boolean
+ *       500:
+ *         description: Server error
+ */
+router.get('/reviews/tripadvisor', async (req, res) => {
+  try {
+    const tripAdvisorService = require('../../application/services/tripAdvisorService');
+    const { language = 'es', count = 5 } = req.query;
+
+    const reviews = await tripAdvisorService.getTopReviews(
+      parseInt(count, 10),
+      language
+    );
+
+    res.json({
+      success: true,
+      reviews,
+      cached: tripAdvisorService.cache !== null,
+      language,
+    });
+  } catch (error) {
+    logger.error('Error fetching TripAdvisor reviews:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch reviews',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+});
+
 module.exports = router;

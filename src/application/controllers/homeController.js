@@ -1,4 +1,5 @@
 const logger = require('../../infrastructure/logger');
+const tripAdvisorService = require('../services/tripAdvisorService');
 
 /**
  * Home Controller - Handles public web pages and landing page functionality.
@@ -38,16 +39,32 @@ const logger = require('../../infrastructure/logger');
 class HomeController {
   async index(req, res, next) {
     try {
+      // Use req.language if set by route, otherwise use i18n detected language
+      const currentLang = req.language || req.i18n?.language || 'es';
+
+      // Fetch testimonials from TripAdvisor service
+      let testimonials = [];
+      try {
+        testimonials = await tripAdvisorService.getTopReviews(15, currentLang);
+      } catch (error) {
+        logger.error('Error fetching testimonials for landing page:', error);
+        // Will use fallback testimonials from the service
+      }
+
       const data = {
-        title: 'Amexing Experience - Transporte Premium en San Miguel de Allende',
+        title: req.t ? req.t('pages:home.title') : 'Amexing Experience',
         user: req.session?.user || null,
         currentPage: 'home',
         seo: {
-          description: 'Experiencia de transporte premium en San Miguel de Allende con flota Tesla y 30 años de experiencia. Servicios de lujo, tours exclusivos y atención personalizada.',
-          keywords: 'transporte premium, San Miguel de Allende, Tesla, tours, experiencias de lujo, transporte ejecutivo',
+          description: req.t ? req.t('pages:home.description') : 'Premium transportation experience',
+          keywords: req.t ? req.t('pages:home.keywords') : 'premium transport, San Miguel de Allende',
           author: 'Amexing Experience',
         },
         company: this.getCompanyData(),
+        testimonials, // Add testimonials to the data
+        req,
+        t: req.t || ((key) => key),
+        currentLang,
       };
 
       res.render('landing', data);
@@ -63,16 +80,21 @@ class HomeController {
    */
   async nosotros(req, res, next) {
     try {
+      const currentLang = req.language || req.language || 'es';
+
       const data = {
-        title: 'Nosotros - Amexing Experience',
+        title: req.t ? req.t('pages:about.title') : 'About - Amexing Experience',
         user: req.session?.user || null,
         currentPage: 'about',
         seo: {
-          description: '30 años de experiencia en transporte premium en San Miguel de Allende. Conoce nuestra historia, misión y valores que nos hacen únicos.',
-          keywords: 'nosotros, amexing experience, historia, san miguel de allende, transporte premium',
+          description: req.t ? req.t('pages:about.description') : '30 years of experience',
+          keywords: req.t ? req.t('pages:about.keywords') : 'about us, amexing experience',
           author: 'Amexing Experience',
         },
         company: this.getCompanyData(),
+        req,
+        t: req.t || ((key) => key),
+        currentLang,
       };
 
       res.render('nosotros', data);
@@ -88,16 +110,21 @@ class HomeController {
    */
   async servicios(req, res, next) {
     try {
+      const currentLang = req.language || req.language || 'es';
+
       const data = {
-        title: 'Servicios - Amexing Experience',
+        title: req.t ? req.t('pages:services.title') : 'Services - Amexing Experience',
         user: req.session?.user || null,
         currentPage: 'services',
         seo: {
-          description: 'Servicios de transporte premium, tours exclusivos y experiencias de lujo en San Miguel de Allende. Tesla, tours personalizados y más.',
-          keywords: 'servicios, transporte premium, tours, tesla, san miguel de allende, experiencias de lujo',
+          description: req.t ? req.t('pages:services.description') : 'Premium transportation services',
+          keywords: req.t ? req.t('pages:services.keywords') : 'services, premium transport',
           author: 'Amexing Experience',
         },
         company: this.getCompanyData(),
+        req,
+        t: req.t || ((key) => key),
+        currentLang,
       };
 
       res.render('servicios', data);
@@ -113,16 +140,21 @@ class HomeController {
    */
   async fleet(req, res, next) {
     try {
+      const currentLang = req.language || req.language || 'es';
+
       const data = {
-        title: 'Nuestra Flota - Amexing Experience',
+        title: req.t ? req.t('pages:fleet.title') : 'Our Fleet - Amexing Experience',
         user: req.session?.user || null,
         currentPage: 'fleet',
         seo: {
-          description: 'Conoce nuestra flota premium de vehículos Tesla y otros vehículos de lujo para transporte ejecutivo en San Miguel de Allende.',
-          keywords: 'flota, tesla, vehículos premium, transporte ejecutivo, san miguel de allende',
+          description: req.t ? req.t('pages:fleet.description') : 'Premium fleet of vehicles',
+          keywords: req.t ? req.t('pages:fleet.keywords') : 'fleet, tesla, premium vehicles',
           author: 'Amexing Experience',
         },
         company: this.getCompanyData(),
+        req,
+        t: req.t || ((key) => key),
+        currentLang,
       };
 
       res.render('nuestra-flota', data);
@@ -138,16 +170,21 @@ class HomeController {
    */
   async contacto(req, res, next) {
     try {
+      const currentLang = req.language || req.language || 'es';
+
       const data = {
-        title: 'Contacto - Amexing Experience',
+        title: req.t ? req.t('pages:contact.title') : 'Contact - Amexing Experience',
         user: req.session?.user || null,
         currentPage: 'contact',
         seo: {
-          description: 'Contacta con Amexing Experience para reservar tu transporte premium en San Miguel de Allende. WhatsApp, email y reservas online.',
-          keywords: 'contacto, reservas, whatsapp, booking, san miguel de allende, transporte premium',
+          description: req.t ? req.t('pages:contact.description') : 'Contact Amexing Experience',
+          keywords: req.t ? req.t('pages:contact.keywords') : 'contact, bookings, san miguel de allende',
           author: 'Amexing Experience',
         },
         company: this.getCompanyData(),
+        req,
+        t: req.t || ((key) => key),
+        currentLang,
       };
 
       res.render('contacto', data);
@@ -168,7 +205,7 @@ class HomeController {
       description: 'Transporte premium y experiencias de lujo en San Miguel de Allende',
       phone: '+52 (415) 152-7890',
       email: 'info@amexing.com',
-      whatsapp: '+52 415 152 7890',
+      whatsapp: '+52 1 415 153 3818',
       address: 'San Miguel de Allende, Guanajuato, México',
       founded: '1994',
       certifications: ['SECTUR', 'AMESTUR', 'EarthCheck'],
@@ -195,9 +232,21 @@ class HomeController {
    */
   async about(req, res, next) {
     try {
+      const currentLang = req.language || req.language || 'es';
+
       const data = {
-        title: 'About AmexingWeb',
+        title: req.t ? req.t('pages:about.title') : 'About - Amexing Experience',
         user: req.session?.user || null,
+        currentPage: 'about',
+        seo: {
+          description: req.t ? req.t('pages:about.description') : '30 years of experience',
+          keywords: req.t ? req.t('pages:about.keywords') : 'about us, amexing experience',
+          author: 'Amexing Experience',
+        },
+        company: this.getCompanyData(),
+        req,
+        t: req.t || ((key) => key),
+        currentLang,
         description:
           'AmexingWeb is a secure e-commerce platform built with Parse Server and designed for PCI DSS compliance.',
       };
