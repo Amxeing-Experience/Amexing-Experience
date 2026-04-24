@@ -2,7 +2,15 @@
 Contact Section Organism - Landing Page
 Contact form and information section matching reference design
 
+@param {object} companyInfo - Company information object (optional)
+@param {object} req - Express request object with i18n
+@param {function} t - Translation function
+
 Created by Denisse Maldonado
+%>
+
+<%
+const translate = typeof t !== 'undefined' ? t : (key) => key;
 %>
 
 <section class="contact-section" id="contact">
@@ -10,7 +18,7 @@ Created by Denisse Maldonado
         <div class="contact-section__content">
             <!-- Left Side: Contact Form -->
             <div class="contact-section__form-container">
-                <h2 class="contact-section__form-title">Ponte en contacto</h2>
+                <h2 class="contact-section__form-title"><%= translate('pages:contactSection.formTitle') %></h2>
                 
                 <form class="contact-section__form" id="contactForm">
                     <!-- Form Status Messages -->
@@ -21,14 +29,14 @@ Created by Denisse Maldonado
                             <input type="email" 
                                    name="email" 
                                    class="contact-section__input" 
-                                   placeholder="Email" 
+                                   placeholder="<%= translate('pages:contactSection.form.email') %>" 
                                    required>
                         </div>
                         <div class="contact-section__form-group">
                             <input type="tel" 
                                    name="phone" 
                                    class="contact-section__input" 
-                                   placeholder="Teléfono"
+                                   placeholder="<%= translate('pages:contactSection.form.phone') %>"
                                    pattern="[0-9]*"
                                    inputmode="numeric"
                                    id="phoneInput">
@@ -40,14 +48,14 @@ Created by Denisse Maldonado
                             <input type="text" 
                                    name="firstName" 
                                    class="contact-section__input" 
-                                   placeholder="Nombre" 
+                                   placeholder="<%= translate('pages:contactSection.form.firstName') %>" 
                                    required>
                         </div>
                         <div class="contact-section__form-group">
                             <input type="text" 
                                    name="lastName" 
                                    class="contact-section__input" 
-                                   placeholder="Apellido" 
+                                   placeholder="<%= translate('pages:contactSection.form.lastName') %>" 
                                    required>
                         </div>
                     </div>
@@ -56,20 +64,20 @@ Created by Denisse Maldonado
                         <input type="text" 
                                name="company" 
                                class="contact-section__input" 
-                               placeholder="Empresa (opcional)">
+                               placeholder="<%= translate('pages:contactSection.form.company') %>">
                     </div>
                     
                     <div class="contact-section__form-group contact-section__form-group--full">
                         <input type="text" 
                                name="subject" 
                                class="contact-section__input" 
-                               placeholder="Título del mensaje">
+                               placeholder="<%= translate('pages:contactSection.form.subject') %>">
                     </div>
                     
                     <div class="contact-section__form-group contact-section__form-group--full">
                         <textarea name="message" 
                                   class="contact-section__textarea" 
-                                  placeholder="Mensaje" 
+                                  placeholder="<%= translate('pages:contactSection.form.message') %>" 
                                   rows="5" 
                                   required 
                                   minlength="10"
@@ -77,7 +85,7 @@ Created by Denisse Maldonado
                     </div>
                     
                     <button type="submit" class="contact-section__submit" id="contactSubmitBtn">
-                        <span class="contact-submit__text">SEND MESSAGE</span>
+                        <span class="contact-submit__text"><%= translate('pages:contactSection.form.sendButton') %></span>
                         <span class="contact-submit__loading" style="display: none;">
                             <svg class="contact-submit__spinner" width="16" height="16" viewBox="0 0 24 24" fill="none">
                                 <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="32" stroke-dashoffset="32">
@@ -85,7 +93,7 @@ Created by Denisse Maldonado
                                     <animate attributeName="stroke-dashoffset" dur="2s" values="0;-16;-32;-32" repeatCount="indefinite"/>
                                 </circle>
                             </svg>
-                            ENVIANDO...
+                            <%= translate('pages:contactSection.form.sending') %>
                         </span>
                     </button>
                 </form>
@@ -96,7 +104,7 @@ Created by Denisse Maldonado
                 <div class="contact-section__info-card">
                     <img src="/images/g12086.png" alt="Phone" class="contact-section__info-icon">
                     <div class="contact-section__info-content">
-                        <h3 class="contact-section__info-label">Oficina:</h3>
+                        <h3 class="contact-section__info-label"><%= translate('pages:contactSection.info.office') %></h3>
                         <p class="contact-section__info-value">+52 (415) 167 39 90</p>
                     </div>
                 </div>
@@ -104,7 +112,7 @@ Created by Denisse Maldonado
                 <div class="contact-section__info-card">
                     <img src="/images/g12110.png" alt="Emergency" class="contact-section__info-icon">
                     <div class="contact-section__info-content">
-                        <h3 class="contact-section__info-label">Solo para emergencias:</h3>
+                        <h3 class="contact-section__info-label"><%= translate('pages:contactSection.info.emergency') %></h3>
                         <p class="contact-section__info-value">+52 (415) 153 50 67</p>
                     </div>
                 </div>
@@ -112,15 +120,15 @@ Created by Denisse Maldonado
                 <div class="contact-section__info-card">
                     <img src="/images/g12098.png" alt="Hours" class="contact-section__info-icon">
                     <div class="contact-section__info-content">
-                        <h3 class="contact-section__info-label">Horarios de Oficina:</h3>
-                        <p class="contact-section__info-value">Lunes a Sábado<br>de las 08:00 hrs a las 15:00 hrs (CDT)</p>
+                        <h3 class="contact-section__info-label"><%= translate('pages:contactSection.info.hours') %></h3>
+                        <p class="contact-section__info-value"><%- translate('pages:contactSection.info.hoursText') %></p>
                     </div>
                 </div>
                 
                 <div class="contact-section__info-card">
                     <img src="/images/g12136.png" alt="Email" class="contact-section__info-icon">
                     <div class="contact-section__info-content">
-                        <h3 class="contact-section__info-label">Email:</h3>
+                        <h3 class="contact-section__info-label"><%= translate('pages:contactSection.info.emailLabel') %></h3>
                         <p class="contact-section__info-value">contact@amexing.com</p>
                     </div>
                 </div>
@@ -437,24 +445,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Basic client-side validation
         if (!data.name || !data.email || !data.message) {
-            showMessage('Por favor complete todos los campos requeridos.', 'error');
+            showMessage("<%= translate('pages:contactSection.validation.requiredFields') %>", 'error');
             return;
         }
 
         if (data.message.length < 10) {
-            showMessage('El mensaje debe tener al menos 10 caracteres.', 'error');
+            showMessage("<%= translate('pages:contactSection.validation.messageMinLength') %>", 'error');
             return;
         }
 
         if (data.message.length > 2000) {
-            showMessage('El mensaje no puede exceder los 2000 caracteres.', 'error');
+            showMessage("<%= translate('pages:contactSection.validation.messageMaxLength') %>", 'error');
             return;
         }
 
         // Email format validation
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailPattern.test(data.email)) {
-            showMessage('Por favor ingrese una dirección de email válida.', 'error');
+            showMessage("<%= translate('pages:contactSection.validation.invalidEmail') %>", 'error');
             return;
         }
 
@@ -476,7 +484,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (response.ok && result.success) {
                 // Success
-                showMessage(result.message || '¡Gracias por su mensaje! Nos pondremos en contacto pronto.', 'success');
+                showMessage(result.message || "<%= translate('pages:contactSection.validation.successMessage') %>", 'success');
                 contactForm.reset();
                 
                 // Scroll to status message
@@ -488,11 +496,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 10000);
             } else {
                 // Error from server
-                showMessage(result.message || 'Hubo un error al enviar su mensaje. Por favor intente nuevamente.', 'error');
+                showMessage(result.message || "<%= translate('pages:contactSection.validation.errorMessage') %>", 'error');
             }
         } catch (error) {
             console.error('Contact form error:', error);
-            showMessage('Hubo un error de conexión. Por favor verifique su conexión a internet e intente nuevamente.', 'error');
+            showMessage("<%= translate('pages:contactSection.validation.connectionError') %>", 'error');
         } finally {
             setLoadingState(false);
         }
@@ -538,7 +546,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update counter on input
         function updateCounter() {
             const remaining = maxLength - messageTextarea.value.length;
-            counterDiv.textContent = `${messageTextarea.value.length}/${maxLength} caracteres`;
+            counterDiv.textContent = `${messageTextarea.value.length}/${maxLength} <%= translate('pages:contactSection.validation.characterCounter') %>`;
             
             if (remaining < 100) {
                 counterDiv.style.color = remaining < 0 ? '#dc3545' : '#fd7e14';

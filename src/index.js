@@ -42,6 +42,7 @@ const securityMiddleware = require('./infrastructure/security/securityMiddleware
 const { initializeParseServer, shutdownParseServer } = require('./infrastructure/server/parseServerInit');
 const { configureStaticFiles } = require('./infrastructure/server/staticFilesConfig');
 const { getHealthCheck, getMetrics } = require('./infrastructure/monitoring/healthCheck');
+const { initI18n, getMiddleware: getI18nMiddleware } = require('./infrastructure/i18n/i18nConfig');
 
 // API Documentation (Redocly)
 const { configureRedoclyDocs } = require('./infrastructure/docs/redoclyServer');
@@ -145,11 +146,116 @@ app.use((req, res, next) => {
 // Compression middleware
 app.use(compression());
 
+// Initialize Parse Server variable (will be set after server initialization)
+let parseServer;
+
+// Initialize i18n and mount routes only after it's ready
+console.log('🌐 Initializing i18next translations...');
+const initPromise = initI18n().then(() => {
+  console.log('✅ i18next initialization complete');
+
+  // Apply i18n middleware immediately after initialization
+  app.use(getI18nMiddleware());
+  console.log('✅ i18n middleware applied before routes');
+
+  // Routes must be mounted AFTER i18n middleware is applied
+  // This ensures req.t is available in all route handlers
+
+  // Session health check endpoint (before other routes)
+  app.get('/api/session/health', sessionRecovery.sessionHealthEndpoint);
+
+  // Parse context middleware - Global user context propagation for audit trails
+  // Uses AsyncLocalStorage to make user context available throughout request lifecycle
+  // IMPORTANT: Must be applied BEFORE routes to capture all authenticated requests
+  app.use(parseContextMiddleware);
+
+  // Audit context middleware - Propagates authenticated user context to Parse hooks
+  // IMPORTANT: Must be applied AFTER authentication middleware but BEFORE routes
+  app.use(auditContextMiddleware);
+
+  // Public Routes (no authentication - must be before other routes)
+  app.use('/', publicRoutes);
+
+  // API Routes
+  app.use('/api', apiRoutes);
+
+  // Authentication Routes
+  app.use('/auth', authRoutes);
+
+  // Documentation Routes
+  app.use('/', docsRoutes);
+
+  // Dashboard Routes
+  app.use('/dashboard', dashboardRoutes);
+
+  // Atomic Design Routes
+  app.use('/atomic', atomicRoutes);
+
+  // Web Routes (must be last to avoid route conflicts)
+  app.use('/', webRoutes);
+
+  // Health check endpoint (uses centralized health check module)
+  app.get('/health', async (req, res) => {
+    try {
+      const healthCheck = await getHealthCheck();
+      const statusCode = healthCheck.status === 'healthy' ? 200 : 503;
+      res.status(statusCode).json(healthCheck);
+    } catch (error) {
+      logger.error('Health check error:', error);
+      res.status(503).json({
+        status: 'error',
+        timestamp: new Date().toISOString(),
+        error: error.message,
+      });
+    }
+  });
+
+  // Metrics endpoint for monitoring (uses centralized metrics module)
+  app.get('/metrics', async (req, res) => {
+    try {
+      const metrics = await getMetrics(parseServer);
+      res.json(metrics);
+    } catch (error) {
+      logger.error('Error generating metrics:', error);
+      res.status(500).json({
+        error: 'Failed to generate metrics',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  // 404 handler
+  app.use((req, res) => {
+    res.status(404);
+
+    if (req.accepts('html')) {
+      res.render('errors/404', {
+        title: 'Page Not Found',
+        message: 'The page you are looking for does not exist.',
+        url: req.url,
+      });
+    } else if (req.accepts('json')) {
+      res.json({
+        error: 'Not Found',
+        message: 'The requested resource was not found',
+        path: req.url,
+      });
+    } else {
+      res.type('txt').send('Not Found');
+    }
+  });
+
+  // Error handling middleware (must be last)
+  app.use(errorHandler);
+}).catch((error) => {
+  logger.error('Failed to initialize i18n:', error);
+  process.exit(1);
+});
+
 // Configure static file serving (centralized configuration)
 configureStaticFiles(app);
 
 // Initialize Parse Server (async initialization handled in module)
-let parseServer;
 initializeParseServer()
   .then((server) => {
     parseServer = server;
@@ -226,104 +332,26 @@ securityMiddlewares.forEach((middleware) => {
 // SECURITY: Disabled in production (PCI DSS 4.0.1 compliant)
 configureRedoclyDocs(app);
 
-// Session health check endpoint (before other routes)
-app.get('/api/session/health', sessionRecovery.sessionHealthEndpoint);
-
-// Parse context middleware - Global user context propagation for audit trails
-// Uses AsyncLocalStorage to make user context available throughout request lifecycle
-// IMPORTANT: Must be applied BEFORE routes to capture all authenticated requests
-app.use(parseContextMiddleware);
-
-// Audit context middleware - Propagates authenticated user context to Parse hooks
-// IMPORTANT: Must be applied AFTER authentication middleware but BEFORE routes
-app.use(auditContextMiddleware);
-
-// Public Routes (no authentication - must be before other routes)
-app.use('/', publicRoutes);
-
-// API Routes
-app.use('/api', apiRoutes);
-
-// Authentication Routes
-app.use('/auth', authRoutes);
-
-// Documentation Routes
-app.use('/', docsRoutes);
-
-// Dashboard Routes
-app.use('/dashboard', dashboardRoutes);
-
-// Atomic Design Routes
-app.use('/atomic', atomicRoutes);
-
-// Web Routes (must be last to avoid route conflicts)
-app.use('/', webRoutes);
-
-// Health check endpoint (uses centralized health check module)
-app.get('/health', async (req, res) => {
-  try {
-    const healthCheck = await getHealthCheck();
-    const statusCode = healthCheck.status === 'healthy' ? 200 : 503;
-    res.status(statusCode).json(healthCheck);
-  } catch (error) {
-    logger.error('Health check error:', error);
-    res.status(503).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      error: error.message,
-    });
-  }
-});
-
-// Metrics endpoint for monitoring (uses centralized metrics module)
-app.get('/metrics', async (req, res) => {
-  try {
-    const metrics = await getMetrics(parseServer);
-    res.json(metrics);
-  } catch (error) {
-    logger.error('Error generating metrics:', error);
-    res.status(500).json({
-      error: 'Failed to generate metrics',
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404);
-
-  if (req.accepts('html')) {
-    res.render('errors/404', {
-      title: 'Page Not Found',
-      message: 'The page you are looking for does not exist.',
-      url: req.url,
-    });
-  } else if (req.accepts('json')) {
-    res.json({
-      error: 'Not Found',
-      message: 'The requested resource was not found',
-      path: req.url,
-    });
-  } else {
-    res.type('txt').send('Not Found');
-  }
-});
-
-// Error handling middleware (must be last)
-app.use(errorHandler);
+// Routes, error handlers, and endpoints are now mounted inside the i18n initialization promise
+// This ensures the i18n middleware is applied before any route handlers execute
 
 // Start server only if this file is run directly (not imported for testing)
 let server;
 if (require.main === module) {
-  server = app.listen(PORT, () => {
-    logger.info(`AmexingWeb API Server running on http://localhost:${PORT}`);
-    logger.info(`Parse Server endpoint: http://localhost:${PORT}/parse`);
-    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  // Wait for i18n initialization before starting server
+  initPromise.then(() => {
+    server = app.listen(PORT, () => {
+      logger.info(`AmexingWeb API Server running on http://localhost:${PORT}`);
+      logger.info(`Parse Server endpoint: http://localhost:${PORT}/parse`);
+      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
-    if (process.env.NODE_ENV === 'production') {
-      logger.info('Running in PRODUCTION mode with enhanced security');
-    }
+      if (process.env.NODE_ENV === 'production') {
+        logger.info('Running in PRODUCTION mode with enhanced security');
+      }
+    });
+  }).catch((error) => {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
   });
 }
 

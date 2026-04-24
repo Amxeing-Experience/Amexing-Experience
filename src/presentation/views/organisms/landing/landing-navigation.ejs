@@ -7,12 +7,16 @@ Features transparent overlay design with smooth transitions
 @param {string} currentPage - Current page identifier (optional)
 @param {boolean} transparent - Whether nav should be transparent (default: true)
 @param {object} companyInfo - Company information object (optional)
+@param {object} req - Express request object with i18n
+@param {function} t - Translation function
 
 @example
 include('organisms/landing/landing-navigation', {
     user: user,
     currentPage: 'home',
-    transparent: true
+    transparent: true,
+    req: req,
+    t: t
 })
 %>
 
@@ -27,6 +31,9 @@ const company = typeof companyInfo !== 'undefined' ? companyInfo : {
     name: 'AMEXING',
     tagline: 'Experience'
 };
+const currentLang = (typeof req !== 'undefined' && req.language) || 'es';
+const isEnglish = currentLang === 'en';
+const translate = typeof t !== 'undefined' ? t : (key) => key;
 %>
 
 <nav class="landing-nav <%= isTransparent ? 'landing-nav--transparent' : '' %>" id="landingNav">
@@ -40,41 +47,40 @@ const company = typeof companyInfo !== 'undefined' ? companyInfo : {
         
         <!-- Mobile logo (visible only on mobile) -->
         <div class="landing-nav__mobile-logo">
-            <a href="/" class="landing-nav__logo">
+            <a href="<%= isEnglish ? '/en' : '/' %>" class="landing-nav__logo">
                 <img src="/images/logos/light_white_amexing.png" alt="AMEXING EXPERIENCE" class="landing-nav__logo-img">
             </a>
         </div>
-        
         <div class="landing-nav__menu" id="landingNavMenu">
             <ul class="landing-nav__list">
                 <li class="landing-nav__item">
-                    <a href="/nosotros" class="landing-nav__link <%= activePage === 'about' ? 'landing-nav__link--active' : '' %>">
-                        NOSOTROS
+                    <a href="<%= isEnglish ? '/en/about' : '/nosotros' %>" class="landing-nav__link <%= activePage === 'about' ? 'landing-nav__link--active' : '' %>">
+                        <%= translate('navbar:menu.about') %>
                     </a>
                 </li>
                 <li class="landing-nav__item">
-                    <a href="/servicios" class="landing-nav__link <%= activePage === 'services' ? 'landing-nav__link--active' : '' %>">
-                        SERVICIOS
+                    <a href="<%= isEnglish ? '/en/services' : '/servicios' %>" class="landing-nav__link <%= activePage === 'services' ? 'landing-nav__link--active' : '' %>">
+                        <%= translate('navbar:menu.services') %>
                     </a>
                 </li>
                 <li class="landing-nav__item">
-                    <a href="/nuestra-flota" class="landing-nav__link <%= activePage === 'fleet' ? 'landing-nav__link--active' : '' %>">
-                        NUESTRA FLOTA
+                    <a href="<%= isEnglish ? '/en/our-fleet' : '/nuestra-flota' %>" class="landing-nav__link <%= activePage === 'fleet' ? 'landing-nav__link--active' : '' %>">
+                        <%= translate('navbar:menu.fleet') %>
                     </a>
                 </li>
                 <li class="landing-nav__item landing-nav__item--logo">
-                    <a href="/" class="landing-nav__logo">
+                    <a href="<%= isEnglish ? '/en' : '/' %>" class="landing-nav__logo">
                         <img src="/images/logos/light_white_amexing.png" alt="AMEXING EXPERIENCE" class="landing-nav__logo-img">
                     </a>
                 </li>
                 <li class="landing-nav__item">
-                    <a href="/contacto" class="landing-nav__link <%= activePage === 'contact' ? 'landing-nav__link--active' : '' %>">
-                        CONTACTO
+                    <a href="<%= isEnglish ? '/en/contact' : '/contacto' %>" class="landing-nav__link <%= activePage === 'contact' ? 'landing-nav__link--active' : '' %>">
+                        <%= translate('navbar:menu.contact') %>
                     </a>
                 </li>
                 <li class="landing-nav__item landing-nav__item--actions">
-                    <a href="/contacto#book" class="landing-nav__book-btn">
-                        BOOK NOW
+                    <a href="<%= isEnglish ? '/en/contact' : '/contacto' %>#book" class="landing-nav__book-btn">
+                        <%= translate('navbar:menu.bookNow') %>
                     </a>
                 </li>
                 <li class="landing-nav__item landing-nav__item--user">
@@ -85,14 +91,14 @@ const company = typeof companyInfo !== 'undefined' ? companyInfo : {
                 <li class="landing-nav__item landing-nav__item--language">
                     <div class="landing-nav__language-switcher">
                         <button class="landing-nav__language-btn" id="languageBtn" aria-label="Change Language">
-                            <img src="/images/icons/spanish.png" alt="Spanish" class="landing-nav__language-icon" id="currentLanguageIcon">
+                            <img src="/images/icons/<%= currentLang === 'en' ? 'english' : 'spanish' %>.png" alt="<%= currentLang === 'en' ? 'English' : 'Spanish' %>" class="landing-nav__language-icon" id="currentLanguageIcon">
                         </button>
                         <div class="landing-nav__language-dropdown" id="languageDropdown">
-                            <a href="#" class="landing-nav__language-option" data-lang="es">
+                            <a href="/set-language/es" class="landing-nav__language-option" data-lang="es">
                                 <img src="/images/icons/spanish.png" alt="Español" class="landing-nav__language-option-icon">
                                 <span>Español</span>
                             </a>
-                            <a href="#" class="landing-nav__language-option" data-lang="en">
+                            <a href="/set-language/en" class="landing-nav__language-option" data-lang="en">
                                 <img src="/images/icons/english.png" alt="English" class="landing-nav__language-option-icon">
                                 <span>English</span>
                             </a>
@@ -369,7 +375,6 @@ const company = typeof companyInfo !== 'undefined' ? companyInfo : {
     left: 50%;
     transform: translateX(-50%);
 }
-
 .landing-nav__toggle {
     display: none;
     flex-direction: column;
@@ -475,7 +480,6 @@ const company = typeof companyInfo !== 'undefined' ? companyInfo : {
         margin-left: 0.75rem;
     }
 }
-
 @media (max-width: 1024px) {
     .landing-nav__container {
         padding: 0 1.5rem;
@@ -587,12 +591,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Language Switcher
     const languageBtn = document.getElementById('languageBtn');
     const languageDropdown = document.getElementById('languageDropdown');
-    const currentLanguageIcon = document.getElementById('currentLanguageIcon');
-    const languageOptions = document.querySelectorAll('.landing-nav__language-option');
-
-    // Initialize language from localStorage or default to Spanish
-    let currentLanguage = localStorage.getItem('preferredLanguage') || 'es';
-    updateLanguageIcon(currentLanguage);
 
     // Language switcher functionality
     if (languageBtn && languageDropdown) {
@@ -601,44 +599,12 @@ document.addEventListener('DOMContentLoaded', function() {
             languageDropdown.classList.toggle('landing-nav__language-dropdown--open');
         });
 
-        // Language option selection
-        languageOptions.forEach(option => {
-            option.addEventListener('click', function(e) {
-                e.preventDefault();
-                const selectedLang = this.getAttribute('data-lang');
-                
-                // Update current language
-                currentLanguage = selectedLang;
-                localStorage.setItem('preferredLanguage', selectedLang);
-                
-                // Update icon
-                updateLanguageIcon(selectedLang);
-                
-                // Close dropdown
-                languageDropdown.classList.remove('landing-nav__language-dropdown--open');
-                
-                // Here you can add actual language switching logic
-                // For example: window.location.href = `/${selectedLang}${window.location.pathname}`;
-                console.log('Language changed to:', selectedLang);
-            });
-        });
-
         // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
             if (!languageBtn.contains(e.target) && !languageDropdown.contains(e.target)) {
                 languageDropdown.classList.remove('landing-nav__language-dropdown--open');
             }
         });
-    }
-
-    function updateLanguageIcon(lang) {
-        if (currentLanguageIcon) {
-            const iconPath = lang === 'es' ? '/images/icons/spanish.png' : '/images/icons/english.png';
-            const altText = lang === 'es' ? 'Spanish' : 'English';
-            
-            currentLanguageIcon.src = iconPath;
-            currentLanguageIcon.alt = altText;
-        }
     }
 
     if (navToggle && navMenu) {

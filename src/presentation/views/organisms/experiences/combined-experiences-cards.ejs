@@ -2806,6 +2806,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const itineraryTabItem = document.getElementById('itineraryTabItem');
         const itineraryCountBadge = document.getElementById('itineraryCountBadge');
 
+        // Hide tab for department_manager and client roles
+        <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+            if (itineraryTabItem) itineraryTabItem.style.display = 'none';
+            return;
+        <% } %>
+
         const subconcepts = experience.serviceItems?.subconcepts || [];
 
         // Hide tab if no services

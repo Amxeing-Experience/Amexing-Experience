@@ -184,7 +184,6 @@ Created by Denisse Maldonado
             border-color: currentColor;
             transform: rotate(-45deg);
         }
-        
         /* Accessibility */
         .sr-only {
             position: absolute;
@@ -319,14 +318,14 @@ Created by Denisse Maldonado
         
         .testimonios-section__slider {
             position: relative;
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
         }
         
         .testimonios-section__slider-container {
             overflow: hidden;
             border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            /* box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); */
         }
         
         .testimonios-section__slides {
@@ -338,60 +337,48 @@ Created by Denisse Maldonado
             min-width: 100%;
             padding: 2rem;
             background: white;
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
         }
         
         .testimonios-section__card {
-            max-width: 600px;
-            margin: 0 auto;
+            flex: 1;
+            max-width: 350px;
             text-align: left;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
         
         .testimonios-section__rating {
+            text-align: left !important;
             margin-bottom: 1rem;
-            height: 20px;
         }
         
-        .testimonios-section__rating img {
-            height: 100%;
+        .testimonios-section__rating-img {
+            height: 20px;
             width: auto;
         }
         
         .testimonios-section__text {
-            font-family: var(--font-myriad);
-            font-weight: 400;
-            font-size: 1.1rem;
-            line-height: 1.6;
+            margin: 1rem 0;
+            line-height: 1.5;
             color: #333;
-            margin-bottom: 1rem;
-            quotes: """ """;
-        }
-        
-        .testimonios-section__text::before {
-            content: open-quote;
-            font-size: 1.5em;
-            color: #969b81;
-            margin-right: 0.2em;
-        }
-        
-        .testimonios-section__text::after {
-            content: close-quote;
-            font-size: 1.5em;
-            color: #969b81;
-            margin-left: 0.2em;
+            text-align: left;
+            font-size: 1rem;
         }
         
         .testimonios-section__attribution {
-            font-family: var(--font-myriad);
-            font-weight: 300;
-            font-size: 0.9rem;
             color: #666;
-            font-style: italic;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+            text-align: left;
         }
         
-        .testimonios-section__date {
-            font-weight: 400;
-            color: #999;
-        }
+        
         
         .testimonios-section__navigation {
             position: absolute;
@@ -448,6 +435,34 @@ Created by Denisse Maldonado
         
         .testimonios-section__nav-arrow--right {
             transform: rotate(45deg);
+        }
+        
+        /* Responsive design for testimonials */
+        @media (max-width: 1024px) {
+            .testimonios-section__slide {
+                flex-wrap: wrap;
+            }
+            
+            .testimonios-section__card {
+                max-width: 45%;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .testimonios-section__slider {
+                max-width: 100%;
+            }
+            
+            .testimonios-section__slide {
+                flex-direction: column;
+                align-items: center;
+                padding: 1rem;
+            }
+            
+            .testimonios-section__card {
+                max-width: 100%;
+                margin-bottom: 1rem;
+            }
         }
         
         .testimonios-section__indicators {
@@ -634,7 +649,6 @@ Created by Denisse Maldonado
             .testimonios-section__container {
                 padding: 0 1rem;
             }
-            
             .testimonios-section__title {
                 margin-bottom: 3rem;
             }
@@ -642,7 +656,6 @@ Created by Denisse Maldonado
             .testimonios-section__slider {
                 margin: 0;
             }
-            
             
             .testimonios-section__slide {
                 padding: 2rem 1rem;
@@ -677,7 +690,6 @@ Created by Denisse Maldonado
             .testimonios-section__indicators {
                 margin-top: 1rem;
             }
-            
             .home-overview {
                 padding: 4rem 0;
             }
@@ -731,7 +743,6 @@ Created by Denisse Maldonado
                 line-height: 1.5;
             }
         }
-
         /* Print Styles */
         @media print {
             .landing-nav,
@@ -797,7 +808,9 @@ Created by Denisse Maldonado
             user: typeof user !== 'undefined' ? user : null,
             currentPage: 'home',
             transparent: true,
-            companyInfo: typeof company !== 'undefined' ? company : null
+            companyInfo: typeof company !== 'undefined' ? company : null,
+            req: typeof req !== 'undefined' ? req : null,
+            t: typeof t !== 'undefined' ? t : ((key) => key)
         }) %>
 
         <%# Main Content %>
@@ -1102,70 +1115,9 @@ Created by Denisse Maldonado
         // Initialize testimonios slider when DOM is loaded
         initTestimoniosSlider();
         
-        // Testimonials Data (from TripAdvisor API)
+        // Testimonials Data (from TripAdvisor API or fallback)
         const testimonialData = {
-            "data": [
-                {
-                    "id": 1054943083,
-                    "lang": "en",
-                    "rating": 5,
-                    "rating_image_url": "https://www.tripadvisor.com/img/cdsi/img2/ratings/traveler/s5.0-66827-5.svg",
-                    "text": "Angelica and her team are AMAZING. So easy and accommodating and fabulous follow up and assistance even when we returned to the US. Will you again and often. Highly recommend.",
-                    "title": "A Fabulous Experience",
-                    "published_date": "2026-03-31T22:49:10Z",
-                    "user": {
-                        "username": "lisapY2377ZG"
-                    }
-                },
-                {
-                    "id": 1054009617,
-                    "lang": "en",
-                    "rating": 5,
-                    "rating_image_url": "https://www.tripadvisor.com/img/cdsi/img2/ratings/traveler/s5.0-66827-5.svg",
-                    "text": "We've had a number of great experiences with Angelica Tours in San Miguel over the years. Michelle, the manager is wonderful. Their team is incredibly reliable - drivers are always friendly, professional, and right on time.",
-                    "title": "Great experience",
-                    "published_date": "2026-03-23T16:12:04Z",
-                    "user": {
-                        "username": "11tonya"
-                    }
-                },
-                {
-                    "id": 1053767833,
-                    "lang": "en",
-                    "rating": 5,
-                    "rating_image_url": "https://www.tripadvisor.com/img/cdsi/img2/ratings/traveler/s5.0-66827-5.svg",
-                    "text": "Angelica Tours in San Miguel is among the best ever. Angelica has led me and also friends of mine over the years through San Miguel and Guanajuato. She is amazing.",
-                    "title": "We have been with Angelica",
-                    "published_date": "2026-03-21T16:15:19Z",
-                    "user": {
-                        "username": "conniefB1715DQ"
-                    }
-                },
-                {
-                    "id": 1053341083,
-                    "lang": "en",
-                    "rating": 5,
-                    "rating_image_url": "https://www.tripadvisor.com/img/cdsi/img2/ratings/traveler/s5.0-66827-5.svg",
-                    "text": "We have used Angelica Tours for at least 20 years to drive us between our house in San Miguel and local airports. They have been very reliable, prompt and courteous.",
-                    "title": "Always use Angelica Tours",
-                    "published_date": "2026-03-17T12:54:43Z",
-                    "user": {
-                        "username": "343vivienneh"
-                    }
-                },
-                {
-                    "id": 1052022013,
-                    "lang": "en",
-                    "rating": 5,
-                    "rating_image_url": "https://www.tripadvisor.com/img/cdsi/img2/ratings/traveler/s5.0-66827-5.svg",
-                    "text": "Michelle was very responsive, planned well and the drivers, especially Luis, were kind, gracious and very courteous. They also knew the area well and offered suggestions for places to go.",
-                    "title": "Wonderful experience",
-                    "published_date": "2026-03-05T11:17:20Z",
-                    "user": {
-                        "username": "S4300BFbethh"
-                    }
-                }
-            ]
+            "data": <%- JSON.stringify(typeof testimonials !== 'undefined' ? testimonials : []) %>
         };
         
         // Function to format date
@@ -1175,25 +1127,24 @@ Created by Denisse Maldonado
             return date.toLocaleDateString('en-US', options);
         }
         
-        // Function to create testimonial card HTML
+        // Function to create testimonial card HTML (just the card, not the slide)
         function createTestimonialCard(testimonial) {
             const formattedDate = formatTestimonialDate(testimonial.published_date);
+            
             return `
-                <div class="testimonios-section__slide">
-                    <div class="testimonios-section__card">
-                        <div class="testimonios-section__rating">
-                            <img src="${testimonial.rating_image_url}" alt="${testimonial.rating} star rating" />
-                        </div>
-                        <p class="testimonios-section__text">${testimonial.text}</p>
-                        <div class="testimonios-section__attribution">
-                            Review by TripAdvisor Traveler <span class="testimonios-section__date">${formattedDate}</span>
-                        </div>
+                <div class="testimonios-section__card">
+                    <div class="testimonios-section__rating">
+                        <img src="${testimonial.rating_image_url}" alt="${testimonial.rating} star rating" class="testimonios-section__rating-img" />
+                    </div>
+                    <p class="testimonios-section__text">"${testimonial.text}"</p>
+                    <div class="testimonios-section__attribution">
+                        Review by Tripadvisor Traveler ${formattedDate}
                     </div>
                 </div>
             `;
         }
         
-        // Function to populate testimonials
+        // Function to populate testimonials (grouping by 3 per slide)
         function populateTestimonials() {
             const slidesContainer = document.getElementById('testimonialSlides');
             const indicatorsContainer = document.getElementById('testimonialIndicators');
@@ -1204,16 +1155,32 @@ Created by Denisse Maldonado
             slidesContainer.innerHTML = '';
             indicatorsContainer.innerHTML = '';
             
-            // Add testimonial cards
-            testimonialData.data.forEach((testimonial, index) => {
-                slidesContainer.innerHTML += createTestimonialCard(testimonial);
+            // Group testimonials by 3 and create slides
+            const testimonialsPerSlide = 3;
+            const totalTestimonials = testimonialData.data.length;
+            const totalSlides = Math.ceil(totalTestimonials / testimonialsPerSlide);
+            
+            for (let slideIndex = 0; slideIndex < totalSlides; slideIndex++) {
+                // Create slide container
+                let slideHTML = '<div class="testimonios-section__slide">';
                 
-                // Add indicator
+                // Add up to 3 testimonials per slide
+                const startIndex = slideIndex * testimonialsPerSlide;
+                const endIndex = Math.min(startIndex + testimonialsPerSlide, totalTestimonials);
+                
+                for (let i = startIndex; i < endIndex; i++) {
+                    slideHTML += createTestimonialCard(testimonialData.data[i]);
+                }
+                
+                slideHTML += '</div>';
+                slidesContainer.innerHTML += slideHTML;
+                
+                // Add indicator for this slide
                 const indicator = document.createElement('button');
-                indicator.className = `testimonios-section__indicator ${index === 0 ? 'testimonios-section__indicator--active' : ''}`;
-                indicator.setAttribute('data-slide', index);
+                indicator.className = `testimonios-section__indicator ${slideIndex === 0 ? 'testimonios-section__indicator--active' : ''}`;
+                indicator.setAttribute('data-slide', slideIndex);
                 indicatorsContainer.appendChild(indicator);
-            });
+            }
             
             // Re-initialize the slider after adding content
             initTestimoniosSlider();

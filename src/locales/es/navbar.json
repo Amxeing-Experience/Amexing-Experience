@@ -1,0 +1,11 @@
+{
+  "menu": {
+    "about": "NOSOTROS",
+    "services": "SERVICIOS",
+    "fleet": "NUESTRA FLOTA",
+    "contact": "CONTACTO",
+    "bookNow": "BOOK NOW",
+    "login": "Iniciar Sesión",
+    "dashboard": "Panel de Control"
+  }
+}

@@ -59,7 +59,9 @@ Created by Denisse Maldonado
         user: typeof user !== 'undefined' ? user : null,
         currentPage: typeof currentPage !== 'undefined' ? currentPage : 'services',
         transparent: false,
-        companyInfo: typeof company !== 'undefined' ? company : null
+        companyInfo: typeof company !== 'undefined' ? company : null,
+        req: typeof req !== 'undefined' ? req : null,
+        t: typeof t !== 'undefined' ? t : ((key) => key)
     }) %>
 
     <%# Page Hero Section %>
@@ -71,7 +73,10 @@ Created by Denisse Maldonado
     <%- include('organisms/landing/transporte-section') %>
 
     <%# Tours Section %>
-    <%- include('organisms/landing/tours-section') %>
+    <%- include('organisms/landing/tours-section', {
+        req: typeof req !== 'undefined' ? req : null,
+        t: typeof t !== 'undefined' ? t : ((key) => key)
+    }) %>
 
     <%# Eventos Section %>
     <%- include('organisms/landing/eventos-section') %>

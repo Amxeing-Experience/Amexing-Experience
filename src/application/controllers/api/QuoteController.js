@@ -515,6 +515,7 @@ class QuoteController {
       const searchValue = req.query.search?.value || '';
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'desc';
+      const dateFilter = req.query.dateFilter || 'future';
 
       // Column mapping for sorting (must match frontend columns exactly)
       // Frontend columns depend on user role (admin/superadmin show client column)
@@ -574,9 +575,6 @@ class QuoteController {
         filteredQuery.include('rate');
         filteredQuery.include('createdBy');
       }
-
-      // Get count of filtered results
-      const recordsFiltered = await filteredQuery.count({ useMasterKey: true });
 
       // Apply sorting
       if (sortDirection === 'asc') {
@@ -735,19 +733,76 @@ class QuoteController {
               const si = quote.get('serviceItems');
               return (si && si.days) ? si.days.length : 0;
             })(),
+            serviceItems: quote.get('serviceItems') || {
+              days: [],
+              subtotal: 0,
+              iva: 0,
+              total: 0,
+            },
             createdAt: quote.createdAt,
             updatedAt: quote.updatedAt,
           };
         })
       );
 
+      // Apply date filtering to the data array
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of today
+
+      const filteredData = data.filter((quote) => {
+        const serviceItems = quote.serviceItems || {};
+        const days = serviceItems.days || [];
+
+        // Check if quote has no services or no valid dates
+        const hasNoServices = days.length === 0;
+        let hasValidDates = false;
+        let earliestDate = null;
+        let latestDate = null;
+
+        // Calculate earliest and latest service dates
+        for (const day of days) {
+          if (day.date) {
+            hasValidDates = true;
+            const serviceDate = new Date(`${day.date}T12:00:00`);
+            if (!earliestDate || serviceDate < earliestDate) {
+              earliestDate = serviceDate;
+            }
+            if (!latestDate || serviceDate > latestDate) {
+              latestDate = serviceDate;
+            }
+          }
+        }
+
+        if (dateFilter === 'no-services') {
+          // Show only quotes without services or without valid dates
+          return hasNoServices || !hasValidDates;
+        }
+
+        if (hasNoServices || !hasValidDates) {
+          // Quotes without services should not appear in future/previous filters
+          return false;
+        }
+
+        if (dateFilter === 'future') {
+          // Show quotes where the earliest service date is today or in the future
+          return earliestDate >= today;
+        } if (dateFilter === 'previous') {
+          // Show quotes where the latest service date has passed
+          return latestDate < today;
+        }
+
+        return true;
+      });
+
+      // Update recordsFiltered count for DataTables based on date filtering
+
       // DataTables response format
       const response = {
         success: true,
         draw,
         recordsTotal,
-        recordsFiltered,
-        data,
+        recordsFiltered: filteredData.length,
+        data: filteredData,
       };
 
       return res.json(response);
@@ -1939,27 +1994,37 @@ class QuoteController {
         return this.sendError(res, 'Tarifa no encontrada', 404);
       }
 
-      // 4. Get services filtered by this rate
-      const servicesQuery = new Parse.Query('Service');
-      servicesQuery.equalTo('rate', rate);
-      servicesQuery.equalTo('active', true);
-      servicesQuery.equalTo('exists', true);
-      servicesQuery.include('originPOI');
-      servicesQuery.include('destinationPOI');
-      servicesQuery.include('destinationPOI.serviceType');
-      servicesQuery.include('vehicleType');
-      servicesQuery.limit(1000); // Support large datasets
+      // 4. Get RatePrices filtered by this rate (matching traslados system)
+      const ratePricesQuery = new Parse.Query('RatePrices');
+      ratePricesQuery.equalTo('rate', {
+        __type: 'Pointer',
+        className: 'Rate',
+        objectId: rateId,
+      });
+      ratePricesQuery.equalTo('exists', true);
+      ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only active (non-historical) prices
+      ratePricesQuery.include([
+        'service',
+        'service.originPOI',
+        'service.destinationPOI',
+        'service.originPOI.serviceType',
+        'service.destinationPOI.serviceType',
+        'vehicleType',
+      ]);
+      ratePricesQuery.limit(1000); // Support large datasets
 
-      const services = await servicesQuery.find({ useMasterKey: true });
+      const ratePrices = await ratePricesQuery.find({ useMasterKey: true });
 
       // 5. Group services by route (origin → destination)
       const routeMap = new Map();
 
       // Use for...of to support async price calculations
-      for (const service of services) {
-        const originPOI = service.get('originPOI');
-        const destinationPOI = service.get('destinationPOI');
-        const vehicleType = service.get('vehicleType');
+      for (const ratePrice of ratePrices) {
+        const service = ratePrice.get('service');
+        const originPOI = service?.get('originPOI');
+        const destinationPOI = service?.get('destinationPOI');
+        const vehicleType = ratePrice.get('vehicleType');
         const serviceType = destinationPOI?.get('serviceType');
 
         const originId = originPOI ? originPOI.id : 'local';
@@ -1996,8 +2061,8 @@ class QuoteController {
         // Filter by capacity if quoteNumberOfPeople is provided
         // Only add vehicle if it meets capacity requirements
         if (!(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople)) {
-          // Get price breakdown with surcharge
-          const basePrice = service.get('price') || 0;
+          // Get price breakdown with surcharge (from RatePrices record)
+          const basePrice = ratePrice.get('price') || 0;
           const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
 
           // Add vehicle type to this route with price breakdown and capacity info
@@ -2033,7 +2098,7 @@ class QuoteController {
       logger.info('Available services fetched and grouped by rate', {
         rateId,
         rateName: rate.get('name'),
-        servicesCount: services.length,
+        servicesCount: ratePrices.length,
         routesCount: groupedRoutes.length,
         userId: currentUser.id,
       });

@@ -601,13 +601,13 @@
                         <span class="sm-quote-info-label">Folio</span>
                         <span class="sm-quote-info-value" id="summaryFolio">-</span>
                     </div>
-                    <div class="sm-quote-info-item d-print-none">
-                        <span class="sm-quote-info-label">Fecha</span>
-                        <span class="sm-quote-info-value" id="summaryCurrentDate">-</span>
+                    <div class="sm-quote-info-item">
+                        <span class="sm-quote-info-label">Fecha de Creación</span>
+                        <span class="sm-quote-info-value" id="summaryGenerationDate">-</span>
                     </div>
                     <div class="sm-quote-info-item">
-                        <span class="sm-quote-info-label">Generación</span>
-                        <span class="sm-quote-info-value" id="summaryGenerationDate">-</span>
+                        <span class="sm-quote-info-label">Última actualización</span>
+                        <span class="sm-quote-info-value" id="summaryLastUpdated">-</span>
                     </div>
                 </div>
                 <div class="sm-quote-info-divider"></div>
@@ -741,8 +741,8 @@
 
             // Populate summary information
             document.getElementById('summaryFolio').textContent = quote.folio || quote.id || 'N/A';
-            document.getElementById('summaryCurrentDate').textContent = formatDateSpanish(new Date());
             document.getElementById('summaryGenerationDate').textContent = formatDateSpanish(quote.createdAt);
+            document.getElementById('summaryLastUpdated').textContent = formatDateSpanish(quote.updatedAt);
             // Atención a
             const contactPerson = quote.contactPerson || '';
             const summaryContactPersonElement = document.getElementById('summaryContactPerson');

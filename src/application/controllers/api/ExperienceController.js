@@ -204,10 +204,18 @@ class ExperienceController {
    * @param {Array<Parse.Object>} includedProviderExperiences - Included provider experiences.
    * @param {Array<Parse.Object>} includedTours - Included tours.
    * @param {Parse.Object} vehicleType - Vehicle type object.
+   * @param destinationPOI
    * @returns {object} Formatted experience data.
    * @example
    */
-  formatExperienceData(experience, includedExperiences, includedProviderExperiences, includedTours, vehicleType) {
+  formatExperienceData(
+    experience,
+    includedExperiences,
+    includedProviderExperiences,
+    includedTours,
+    vehicleType,
+    destinationPOI = null
+  ) {
     return {
       id: experience.id,
       name: experience.get('name'),
@@ -233,6 +241,11 @@ class ExperienceController {
       team_notes: experience.get('team_notes') || null,
       vehicleType: this.formatVehicleType(vehicleType),
       vehicleTypeId: vehicleType ? vehicleType.id : null,
+      destinationPOI: destinationPOI ? {
+        id: destinationPOI.id,
+        name: destinationPOI.get('name'),
+        serviceType: destinationPOI.get('serviceType'),
+      } : null,
       experiences: includedExperiences.map((exp) => exp.id),
       experienceDetails: this.formatExperienceDetails(includedExperiences),
       providerExperiences: includedProviderExperiences.map((provExp) => provExp.id),
@@ -277,6 +290,7 @@ class ExperienceController {
       query.include('providerExperiences');
       query.include('tours');
       query.include('vehicleType');
+      query.include('destinationPOI');
 
       const experience = await query.get(experienceId, { useMasterKey: true });
 
@@ -288,13 +302,15 @@ class ExperienceController {
       const includedProviderExperiences = experience.get('providerExperiences') || [];
       const includedTours = experience.get('tours') || [];
       const vehicleType = experience.get('vehicleType');
+      const destinationPOI = experience.get('destinationPOI');
 
       const data = this.formatExperienceData(
         experience,
         includedExperiences,
         includedProviderExperiences,
         includedTours,
-        vehicleType
+        vehicleType,
+        destinationPOI
       );
 
       // Debug logging
@@ -863,6 +879,7 @@ class ExperienceController {
     const {
       name,
       description,
+      type,
       cost,
       duration,
       providerType,
@@ -900,6 +917,35 @@ class ExperienceController {
         return { error: 'Description cannot be empty', status: 400 };
       }
       experienceObj.set('description', description);
+    }
+
+    // Handle type field updates (only allow Provider <-> Establishment conversions)
+    if (type !== undefined) {
+      const currentType = experienceObj.get('type');
+
+      // Validate the new type is valid
+      if (!['Experience', 'Provider', 'Establishment'].includes(type)) {
+        return { error: 'Type must be Experience, Provider, or Establishment', status: 400 };
+      }
+
+      // Only allow Provider <-> Establishment conversions
+      if (currentType === 'Provider' && type !== 'Establishment' && type !== 'Provider') {
+        return { error: 'Provider can only be converted to Establishment', status: 400 };
+      }
+      if (currentType === 'Establishment' && type !== 'Provider' && type !== 'Establishment') {
+        return { error: 'Establishment can only be converted to Provider', status: 400 };
+      }
+      if (currentType === 'Experience' && type !== 'Experience') {
+        return { error: 'Experience type cannot be changed to Provider or Establishment', status: 400 };
+      }
+
+      // If converting from Provider to Establishment or vice versa, clear providerType
+      if ((currentType === 'Provider' && type === 'Establishment')
+          || (currentType === 'Establishment' && type === 'Provider')) {
+        experienceObj.unset('providerType');
+      }
+
+      experienceObj.set('type', type);
     }
 
     // Store cost change info for versioning (but don't return early - process all fields first)
@@ -1804,6 +1850,12 @@ class ExperienceController {
         }
         : null,
       vehicleTypeId: vehicleType ? vehicleType.id : null,
+      destinationPOI: experience.get('destinationPOI') ? {
+        objectId: experience.get('destinationPOI').id,
+        id: experience.get('destinationPOI').id,
+        name: experience.get('destinationPOI').get('name'),
+        serviceType: experience.get('destinationPOI').get('serviceType'),
+      } : null,
       experiences: includedExperiences.map((exp) => ({
         id: exp.id,
         name: exp.get('name'),
