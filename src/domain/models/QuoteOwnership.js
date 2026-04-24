@@ -321,7 +321,7 @@ class QuoteOwnership extends BaseModel {
 
     try {
       currentOwnership = await currentQuery.first({ useMasterKey: true });
-      
+
       // Handle missing ownership records - create initial ownership for fromOwner first
       if (!currentOwnership) {
         logger.info('No current ownership found, creating initial ownership for fromOwner', {
@@ -342,7 +342,7 @@ class QuoteOwnership extends BaseModel {
 
         await initialOwnership.save(null, { useMasterKey: true });
         currentOwnership = initialOwnership;
-        
+
         logger.info('Created initial ownership record', {
           quoteId: quote.id,
           initialOwnershipId: currentOwnership.id,

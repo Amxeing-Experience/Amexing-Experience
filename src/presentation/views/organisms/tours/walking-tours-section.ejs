@@ -722,9 +722,37 @@ async function loadWalkingTourForEdit(tourId) {
         $('#saveWalkingButtonText').text('Guardar Cambios');
         $('#walkingTourId').val(tourId);
         
+        // Clear POI dropdown immediately before opening modal to avoid showing old value
+        const clearPOIDropdown = () => {
+            const walkingDestElement = document.getElementById('walkingDestinationPOI');
+            if (walkingDestElement) {
+                // Clear custom select value
+                if (walkingDestElement.customSelect) {
+                    walkingDestElement.customSelect.setValue('');
+                }
+                // Reset display to placeholder
+                const displayEl = document.getElementById('walkingDestinationPOI_display');
+                if (displayEl) {
+                    const textEl = displayEl.querySelector('.dropdown-selected-text');
+                    if (textEl) {
+                        textEl.textContent = 'Seleccionar destino del tour a pie';
+                        textEl.classList.add('text-muted');
+                    }
+                }
+            }
+        };
+        clearPOIDropdown();
+        
         // Open the modal
         const modal = new bootstrap.Modal(walkingTourModal);
         modal.show();
+        
+        // Load POI dropdown data for edit modal (will also clear again for consistency)
+        if (typeof loadWalkingTourDropdownData === 'function') {
+            loadWalkingTourDropdownData();
+        } else {
+            console.warn('loadWalkingTourDropdownData not available');
+        }
         
         // Wait for modal to be fully shown before populating data
         walkingTourModal.addEventListener('shown.bs.modal', function modalShownHandler() {
@@ -822,34 +850,55 @@ function populateWalkingTourForm(tourData) {
     setFieldValue('walkingNotIncludes', Array.isArray(notIncludesValue) ? notIncludesValue.join('\n') : notIncludesValue);
     setFieldValue('walkingLanguages', Array.isArray(languagesValue) ? languagesValue.join('\n') : languagesValue);
 
-    // Set destination POI
-    setTimeout(() => {
+    // Set destination POI - with retry logic for custom select
+    const setWalkingPOI = () => {
         const walkingDestElement = document.getElementById('walkingDestinationPOI');
         
-        if (walkingDestElement && walkingDestElement.tomselect) {
-            // Try extensive POI reference formats
-            const poiId = tour.destinationPOI?.objectId || 
-                         tour.destinationPOI?.id || 
-                         tour.destinationPOI || 
-                         tour.destination_poi || 
-                         tour.poi?.objectId ||
-                         tour.poi?.id ||
-                         tour.poi ||
-                         tour.poiId ||
-                         tour.destination?.objectId ||
-                         tour.destination?.id ||
-                         tour.destination ||
-                         tour.destinationId;
-            
-            if (poiId) {
+        // Try extensive POI reference formats
+        const poiId = tour.destinationPOI?.objectId || 
+                     tour.destinationPOI?.id || 
+                     tour.destinationPOI || 
+                     tour.destination_poi || 
+                     tour.poi?.objectId ||
+                     tour.poi?.id ||
+                     tour.poi ||
+                     tour.poiId ||
+                     tour.destination?.objectId ||
+                     tour.destination?.id ||
+                     tour.destination ||
+                     tour.destinationId;
+        
+        if (!poiId) {
+            console.log('No POI ID found in tour data');
+            return;
+        }
+        
+        // Check for both TomSelect and custom select
+        if (walkingDestElement) {
+            if (walkingDestElement.tomselect) {
                 try {
                     walkingDestElement.tomselect.setValue(poiId);
+                    console.log('Set POI value via TomSelect:', poiId);
                 } catch (error) {
-                    console.error('Error setting POI:', error);
+                    console.error('Error setting POI via TomSelect:', error);
                 }
+            } else if (walkingDestElement.customSelect) {
+                try {
+                    walkingDestElement.customSelect.setValue(poiId);
+                    console.log('Set POI value via custom select:', poiId);
+                } catch (error) {
+                    console.error('Error setting POI via custom select:', error);
+                }
+            } else {
+                // Neither TomSelect nor custom select ready yet, retry
+                console.log('Waiting for select to be ready...');
+                setTimeout(setWalkingPOI, 500);
             }
         }
-    }, 1000); // Delay to ensure TomSelect is ready
+    };
+    
+    // Initial delay to allow POI dropdown to load options
+    setTimeout(setWalkingPOI, 1500); // Increased delay to ensure options are loaded
 
     // Load existing photos
     if (tour.photos && Array.isArray(tour.photos) && tour.photos.length > 0) {

@@ -1,0 +1,79 @@
+{
+  "home": {
+    "title": "Amexing Experience - Premium Transportation in San Miguel de Allende",
+    "description": "Premium transportation experience in San Miguel de Allende with Tesla fleet and 30 years of expertise. Luxury services, exclusive tours and personalized attention for discerning travelers.",
+    "keywords": "premium transport, San Miguel de Allende, Tesla, luxury tours, executive transportation, chauffeur service"
+  },
+  "about": {
+    "title": "About Us - Amexing Experience",
+    "description": "With over 30 years of excellence in premium transportation in San Miguel de Allende. Discover our history, mission and the values that set us apart as the region's leading luxury transport provider.",
+    "keywords": "about us, amexing experience, history, san miguel de allende, premium transport, luxury travel"
+  },
+  "services": {
+    "title": "Services - Amexing Experience",
+    "description": "Premium transportation services, exclusive tours and bespoke luxury experiences in San Miguel de Allende. Tesla fleet, customized itineraries, and world-class hospitality.",
+    "keywords": "services, premium transport, luxury tours, tesla, san miguel de allende, bespoke experiences, chauffeur service"
+  },
+  "fleet": {
+    "title": "Our Fleet - Amexing Experience",
+    "description": "Discover our premium fleet featuring Tesla vehicles and other luxury automobiles for executive transportation in San Miguel de Allende. Comfort, elegance, and sustainability combined.",
+    "keywords": "fleet, tesla, luxury vehicles, executive transport, san miguel de allende, sustainable transportation"
+  },
+  "contact": {
+    "title": "Contact - Amexing Experience",
+    "description": "Contact Amexing Experience to reserve your premium transportation in San Miguel de Allende. Available via WhatsApp, email and online bookings. Your luxury journey starts here.",
+    "keywords": "contact, reservations, whatsapp, booking, san miguel de allende, premium transport, luxury travel"
+  },
+  "toursSection": {
+    "title": "Tours &",
+    "subtitle": "Experiences",
+    "description1": "Discover the magic of San Miguel de Allende through our exclusive tours and experiences. With over three decades of expertise, we offer personalized journeys that showcase the best of our region's culture, cuisine, and natural beauty.",
+    "description2": "From wine tastings to historical tours, each experience is carefully curated to create unforgettable memories for our distinguished guests.",
+    "cards": {
+      "catas": "WINE TASTINGS",
+      "gastronomicas": "GASTRONOMIC",
+      "culturales": "CULTURAL",
+      "pueblos": "MAGICAL TOWNS",
+      "magicos": "MAGICAL",
+      "piramides": "PYRAMIDS",
+      "aventura": "ADVENTURE",
+      "arte": "ART",
+      "historia": "HISTORY & ARCHITECTURE",
+      "naturaleza": "NATURE"
+    }
+  },
+  "contactSection": {
+    "formTitle": "Get in Touch",
+    "form": {
+      "email": "Email",
+      "phone": "Phone",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "company": "Company (optional)",
+      "subject": "Message Subject",
+      "message": "Message",
+      "sendButton": "SEND MESSAGE",
+      "sending": "SENDING..."
+    },
+    "info": {
+      "office": "Office:",
+      "officePhone": "+52 (415) 167 39 90",
+      "emergency": "Emergency Only:",
+      "emergencyPhone": "+52 (415) 153 50 67",
+      "hours": "Office Hours:",
+      "hoursText": "Monday to Saturday<br>08:00 AM to 03:00 PM (CDT)",
+      "emailLabel": "Email:",
+      "emailAddress": "contact@amexing.com"
+    },
+    "validation": {
+      "requiredFields": "Please complete all required fields.",
+      "messageMinLength": "Message must be at least 10 characters.",
+      "messageMaxLength": "Message cannot exceed 2000 characters.",
+      "invalidEmail": "Please enter a valid email address.",
+      "successMessage": "Thank you for your message! We'll be in touch soon.",
+      "errorMessage": "There was an error sending your message. Please try again.",
+      "connectionError": "Connection error. Please check your internet connection and try again.",
+      "characterCounter": "characters"
+    }
+  }
+}

@@ -2039,10 +2039,7 @@ async function getAccessToken() {
         // Initialize for all users - both rates are loaded above
         // Load rates for the header filter
         loadRatesForFilter();
-        // Load POIs for dropdowns
-        loadDropdownData();
-        // Load POIs for walking tour modal dropdown
-        loadWalkingTourDropdownData();
+        // Note: POI loading moved to modal open events for proper timing
 
         // Object to store day schedules
         let daySchedules = {};
@@ -2201,141 +2198,201 @@ async function getAccessToken() {
             }
         });
 
-        // Load options into a Tom Select instance, waiting for atom auto-initialization
-        function loadOptionsIntoTomSelect(elementId, data) {
+        // Load options into a Tom Select or Custom Select instance using proper async pattern
+        async function loadOptionsIntoTomSelect(elementId, data) {
+            console.log(`🔧 loadOptionsIntoTomSelect: Loading options into #${elementId}, data count:`, data.length);
+            
             const el = document.getElementById(elementId);
-            if (!el) return;
-            if (el.tomselect) {
-                el.tomselect.clearOptions();
-                data.forEach(function(poi) {
-                    el.tomselect.addOption({ value: poi.value, text: poi.label });
-                });
-                el.tomselect.refreshOptions(false);
-                el.tomselect.clear();
+            if (!el) {
+                console.error(`🔧 loadOptionsIntoTomSelect: Element #${elementId} not found in DOM!`);
                 return;
             }
-            setTimeout(function() { loadOptionsIntoTomSelect(elementId, data); }, 100);
+            console.log(`🔧 loadOptionsIntoTomSelect: Element #${elementId} exists in DOM`);
+            
+            // Wait for Tom Select or Custom Select to be initialized
+            console.log(`🔧 loadOptionsIntoTomSelect: Waiting for select initialization on #${elementId}...`);
+            const selectInstance = await waitForTomSelect(elementId);
+            if (!selectInstance) {
+                console.warn(`🔧 loadOptionsIntoTomSelect: No select instance found for #${elementId}`);
+                return;
+            }
+            console.log(`🔧 loadOptionsIntoTomSelect: Select instance found for #${elementId}, type:`, 
+                        selectInstance.constructor ? selectInstance.constructor.name : 'custom');
+            
+            // For custom select, explicitly remove template's default "no options" message
+            const optionsContainer = document.getElementById(elementId + '_options');
+            if (optionsContainer) {
+                // Remove any "No hay opciones disponibles" template message
+                const noOptionsMsg = optionsContainer.querySelector('.dropdown-item-text');
+                if (noOptionsMsg && noOptionsMsg.textContent.includes('No hay opciones disponibles')) {
+                    noOptionsMsg.remove();
+                    console.log(`🔧 loadOptionsIntoTomSelect: Removed template "no options" message`);
+                }
+            }
+            
+            // Clear existing options only if we have data to replace them
+            if (data && data.length > 0) {
+                selectInstance.clearOptions();
+                console.log(`🔧 loadOptionsIntoTomSelect: Cleared existing options`);
+            }
+            
+            // Add new options - handle both TomSelect and Custom Select APIs
+            data.forEach(function(poi) {
+                // Custom select expects 'text' property, POI data has 'label'
+                const option = {
+                    value: poi.value,
+                    text: poi.label  // Map 'label' to 'text' for custom select
+                };
+                selectInstance.addOption(option);
+            });
+            console.log(`🔧 loadOptionsIntoTomSelect: Added ${data.length} POI options`);
+            
+            // For custom select, ensure options are visible and properly displayed
+            if (optionsContainer) {
+                // Force refresh of option display
+                const allOptionElements = optionsContainer.querySelectorAll('.dropdown-option');
+                allOptionElements.forEach(option => {
+                    option.style.display = 'block';
+                });
+                console.log(`🔧 loadOptionsIntoTomSelect: Forced visibility refresh for ${allOptionElements.length} options`);
+            }
+            
+            // Refresh options (compatibility method for both implementations)
+            if (typeof selectInstance.refreshOptions === 'function') {
+                selectInstance.refreshOptions(false);
+            }
+            
+            // Clear selection but preserve options
+            if (typeof selectInstance.clear === 'function') {
+                selectInstance.clear();
+            } else if (typeof selectInstance.setValue === 'function') {
+                selectInstance.setValue('');
+            }
+            
+            console.log(`✅ loadOptionsIntoTomSelect: Successfully loaded options into #${elementId}`);
         }
 
         // Load dropdown options for tour modal
         function loadDropdownData(retryCount = 0) {
+            console.log('🔧 POI Loading: Starting loadDropdownData, retry count:', retryCount);
+            
+            // Check if target element exists
+            const targetElement = document.getElementById('destinationPOI');
+            console.log('🔧 POI Loading: destinationPOI element exists:', !!targetElement);
+            
+            // Immediately clear the dropdown selection to avoid showing old values
+            if (targetElement) {
+                // Clear custom select if available
+                if (targetElement.customSelect) {
+                    targetElement.customSelect.setValue('');
+                    console.log('🔧 POI Loading: Cleared existing selection (custom select)');
+                }
+                // Clear TomSelect if available
+                if (targetElement.tomselect) {
+                    targetElement.tomselect.clear();
+                    console.log('🔧 POI Loading: Cleared existing selection (TomSelect)');
+                }
+                // Clear the display text to show placeholder
+                const displayElement = document.getElementById('destinationPOI_display');
+                if (displayElement) {
+                    const placeholderText = displayElement.querySelector('.dropdown-selected-text');
+                    if (placeholderText) {
+                        placeholderText.textContent = 'Seleccionar...';
+                        placeholderText.classList.add('text-muted');
+                    }
+                }
+            }
+            
+            // Check authentication
+            const token = getAccessTokenSync();
+            console.log('🔧 POI Loading: Authentication token available:', !!token, token ? '(length: ' + token.length + ')' : '');
+            
             const maxRetries = 3;
 
             $.ajax({
                 url: '/api/pois/active?serviceType=Tours',
                 type: 'GET',
-                success: function(data) {
+                beforeSend: function(xhr) {
+                    console.log('🔧 POI Loading: Making API request to /api/pois/active?serviceType=Tours');
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        console.log('🔧 POI Loading: Added Authorization header');
+                    } else {
+                        console.warn('🔧 POI Loading: No authentication token available!');
+                    }
+                },
+                success: async function(data) {
+                    console.log('🔧 POI Loading: API response received:', data);
                     if (data.success && data.data) {
+                        console.log('🔧 POI Loading: POI data count:', data.data.length);
                         poisData = data.data;
-                        loadOptionsIntoTomSelect('destinationPOI', data.data);
+                        console.log('🔧 POI Loading: About to load options into TomSelect...');
+                        await loadOptionsIntoTomSelect('destinationPOI', data.data);
+                        console.log('✅ POI Loading: Successfully loaded POI options into destinationPOI');
+                    } else {
+                        console.error('🔧 POI Loading: Invalid API response structure:', data);
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error loading POIs for Tours:', error);
+                    console.error('❌ POI Loading Error:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        error: error,
+                        responseText: xhr.responseText,
+                        retryCount: retryCount
+                    });
                     if (xhr.status === 401 && retryCount < maxRetries) {
+                        console.log('🔧 POI Loading: Retrying due to 401 error...');
                         setTimeout(function() { loadDropdownData(retryCount + 1); }, 1000);
+                    } else if (retryCount >= maxRetries) {
+                        console.error('❌ POI Loading: Max retries exceeded, giving up');
                     }
                 }
             });
         }
 
-        // Load dropdown data for walking tours modal
-        function loadWalkingTourDropdownData() {
-            $.ajax({
-                url: '/api/pois/active?serviceType=Tours',
-                type: 'GET',
-                success: function(data) {
-                    if (data.success && data.data) {
-                        loadOptionsIntoTomSelect('walkingDestinationPOI', data.data);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error loading POIs for Walking Tours:', error);
-                }
-            });
-        }
-
-        // Load dropdown data for walking tours modal
-        function loadWalkingTourDropdownData() {
-            // Load Active POIs (filtered by Tours service type)
-            $.ajax({
-                url: '/api/pois/active?serviceType=Tours',
-                type: 'GET',
-                success: function(data) {
-                    if (data.success && data.data) {
-                        const selectElement = document.getElementById('walkingDestinationPOI');
-
-                        // Destroy existing Tom Select instance if it exists
-                        if (selectElement && selectElement.tomselect) {
-                            selectElement.tomselect.destroy();
-                        }
-
-                        // Clear the select element
-                        const select = $('#walkingDestinationPOI');
-                        select.empty();
-
-                        // Initialize Tom Select first (on empty select)
-                        if (typeof TomSelect !== 'undefined') {
-                            const tomSelectInstance = new TomSelect('#walkingDestinationPOI', {
-                                plugins: [],
-                                maxOptions: 1000,
-                                placeholder: 'Seleccionar destino del tour a pie',
-                                maxItems: 1,
-                                highlight: true,
-                                searchField: ['text'],
-                                valueField: 'value',
-                                labelField: 'text',
-                                sortField: 'text',
-                                closeAfterSelect: true,
-                                persist: false
-                            });
-
-                            // Store instance reference
-                            selectElement.tomselect = tomSelectInstance;
-
-                            // Load options using Tom Select API (prevents auto-selection)
-                            tomSelectInstance.clearOptions();
-                            data.data.forEach(poi => {
-                                tomSelectInstance.addOption({ value: poi.value, text: poi.label });
-                            });
-                            tomSelectInstance.refreshOptions(false);
-                            tomSelectInstance.clear(); // Clear selection to start empty
-                        }
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error loading POIs for Walking Tours:', error);
-                }
-            });
-        }
 
         // Event Handlers
         $('#createTourBtn').on('click', function() {
             openTourModal();
         });
 
-        // Helper function to wait for Tom Select to be initialized
+        // Helper function to wait for Tom Select or Custom Select to be initialized
         function waitForTomSelect(elementId, maxAttempts = 80) {
             return new Promise((resolve) => {
                 let attempts = 0;
                 const checkInterval = setInterval(() => {
                     const element = document.getElementById(elementId);
-                    if (element && element.tomselect) {
-                        clearInterval(checkInterval);
-                        resolve(element.tomselect);
-                    } else {
-                        attempts++;
-                        if (attempts >= maxAttempts) {
+                    if (element) {
+                        // Check for actual TomSelect instance
+                        if (element.tomselect) {
                             clearInterval(checkInterval);
-                            console.warn(`Tom Select not yet initialized on #${elementId}, continuing without it`);
-                            resolve(null);
+                            console.log(`🔧 Found TomSelect instance on #${elementId}`);
+                            resolve(element.tomselect);
+                            return;
                         }
+                        // Check for custom select instance (our custom dropdown component)
+                        if (element.customSelect) {
+                            clearInterval(checkInterval);
+                            console.log(`🔧 Found Custom Select instance on #${elementId}`);
+                            resolve(element.customSelect);
+                            return;
+                        }
+                    }
+                    
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        clearInterval(checkInterval);
+                        console.warn(`Neither TomSelect nor Custom Select initialized on #${elementId}, continuing without it`);
+                        resolve(null);
                     }
                 }, 100);
             });
         }
 
         async function openTourModal(isEdit = false) {
+            console.log('🔧 Opening tour modal, isEdit:', isEdit);
+            
             // Clear any previous modal alerts
             const alertsContainer = document.getElementById('tourModalAlerts');
             if (alertsContainer) {
@@ -2346,6 +2403,32 @@ async function getAccessToken() {
             $('#tourForm')[0].reset();
             $('#tourId').val('');
             $('#modalTitle').text(isEdit ? 'Editar Tour' : 'Crear Nuevo Tour');
+
+            // Clear POI dropdown immediately before loading to avoid showing old values
+            const destElement = document.getElementById('destinationPOI');
+            if (destElement) {
+                // Clear custom select if available
+                if (destElement.customSelect) {
+                    destElement.customSelect.setValue('');
+                }
+                // Clear TomSelect if available
+                if (destElement.tomselect) {
+                    destElement.tomselect.clear();
+                }
+                // Reset display to placeholder
+                const displayEl = document.getElementById('destinationPOI_display');
+                if (displayEl) {
+                    const textEl = displayEl.querySelector('.dropdown-selected-text');
+                    if (textEl) {
+                        textEl.textContent = 'Seleccionar...';
+                        textEl.classList.add('text-muted');
+                    }
+                }
+            }
+
+            // Load POI data when modal opens (proper timing)
+            console.log('🔧 Tour modal opened, loading POI data...');
+            loadDropdownData();
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Tour');
             
             // Reset save button state (ensure it's not disabled from previous operations)
@@ -2375,11 +2458,7 @@ async function getAccessToken() {
                 loadEmptyPricingStructure();
             }
 
-            // Wait for and clear Tom Select instances
-            const destTS = await waitForTomSelect('destinationPOI');
-            if (destTS) {
-                destTS.clear();
-            }
+            // POI dropdown clearing is now handled at the beginning of the function
         }
 
         // Edit tour
@@ -5220,6 +5299,120 @@ if (document.readyState === 'loading') {
 
 // ========== WALKING TOUR FUNCTIONALITY ==========
 
+// Load dropdown data for walking tours modal - moved to global scope for accessibility
+function loadWalkingTourDropdownData() {
+    console.log('🔧 Walking Tours POI: Starting loadWalkingTourDropdownData');
+    
+    // Check if target element exists
+    const targetElement = document.getElementById('walkingDestinationPOI');
+    console.log('🔧 Walking Tours POI: walkingDestinationPOI element exists:', !!targetElement);
+    
+    // Immediately clear the dropdown selection to avoid showing old values
+    if (targetElement) {
+        // Clear custom select if available
+        if (targetElement.customSelect) {
+            targetElement.customSelect.setValue('');
+            console.log('🔧 Walking Tours POI: Cleared existing selection');
+        }
+        // Clear the display text to show placeholder
+        const displayElement = document.getElementById('walkingDestinationPOI_display');
+        if (displayElement) {
+            const placeholderText = displayElement.querySelector('.dropdown-selected-text');
+            if (placeholderText) {
+                placeholderText.textContent = 'Seleccionar destino del tour a pie';
+                placeholderText.classList.add('text-muted');
+            }
+        }
+    }
+    
+    // Check authentication
+    const token = getAccessTokenSync();
+    console.log('🔧 Walking Tours POI: Authentication token available:', !!token);
+    
+    // Self-contained POI loading for walking tours (doesn't depend on IIFE functions)
+    $.ajax({
+        url: '/api/pois/active?serviceType=Tours',
+        type: 'GET',
+        beforeSend: function(xhr) {
+            console.log('🔧 Walking Tours POI: Making API request...');
+            if (token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                console.log('🔧 Walking Tours POI: Added Authorization header');
+            } else {
+                console.warn('🔧 Walking Tours POI: No authentication token available!');
+            }
+        },
+        success: async function(data) {
+            console.log('🔧 Walking Tours POI: API response received:', data);
+            if (data.success && data.data) {
+                console.log('🔧 Walking Tours POI: POI data count:', data.data.length);
+                
+                // Wait for custom select to be initialized
+                let attempts = 0;
+                const maxAttempts = 50;
+                
+                const waitForCustomSelect = setInterval(() => {
+                    const element = document.getElementById('walkingDestinationPOI');
+                    attempts++;
+                    
+                    if (element && element.customSelect) {
+                        clearInterval(waitForCustomSelect);
+                        console.log('🔧 Walking Tours POI: Custom select found, loading options...');
+                        
+                        // Clear existing options first
+                        element.customSelect.clearOptions();
+                        
+                        // Remove template's "no options" message
+                        const optionsContainer = document.getElementById('walkingDestinationPOI_options');
+                        if (optionsContainer) {
+                            const noOptionsMsg = optionsContainer.querySelector('.dropdown-item-text');
+                            if (noOptionsMsg && noOptionsMsg.textContent.includes('No hay opciones disponibles')) {
+                                noOptionsMsg.remove();
+                                console.log('🔧 Walking Tours POI: Removed template "no options" message');
+                            }
+                        }
+                        
+                        // Add POI options
+                        data.data.forEach(poi => {
+                            element.customSelect.addOption({
+                                value: poi.value,
+                                text: poi.label
+                            });
+                        });
+                        
+                        // Force option visibility
+                        if (optionsContainer) {
+                            const allOptionElements = optionsContainer.querySelectorAll('.dropdown-option');
+                            allOptionElements.forEach(option => {
+                                option.style.display = 'block';
+                            });
+                        }
+                        
+                        // Clear selection
+                        element.customSelect.setValue('');
+                        
+                        console.log('✅ Walking Tours POI: Successfully loaded POI options into walkingDestinationPOI');
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(waitForCustomSelect);
+                        console.warn('🔧 Walking Tours POI: Custom select not found after max attempts');
+                    }
+                }, 100);
+                
+            } else {
+                console.error('🔧 Walking Tours POI: Invalid API response structure:', data);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('❌ Walking Tours POI Error:', {
+                status: xhr.status,
+                statusText: xhr.statusText,
+                error: error,
+                responseText: xhr.responseText
+            });
+        }
+    });
+}
+
 // Walking tour modal event handlers - ensure jQuery is loaded
 function attachWalkingTourHandlers() {
     if (typeof $ === 'undefined') {
@@ -5297,6 +5490,8 @@ attachWalkingTourHandlers();
 
 // Function to open walking tour modal in create mode
 function openWalkingTourModal() {
+    console.log('🔧 Opening walking tour modal');
+    
     // Check if jQuery is available
     if (typeof $ === 'undefined') {
         console.error('jQuery not loaded - cannot open modal');
@@ -5308,6 +5503,10 @@ function openWalkingTourModal() {
     if (alertsContainer) {
         alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
     }
+
+    // Load POI data for walking tour modal
+    console.log('🔧 Walking tour modal opening, loading POI data...');
+    loadWalkingTourDropdownData();
 
     // Reset form using vanilla JS
     const form = document.getElementById('walkingTourForm');
@@ -5371,15 +5570,23 @@ function openWalkingTourModal() {
     // Show modal using jQuery (required for Bootstrap modal)
     $('#walkingTourModal').modal('show');
     
-    // Clear Tom Select dropdown after modal is shown
+    // Clear dropdown after modal is shown (works with both TomSelect and Custom Select)
     setTimeout(() => {
         const walkingDestElement = document.getElementById('walkingDestinationPOI');
-        if (walkingDestElement && walkingDestElement.tomselect) {
-            walkingDestElement.tomselect.clear();
-            walkingDestElement.tomselect.clearOptions();
-            walkingDestElement.tomselect.refreshOptions(false);
+        if (walkingDestElement) {
+            // Handle TomSelect
+            if (walkingDestElement.tomselect) {
+                walkingDestElement.tomselect.clear();
+                walkingDestElement.tomselect.clearOptions();
+                walkingDestElement.tomselect.refreshOptions(false);
+            }
+            // Handle Custom Select - reset to placeholder state
+            else if (walkingDestElement.customSelect) {
+                walkingDestElement.customSelect.setValue('');
+                // Don't clear options since they were just loaded by loadWalkingTourDropdownData()
+            }
         }
-    }, 500);
+    }, 100); // Reduced timeout to minimize interference with POI loading
 }
 
 // Function to open walking tour modal for editing

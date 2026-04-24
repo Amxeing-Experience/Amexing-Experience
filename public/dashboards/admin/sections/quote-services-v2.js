@@ -382,7 +382,15 @@ class ItineraryBuilder {
     // Additional vehicle checkbox for transport
     document.getElementById('additionalVehicleCheckbox')?.addEventListener('change', (e) => {
       const qty = document.getElementById('serviceQuantity');
-      if (qty) qty.value = e.target.checked ? 2 : 1;
+      if (qty) {
+        // Context-aware quantity calculation
+        const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+        const baseQuantity = (tripType === 'round-trip') ? 2 : 1;
+        const newQuantity = e.target.checked ? (baseQuantity * 2) : baseQuantity;
+        qty.value = newQuantity;
+        
+        console.log(`🚗 Additional vehicle ${e.target.checked ? 'checked' : 'unchecked'}: tripType=${tripType}, baseQuantity=${baseQuantity}, newQuantity=${newQuantity}`);
+      }
       this.updateServicePriceBreakdown();
     });
 
@@ -1073,6 +1081,14 @@ class ItineraryBuilder {
     
     if (experienceAdultsField) experienceAdultsField.value = numberOfAdults;
     if (experienceChildrenField) experienceChildrenField.value = numberOfChildren;
+    
+    // Concepto fields (auto-fill from quote information)
+    const conceptoAdultsField = document.getElementById('conceptoAdultsQuantity');
+    const conceptoChildrenField = document.getElementById('conceptoChildrenQuantity');
+    
+    if (conceptoAdultsField) conceptoAdultsField.value = numberOfAdults || '';
+    if (conceptoChildrenField) conceptoChildrenField.value = numberOfChildren || '';
+    // Note: conceptoAdultsNoAlcoholQuantity stays empty (no corresponding quote data)
   }
 
   // Service Management Methods
@@ -1341,6 +1357,11 @@ class ItineraryBuilder {
         }
         if (priceTypeLabel) {
           priceTypeLabel.innerHTML = 'Pago';
+        }
+        
+        // Auto-fill concepto fields from quote information (only for new services)
+        if (!this.currentServiceId && this.quoteData) {
+          this.prefillPeopleFields();
         }
       } else if (type === 'a-disposicion') {
         // Hide quantity field for A Disposición
@@ -1992,8 +2013,15 @@ class ItineraryBuilder {
       roundTripForm?.classList.add('d-none');
       // Show arrival/departure selector only for one-way
       arrivalDepartureSelector?.classList.remove('d-none');
-      // Reset quantity to 1 for one-way
-      if (quantityField) quantityField.value = '1';
+      // Reset quantity to 1 for one-way, or 2 if additional vehicle is checked
+      if (quantityField) {
+        const additionalVehicle = document.getElementById('additionalVehicleCheckbox')?.checked;
+        const baseQuantity = 1; // one-way base quantity
+        const finalQuantity = additionalVehicle ? (baseQuantity * 2) : baseQuantity;
+        quantityField.value = finalQuantity;
+        
+        console.log(`➡️  One-way selected: additionalVehicle=${additionalVehicle}, baseQuantity=${baseQuantity}, finalQuantity=${finalQuantity}`);
+      }
       roundTripHint?.classList.add('d-none');
       // Initialize direction type fields
       this.handleDirectionTypeChange();
@@ -2020,8 +2048,15 @@ class ItineraryBuilder {
       roundTripForm?.classList.remove('d-none');
       // Hide arrival/departure selector for round trip
       arrivalDepartureSelector?.classList.add('d-none');
-      // Set quantity to 2 for round trip (Ida + Regreso)
-      if (quantityField) quantityField.value = '2';
+      // Set quantity to 2 for round trip (Ida + Regreso), or 4 if additional vehicle is checked
+      if (quantityField) {
+        const additionalVehicle = document.getElementById('additionalVehicleCheckbox')?.checked;
+        const baseQuantity = 2; // round trip base quantity
+        const finalQuantity = additionalVehicle ? (baseQuantity * 2) : baseQuantity;
+        quantityField.value = finalQuantity;
+        
+        console.log(`🔄 Round trip selected: additionalVehicle=${additionalVehicle}, baseQuantity=${baseQuantity}, finalQuantity=${finalQuantity}`);
+      }
       roundTripHint?.classList.remove('d-none');
       // Pre-fill date fields with current day's date (or today if day has no date)
       const currentDay = this.days.find(d => d.id === this.currentDayId);
@@ -4930,6 +4965,53 @@ class ItineraryBuilder {
     }).join('');
   }
 
+  renderAvailabilityTable(schedule) {
+    if (!schedule || schedule.length === 0 || (schedule.length === 7 && schedule.every((s) => s.times && s.times.length === 0))) {
+      return `
+        <div class="table-responsive">
+          <table class="table table-sm table-borderless mb-0">
+            <tbody>
+              <tr>
+                <td colspan="2" class="text-center py-2">
+                  <span class="badge bg-light text-dark border">Todos los días</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+    
+    const rows = schedule.map((s) => {
+      const times = s.times && s.times.length > 0 
+        ? s.times.map((t) => t.replace(/\s*-\s*/g, ' - ')).join('<br>')
+        : '<span class="text-muted">Sin horarios específicos</span>';
+      
+      return `
+        <tr>
+          <td class="fw-medium" style="width: 30%;">${s.day}</td>
+          <td class="small">${times}</td>
+        </tr>
+      `;
+    }).join('');
+    
+    return `
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="small fw-bold">Día</th>
+              <th class="small fw-bold">Horarios</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
   buildDetailsCard(type, data) {
     const cardId = type === 'experience' ? 'experienceDetailsCard' : 'tourDetailsCard';
     const bodyId = type === 'experience' ? 'experienceDetailsCardBody' : 'tourDetailsCardBody';
@@ -4953,12 +5035,12 @@ class ItineraryBuilder {
       <hr class="my-2">
       <div class="d-flex flex-wrap align-items-center mb-2">
         ${tag('clock', data.duration ? `${data.durationLabel || 'Duración'}: ${data.duration}` : null)}
-        ${tag('calendar-event', `Reserva: ${data.advanceBooking || 'Inmediata'}`)}
+        ${tag('calendar-event', `Reserva anticipada: ${data.advanceBooking || 'Inmediata'}`)}
         ${tag('language', data.languages ? `Idiomas: ${data.languages}` : null)}
       </div>
       <div class="mb-2">
-        <span class="small text-muted d-block mb-1"><i class="ti ti-calendar me-1"></i>Horarios sugeridos:</span>
-        <div class="d-flex flex-wrap">${this.renderAvailabilityPills(data.availabilitySchedule)}</div>
+        <span class="small text-muted d-block mb-2"><i class="ti ti-calendar me-1"></i>Recomendamos salir:</span>
+        ${this.renderAvailabilityTable(data.availabilitySchedule)}
       </div>
       ${data.includes || data.notIncludes || data.clientNotes ? '<hr class="my-2">' : ''}
       ${infoLine('circle-check', 'Incluye', data.includes)}
@@ -5640,6 +5722,12 @@ class ItineraryBuilder {
 
         // Check if times overlap
         if (this.timeRangesOverlap(timeRangeA, timeRangeB)) {
+          // NEW: Check if both services share the same destination POI
+          // If they do, it's not a conflict since they're at the same location
+          if (this.servicesShareDestination(serviceA, serviceB)) {
+            continue; // Skip conflict - same destination allows overlapping activities
+          }
+          
           serviceA.hasOverlap = true;
           if (!serviceA.overlapsWith) serviceA.overlapsWith = [];
           serviceA.overlapsWith.push({
@@ -5690,6 +5778,78 @@ class ItineraryBuilder {
     // Two ranges overlap if:
     // A starts before B ends AND B starts before A ends
     return rangeA.start < rangeB.end && rangeB.start < rangeA.end;
+  }
+
+  // Check if two services share the same destination POI
+  servicesShareDestination(serviceA, serviceB) {
+    // Only check for tours and experiences that have destinationPOI
+    if (!serviceA || !serviceB) return false;
+    
+    // Both must be tour or experience types to have destinations
+    const hasDestinationTypes = ['tour', 'experience'];
+    if (!hasDestinationTypes.includes(serviceA.type) || !hasDestinationTypes.includes(serviceB.type)) {
+      return false;
+    }
+    
+    // Get destination POI IDs for comparison
+    let destinationA = null;
+    let destinationB = null;
+    
+    // For tours, check the cached tour data
+    if (serviceA.type === 'tour' && serviceA.tourId && this.toursCache.has('all')) {
+      const tourA = this.toursCache.get('all').find(t => t.id === serviceA.tourId || t.objectId === serviceA.tourId);
+      if (tourA?.destinationPOI) {
+        destinationA = tourA.destinationPOI.objectId || tourA.destinationPOI.id || tourA.destinationPOI;
+      }
+    }
+    
+    if (serviceB.type === 'tour' && serviceB.tourId && this.toursCache.has('all')) {
+      const tourB = this.toursCache.get('all').find(t => t.id === serviceB.tourId || t.objectId === serviceB.tourId);
+      if (tourB?.destinationPOI) {
+        destinationB = tourB.destinationPOI.objectId || tourB.destinationPOI.id || tourB.destinationPOI;
+      }
+    }
+    
+    // For experiences, check the cached experience data
+    if (serviceA.type === 'experience' && serviceA.experienceId) {
+      if (this.experiencesCache.has('all')) {
+        const expA = this.experiencesCache.get('all').find(e => e.id === serviceA.experienceId || e.objectId === serviceA.experienceId);
+        if (expA?.destinationPOI) {
+          destinationA = expA.destinationPOI.objectId || expA.destinationPOI.id || expA.destinationPOI;
+        }
+      }
+      // Also check provider experiences cache
+      if (!destinationA && this.providerExperiencesCache) {
+        const expA = this.providerExperiencesCache.find(e => e.id === serviceA.experienceId || e.objectId === serviceA.experienceId);
+        if (expA?.destinationPOI) {
+          destinationA = expA.destinationPOI.objectId || expA.destinationPOI.id || expA.destinationPOI;
+        }
+      }
+    }
+    
+    if (serviceB.type === 'experience' && serviceB.experienceId) {
+      if (this.experiencesCache.has('all')) {
+        const expB = this.experiencesCache.get('all').find(e => e.id === serviceB.experienceId || e.objectId === serviceB.experienceId);
+        if (expB?.destinationPOI) {
+          destinationB = expB.destinationPOI.objectId || expB.destinationPOI.id || expB.destinationPOI;
+        }
+      }
+      // Also check provider experiences cache
+      if (!destinationB && this.providerExperiencesCache) {
+        const expB = this.providerExperiencesCache.find(e => e.id === serviceB.experienceId || e.objectId === serviceB.experienceId);
+        if (expB?.destinationPOI) {
+          destinationB = expB.destinationPOI.objectId || expB.destinationPOI.id || expB.destinationPOI;
+        }
+      }
+    }
+    
+    // Both services must have destinations and they must match
+    if (destinationA && destinationB && destinationA === destinationB) {
+      console.log(`✅ Services at same destination (${destinationA}) - no overlap conflict`);
+      return true;
+    }
+    
+    return false;
   }
 
   // Get overlap tooltip text
@@ -6506,7 +6666,7 @@ class ItineraryBuilder {
 
       // Set default values for people quantities
       if (adultsQuantityField) {
-        adultsQuantityField.value = experience.defaultAdults || 2;
+        adultsQuantityField.value = experience.defaultAdults || '';
       } else {
 
       }
@@ -8054,9 +8214,22 @@ class ItineraryBuilder {
     // Round trip uses Ida (arrival) data which is already in DB order
     let apiOrigin = originName;
     let apiDestination = destinationName;
+    
+    // Debug logging for price investigation
+    console.log('🔍 Transport Route Price Lookup:', {
+      userSelection: {
+        direction,
+        tripType,
+        originName,
+        destinationName,
+        rateId
+      }
+    });
+    
     if (tripType !== 'round-trip' && direction === 'departure') {
       apiOrigin = destinationName;
       apiDestination = originName;
+      console.log('🔄 Swapped for departure:', { apiOrigin, apiDestination });
     }
 
     // Show loading spinner next to Vehículo label
@@ -8090,6 +8263,19 @@ class ItineraryBuilder {
         this.transportPriceData = null;
         return;
       }
+
+      // Debug logging for price investigation
+      console.log('📦 API Response - Transport Prices:', {
+        apiRequest: { apiOrigin, apiDestination, rateId },
+        vehiclesReturned: result.data.vehicles?.length || 0,
+        vehicles: result.data.vehicles?.map(v => ({
+          type: v.vehicleType,
+          basePrice: v.basePrice,
+          clientPrice: v.clientPrice,
+          finalPrice: v.finalPrice,
+          isClientPrice: v.isClientPrice
+        }))
+      });
 
       // Cache the transport price data for vehicle selection
       this.transportPriceData = result.data;
@@ -8148,12 +8334,24 @@ class ItineraryBuilder {
    */
   getTransportVehiclePrice(vehicleTypeId) {
     if (!this.transportPriceData || !this.transportPriceData.vehicles) {
+      console.log('⚠️ No transport price data available');
       return null;
     }
 
     const vehicle = this.transportPriceData.vehicles.find(
       (v) => v.vehicleTypeId === vehicleTypeId
     );
+
+    console.log('💰 Getting vehicle price:', {
+      vehicleTypeId,
+      vehicle: vehicle ? {
+        type: vehicle.vehicleType,
+        basePrice: vehicle.basePrice,
+        clientPrice: vehicle.clientPrice,
+        finalPrice: vehicle.finalPrice,
+        isClientPrice: vehicle.isClientPrice
+      } : 'NOT FOUND'
+    });
 
     return vehicle ? vehicle.finalPrice : null;
   }

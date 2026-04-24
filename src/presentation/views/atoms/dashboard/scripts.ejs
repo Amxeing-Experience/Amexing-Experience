@@ -57,6 +57,12 @@ const dashboardUserId = typeof userId !== 'undefined' ? userId : null;
         }
 
         initializeBootstrapComponents() {
+            // Check if Bootstrap is loaded
+            if (typeof bootstrap === 'undefined') {
+                console.warn('Bootstrap not loaded - skipping component initialization');
+                return;
+            }
+
             // Initialize Bootstrap tooltips
             const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
             const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl =>
@@ -184,6 +190,13 @@ const dashboardUserId = typeof userId !== 'undefined' ? userId : null;
         }
 
         showNotification(message, type = 'info') {
+            // Check if Bootstrap is loaded
+            if (typeof bootstrap === 'undefined') {
+                console.warn('Bootstrap not loaded, showing simple alert instead');
+                alert(message);
+                return;
+            }
+
             // Create and show toast notification
             const toastHtml = `
                 <div class="toast align-items-center text-white bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'} border-0" role="alert">

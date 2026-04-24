@@ -895,7 +895,7 @@ class ClientsController {
 
   /**
    * GET /api/clients/amexing-direct - Get direct Amexing clients for dropdown/selector
-   * Returns Client records where clientBelongsTo = "amexing"
+   * Returns Client records where clientBelongsTo = "amexing".
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
@@ -1043,7 +1043,7 @@ class ClientsController {
 
   /**
    * GET /api/clients/:clientId/sub-clients - Get sub-clients (Client records owned by this client)
-   * Fetches Client records from the Client table where ownedBy points to the specified clientId
+   * Fetches Client records from the Client table where ownedBy points to the specified clientId.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}

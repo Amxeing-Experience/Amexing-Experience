@@ -827,6 +827,31 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     </div>
 </template>
 
+<!-- Type Conversion Modal (Shared for Provider <-> Establishment) -->
+<div class="modal fade" id="convertTypeModal" tabindex="-1" aria-labelledby="convertTypeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);">
+                <h5 class="modal-title text-white" id="convertTypeModalLabel">
+                    <i class="ti ti-transform me-2"></i>Confirmar Conversión
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="convertTypeMessage">
+                    <!-- Message will be populated dynamically -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmConversionBtn">
+                    <i class="ti ti-check me-1"></i>Confirmar Conversión
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (function() {
     function initWhenReady() {
@@ -847,6 +872,28 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const showActions = <%= dtShowActions %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
+
+        // Function to get access token from various sources
+        function getAccessToken() {
+            // Try localStorage first (common keys)
+            const tokenFromStorage = localStorage.getItem('accessToken') || 
+                                   localStorage.getItem('token') || 
+                                   localStorage.getItem('authToken');
+            if (tokenFromStorage) {
+                return tokenFromStorage;
+            }
+            
+            // Try cookies as fallback
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'clientAccessToken' || name === 'accessToken') {
+                    return value;
+                }
+            }
+            
+            return null;
+        }
 
         // DataTable initialization with type=Provider filter
         const dataTable = $(`#${tableId}`).DataTable({
@@ -972,6 +1019,19 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                         </button>`;
                         }
 
+                        // Add conversion to Establishment button
+                        if (canEdit) {
+                            actions += `<button type="button"
+                                            class="btn btn-info convert-to-establishment-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Convertir a Establecimiento">
+                                            <i class="ti ti-building"></i>
+                                        </button>`;
+                        }
+
                         if (canDelete) {
                             actions += `<button type="button"
                                             class="btn btn-danger delete-provider-btn"
@@ -1015,6 +1075,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             toggleProviderStatus($(this).data('id'), $(this).data('current-status'), $(this).data('name'));
         });
         $(`#${tableId}`).on('click', '.delete-provider-btn', function() { deleteProvider($(this).data('id'), $(this).data('name')); });
+        
+        // Handle Provider to Establishment conversion
+        $(`#${tableId}`).on('click', '.convert-to-establishment-btn', function() {
+            const id = $(this).data('id');
+            const name = $(this).data('name');
+            openConversionModal(id, name, 'Provider', 'Establishment');
+        });
+        
         $('#saveProviderBtn').on('click', function() { saveProvider(); });
         $('#saveQuickExperienceBtn').on('click', function() { saveQuickExperience(); });
         
@@ -3194,6 +3262,68 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
         // Initialize photo upload functionality
         initPhotoUpload();
+        
+        // Conversion Modal Functions
+        function openConversionModal(id, name, fromType, toType) {
+            const fromTypeText = fromType === 'Provider' ? 'Proveedor' : 'Establecimiento';
+            const toTypeText = toType === 'Establishment' ? 'Establecimiento' : 'Proveedor';
+            
+            const message = `
+                <p>¿Está seguro de convertir <strong>"${name}"</strong> de ${fromTypeText} a ${toTypeText}?</p>
+                <div class="alert alert-warning">
+                    <i class="ti ti-alert-triangle me-2"></i>
+                    <strong>Importante:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>Este cambio moverá el elemento a la sección de ${toTypeText === 'Establecimiento' ? 'Establecimientos' : 'Proveedores'}</li>
+                        <li>Se mantendrán todos los datos y configuraciones existentes</li>
+                        <li>Este cambio puede ser revertido posteriormente si es necesario</li>
+                    </ul>
+                </div>
+            `;
+            
+            $('#convertTypeMessage').html(message);
+            $('#convertTypeModal').data('id', id);
+            $('#convertTypeModal').data('newType', toType);
+            $('#convertTypeModal').modal('show');
+        }
+        
+        // Handle conversion confirmation
+        $('#confirmConversionBtn').on('click', function() {
+            const id = $('#convertTypeModal').data('id');
+            const newType = $('#convertTypeModal').data('newType');
+            const $btn = $(this);
+            const originalText = $btn.html();
+            
+            // Show loading state
+            $btn.html('<span class="spinner-border spinner-border-sm me-2"></span>Convirtiendo...').prop('disabled', true);
+            
+            const accessToken = getAccessToken();
+            $.ajax({
+                url: `${apiEndpoint}/${id}`,
+                type: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                data: JSON.stringify({ type: newType }),
+                success: function(response) {
+                    $('#convertTypeModal').modal('hide');
+                    showSuccessAlert(`Conversión exitosa. El elemento ha sido movido a ${newType === 'Establishment' ? 'Establecimientos' : 'Proveedores'}.`);
+                    dataTable.ajax.reload();
+                },
+                error: function(xhr) {
+                    console.error('Error converting type:', xhr);
+                    let errorMessage = 'Error al convertir el tipo';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMessage = xhr.responseJSON.error;
+                    }
+                    showErrorAlert(errorMessage);
+                },
+                complete: function() {
+                    $btn.html(originalText).prop('disabled', false);
+                }
+            });
+        });
     }
 
     if (document.readyState === 'loading') {
