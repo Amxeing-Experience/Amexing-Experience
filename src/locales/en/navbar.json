@@ -1,0 +1,11 @@
+{
+  "menu": {
+    "about": "ABOUT",
+    "services": "SERVICES",
+    "fleet": "OUR FLEET",
+    "contact": "CONTACT",
+    "bookNow": "BOOK NOW",
+    "login": "Login",
+    "dashboard": "Dashboard"
+  }
+}

@@ -107,11 +107,20 @@
                                 <select class="form-select" id="experienceSelect" required>
                                     <option value="">-- Selecciona una experiencia --</option>
                                 </select>
-                                <div class="form-text">Las experiencias disponibles se cargan según el día seleccionado</div>
+                                <div class="form-text" id="experienceAvailabilityWarning" style="display: none; color: #fd7e14;">
+                                    *Se verificará disponibilidad y se confirmará en la reservación
+                                </div>
+                            </div>
+                            
+                            <!-- Experience Details Card -->
+                            <div id="experienceDetailsCard" class="card border mb-3 d-none">
+                                <div class="card-body p-3" id="experienceDetailsCardBody">
+                                    <!-- Populated dynamically by JS -->
+                                </div>
                             </div>
 
-                            <!-- Schedule Fields -->
-                            <div class="row">
+                            <!-- Schedule Fields (now optional/hidden by default) -->
+                            <div class="row" id="experienceScheduleFields" style="display: none;">
                                 <div class="col-md-6 mb-3">
                                     <label for="experienceStartTime" class="form-label">Hora de inicio</label>
                                     <div class="input-group">
@@ -138,48 +147,20 @@
                                 <select class="form-select" id="tourSelect" required>
                                     <option value="">-- Selecciona un tour --</option>
                                 </select>
-                                <div class="form-text">Los tours disponibles se cargan según el día seleccionado</div>
-                            </div>
-                            <!-- Tour Details Container -->
-                            <div id="tourDetails" class="mt-2"></div>
-                            
-                            <!-- Tour Details Fields (Read-only) -->
-                            <div class="row">
-                                <div class="col-md-12 mb-3">
-                                    <label for="tourDescription" class="form-label">Descripción</label>
-                                    <textarea class="form-control bg-light" id="tourDescription" rows="2" readonly></textarea>
+                                <div class="form-text" id="tourAvailabilityWarning" style="display: none; color: #fd7e14;">
+                                    *Se verificará disponibilidad y se confirmará en la reservación
                                 </div>
                             </div>
                             
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="tourAdvanceBookingTime" class="form-label">Tiempo de Reserva Anticipada</label>
-                                    <input type="text" class="form-control bg-light" id="tourAdvanceBookingTime" readonly>
+                            <!-- Tour Details Card -->
+                            <div id="tourDetailsCard" class="card border mb-3 d-none">
+                                <div class="card-body p-3" id="tourDetailsCardBody">
+                                    <!-- Populated dynamically by JS -->
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="tourLanguages" class="form-label">Idiomas</label>
-                                    <input type="text" class="form-control bg-light" id="tourLanguages" readonly>
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="tourIncludes" class="form-label">Incluye</label>
-                                    <textarea class="form-control bg-light" id="tourIncludes" rows="2" readonly></textarea>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="tourNotIncludes" class="form-label">No Incluye</label>
-                                    <textarea class="form-control bg-light" id="tourNotIncludes" rows="2" readonly></textarea>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label for="tourClientNotes" class="form-label">Notas para el Cliente</label>
-                                <textarea class="form-control bg-light" id="tourClientNotes" rows="2" readonly></textarea>
                             </div>
 
-                            <!-- Schedule Fields -->
-                            <div class="row">
+                            <!-- Schedule Fields (now optional/hidden by default) -->
+                            <div class="row" id="tourScheduleFields" style="display: none;">
                                 <div class="col-md-6 mb-3">
                                     <label for="tourStartTime" class="form-label">Hora de inicio</label>
                                     <div class="input-group">
@@ -597,48 +578,20 @@
                         </div>
                     </div>
                     
+                    <!-- Horas -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label for="hoursQuantity" class="form-label">Horas</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="ti ti-clock-hour-3"></i></span>
+                                <input type="number" class="form-control" id="hoursQuantity" min="0.5" step="0.5" value="1">
+                                <span class="input-group-text">horas</span>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Experience pricing with adult/child/no-alcohol options -->
                     <div id="experiencePricingSection" class="d-none">
-                        <!-- Experience Information (Read-only) -->
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <label class="form-label fw-bold text-primary">Descripción</label>
-                                <textarea class="form-control bg-light" id="experienceDescription" rows="3" readonly></textarea>
-                            </div>
-                        </div>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-primary">Tiempo de reserva anticipada</label>
-                                <input type="text" class="form-control bg-light" id="advanceBookingTime" readonly>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-primary">Idiomas</label>
-                                <input type="text" class="form-control bg-light" id="experienceLanguages" readonly>
-                            </div>
-                        </div>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-primary">Incluye</label>
-                                <textarea class="form-control bg-light" id="experienceIncludes" rows="4" readonly></textarea>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-primary">No incluye</label>
-                                <textarea class="form-control bg-light" id="experienceNotIncludes" rows="4" readonly></textarea>
-                            </div>
-                        </div>
-                        
-                        <!-- Client Notes Field -->
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <label class="form-label fw-bold text-primary">Notas para Cliente</label>
-                                <textarea class="form-control bg-light" id="experienceClientNotes" rows="3" readonly></textarea>
-                            </div>
-                        </div>
-                        
-                        <hr class="my-4">
-
                         <!-- Price fields for each type -->
                         <div class="row">
                             <div class="col-md-4 mb-3">

@@ -3962,64 +3962,86 @@ class ServicesController {
         return res.json({ success: true, data: { serviceId: null, vehicles: [] } });
       }
 
-      // Find active services matching origin + destination (any matching POI)
-      const servicesQuery = new Parse.Query('Services');
-      if (originPOIs.length > 0) {
-        servicesQuery.containedIn('originPOI', originPOIs);
-      } else {
-        servicesQuery.doesNotExist('originPOI');
-      }
-      servicesQuery.containedIn('destinationPOI', destinationPOIs);
-      servicesQuery.equalTo('active', true);
-      servicesQuery.equalTo('exists', true);
-      servicesQuery.limit(100);
-
-      const services = await servicesQuery.find({ useMasterKey: true });
-
-      // Also try services without originPOI if we had an origin but found none
-      let allServices = [...services];
-      if (originPOIs.length > 0 && services.length === 0) {
-        const noOriginQuery = new Parse.Query('Services');
-        noOriginQuery.doesNotExist('originPOI');
-        noOriginQuery.containedIn('destinationPOI', destinationPOIs);
-        noOriginQuery.equalTo('active', true);
-        noOriginQuery.equalTo('exists', true);
-        noOriginQuery.limit(100);
-        const noOriginServices = await noOriginQuery.find({ useMasterKey: true });
-        allServices = [...services, ...noOriginServices];
-      }
-
-      if (allServices.length === 0) {
-        return res.json({ success: true, data: { serviceId: null, vehicles: [] } });
-      }
-
-      const serviceIds = allServices.map((s) => s.id);
-
+      // Get all RatePrices for the specific rate (matching quotes system approach)
       const Rate = Parse.Object.extend('Rate');
       const ratePointer = new Rate();
       ratePointer.id = rateId;
 
-      // Query RatePrices by destinationPOI (all matching POI IDs) + rate
-      // Also query by service pointer as fallback
-      const rpByDestQuery = new Parse.Query('RatePrices');
-      rpByDestQuery.containedIn('destinationPOI', destinationPOIs);
+      const ratePricesQuery = new Parse.Query('RatePrices');
+      ratePricesQuery.equalTo('rate', ratePointer);
+      ratePricesQuery.equalTo('exists', true);
+      ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only active (non-historical) prices
+      ratePricesQuery.include([
+        'service',
+        'service.originPOI',
+        'service.destinationPOI',
+        'service.originPOI.serviceType',
+        'service.destinationPOI.serviceType',
+        'vehicleType',
+      ]);
+      ratePricesQuery.limit(1000);
 
-      const rpByServiceQuery = new Parse.Query('RatePrices');
-      rpByServiceQuery.containedIn('service', allServices);
+      const allRatePrices = await ratePricesQuery.find({ useMasterKey: true });
 
-      // Combine: find RatePrices matching either destination POI or service
-      const combinedQuery = Parse.Query.or(rpByDestQuery, rpByServiceQuery);
-      combinedQuery.equalTo('rate', ratePointer);
-      combinedQuery.equalTo('exists', true);
-      combinedQuery.equalTo('active', true);
-      combinedQuery.doesNotExist('valid_until');
-      combinedQuery.include(['vehicleType', 'service']);
-      combinedQuery.limit(1000);
+      // Helper function to filter RatePrices by direction
+      const filterRatePricesByDirection = (
+        requestedOriginPOIs,
+        requestedDestinationPOIs
+      ) => allRatePrices.filter((ratePrice) => {
+        const service = ratePrice.get('service');
+        if (!service) return false;
 
-      const ratePrices = await combinedQuery.find({ useMasterKey: true });
+        const serviceOriginPOI = service.get('originPOI');
+        const serviceDestinationPOI = service.get('destinationPOI');
 
-      logger.info('getPricesByRoute - combined query result', {
+        // Check destination match (required)
+        const destinationMatch = requestedDestinationPOIs.some(
+          (poi) => serviceDestinationPOI && serviceDestinationPOI.id === poi.id
+        );
+
+        if (!destinationMatch) return false;
+
+        // Check origin match (optional - if no origin specified, match services without origin)
+        if (requestedOriginPOIs.length === 0) {
+          // No origin specified - match services without originPOI or any service
+          return true;
+        }
+        // Origin specified - match services with matching originPOI
+        // Also include services without originPOI as fallback
+        return (
+          requestedOriginPOIs.some((poi) => serviceOriginPOI && serviceOriginPOI.id === poi.id)
+          || !serviceOriginPOI
+        );
+      });
+
+      // Try exact direction first (origin → destination)
+      let ratePrices = filterRatePricesByDirection(originPOIs, destinationPOIs);
+      let searchDirection = 'exact';
+
+      // If no results and both origin and destination specified, try reverse direction
+      if (ratePrices.length === 0 && originPOIs.length > 0 && destinationPOIs.length > 0) {
+        console.log('No routes found in exact direction, trying reverse direction...');
+        ratePrices = filterRatePricesByDirection(destinationPOIs, originPOIs);
+        searchDirection = 'reverse';
+
+        if (ratePrices.length > 0) {
+          console.log(`Found ${ratePrices.length} routes in reverse direction`);
+        }
+      }
+
+      if (ratePrices.length === 0) {
+        console.log('No routes found in either direction');
+        return res.json({ success: true, data: { serviceId: null, vehicles: [] } });
+      }
+
+      // Extract service IDs for logging and client prices
+      const serviceIds = ratePrices.map((rp) => rp.get('service')?.id).filter(Boolean);
+
+      logger.info('getPricesByRoute - RatePrices query result', {
+        originPOIIds: originPOIs.map((p) => p.id),
         destinationPOIIds: destinationPOIs.map((p) => p.id),
+        searchDirection,
         serviceIds,
         rateId,
         ratePricesFound: ratePrices.length,
@@ -4092,12 +4114,12 @@ class ServicesController {
         destinationPOI: destinationPOIName,
         rateId,
         clientId,
-        servicesFound: services.length,
+        ratePricesFound: ratePrices.length,
         vehiclesFound: vehicles.length,
       });
 
       // Get routeDuration from the first service (all services for same route share duration)
-      const routeDuration = allServices[0]?.get('routeDuration') || null;
+      const routeDuration = ratePrices[0]?.get('service')?.get('routeDuration') || null;
 
       return res.json({
         success: true,

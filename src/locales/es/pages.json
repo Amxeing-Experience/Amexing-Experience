@@ -1,0 +1,79 @@
+{
+  "home": {
+    "title": "Amexing Experience - Transporte Premium en San Miguel de Allende",
+    "description": "Experiencia de transporte premium en San Miguel de Allende con flota Tesla y 30 años de experiencia. Servicios de lujo, tours exclusivos y atención personalizada.",
+    "keywords": "transporte premium, San Miguel de Allende, Tesla, tours, experiencias de lujo, transporte ejecutivo"
+  },
+  "about": {
+    "title": "Nosotros - Amexing Experience",
+    "description": "30 años de experiencia en transporte premium en San Miguel de Allende. Conoce nuestra historia, misión y valores que nos hacen únicos.",
+    "keywords": "nosotros, amexing experience, historia, san miguel de allende, transporte premium"
+  },
+  "services": {
+    "title": "Servicios - Amexing Experience",
+    "description": "Servicios de transporte premium, tours exclusivos y experiencias de lujo en San Miguel de Allende. Tesla, tours personalizados y más.",
+    "keywords": "servicios, transporte premium, tours, tesla, san miguel de allende, experiencias de lujo"
+  },
+  "fleet": {
+    "title": "Nuestra Flota - Amexing Experience",
+    "description": "Conoce nuestra flota premium de vehículos Tesla y otros vehículos de lujo para transporte ejecutivo en San Miguel de Allende.",
+    "keywords": "flota, tesla, vehículos premium, transporte ejecutivo, san miguel de allende"
+  },
+  "contact": {
+    "title": "Contacto - Amexing Experience",
+    "description": "Contacta con Amexing Experience para reservar tu transporte premium en San Miguel de Allende. WhatsApp, email y reservas online.",
+    "keywords": "contacto, reservas, whatsapp, booking, san miguel de allende, transporte premium"
+  },
+  "toursSection": {
+    "title": "Tours y",
+    "subtitle": "Experiencias",
+    "description1": "Descubre la magia de San Miguel de Allende a través de nuestros tours y experiencias exclusivas. Con más de tres décadas de experiencia, ofrecemos recorridos personalizados que muestran lo mejor de la cultura, gastronomía y belleza natural de nuestra región.",
+    "description2": "Desde catas de vino hasta recorridos históricos, cada experiencia está cuidadosamente diseñada para crear recuerdos inolvidables para nuestros distinguidos huéspedes.",
+    "cards": {
+      "catas": "CATAS",
+      "gastronomicas": "GASTRONÓMICAS",
+      "culturales": "CULTURALES",
+      "pueblos": "PUEBLOS",
+      "magicos": "MÁGICOS",
+      "piramides": "PIRÁMIDES",
+      "aventura": "AVENTURA",
+      "arte": "ARTE",
+      "historia": "HISTORIA Y ARQUITECTURA",
+      "naturaleza": "NATURALEZA"
+    }
+  },
+  "contactSection": {
+    "formTitle": "Ponte en contacto",
+    "form": {
+      "email": "Email",
+      "phone": "Teléfono",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "company": "Empresa (opcional)",
+      "subject": "Título del mensaje",
+      "message": "Mensaje",
+      "sendButton": "ENVIAR MENSAJE",
+      "sending": "ENVIANDO..."
+    },
+    "info": {
+      "office": "Oficina:",
+      "officePhone": "+52 (415) 167 39 90",
+      "emergency": "Solo para emergencias:",
+      "emergencyPhone": "+52 (415) 153 50 67",
+      "hours": "Horarios de Oficina:",
+      "hoursText": "Lunes a Sábado<br>de las 08:00 hrs a las 15:00 hrs (CDT)",
+      "emailLabel": "Email:",
+      "emailAddress": "contact@amexing.com"
+    },
+    "validation": {
+      "requiredFields": "Por favor complete todos los campos requeridos.",
+      "messageMinLength": "El mensaje debe tener al menos 10 caracteres.",
+      "messageMaxLength": "El mensaje no puede exceder los 2000 caracteres.",
+      "invalidEmail": "Por favor ingrese una dirección de email válida.",
+      "successMessage": "¡Gracias por su mensaje! Nos pondremos en contacto pronto.",
+      "errorMessage": "Hubo un error al enviar su mensaje. Por favor intente nuevamente.",
+      "connectionError": "Hubo un error de conexión. Por favor verifique su conexión a internet e intente nuevamente.",
+      "characterCounter": "caracteres"
+    }
+  }
+}

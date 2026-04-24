@@ -16,7 +16,7 @@ const logger = require('../../infrastructure/logger');
  * - Email notifications to environment-configured recipients
  * - Audit logging and security monitoring
  * - Error handling and recovery mechanisms
- * - Rate limiting and spam protection support
+ * - Rate limiting and spam protection support.
  * @class ContactFormService
  * @author Created by Denisse Maldonado
  * @version 1.0.0
@@ -35,9 +35,10 @@ class ContactFormService {
   }
 
   /**
-   * Lazy-loads EmailService to avoid circular dependencies
+   * Lazy-loads EmailService to avoid circular dependencies.
    * @private
-   * @returns {object} EmailService instance
+   * @returns {object} EmailService instance.
+   * @example
    */
   getEmailService() {
     if (!this.emailService) {
@@ -51,16 +52,16 @@ class ContactFormService {
    * Validates form data, stores submission in database, and sends notification email
    * to configured recipients with comprehensive error handling and logging.
    * @function processContactForm
-   * @param {object} formData - Contact form data object
-   * @param {string} formData.name - Full name of the contact
-   * @param {string} formData.email - Email address of the contact
-   * @param {string} formData.message - Message content
-   * @param {string} [formData.phone] - Optional phone number
-   * @param {string} [formData.company] - Optional company name
-   * @param {string} [formData.subject] - Optional message subject
-   * @param {string} [formData.ip] - Client IP address for logging
-   * @param {string} [formData.userAgent] - Client user agent for logging
-   * @param {Date} [formData.timestamp] - Submission timestamp
+   * @param {object} formData - Contact form data object.
+   * @param {string} formData.name - Full name of the contact.
+   * @param {string} formData.email - Email address of the contact.
+   * @param {string} formData.message - Message content.
+   * @param {string} [formData.phone] - Optional phone number.
+   * @param {string} [formData.company] - Optional company name.
+   * @param {string} [formData.subject] - Optional message subject.
+   * @param {string} [formData.ip] - Client IP address for logging.
+   * @param {string} [formData.userAgent] - Client user agent for logging.
+   * @param {Date} [formData.timestamp] - Submission timestamp.
    * @returns {Promise<object>} - Result object with success status and details
    * @example
    * const result = await contactFormService.processContactForm({
@@ -125,8 +126,8 @@ class ContactFormService {
    * Creates ContactSubmission object with form data, metadata, and audit information
    * for tracking, analytics, and customer relationship management purposes.
    * @function storeContactSubmission
-   * @param {object} formData - Contact form data to store
-   * @returns {Promise<object>} - Saved Parse object with generated ID
+   * @param {object} formData - Contact form data to store.
+   * @returns {Promise<object>} - Saved Parse object with generated ID.
    * @example
    * const submission = await this.storeContactSubmission({
    *   name: 'John Doe',
@@ -190,9 +191,9 @@ class ContactFormService {
    * Uses EmailService to dispatch notification with contact details and manages
    * environment-specific recipient configuration for development and production.
    * @function sendContactNotification
-   * @param {object} formData - Contact form data for email content
-   * @param {string} submissionId - Database submission ID for reference
-   * @returns {Promise<object>} - Email send result with success status and message ID
+   * @param {object} formData - Contact form data for email content.
+   * @param {string} submissionId - Database submission ID for reference.
+   * @returns {Promise<object>} - Email send result with success status and message ID.
    * @example
    * const result = await this.sendContactNotification(formData, 'sub123');
    * // Returns: { success: true, messageId: 'msg456' }
@@ -281,9 +282,9 @@ class ContactFormService {
    * Creates formatted HTML template with contact information, submission details,
    * and professional styling for email notifications to staff members.
    * @function generateContactNotificationHTML
-   * @param {object} formData - Contact form data for email content
-   * @param {string} submissionId - Database submission ID for reference
-   * @returns {Promise<string>} - Formatted HTML email content
+   * @param {object} formData - Contact form data for email content.
+   * @param {string} submissionId - Database submission ID for reference.
+   * @returns {Promise<string>} - Formatted HTML email content.
    * @example
    * const htmlContent = await this.generateContactNotificationHTML(formData, 'sub123');
    * // Returns formatted HTML string with contact details
@@ -375,9 +376,9 @@ ${formData.message}
    * Creates formatted plain text version of contact notification for email clients
    * that don't support HTML or when text format is preferred.
    * @function generateContactNotificationText
-   * @param {object} formData - Contact form data for email content
-   * @param {string} submissionId - Database submission ID for reference
-   * @returns {Promise<string>} - Formatted plain text email content
+   * @param {object} formData - Contact form data for email content.
+   * @param {string} submissionId - Database submission ID for reference.
+   * @returns {Promise<string>} - Formatted plain text email content.
    * @example
    * const textContent = await this.generateContactNotificationText(formData, 'sub123');
    * // Returns formatted plain text string with contact details
@@ -427,13 +428,13 @@ Entorno: ${environment.toUpperCase()} | ID: ${submissionId}
    * Queries database for contact submissions with optional filtering by status,
    * date range, or other criteria for administration and customer management.
    * @function getContactSubmissions
-   * @param {object} [options={}] - Query options for filtering and pagination
-   * @param {number} [options.limit=50] - Maximum number of results to return
-   * @param {number} [options.skip=0] - Number of results to skip for pagination
-   * @param {string} [options.status] - Filter by submission status
-   * @param {Date} [options.startDate] - Filter submissions from this date
-   * @param {Date} [options.endDate] - Filter submissions until this date
-   * @returns {Promise<object>} - Query results with submissions and metadata
+   * @param {object} [options] - Query options for filtering and pagination.
+   * @param {number} [options.limit] - Maximum number of results to return.
+   * @param {number} [options.skip] - Number of results to skip for pagination.
+   * @param {string} [options.status] - Filter by submission status.
+   * @param {Date} [options.startDate] - Filter submissions from this date.
+   * @param {Date} [options.endDate] - Filter submissions until this date.
+   * @returns {Promise<object>} - Query results with submissions and metadata.
    * @example
    * const results = await contactFormService.getContactSubmissions({
    *   limit: 20,

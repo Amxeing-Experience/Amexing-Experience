@@ -15,7 +15,7 @@
         <input type="hidden" id="experienceType" value="Experience">
 
         <div class="row g-4">
-            <!-- Left Column: Image + Basic Info + Precios + Detalles + Personas + Vehiculo -->
+            <!-- Left Column: Image + Basic Info + Tiempos + Capacidad + Notas -->
             <div class="col-md-6">
                 <!-- Imagen Principal (Portada) -->
                 <div class="mb-4">
@@ -57,48 +57,16 @@
                         <textarea class="form-control" id="experienceDescription" name="description" required rows="2" placeholder="Descripcion detallada de lo que incluye esta experiencia..."></textarea>
                         <div class="invalid-feedback" id="description-error"></div>
                     </div>
-                </div>
-
-                <!-- Precios -->
-                <div class="mb-4">
-                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                        <i class="ti ti-currency-dollar me-1"></i>
-                        Precios
-                    </h6>
-                    <div class="row">
-                        <!-- Adult Prices Row -->
-                        <div class="col-md-6 mb-3">
-                            <label for="experienceCost" class="form-label">Precio Adulto <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="experienceCost" name="cost" required min="0" step="0.01" placeholder="0.00">
-                            </div>
-                            <div class="invalid-feedback" id="cost-error"></div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="experiencePriceNoAlcohol" class="form-label">Precio Sin Alcohol</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="experiencePriceNoAlcohol" name="price_no_alcohol" min="0" step="0.01" placeholder="0.00">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <!-- Child Prices Row -->
-                        <div class="col-md-6 mb-3">
-                            <label for="experiencePriceChild" class="form-label">Precio Niño (3-12)</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="experiencePriceChild" name="price_child" min="0" step="0.01" placeholder="0.00">
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="experiencePriceInfant" class="form-label">Precio Infante (0-2)</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="experiencePriceInfant" name="price_infant" min="0" step="0.01" placeholder="0.00">
-                            </div>
-                        </div>
+                    <!-- Destino (Optional) -->
+                    <div class="mb-3">
+                        <label for="experienceDestino" class="form-label">
+                            Destino <small class="text-muted">(Opcional)</small>
+                        </label>
+                        <select class="form-control" id="experienceDestino" name="destinationPOI">
+                            <option value="">Seleccione un destino...</option>
+                            <!-- Dynamically populated with POI data -->
+                        </select>
+                        <div class="form-text">Punto de interés o destino principal asociado con esta experiencia</div>
                     </div>
                 </div>
 
@@ -188,7 +156,7 @@
                 </div>
             </div>
 
-            <!-- Right Column: Incluye/NoIncluye + Idiomas + Disponibilidad + Fotos -->
+            <!-- Right Column: Incluye/NoIncluye + Idiomas + Disponibilidad + Fotos + Precios -->
             <div class="col-md-6">
                 <!-- Incluye / No Incluye -->
                 <div class="mb-4">
@@ -262,6 +230,100 @@
                     <div class="form-text"><small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small></div>
                 </div>
 
+                <!-- Precios -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                        <i class="ti ti-currency-dollar me-1"></i>
+                        Precios
+                    </h6>
+                    <div class="row">
+                        <!-- Adult Prices Row -->
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceCost" class="form-label">Precio Adulto <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experienceCost" name="cost" required min="0" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="invalid-feedback" id="cost-error"></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="experiencePriceNoAlcohol" class="form-label">Precio Sin Alcohol</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experiencePriceNoAlcohol" name="price_no_alcohol" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <!-- Child Prices Row -->
+                        <div class="col-md-6 mb-3">
+                            <label for="experiencePriceChild" class="form-label">Precio Niño (3-12)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experiencePriceChild" name="price_child" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="experiencePriceInfant" class="form-label">Precio Infante (0-2)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experiencePriceInfant" name="price_infant" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Services Price Breakdown -->
+                <div class="mb-4">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-light border-bottom-0 d-flex justify-content-between align-items-center py-3">
+                            <h6 class="mb-0 fw-bold">
+                                <i class="ti ti-calculator me-2"></i>Desglose de Precios de Servicios
+                            </h6>
+                            <button class="btn btn-sm btn-link text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#priceBreakdownContent" aria-expanded="true">
+                                <i class="ti ti-chevron-down" id="breakdownToggleIcon"></i>
+                            </button>
+                        </div>
+                        <div class="collapse show" id="priceBreakdownContent">
+                            <div class="card-body">
+                                <div id="servicesBreakdownList" class="mb-3">
+                                    <!-- Dynamic service breakdown will appear here -->
+                                    <div class="text-center text-muted py-3">
+                                        <i class="ti ti-package-off"></i>
+                                        <p class="mb-0 small">No hay servicios agregados aun</p>
+                                        <p class="mb-0 small text-muted">Los servicios se agregan en la seccion Servicios</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Summary totals -->
+                                <div class="border-top pt-3">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span class="text-muted">Total de Servicios:</span>
+                                                <strong id="servicesTotalCost">$0.00</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span class="text-muted">Costo por Persona:</span>
+                                                <strong id="servicesPerPersonCost">$0.00</strong>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="alert alert-info mb-0">
+                                                <h6 class="alert-heading mb-2">
+                                                    <i class="ti ti-bulb me-1"></i>Referencia para Precio Final
+                                                </h6>
+                                                <p class="mb-1 small">Costo base de servicios: <strong id="baseServicesCost">$0.00</strong></p>
+                                                <p class="mb-0 small text-muted">Use este costo como referencia para establecer los precios arriba.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -330,6 +392,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // to ensure we always have the latest valid token
     const experienceId = document.getElementById('experienceId').value;
     const isNew = experienceId === 'new';
+    
+    // Update price breakdown when services change (called from experience-services.js)
+    window.addEventListener('servicesUpdated', function() {
+        if (window.experienceServicesBuilder && typeof window.experienceServicesBuilder.updatePriceBreakdown === 'function') {
+            window.experienceServicesBuilder.updatePriceBreakdown();
+        }
+    });
 
     // Availability state
     const selectedDays = new Map();
@@ -349,6 +418,77 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize
     init();
+
+    // Load POI options for Destino dropdown
+    async function loadPOIOptions() {
+        try {
+            console.log('🌍 Loading POI options for Destino selectbox...');
+            
+            const accessToken = getAccessToken() || localStorage.getItem('authToken');
+            const response = await fetch('/api/pois/active', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to load POIs');
+            }
+
+            // Extract POI array from response
+            const poisArray = result.success ? result.data : result;
+            
+            if (!Array.isArray(poisArray)) {
+                console.error('❌ POI API did not return an array:', poisArray);
+                return [];
+            }
+            
+            console.log(`📍 Loaded ${poisArray.length} POIs from API`);
+            
+            // Deduplicate by name - show unique names only (same as provider modal)
+            const uniquePOIs = poisArray.filter((poi, index, self) => 
+                index === self.findIndex(p => p.label === poi.label)
+            );
+            
+            console.log(`✨ Deduplicated to ${uniquePOIs.length} unique POIs`);
+            return uniquePOIs;
+            
+        } catch (error) {
+            console.error('❌ Error loading POI options:', error);
+            showAlert('Error al cargar destinos', 'warning');
+            return [];
+        }
+    }
+
+    // Populate Destino selectbox
+    function populateDestinoSelect(pois) {
+        const select = document.getElementById('experienceDestino');
+        if (!select) {
+            console.warn('⚠️ Destino select element not found');
+            return;
+        }
+        
+        // Clear existing options except the first one
+        select.innerHTML = '<option value="">Seleccione un destino...</option>';
+        
+        // Add POI options (same format as provider modal)
+        pois.forEach(poi => {
+            const option = document.createElement('option');
+            option.value = poi.value;
+            option.textContent = poi.label;
+            option.setAttribute('data-service-type', poi.serviceType?.name || '');
+            select.appendChild(option);
+        });
+        
+        console.log(`✅ Populated Destino with ${pois.length} POI options`);
+    }
 
     async function init() {
         // Add debug mode indicator if active
@@ -372,6 +512,13 @@ document.addEventListener('DOMContentLoaded', function() {
         setupEventListeners();
         setupImageUpload();
         setupPhotoUpload();
+        
+        // Load POI options for Destino dropdown
+        const pois = await loadPOIOptions();
+        if (pois.length > 0) {
+            populateDestinoSelect(pois);
+        }
+        
         if (!isNew) {
             await loadExperienceData();
         }
@@ -1107,6 +1254,34 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('experienceMinPeople').value = data.min_people || '';
             document.getElementById('experienceMaxPeople').value = data.max_people || '';
 
+            // 🔍 LOAD DEBUG - Log complete destinationPOI load details
+            console.log('🔍 LOAD DEBUG - Complete API response data:', data);
+            console.log('🔍 LOAD DEBUG - DestinationPOI field:', data.destinationPOI);
+            console.log('🔍 LOAD DEBUG - DestinationPOI type:', typeof data.destinationPOI);
+            
+            const destinoDropdown = document.getElementById('experienceDestino');
+            console.log('🔍 LOAD DEBUG - Destino dropdown element:', destinoDropdown);
+            console.log('🔍 LOAD DEBUG - Available dropdown options:', Array.from(destinoDropdown.options).map(o => ({value: o.value, text: o.textContent})));
+
+            // Set destinationPOI if exists
+            if (data.destinationPOI && data.destinationPOI.id) {
+                console.log('🔍 LOAD DEBUG - Setting destinationPOI value:', data.destinationPOI.id);
+                console.log('🔍 LOAD DEBUG - DestinationPOI object:', data.destinationPOI);
+                
+                document.getElementById('experienceDestino').value = data.destinationPOI.id;
+                
+                // Verify the value was set correctly
+                const setValueCheck = document.getElementById('experienceDestino').value;
+                console.log('🔍 LOAD DEBUG - Value after setting:', setValueCheck);
+                console.log('🔍 LOAD DEBUG - Value set successfully:', setValueCheck === data.destinationPOI.id);
+                console.log('🔍 LOAD DEBUG - Selected option after setting:', destinoDropdown.selectedOptions[0] ? {value: destinoDropdown.selectedOptions[0].value, text: destinoDropdown.selectedOptions[0].textContent} : 'None selected');
+                
+                console.log('📍 Loaded destinationPOI:', data.destinationPOI.name || data.destinationPOI.id);
+            } else {
+                console.log('🔍 LOAD DEBUG - No destinationPOI found, clearing dropdown');
+                document.getElementById('experienceDestino').value = '';
+            }
+
             // Includes / NotIncludes / Languages (arrays to textarea)
             console.log('🔍 Loading textarea fields - API Response data:', { 
                 includes: data.includes, 
@@ -1373,12 +1548,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function saveExperience() {
-        // Get access token using simple working pattern
-        const accessToken = getAccessToken();
+        // Try multiple auth approaches - same as provider modal
+        const accessToken = getAccessToken() || localStorage.getItem('authToken');
         
         if (!accessToken) {
             showAlert('Error de autenticación. Por favor, recarga la página e intenta nuevamente.', 'danger');
-            debugLog('Save Experience - Auth Error', { hasToken: false });
+            debugLog('Save Experience - Auth Error', { 
+                hasToken: false,
+                cookieToken: !!getAccessToken(),
+                localStorageToken: !!localStorage.getItem('authToken')
+            });
             return;
         }
 
@@ -1523,7 +1702,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 provider_notes: document.getElementById('experienceProviderNotes').value.trim() || null,
                 team_notes: document.getElementById('experienceTeamNotes').value.trim() || null,
                 availability: availability.length > 0 ? availability : null,
+                destinationPOI: document.getElementById('experienceDestino').value || null,
             };
+
+            // 🔍 SAVE DEBUG - Log destinationPOI save details
+            const destinoValue = document.getElementById('experienceDestino').value;
+            const destinoElement = document.getElementById('experienceDestino');
+            console.log('🔍 SAVE DEBUG - Destino form value:', destinoValue);
+            console.log('🔍 SAVE DEBUG - Destino element:', destinoElement);
+            console.log('🔍 SAVE DEBUG - Destino dropdown options:', Array.from(destinoElement.options).map(o => ({value: o.value, text: o.textContent})));
+            console.log('🔍 SAVE DEBUG - Selected option:', destinoElement.selectedOptions[0] ? {value: destinoElement.selectedOptions[0].value, text: destinoElement.selectedOptions[0].textContent} : 'None selected');
+            console.log('🔍 SAVE DEBUG - Body.destinationPOI:', body.destinationPOI);
 
             if (window._mainImageRemoved) {
                 body.mainImage = '';
@@ -1533,6 +1722,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 url: isNew ? '/api/experiences' : `/api/experiences/${experienceId}`,
                 method: isNew ? 'POST' : 'PUT',
                 body: body,
+                authToken: accessToken ? `${accessToken.substring(0, 10)}...` : 'NO TOKEN',
+                hasToken: !!accessToken,
                 bodyStringified: JSON.stringify(body, null, 2),
                 capturedTextareas: {
                     includes: capturedFormValues.includes,
@@ -1559,6 +1750,16 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const result = await response.json();
+
+            // 🔍 SAVE RESPONSE DEBUG - Log server response details
+            console.log('🔍 SAVE RESPONSE DEBUG - Complete server response:', result);
+            console.log('🔍 SAVE RESPONSE DEBUG - Response success:', result.success);
+            console.log('🔍 SAVE RESPONSE DEBUG - Response data:', result.data);
+            if (result.data && result.data.destinationPOI) {
+                console.log('🔍 SAVE RESPONSE DEBUG - Saved destinationPOI in response:', result.data.destinationPOI);
+            } else {
+                console.log('🔍 SAVE RESPONSE DEBUG - No destinationPOI in response data');
+            }
 
             // Store access token if provided in response
             if (result.accessToken) {
@@ -1871,3 +2072,49 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<style>
+/* Services Price Breakdown */
+.services-price-breakdown .card-header {
+    cursor: pointer;
+}
+
+.services-price-breakdown .collapse {
+    transition: height 0.35s ease;
+}
+
+#breakdownToggleIcon {
+    transition: transform 0.3s ease;
+}
+
+.services-price-breakdown [aria-expanded="false"] #breakdownToggleIcon,
+[aria-expanded="false"] #breakdownToggleIcon {
+    transform: rotate(-90deg);
+}
+
+.service-breakdown-item {
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.service-breakdown-item:last-child {
+    margin-bottom: 0;
+}
+
+.service-breakdown-name {
+    font-weight: 500;
+    color: #212529;
+}
+
+.service-breakdown-details {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.service-breakdown-price {
+    font-weight: 600;
+    color: #28a745;
+}
+</style>
