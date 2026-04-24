@@ -77,6 +77,10 @@ class HomeController {
   /**
    * Renders the about page in Spanish (Nosotros).
    * Displays information about Amexing Experience company, history, and values.
+   * @param req
+   * @param res
+   * @param next
+   * @example
    */
   async nosotros(req, res, next) {
     try {
@@ -107,6 +111,10 @@ class HomeController {
   /**
    * Renders the services page (Servicios).
    * Displays all service offerings and experiences available.
+   * @param req
+   * @param res
+   * @param next
+   * @example
    */
   async servicios(req, res, next) {
     try {
@@ -137,6 +145,10 @@ class HomeController {
   /**
    * Renders the fleet page (Nuestra Flota).
    * Displays vehicle fleet information and specifications.
+   * @param req
+   * @param res
+   * @param next
+   * @example
    */
   async fleet(req, res, next) {
     try {
@@ -167,6 +179,10 @@ class HomeController {
   /**
    * Renders the contact page (Contacto).
    * Displays contact information and booking functionality.
+   * @param req
+   * @param res
+   * @param next
+   * @example
    */
   async contacto(req, res, next) {
     try {
@@ -196,6 +212,7 @@ class HomeController {
 
   /**
    * Returns standardized company data for all pages.
+   * @example
    */
   getCompanyData() {
     return {

@@ -53,19 +53,40 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
     </div>
 
     <div class="card-body" id="quotes-content">
+        <!-- Date Filter Pills -->
+        <div class="mb-3">
+            <div class="btn-group" role="group" aria-label="Filtro por estado de servicios">
+                <input type="radio" class="btn-check" name="dateFilter" id="filterFuture" value="future" checked>
+                <label class="btn btn-outline-primary" for="filterFuture">
+                    <i class="ti ti-calendar-forward me-1"></i>Próximas cotizaciones
+                </label>
+                
+                <input type="radio" class="btn-check" name="dateFilter" id="filterPrevious" value="previous">
+                <label class="btn btn-outline-secondary" for="filterPrevious">
+                    <i class="ti ti-calendar-time me-1"></i>Cotizaciones anteriores
+                </label>
+                
+                <input type="radio" class="btn-check" name="dateFilter" id="filterNoServices" value="no-services">
+                <label class="btn btn-outline-warning" for="filterNoServices">
+                    <i class="ti ti-alert-triangle me-1"></i>Sin servicios
+                </label>
+            </div>
+        </div>
+
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">
                     <tr>
                         <th>Folio</th>
-                        <th class="text-center">Mi Rol</th>
+                        <% if (dtUserRole !== 'admin') { %><th class="text-center">Mi Rol</th><% } %>
                         <% if (showClientColumn) { %><th>Cliente</th><% } %>
-                        <th>Tipo de Evento</th>
+                        <% if (dtUserRole !== 'admin') { %><th>Tipo de Evento</th><% } %>
                         <th class="text-center">No. Personas</th>
                         <th>Creado Por</th>
                         <th class="text-center">Estatus</th>
                         <th class="text-center">Fecha Creación</th>
                         <th class="text-center">Última Modificación</th>
+                        <th class="text-center">Fecha inicio de servicios</th>
                         <% if (dtShowActions) { %>
                             <th class="text-center">Acciones</th>
                         <% } %>
@@ -367,6 +388,14 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
             ajax: {
                 url: apiEndpoint,
                 type: 'GET',
+                data: function(data) {
+                    // Add date filter parameter to the request
+                    const activeFilter = document.querySelector('input[name="dateFilter"]:checked');
+                    if (activeFilter) {
+                        data.dateFilter = activeFilter.value;
+                    }
+                    return data;
+                },
                 dataSrc: function(json) {
                     return json.data || [];
                 },
@@ -382,6 +411,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         return `<span class="fw-semibold text-primary">${data || 'N/A'}</span>`;
                     }
                 },
+                <% if (dtUserRole !== 'admin') { %>
                 {
                     data: 'userQuoteRoleSpanish',
                     className: 'text-center',
@@ -423,6 +453,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                                 </span>`;
                     }
                 },
+                <% } %>
                 <% if (showClientColumn) { %>
                 {
                     data: 'client',
@@ -446,6 +477,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     }
                 },
                 <% } %>
+                <% if (dtUserRole !== 'admin') { %>
                 {
                     data: 'eventType',
                     render: function(data) {
@@ -455,6 +487,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         return `<span class="text-truncate" style="max-width: 200px; display: inline-block;" title="${data}">${data}</span>`;
                     }
                 },
+                <% } %>
                 {
                     data: null,
                     className: 'text-center',
@@ -572,6 +605,41 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                                     <div class="fw-semibold">${dateStr}</div>
                                     <small class="text-muted">${timeStr}</small>
                                 </div>`;
+                    }
+                },
+                {
+                    data: null,
+                    className: 'text-center',
+                    orderable: true,
+                    render: function(data, type, row) {
+                        const serviceItems = row.serviceItems || {};
+                        const days = serviceItems.days || [];
+                        
+                        if (days.length === 0) {
+                            return '<em class="text-muted">Sin servicios</em>';
+                        }
+                        
+                        let startDate = null;
+                        for (const day of days) {
+                            if (day.date) {
+                                const d = new Date(`${day.date}T12:00:00`);
+                                if (!startDate || d < startDate) {
+                                    startDate = d;
+                                }
+                            }
+                        }
+                        
+                        if (!startDate) {
+                            return '<em class="text-muted">Sin fecha</em>';
+                        }
+                        
+                        const dateStr = startDate.toLocaleDateString('es-MX', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        });
+                        
+                        return `<div class="fw-semibold text-info">${dateStr}</div>`;
                     }
                 },
                 ...(showActions ? [{
@@ -693,7 +761,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando Cotizaciones...'
             },
-            order: [[<%= showClientColumn ? 8 : 7 %>, 'desc']], // Sort by updatedAt column by default (most recent first) - adjusted for Mi Rol column
+            order: [[<%= dtUserRole === 'admin' ? (showClientColumn ? 6 : 5) : (showClientColumn ? 8 : 7) %>, 'desc']], // Sort by updatedAt column by default (most recent first) - adjusted for admin role (no Mi Rol/Tipo de Evento columns)
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
@@ -709,6 +777,16 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         });
 
         // Event Handlers
+
+        // Date filter pill change events
+        document.querySelectorAll('input[name="dateFilter"]').forEach(button => {
+            button.addEventListener('change', function() {
+                if (this.checked && dataTable) {
+                    // Reload the DataTable with the new filter
+                    dataTable.ajax.reload();
+                }
+            });
+        });
 
         // Status dropdown change
         let pendingSchedule = null;

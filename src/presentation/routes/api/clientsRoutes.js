@@ -337,7 +337,7 @@ router.get('/active', async (req, res) => {
 
 /**
  * GET /api/clients/amexing-direct - Get direct Amexing clients for dropdowns/selectors
- * Admin/SuperAdmin only endpoint for getting clients with clientBelongsTo = "amexing"
+ * Admin/SuperAdmin only endpoint for getting clients with clientBelongsTo = "amexing".
  */
 router.get('/amexing-direct', async (req, res) => {
   await clientsController.getAmexingDirectClients(req, res);
@@ -345,7 +345,7 @@ router.get('/amexing-direct', async (req, res) => {
 
 /**
  * POST /api/clients/amexing-direct/quick - Create quick direct Amexing client
- * Admin/SuperAdmin only endpoint for creating direct clients with clientBelongsTo = "amexing"
+ * Admin/SuperAdmin only endpoint for creating direct clients with clientBelongsTo = "amexing".
  */
 router.post('/amexing-direct/quick', writeOperationsLimiter, async (req, res) => {
   await clientsController.createQuickDirectClient(req, res);

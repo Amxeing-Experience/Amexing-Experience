@@ -671,6 +671,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             isOpen: false,
             sessionId: null // Unique session ID for each modal opening
         };
+        
+        // Track deleted experience IDs to remove from database
+        let deletedExperienceIds = [];
 
         // Initialize variables (following providers table pattern)
         const tableId = '<%= dtTableId %>';
@@ -678,6 +681,28 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const showActions = <%= dtShowActions %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
+
+        // Function to get access token from various sources
+        function getAccessToken() {
+            // Try localStorage first (common keys)
+            const tokenFromStorage = localStorage.getItem('accessToken') || 
+                                   localStorage.getItem('token') || 
+                                   localStorage.getItem('authToken');
+            if (tokenFromStorage) {
+                return tokenFromStorage;
+            }
+            
+            // Try cookies as fallback
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'clientAccessToken' || name === 'accessToken') {
+                    return value;
+                }
+            }
+            
+            return null;
+        }
 
         // DataTable initialization with type=Establishment filter
         const dataTable = $(`#${tableId}`).DataTable({
@@ -811,6 +836,19 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                         data-bs-placement="top"
                                         title="${statusTitle}">
                                         <i class="ti ${statusIcon}"></i>
+                                    </button>`;
+                    }
+
+                    // Add conversion to Provider button
+                    if (canEdit) {
+                        actions += `<button type="button"
+                                        class="btn btn-warning convert-to-provider-btn"
+                                        data-id="${row.id}"
+                                        data-name="${row.name}"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Convertir a Proveedor">
+                                        <i class="ti ti-building-store"></i>
                                     </button>`;
                     }
 
@@ -976,14 +1014,31 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 sessionId: null
             };
             
+            // Clear deleted experiences tracking
+            deletedExperienceIds = [];
+            
             console.log('✅ Modal state reset:', currentModalState);
+            console.log('✅ Deleted experiences queue cleared');
         });
 
         // Event delegation for experience management
         $(document).on('click', '.delete-experiencia-btn', function() {
             const experienciaCard = $(this).closest('.experiencia-editable');
             const index = experienciaCard.data('index');
-            console.log('🗑️ Deleting establishment experience:', index);
+            const experienceId = experienciaCard.data('id');
+            
+            console.log('🗑️ Deleting establishment experience:', {
+                index: index,
+                experienceId: experienceId,
+                hasId: !!experienceId
+            });
+            
+            // Track deleted experience ID if it's an existing experience
+            if (experienceId && experienceId !== '') {
+                deletedExperienceIds.push(experienceId);
+                console.log('📝 Added to deletion queue:', experienceId);
+                console.log('📋 Current deletion queue:', deletedExperienceIds);
+            }
             
             experienciaCard.fadeOut(300, function() {
                 $(this).remove();
@@ -1474,6 +1529,42 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         });
                         showEstablishmentError('Error crítico: ID del establecimiento inválido. No se pueden guardar experiencias.');
                         return;
+                    }
+                    
+                    // Delete removed experiences first (if any)
+                    if (deletedExperienceIds.length > 0) {
+                        console.log('🗑️ Processing deleted experiences:', {
+                            count: deletedExperienceIds.length,
+                            ids: deletedExperienceIds,
+                            establishmentId: finalEstablishmentId
+                        });
+                        
+                        try {
+                            for (let i = 0; i < deletedExperienceIds.length; i++) {
+                                const experienceId = deletedExperienceIds[i];
+                                console.log(`🗑️ Deleting experience ${i + 1}/${deletedExperienceIds.length}: ${experienceId}`);
+                                
+                                await $.ajax({
+                                    url: `/api/providers/${finalEstablishmentId}/experiencias/${experienceId}`,
+                                    method: 'DELETE',
+                                    success: function(response) {
+                                        console.log(`✅ Experience ${experienceId} deleted successfully`);
+                                    },
+                                    error: function(xhr) {
+                                        // Log error but don't stop the process
+                                        console.error(`❌ Failed to delete experience ${experienceId}:`, xhr.responseJSON?.error || xhr.statusText);
+                                    }
+                                });
+                            }
+                            
+                            // Clear the deleted experiences array after processing
+                            console.log('✅ All deleted experiences processed');
+                            deletedExperienceIds = [];
+                            
+                        } catch (deleteError) {
+                            console.error('❌ Error deleting experiences:', deleteError);
+                            // Continue with saving even if deletion fails
+                        }
                     }
                     
                     // Save experiences individually if any exist
@@ -2326,7 +2417,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 sessionId: sessionId
             };
             
+            // Clear deleted experiences tracking when opening modal
+            deletedExperienceIds = [];
+            
             console.log('🔍 DEBUGGING: Opening modal with state', currentModalState);
+            console.log('✅ Deleted experiences queue cleared for new modal session');
             
             // Clear any previous modal alerts
             const alertsContainer = document.getElementById('establishmentModalAlerts');
@@ -2697,6 +2792,74 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             });
         }
 
+        // Conversion handlers
+        let conversionItemId = null;
+        let conversionItemName = null;
+        
+        // Function to open conversion modal
+        function openConversionModal(id, name) {
+            conversionItemId = id;
+            conversionItemName = name;
+            $('#conversionItemName').text(name);
+            $('#conversionModal').modal('show');
+        }
+        
+        // Handle conversion button click
+        $(document).on('click', '.convert-to-provider-btn', function() {
+            const id = $(this).data('id');
+            const name = $(this).data('name');
+            openConversionModal(id, name);
+        });
+        
+        // Handle conversion confirmation
+        $('#confirmConversionBtn').on('click', async function() {
+            if (!conversionItemId) return;
+            
+            const $btn = $(this);
+            const originalHtml = $btn.html();
+            
+            try {
+                // Show loading state
+                $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Convirtiendo...');
+                
+                // Make API call to update type
+                const response = await $.ajax({
+                    url: `/api/experiences/${conversionItemId}`,
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${getAccessToken()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    data: JSON.stringify({
+                        type: 'Provider'
+                    })
+                });
+                
+                if (response.success) {
+                    // Close modal
+                    $('#conversionModal').modal('hide');
+                    
+                    // Show success message
+                    showSuccessAlert(`"${conversionItemName}" ha sido convertido a Proveedor exitosamente.`);
+                    
+                    // Reload DataTable
+                    dataTable.ajax.reload(null, false);
+                } else {
+                    throw new Error(response.error || 'Error al convertir el establecimiento');
+                }
+            } catch (error) {
+                console.error('Conversion error:', error);
+                showErrorAlert(error.responseJSON?.error || error.message || 'Error al convertir el establecimiento');
+            } finally {
+                // Restore button state
+                $btn.prop('disabled', false).html(originalHtml);
+                
+                // Reset conversion data
+                conversionItemId = null;
+                conversionItemName = null;
+            }
+        });
+
         console.log('✅ Establishments DataTable initialized successfully');
     }
 
@@ -2839,6 +3002,32 @@ function showErrorAlert(message) {
     border-width: 0.2em;
 }
 </style>
+
+<!-- Conversion Modal -->
+<div class="modal fade" id="conversionModal" tabindex="-1" aria-labelledby="conversionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="conversionModalLabel">
+                    <i class="ti ti-exchange"></i> Confirmar Conversión
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro que desea convertir "<span id="conversionItemName"></span>" de Establecimiento a Proveedor?</p>
+                <div class="alert alert-info mb-0">
+                    <i class="ti ti-info-circle"></i> Esta acción cambiará el tipo pero mantendrá toda la información asociada.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmConversionBtn">
+                    <i class="ti ti-check"></i> Confirmar Conversión
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Include Experience Images Modal -->
 <%- include('../modal/experience-images-modal.ejs') %>

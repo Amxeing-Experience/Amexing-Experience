@@ -106,6 +106,7 @@ class ExperienceServicesBuilder {
         this.loadPricingRates(),
         this.loadTransportServices(),
         this.loadVehicleRatePrices(),
+        this.loadActiveServicesForDropdowns(),
       ]);
 
       this.setupEventListeners();
@@ -120,19 +121,87 @@ class ExperienceServicesBuilder {
   }
 
   setupEventListeners() {
+    // Numeric input validation functions
+    const validateNumericInput = (e) => {
+      const input = e.target;
+      let value = input.value;
+      
+      // Remove any non-numeric characters except decimal point
+      value = value.replace(/[^0-9.]/g, '');
+      
+      // Ensure only one decimal point
+      const parts = value.split('.');
+      if (parts.length > 2) {
+        value = parts[0] + '.' + parts.slice(1).join('');
+      }
+      
+      // Limit decimal places based on field type
+      const isHoursField = input.id === 'hoursQuantity';
+      const maxDecimals = isHoursField ? 1 : 2;
+      if (parts.length === 2 && parts[1].length > maxDecimals) {
+        value = parts[0] + '.' + parts[1].substring(0, maxDecimals);
+      }
+      
+      // Update the input value
+      if (input.value !== value) {
+        input.value = value;
+      }
+    };
+    
+    // Prevent invalid characters on keypress
+    const preventInvalidNumericChars = (e) => {
+      // Allow: backspace, delete, tab, escape, enter, decimal point
+      if ([46, 8, 9, 27, 13, 110, 190].indexOf(e.keyCode) !== -1 ||
+          // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+          (e.keyCode === 65 && e.ctrlKey === true) ||
+          (e.keyCode === 67 && e.ctrlKey === true) ||
+          (e.keyCode === 86 && e.ctrlKey === true) ||
+          (e.keyCode === 88 && e.ctrlKey === true) ||
+          // Allow: home, end, left, right
+          (e.keyCode >= 35 && e.keyCode <= 39)) {
+        // Allow decimal point only if not already present
+        if ((e.keyCode === 110 || e.keyCode === 190) && e.target.value.indexOf('.') !== -1) {
+          e.preventDefault();
+        }
+        return;
+      }
+      // Ensure that it is a number and stop the keypress
+      if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+        e.preventDefault();
+      }
+    };
+    
+    // Handle paste events to validate pasted content
+    const handleNumericPaste = (e) => {
+      e.preventDefault();
+      const clipboard = e.clipboardData || window.clipboardData;
+      const pastedText = clipboard ? clipboard.getData('text') : '';
+      // Clean the pasted text
+      let cleanedText = pastedText.replace(/[^0-9.]/g, '');
+      // Ensure only one decimal point
+      const parts = cleanedText.split('.');
+      if (parts.length > 2) {
+        cleanedText = parts[0] + '.' + parts.slice(1).join('');
+      }
+      // Insert cleaned text at cursor position
+      const input = e.target;
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+      const currentValue = input.value;
+      input.value = currentValue.substring(0, start) + cleanedText + currentValue.substring(end);
+      // Trigger input event to apply full validation
+      input.dispatchEvent(new Event('input'));
+    };
+
     // Add Service buttons
-    document.getElementById('addServiceBtn')?.addEventListener('click', () => this.openServiceModal());
-    document.getElementById('emptyStateAddServiceBtn')?.addEventListener('click', () => this.openServiceModal());
+    document.getElementById('addServiceBtn')?.addEventListener('click', async () => await this.openServiceModal());
+    document.getElementById('emptyStateAddServiceBtn')?.addEventListener('click', async () => await this.openServiceModal());
 
     // Save Service button
     document.getElementById('saveServiceBtn')?.addEventListener('click', () => this.saveService());
 
-    // Person count for per-person calculation
-    document.getElementById('personCount')?.addEventListener('input', () => this.updateTotals());
-
-    // Payment type and currency dropdowns
-    document.getElementById('paymentTypeSelect')?.addEventListener('change', () => this.updateTotals());
-    document.getElementById('currencySelect')?.addEventListener('change', () => this.updateTotals());
+    // Removed: Person count, payment type and currency event listeners
+    // These UI elements were removed from the bottom panel
 
     // Service Type Toggle
     document.querySelectorAll('input[name="serviceType"]').forEach((radio) => {
@@ -151,7 +220,7 @@ class ExperienceServicesBuilder {
 
     // Direction Type Toggle
     document.querySelectorAll('input[name="directionType"]').forEach((radio) => {
-      radio.addEventListener('change', () => this.handleDirectionTypeChange());
+      radio.addEventListener('change', async () => await this.handleDirectionTypeChange());
     });
 
     // Experience selection
@@ -237,6 +306,25 @@ class ExperienceServicesBuilder {
       });
     });
 
+    // Apply numeric validation to all numeric input fields
+    const numericFields = [
+      'hoursQuantity',      // Hours field
+      'adultPrice',         // Experience adult price
+      'childPrice',         // Experience child price
+      'noAlcoholPrice',     // Experience no alcohol price
+      'servicePrice',       // Standard service price
+      'serviceQuantity'     // Service quantity
+    ];
+
+    numericFields.forEach(id => {
+      const field = document.getElementById(id);
+      if (field) {
+        field.addEventListener('input', validateNumericInput);
+        field.addEventListener('keydown', preventInvalidNumericChars);
+        field.addEventListener('paste', handleNumericPaste);
+      }
+    });
+
     // Experience quantity inputs - recalculate price
     document.querySelectorAll('.experience-quantity-input').forEach((input) => {
       input.addEventListener('change', () => this.recalculateExperiencePrice());
@@ -253,13 +341,13 @@ class ExperienceServicesBuilder {
     });
 
     // Delegated click events for service actions
-    document.getElementById('servicesContainer')?.addEventListener('click', (e) => {
+    document.getElementById('servicesContainer')?.addEventListener('click', async (e) => {
       const editBtn = e.target.closest('.edit-service-btn');
       const duplicateBtn = e.target.closest('.duplicate-service-btn');
       const deleteBtn = e.target.closest('.delete-service-btn');
 
       if (editBtn) {
-        this.openServiceModal(editBtn.dataset.serviceId);
+        await this.openServiceModal(editBtn.dataset.serviceId);
       } else if (duplicateBtn) {
         this.duplicateService(duplicateBtn.dataset.serviceId);
       } else if (deleteBtn) {
@@ -586,7 +674,7 @@ class ExperienceServicesBuilder {
   // SERVICE MODAL
   // =====================
 
-  openServiceModal(serviceId = null) {
+  async openServiceModal(serviceId = null) {
     this.currentServiceId = serviceId;
     const modal = document.getElementById('serviceModal');
     if (!modal) return;
@@ -614,7 +702,7 @@ class ExperienceServicesBuilder {
       }
 
       // Populate fields based on type
-      this.populateServiceFields(service);
+      await this.populateServiceFields(service);
     } else {
       // Create mode
       if (modalTitle) modalTitle.innerHTML = '<i class="ti ti-plus-circle me-2"></i>Agregar Servicio';
@@ -636,6 +724,10 @@ class ExperienceServicesBuilder {
   resetServiceTypeContent() {
     document.querySelectorAll('.service-content').forEach((el) => el.classList.add('d-none'));
     document.getElementById('experienceContent')?.classList.remove('d-none');
+    
+    // Hide both details cards
+    this.hideExperienceDetailsCard();
+    this.hideTourDetailsCard();
     document.getElementById('transportTypeSelector')?.classList.add('d-none');
     document.getElementById('tripTypeSelector')?.classList.add('d-none');
     document.getElementById('experiencePricingSection')?.classList.add('d-none');
@@ -693,21 +785,95 @@ class ExperienceServicesBuilder {
       transportFieldsRow.classList.toggle('d-none', type !== 'transport');
     }
 
-    // Tiempo de espera - only for transport
+    // Hide Tiempo de espera for transport (as requested)
     const tiempoEsperaSection = document.getElementById('tiempoEsperaSection');
     if (tiempoEsperaSection) {
-      tiempoEsperaSection.classList.toggle('d-none', type !== 'transport');
+      tiempoEsperaSection.classList.add('d-none');  // Always hidden for now
     }
 
-    // Quantity field vs Additional Vehicle checkbox
+    // Hide Additional Vehicle checkbox and Cantidad field for transport (as requested) 
     const quantityFieldContainer = document.getElementById('quantityFieldContainer');
     const additionalVehicleContainer = document.getElementById('additionalVehicleContainer');
     if (type === 'transport') {
-      if (quantityFieldContainer) quantityFieldContainer.classList.add('d-none');
-      if (additionalVehicleContainer) additionalVehicleContainer.classList.remove('d-none');
+      if (quantityFieldContainer) quantityFieldContainer.classList.add('d-none');  // Hide cantidad field for transport
+      if (additionalVehicleContainer) additionalVehicleContainer.classList.add('d-none');  // Hide additional vehicle
     } else {
       if (quantityFieldContainer) quantityFieldContainer.classList.remove('d-none');
       if (additionalVehicleContainer) additionalVehicleContainer.classList.add('d-none');
+    }
+
+    // Hide Guía + Chofer and Greeter checkboxes for transport (as requested)
+    const includeGuideContainer = document.getElementById('includeGuide')?.closest('.form-check');
+    const includeGreeterContainer = document.getElementById('greeterCheckboxContainer');
+    
+    // Hide the "Opcional" label column for transport
+    const opcionalLabelContainer = includeGuideContainer?.closest('.col-md-2');
+    
+    if (type === 'transport') {
+      if (includeGuideContainer) includeGuideContainer.classList.add('d-none');
+      if (includeGreeterContainer) includeGreeterContainer.classList.add('d-none');
+      if (opcionalLabelContainer) opcionalLabelContainer.classList.add('d-none');
+    } else {
+      if (includeGuideContainer) includeGuideContainer.classList.remove('d-none');
+      if (includeGreeterContainer) includeGreeterContainer.classList.remove('d-none');
+      if (opcionalLabelContainer) opcionalLabelContainer.classList.remove('d-none');
+    }
+
+    // Hide horas field for transport but keep for tours and experiences  
+    const hoursContainer = document.getElementById('hoursQuantity')?.closest('.row');
+    if (type === 'transport') {
+      if (hoursContainer) hoursContainer.classList.add('d-none');
+    } else {
+      if (hoursContainer) hoursContainer.classList.remove('d-none');
+    }
+
+    // Repopulate rates dropdown to filter based on service type
+    this.populateRateSelector();
+
+    // Populate POI dropdowns for transport if preselected values exist
+    if (type === 'transport') {
+      // Use setTimeout to avoid blocking the UI and let the DOM settle
+      setTimeout(async () => {
+        await this.populateTransportDropdownsOnLoad();
+      }, 100);
+    }
+  }
+
+  async populateTransportDropdownsOnLoad() {
+    console.log('🚨 DEBUG: populateTransportDropdownsOnLoad called');
+    
+    // Ensure services are loaded before populating dropdowns
+    if (!window.servicesByTransportType) {
+      console.log('🚨 DEBUG: No services data available, loading services...');
+      await this.loadActiveServicesForDropdowns();
+    }
+    
+    // Check if transport type is preselected
+    const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
+    if (!transportType) {
+      console.log('🚨 DEBUG: No transport type preselected');
+      return;
+    }
+
+    // Check if direction type is preselected  
+    const directionType = document.querySelector('input[name="directionType"]:checked')?.value;
+    if (!directionType) {
+      console.log('🚨 DEBUG: No direction type preselected');
+      return;
+    }
+
+    console.log('🚨 DEBUG: Found preselected values:', { transportType, directionType });
+
+    // Check if we're in One Way mode (default when transport content loads)
+    const tripType = document.querySelector('input[name="tripType"]:checked')?.value || 'one-way';
+    
+    if (tripType === 'one-way') {
+      console.log('🚨 DEBUG: Setting up One Way fields and populating dropdowns on load');
+      // First ensure fields are visible by calling direction change handler
+      await this.handleDirectionTypeChange();
+    } else {
+      console.log('🚨 DEBUG: Setting up Round Trip fields and populating dropdowns on load');
+      await this.updateRoundTripFieldVisibility();
     }
   }
 
@@ -753,7 +919,7 @@ class ExperienceServicesBuilder {
     document.getElementById('greeterInVehicleContainer')?.classList.add('d-none');
   }
 
-  handleTransportTypeChange() {
+  async handleTransportTypeChange() {
     this.clearTransportFormFields();
     const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
     const flightDetailsSection = document.getElementById('flightDetailsSection');
@@ -762,8 +928,7 @@ class ExperienceServicesBuilder {
     const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
     const transportScheduleSection = document.getElementById('transportScheduleSection');
 
-    // Populate dropdowns based on transport type
-    this.populateTransportDropdowns(transportType);
+    // Dropdowns will be populated in handleDirectionTypeChange() after fields are made visible
 
     // Update direction labels
     const arrivalLabel = document.querySelector('label[for="typeArrival"] span');
@@ -801,9 +966,9 @@ class ExperienceServicesBuilder {
     // Re-evaluate field visibility
     const tripType2 = document.querySelector('input[name="tripType"]:checked')?.value;
     if (tripType2 === 'one-way') {
-      this.handleDirectionTypeChange();
+      await this.handleDirectionTypeChange();
     } else {
-      this.updateRoundTripFieldVisibility();
+      await this.updateRoundTripFieldVisibility();
     }
   }
 
@@ -861,7 +1026,7 @@ class ExperienceServicesBuilder {
     return { origin, dest };
   }
 
-  handleTripTypeChange() {
+  async handleTripTypeChange() {
     const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
     const oneWayForm = document.getElementById('oneWayForm');
     const roundTripForm = document.getElementById('roundTripForm');
@@ -889,7 +1054,8 @@ class ExperienceServicesBuilder {
       roundTripForm?.classList.add('d-none');
       arrivalDepartureSelector?.classList.remove('d-none');
       if (transportType) {
-        this.populateTransportDropdowns(transportType);
+        const directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
+        this.populateDropdownsForTransportType(transportType, directionType);
       }
       // Restore values to one-way fields
       this.restoreOneWayValues(savedOrigin, savedDest, transportType);
@@ -897,7 +1063,7 @@ class ExperienceServicesBuilder {
       oneWayForm?.classList.add('d-none');
       roundTripForm?.classList.remove('d-none');
       arrivalDepartureSelector?.classList.add('d-none');
-      this.updateRoundTripFieldVisibility();
+      await this.updateRoundTripFieldVisibility();
       // Restore values to round-trip Ida fields
       this.restoreRoundTripValues(savedOrigin, savedDest, transportType);
     }
@@ -1017,7 +1183,8 @@ class ExperienceServicesBuilder {
     }, 50);
   }
 
-  handleDirectionTypeChange() {
+  async handleDirectionTypeChange() {
+    console.log('🚨 DEBUG: handleDirectionTypeChange called');
     // Capture current values before clearing (swap: old origin → new dest, old dest → new origin)
     const savedValues = this.getActiveOneWayValues();
     const savedOrigin = savedValues.origin;
@@ -1061,10 +1228,11 @@ class ExperienceServicesBuilder {
       if (originLabel) originLabel.innerHTML = 'Origen (San Miguel de Allende) <span class="text-danger">*</span>';
       if (destinationLabel) destinationLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
     } else if (directionType === 'arrival') {
+      // Aeropuerto/Punto-a-Punto Arrival: Origin = SELECT, Destination = SELECT (match quote modal)
       originSelect?.classList.remove('d-none');
       originSelect?.setAttribute('required', 'required');
-      destinationComboWrapper?.classList.remove('d-none');
-      document.getElementById('transportDestinationCombo')?.setAttribute('required', 'required');
+      destinationSelect?.classList.remove('d-none');
+      destinationSelect?.setAttribute('required', 'required');
       if (originLabel) originLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
       if (destinationLabel) destinationLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
       if (timeLabel) timeLabel.textContent = 'Hora de Llegada';
@@ -1076,8 +1244,9 @@ class ExperienceServicesBuilder {
       if (originLabel) originLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
       if (destinationLabel) destinationLabel.innerHTML = 'Destino (San Miguel de Allende) <span class="text-danger">*</span>';
     } else if (directionType === 'departure') {
-      originComboWrapper?.classList.remove('d-none');
-      document.getElementById('transportOriginCombo')?.setAttribute('required', 'required');
+      // Aeropuerto/Punto-a-Punto Departure: Origin = SELECT, Destination = SELECT (match quote modal)
+      originSelect?.classList.remove('d-none');
+      originSelect?.setAttribute('required', 'required');
       destinationSelect?.classList.remove('d-none');
       destinationSelect?.setAttribute('required', 'required');
       if (originLabel) originLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
@@ -1085,9 +1254,13 @@ class ExperienceServicesBuilder {
       if (timeLabel) timeLabel.textContent = 'Hora de Salida';
     }
 
-    // Re-populate dropdowns considering direction
+    // Re-populate dropdowns considering direction (like quote modal)
+    console.log('🚨 DEBUG: About to check transportType:', { transportType, directionType });
     if (transportType) {
-      this.populateTransportDropdowns(transportType, directionType);
+      console.log('🚨 DEBUG: Calling populateTransportPOIDropdowns...');
+      this.populateDropdownsForTransportType(transportType, directionType);
+    } else {
+      console.log('🚨 DEBUG: transportType is empty, not calling populateTransportDropdowns');
     }
 
     // Restore values swapped: old origin → new dest, old dest → new origin
@@ -1096,7 +1269,7 @@ class ExperienceServicesBuilder {
     }
   }
 
-  updateRoundTripFieldVisibility() {
+  async updateRoundTripFieldVisibility() {
     const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
     if (!transportType) return;
 
@@ -1117,8 +1290,9 @@ class ExperienceServicesBuilder {
       idaDestSelect?.classList.remove('d-none');
       if (idaOriginLabel) idaOriginLabel.innerHTML = 'Origen (San Miguel de Allende) <span class="text-danger">*</span>';
     } else {
+      // Aeropuerto/Punto-a-Punto: Origin = SELECT, Destination = SELECT (match quote modal)
       idaOriginSelect?.classList.remove('d-none');
-      idaDestComboWrapper?.classList.remove('d-none');
+      idaDestSelect?.classList.remove('d-none');
       if (idaOriginLabel) idaOriginLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
     }
 
@@ -1139,7 +1313,8 @@ class ExperienceServicesBuilder {
       vueltaDestText?.classList.remove('d-none');
       if (vueltaDestLabel) vueltaDestLabel.innerHTML = 'Destino (San Miguel de Allende) <span class="text-danger">*</span>';
     } else {
-      vueltaOriginComboWrapper?.classList.remove('d-none');
+      // Aeropuerto/Punto-a-Punto: Origin = SELECT, Destination = SELECT (match quote modal)
+      vueltaOriginSelect?.classList.remove('d-none');
       vueltaDestSelect?.classList.remove('d-none');
       if (vueltaDestLabel) vueltaDestLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
     }
@@ -1168,103 +1343,62 @@ class ExperienceServicesBuilder {
       if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Vuelta';
     }
 
-    // Populate round-trip dropdowns
-    this.populateRoundTripDropdowns(transportType);
+    // Populate round-trip dropdowns (using same POI logic)
+    await this.populateRoundTripDropdowns(transportType);
   }
 
-  // Populate transport dropdowns from cached services data
-  populateTransportDropdowns(transportType, directionType) {
-    if (!this.servicesByTransportType) return;
-
-    if (!directionType) {
-      directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
+  // Legacy function - now delegates to quote modal logic
+  async populateTransportPOIDropdowns(transportType, directionType) {
+    console.log('🚨 DEBUG: Legacy populateTransportPOIDropdowns called - delegating to populateDropdownsForTransportType');
+    // Ensure services are loaded first
+    if (!window.servicesByTransportType) {
+      await this.loadActiveServicesForDropdowns();
     }
+    // Delegate to the quote modal logic
+    this.populateDropdownsForTransportType(transportType, directionType);
+  }
 
-    const services = this.servicesByTransportType[transportType] || [];
-    const origins = new Set();
-    const destinations = new Set();
-
-    services.forEach((service) => {
-      if (transportType === 'aeropuerto') {
-        if (directionType === 'departure') {
-          if (service.destination) origins.add(service.destination);
-          if (service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
-            destinations.add(service.origin);
-          }
-        } else {
-          if (service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
-            origins.add(service.origin);
-          }
-          if (service.destination) destinations.add(service.destination);
+  async populateRoundTripDropdowns(transportType) {
+    console.log('[Services] populateRoundTripDropdowns called for', transportType);
+    
+    try {
+      // Ensure services are loaded
+      if (!window.servicesByTransportType) {
+        console.warn('[Services] No services data available, loading now...');
+        await this.loadActiveServicesForDropdowns();
+        if (!window.servicesByTransportType) {
+          console.warn('[Services] Services not available for round trip dropdowns');
+          return;
         }
-      } else if (directionType === 'departure') {
-        if (service.destination) origins.add(service.destination);
-        if (service.origin) destinations.add(service.origin);
-      } else {
-        if (service.origin) origins.add(service.origin);
-        if (service.destination) destinations.add(service.destination);
       }
-    });
-
-    // Slug mapping for selects
-    window.slugToOriginalMapping = window.slugToOriginalMapping || new Map();
-
-    const populateSelect = (element, dataSet) => {
-      if (!element) return;
-      while (element.options.length > 1) element.remove(1);
-      [...dataSet].sort().forEach((location) => {
-        const option = document.createElement('option');
-        const slugValue = location.toLowerCase().replace(/\s+/g, '-');
-        option.value = slugValue;
-        option.textContent = location;
-        element.appendChild(option);
-        window.slugToOriginalMapping.set(slugValue, location);
-      });
-    };
-
-    const populateDatalist = (element, dataSet) => {
-      if (!element) return;
-      element.innerHTML = '';
-      [...dataSet].sort().forEach((location) => {
-        const option = document.createElement('option');
-        option.value = location;
-        element.appendChild(option);
-      });
-    };
-
-    const isDeparture = directionType === 'departure';
-    const originSelect = document.getElementById('transportOriginSelect');
-    const destinationSelect = document.getElementById('transportDestinationSelect');
-    const originDatalist = document.getElementById('transportOriginList');
-    const destinationDatalist = document.getElementById('transportDestinationList');
-
-    if (isDeparture && transportType === 'local') {
-      populateSelect(originSelect, origins);
-    } else if (isDeparture) {
-      populateDatalist(originDatalist, origins);
-      populateSelect(originSelect, origins);
-      populateSelect(destinationSelect, destinations);
-      populateDatalist(destinationDatalist, destinations);
-    } else if (transportType === 'local') {
-      populateSelect(destinationSelect, destinations);
-    } else {
-      populateSelect(originSelect, origins);
-      populateDatalist(destinationDatalist, destinations);
+    } catch (error) {
+      console.error('[Services] Error loading services for round trip:', error);
+      return;
     }
-  }
 
-  populateRoundTripDropdowns(transportType) {
-    if (!this.servicesByTransportType) return;
+    const services = window.servicesByTransportType[transportType] || [];
+    console.log('[Services] Using', services.length, 'services for round trip dropdowns');
 
-    const services = this.servicesByTransportType[transportType] || [];
+    // Collect origins/destinations for both directions
     const arrivalOrigins = new Set();
     const arrivalDestinations = new Set();
     const departureOrigins = new Set();
     const departureDestinations = new Set();
 
-    services.forEach((service) => {
+    services.forEach(service => {
       if (transportType === 'aeropuerto') {
+        // Arrival: airports → origins, destinations → destinations
         if (service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
+          arrivalOrigins.add(service.origin);
+          departureDestinations.add(service.origin); // Departure dest = airports
+        }
+        if (service.destination) {
+          arrivalDestinations.add(service.destination);
+          departureOrigins.add(service.destination); // Departure origin = hotels/cities
+        }
+      } else {
+        // Punto a Punto / Local
+        if (service.origin) {
           arrivalOrigins.add(service.origin);
           departureDestinations.add(service.origin);
         }
@@ -1272,11 +1406,10 @@ class ExperienceServicesBuilder {
           arrivalDestinations.add(service.destination);
           departureOrigins.add(service.destination);
         }
-      } else {
-        if (service.origin) { arrivalOrigins.add(service.origin); departureDestinations.add(service.origin); }
-        if (service.destination) { arrivalDestinations.add(service.destination); departureOrigins.add(service.destination); }
       }
     });
+
+    console.log('🔧 POI Loading: Round trip POIs filtered - Arrival Origins:', arrivalOrigins.size, 'Departure Origins:', departureOrigins.size);
 
     window.slugToOriginalMapping = window.slugToOriginalMapping || new Map();
 
@@ -1303,58 +1436,32 @@ class ExperienceServicesBuilder {
       });
     };
 
-    // Ida (arrival): origin = SELECT, dest = COMBO
+    // Ida (arrival): origin = SELECT, dest = SELECT (match quote modal)
     populateSelect(document.getElementById('roundTripOriginIdaSelect'), arrivalOrigins);
-    populateDatalist(document.getElementById('roundTripDestinationIdaList'), arrivalDestinations);
     populateSelect(document.getElementById('roundTripDestinationIdaSelect'), arrivalDestinations);
 
-    // Vuelta (departure): origin = COMBO, dest = SELECT
-    populateDatalist(document.getElementById('roundTripOriginVueltaList'), departureOrigins);
+    // Vuelta (departure): origin = SELECT, dest = SELECT (match quote modal)
     populateSelect(document.getElementById('roundTripOriginVueltaSelect'), departureOrigins);
     populateSelect(document.getElementById('roundTripDestinationVueltaSelect'), departureDestinations);
   }
 
   handleExperienceSelection(experienceId) {
-    if (!experienceId) return;
+    if (!experienceId) {
+      this.hideExperienceDetailsCard();
+      return;
+    }
+    
     const exp = this.experiencesCache.get(experienceId);
-    if (!exp) return;
+    if (!exp) {
+      this.hideExperienceDetailsCard();
+      return;
+    }
 
+    // Build and show the experience details card
+    this.buildExperienceDetailsCard(exp);
+
+    // Set default prices (these might be hidden fields used for calculation)
     const isProvider = exp.type === 'provider_experience';
-
-    // Populate read-only fields
-    const descEl = document.getElementById('experienceDescription');
-    if (descEl) descEl.value = exp.description || '';
-
-    // Advance booking time
-    const advEl = document.getElementById('advanceBookingTime');
-    if (advEl) advEl.value = exp.advanceBookingTime || exp.advance_booking_time || '';
-
-    // Languages
-    const langEl = document.getElementById('experienceLanguages');
-    if (langEl) {
-      const langs = isProvider ? exp.languages : exp.languages;
-      langEl.value = Array.isArray(langs) ? langs.join(', ') : (langs || '');
-    }
-
-    // Includes
-    const inclEl = document.getElementById('experienceIncludes');
-    if (inclEl) {
-      const incl = exp.includes || [];
-      inclEl.value = Array.isArray(incl) ? incl.join(', ') : (incl || '');
-    }
-
-    // Not includes
-    const notInclEl = document.getElementById('experienceNotIncludes');
-    if (notInclEl) {
-      const notIncl = exp.notincludes || exp.notIncludes || [];
-      notInclEl.value = Array.isArray(notIncl) ? notIncl.join(', ') : (notIncl || '');
-    }
-
-    // Client notes
-    const notesEl = document.getElementById('experienceClientNotes');
-    if (notesEl) notesEl.value = exp.clientNotes || exp.client_booking_notes || '';
-
-    // Set default prices
     const adultPrice = isProvider ? exp.price : exp.cost;
     const adultPriceEl = document.getElementById('adultPrice');
     if (adultPriceEl && adultPrice) adultPriceEl.value = adultPrice;
@@ -1364,40 +1471,684 @@ class ExperienceServicesBuilder {
 
     const noAlcPriceEl = document.getElementById('noAlcoholPrice');
     if (noAlcPriceEl) noAlcPriceEl.value = isProvider ? (exp.price_no_alcohol || '') : (exp.noAlcoholPrice || '');
+    
+    // Store experience data for later use
+    this.selectedExperienceData = exp;
+    
+    // Check for transport services in the experience
+    this.detectAndShowTransportServices(exp);
+  }
+
+  buildExperienceDetailsCard(exp) {
+    const card = document.getElementById('experienceDetailsCard');
+    const body = document.getElementById('experienceDetailsCardBody');
+    if (!card || !body) return;
+
+    const isProvider = exp.type === 'provider_experience';
+    
+    // Helper functions for formatting
+    const tag = (icon, value) => {
+      if (!value) return '';
+      return `<span class="me-3 small"><i class="ti ti-${icon} me-1 text-muted"></i>${value}</span>`;
+    };
+
+    const infoLine = (icon, label, value) => {
+      if (!value) return '';
+      return `<div class="small py-1"><i class="ti ti-${icon} me-1 text-muted"></i><span class="text-muted">${label}:</span> ${value}</div>`;
+    };
+    
+    // Format availability schedule
+    const formatSchedule = (availability) => {
+      if (!availability || !availability.length) return '';
+      
+      const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      let scheduleHtml = '';
+      
+      availability.forEach(item => {
+        const dayName = dayNames[item.day] || `Día ${item.day}`;
+        const times = item.times || [];
+        times.forEach(time => {
+          const timeRange = `${time.start || '00:00'}-${time.end || '23:59'}`;
+          scheduleHtml += `<span class="badge bg-light text-dark me-1 mb-1">${dayName} ${timeRange}</span>`;
+        });
+      });
+      
+      return scheduleHtml || '<span class="text-muted">Sin horarios definidos</span>';
+    };
+    
+    // Format experience availability schedule in two-column table format
+    const renderExperienceScheduleTable = (availability) => {
+      if (!availability || !availability.length) {
+        return `
+          <div class="table-responsive">
+            <table class="table table-sm table-borderless mb-0">
+              <tbody>
+                <tr>
+                  <td colspan="2" class="text-center py-2">
+                    <span class="badge bg-light text-dark border">Todos los días</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+      
+      const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      const rows = availability.map(item => {
+        const dayName = dayNames[item.day] || `Día ${item.day}`;
+        const times = item.times || [];
+        
+        let timeStr = '';
+        if (times.length === 0) {
+          timeStr = '<span class="text-muted">Sin horarios específicos</span>';
+        } else {
+          timeStr = times.map(time => {
+            const start = time.start || '00:00';
+            const end = time.end || '23:59';
+            return `${start} - ${end}`;
+          }).join('<br>');
+        }
+        
+        return `
+          <tr>
+            <td class="fw-medium" style="width: 30%;">${dayName}</td>
+            <td class="small">${timeStr}</td>
+          </tr>
+        `;
+      }).join('');
+      
+      return `
+        <div class="table-responsive">
+          <table class="table table-sm table-borderless mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="small fw-bold">Día</th>
+                <th class="small fw-bold">Horarios</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </div>
+      `;
+    };
+    
+    // Format arrays to comma-separated strings
+    const formatArray = (arr) => {
+      if (!arr) return '';
+      return Array.isArray(arr) ? arr.join(', ') : arr;
+    };
+    
+    // Convert minutes to hours and minutes format
+    const formatMinutesToTime = (minutes) => {
+      if (!minutes || minutes === 0) return 'Inmediata';
+      const numMinutes = parseInt(minutes, 10);
+      if (isNaN(numMinutes)) return minutes; // Return original if not a number
+      
+      const hours = Math.floor(numMinutes / 60);
+      const mins = numMinutes % 60;
+      
+      if (hours === 0) return `${mins} min`;
+      if (mins === 0) return `${hours} hora${hours > 1 ? 's' : ''}`;
+      return `${hours} hora${hours > 1 ? 's' : ''} ${mins} min`;
+    };
+    
+    // Get values from experience object
+    const name = exp.name || exp.title || 'Experiencia sin nombre';
+    const description = exp.description || '';
+    const duration = exp.duration ? `${exp.duration} horas` : '';
+    
+    // Handle advance booking time - could be in minutes or already formatted
+    const advanceBookingRaw = exp.advanceBookingTime || exp.advance_booking_time || exp.advance_minutes || 'Inmediata';
+    const advanceBooking = formatMinutesToTime(advanceBookingRaw);
+    
+    const languages = formatArray(isProvider ? exp.languages : exp.languages);
+    const includes = formatArray(exp.includes);
+    const notIncludes = formatArray(exp.notincludes || exp.notIncludes);
+    
+    // Extract all notes types
+    const clientNotes = exp.clientNotes || exp.client_booking_notes || '';
+    const providerNotes = exp.provider_notes || '';
+    const internalNotes = exp.internal_notes || '';
+    const teamNotes = exp.team_notes || '';
+    
+    // Check for availability schedule in multiple possible properties
+    const availabilityData = exp.availability_schedule || exp.availability || exp.schedules || exp.suggested_times || exp.availabilitySchedule;
+    
+    // Check if we have any content to show in the bottom section
+    const hasBottomContent = includes || notIncludes || clientNotes || providerNotes || internalNotes || teamNotes;
+    
+    // Build the card HTML
+    body.innerHTML = `
+      <h6 class="fw-bold mb-1">${name}</h6>
+      ${description ? `<p class="text-muted small mb-2">${description}</p>` : ''}
+      <hr class="my-2">
+      <div class="d-flex flex-wrap align-items-center mb-2">
+        ${tag('clock', duration ? `Duración: ${duration}` : null)}
+        ${tag('calendar-event', `Reserva anticipada: ${advanceBooking}`)}
+        ${tag('language', languages ? `Idiomas: ${languages}` : null)}
+      </div>
+      ${availabilityData ? `
+      <div class="mb-2">
+        <span class="small text-muted d-block mb-2"><i class="ti ti-calendar me-1"></i>Recomendamos salir:</span>
+        ${renderExperienceScheduleTable(availabilityData)}
+      </div>
+      ` : ''}
+      ${hasBottomContent ? '<hr class="my-2">' : ''}
+      ${infoLine('circle-check', 'Incluye', includes)}
+      ${infoLine('circle-x', 'No incluye', notIncludes)}
+      ${infoLine('user', 'Notas Cliente', clientNotes)}
+      ${infoLine('building', 'Notas Proveedor', providerNotes)}
+      ${infoLine('lock', 'Notas Internas', internalNotes)}
+      ${infoLine('users', 'Notas Equipo', teamNotes)}
+    `;
+
+    // Show the card
+    card.classList.remove('d-none');
+    
+    // Hide the schedule fields since we're showing the info in the card
+    const scheduleFields = document.getElementById('experienceScheduleFields');
+    if (scheduleFields) scheduleFields.style.display = 'none';
+  }
+
+  detectAndShowTransportServices(exp) {
+    // Check if experience has transport services in its serviceItems
+    const serviceItems = exp.serviceItems || {};
+    const subconcepts = serviceItems.subconcepts || [];
+    
+    // Find transport services
+    const transportServices = subconcepts.filter(sc => 
+      sc.type === 'traslado' || sc.type === 'transport'
+    );
+    
+    if (transportServices.length > 0) {
+      // Store transport services for editing
+      this.experienceTransportServices = transportServices;
+      
+      // Show transport editing section
+      this.showTransportEditingSection(transportServices);
+    } else {
+      // Hide transport editing section if no transport services
+      this.hideTransportEditingSection();
+    }
+  }
+
+  showTransportEditingSection(transportServices) {
+    // Check if transport editing section already exists
+    let transportSection = document.getElementById('experienceTransportSection');
+    
+    if (!transportSection) {
+      // Create transport editing section after experience details card
+      const experienceCard = document.getElementById('experienceDetailsCard');
+      if (experienceCard) {
+        transportSection = document.createElement('div');
+        transportSection.id = 'experienceTransportSection';
+        transportSection.className = 'card mt-3';
+        experienceCard.parentNode.insertBefore(transportSection, experienceCard.nextSibling);
+      } else {
+        return; // Can't create section without reference point
+      }
+    }
+
+    // Build transport services HTML
+    const transportHTML = this.buildTransportServicesHTML(transportServices);
+    
+    transportSection.innerHTML = `
+      <div class="card-header d-flex align-items-center">
+        <i class="ti ti-car me-2 text-warning"></i>
+        <h6 class="mb-0">Servicios de Transporte Incluidos</h6>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">Esta experiencia incluye servicios de transporte. Puedes editar el tipo de vehículo y segmento para cada servicio.</p>
+        ${transportHTML}
+      </div>
+    `;
+    
+    // Show the section
+    transportSection.classList.remove('d-none');
+    
+    // Initialize transport editing handlers
+    this.initializeTransportEditingHandlers();
+  }
+
+  hideTransportEditingSection() {
+    const transportSection = document.getElementById('experienceTransportSection');
+    if (transportSection) {
+      transportSection.classList.add('d-none');
+    }
+  }
+
+  buildTransportServicesHTML(transportServices) {
+    return transportServices.map((transport, index) => {
+      const vehicleTypeName = transport.vehicleTypeName || 'Sin especificar';
+      const concept = transport.concept || 'Servicio de transporte';
+      
+      return `
+        <div class="border rounded p-3 mb-3 transport-service-item" data-transport-index="${index}">
+          <div class="row align-items-center">
+            <div class="col-md-6">
+              <h6 class="mb-1">${concept}</h6>
+              <div class="text-muted small">
+                <i class="ti ti-car me-1"></i>Vehículo actual: <span class="fw-medium">${vehicleTypeName}</span>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-2">
+                <label class="form-label small">Tipo de Vehículo</label>
+                <select class="form-select form-select-sm vehicle-type-select" data-transport-index="${index}">
+                  <option value="">Seleccionar vehículo...</option>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small">Segmento</label>
+                <select class="form-select form-select-sm segment-select" data-transport-index="${index}">
+                  <option value="">Seleccionar segmento...</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  initializeTransportEditingHandlers() {
+    // Initialize vehicle and segment dropdowns
+    this.populateTransportDropdowns();
+    
+    // Add change event listeners for vehicle selection
+    document.querySelectorAll('.vehicle-type-select').forEach(select => {
+      select.addEventListener('change', (e) => {
+        const transportIndex = e.target.dataset.transportIndex;
+        this.handleTransportVehicleChange(transportIndex, e.target.value);
+      });
+    });
+    
+    // Add change event listeners for segment selection
+    document.querySelectorAll('.segment-select').forEach(select => {
+      select.addEventListener('change', (e) => {
+        const transportIndex = e.target.dataset.transportIndex;
+        this.handleTransportSegmentChange(transportIndex, e.target.value);
+      });
+    });
+  }
+
+  populateTransportDropdowns() {
+    // Populate vehicle type dropdowns (reuse existing cache if available)
+    const vehicleSelects = document.querySelectorAll('.vehicle-type-select');
+    vehicleSelects.forEach(select => {
+      const transportIndex = select.dataset.transportIndex;
+      
+      // Clear existing options except the first one
+      select.innerHTML = '<option value="">Seleccionar vehículo...</option>';
+      
+      // Populate with vehicle types from cache
+      this.populateVehicleSelect(select);
+      
+      // Pre-select current vehicle if available
+      if (this.experienceTransportServices && this.experienceTransportServices[transportIndex]) {
+        const currentVehicleId = this.experienceTransportServices[transportIndex].vehicleId;
+        if (currentVehicleId) {
+          select.value = currentVehicleId;
+        }
+      }
+    });
+    
+    // Populate segment dropdowns
+    const segmentSelects = document.querySelectorAll('.segment-select');
+    segmentSelects.forEach(select => {
+      const transportIndex = select.dataset.transportIndex;
+      
+      // Clear existing options except the first one  
+      select.innerHTML = '<option value="">Seleccionar segmento...</option>';
+      
+      // Populate with segments from cache
+      this.populateSegmentSelect(select);
+      
+      // Pre-select current segment if available
+      if (this.experienceTransportServices && this.experienceTransportServices[transportIndex]) {
+        const currentRateId = this.experienceTransportServices[transportIndex].rateId;
+        if (currentRateId) {
+          select.value = currentRateId;
+        }
+      }
+    });
+  }
+
+  populateVehicleSelect(select) {
+    // Reuse existing vehicle cache logic
+    if (!this.vehiclesCache) return;
+    
+    this.vehiclesCache.forEach(vehicle => {
+      const option = document.createElement('option');
+      option.value = vehicle.id;
+      option.textContent = `${vehicle.name} (${vehicle.capacity} pax)`;
+      select.appendChild(option);
+    });
+  }
+
+  populateSegmentSelect(select) {
+    // Reuse existing rates cache logic
+    if (!this.ratesCache) return;
+    
+    this.ratesCache.forEach(rate => {
+      const option = document.createElement('option');
+      option.value = rate.id;
+      option.textContent = rate.name;
+      select.appendChild(option);
+    });
+  }
+
+  handleTransportVehicleChange(transportIndex, vehicleId) {
+    if (!this.experienceTransportServices || !this.experienceTransportServices[transportIndex]) {
+      return;
+    }
+    
+    // Update the transport service data
+    this.experienceTransportServices[transportIndex].vehicleId = vehicleId;
+    
+    // Find vehicle details from cache to update vehicle type name
+    if (this.vehiclesCache && vehicleId) {
+      const vehicle = this.vehiclesCache.find(v => v.id === vehicleId);
+      if (vehicle) {
+        this.experienceTransportServices[transportIndex].vehicleTypeName = vehicle.name;
+        this.experienceTransportServices[transportIndex].vehicleType = vehicle.type || vehicle.name;
+        
+        // Update the display text
+        const serviceItem = document.querySelector(`[data-transport-index="${transportIndex}"]`);
+        if (serviceItem) {
+          const currentVehicleSpan = serviceItem.querySelector('.fw-medium');
+          if (currentVehicleSpan) {
+            currentVehicleSpan.textContent = `${vehicle.name} (${vehicle.capacity} pax)`;
+          }
+        }
+      }
+    }
+    
+    console.log(`Transport ${transportIndex} vehicle changed to:`, vehicleId);
+  }
+
+  handleTransportSegmentChange(transportIndex, segmentId) {
+    if (!this.experienceTransportServices || !this.experienceTransportServices[transportIndex]) {
+      return;
+    }
+    
+    // Update the transport service data
+    this.experienceTransportServices[transportIndex].rateId = segmentId;
+    
+    // Find rate details from cache to update related data
+    if (this.ratesCache && segmentId) {
+      const rate = this.ratesCache.find(r => r.id === segmentId);
+      if (rate) {
+        this.experienceTransportServices[transportIndex].rateName = rate.name;
+        // You could also update pricing here if needed
+      }
+    }
+    
+    console.log(`Transport ${transportIndex} segment changed to:`, segmentId);
+  }
+  
+  hideExperienceDetailsCard() {
+    const card = document.getElementById('experienceDetailsCard');
+    if (card) card.classList.add('d-none');
   }
 
   handleTourSelection(tourId) {
-    if (!tourId) return;
+    if (!tourId) {
+      this.hideTourDetailsCard();
+      return;
+    }
+    
     const tour = this.toursCache.get(tourId);
-    if (!tour) return;
-
-    // Populate tour fields
-    const descEl = document.getElementById('tourDescription');
-    if (descEl) descEl.value = tour.description || '';
-
-    const advEl = document.getElementById('tourAdvanceBookingTime');
-    if (advEl) advEl.value = tour.advanceBookingTime || '';
-
-    const langEl = document.getElementById('tourLanguages');
-    if (langEl) {
-      const langs = tour.languages;
-      langEl.value = Array.isArray(langs) ? langs.join(', ') : (langs || '');
+    if (!tour) {
+      this.hideTourDetailsCard();
+      return;
     }
 
-    const inclEl = document.getElementById('tourIncludes');
-    if (inclEl) {
-      const incl = tour.includes || [];
-      inclEl.value = Array.isArray(incl) ? incl.join(', ') : (incl || '');
-    }
+    // Build and show the tour details card
+    this.buildTourDetailsCard(tour);
+    
+    // Store tour data for later use
+    this.selectedTourData = tour;
+  }
 
-    const notInclEl = document.getElementById('tourNotIncludes');
-    if (notInclEl) {
-      const notIncl = tour.notIncludes || tour.notincludes || [];
-      notInclEl.value = Array.isArray(notIncl) ? notIncl.join(', ') : (notIncl || '');
-    }
+  buildTourDetailsCard(tour) {
+    const card = document.getElementById('tourDetailsCard');
+    const body = document.getElementById('tourDetailsCardBody');
+    if (!card || !body) return;
+    
+    // Helper functions for formatting
+    const tag = (icon, value) => {
+      if (!value) return '';
+      return `<span class="me-3 small"><i class="ti ti-${icon} me-1 text-muted"></i>${value}</span>`;
+    };
 
-    const notesEl = document.getElementById('tourClientNotes');
-    if (notesEl) notesEl.value = tour.clientNotes || tour.client_booking_notes || '';
+    const infoLine = (icon, label, value) => {
+      if (!value) return '';
+      return `<div class="small py-1"><i class="ti ti-${icon} me-1 text-muted"></i><span class="text-muted">${label}:</span> ${value}</div>`;
+    };
+    
+    // Format tour availability schedule with "Todos los días" logic like quotes system
+    const renderAvailabilityPills = (schedule) => {
+      if (!schedule || schedule.length === 0 || (schedule.length === 7 && schedule.every((s) => s.times && s.times.length === 0))) {
+        return '<span class="badge bg-light text-dark border">Todos los días</span>';
+      }
+      return schedule.map((s) => {
+        const timeStr = s.times && s.times.length > 0 ? ` ${s.times.map((t) => t.replace(/\s*-\s*/g, '-')).join(', ')}` : '';
+        return `<span class="badge bg-light text-dark border me-1 mb-1">${s.day}${timeStr}</span>`;
+      }).join('');
+    };
+    
+    // Format tour availability schedule in two-column table format
+    const renderAvailabilityTable = (schedule) => {
+      if (!schedule || schedule.length === 0 || (schedule.length === 7 && schedule.every((s) => s.times && s.times.length === 0))) {
+        return `
+          <div class="table-responsive">
+            <table class="table table-sm table-borderless mb-0">
+              <tbody>
+                <tr>
+                  <td colspan="2" class="text-center py-2">
+                    <span class="badge bg-light text-dark border">Todos los días</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+      
+      const rows = schedule.map((s) => {
+        const times = s.times && s.times.length > 0 
+          ? s.times.map((t) => t.replace(/\s*-\s*/g, ' - ')).join('<br>')
+          : '<span class="text-muted">Sin horarios específicos</span>';
+        
+        return `
+          <tr>
+            <td class="fw-medium" style="width: 30%;">${s.day}</td>
+            <td class="small">${times}</td>
+          </tr>
+        `;
+      }).join('');
+      
+      return `
+        <div class="table-responsive">
+          <table class="table table-sm table-borderless mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="small fw-bold">Día</th>
+                <th class="small fw-bold">Horarios</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </div>
+      `;
+    };
+    
+    // Extract availability schedule like quotes system
+    const extractAvailabilitySchedule = (item) => {
+      const dayAbbrevs = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      const dayNamesEn = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayNamesEs = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+      const result = []; // Array of { day: 'Lun', times: ['08:00 - 12:00'] }
+
+      // String format: "Sa, Vi, Ju, Mi"
+      if (typeof item.availability === 'string' || typeof item.availableDays === 'string') {
+        const str = item.availability || item.availableDays;
+        const abbrevMap = { do: 0, lu: 1, ma: 2, mi: 3, ju: 4, vi: 5, sa: 6, sá: 6 };
+        str.split(/[,\s]+/).forEach((part) => {
+          const key = part.toLowerCase().substring(0, 2);
+          if (abbrevMap[key] !== undefined) {
+            result.push({ day: dayAbbrevs[abbrevMap[key]], times: [] });
+          }
+        });
+        return result;
+      }
+
+      // Array of day numbers: [0,1,2,3,4,5,6]
+      if (Array.isArray(item.availableDays)) {
+        item.availableDays.forEach((d) => {
+          if (d >= 0 && d <= 6) result.push({ day: dayAbbrevs[d], times: [] });
+        });
+        return result;
+      }
+
+      // Availability array (objects with day keys + time data)
+      if (Array.isArray(item.availability)) {
+        const dayTimesMap = new Map();
+        for (const obj of item.availability) {
+          if (!obj || typeof obj !== 'object') continue;
+          for (let d = 0; d < 7; d++) {
+            const keys = [d.toString(), dayNamesEn[d], dayNamesEs[d]];
+            for (const key of keys) {
+              if (obj.hasOwnProperty(key) && obj[key]) {
+                if (!dayTimesMap.has(d)) dayTimesMap.set(d, []);
+                // For tours, times might be in startTime/endTime format
+                if (obj.startTime && obj.endTime) {
+                  dayTimesMap.get(d).push(`${obj.startTime} - ${obj.endTime}`);
+                }
+                break;
+              }
+            }
+            if (obj.day === d) {
+              if (!dayTimesMap.has(d)) dayTimesMap.set(d, []);
+              if (obj.startTime && obj.endTime) {
+                dayTimesMap.get(d).push(`${obj.startTime} - ${obj.endTime}`);
+              }
+            }
+          }
+        }
+        for (const [d, times] of dayTimesMap) {
+          result.push({ day: dayAbbrevs[d], times });
+        }
+        return result;
+      }
+
+      // Object with days array
+      if (item.availability?.days && Array.isArray(item.availability.days)) {
+        item.availability.days.forEach((d) => {
+          if (d >= 0 && d <= 6) result.push({ day: dayAbbrevs[d], times: [] });
+        });
+        return result;
+      }
+
+      // Object with day-specific booleans
+      if (item.availability && typeof item.availability === 'object') {
+        for (let d = 0; d < 7; d++) {
+          if (item.availability[dayNamesEn[d]] === true || item.availability[dayNamesEs[d]] === true) {
+            result.push({ day: dayAbbrevs[d], times: [] });
+          }
+        }
+        if (result.length > 0) return result;
+      }
+
+      return result; // empty = no availability data = "Todos los días"
+    };
+    
+    // Format arrays to comma-separated strings
+    const formatArray = (arr) => {
+      if (!arr) return '';
+      return Array.isArray(arr) ? arr.join(', ') : arr;
+    };
+    
+    // Convert minutes to hours and minutes format
+    const formatMinutesToTime = (minutes) => {
+      if (!minutes || minutes === 0) return 'Inmediata';
+      const numMinutes = parseInt(minutes, 10);
+      if (isNaN(numMinutes)) return minutes; // Return original if not a number
+      
+      const hours = Math.floor(numMinutes / 60);
+      const mins = numMinutes % 60;
+      
+      if (hours === 0) return `${mins} min`;
+      if (mins === 0) return `${hours} hora${hours > 1 ? 's' : ''}`;
+      return `${hours} hora${hours > 1 ? 's' : ''} ${mins} min`;
+    };
+    
+    // Get values from tour object - use same logic as quotes system
+    const name = tour.destinationPOI?.name || tour.name || tour.title || 'Tour sin nombre';
+    const description = tour.description || '';
+    // Tours store duration in 'time' property (minutes), convert to hours like quotes system
+    const tourDuration = tour.time ? formatMinutesToTime(parseInt(tour.time, 10)) : null;
+    
+    // Handle advance booking time - could be in minutes or already formatted
+    const advanceBookingRaw = tour.advanceBookingTime || tour.advance_booking_time || tour.advance_minutes || 'Inmediata';
+    const advanceBooking = formatMinutesToTime(advanceBookingRaw);
+    
+    const languages = formatArray(tour.languages);
+    const includes = formatArray(tour.includes);
+    const notIncludes = formatArray(tour.notincludes || tour.notIncludes);
+    
+    // Extract all notes types
+    const clientNotes = tour.clientNotes || tour.client_booking_notes || '';
+    const providerNotes = tour.provider_notes || '';
+    const internalNotes = tour.internal_notes || '';
+    const teamNotes = tour.team_notes || '';
+    
+    // Extract availability schedule using same logic as quotes system
+    const availabilitySchedule = extractAvailabilitySchedule(tour);
+    
+    // Check if we have any content to show in the bottom section
+    const hasBottomContent = includes || notIncludes || clientNotes || providerNotes || internalNotes || teamNotes;
+    
+    // Build the card HTML
+    body.innerHTML = `
+      <h6 class="fw-bold mb-1">${name}</h6>
+      ${description ? `<p class="text-muted small mb-2">${description}</p>` : ''}
+      <hr class="my-2">
+      <div class="d-flex flex-wrap align-items-center mb-2">
+        ${tag('clock', tourDuration ? `Mínimo de horas: ${tourDuration}` : null)}
+        ${tag('calendar-event', `Reserva anticipada: ${advanceBooking}`)}
+        ${tag('language', languages ? `Idiomas: ${languages}` : null)}
+      </div>
+      <div class="mb-2">
+        <span class="small text-muted d-block mb-2"><i class="ti ti-calendar me-1"></i>Recomendamos salir:</span>
+        ${renderAvailabilityTable(availabilitySchedule)}
+      </div>
+      ${hasBottomContent ? '<hr class="my-2">' : ''}
+      ${infoLine('circle-check', 'Incluye', includes)}
+      ${infoLine('circle-x', 'No incluye', notIncludes)}
+      ${infoLine('user', 'Notas Cliente', clientNotes)}
+      ${infoLine('building', 'Notas Proveedor', providerNotes)}
+      ${infoLine('lock', 'Notas Internas', internalNotes)}
+      ${infoLine('users', 'Notas Equipo', teamNotes)}
+    `;
+
+    // Show the card
+    card.classList.remove('d-none');
+    
+    // Hide the schedule fields since we're showing the info in the card
+    const scheduleFields = document.getElementById('tourScheduleFields');
+    if (scheduleFields) scheduleFields.style.display = 'none';
+  }
+  
+  hideTourDetailsCard() {
+    const card = document.getElementById('tourDetailsCard');
+    if (card) card.classList.add('d-none');
   }
 
   handleTourTransportToggle(checked) {
@@ -1408,21 +2159,41 @@ class ExperienceServicesBuilder {
   }
 
   async handleRateSelection(rateId) {
+    // Clear price field immediately when rate changes
+    const servicePriceField = document.getElementById('servicePrice');
+    if (servicePriceField) {
+      servicePriceField.value = '0.00';
+    }
+
     if (!rateId) {
       this.clearVehicleDropdown();
       this.transportPriceData = null;
       return;
     }
 
-    // Only do route-based lookup for transport type
+    // Check service type and delegate to appropriate handler
     const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
-    if (serviceType !== 'transport') {
-      this.populateVehicleSelectFallback(rateId);
+    
+    if (serviceType === 'transport') {
+      this.handleTransportRateSelection(rateId);
+      this.updateWaitingTimeRateDisplay();
       return;
     }
 
-    // Read origin/destination from visible form fields
-    const directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
+    // For non-transport services, use fallback vehicle population
+    this.populateVehicleSelectFallback(rateId);
+  }
+
+  async handleTransportRateSelection(rateId, fallbackOrigin = null, fallbackDestination = null) {
+    if (!rateId) {
+      this.clearVehicleDropdown();
+      this.transportPriceData = null;
+      return;
+    }
+
+    // Get origin and destination from the appropriate fields based on direction
+    const directionRadio = document.querySelector('input[name="directionType"]:checked');
+    const direction = directionRadio?.value || 'arrival';
     const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
     const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
 
@@ -1430,114 +2201,248 @@ class ExperienceServicesBuilder {
     let destinationName = '';
 
     if (tripType === 'round-trip') {
+      // Round trip: read from Ida fields (arrival leg)
       if (transportType === 'local') {
+        // Local: Ida origin = TEXT, Ida destination = SELECT
         originName = document.getElementById('roundTripOriginIdaText')?.value || '';
         const destSelect = document.getElementById('roundTripDestinationIdaSelect');
         const destSlug = destSelect?.value;
         destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
       } else {
+        // Aeropuerto / Punto a Punto: Ida origin = SELECT (slug), Ida destination = SELECT (slug)
         const originSelect = document.getElementById('roundTripOriginIdaSelect');
-        const slug = originSelect?.value;
-        originName = window.slugToOriginalMapping?.get(slug) || slug || '';
-        destinationName = document.getElementById('roundTripDestinationIdaCombo')?.value || '';
+        const originSlug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
+        const destSelect = document.getElementById('roundTripDestinationIdaSelect');
+        const destSlug = destSelect?.value;
+        destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
       }
     } else {
-      const isDepartureWithSelect = directionType === 'departure' && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
-      const isLocalIda = directionType === 'arrival' && transportType === 'local';
+      // One-way: read from one-way fields based on direction
+      const isDepartureWithSelect = direction === 'departure' && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
 
+      // Helper to resolve destination SELECT display name
       const resolveDestSelect = () => {
         const destSelect = document.getElementById('transportDestinationSelect');
         const destSlug = destSelect?.value;
         return window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
       };
 
+      const isLocalIda = direction === 'arrival' && transportType === 'local';
+
       if (isLocalIda) {
+        // Local Ida: origin TEXT, destination SELECT
         originName = document.getElementById('transportOriginText')?.value || '';
         destinationName = resolveDestSelect();
-      } else if (isDepartureWithSelect) {
-        originName = document.getElementById('transportOriginCombo')?.value || '';
-        destinationName = resolveDestSelect();
-      } else if (directionType === 'departure' && transportType === 'local') {
+      } else if (direction === 'departure' && transportType === 'local') {
+        // Local Vuelta: origin SELECT, destination TEXT
         const originSelect = document.getElementById('transportOriginSelect');
         const slug = originSelect?.value;
         originName = window.slugToOriginalMapping?.get(slug) || slug || '';
         destinationName = document.getElementById('transportDestinationText')?.value || '';
-      } else if (directionType === 'arrival') {
+      } else if (direction === 'departure') {
+        // Departure: origin SELECT (city), destination SELECT (airport)
         const originSelect = document.getElementById('transportOriginSelect');
-        const slug = originSelect?.value;
-        originName = window.slugToOriginalMapping?.get(slug) || slug || '';
-        destinationName = document.getElementById('transportDestinationCombo')?.value || '';
+        const originSlug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
+        destinationName = resolveDestSelect();
       } else {
-        originName = document.getElementById('transportOriginCombo')?.value || '';
-        destinationName = document.getElementById('transportDestinationCombo')?.value || '';
+        // Arrival: origin SELECT (airport), destination SELECT (city)
+        const originSelect = document.getElementById('transportOriginSelect');
+        const originSlug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
+        destinationName = resolveDestSelect();
       }
     }
 
+    // Use fallbacks from service data if form fields are empty (edit race condition)
+    if (!originName && fallbackOrigin) originName = fallbackOrigin;
+    if (!destinationName && fallbackDestination) destinationName = fallbackDestination;
+
     if (!originName || !destinationName) {
-      // No route yet — use fallback
+      this.clearVehicleDropdown();
       this.transportPriceData = null;
-      this.populateVehicleSelectFallback(rateId);
       return;
     }
 
-    // Swap for departure (DB stores origin→destination, user selected reverse)
+    // For one-way departure: swap origin/destination for API query
+    // DB stores routes as origin→destination, but user selected in reverse for departure
+    // Round trip uses Ida (arrival) data which is already in DB order
     let apiOrigin = originName;
     let apiDestination = destinationName;
-    if (tripType !== 'round-trip' && directionType === 'departure') {
+    
+    // Debug logging for price investigation
+    console.log('🔍 Transport Route Price Lookup:', {
+      userSelection: {
+        direction,
+        tripType,
+        originName,
+        destinationName,
+        rateId
+      }
+    });
+    
+    if (tripType !== 'round-trip' && direction === 'departure') {
       apiOrigin = destinationName;
       apiDestination = originName;
+      console.log('🔄 Swapped for departure:', { apiOrigin, apiDestination });
     }
 
+    // Show loading spinner next to Vehículo label
+    const vehicleSpinner = document.getElementById('vehicleLoadingSpinner');
+    vehicleSpinner?.classList.remove('d-none');
+
     try {
-      const token = this.getAccessToken();
       const params = new URLSearchParams({
         originPOI: apiOrigin,
         destinationPOI: apiDestination,
         rateId,
       });
+      if (this.clientId) {
+        params.append('clientId', this.clientId);
+      }
 
+      const accessToken = this.getAccessToken();
       const response = await fetch(`/api/services/prices-by-route?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token || ''}` },
+        headers: {
+          Authorization: `Bearer ${accessToken || ''}`,
+        },
       });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
 
       const result = await response.json();
-      if (result.success && result.data && result.data.vehicles && result.data.vehicles.length > 0) {
-        // Route match — use route-specific vehicles
-        this.transportPriceData = result.data;
-        this.populateVehicleSelectFromRoute(result.data.vehicles);
-      } else {
-        // No match — fallback to VehicleRatePrices
+      if (!result.success || !result.data) {
+        this.clearVehicleDropdown();
         this.transportPriceData = null;
-        this.populateVehicleSelectFallback(rateId);
+        return;
       }
+
+      // Debug logging for price investigation
+      console.log('📦 API Response - Transport Prices:', {
+        apiRequest: { apiOrigin, apiDestination, rateId },
+        vehiclesReturned: result.data.vehicles?.length || 0,
+        vehicles: result.data.vehicles?.map(v => ({
+          type: v.vehicleType,
+          basePrice: v.basePrice,
+          clientPrice: v.clientPrice,
+          finalPrice: v.finalPrice,
+          isClientPrice: v.isClientPrice
+        }))
+      });
+
+      // Cache the transport price data for vehicle selection
+      this.transportPriceData = result.data;
+      // Cache routeDuration separately so it persists even if transportPriceData is cleared
+      this.cachedRouteDuration = result.data.routeDuration || null;
+      this.populateTransportVehicleDropdown(result.data.vehicles);
     } catch (error) {
       console.error('Error looking up transport prices:', error);
+      this.clearVehicleDropdown();
       this.transportPriceData = null;
-      this.populateVehicleSelectFallback(rateId);
+    } finally {
+      vehicleSpinner?.classList.add('d-none');
+    }
+  }
+
+  populateTransportVehicleDropdown(vehicles) {
+    const vehicleSelect = document.getElementById('vehicleSelect');
+    if (!vehicleSelect) return;
+
+    vehicleSelect.innerHTML = '<option value="">-- Sin vehículo --</option>';
+    vehicleSelect.value = '';
+
+    if (!vehicles || vehicles.length === 0) {
+      const noOption = document.createElement('option');
+      noOption.value = '';
+      noOption.textContent = '-- Sin vehículos disponibles --';
+      noOption.disabled = true;
+      vehicleSelect.appendChild(noOption);
+      return;
     }
 
-    this.updateWaitingTimeRateDisplay();
+    vehicles.forEach((vehicle) => {
+      const option = document.createElement('option');
+      option.value = vehicle.vehicleTypeId;
+
+      const pax = vehicle.capacity || 0;
+      const trunk = vehicle.trunkCapacity || 0;
+      const clientIndicator = vehicle.isClientPrice ? ' *' : '';
+      option.textContent = `${vehicle.vehicleType} - ${pax} pax, ${trunk} carry-on${clientIndicator}`;
+
+      vehicleSelect.appendChild(option);
+    });
+
+    // Reset price since no vehicle is selected yet
+    const servicePriceField = document.getElementById('servicePrice');
+    if (servicePriceField) {
+      servicePriceField.value = '0.00';
+    }
+  }
+
+  getTransportVehiclePrice(vehicleTypeId) {
+    if (!this.transportPriceData || !this.transportPriceData.vehicles) {
+      console.log('⚠️ No transport price data available');
+      return null;
+    }
+
+    const vehicle = this.transportPriceData.vehicles.find(
+      (v) => v.vehicleTypeId === vehicleTypeId
+    );
+
+    console.log('💰 Getting vehicle price:', {
+      vehicleTypeId,
+      vehicle: vehicle ? {
+        type: vehicle.vehicleType,
+        basePrice: vehicle.basePrice,
+        clientPrice: vehicle.clientPrice,
+        finalPrice: vehicle.finalPrice,
+        isClientPrice: vehicle.isClientPrice
+      } : 'Not found'
+    });
+
+    return vehicle ? vehicle.finalPrice : null;
   }
 
   handleVehicleSelection(vehicleId) {
     if (!vehicleId) {
       const priceEl = document.getElementById('servicePrice');
-      if (priceEl) priceEl.value = '';
+      if (priceEl) priceEl.value = '0.00';
       this.updateWaitingTimeRateDisplay();
       return;
     }
+    
+    // Don't auto-update price during form population (preserve saved price)
+    const isPopulating = this._populatingTransportForm;
 
-    // Route match: auto-fill price from transportPriceData
-    if (this.transportPriceData && this.transportPriceData.vehicles) {
-      const vehicle = this.transportPriceData.vehicles.find((v) => v.vehicleTypeId === vehicleId);
-      if (vehicle) {
-        const priceEl = document.getElementById('servicePrice');
-        if (priceEl) priceEl.value = vehicle.finalPrice || 0;
+    // Check service type to determine pricing behavior
+    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+    const priceEl = document.getElementById('servicePrice');
+
+    if (serviceType === 'transport') {
+      // For transport services, use route-based pricing
+      let price = this.getTransportVehiclePrice(vehicleId);
+      if (priceEl && price !== null && !isPopulating) {
+        // Check if round-trip to multiply by 2
+        const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+        if (tripType === 'round-trip') {
+          price = price * 2;
+        }
+        priceEl.value = price.toFixed(2);
+      } else if (priceEl && !isPopulating) {
+        priceEl.value = '0.00';
+      }
+    } else {
+      // For non-transport services, use fallback pricing logic
+      if (this.transportPriceData && this.transportPriceData.vehicles) {
+        const vehicle = this.transportPriceData.vehicles.find((v) => v.vehicleTypeId === vehicleId);
+        if (vehicle && priceEl) {
+          priceEl.value = vehicle.finalPrice || '0.00';
+        }
       }
     }
-    // Fallback (no transportPriceData): don't touch price — user fills manually
 
     this.updateWaitingTimeRateDisplay();
   }
@@ -1664,13 +2569,41 @@ class ExperienceServicesBuilder {
     const select = document.getElementById('transportCategory');
     if (!select || !this.ratesCache) return;
 
+    // Store current value to restore after population
+    const currentValue = select.value;
+
+    // Check if current service type is Tour
+    const serviceTypeInputs = document.querySelectorAll('input[name="serviceType"]');
+    let currentServiceType = 'experience'; // default
+    serviceTypeInputs.forEach((input) => {
+      if (input.checked) {
+        currentServiceType = input.value;
+      }
+    });
+
     select.innerHTML = '<option value="">-- Seleccionar segmento --</option>';
     this.ratesCache.forEach((rate) => {
+      const label = rate.label || rate.name;
+
+      // Skip "Economico/Económico" option when Tour is selected
+      // Check for both spellings with and without accent
+      if (currentServiceType === 'tour' && label) {
+        const normalizedLabel = label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (normalizedLabel === 'economico' || normalizedLabel === 'economica') {
+          return; // Skip this rate
+        }
+      }
+
       const option = document.createElement('option');
       option.value = rate.id;
-      option.textContent = rate.name;
+      option.textContent = label;
       select.appendChild(option);
     });
+
+    // Restore previous value if it still exists in the updated options
+    if (currentValue) {
+      select.value = currentValue;
+    }
   }
 
   populateVehicleSelectFromRoute(vehicles) {
@@ -1737,6 +2670,12 @@ class ExperienceServicesBuilder {
     if (select) {
       select.innerHTML = '<option value="">-- Sin vehículo --</option>';
       select.value = '';
+    }
+
+    // Also clear price field - set to 0.00 to match quote modal behavior
+    const servicePriceField = document.getElementById('servicePrice');
+    if (servicePriceField) {
+      servicePriceField.value = '0.00';
     }
   }
 
@@ -1829,7 +2768,7 @@ class ExperienceServicesBuilder {
     }
   }
 
-  populateServiceFields(service) {
+  async populateServiceFields(service) {
     switch (service.type) {
       case 'experience':
         this.populateExperienceFields(service);
@@ -1838,7 +2777,7 @@ class ExperienceServicesBuilder {
         this.populateTourFields(service);
         break;
       case 'transport':
-        this.populateTransportFields(service);
+        await this.populateTransportFields(service);
         break;
       case 'concepto':
         this.populateConceptoFields(service);
@@ -1919,13 +2858,13 @@ class ExperienceServicesBuilder {
     }, 100);
   }
 
-  populateTransportFields(service) {
+  async populateTransportFields(service) {
     // 1. Set transport type radio (aeropuerto/punto-a-punto/local)
     if (service.transportType) {
       const transportRadio = document.querySelector(`input[name="transportType"][value="${service.transportType}"]`);
       if (transportRadio) {
         transportRadio.checked = true;
-        this.handleTransportTypeChange();
+        await this.handleTransportTypeChange();
       }
     }
 
@@ -1934,7 +2873,7 @@ class ExperienceServicesBuilder {
       const tripRadio = document.querySelector(`input[name="tripType"][value="${service.tripType}"]`);
       if (tripRadio) {
         tripRadio.checked = true;
-        this.handleTripTypeChange();
+        await this.handleTripTypeChange();
       }
     }
 
@@ -1943,7 +2882,7 @@ class ExperienceServicesBuilder {
       const dirRadio = document.querySelector(`input[name="directionType"][value="${service.directionType}"]`);
       if (dirRadio) {
         dirRadio.checked = true;
-        this.handleDirectionTypeChange();
+        await this.handleDirectionTypeChange();
       }
     }
 
@@ -2096,7 +3035,9 @@ class ExperienceServicesBuilder {
     const total = (adultsQty * adultPrice) + (childrenQty * childPrice) + (noAlcQty * noAlcPrice);
 
     const isProvider = exp && exp.type === 'provider_experience';
-    return {
+    
+    // Build base service object
+    const service = {
       experienceId,
       concept: exp ? exp.name : 'Experiencia',
       isProviderExperience: isProvider,
@@ -2114,6 +3055,49 @@ class ExperienceServicesBuilder {
       languages: document.getElementById('experienceLanguages')?.value || '',
       clientNotes: document.getElementById('experienceClientNotes')?.value || '',
     };
+    
+    // Include modified transport services if they exist
+    if (this.experienceTransportServices && this.experienceTransportServices.length > 0) {
+      // Create a modified serviceItems structure with updated transport services
+      const originalServiceItems = exp?.serviceItems || {};
+      const modifiedSubconcepts = [];
+      
+      // Copy all original subconcepts
+      if (originalServiceItems.subconcepts) {
+        originalServiceItems.subconcepts.forEach((subconcept, index) => {
+          if (subconcept.type === 'traslado' || subconcept.type === 'transport') {
+            // Use modified transport service if available
+            const modifiedTransport = this.experienceTransportServices[index];
+            if (modifiedTransport) {
+              modifiedSubconcepts.push({
+                ...subconcept,
+                vehicleId: modifiedTransport.vehicleId || subconcept.vehicleId,
+                vehicleType: modifiedTransport.vehicleType || subconcept.vehicleType,
+                vehicleTypeName: modifiedTransport.vehicleTypeName || subconcept.vehicleTypeName,
+                rateId: modifiedTransport.rateId || subconcept.rateId,
+                rateName: modifiedTransport.rateName || subconcept.rateName
+              });
+            } else {
+              modifiedSubconcepts.push(subconcept);
+            }
+          } else {
+            // Keep non-transport subconcepts as-is
+            modifiedSubconcepts.push(subconcept);
+          }
+        });
+      }
+      
+      // Add the modified service items to the service object
+      service.modifiedServiceItems = {
+        ...originalServiceItems,
+        subconcepts: modifiedSubconcepts
+      };
+      
+      // Add a flag to indicate transport services were modified
+      service.hasTransportModifications = true;
+    }
+    
+    return service;
   }
 
   buildTourService() {
@@ -2344,6 +3328,12 @@ class ExperienceServicesBuilder {
       return this.renderTransportServiceItem(service, servicePrice, overlapClass, overlapBadge);
     }
 
+    // Add price breakdown for experience and tour services
+    let priceBreakdownHtml = '';
+    if ((service.type === 'experience' || service.type === 'tour')) {
+      priceBreakdownHtml = this.renderPriceBreakdown(service);
+    }
+
     return `
       <div class="service-item mb-3 p-3 border rounded hover-shadow${overlapClass}" data-service-id="${service.id}" style="animation: fadeInUp 0.3s ease;">
         <div class="d-flex justify-content-between align-items-start">
@@ -2362,6 +3352,7 @@ class ExperienceServicesBuilder {
                 ` : ''}
               </div>
               ${this.renderPeopleQuantities(service)}
+              ${priceBreakdownHtml}
               ${service.includeGuide ? '<div class="text-success small mt-1"><i class="ti ti-user me-1"></i><strong>Incluye Guia + Chofer</strong></div>' : ''}
               ${service.includeGreeter ? '<div class="text-info small mt-1"><i class="ti ti-users me-1"></i><strong>Incluye Greeter</strong></div>' : ''}
               ${service.notes ? `<div class="text-muted small mt-1"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
@@ -2373,7 +3364,10 @@ class ExperienceServicesBuilder {
               <button type="button" class="btn btn-light duplicate-service-btn" data-service-id="${service.id}" title="Duplicar"><i class="ti ti-copy"></i></button>
               <button type="button" class="btn btn-light delete-service-btn" data-service-id="${service.id}" title="Eliminar"><i class="ti ti-trash"></i></button>
             </div>
-            <div class="fw-bold text-end mt-2">$${servicePrice.toFixed(2)}</div>
+            <div class="fw-bold text-end mt-2">
+              <div class="text-muted small">Total</div>
+              $${servicePrice.toFixed(2)}
+            </div>
           </div>
         </div>
       </div>
@@ -2415,7 +3409,7 @@ class ExperienceServicesBuilder {
 
     // Vehicle
     const vehicleHtml = service.vehicleTypeName
-      ? `<div class="small text-muted mt-2"><i class="ti ti-bus me-1"></i>${service.vehicleTypeName}${service.quantity > 1 ? ` x${service.quantity}` : ''}</div>`
+      ? `<div class="small text-muted mt-2"><i class="ti ti-bus me-1"></i>${service.vehicleTypeName}${service.quantity > 1 ? ` x${service.quantity}` : ''}${service.tripType === 'round-trip' ? ' <span class="text-info">(Ida y Regreso ×2)</span>' : ''}</div>`
       : '';
 
     // Greeter
@@ -2467,14 +3461,113 @@ class ExperienceServicesBuilder {
     const adults = service.adultsQuantity || 0;
     const children = service.childrenQuantity || 0;
     const noAlc = service.adultsNoAlcoholQuantity || 0;
-    if (adults === 0 && children === 0 && noAlc === 0) return '';
+    
+    // If no quantities but prices exist, show simulated single person
+    const hasNoPeople = adults === 0 && children === 0 && noAlc === 0;
+    const hasPrices = (service.adultPrice > 0) || (service.childPrice > 0) || (service.noAlcoholPrice > 0);
+    
+    if (hasNoPeople && hasPrices) {
+      const parts = [];
+      if (service.adultPrice > 0) {
+        parts.push('1 adulto (simulado)');
+      }
+      if (service.childPrice > 0) {
+        parts.push('1 niño (simulado)');
+      }
+      if (service.noAlcoholPrice > 0) {
+        parts.push('1 s/alcohol (simulado)');
+      }
+      return `<div class="text-muted small mt-1"><i class="ti ti-users me-1"></i>${parts.join(' + ')}</div>`;
+    }
+    
+    if (hasNoPeople) return '';
 
     const parts = [];
     if (adults > 0) parts.push(`${adults} adulto${adults > 1 ? 's' : ''}`);
-    if (children > 0) parts.push(`${children} nino${children > 1 ? 's' : ''}`);
+    if (children > 0) parts.push(`${children} niño${children > 1 ? 's' : ''}`);
     if (noAlc > 0) parts.push(`${noAlc} s/alcohol`);
 
     return `<div class="text-muted small mt-1"><i class="ti ti-users me-1"></i>${parts.join(' + ')}</div>`;
+  }
+
+  renderPriceBreakdown(service) {
+    if (service.type !== 'experience' && service.type !== 'tour') return '';
+    
+    const adults = service.adultsQuantity || 0;
+    const children = service.childrenQuantity || 0;
+    const noAlc = service.adultsNoAlcoholQuantity || 0;
+    const adultPrice = service.adultPrice || 0;
+    const childPrice = service.childPrice || 0;
+    const noAlcPrice = service.noAlcoholPrice || 0;
+    
+    // If no quantities but prices exist, simulate single person pricing
+    const hasNoPeople = adults === 0 && children === 0 && noAlc === 0;
+    const hasPrices = adultPrice > 0 || childPrice > 0 || noAlcPrice > 0;
+    
+    if (hasNoPeople && hasPrices) {
+      const breakdownParts = [];
+      
+      if (adultPrice > 0) {
+        const total = adultPrice * 1;
+        breakdownParts.push(`<span class="text-primary">Adulto: $${adultPrice.toFixed(2)} × 1 = $${total.toFixed(2)}</span>`);
+      }
+      if (childPrice > 0) {
+        const total = childPrice * 1;
+        breakdownParts.push(`<span class="text-info">Niño: $${childPrice.toFixed(2)} × 1 = $${total.toFixed(2)}</span>`);
+      }
+      if (noAlcPrice > 0) {
+        const total = noAlcPrice * 1;
+        breakdownParts.push(`<span class="text-warning">Sin Alcohol: $${noAlcPrice.toFixed(2)} × 1 = $${total.toFixed(2)}</span>`);
+      }
+      
+      return `
+        <div class="price-breakdown mt-2 p-2 bg-light rounded">
+          <div class="small fw-bold mb-1">Precios simulados para 1 persona:</div>
+          <div class="small">${breakdownParts.join('<br>')}</div>
+        </div>
+      `;
+    }
+    
+    // Show actual breakdown for selected quantities
+    const breakdownLines = [];
+    
+    if (adults > 0 && adultPrice > 0) {
+      const adultsTotal = adults * adultPrice;
+      breakdownLines.push(`
+        <div class="d-flex justify-content-between small">
+          <span>Adultos: $${adultPrice.toFixed(2)} × ${adults}</span>
+          <span class="fw-semibold">$${adultsTotal.toFixed(2)}</span>
+        </div>
+      `);
+    }
+    
+    if (children > 0 && childPrice > 0) {
+      const childrenTotal = children * childPrice;
+      breakdownLines.push(`
+        <div class="d-flex justify-content-between small">
+          <span>Niños: $${childPrice.toFixed(2)} × ${children}</span>
+          <span class="fw-semibold">$${childrenTotal.toFixed(2)}</span>
+        </div>
+      `);
+    }
+    
+    if (noAlc > 0 && noAlcPrice > 0) {
+      const noAlcTotal = noAlc * noAlcPrice;
+      breakdownLines.push(`
+        <div class="d-flex justify-content-between small">
+          <span>Sin Alcohol: $${noAlcPrice.toFixed(2)} × ${noAlc}</span>
+          <span class="fw-semibold">$${noAlcTotal.toFixed(2)}</span>
+        </div>
+      `);
+    }
+    
+    if (breakdownLines.length === 0) return '';
+    
+    return `
+      <div class="price-breakdown mt-2 p-2 bg-light rounded">
+        ${breakdownLines.join('')}
+      </div>
+    `;
   }
 
   getServiceTitle(service) {
@@ -2496,9 +3589,30 @@ class ExperienceServicesBuilder {
 
   calculateServicePrice(service) {
     if (service.type === 'experience' || service.type === 'tour') {
-      const adultsTotal = (service.adultsQuantity || 0) * (service.adultPrice || 0);
-      const childrenTotal = (service.childrenQuantity || 0) * (service.childPrice || 0);
-      const noAlcTotal = (service.adultsNoAlcoholQuantity || 0) * (service.noAlcoholPrice || 0);
+      const adults = service.adultsQuantity || 0;
+      const children = service.childrenQuantity || 0;
+      const noAlc = service.adultsNoAlcoholQuantity || 0;
+      const adultPrice = service.adultPrice || 0;
+      const childPrice = service.childPrice || 0;
+      const noAlcPrice = service.noAlcoholPrice || 0;
+      
+      // If no quantities but prices exist, simulate single person pricing for display
+      const hasNoPeople = adults === 0 && children === 0 && noAlc === 0;
+      const hasPrices = adultPrice > 0 || childPrice > 0 || noAlcPrice > 0;
+      
+      if (hasNoPeople && hasPrices) {
+        // Calculate simulated total for 1 person
+        let simulatedTotal = 0;
+        if (adultPrice > 0) simulatedTotal += adultPrice * 1;
+        if (childPrice > 0) simulatedTotal += childPrice * 1;
+        if (noAlcPrice > 0) simulatedTotal += noAlcPrice * 1;
+        return simulatedTotal;
+      }
+      
+      // Calculate actual totals
+      const adultsTotal = adults * adultPrice;
+      const childrenTotal = children * childPrice;
+      const noAlcTotal = noAlc * noAlcPrice;
       return adultsTotal + childrenTotal + noAlcTotal;
     }
     return (service.price || 0) * (service.quantity || 1);
@@ -2513,55 +3627,143 @@ class ExperienceServicesBuilder {
   }
 
   updateTotals() {
-    const baseSubtotal = this.calculateSubtotal();
-    const baseIva = Math.round(baseSubtotal * 0.16 * 100) / 100;
-    const baseTotal = Math.round((baseSubtotal + baseIva) * 100) / 100;
-
-    // Apply payment rate
-    const paymentType = document.getElementById('paymentTypeSelect')?.value || 'efectivo';
-    const currency = document.getElementById('currencySelect')?.value || 'MXN';
-
-    let adjustedSubtotal = baseSubtotal;
-    let adjustedIva = baseIva;
-    let adjustedTotal = baseTotal;
-
-    // Apply payment rate markup
-    if (paymentType === 'transferencia') {
-      adjustedSubtotal = baseSubtotal * (1 + this.transferRate / 100);
-    } else if (paymentType === 'tarjeta') {
-      adjustedSubtotal = baseSubtotal * (1 + this.agencyRate / 100);
-    }
-    adjustedIva = Math.round(adjustedSubtotal * 0.16 * 100) / 100;
-    adjustedTotal = Math.round((adjustedSubtotal + adjustedIva) * 100) / 100;
-
-    // Apply currency conversion
-    if (currency === 'USD' && this.exchangeRate > 0) {
-      adjustedSubtotal = adjustedSubtotal / this.exchangeRate;
-      adjustedIva = adjustedIva / this.exchangeRate;
-      adjustedTotal = adjustedTotal / this.exchangeRate;
-
-      if (window.PricingUtils && typeof window.PricingUtils.applyUSDRoundingRules === 'function') {
-        adjustedSubtotal = window.PricingUtils.applyUSDRoundingRules(adjustedSubtotal);
-        adjustedIva = window.PricingUtils.applyUSDRoundingRules(adjustedIva);
-        adjustedTotal = window.PricingUtils.applyUSDRoundingRules(adjustedTotal);
-      }
-    }
-
-    const subtotalEl = document.getElementById('subtotalAmount');
-    const ivaEl = document.getElementById('ivaAmount');
-    const totalEl = document.getElementById('totalAmount');
-    const perPersonEl = document.getElementById('perPersonAmount');
-    const personCountEl = document.getElementById('personCount');
-
-    const currSuffix = currency === 'USD' ? ' USD' : '';
-    if (subtotalEl) subtotalEl.textContent = `$${adjustedSubtotal.toFixed(2)}${currSuffix}`;
-    if (ivaEl) ivaEl.textContent = `$${adjustedIva.toFixed(2)}${currSuffix}`;
-    if (totalEl) totalEl.textContent = `$${adjustedTotal.toFixed(2)}${currSuffix}`;
-
-    const persons = parseInt(personCountEl?.value, 10) || 1;
-    const perPerson = Math.round((adjustedTotal / persons) * 100) / 100;
-    if (perPersonEl) perPersonEl.textContent = `$${perPerson.toFixed(2)}${currSuffix}`;
+    // Simplified version - bottom panel UI elements were removed
+    // Only dispatch event for cross-panel updates
+    window.dispatchEvent(new CustomEvent('servicesUpdated'));
   }
+
+  updatePriceBreakdown() {
+    // Update the information panel breakdown (not the removed bottom panel)
+    const breakdownListEl = document.getElementById('servicesBreakdownList');
+    const servicesTotalCostEl = document.getElementById('servicesTotalCost');
+    const servicesPerPersonCostEl = document.getElementById('servicesPerPersonCost');
+    
+    if (!breakdownListEl) return;
+    
+    // Clear existing breakdown
+    breakdownListEl.innerHTML = '';
+    
+    if (this.services.size === 0) {
+      breakdownListEl.innerHTML = `
+        <div class="text-center text-muted py-3">
+          <i class="ti ti-package-off"></i>
+          <p class="mb-0 small">No hay servicios agregados aun</p>
+          <p class="mb-0 small text-muted">Los servicios se agregan en la seccion Servicios</p>
+        </div>
+      `;
+      
+      // Update totals to zero
+      if (servicesTotalCostEl) servicesTotalCostEl.textContent = '$0.00';
+      if (servicesPerPersonCostEl) servicesPerPersonCostEl.textContent = '$0.00';
+      return;
+    }
+    
+    let totalServicesCost = 0;
+    
+    // Build the breakdown list
+    this.services.forEach((service) => {
+      const servicePrice = this.calculateServicePrice(service);
+      const serviceTitle = this.getServiceTitle(service);
+      const quantity = service.quantity || 1;
+      const subtotal = servicePrice * quantity;
+      totalServicesCost += subtotal;
+      
+      const breakdownItem = document.createElement('div');
+      breakdownItem.className = 'service-breakdown-item mb-3 pb-3 border-bottom';
+      
+      let details = [];
+      if (service.startTime) details.push(`Hora: ${service.startTime}`);
+      if (service.vehicleTypeName) {
+        const vehicleDetail = service.tripType === 'round-trip' 
+          ? `Vehículo: ${service.vehicleTypeName} (Ida y Regreso ×2)` 
+          : `Vehículo: ${service.vehicleTypeName}`;
+        details.push(vehicleDetail);
+      }
+      if (quantity > 1 && service.type !== 'experience' && service.type !== 'tour') {
+        details.push(`Cantidad: ${quantity}`);
+      }
+      
+      // Build price breakdown for experiences and tours with static simulado
+      let priceDetailsHtml = '';
+      if (service.type === 'experience' || service.type === 'tour') {
+        const adults = service.adultsQuantity || 0;
+        const children = service.childrenQuantity || 0;
+        const noAlc = service.adultsNoAlcoholQuantity || 0;
+        const adultPrice = service.adultPrice || 0;
+        const childPrice = service.childPrice || 0;
+        const noAlcPrice = service.noAlcoholPrice || 0;
+        
+        const priceLines = [];
+        
+        // If no quantities but prices exist, show static simulado pricing
+        const hasNoPeople = adults === 0 && children === 0 && noAlc === 0;
+        const hasPrices = adultPrice > 0 || childPrice > 0 || noAlcPrice > 0;
+        
+        if (hasNoPeople && hasPrices) {
+          priceLines.push(`<div class="text-muted small mt-2">Precios simulados para 1 persona:</div>`);
+          if (adultPrice > 0) {
+            const total = adultPrice * 1;
+            priceLines.push(`<div class="small ms-3">• 1 Adulto: $${adultPrice.toFixed(2)} × 1 = $${total.toFixed(2)}</div>`);
+          }
+          if (childPrice > 0) {
+            const total = childPrice * 1;
+            priceLines.push(`<div class="small ms-3">• 1 Niño: $${childPrice.toFixed(2)} × 1 = $${total.toFixed(2)}</div>`);
+          }
+          if (noAlcPrice > 0) {
+            const total = noAlcPrice * 1;
+            priceLines.push(`<div class="small ms-3">• 1 Sin Alcohol: $${noAlcPrice.toFixed(2)} × 1 = $${total.toFixed(2)}</div>`);
+          }
+        } else {
+          // Show actual breakdown
+          if (adults > 0 && adultPrice > 0) {
+            const adultsTotal = adults * adultPrice;
+            priceLines.push(`<div class="small ms-3">• ${adults} Adulto${adults > 1 ? 's' : ''}: $${adultPrice.toFixed(2)} × ${adults} = $${adultsTotal.toFixed(2)}</div>`);
+          }
+          if (children > 0 && childPrice > 0) {
+            const childrenTotal = children * childPrice;
+            priceLines.push(`<div class="small ms-3">• ${children} Niño${children > 1 ? 's' : ''}: $${childPrice.toFixed(2)} × ${children} = $${childrenTotal.toFixed(2)}</div>`);
+          }
+          if (noAlc > 0 && noAlcPrice > 0) {
+            const noAlcTotal = noAlc * noAlcPrice;
+            priceLines.push(`<div class="small ms-3">• ${noAlc} Sin Alcohol: $${noAlcPrice.toFixed(2)} × ${noAlc} = $${noAlcTotal.toFixed(2)}</div>`);
+          }
+        }
+        
+        if (priceLines.length > 0) {
+          priceDetailsHtml = priceLines.join('');
+        }
+      }
+      
+      breakdownItem.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start">
+          <div class="flex-grow-1">
+            <div class="service-breakdown-name fw-semibold">${serviceTitle}</div>
+            ${details.length > 0 ? `<div class="service-breakdown-details text-muted small">${details.join(' | ')}</div>` : ''}
+            ${priceDetailsHtml}
+          </div>
+          <div class="text-end">
+            <div class="service-breakdown-price fw-bold">$${servicePrice.toFixed(2)}</div>
+            ${quantity > 1 && service.type !== 'experience' && service.type !== 'tour' ? `<small class="text-muted">x${quantity} = $${subtotal.toFixed(2)}</small>` : ''}
+          </div>
+        </div>
+      `;
+      
+      breakdownListEl.appendChild(breakdownItem);
+    });
+    
+    // Calculate per person cost using fixed 1 person for simplicity
+    const perPersonCost = Math.round(totalServicesCost * 100) / 100;
+    
+    // Update summary totals in information panel
+    if (servicesTotalCostEl) servicesTotalCostEl.textContent = `$${totalServicesCost.toFixed(2)}`;
+    if (servicesPerPersonCostEl) servicesPerPersonCostEl.textContent = `$${perPersonCost.toFixed(2)}`;
+  }
+
+  // =====================
+  // PERSONA COUNT HELPER
+  // =====================
+
+  // Removed: getPersonCount() method - no longer needed after bottom panel removal
 
   // =====================
   // AUTO-SAVE
@@ -2948,6 +4150,211 @@ class ExperienceServicesBuilder {
     }
   }
 
+  async loadActiveServicesForDropdowns() {
+    try {
+      console.log('[Services] Loading active services from Services table...');
+
+      // Fetch active services from the API
+      const response = await fetch('/api/services/active', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load services: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        console.log(`[Services] Loaded ${result.data.length} active services`);
+
+        // Store services data globally for filtering
+        this.servicesData = result.data;
+
+        // Group services by transport type
+        const servicesByType = {
+          aeropuerto: [],
+          'punto-a-punto': [],
+          local: []
+        };
+
+        result.data.forEach(service => {
+          // Use originPOI serviceType for filtering instead of service transportType
+          const originServiceType = service.originServiceType || '';
+          const destinationServiceType = service.destinationServiceType || '';
+
+          // Group services based on POI serviceType
+          // For Aeropuerto: show services where origin or destination POI has serviceType "Aeropuerto"
+          if (originServiceType.toLowerCase().includes('aeropuerto') || destinationServiceType.toLowerCase().includes('aeropuerto')) {
+            servicesByType.aeropuerto.push(service);
+          }
+
+          // For Punto a Punto: show services where POI serviceType includes "punto" or similar
+          if (originServiceType.toLowerCase().includes('punto') || destinationServiceType.toLowerCase().includes('punto') ||
+            originServiceType.toLowerCase().includes('point') || destinationServiceType.toLowerCase().includes('point')) {
+            servicesByType['punto-a-punto'].push(service);
+          }
+
+          // For Local: show services where POI serviceType includes "local"
+          if (originServiceType.toLowerCase().includes('local') || destinationServiceType.toLowerCase().includes('local')) {
+            servicesByType.local.push(service);
+          }
+
+          // If no specific serviceType is found, default to aeropuerto
+          if (!originServiceType && !destinationServiceType) {
+            servicesByType.aeropuerto.push(service);
+          }
+        });
+
+        // Store for global access
+        window.servicesByTransportType = servicesByType;
+        this.servicesByTransportType = servicesByType; // Also store on instance
+
+        console.log('[Services] Services grouped by transport type:', {
+          aeropuerto: servicesByType.aeropuerto.length,
+          'punto-a-punto': servicesByType['punto-a-punto'].length,
+          local: servicesByType.local.length
+        });
+
+        return result.data;
+      }
+    } catch (error) {
+      console.error('[Services] Error loading active services:', error);
+      // Don't break the app if services can't be loaded
+    }
+    return [];
+  }
+
+  populateDropdownsForTransportType(transportType, directionType) {
+    if (!window.servicesByTransportType) {
+      console.warn('[Services] No services data available for filtering');
+      return;
+    }
+
+    // If directionType not passed, read from DOM
+    if (!directionType) {
+      directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
+    }
+
+    const services = window.servicesByTransportType[transportType] || [];
+
+    const origins = new Set();
+    const destinations = new Set();
+
+    services.forEach(service => {
+      if (transportType === 'aeropuerto') {
+        if (directionType === 'departure') {
+          // Departure: user leaves FROM a local destination TO the airport
+          // origin dropdown = non-airport POIs (hotels, cities — same as arrival destinations)
+          // destination combo = airports
+          if (service.destination) {
+            origins.add(service.destination);
+          }
+          if (service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
+            destinations.add(service.origin);
+          }
+        } else {
+          // Arrival: user arrives FROM the airport TO a local destination
+          // origin dropdown = airports
+          // destination combo = non-airport destinations
+          if (service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
+            origins.add(service.origin);
+          }
+          if (service.destination) {
+            destinations.add(service.destination);
+          }
+        }
+      } else if (directionType === 'departure') {
+        // Departure for non-aeropuerto: swap origins/destinations
+        // User departs FROM destination → TO origin (relative to DB)
+        if (service.destination) origins.add(service.destination);
+        if (service.origin) destinations.add(service.origin);
+      } else {
+        // Arrival for non-aeropuerto: origins and destinations as stored
+        if (service.origin) origins.add(service.origin);
+        if (service.destination) destinations.add(service.destination);
+      }
+    });
+
+    // Create mapping from slugified values to original names (make it global)
+    window.slugToOriginalMapping = new Map();
+
+    const isDeparture = directionType === 'departure';
+
+    // Elements (one-way only — round trip uses populateRoundTripDropdowns)
+    const originSelectEls = [
+      document.getElementById('transportOriginSelect'),
+    ];
+    const destinationSelectEl = document.getElementById('transportDestinationSelect');
+    const originDatalistEl = document.getElementById('transportOriginList');
+    const destinationDatalistEls = [
+      document.getElementById('transportDestinationList'),
+    ];
+
+    // Helper: populate a SELECT element with slugified values
+    const populateSelect = (element, dataSet) => {
+      if (!element) return;
+      while (element.options.length > 1) element.remove(1);
+      [...dataSet].sort().forEach(location => {
+        const option = document.createElement('option');
+        const slugValue = location.toLowerCase().replace(/\s+/g, '-');
+        option.value = slugValue;
+        option.textContent = location;
+        element.appendChild(option);
+        window.slugToOriginalMapping.set(slugValue, location);
+      });
+    };
+
+    // Helper: populate a DATALIST element with original values
+    const populateDatalist = (element, dataSet) => {
+      if (!element) return;
+      element.innerHTML = '';
+      [...dataSet].sort().forEach(location => {
+        const option = document.createElement('option');
+        option.value = location;
+        element.appendChild(option);
+      });
+    };
+
+    if (isDeparture && transportType === 'local') {
+      // Local Vuelta: origin = SELECT, destination = TEXT (no dropdown needed)
+      originSelectEls.forEach(el => populateSelect(el, origins));
+      // Clear unused elements
+      if (originDatalistEl) originDatalistEl.innerHTML = '';
+      if (destinationSelectEl) { while (destinationSelectEl.options.length > 1) destinationSelectEl.remove(1); }
+      destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
+    } else if (isDeparture) {
+      // Aeropuerto / Punto a Punto departure: origin = SELECT dropdown, destination = SELECT
+      originSelectEls.forEach(el => populateSelect(el, origins));
+      populateSelect(destinationSelectEl, destinations);
+      if (originDatalistEl) originDatalistEl.innerHTML = '';
+      destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
+    } else if (transportType === 'local') {
+      // Local Ida: origin = TEXT (no dropdown needed), destination = SELECT
+      populateSelect(destinationSelectEl, destinations);
+      // Clear unused elements
+      originSelectEls.forEach(el => { if (el) { while (el.options.length > 1) el.remove(1); } });
+      if (originDatalistEl) originDatalistEl.innerHTML = '';
+      destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
+    } else {
+      // Arrival: origins → origin SELECT, destinations → destination SELECT dropdown
+      originSelectEls.forEach(el => populateSelect(el, origins));
+      if (destinationSelectEl) populateSelect(destinationSelectEl, destinations);
+      // Clear departure-specific elements
+      if (originDatalistEl) originDatalistEl.innerHTML = '';
+      destinationDatalistEls.forEach(el => { if (el) el.innerHTML = ''; });
+    }
+
+    console.log(`[Services] Dropdowns updated for ${transportType}:`, {
+      origins: origins.size,
+      destinations: destinations.size,
+      directionType
+    });
+  }
+
   buildServicesByTransportType(services) {
     const servicesByType = { aeropuerto: [], 'punto-a-punto': [], local: [] };
 
@@ -3169,12 +4576,12 @@ class ExperienceServicesBuilder {
     });
   }
 
-  handleDrop(itemId, type) {
+  async handleDrop(itemId, type) {
     // Open the service modal pre-filled with the dropped item
-    this.openServiceModal();
+    await this.openServiceModal();
 
     // Wait for modal to render, then select the type and item
-    setTimeout(() => {
+    setTimeout(async () => {
       // Select the correct service type radio
       const typeMap = { experience: 'typeExperience', tour: 'typeTour', transport: 'typeTransport' };
       const typeRadio = document.getElementById(typeMap[type]);
@@ -3191,7 +4598,7 @@ class ExperienceServicesBuilder {
           this.handleExperienceSelection(itemId);
         }
       } else if (type === 'transport') {
-        this.preselectTransportRoute(itemId);
+        await this.preselectTransportRoute(itemId);
       } else if (type === 'tour') {
         const select = document.getElementById('tourSelect');
         if (select) {
@@ -3202,7 +4609,7 @@ class ExperienceServicesBuilder {
     }, 200);
   }
 
-  preselectTransportRoute(serviceId) {
+  async preselectTransportRoute(serviceId) {
     // Find the service in cache
     const services = this.transportServicesCache || [];
     const service = services.find((s) => s.value === serviceId);
@@ -3223,7 +4630,7 @@ class ExperienceServicesBuilder {
     const transportRadio = document.querySelector(`input[name="transportType"][value="${transportType}"]`);
     if (transportRadio) {
       transportRadio.checked = true;
-      this.handleTransportTypeChange();
+      await this.handleTransportTypeChange();
     }
 
     // For aeropuerto, determine direction based on which POI is the airport
@@ -3235,7 +4642,7 @@ class ExperienceServicesBuilder {
       const dirRadio = document.querySelector(`input[name="directionType"][value="${direction}"]`);
       if (dirRadio) {
         dirRadio.checked = true;
-        this.handleDirectionTypeChange();
+        await this.handleDirectionTypeChange();
       }
 
       // Pre-fill origin/destination
@@ -3409,7 +4816,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (container) {
     const experienceId = container.dataset.experienceId;
     if (experienceId) {
-      new ExperienceServicesBuilder(experienceId);
+      // Make the instance globally accessible for cross-panel communication
+      window.experienceServicesBuilder = new ExperienceServicesBuilder(experienceId);
     }
   }
 });

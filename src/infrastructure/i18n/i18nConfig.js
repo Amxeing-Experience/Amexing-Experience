@@ -1,11 +1,11 @@
 /**
- * i18n Configuration Module.
+ * I18n Configuration Module.
  *
  * Handles internationalization setup for the Amexing Experience application.
  * Configures i18next with file system backend for loading translations
  * and middleware for Express integration.
  *
- * Created by Denisse Maldonado
+ * Created by Denisse Maldonado.
  * @module i18nConfig
  */
 
@@ -15,8 +15,9 @@ const i18nextMiddleware = require('i18next-http-middleware');
 const path = require('path');
 
 /**
- * Initialize i18next with configuration
+ * Initialize i18next with configuration.
  * @returns {Promise<void>}
+ * @example
  */
 const initI18n = async () => {
   await i18next
@@ -58,37 +59,42 @@ const initI18n = async () => {
 };
 
 /**
- * Get the i18next middleware for Express
- * @returns {Function} Express middleware
+ * Get the i18next middleware for Express.
+ * @returns {Function} Express middleware.
+ * @example
  */
 const getMiddleware = () => i18nextMiddleware.handle(i18next);
 
 /**
- * Helper function to change language
- * @param {string} lang - Language code (e.g., 'es', 'en')
+ * Helper function to change language.
+ * @param {string} lang - Language code (e.g., 'es', 'en').
  * @returns {Promise<void>}
+ * @example
  */
 const changeLanguage = async (lang) => {
   await i18next.changeLanguage(lang);
 };
 
 /**
- * Get available languages
- * @returns {Array<string>} Array of supported language codes
+ * Get available languages.
+ * @returns {Array<string>} Array of supported language codes.
+ * @example
  */
 const getLanguages = () => i18next.options.supportedLngs.filter((lng) => lng !== 'cimode');
 
 /**
- * Get current language
- * @returns {string} Current language code
+ * Get current language.
+ * @returns {string} Current language code.
+ * @example
  */
 const getCurrentLanguage = () => i18next.language || 'es';
 
 /**
- * Translate key with optional options
- * @param {string} key - Translation key
- * @param {object} options - Optional translation options
- * @returns {string} Translated string
+ * Translate key with optional options.
+ * @param {string} key - Translation key.
+ * @param {object} options - Optional translation options.
+ * @returns {string} Translated string.
+ * @example
  */
 const translate = (key, options = {}) => i18next.t(key, options);
 

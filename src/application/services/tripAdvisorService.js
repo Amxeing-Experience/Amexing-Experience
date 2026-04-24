@@ -1,7 +1,6 @@
 /**
  * TripAdvisor Reviews Service
- * Handles fetching and caching reviews from TripAdvisor API
- *
+ * Handles fetching and caching reviews from TripAdvisor API.
  * @module TripAdvisorService
  * @author Amexing Development Team
  */
@@ -204,7 +203,10 @@ class TripAdvisorService {
   }
 
   /**
-   * Format time ago from date
+   * Format time ago from date.
+   * @param dateStr
+   * @param language
+   * @example
    */
   formatTimeAgo(dateStr, language = 'es') {
     const date = new Date(dateStr);
@@ -235,7 +237,10 @@ class TripAdvisorService {
   }
 
   /**
-   * Format TripAdvisor review to match our testimonial structure
+   * Format TripAdvisor review to match our testimonial structure.
+   * @param review
+   * @param language
+   * @example
    */
   formatReview(review, language = 'es') {
     // Extract location from user if available, otherwise use default
@@ -263,7 +268,10 @@ class TripAdvisorService {
   }
 
   /**
-   * Detect service type from review text
+   * Detect service type from review text.
+   * @param text
+   * @param language
+   * @example
    */
   detectServiceType(text, language = 'es') {
     const lowercaseText = text.toLowerCase();
@@ -297,7 +305,9 @@ class TripAdvisorService {
   }
 
   /**
-   * Fetch reviews from TripAdvisor API
+   * Fetch reviews from TripAdvisor API.
+   * @param language
+   * @example
    */
   async fetchFromAPI(language = 'es') {
     try {
@@ -333,7 +343,10 @@ class TripAdvisorService {
   }
 
   /**
-   * Get reviews with caching
+   * Get reviews with caching.
+   * @param language
+   * @param forceRefresh
+   * @example
    */
   async getReviews(language = 'es', forceRefresh = false) {
     try {
@@ -376,7 +389,10 @@ class TripAdvisorService {
   }
 
   /**
-   * Get a specific number of top-rated reviews
+   * Get a specific number of top-rated reviews.
+   * @param count
+   * @param language
+   * @example
    */
   async getTopReviews(count = 15, language = 'es') {
     const allReviews = await this.getReviews(language);
@@ -393,7 +409,8 @@ class TripAdvisorService {
   }
 
   /**
-   * Clear cache manually
+   * Clear cache manually.
+   * @example
    */
   clearCache() {
     this.cache = null;
