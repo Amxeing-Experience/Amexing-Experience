@@ -289,20 +289,10 @@ async function createAuditLogEntry(data) {
     const AuditLog = Parse.Object.extend('AuditLog');
     const log = new AuditLog();
 
-    // Convert userId string to Parse pointer if needed
-    let userPointer = data.userId;
-    if (typeof data.userId === 'string' && data.userId) {
-      // Create a pointer to the AmexingUser object
-      const User = Parse.Object.extend('AmexingUser');
-      userPointer = User.createWithoutData(data.userId);
-      console.log('🔍 DEBUG createAuditLogEntry - Created pointer:', userPointer);
-      console.log('🔍 DEBUG createAuditLogEntry - Pointer className:', userPointer.className);
-      console.log('🔍 DEBUG createAuditLogEntry - Pointer id:', userPointer.id);
-    }
-
+    // Keep userId as string - schema expects String not Pointer
     // Build all attributes at once to avoid intermediate validation
     const attributes = {
-      userId: userPointer,
+      userId: data.userId,
       username: data.username || 'unknown',
       action: data.action,
       entityType: data.entityType,
@@ -320,7 +310,7 @@ async function createAuditLogEntry(data) {
     console.log('🔍 DEBUG createAuditLogEntry - Setting attributes:', Object.keys(attributes));
 
     // Set fields individually to match AuditLog.createEntry() pattern
-    log.set('userId', userPointer);
+    log.set('userId', data.userId);
     log.set('username', attributes.username);
     log.set('action', attributes.action);
     log.set('entityType', attributes.entityType);
