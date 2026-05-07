@@ -289,25 +289,38 @@ async function createAuditLogEntry(data) {
     const AuditLog = Parse.Object.extend('AuditLog');
     const log = new AuditLog();
 
-    // Set required fields
-    log.set('userId', data.userId);
+    // Convert userId string to Parse pointer if needed
+    let userPointer = data.userId;
+    if (typeof data.userId === 'string' && data.userId) {
+      // Create a pointer to the AmexingUser object
+      const User = Parse.Object.extend('AmexingUser');
+      userPointer = User.createWithoutData(data.userId);
+      console.log('🔍 DEBUG createAuditLogEntry - Created pointer:', userPointer);
+      console.log('🔍 DEBUG createAuditLogEntry - Pointer className:', userPointer.className);
+      console.log('🔍 DEBUG createAuditLogEntry - Pointer id:', userPointer.id);
+    }
 
-    // DEBUG: Verify the field was set
-    console.log('🔍 DEBUG createAuditLogEntry - After setting userId, log.get("userId"):', log.get('userId'));
-    log.set('username', data.username || 'unknown');
-    log.set('action', data.action);
-    log.set('entityType', data.entityType);
-    log.set('timestamp', new Date());
+    // Build all attributes at once to avoid intermediate validation
+    const attributes = {
+      userId: userPointer,
+      username: data.username || 'unknown',
+      action: data.action,
+      entityType: data.entityType,
+      timestamp: new Date(),
+      active: true,
+      exists: true,
+    };
 
-    // Set optional fields
-    if (data.entityId) log.set('entityId', data.entityId);
-    if (data.entityName) log.set('entityName', data.entityName);
-    if (data.changes) log.set('changes', data.changes);
-    if (data.metadata) log.set('metadata', data.metadata);
+    // Add optional fields
+    if (data.entityId) attributes.entityId = data.entityId;
+    if (data.entityName) attributes.entityName = data.entityName;
+    if (data.changes) attributes.changes = data.changes;
+    if (data.metadata) attributes.metadata = data.metadata;
 
-    // Audit logs are always active and exist
-    log.set('active', true);
-    log.set('exists', true);
+    console.log('🔍 DEBUG createAuditLogEntry - Setting attributes:', Object.keys(attributes));
+
+    // Set all attributes at once
+    log.set(attributes);
 
     // Save with master key (audit logs require system-level permissions)
     await log.save(null, { useMasterKey: true });
