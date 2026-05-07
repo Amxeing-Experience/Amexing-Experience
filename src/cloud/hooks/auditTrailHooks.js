@@ -319,8 +319,20 @@ async function createAuditLogEntry(data) {
 
     console.log('🔍 DEBUG createAuditLogEntry - Setting attributes:', Object.keys(attributes));
 
-    // Set all attributes at once
-    log.set(attributes);
+    // Set fields individually to match AuditLog.createEntry() pattern
+    log.set('userId', userPointer);
+    log.set('username', attributes.username);
+    log.set('action', attributes.action);
+    log.set('entityType', attributes.entityType);
+    log.set('timestamp', attributes.timestamp);
+    log.set('active', attributes.active);
+    log.set('exists', attributes.exists);
+
+    // Set optional fields individually
+    if (attributes.entityId) log.set('entityId', attributes.entityId);
+    if (attributes.entityName) log.set('entityName', attributes.entityName);
+    if (attributes.changes) log.set('changes', attributes.changes);
+    if (attributes.metadata) log.set('metadata', attributes.metadata);
 
     // Save with master key (audit logs require system-level permissions)
     await log.save(null, { useMasterKey: true });
