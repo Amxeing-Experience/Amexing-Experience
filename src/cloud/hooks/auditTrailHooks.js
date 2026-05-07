@@ -141,8 +141,17 @@ async function extractUserContext(request) {
       }
     } else if (request.master) {
       // 5. Check if master key was used
-      context.userId = 'system';
-      context.username = 'MasterKey';
+      // Check if this is a user self-operation (common in login/auth flows)
+      const { object } = request;
+      if (object && object.className === 'AmexingUser' && object.id) {
+        // User is updating themselves via system operation (login/auth)
+        context.userId = object.id;
+        context.username = object.get('username') || object.get('email') || 'AuthUser';
+      } else {
+        // True system operation - use system identifier
+        context.userId = 'system';
+        context.username = 'MasterKey';
+      }
     } else {
       // 6. Fallback to anonymous
       context.userId = 'anonymous';
