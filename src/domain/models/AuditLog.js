@@ -73,34 +73,8 @@ class AuditLog extends BaseModel {
     super('AuditLog');
   }
 
-  /**
-   * Validates audit log data before saving.
-   * Ensures all required fields are present and valid.
-   * @returns {boolean} - True if valid, throws error otherwise.
-   * @throws {Error} If required fields are missing or invalid.
-   * @example
-   * // Validation
-   * const log = new AuditLog();
-   * log.set('userId', 'user123');
-   * log.validate(); // throws if invalid
-   */
-  validate() {
-    const required = ['userId', 'action', 'entityType', 'timestamp'];
-
-    for (const field of required) {
-      if (!this.get(field)) {
-        throw new Error(`AuditLog validation failed: ${field} is required`);
-      }
-    }
-
-    // Validate action type
-    const validActions = ['CREATE', 'READ', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'ACCESS'];
-    if (!validActions.includes(this.get('action'))) {
-      throw new Error(`AuditLog validation failed: action must be one of ${validActions.join(', ')}`);
-    }
-
-    return true;
-  }
+  // validate() method removed - Parse Server handles schema validation
+  // and createAuditLogEntry in auditTrailHooks.js already ensures required fields
 
   /**
    * Override: Audit logs cannot be deactivated.
@@ -221,53 +195,8 @@ class AuditLog extends BaseModel {
     return query.find({ useMasterKey: true });
   }
 
-  /**
-   * Create audit log entry (static helper).
-   * @param {object} data - Audit log data.
-   * @param {string} data.userId - User who performed action.
-   * @param {string} data.username - Username for reference.
-   * @param {string} data.action - Action type.
-   * @param {string} data.entityType - Entity type affected.
-   * @param {string} [data.entityId] - Entity ID affected.
-   * @param {object} [data.changes] - Field changes.
-   * @param {object} [data.metadata] - Additional metadata.
-   * @returns {Promise<AuditLog>} - Promise resolving to saved audit log.
-   * @example
-   * // Create audit entry
-   * await AuditLog.createEntry({
-   *   userId: 'user123',
-   *   username: 'admin@amexing.com',
-   *   action: 'UPDATE',
-   *   entityType: 'Client',
-   *   entityId: 'xyz789',
-   *   changes: { companyName: { from: 'Old', to: 'New' } },
-   *   metadata: { ip: '192.168.1.1' }
-   * });
-   */
-  static async createEntry(data) {
-    const log = new AuditLog();
-
-    // Set required fields
-    log.set('userId', data.userId);
-    log.set('username', data.username || 'unknown');
-    log.set('action', data.action);
-    log.set('entityType', data.entityType);
-    log.set('timestamp', new Date());
-
-    // Set optional fields
-    if (data.entityId) log.set('entityId', data.entityId);
-    if (data.changes) log.set('changes', data.changes);
-    if (data.metadata) log.set('metadata', data.metadata);
-
-    // Audit logs are always active and exist
-    log.set('active', true);
-    log.set('exists', true);
-
-    // Validate before saving
-    log.validate();
-
-    return log.save(null, { useMasterKey: true });
-  }
+  // createEntry() static method removed - dead code, never called
+  // Use createAuditLogEntry() in auditTrailHooks.js instead
 
   /**
    * Get summary statistics for audit logs.
