@@ -143,9 +143,9 @@ async function extractUserContext(request) {
       // 5. Check if master key was used
       // Check if this is a user self-operation (common in login/auth flows)
       const { object } = request;
-      if (object && object.className === 'AmexingUser' && object.id) {
+      if (object && object.className === 'AmexingUser' && (object.id || object.get('objectId'))) {
         // User is updating themselves via system operation (login/auth)
-        context.userId = object.id;
+        context.userId = object.id || object.get('objectId');
         context.username = object.get('username') || object.get('email') || 'AuthUser';
       } else {
         // True system operation - use system identifier
@@ -281,12 +281,19 @@ function extractEntityName(object) {
  */
 async function createAuditLogEntry(data) {
   try {
+    // DEBUG: Log the data being passed
+    console.log('🔍 DEBUG createAuditLogEntry - Input data:', JSON.stringify(data, null, 2));
+    console.log('🔍 DEBUG createAuditLogEntry - data.userId type:', typeof data.userId, 'value:', data.userId);
+
     // Create Parse.Object directly in cloud code context
     const AuditLog = Parse.Object.extend('AuditLog');
     const log = new AuditLog();
 
     // Set required fields
     log.set('userId', data.userId);
+
+    // DEBUG: Verify the field was set
+    console.log('🔍 DEBUG createAuditLogEntry - After setting userId, log.get("userId"):', log.get('userId'));
     log.set('username', data.username || 'unknown');
     log.set('action', data.action);
     log.set('entityType', data.entityType);
