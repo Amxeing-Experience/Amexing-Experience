@@ -141,8 +141,17 @@ async function extractUserContext(request) {
       }
     } else if (request.master) {
       // 5. Check if master key was used
-      context.userId = 'system';
-      context.username = 'MasterKey';
+      // Check if this is a user self-operation (common in login/auth flows)
+      const { object } = request;
+      if (object && object.className === 'AmexingUser' && (object.id || object.get('objectId'))) {
+        // User is updating themselves via system operation (login/auth)
+        context.userId = object.id || object.get('objectId');
+        context.username = object.get('username') || object.get('email') || 'AuthUser';
+      } else {
+        // True system operation - use system identifier
+        context.userId = 'system';
+        context.username = 'MasterKey';
+      }
     } else {
       // 6. Fallback to anonymous
       context.userId = 'anonymous';
@@ -272,26 +281,48 @@ function extractEntityName(object) {
  */
 async function createAuditLogEntry(data) {
   try {
+    // DEBUG: Log the data being passed
+    console.log('🔍 DEBUG createAuditLogEntry - Input data:', JSON.stringify(data, null, 2));
+    console.log('🔍 DEBUG createAuditLogEntry - data.userId type:', typeof data.userId, 'value:', data.userId);
+
     // Create Parse.Object directly in cloud code context
     const AuditLog = Parse.Object.extend('AuditLog');
     const log = new AuditLog();
 
-    // Set required fields
+    // Keep userId as string - schema expects String not Pointer
+    // Build all attributes at once to avoid intermediate validation
+    const attributes = {
+      userId: data.userId,
+      username: data.username || 'unknown',
+      action: data.action,
+      entityType: data.entityType,
+      timestamp: new Date(),
+      active: true,
+      exists: true,
+    };
+
+    // Add optional fields
+    if (data.entityId) attributes.entityId = data.entityId;
+    if (data.entityName) attributes.entityName = data.entityName;
+    if (data.changes) attributes.changes = data.changes;
+    if (data.metadata) attributes.metadata = data.metadata;
+
+    console.log('🔍 DEBUG createAuditLogEntry - Setting attributes:', Object.keys(attributes));
+
+    // Set fields individually to match AuditLog.createEntry() pattern
     log.set('userId', data.userId);
-    log.set('username', data.username || 'unknown');
-    log.set('action', data.action);
-    log.set('entityType', data.entityType);
-    log.set('timestamp', new Date());
+    log.set('username', attributes.username);
+    log.set('action', attributes.action);
+    log.set('entityType', attributes.entityType);
+    log.set('timestamp', attributes.timestamp);
+    log.set('active', attributes.active);
+    log.set('exists', attributes.exists);
 
-    // Set optional fields
-    if (data.entityId) log.set('entityId', data.entityId);
-    if (data.entityName) log.set('entityName', data.entityName);
-    if (data.changes) log.set('changes', data.changes);
-    if (data.metadata) log.set('metadata', data.metadata);
-
-    // Audit logs are always active and exist
-    log.set('active', true);
-    log.set('exists', true);
+    // Set optional fields individually
+    if (attributes.entityId) log.set('entityId', attributes.entityId);
+    if (attributes.entityName) log.set('entityName', attributes.entityName);
+    if (attributes.changes) log.set('changes', attributes.changes);
+    if (attributes.metadata) log.set('metadata', attributes.metadata);
 
     // Save with master key (audit logs require system-level permissions)
     await log.save(null, { useMasterKey: true });

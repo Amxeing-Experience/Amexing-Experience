@@ -62,7 +62,7 @@ class ContactFormService {
    * @param {string} [formData.ip] - Client IP address for logging.
    * @param {string} [formData.userAgent] - Client user agent for logging.
    * @param {Date} [formData.timestamp] - Submission timestamp.
-   * @returns {Promise<object>} - Result object with success status and details
+   * @returns {Promise<object>} - Result object with success status and details.
    * @example
    * const result = await contactFormService.processContactForm({
    *   name: 'Jane Smith',
