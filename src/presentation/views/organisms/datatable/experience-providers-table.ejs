@@ -1057,6 +1057,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             ordering: false, // Disable all column sorting UI
             pageLength: 10,
             searchDelay: 300,
+            responsive: true,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
             drawCallback: function() {
                 const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));

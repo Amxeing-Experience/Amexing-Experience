@@ -1,0 +1,736 @@
+<%
+/**
+ * Mobile Experience Establishments DataTable Organism
+ * Simplified mobile-optimized DataTable for establishments management
+ *
+ * Atomic Design Level: Organism
+ * Category: Mobile Dashboard Data Tables
+ * 
+ * Created by Denisse Maldonado
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'experience-establishments-table-mobile';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/experiences';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<!-- Mobile Establishments Table Card -->
+<div class="mobile-table-card">
+    <!-- Mobile Table Header -->
+    <div class="mobile-table-header">
+        <div class="mobile-table-title">
+            <h3><i class="ti ti-building me-2"></i>Establecimientos</h3>
+            <span class="mobile-table-count" id="establishments-count">Cargando...</span>
+        </div>
+        <% if (canCreate) { %>
+        <button class="mobile-add-btn" id="add-establishment-mobile">
+            <i class="ti ti-plus"></i>
+            <span>Agregar</span>
+        </button>
+        <% } %>
+    </div>
+
+    <!-- Mobile Search and Filters -->
+    <div class="mobile-filters">
+        <div class="mobile-search-container">
+            <i class="ti ti-search"></i>
+            <input type="text" class="mobile-search" id="mobile-search-establishments" placeholder="Buscar establecimientos...">
+        </div>
+        
+        <button class="mobile-filter-toggle" id="mobile-establishment-filter-toggle">
+            <i class="ti ti-filter"></i>
+            <span>Filtros</span>
+        </button>
+    </div>
+
+    <!-- Collapsible Filter Panel -->
+    <div class="mobile-filter-panel" id="mobile-establishment-filter-panel">
+        <div class="mobile-filter-group">
+            <label for="mobile-establishment-type-filter">Tipo de Establecimiento</label>
+            <select class="form-select" id="mobile-establishment-type-filter">
+                <option value="">Todos los tipos</option>
+                <option value="hotel">Hotel</option>
+                <option value="restaurant">Restaurante</option>
+                <option value="museum">Museo</option>
+                <option value="park">Parque</option>
+                <option value="attraction">Atracción</option>
+                <option value="venue">Venue</option>
+            </select>
+        </div>
+        
+        <div class="mobile-filter-group">
+            <label for="mobile-establishment-status-filter">Estado</label>
+            <select class="form-select" id="mobile-establishment-status-filter">
+                <option value="">Todos los estados</option>
+                <option value="active">Activo</option>
+                <option value="inactive">Inactivo</option>
+                <option value="maintenance">Mantenimiento</option>
+            </select>
+        </div>
+
+        <div class="mobile-filter-group">
+            <label for="mobile-establishment-city-filter">Ciudad</label>
+            <select class="form-select" id="mobile-establishment-city-filter">
+                <option value="">Todas las ciudades</option>
+                <option value="mexico-city">Ciudad de México</option>
+                <option value="guadalajara">Guadalajara</option>
+                <option value="veracruz">Veracruz</option>
+                <option value="merida">Mérida</option>
+                <option value="puebla">Puebla</option>
+            </select>
+        </div>
+
+        <div class="mobile-filter-group">
+            <label for="mobile-establishment-rating-filter">Calificación</label>
+            <select class="form-select" id="mobile-establishment-rating-filter">
+                <option value="">Todas las calificaciones</option>
+                <option value="5">5 estrellas</option>
+                <option value="4">4+ estrellas</option>
+                <option value="3">3+ estrellas</option>
+                <option value="2">2+ estrellas</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Mobile View Toggle -->
+    <div class="mobile-view-toggle">
+        <button class="view-toggle-btn active" data-view="cards">
+            <i class="ti ti-layout-cards"></i>
+            <span>Tarjetas</span>
+        </button>
+        <button class="view-toggle-btn" data-view="list">
+            <i class="ti ti-list"></i>
+            <span>Lista</span>
+        </button>
+        <button class="view-toggle-btn" data-view="map">
+            <i class="ti ti-map"></i>
+            <span>Mapa</span>
+        </button>
+    </div>
+
+    <!-- Loading State -->
+    <div class="mobile-loading" id="mobile-establishments-loading">
+        <div class="loading-spinner"></div>
+        <span>Cargando establecimientos...</span>
+    </div>
+
+    <!-- Mobile Cards View -->
+    <div class="mobile-cards-container" id="mobile-establishments-cards-view">
+        <!-- Cards will be populated by JavaScript -->
+    </div>
+
+    <!-- Mobile List View -->
+    <div class="mobile-list-container" id="mobile-establishments-list-view" style="display: none;">
+        <!-- Simplified DataTable for list view -->
+        <div class="table-responsive">
+            <table class="table mobile-table" id="<%= dtTableId %>">
+                <thead>
+                    <tr>
+                        <th>Establecimiento</th>
+                        <th>Tipo</th>
+                        <th>Ciudad</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                        <th>Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Populated by DataTable -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Mobile Map View -->
+    <div class="mobile-map-container" id="mobile-establishments-map-view" style="display: none;">
+        <div class="mobile-map-placeholder">
+            <i class="ti ti-map-pin"></i>
+            <p>Vista de mapa próximamente</p>
+            <small>Mostrará la ubicación de todos los establecimientos en un mapa interactivo</small>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="mobile-empty-state" id="mobile-establishments-empty-state" style="display: none;">
+        <div class="empty-state-icon">
+            <i class="ti ti-building-off"></i>
+        </div>
+        <h4>No hay establecimientos</h4>
+        <p>No se encontraron establecimientos que coincidan con los filtros seleccionados.</p>
+        <% if (canCreate) { %>
+        <button class="btn btn-primary" onclick="document.getElementById('add-establishment-mobile').click()">
+            <i class="ti ti-plus me-2"></i>Registrar primer establecimiento
+        </button>
+        <% } %>
+    </div>
+</div>
+
+<!-- Mobile Establishment Card Template -->
+<template id="mobile-establishment-card-template">
+    <div class="mobile-establishment-card">
+        <div class="mobile-establishment-image">
+            <img src="/placeholder-establishment.jpg" alt="Establishment" class="establishment-image">
+            <div class="establishment-type-badge">
+                <span class="type-text">Tipo</span>
+            </div>
+            <div class="establishment-rating">
+                <div class="rating-stars">
+                    <i class="ti ti-star-filled"></i>
+                    <i class="ti ti-star-filled"></i>
+                    <i class="ti ti-star-filled"></i>
+                    <i class="ti ti-star-filled"></i>
+                    <i class="ti ti-star"></i>
+                </div>
+                <span class="rating-value">4.0</span>
+            </div>
+        </div>
+        <div class="mobile-establishment-content">
+            <h4 class="establishment-name">Nombre del Establecimiento</h4>
+            <div class="establishment-location">
+                <i class="ti ti-map-pin"></i>
+                <span class="location-address">Dirección completa</span>
+            </div>
+            <div class="establishment-contact">
+                <div class="contact-item">
+                    <i class="ti ti-phone"></i>
+                    <span class="contact-phone">+52 55 1234 5678</span>
+                </div>
+                <div class="contact-item">
+                    <i class="ti ti-clock"></i>
+                    <span class="contact-hours">9:00 - 18:00</span>
+                </div>
+            </div>
+            <div class="establishment-features">
+                <span class="feature-tag">WiFi</span>
+                <span class="feature-tag">Estacionamiento</span>
+                <span class="feature-tag">Accesible</span>
+            </div>
+        </div>
+        <div class="mobile-establishment-footer">
+            <div class="establishment-status">
+                <span class="status-indicator"></span>
+                <span class="status-text">Activo</span>
+            </div>
+            <% if (dtShowActions) { %>
+            <div class="establishment-quick-actions">
+                <button class="quick-action-btn" data-action="directions" title="Obtener direcciones">
+                    <i class="ti ti-directions"></i>
+                </button>
+                <button class="quick-action-btn" data-action="call" title="Llamar">
+                    <i class="ti ti-phone"></i>
+                </button>
+                <% if (canEdit) { %>
+                <button class="quick-action-btn" data-action="edit" title="Editar">
+                    <i class="ti ti-edit"></i>
+                </button>
+                <% } %>
+            </div>
+            <% } %>
+        </div>
+        <% if (dtShowActions) { %>
+        <div class="mobile-establishment-actions">
+            <% if (canEdit) { %>
+            <button class="establishment-action-btn edit-btn" data-action="edit">
+                <i class="ti ti-edit"></i>
+                <span>Editar</span>
+            </button>
+            <% } %>
+            <button class="establishment-action-btn view-btn" data-action="view">
+                <i class="ti ti-eye"></i>
+                <span>Ver Detalles</span>
+            </button>
+            <button class="establishment-action-btn map-btn" data-action="map">
+                <i class="ti ti-map"></i>
+                <span>Ver en Mapa</span>
+            </button>
+            <% if (canDelete) { %>
+            <button class="establishment-action-btn delete-btn" data-action="delete">
+                <i class="ti ti-trash"></i>
+                <span>Eliminar</span>
+            </button>
+            <% } %>
+        </div>
+        <% } %>
+    </div>
+</template>
+
+<!-- Mobile Establishments Table Styles -->
+<style>
+/* Establishment-specific card styles */
+.mobile-establishment-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.2s;
+    margin-bottom: 1rem;
+}
+
+.mobile-establishment-card:active {
+    transform: scale(0.98);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.mobile-establishment-image {
+    position: relative;
+    height: 140px;
+    overflow: hidden;
+}
+
+.establishment-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.establishment-type-badge {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    background: rgba(245, 158, 11, 0.9);
+    color: white;
+    padding: 0.375rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.establishment-rating {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 0.375rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.rating-stars {
+    display: flex;
+    gap: 1px;
+}
+
+.rating-stars i {
+    font-size: 0.75rem;
+    color: #fbbf24;
+}
+
+.mobile-establishment-content {
+    padding: 1rem;
+}
+
+.establishment-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem 0;
+    color: #111827;
+    line-height: 1.3;
+}
+
+.establishment-location {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.establishment-location i {
+    color: #f59e0b;
+    margin-top: 0.125rem;
+    flex-shrink: 0;
+}
+
+.establishment-contact {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: #6b7280;
+}
+
+.contact-item i {
+    width: 1rem;
+    flex-shrink: 0;
+}
+
+.establishment-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.feature-tag {
+    background: #f3f4f6;
+    color: #6b7280;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.mobile-establishment-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #f3f4f6;
+    background: #f9fafb;
+}
+
+.establishment-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+}
+
+.status-indicator[data-status="inactive"] {
+    background: #ef4444;
+}
+
+.status-indicator[data-status="maintenance"] {
+    background: #f59e0b;
+}
+
+.establishment-quick-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.quick-action-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    transition: all 0.2s;
+}
+
+.quick-action-btn:active {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
+}
+
+.mobile-establishment-actions {
+    padding: 1rem;
+    border-top: 1px solid #e5e7eb;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.establishment-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+    color: #6b7280;
+}
+
+.edit-btn:active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.view-btn:active {
+    background: #10b981;
+    color: white;
+    border-color: #10b981;
+}
+
+.map-btn:active {
+    background: #8b5cf6;
+    color: white;
+    border-color: #8b5cf6;
+}
+
+.delete-btn:active {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+}
+
+/* Map view styles */
+.mobile-map-container {
+    padding: 3rem 2rem;
+    text-align: center;
+    color: #6b7280;
+    background: #f9fafb;
+}
+
+.mobile-map-placeholder i {
+    font-size: 3rem;
+    color: #d1d5db;
+    margin-bottom: 1rem;
+}
+
+.mobile-map-placeholder p {
+    font-size: 1.125rem;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .mobile-establishment-actions {
+        grid-template-columns: 1fr;
+    }
+    
+    .establishment-contact {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .mobile-establishment-footer {
+        padding: 0.5rem 1rem;
+    }
+    
+    .establishment-quick-actions {
+        gap: 0.375rem;
+    }
+    
+    .quick-action-btn {
+        width: 32px;
+        height: 32px;
+    }
+}
+</style>
+
+<!-- Mobile Establishments Table Script -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initMobileEstablishmentsTable();
+});
+
+function initMobileEstablishmentsTable() {
+    const mobileFilterToggle = document.getElementById('mobile-establishment-filter-toggle');
+    const mobileFilterPanel = document.getElementById('mobile-establishment-filter-panel');
+    const viewToggleBtns = document.querySelectorAll('#mobile-establishments-cards-view').parentElement.querySelectorAll('.view-toggle-btn');
+    const cardsView = document.getElementById('mobile-establishments-cards-view');
+    const listView = document.getElementById('mobile-establishments-list-view');
+    const mapView = document.getElementById('mobile-establishments-map-view');
+    const mobileSearch = document.getElementById('mobile-search-establishments');
+    const mobileLoading = document.getElementById('mobile-establishments-loading');
+    
+    // Filter toggle
+    if (mobileFilterToggle && mobileFilterPanel) {
+        mobileFilterToggle.addEventListener('click', function() {
+            mobileFilterPanel.classList.toggle('show');
+            const isOpen = mobileFilterPanel.classList.contains('show');
+            this.querySelector('i').className = isOpen ? 'ti ti-filter-off' : 'ti ti-filter';
+        });
+    }
+    
+    // View toggle
+    viewToggleBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const view = this.dataset.view;
+            
+            // Update active state
+            viewToggleBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Toggle views
+            if (view === 'cards') {
+                cardsView.style.display = 'block';
+                listView.style.display = 'none';
+                mapView.style.display = 'none';
+            } else if (view === 'list') {
+                cardsView.style.display = 'none';
+                listView.style.display = 'block';
+                mapView.style.display = 'none';
+            } else if (view === 'map') {
+                cardsView.style.display = 'none';
+                listView.style.display = 'none';
+                mapView.style.display = 'block';
+            }
+        });
+    });
+    
+    // Initialize with mock data for now
+    setTimeout(() => {
+        if (mobileLoading) {
+            mobileLoading.style.display = 'none';
+        }
+        loadMockEstablishments();
+    }, 1500);
+}
+
+function loadMockEstablishments() {
+    // Mock data for demonstration
+    const mockEstablishments = [
+        {
+            id: 1,
+            name: 'Hotel Plaza Central',
+            type: 'Hotel',
+            status: 'Activo',
+            city: 'Ciudad de México',
+            address: 'Av. Juárez 123, Centro Histórico',
+            phone: '+52 55 1234 5678',
+            hours: '24 horas',
+            rating: 4.5,
+            image: '/placeholder-establishment.jpg',
+            features: ['WiFi', 'Estacionamiento', 'Accesible']
+        },
+        {
+            id: 2,
+            name: 'Restaurante El Corazón',
+            type: 'Restaurante',
+            status: 'Activo',
+            city: 'Guadalajara',
+            address: 'Calle Morelos 456, Centro',
+            phone: '+52 33 987 6543',
+            hours: '12:00 - 22:00',
+            rating: 4.2,
+            image: '/placeholder-establishment.jpg',
+            features: ['WiFi', 'Terraza', 'Música en vivo']
+        },
+        {
+            id: 3,
+            name: 'Museo de Arte Contemporáneo',
+            type: 'Museo',
+            status: 'Mantenimiento',
+            city: 'Puebla',
+            address: 'Av. Reforma 789, Zona Centro',
+            phone: '+52 222 555 0123',
+            hours: '10:00 - 18:00',
+            rating: 4.8,
+            image: '/placeholder-establishment.jpg',
+            features: ['Accesible', 'Audioguías', 'Cafetería']
+        },
+        {
+            id: 4,
+            name: 'Parque Ecológico Xochimilco',
+            type: 'Parque',
+            status: 'Activo',
+            city: 'Ciudad de México',
+            address: 'Periférico Sur s/n, Xochimilco',
+            phone: '+52 55 999 7777',
+            hours: '8:00 - 17:00',
+            rating: 4.0,
+            image: '/placeholder-establishment.jpg',
+            features: ['Estacionamiento', 'Área de picnic', 'Senderos']
+        }
+    ];
+    
+    const cardsContainer = document.getElementById('mobile-establishments-cards-view');
+    const template = document.getElementById('mobile-establishment-card-template');
+    const countElement = document.getElementById('establishments-count');
+    
+    if (cardsContainer && template && countElement) {
+        cardsContainer.innerHTML = '';
+        countElement.textContent = `${mockEstablishments.length} establecimientos`;
+        
+        mockEstablishments.forEach(establishment => {
+            const cardElement = template.content.cloneNode(true);
+            
+            // Populate card data
+            cardElement.querySelector('.establishment-name').textContent = establishment.name;
+            cardElement.querySelector('.type-text').textContent = establishment.type;
+            cardElement.querySelector('.status-text').textContent = establishment.status;
+            cardElement.querySelector('.location-address').textContent = establishment.address;
+            cardElement.querySelector('.contact-phone').textContent = establishment.phone;
+            cardElement.querySelector('.contact-hours').textContent = establishment.hours;
+            cardElement.querySelector('.rating-value').textContent = establishment.rating;
+            cardElement.querySelector('.establishment-image').src = establishment.image;
+            cardElement.querySelector('.establishment-image').alt = establishment.name;
+            
+            // Set rating stars
+            const stars = cardElement.querySelectorAll('.rating-stars i');
+            const rating = Math.floor(establishment.rating);
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.className = 'ti ti-star-filled';
+                } else {
+                    star.className = 'ti ti-star';
+                }
+            });
+            
+            // Add status styling
+            const statusIndicator = cardElement.querySelector('.status-indicator');
+            statusIndicator.dataset.status = establishment.status.toLowerCase();
+            
+            // Add features
+            const featuresContainer = cardElement.querySelector('.establishment-features');
+            featuresContainer.innerHTML = '';
+            establishment.features.forEach(feature => {
+                const featureTag = document.createElement('span');
+                featureTag.className = 'feature-tag';
+                featureTag.textContent = feature;
+                featuresContainer.appendChild(featureTag);
+            });
+            
+            // Add action listeners
+            const actionBtns = cardElement.querySelectorAll('.establishment-action-btn, .quick-action-btn');
+            actionBtns.forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const action = this.dataset.action;
+                    handleEstablishmentAction(action, establishment);
+                });
+            });
+            
+            cardsContainer.appendChild(cardElement);
+        });
+    }
+}
+
+function handleEstablishmentAction(action, establishment) {
+    console.log(`Action: ${action} on establishment:`, establishment);
+    // TODO: Implement actual action handlers
+    // For now, just show an alert
+    let actionText = action;
+    switch(action) {
+        case 'directions': actionText = 'obtener direcciones'; break;
+        case 'call': actionText = 'llamar'; break;
+        case 'edit': actionText = 'editar'; break;
+        case 'view': actionText = 'ver detalles'; break;
+        case 'map': actionText = 'ver en mapa'; break;
+        case 'delete': actionText = 'eliminar'; break;
+    }
+    alert(`Acción "${actionText}" en establecimiento "${establishment.name}"`);
+}
+</script>

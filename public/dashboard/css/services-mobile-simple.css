@@ -1,0 +1,769 @@
+/**
+ * Services Dashboard Mobile Styles - Simplified Version
+ * Minimal changes to preserve existing functionality
+ * Created by Denisse Maldonado
+ */
+
+/* ============================================
+   Mobile Layout Adjustments
+   ============================================ */
+
+@media (max-width: 991.98px) {
+    /* Adjust content margin for mobile since sidebar is handled elsewhere */
+    .main-content {
+        margin-left: 0 !important;
+    }
+    
+    /* General mobile padding adjustments */
+    .dashboard-content {
+        padding: 1rem;
+    }
+}
+
+/* ============================================
+   Filter Controls - Mobile Layout
+   ============================================ */
+
+@media (max-width: 991.98px) {
+    /* Stack main filter container */
+    #services-content > .d-flex.justify-content-between {
+        flex-direction: column !important;
+        gap: 1rem;
+    }
+    
+    /* Service type pills - make them scrollable */
+    .nav-pills {
+        display: flex;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 0.5rem;
+        width: 100%;
+    }
+    
+    .nav-pills::-webkit-scrollbar {
+        height: 4px;
+    }
+    
+    .nav-pills::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    
+    .nav-pills::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 2px;
+    }
+    
+    .nav-pills .nav-item {
+        flex-shrink: 0;
+    }
+    
+    /* Control buttons group - grid layout */
+    #services-content .d-flex.gap-3 {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem !important;
+        width: 100%;
+    }
+    
+    /* Individual controls */
+    #services-content .d-flex.align-items-center {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+    
+    /* Labels and inputs */
+    #services-content .form-label {
+        margin-bottom: 0;
+        margin-right: 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    #services-content .form-select {
+        min-width: auto !important;
+        max-width: 120px;
+        font-size: 0.875rem;
+    }
+    
+    /* Toggle switches */
+    #services-content .form-check {
+        margin-bottom: 0;
+    }
+    
+    #services-content .form-check-label {
+        font-size: 0.875rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    /* Single column on small phones */
+    #services-content .d-flex.gap-3 {
+        grid-template-columns: 1fr !important;
+    }
+    
+    #services-content .form-select {
+        max-width: 100%;
+    }
+}
+
+/* ============================================
+   Vehicle Rate Prices - Mobile
+   ============================================ */
+
+@media (max-width: 991.98px) {
+    /* Fix the vehicle rate prices header layout - all roles */
+    #admin-vehicle-rate-prices .card-header .d-flex,
+    #dept-manager-vehicle-rate-prices .card-header .d-flex,
+    #client-vehicle-rate-prices .card-header .d-flex {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 1rem;
+    }
+    
+    /* Title and subtitle section - all roles */
+    #admin-vehicle-rate-prices .card-header > .d-flex > div:first-child,
+    #dept-manager-vehicle-rate-prices .card-header > .d-flex > div:first-child,
+    #client-vehicle-rate-prices .card-header > .d-flex > div:first-child {
+        text-align: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Filter controls container - all roles */
+    #admin-vehicle-rate-prices .card-header .d-flex.align-items-center.gap-3,
+    #dept-manager-vehicle-rate-prices .card-header .d-flex.align-items-center.gap-3,
+    #client-vehicle-rate-prices .card-header .d-flex.align-items-center.gap-3 {
+        flex-direction: column !important;
+        gap: 0.75rem !important;
+        width: 100%;
+    }
+    
+    /* Filter controls group - all roles */
+    #admin-vehicle-rate-prices .d-flex.gap-2.align-items-center,
+    #dept-manager-vehicle-rate-prices .d-flex.gap-2.align-items-center,
+    #client-vehicle-rate-prices .d-flex.gap-2.align-items-center {
+        width: 100%;
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        gap: 1rem !important;
+    }
+    
+    /* Individual filter controls - all roles */
+    #admin-vehicle-rate-prices .d-flex.align-items-center.gap-1,
+    #dept-manager-vehicle-rate-prices .d-flex.align-items-center.gap-1,
+    #client-vehicle-rate-prices .d-flex.align-items-center.gap-1 {
+        flex: 1;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.25rem !important;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+    
+    /* Labels - all roles */
+    #admin-vehicle-rate-prices label[for*="vehicleRates"],
+    #dept-manager-vehicle-rate-prices label[for*="vehicleRates"],
+    #client-vehicle-rate-prices label[for*="vehicleRates"] {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-bottom: 0.25rem;
+        font-weight: 500;
+    }
+    
+    /* Dropdowns - all roles */
+    #admin-vehicle-rate-prices select[id*="vehicleRates"],
+    #dept-manager-vehicle-rate-prices select[id*="vehicleRates"],
+    #client-vehicle-rate-prices select[id*="vehicleRates"] {
+        width: 100% !important;
+        min-width: unset !important;
+        font-size: 0.875rem;
+    }
+    
+    /* Badge "Por hora" - all roles */
+    #admin-vehicle-rate-prices .badge.bg-primary-subtle,
+    #dept-manager-vehicle-rate-prices .badge.bg-primary-subtle,
+    #client-vehicle-rate-prices .badge.bg-primary-subtle {
+        align-self: center;
+        padding: 0.5rem 1rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    /* Stack the two filter controls vertically on phones - all roles */
+    #admin-vehicle-rate-prices .d-flex.gap-2.align-items-center,
+    #dept-manager-vehicle-rate-prices .d-flex.gap-2.align-items-center,
+    #client-vehicle-rate-prices .d-flex.gap-2.align-items-center {
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+    }
+    
+    #admin-vehicle-rate-prices .d-flex.align-items-center.gap-1,
+    #dept-manager-vehicle-rate-prices .d-flex.align-items-center.gap-1,
+    #client-vehicle-rate-prices .d-flex.align-items-center.gap-1 {
+        width: 100%;
+    }
+    
+    /* Rate pills - horizontal scroll */
+    #rate-pills-container {
+        display: flex !important;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 0.5rem;
+        gap: 0.5rem;
+    }
+    
+    #rate-pills-container::-webkit-scrollbar {
+        height: 4px;
+    }
+    
+    #rate-pills-container .rate-pill {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+    
+    /* Vehicle cards grid */
+    #vehicle-rates-container .row {
+        margin: 0 -0.25rem;
+    }
+    
+    #vehicle-rates-container .col-md-2 {
+        padding: 0.25rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    /* Single column for very small phones */
+    #vehicle-rates-container .col-6 {
+        width: 100%;
+    }
+    
+    /* Larger text for small screens */
+    .vehicle-rate-price {
+        font-size: 1.125rem !important;
+    }
+}
+
+/* ============================================
+   DataTable - Mobile Responsive Enhanced
+   ============================================ */
+
+@media (max-width: 991.98px) {
+    /* Make table container scrollable with visual indicator */
+    .table-responsive {
+        -webkit-overflow-scrolling: touch;
+        margin-bottom: 1rem;
+        position: relative;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        background: white;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+    
+    /* Scroll indicator gradient */
+    .table-responsive::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 30px;
+        background: linear-gradient(to right, transparent, rgba(255,255,255,0.9));
+        pointer-events: none;
+        opacity: 1;
+        transition: opacity 0.3s;
+    }
+    
+    .table-responsive.scrolled-right::after {
+        opacity: 0;
+    }
+    
+    /* DataTable controls layout */
+    .dataTables_wrapper .row {
+        margin: 0;
+    }
+    
+    .dataTables_wrapper .col-sm-12.col-md-6 {
+        width: 100%;
+        padding: 0;
+        margin-bottom: 1rem;
+    }
+    
+    /* Search and length controls styling */
+    .dataTables_length,
+    .dataTables_filter {
+        background: #f8f9fa;
+        padding: 0.75rem;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+    }
+    
+    .dataTables_filter input {
+        width: 100%;
+        max-width: 250px;
+        display: inline-block;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .dataTables_length select {
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+        padding: 0.5rem;
+    }
+    
+    /* Pagination mobile friendly */
+    .dataTables_info,
+    .dataTables_paginate {
+        text-align: center !important;
+        float: none !important;
+    }
+    
+    .dataTables_paginate .pagination {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .dataTables_paginate .page-link {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* Table styling enhancements */
+    #all-services-table {
+        font-size: 0.875rem;
+        background: white;
+    }
+    
+    #all-services-table thead {
+        background: #f8f9fa;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    #all-services-table th,
+    #all-services-table td {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    /* Row styling for mobile */
+    #all-services-table tbody tr {
+        transition: background 0.2s;
+        background: white;
+    }
+    
+    #all-services-table tbody tr:active {
+        background: #f8f9fa;
+    }
+    
+    /* Hide header dropdown on mobile */
+    #headerRateFilter-all-services-table {
+        display: none;
+    }
+    
+    /* Column specific styling */
+    #all-services-table thead th:nth-child(2) {
+        min-width: 100px;
+    }
+    
+    #all-services-table thead th:nth-child(2)::before {
+        content: "Precio";
+        display: block;
+        font-weight: 600;
+    }
+    
+    /* Priority columns - always visible */
+    #all-services-table th:nth-child(1),
+    #all-services-table td:nth-child(1) {
+        position: sticky;
+        left: 0;
+        background: white;
+        z-index: 5;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.05);
+    }
+    
+    #all-services-table thead th:nth-child(1) {
+        background: #f8f9fa;
+        z-index: 11;
+    }
+    
+    /* Remove gaps between cells */
+    #all-services-table {
+        border-collapse: collapse;
+        border-spacing: 0;
+    }
+    
+    #all-services-table tbody tr td {
+        border-top: 1px solid #f1f3f5;
+        border-bottom: none;
+    }
+    
+    #all-services-table tbody tr:first-child td {
+        border-top: none;
+    }
+}
+
+@media (max-width: 767.98px) {
+    /* Enhanced mobile table layout */
+    #all-services-table_wrapper {
+        position: relative;
+    }
+    
+    /* Add expand indicator for rows with hidden content */
+    #all-services-table tbody tr {
+        position: relative;
+        cursor: pointer;
+    }
+    
+    #all-services-table tbody tr::after {
+        content: '\f107';
+        font-family: 'Font Awesome 5 Free';
+        font-weight: 900;
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+        font-size: 1rem;
+        transition: transform 0.2s;
+    }
+    
+    #all-services-table tbody tr.expanded::after {
+        transform: translateY(-50%) rotate(180deg);
+    }
+    
+    /* Hide less important columns on phones */
+    #all-services-table th:nth-child(4), /* Notes */
+    #all-services-table td:nth-child(4),
+    #all-services-table th:nth-child(5), /* Status */
+    #all-services-table td:nth-child(5) {
+        display: none;
+    }
+    
+    /* Minimum column widths */
+    #all-services-table th:nth-child(1),
+    #all-services-table td:nth-child(1) {
+        min-width: 140px;
+        max-width: 200px;
+        white-space: normal;
+        word-wrap: break-word;
+    }
+    
+    #all-services-table th:nth-child(2),
+    #all-services-table td:nth-child(2) {
+        min-width: 90px;
+        font-weight: 600;
+        color: #10b981;
+    }
+    
+    #all-services-table th:nth-child(3),
+    #all-services-table td:nth-child(3) {
+        min-width: 70px;
+    }
+    
+    /* Action buttons - responsive layout */
+    #all-services-table .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        justify-content: flex-end;
+    }
+    
+    #all-services-table .btn {
+        font-size: 0.75rem;
+        padding: 0.375rem 0.5rem;
+        min-width: auto;
+    }
+    
+    /* Expanded row details */
+    .mobile-details-row {
+        background: #f8f9fa;
+        border-left: 3px solid #10b981;
+    }
+    
+    .mobile-details-row td {
+        padding: 1rem !important;
+    }
+    
+    .mobile-details-content {
+        display: grid;
+        gap: 0.75rem;
+    }
+    
+    .mobile-detail-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem;
+        background: white;
+        border-radius: 6px;
+    }
+    
+    .mobile-detail-label {
+        font-weight: 600;
+        color: #6c757d;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+    
+    .mobile-detail-value {
+        color: #212529;
+        text-align: right;
+    }
+}
+
+@media (max-width: 575.98px) {
+    /* Card-based view for small phones */
+    .switch-to-cards {
+        display: block;
+        width: 100%;
+        padding: 0.75rem;
+        background: #10b981;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        font-weight: 600;
+        text-align: center;
+    }
+    
+    .switch-to-cards:active {
+        background: #059669;
+    }
+    
+    /* Hide table on very small screens if card view is active */
+    .cards-view-active .table-responsive {
+        display: none;
+    }
+    
+    /* Service cards container */
+    .services-cards-container {
+        display: none;
+        gap: 1rem;
+        padding: 0 0.25rem;
+    }
+    
+    .cards-view-active .services-cards-container {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* Individual service card */
+    .service-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: 1px solid #e9ecef;
+    }
+    
+    .service-card:active {
+        transform: scale(0.98);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+    
+    .service-card-header {
+        padding: 1rem;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+    }
+    
+    .service-card-route {
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    
+    .service-card-price {
+        font-size: 1.25rem;
+        font-weight: 700;
+    }
+    
+    .service-card-body {
+        padding: 1rem;
+    }
+    
+    .service-card-info {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .service-card-info-item {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .service-card-info-label {
+        font-size: 0.625rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-weight: 600;
+        margin-bottom: 0.125rem;
+    }
+    
+    .service-card-info-value {
+        font-size: 0.875rem;
+        color: #212529;
+    }
+    
+    .service-card-actions {
+        display: flex;
+        gap: 0.5rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #f1f3f5;
+    }
+    
+    .service-card-actions .btn {
+        flex: 1;
+        padding: 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    /* Ultra compact table view fallback */
+    #all-services-table {
+        font-size: 0.75rem;
+    }
+    
+    /* Show only essential columns */
+    #all-services-table th:nth-child(3), /* Duration */
+    #all-services-table td:nth-child(3) {
+        display: none;
+    }
+    
+    /* Larger touch targets for action buttons */
+    #all-services-table .btn {
+        min-height: 36px;
+        padding: 0.5rem;
+    }
+    
+    /* Hide pagination text, keep only buttons */
+    .dataTables_info {
+        display: none;
+    }
+    
+    .dataTables_paginate .pagination {
+        margin-bottom: 0;
+    }
+}
+
+/* ============================================
+   Touch Optimization
+   ============================================ */
+
+@media (max-width: 991.98px) {
+    /* Minimum touch target sizes */
+    .btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    .form-control,
+    .form-select {
+        min-height: 44px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .form-check-input {
+        width: 24px;
+        height: 24px;
+        cursor: pointer;
+    }
+    
+    /* Active states for touch feedback */
+    .btn:active,
+    a:active {
+        transform: scale(0.98);
+        opacity: 0.9;
+    }
+}
+
+/* ============================================
+   General Mobile Adjustments
+   ============================================ */
+
+@media (max-width: 991.98px) {
+    /* Page header */
+    .row.mb-4 h2 {
+        font-size: 1.5rem;
+    }
+    
+    /* Card spacing */
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    /* Breadcrumb */
+    .breadcrumb {
+        font-size: 0.875rem;
+        flex-wrap: wrap;
+    }
+    
+    /* Dashboard content padding */
+    .dashboard-content {
+        padding: 1rem;
+    }
+    
+    /* Add swipe hint for scrollable tables */
+    .swipe-hint {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: #e3f2fd;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+        color: #1976d2;
+        animation: fadeIn 0.3s ease-in;
+    }
+    
+    .swipe-hint i {
+        animation: swipeHint 2s infinite;
+    }
+    
+    @keyframes swipeHint {
+        0%, 100% { transform: translateX(0); }
+        50% { transform: translateX(10px); }
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+}
+
+@media (max-width: 575.98px) {
+    /* Tighter padding on small phones */
+    .dashboard-content {
+        padding: 0.75rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    /* Smaller headers */
+    h2 {
+        font-size: 1.25rem;
+    }
+    
+    h5 {
+        font-size: 1rem;
+    }
+}

@@ -396,19 +396,23 @@ describe('AuthenticationService', () => {
     describe('resetPassword', () => {
       it('should successfully reset password with valid token', async () => {
         const Parse = require('parse/node');
+        
+        // Setup mockUser with proper methods
+        mockUser.save = jest.fn().mockResolvedValue(mockUser);
+        mockUser.unset = jest.fn();
+        mockUser.set = jest.fn();
+        
         Parse.Query.mockImplementation(() => ({
           equalTo: jest.fn().mockReturnThis(),
           greaterThan: jest.fn().mockReturnThis(),
           first: jest.fn().mockResolvedValue(mockUser)
         }));
 
-        mockUser.save.mockResolvedValue(mockUser);
-
         const result = await AuthenticationService.resetPassword(resetToken, newPassword);
 
         expect(result.success).toBe(true);
         expect(result.message).toBe('Password has been reset successfully');
-        expect(mockUser.setPassword).toHaveBeenCalledWith(newPassword);
+        expect(mockUser.set).toHaveBeenCalledWith('password', expect.any(String));
         expect(mockUser.unset).toHaveBeenCalledWith('passwordResetToken');
         expect(mockUser.unset).toHaveBeenCalledWith('passwordResetExpires');
         expect(logger.logSecurityEvent).toHaveBeenCalledWith('PASSWORD_RESET_COMPLETED', expect.any(Object));

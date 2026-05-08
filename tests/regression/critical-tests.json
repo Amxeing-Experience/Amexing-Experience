@@ -1,0 +1,73 @@
+{
+  "criticalTests": [
+    {
+      "category": "Authentication",
+      "priority": "CRITICAL",
+      "tests": [
+        "tests/integration/api/auth.test.js",
+        "tests/integration/auth/mobile-auth-flows.test.js",
+        "tests/unit/middleware/jwtMiddleware-rbac.test.js",
+        "tests/unit/services/AuthenticationService.test.js"
+      ],
+      "maxDuration": 30000
+    },
+    {
+      "category": "Database Operations",
+      "priority": "CRITICAL",
+      "tests": [
+        "tests/integration/parseServer.test.js",
+        "tests/integration/cloud/beforeSave-amexinguser.test.js"
+      ],
+      "maxDuration": 10000
+    },
+    {
+      "category": "Core API Endpoints",
+      "priority": "HIGH",
+      "tests": [
+        "tests/integration/api/employees.test.js",
+        "tests/integration/api/quotes-duplicate.test.js",
+        "tests/integration/api/health.test.js"
+      ],
+      "maxDuration": 10000
+    },
+    {
+      "category": "Permissions",
+      "priority": "HIGH",
+      "tests": [
+        "tests/integration/rbac/permission-system.integration.test.js",
+        "tests/unit/services/PermissionService.test.js"
+      ],
+      "maxDuration": 8000
+    },
+    {
+      "category": "Business Logic",
+      "priority": "MEDIUM",
+      "tests": [
+        "tests/unit/services/BulkImportService.test.js",
+        "tests/unit/controllers/api/ClientEmployeesController.test.js"
+      ],
+      "maxDuration": 5000
+    },
+    {
+      "category": "Financial Operations",
+      "priority": "CRITICAL",
+      "tests": [
+        "tests/integration/api/invoices.test.js",
+        "tests/integration/api/billing.test.js"
+      ],
+      "maxDuration": 10000
+    },
+    {
+      "category": "Reservations",
+      "priority": "HIGH",
+      "tests": [
+        "tests/integration/api/reservations.test.js"
+      ],
+      "maxDuration": 8000
+    }
+  ],
+  "totalMaxDuration": 120000,
+  "parallelExecution": false,
+  "failFast": true,
+  "verbose": false
+}

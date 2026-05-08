@@ -1,0 +1,50 @@
+{
+  "generated": "2026-05-06T20:17:07.677Z",
+  "phase": "5 - Advanced Tooling",
+  "overview": {
+    "totalAPIControllers": 47,
+    "totalDashboardControllers": 8,
+    "externalServices": 8,
+    "configurationVariables": "50+",
+    "featureFlags": "15+",
+    "userRoles": 8,
+    "rbacPermissions": 30
+  },
+  "criticalDependencies": {
+    "services": [
+      "Parse Server",
+      "MongoDB Atlas"
+    ],
+    "configurations": [
+      "PARSE_APP_ID",
+      "PARSE_MASTER_KEY",
+      "DATABASE_URI",
+      "JWT_SECRET"
+    ],
+    "featureFlags": [
+      "NODE_ENV",
+      "ENABLE_PCI_COMPLIANCE"
+    ]
+  },
+  "riskAnalysis": {
+    "highRiskAreas": [
+      "Parse Server configuration changes",
+      "Database connectivity issues",
+      "External service outages",
+      "Configuration validation failures",
+      "Feature flag misconfigurations"
+    ],
+    "mitigationStrategies": [
+      "Health check monitoring",
+      "Configuration validation on startup",
+      "Fallback mechanisms for external services",
+      "Comprehensive testing for all environments",
+      "Documentation and change procedures"
+    ]
+  },
+  "fileLocations": {
+    "documentation": "docs/maps/",
+    "scripts": "scripts/analysis/",
+    "graphs": "docs/graphs"
+  }
+}

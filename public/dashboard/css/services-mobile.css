@@ -1,0 +1,787 @@
+/**
+ * Services Dashboard Mobile Styles
+ * Responsive design for mobile devices
+ * Created by Denisse Maldonado
+ */
+
+/* ============================================
+   DataTable Mobile Fixes
+   ============================================ */
+
+/* Ensure DataTable loads properly on mobile */
+@media (max-width: 991.98px) {
+    /* Fix DataTable wrapper */
+    .dataTables_wrapper {
+        width: 100% !important;
+        overflow: visible !important;
+    }
+    
+    /* Fix pagination controls */
+    .dataTables_wrapper .dataTables_paginate {
+        float: none !important;
+        text-align: center !important;
+        margin-top: 1rem;
+    }
+    
+    .dataTables_wrapper .dataTables_info {
+        float: none !important;
+        text-align: center !important;
+        margin-bottom: 1rem;
+    }
+    
+    .dataTables_wrapper .dataTables_length,
+    .dataTables_wrapper .dataTables_filter {
+        float: none !important;
+        text-align: center !important;
+        margin-bottom: 1rem;
+    }
+    
+    /* Fix search box */
+    .dataTables_filter input {
+        width: 100% !important;
+        max-width: 300px;
+        margin-left: 0 !important;
+    }
+}
+
+/* ============================================
+   Mobile Navigation Enhancements
+   ============================================ */
+
+/* Hamburger Menu Button */
+.mobile-menu-toggle {
+    display: none;
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 1050;
+    width: 44px;
+    height: 44px;
+    border: none;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.mobile-menu-toggle:hover,
+.mobile-menu-toggle:active {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.mobile-menu-toggle i {
+    font-size: 24px;
+    color: #10b981;
+}
+
+/* Mobile Sidebar Overlay */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+/* ============================================
+   Responsive Breakpoints
+   ============================================ */
+
+/* Large tablets and below (< 992px) */
+@media (max-width: 991.98px) {
+    /* Show mobile menu toggle */
+    .mobile-menu-toggle {
+        display: flex;
+    }
+    
+    /* Adjust main content for mobile */
+    .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+        padding-top: 60px; /* Space for mobile header */
+    }
+    
+    /* Mobile sidebar styles */
+    .left-sidebar {
+        position: fixed !important;
+        left: -280px;
+        top: 0;
+        width: 280px;
+        height: 100vh;
+        z-index: 1045;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    }
+    
+    .left-sidebar.active {
+        left: 0;
+    }
+    
+    /* Adjust dashboard content padding */
+    .dashboard-content {
+        padding: 1.5rem 1rem;
+    }
+    
+    /* Mobile header adjustments */
+    .dashboard-header {
+        padding: 0.75rem 1rem;
+        padding-left: 60px; /* Space for hamburger */
+    }
+}
+
+/* Tablets (576px - 768px) */
+@media (min-width: 576px) and (max-width: 767.98px) {
+    .dashboard-content {
+        padding: 1.25rem;
+    }
+}
+
+/* Mobile phones (< 576px) */
+@media (max-width: 575.98px) {
+    /* Smaller padding on mobile */
+    .dashboard-content {
+        padding: 1rem 0.75rem;
+    }
+    
+    /* Stack breadcrumb items */
+    .breadcrumb {
+        font-size: 0.875rem;
+    }
+    
+    /* Page header adjustments */
+    .page-header h2 {
+        font-size: 1.5rem;
+    }
+}
+
+/* ============================================
+   Vehicle Rate Prices Section - Mobile
+   ============================================ */
+
+@media (max-width: 991.98px) {
+    /* Stack filter controls vertically on tablets */
+    #vehicle-rates-pills .d-flex.gap-3 {
+        flex-direction: column;
+        gap: 1rem !important;
+    }
+    
+    /* Make filter dropdowns full width */
+    #vehicle-rates-pills .form-select {
+        width: 100% !important;
+        min-width: unset !important;
+    }
+}
+
+@media (max-width: 767.98px) {
+    /* Collapsible filter panel for mobile */
+    .vehicle-filters-mobile {
+        margin-bottom: 1rem;
+    }
+    
+    .vehicle-filters-toggle {
+        display: flex;
+        width: 100%;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    
+    .vehicle-filters-content {
+        display: none;
+        padding: 1rem;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+    }
+    
+    .vehicle-filters-content.show {
+        display: block;
+    }
+    
+    /* Horizontal scroll for rate pills */
+    #rate-pills-container {
+        display: flex;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    #rate-pills-container::-webkit-scrollbar {
+        height: 6px;
+    }
+    
+    #rate-pills-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+    }
+    
+    #rate-pills-container::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 3px;
+    }
+    
+    .rate-pill {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+    
+    /* Vehicle rate cards - better mobile layout */
+    .vehicle-rate-card {
+        min-height: 100px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 1rem !important;
+    }
+    
+    .vehicle-rate-price {
+        font-size: 1.125rem !important;
+    }
+}
+
+@media (max-width: 575.98px) {
+    /* Single column for vehicle rates on small phones */
+    #vehicle-rates-container .col-6 {
+        width: 100%;
+    }
+    
+    /* Larger touch targets for rate pills */
+    .rate-pill {
+        min-height: 44px;
+        padding: 10px 16px !important;
+        font-size: 0.9rem;
+    }
+}
+
+/* ============================================
+   Services DataTable - Mobile
+   ============================================ */
+
+/* Fix for filter pills on mobile */
+@media (max-width: 991.98px) {
+    /* Keep original filter controls visible but responsive */
+    .d-flex.justify-content-between.align-items-center.mb-3 {
+        flex-direction: column !important;
+        gap: 1rem;
+    }
+    
+    /* Filter pills - make them wrap properly */
+    .nav-pills {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .nav-pills .nav-item {
+        flex: 0 0 auto;
+    }
+    
+    .nav-pills .nav-link {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+    
+    /* Filter controls - responsive grid */
+    .d-flex.gap-3.align-items-center {
+        width: 100%;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem !important;
+        margin-top: 1rem;
+    }
+    
+    /* Individual filter items */
+    .d-flex.align-items-center.gap-2,
+    .d-flex.align-items-center.gap-1 {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.25rem !important;
+    }
+    
+    /* Labels above controls */
+    .d-flex.align-items-center.gap-2 label,
+    .d-flex.align-items-center.gap-1 label {
+        text-align: left;
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-bottom: 0.25rem;
+    }
+    
+    /* Form controls full width */
+    .d-flex.align-items-center .form-select,
+    .d-flex.align-items-center .form-check {
+        width: 100% !important;
+        min-width: unset !important;
+    }
+    
+    /* Toggle switches layout */
+    .form-check.form-switch {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+    
+    .form-check.form-switch .form-check-input {
+        margin-left: auto;
+        margin-right: 0;
+    }
+    
+    /* Mobile filter controls container - removed for now */
+    .services-filters-mobile {
+        display: none;
+    }
+    
+    .filters-toggle-btn {
+        width: 100%;
+        padding: 0.875rem 1rem;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .filters-toggle-btn:hover,
+    .filters-toggle-btn:active {
+        background: #f8f9fa;
+    }
+    
+    .filters-toggle-btn .badge {
+        background: #10b981;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+    }
+    
+    .services-filters-content {
+        display: none;
+        padding: 1rem;
+        border-top: 1px solid #dee2e6;
+        background: white;
+    }
+    
+    .services-filters-content.show {
+        display: block;
+    }
+    
+    /* Stack filter pills vertically */
+    .services-filters-content .nav-pills {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .services-filters-content .nav-pills .nav-item {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .services-filters-content .nav-pills .nav-link {
+        width: 100%;
+        text-align: left;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+    }
+    
+    /* Filter controls grid */
+    .filter-controls-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .filter-control-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .filter-control-item label {
+        font-weight: 500;
+        margin-bottom: 0;
+    }
+    
+    /* Larger toggle switches for mobile */
+    .form-check-input[type="checkbox"] {
+        min-width: 48px;
+        height: 24px;
+        cursor: pointer;
+    }
+    
+    .form-check-label {
+        padding-left: 0.5rem;
+        cursor: pointer;
+    }
+}
+
+@media (max-width: 767.98px) {
+    /* DataTable responsive configuration */
+    #all-services-table_wrapper {
+        font-size: 0.875rem;
+    }
+    
+    /* Make table scrollable horizontally on mobile */
+    .table-responsive {
+        -webkit-overflow-scrolling: touch;
+        overflow-x: auto;
+    }
+    
+    #all-services-table {
+        min-width: 600px; /* Minimum width to maintain readability */
+    }
+    
+    /* Adjust column widths for mobile */
+    #all-services-table th:nth-child(1),
+    #all-services-table td:nth-child(1) {
+        min-width: 150px; /* Route column */
+    }
+    
+    #all-services-table th:nth-child(2),
+    #all-services-table td:nth-child(2) {
+        min-width: 120px; /* Price column */
+    }
+    
+    /* Hide only less critical columns on very small screens */
+    @media (max-width: 575.98px) {
+        #all-services-table th:nth-child(4), /* Notes */
+        #all-services-table td:nth-child(4),
+        #all-services-table th:nth-child(5), /* Status */
+        #all-services-table td:nth-child(5) {
+            display: none;
+        }
+    }
+    
+    /* Add expand button for row details */
+    .dt-mobile-expand {
+        display: inline-block;
+        width: 32px;
+        height: 32px;
+        background: #10b981;
+        color: white;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 32px;
+        cursor: pointer;
+        margin-left: 0.5rem;
+    }
+    
+    /* Mobile row details card */
+    .mobile-row-details {
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-top: 0.5rem;
+    }
+    
+    .mobile-detail-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .mobile-detail-item:last-child {
+        border-bottom: none;
+    }
+    
+    .mobile-detail-label {
+        font-weight: 600;
+        color: #6c757d;
+    }
+    
+    .mobile-detail-value {
+        text-align: right;
+    }
+    
+    /* Action buttons for mobile */
+    .mobile-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+    
+    .mobile-actions .btn {
+        flex: 1;
+        padding: 0.75rem;
+        font-size: 0.875rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    /* Smaller grid on phones */
+    .d-flex.gap-3.align-items-center {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Card-based view for services on small phones */
+    .services-mobile-cards {
+        display: none;
+    }
+    
+    .service-mobile-card {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .service-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #f1f3f5;
+    }
+    
+    .service-card-route {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #212529;
+        margin-bottom: 0.25rem;
+    }
+    
+    .service-card-type {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        background: #e7f5ff;
+        color: #1971c2;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .service-card-price {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: #10b981;
+    }
+    
+    .service-card-details {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    
+    .service-detail {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .service-detail-label {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-bottom: 0.125rem;
+    }
+    
+    .service-detail-value {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #212529;
+    }
+    
+    .service-card-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .service-card-actions .btn {
+        flex: 1;
+        padding: 0.625rem;
+        font-size: 0.875rem;
+        border-radius: 6px;
+    }
+    
+    /* Show cards view, hide table on small phones */
+    #all-services-table_wrapper {
+        display: none !important;
+    }
+    
+    .services-mobile-cards {
+        display: block !important;
+    }
+}
+
+/* ============================================
+   Touch Optimization
+   ============================================ */
+
+/* Minimum touch target size */
+@media (max-width: 991.98px) {
+    /* Buttons */
+    .btn {
+        min-height: 44px;
+        padding: 0.625rem 1rem;
+    }
+    
+    .btn-sm {
+        min-height: 36px;
+        padding: 0.5rem 0.75rem;
+    }
+    
+    /* Form controls */
+    .form-control,
+    .form-select {
+        min-height: 44px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    /* Clickable elements */
+    a, button, [role="button"] {
+        min-width: 44px;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* Table rows */
+    .table tbody tr {
+        min-height: 48px;
+    }
+    
+    .table td {
+        padding: 0.75rem 0.5rem;
+        vertical-align: middle;
+    }
+    
+    /* Dropdown items */
+    .dropdown-item {
+        padding: 0.75rem 1rem;
+        min-height: 44px;
+    }
+    
+    /* Active states for touch */
+    button:active,
+    .btn:active,
+    a:active {
+        transform: scale(0.98);
+        opacity: 0.9;
+    }
+}
+
+/* ============================================
+   Loading States
+   ============================================ */
+
+.mobile-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    color: #6c757d;
+}
+
+.mobile-loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #f3f4f6;
+    border-top-color: #10b981;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+/* Hide on mobile */
+@media (max-width: 767.98px) {
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
+/* Show only on mobile */
+.show-mobile {
+    display: none !important;
+}
+
+@media (max-width: 767.98px) {
+    .show-mobile {
+        display: block !important;
+    }
+}
+
+/* Responsive text */
+@media (max-width: 575.98px) {
+    .text-responsive {
+        font-size: 0.875rem;
+    }
+    
+    h1.text-responsive {
+        font-size: 1.5rem;
+    }
+    
+    h2.text-responsive {
+        font-size: 1.25rem;
+    }
+    
+    h3.text-responsive {
+        font-size: 1.125rem;
+    }
+}
+
+/* ============================================
+   Landscape Orientation Fixes
+   ============================================ */
+
+@media (max-width: 767.98px) and (orientation: landscape) {
+    .dashboard-content {
+        padding: 0.75rem;
+    }
+    
+    .mobile-menu-toggle {
+        top: 0.5rem;
+        left: 0.5rem;
+    }
+    
+    .left-sidebar {
+        width: 250px;
+    }
+    
+    .service-mobile-card {
+        padding: 0.75rem;
+    }
+}
