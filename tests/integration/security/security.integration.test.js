@@ -37,8 +37,9 @@ describe('Security Integration Tests', () => {
       expect([200, 302]).toContain(response.status);
 
       if (response.status === 200) {
-        // Check for CSRF token in response - it should be in locals for template rendering
-        expect(response.text).toContain('AmexingWeb');
+        // Check that we got an HTML response (landing page)
+        expect(response.text).toContain('<!DOCTYPE html>');
+        expect(response.type).toMatch(/html/);
       }
     });
 

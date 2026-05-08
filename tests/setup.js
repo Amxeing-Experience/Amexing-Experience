@@ -9,6 +9,9 @@
 
 const Parse = require('parse/node');
 
+// Mock ExcelJS to avoid ESM issues in tests
+jest.mock('exceljs');
+
 // Test configuration
 const testConfig = {
   databaseURI: process.env.TEST_DATABASE_URI || process.env.DATABASE_URI || 'mongodb://localhost:27017/AmexingTEST',

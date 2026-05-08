@@ -135,12 +135,16 @@ describe('ExperienceController', () => {
 
     jest.clearAllMocks();
 
-    // Reset Parse.Query mock
-    const mockQuery = new Parse.Query();
-    mockQuery.count.mockReset();
-    mockQuery.find.mockReset();
-    mockQuery.get.mockReset();
-    mockQuery.first.mockReset();
+    // Reset Parse.Query mock if it exists
+    if (Parse.Query.getAllInstances) {
+      const instances = Parse.Query.getAllInstances();
+      instances.forEach(query => {
+        if (query.count) query.count.mockReset();
+        if (query.find) query.find.mockReset();
+        if (query.get) query.get.mockReset();
+        if (query.first) query.first.mockReset();
+      });
+    }
   });
 
   /**
@@ -156,7 +160,7 @@ describe('ExperienceController', () => {
    * Solution: Refactor controller to use dependency injection or integration tests
    * Integration tests exist and pass - unit tests cannot properly mock multiple dynamic instances
    */
-  describe.skip('getExperiences - NEEDS DEPENDENCY INJECTION', () => {
+  describe('getExperiences', () => {
     const mockExperiences = [
       {
         id: 'exp-1',
@@ -201,9 +205,23 @@ describe('ExperienceController', () => {
         length: '25',
       };
 
-      const mockQuery = new Parse.Query('Experience');
-      mockQuery.count.mockResolvedValue(2);
-      mockQuery.find.mockResolvedValue(mockExperiences);
+      // Setup mocks for all Query instances the controller will create
+      // The controller creates 2 queries: totalQuery and filteredQuery
+      Parse.Query.mockImplementation(() => {
+        const query = {
+          equalTo: jest.fn().mockReturnThis(),
+          notEqualTo: jest.fn().mockReturnThis(),
+          doesNotExist: jest.fn().mockReturnThis(),
+          ascending: jest.fn().mockReturnThis(),
+          descending: jest.fn().mockReturnThis(),
+          skip: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          include: jest.fn().mockReturnThis(),
+          count: jest.fn().mockResolvedValue(2),
+          find: jest.fn().mockResolvedValue(mockExperiences),
+        };
+        return query;
+      });
 
       await controller.getExperiences(mockReq, mockRes);
 
@@ -225,9 +243,23 @@ describe('ExperienceController', () => {
         type: 'Experience',
       };
 
-      const mockQuery = new Parse.Query('Experience');
-      mockQuery.count.mockResolvedValue(2);
-      mockQuery.find.mockResolvedValue(mockExperiences);
+      // Setup mock to track method calls
+      let mockQuery;
+      Parse.Query.mockImplementation(() => {
+        mockQuery = {
+          equalTo: jest.fn().mockReturnThis(),
+          notEqualTo: jest.fn().mockReturnThis(),
+          doesNotExist: jest.fn().mockReturnThis(),
+          ascending: jest.fn().mockReturnThis(),
+          descending: jest.fn().mockReturnThis(),
+          skip: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          include: jest.fn().mockReturnThis(),
+          count: jest.fn().mockResolvedValue(2),
+          find: jest.fn().mockResolvedValue(mockExperiences),
+        };
+        return mockQuery;
+      });
 
       await controller.getExperiences(mockReq, mockRes);
 
@@ -248,9 +280,23 @@ describe('ExperienceController', () => {
         type: 'Provider',
       };
 
-      const mockQuery = new Parse.Query('Experience');
-      mockQuery.count.mockResolvedValue(1);
-      mockQuery.find.mockResolvedValue([mockExperiences[0]]);
+      // Setup mock to track method calls
+      let mockQuery;
+      Parse.Query.mockImplementation(() => {
+        mockQuery = {
+          equalTo: jest.fn().mockReturnThis(),
+          notEqualTo: jest.fn().mockReturnThis(),
+          doesNotExist: jest.fn().mockReturnThis(),
+          ascending: jest.fn().mockReturnThis(),
+          descending: jest.fn().mockReturnThis(),
+          skip: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          include: jest.fn().mockReturnThis(),
+          count: jest.fn().mockResolvedValue(1),
+          find: jest.fn().mockResolvedValue([mockExperiences[0]]),
+        };
+        return mockQuery;
+      });
 
       await controller.getExperiences(mockReq, mockRes);
 
@@ -272,7 +318,7 @@ describe('ExperienceController', () => {
      * Solution: Refactor controller to use dependency injection or test with
      * integration tests instead of unit tests for search functionality.
      */
-    it.skip('should handle search parameter - NEEDS CONTROLLER REFACTOR', async () => {
+    it('should handle search parameter', async () => {
       mockReq.query = {
         draw: '1',
         start: '0',
@@ -280,7 +326,36 @@ describe('ExperienceController', () => {
         search: { value: 'Centro' },
       };
 
-      // This test requires complex mock orchestration that breaks other tests
+      // Mock Parse.Query.or for search functionality
+      const orQuery = {
+        equalTo: jest.fn().mockReturnThis(),
+        notEqualTo: jest.fn().mockReturnThis(),
+        doesNotExist: jest.fn().mockReturnThis(),
+        ascending: jest.fn().mockReturnThis(),
+        descending: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        include: jest.fn().mockReturnThis(),
+        count: jest.fn().mockResolvedValue(1),
+        find: jest.fn().mockResolvedValue([mockExperiences[0]]),
+      };
+
+      Parse.Query.or = jest.fn().mockReturnValue(orQuery);
+      
+      Parse.Query.mockImplementation(() => ({
+        equalTo: jest.fn().mockReturnThis(),
+        notEqualTo: jest.fn().mockReturnThis(),
+        doesNotExist: jest.fn().mockReturnThis(),
+        matches: jest.fn().mockReturnThis(),
+        ascending: jest.fn().mockReturnThis(),
+        descending: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        include: jest.fn().mockReturnThis(),
+        count: jest.fn().mockResolvedValue(1),
+        find: jest.fn().mockResolvedValue([mockExperiences[0]]),
+      }));
+
       await controller.getExperiences(mockReq, mockRes);
 
       expect(mockRes.json).toHaveBeenCalledWith(
@@ -351,7 +426,7 @@ describe('ExperienceController', () => {
   });
 
   /** SKIPPED - Same issue as getExperiences: multiple dynamic Parse.Query instances */
-  describe.skip('getExperienceById - NEEDS DEPENDENCY INJECTION', () => {
+  describe('getExperienceById', () => {
     it('should retrieve single experience by ID', async () => {
       const mockExperience = {
         id: 'exp-1',
@@ -533,7 +608,7 @@ describe('ExperienceController', () => {
      * Solution: Refactor controller to use bulk query (containedIn) or test with
      * integration tests for array validation functionality.
      */
-    it.skip('should handle array of experiences (max 20) - NEEDS CONTROLLER REFACTOR', async () => {
+    it('should handle array of experiences (max 20)', async () => {
       const expIds = Array.from({ length: 15 }, (_, i) => `exp-${i}`);
 
       mockReq.body = {
@@ -544,9 +619,27 @@ describe('ExperienceController', () => {
         experiences: expIds,
       };
 
-      // This test requires complex mock orchestration that breaks other tests
+      // Mock Parse.Object and its save method
+      const mockExperienceObj = {
+        set: jest.fn(),
+        get: jest.fn((key) => {
+          if (key === 'name') return 'Package Tour';
+          if (key === 'type') return 'Experience';
+          return null;
+        }),
+        save: jest.fn().mockResolvedValue({ id: 'new-exp-123' }),
+        id: 'new-exp-123',
+      };
+
+      // Mock Parse.Object constructor
+      const OriginalObject = Parse.Object;
+      Parse.Object.extend = jest.fn(() => {
+        return jest.fn(() => mockExperienceObj);
+      });
+
       await controller.createExperience(mockReq, mockRes);
 
+      expect(mockRes.status).toHaveBeenCalledWith(201);
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
@@ -598,7 +691,7 @@ describe('ExperienceController', () => {
   });
 
   /** SKIPPED - Same issue as getExperiences: multiple dynamic Parse.Query instances */
-  describe.skip('updateExperience - NEEDS DEPENDENCY INJECTION', () => {
+  describe('updateExperience', () => {
     it('should update experience with valid data', async () => {
       const mockExperience = {
         id: 'exp-1',
@@ -669,7 +762,7 @@ describe('ExperienceController', () => {
   });
 
   /** SKIPPED - Same issue as getExperiences: multiple dynamic Parse.Query instances */
-  describe.skip('deleteExperience - NEEDS DEPENDENCY INJECTION', () => {
+  describe('deleteExperience', () => {
     it('should soft delete experience (exists=false)', async () => {
       const mockExperience = {
         id: 'exp-1',

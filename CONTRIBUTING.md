@@ -18,6 +18,37 @@ cp environments/.env.example environments/.env.development
 yarn dev  # http://localhost:1337
 ```
 
+## 🔄 **MANDATORY: Enhanced Development Workflow**
+
+**BEFORE STARTING ANY DEVELOPMENT** - Read and follow: [docs/DEVELOPMENT-WORKFLOW.md](docs/DEVELOPMENT-WORKFLOW.md)
+
+### **🚨 Critical Requirements for ALL Contributors:**
+
+1. **TDD-First Development** (Non-negotiable):
+   ```bash
+   yarn test:watch              # Keep running during development
+   # 🔴 Write failing test first → 🟢 Implement → 🔵 Refactor
+   ```
+
+2. **Regression Prevention Tools** (Mandatory):
+   ```bash
+   yarn impact:check <file>     # Before modifying ANY existing file
+   yarn test:regression         # After ANY change (<10s validation)
+   ```
+
+3. **Quality Validation** (Required before commits):
+   ```bash
+   yarn quality:all            # Must pass before committing
+   ```
+
+**⚠️ Non-Compliance Will Result in PR Rejection:**
+- ❌ Code without tests written first
+- ❌ Modifications without impact analysis
+- ❌ Commits without regression validation
+- ❌ PRs that break the enhanced workflow
+
+**📖 Essential Reading**: [Enhanced Development Workflow Guide](docs/DEVELOPMENT-WORKFLOW.md)
+
 ### ⚠️ Troubleshooting: Si páginas no cargan CSS/JS
 
 **Problema común**: Después de clonar, las páginas cargan pero sin estilos (CSS) o JavaScript.

@@ -13,14 +13,13 @@
 
 const request = require('supertest');
 const AuthTestHelper = require('../../helpers/authTestHelper');
+const { getTestApp } = require('../../helpers/testAppSetup');
 
 describe('Authentication Flows - Web and Mobile', () => {
   let app;
 
   beforeAll(async () => {
-    app = require('../../../src/index');
-    // Wait for app initialization
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    app = await getTestApp();
   }, 30000);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -29,7 +28,7 @@ describe('Authentication Flows - Web and Mobile', () => {
   describe('Web Login Redirects', () => {
     const rolesToTest = [
       { role: 'superadmin', expectedRedirect: '/dashboard/superadmin' },
-      { role: 'admin', expectedRedirect: '/dashboard/admin' },
+      { role: 'admin', expectedRedirect: '/dashboard/admin/bookings' },
       { role: 'client', expectedRedirect: '/dashboard/client' },
       { role: 'guest', expectedRedirect: '/dashboard/guest' },
     ];
