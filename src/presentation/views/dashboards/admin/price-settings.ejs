@@ -1362,34 +1362,6 @@ function updateCurrentValue() {
                         minute: '2-digit'
                     });
                 }
-            }
-        })
-        .catch(error => {
-            console.error('Error updating current value:', error);
-        });
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.data) {
-                const rate = data.data;
-                
-                // Update the display value
-                const displayElement = document.querySelector('#currentValueDisplay .display-3');
-                if (displayElement) {
-                    displayElement.textContent = rate.formatted;
-                }
-                
-                // Update the effective date
-                const effectiveDateElement = document.getElementById('effectiveDate');
-                if (effectiveDateElement) {
-                    const date = new Date(rate.lastUpdated || rate.effectiveDate);
-                    effectiveDateElement.textContent = date.toLocaleDateString('es-MX', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                }
                 
                 // Update the status badge
                 const statusBadgeElement = document.getElementById('createdBy');
@@ -1398,8 +1370,15 @@ function updateCurrentValue() {
                 }
                 
                 // Show the current value display if it was hidden
-                document.getElementById('currentValueDisplay').style.display = 'block';
-                document.getElementById('noCurrentValue').style.display = 'none';
+                const currentValueDisplay = document.getElementById('currentValueDisplay');
+                const noCurrentValue = document.getElementById('noCurrentValue');
+                
+                if (currentValueDisplay) {
+                    currentValueDisplay.style.display = 'block';
+                }
+                if (noCurrentValue) {
+                    noCurrentValue.style.display = 'none';
+                }
             }
         })
         .catch(error => {
@@ -1598,7 +1577,10 @@ function pollInflationStatus(batchId) {
         try {
             const response = await $.ajax({
                 url: `/api/inflation-rate/status/${batchId}`,
-                method: 'GET'
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`
+                }
             });
             
             if (response.success) {
