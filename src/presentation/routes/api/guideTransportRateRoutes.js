@@ -59,12 +59,37 @@ router.get(
   (req, res) => guideTransportRateController.getHistory(req, res)
 );
 
+// GET /api/guide-transport-rate/formula - Get current formula configuration
+// MUST be defined before /:id route to avoid matching "formula" as an ID
+router.get(
+  '/formula',
+  readRateLimit,
+  jwtMiddleware.requireRoleLevel(6), // Admin level and above
+  (req, res) => guideTransportRateController.getFormulaConfiguration(req, res)
+);
+
 // GET /api/guide-transport-rate/:id - Get specific guide transport rate by ID
 router.get(
   '/:id',
   readRateLimit,
   jwtMiddleware.requireRoleLevel(6), // Admin level and above
   (req, res) => guideTransportRateController.getById(req, res)
+);
+
+// PUT /api/guide-transport-rate/formula - Update formula configuration
+router.put(
+  '/formula',
+  writeRateLimit,
+  jwtMiddleware.requireRoleLevel(6), // Admin level and above
+  (req, res) => guideTransportRateController.updateFormulaConfiguration(req, res)
+);
+
+// POST /api/guide-transport-rate/simulate - Simulate formula calculation
+router.post(
+  '/simulate',
+  readRateLimit,
+  jwtMiddleware.requireRoleLevel(6), // Admin level and above
+  (req, res) => guideTransportRateController.simulateCalculation(req, res)
 );
 
 // POST /api/guide-transport-rate - Create new guide transport rate (replaces active one)

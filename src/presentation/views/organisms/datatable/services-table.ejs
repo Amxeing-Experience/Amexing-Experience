@@ -308,6 +308,9 @@ table.dataTable thead th:nth-child(2) select {
             </div>
         </div>
 
+        <!-- Include Generic Guide Formula Evaluator -->
+        <script src="/js/guide-formula-evaluator.js"></script>
+        
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">
@@ -568,7 +571,7 @@ table.dataTable thead th:nth-child(2) select {
     const isDevelopment = <%= dtIsDevelopment ? 'true' : 'false' %>;
     
     // Wait for DOM and all dependencies to be ready
-    function initWhenReady() {
+    async function initWhenReady() {
         // Check if jQuery and DataTables are loaded
         if (typeof jQuery === 'undefined') {
             setTimeout(initWhenReady, 100);
@@ -578,6 +581,19 @@ table.dataTable thead th:nth-child(2) select {
         if (!jQuery.fn.dataTable) {
             setTimeout(initWhenReady, 100);
             return;
+        }
+
+        // Wait for GuideFormulaEvaluator to be ready
+        if (typeof GuideFormulaEvaluator !== 'undefined') {
+            console.log('⏳ Waiting for guide formula to load...');
+            try {
+                await GuideFormulaEvaluator.ready();
+                console.log('✅ Guide formula loaded, initializing services table');
+            } catch (error) {
+                console.warn('⚠️ Could not load guide formula, using defaults:', error);
+            }
+        } else {
+            console.warn('⚠️ GuideFormulaEvaluator not available');
         }
 
         initServicesTable();
@@ -1902,8 +1918,29 @@ table.dataTable thead th:nth-child(2) select {
                     
                     // Apply guide cost if enabled
                     if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
-                        // Calculate guide cost: duration * 2 * hourly_rate
-                        const guideCost = routeDuration * 2 * currentGuideRate;
+                        // Calculate guide cost using generic evaluator (synchronous fallback for now)
+                        // Convert hours to minutes for the evaluator
+                        // Note: Using promise with immediate resolution for synchronous context
+                        let guideCost = routeDuration * 2 * currentGuideRate; // Fallback calculation
+                        
+                        // Try to use the formula evaluator if available
+                        if (typeof GuideFormulaEvaluator !== 'undefined' && GuideFormulaEvaluator.formulaConfig) {
+                            const config = GuideFormulaEvaluator.formulaConfig;
+                            if (config.formulaComponents && config.formulaComponents.length > 0) {
+                                const beforeCost = guideCost;
+                                guideCost = GuideFormulaEvaluator.evaluateComponents(config.formulaComponents, routeDuration * 60, currentGuideRate);
+                                if (isDevelopment) {
+                                    console.log(`📊 Using custom formula: ${routeDuration}h (${routeDuration * 60}min) @ $${currentGuideRate}/hr = $${guideCost} (was: $${beforeCost})`);
+                                }
+                            } else if (config.roundTripMultiplier) {
+                                guideCost = routeDuration * config.roundTripMultiplier * currentGuideRate;
+                                if (isDevelopment) {
+                                    console.log(`📊 Using simple formula: ${routeDuration}h × ${config.roundTripMultiplier} × $${currentGuideRate} = $${guideCost}`);
+                                }
+                            }
+                        } else if (isDevelopment) {
+                            console.log(`⚠️ Formula evaluator not available, using fallback: ${routeDuration}h × 2 × $${currentGuideRate} = $${guideCost}`);
+                        }
                         
                         // Extract numeric value from price string
                         const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
@@ -1998,8 +2035,23 @@ table.dataTable thead th:nth-child(2) select {
                 
                 // Apply guide cost if enabled
                 if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
-                    // Calculate guide cost: duration * 2 * hourly_rate
-                    const guideCost = routeDuration * 2 * currentGuideRate;
+                    // Calculate guide cost using generic evaluator
+                    let guideCost = routeDuration * 2 * currentGuideRate; // Fallback
+                    
+                    if (typeof GuideFormulaEvaluator !== 'undefined' && GuideFormulaEvaluator.formulaConfig) {
+                        const config = GuideFormulaEvaluator.formulaConfig;
+                        if (config.formulaComponents && config.formulaComponents.length > 0) {
+                            guideCost = GuideFormulaEvaluator.evaluateComponents(config.formulaComponents, routeDuration * 60, currentGuideRate);
+                            if (isDevelopment) {
+                                console.log(`📊 [Edit Mode] Custom formula: ${routeDuration}h @ $${currentGuideRate}/hr = $${guideCost}`);
+                            }
+                        } else if (config.roundTripMultiplier) {
+                            guideCost = routeDuration * config.roundTripMultiplier * currentGuideRate;
+                            if (isDevelopment) {
+                                console.log(`📊 [Edit Mode] Simple formula: ${routeDuration}h × ${config.roundTripMultiplier} × $${currentGuideRate} = $${guideCost}`);
+                            }
+                        }
+                    }
                     
                     // Extract numeric value from price string
                     const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
@@ -2506,7 +2558,23 @@ table.dataTable thead th:nth-child(2) select {
                             // Calculate guide cost if needed
                             let guideCost = 0;
                             if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
-                                guideCost = routeDuration * 2 * currentGuideRate;
+                                guideCost = routeDuration * 2 * currentGuideRate; // Fallback
+                                
+                                // Use formula evaluator if available
+                                if (typeof GuideFormulaEvaluator !== 'undefined' && GuideFormulaEvaluator.formulaConfig) {
+                                    const config = GuideFormulaEvaluator.formulaConfig;
+                                    if (config.formulaComponents && config.formulaComponents.length > 0) {
+                                        guideCost = GuideFormulaEvaluator.evaluateComponents(config.formulaComponents, routeDuration * 60, currentGuideRate);
+                                        if (isDevelopment) {
+                                            console.log(`📊 [Render] Custom formula: ${routeDuration}h @ $${currentGuideRate}/hr = $${guideCost}`);
+                                        }
+                                    } else if (config.roundTripMultiplier) {
+                                        guideCost = routeDuration * config.roundTripMultiplier * currentGuideRate;
+                                        if (isDevelopment) {
+                                            console.log(`📊 [Render] Simple formula: ${routeDuration}h × ${config.roundTripMultiplier} × $${currentGuideRate} = $${guideCost}`);
+                                        }
+                                    }
+                                }
                             }
                             
                             // Calculate greeter cost if needed

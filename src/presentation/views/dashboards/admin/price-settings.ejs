@@ -104,6 +104,27 @@ const currentSection = menuItems.find(item => item.section === activeSection);
             </div>
         </div>
 
+        <!-- Tab Navigation for guia-traslados section -->
+        <% if (activeSection === 'guia-traslados') { %>
+        <ul class="nav nav-tabs mb-4" id="guiaTrasladosTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-pane" type="button" role="tab" aria-controls="config-pane" aria-selected="true">
+                    <i class="ti ti-settings-2 me-2"></i>Configuración y Simulador
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab" aria-controls="history-pane" aria-selected="false">
+                    <i class="ti ti-history me-2"></i>Historial de Cambios
+                </button>
+            </li>
+        </ul>
+        
+        <!-- Tab Content -->
+        <div class="tab-content" id="guiaTrasladosTabContent">
+            <!-- Configuration Tab -->
+            <div class="tab-pane fade show active" id="config-pane" role="tabpanel" aria-labelledby="config-tab" tabindex="0">
+        <% } %>
+
         <!-- Current Value Card and New Adjustment Form -->
         <div class="row mb-4">
             <!-- Current Value Display Card -->
@@ -562,8 +583,238 @@ const currentSection = menuItems.find(item => item.section === activeSection);
                 </div>
             </div>
         </div>
-
-        <!-- History Table -->
+        
+        <!-- Formula Configuration Section (only for guia-traslados) -->
+        <% if (activeSection === 'guia-traslados') { %>
+            <div class="row">
+                <!-- Formula Configuration Card -->
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">
+                            <div class="d-flex align-items-center">
+                                <h5 class="card-title mb-0 text-white">
+                                    <i class="ti ti-math me-2"></i>Configuración de Fórmula
+                                </h5>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Current Formula Display -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Fórmula Actual:</label>
+                                <div class="bg-light p-3 rounded border" id="currentFormulaDisplay">
+                                    <code class="text-dark" id="formulaDisplayText">Costo = duración_horas × 2 × tarifa_guía</code>
+                                </div>
+                            </div>
+                            
+                            <!-- Formula Builder Mode Toggle -->
+                            <div class="mb-3">
+                                <div class="btn-group w-100" role="group">
+                                    <input type="radio" class="btn-check" name="formulaMode" id="simpleModeBtn" autocomplete="off" checked>
+                                    <label class="btn btn-outline-primary" for="simpleModeBtn">
+                                        <i class="ti ti-settings me-2"></i>Modo Simple
+                                    </label>
+                                    <input type="radio" class="btn-check" name="formulaMode" id="advancedModeBtn" autocomplete="off">
+                                    <label class="btn btn-outline-primary" for="advancedModeBtn">
+                                        <i class="ti ti-code me-2"></i>Modo Avanzado
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- Simple Mode Form -->
+                            <form id="formulaConfigForm" class="formula-mode-content">
+                                <div class="mb-3">
+                                    <label for="roundTripMultiplier" class="form-label">
+                                        Multiplicador de Viaje <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="number" class="form-control" id="roundTripMultiplier" 
+                                           step="0.1" min="1" max="5" value="2" required>
+                                    <small class="text-muted">Valor por defecto: 2 (viaje redondo)</small>
+                                </div>
+                                
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-success" id="saveFormulaBtn">
+                                        <i class="ti ti-device-floppy me-2"></i>Guardar Configuración
+                                    </button>
+                                </div>
+                            </form>
+                            
+                            <!-- Advanced Mode Formula Builder -->
+                            <div id="advancedFormulaBuilder" class="formula-mode-content" style="display: none;">
+                                <!-- Available Components -->
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Componentes Disponibles:</label>
+                                    <div class="d-flex flex-wrap gap-2 p-3 bg-light rounded" id="availableComponents">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary component-btn" data-type="duration_minutes">
+                                            <i class="ti ti-clock me-1"></i>Duración (min)
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary component-btn" data-type="duration_hours">
+                                            <i class="ti ti-clock me-1"></i>Duración (hrs)
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary component-btn" data-type="rate">
+                                            <i class="ti ti-currency-dollar me-1"></i>Tarifa Guía
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary component-btn" data-type="fixed">
+                                            <i class="ti ti-number me-1"></i>Valor Fijo
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary component-btn" data-type="parenthesis_open">
+                                            <i class="ti ti-parentheses me-1"></i>(
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary component-btn" data-type="parenthesis_close">
+                                            <i class="ti ti-parentheses me-1"></i>)
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Formula Builder Area -->
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Constructor de Fórmula:</label>
+                                    <div class="p-3 border rounded bg-white" id="formulaBuilderArea" style="min-height: 100px;">
+                                        <div class="d-flex flex-wrap align-items-center gap-2" id="formulaComponents">
+                                            <!-- Formula components will be added here dynamically -->
+                                            <div class="text-muted" id="formulaPlaceholder">
+                                                <i class="ti ti-drag-drop me-1"></i>Arrastra componentes aquí o haz clic en ellos para agregar
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 d-flex justify-content-between">
+                                        <button type="button" class="btn btn-sm btn-outline-danger" id="clearFormulaBtn">
+                                            <i class="ti ti-trash me-1"></i>Limpiar
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="resetToDefaultBtn">
+                                            <i class="ti ti-restore me-1"></i>Restaurar Predeterminado
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Save Advanced Formula -->
+                                <div class="d-grid">
+                                    <button type="button" class="btn btn-success" id="saveAdvancedFormulaBtn">
+                                        <i class="ti ti-device-floppy me-2"></i>Guardar Fórmula Avanzada
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Formula Simulator Card - Same row as Formula Config -->
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none;">
+                            <div class="d-flex align-items-center">
+                                <h5 class="card-title mb-0 text-white">
+                                    <i class="ti ti-calculator me-2"></i>Simulador de Fórmula
+                                </h5>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="simulationDuration" class="form-label">
+                                    Duración del Traslado (minutos)
+                                </label>
+                                <input type="number" class="form-control" id="simulationDuration" 
+                                       min="1" max="720" value="30" placeholder="30">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Tarifa de Guía Actual</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="simulationRate" 
+                                           readonly style="background-color: #f8f9fa;">
+                                    <span class="input-group-text">MXN</span>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="simulationBaseCost" class="form-label">
+                                    Costo Base (MXN)
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="simulationBaseCost" 
+                                           step="0.01" min="0" value="0" placeholder="0.00">
+                                    <span class="input-group-text">MXN</span>
+                                </div>
+                                <small class="text-muted">Costo base del traslado al que se suma el costo del guía</small>
+                            </div>
+                            
+                            <div class="bg-primary bg-opacity-10 p-3 rounded border border-primary border-opacity-25 mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold">Costo del Guía:</span>
+                                    <span class="h6 mb-0 text-primary" id="simulationGuideResult">$0.00 MXN</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold">Costo Total:</span>
+                                    <span class="h5 mb-0 text-primary fw-bold" id="simulationResult">$0.00 MXN</span>
+                                </div>
+                                <small class="text-muted d-block mt-2" id="simulationBreakdown">
+                                    Cálculo: (0 ÷ 60) × 2 × $0.00 = $0.00
+                                </small>
+                            </div>
+                            
+                            <!-- Sample Scenarios -->
+                            <div class="mt-4">
+                                <label class="form-label fw-bold">Escenarios de Ejemplo:</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm w-100 scenario-btn" 
+                                                data-duration="15">15 min</button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm w-100 scenario-btn" 
+                                                data-duration="30">30 min</button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm w-100 scenario-btn" 
+                                                data-duration="60">60 min</button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm w-100 scenario-btn" 
+                                                data-duration="90">90 min</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div><!-- End Configuration Tab -->
+            
+            <!-- History Tab -->
+            <div class="tab-pane fade" id="history-pane" role="tabpanel" aria-labelledby="history-tab" tabindex="0">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header text-white" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border: none;">
+                                <div class="d-flex align-items-center">
+                                    <h5 class="card-title mb-0 text-white">
+                                        <i class="ti ti-history me-2"></i>Historial de Cambios
+                                    </h5>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table id="adjustmentsHistoryTableTabbed" class="table table-hover" style="width:100%">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Valor</th>
+                                                <th>Fecha Efectiva</th>
+                                                <th>Modificado Por</th>
+                                                <th>Fecha Creación</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- End History Tab -->
+        </div><!-- End Tab Content -->
+        <% } else { %>
+        <!-- History Table for other sections (non-tabbed) -->
         <div class="row">
             <div class="col-12">
                 <div class="card border-0 shadow-sm">
@@ -592,6 +843,7 @@ const currentSection = menuItems.find(item => item.section === activeSection);
                 </div>
             </div>
         </div>
+        <% } %>
     </div>
 </div>
 
@@ -722,6 +974,51 @@ const currentSection = menuItems.find(item => item.section === activeSection);
         display: none;
     }
 }
+
+/* Formula Builder Styles */
+#formulaBuilderArea {
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6 !important;
+    transition: all 0.3s ease;
+}
+
+#formulaBuilderArea:hover {
+    border-color: #6366f1 !important;
+    background: #fff;
+}
+
+#formulaComponents .badge {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    margin: 0.25rem;
+    min-width: 60px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#formulaComponents .form-select-sm {
+    height: calc(1.5em + 0.5rem + 2px);
+    padding: 0.25rem 0.5rem;
+}
+
+.component-btn {
+    transition: all 0.2s ease;
+}
+
+.component-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.formula-mode-content {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
 </style>
 
 <!-- Price Settings JavaScript -->
@@ -739,6 +1036,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize history table
     initializeHistoryTable();
+    
+    // Handle tab switching for guia-traslados section
+    if (currentSection === 'guia-traslados') {
+        initializeTabHandlers();
+    }
     
     // Form submission
     initializeAdjustmentForm();
@@ -1026,7 +1328,9 @@ function initializeHistoryTable() {
         ];
     }
 
-    $('#adjustmentsHistoryTable').DataTable({
+    // Use different table ID for tabbed (guia-traslados) vs non-tabbed sections
+    const tableId = currentSection === 'guia-traslados' ? '#adjustmentsHistoryTableTabbed' : '#adjustmentsHistoryTable';
+    $(tableId).DataTable({
         processing: true,
         serverSide: currentSection === 'exchange-rate' || currentSection === 'inflation' || currentSection === 'agency' || currentSection === 'transfer' || currentSection === 'guia-chofer' || currentSection === 'guia-traslados', // Use server-side for exchange rate, inflation, agency, transfer, guia-chofer, and guia-traslados
         ajax: {
@@ -1132,7 +1436,9 @@ function initializeAdjustmentForm() {
                 setTimeout(() => {
                     updateCurrentValue(); // Update the current value display
                 }, 100);
-                $('#adjustmentsHistoryTable').DataTable().ajax.reload();
+                // Reload the correct table based on section
+                const tableId = currentSection === 'guia-traslados' ? '#adjustmentsHistoryTableTabbed' : '#adjustmentsHistoryTable';
+                $(tableId).DataTable().ajax.reload();
             } else {
                 showAlert('danger', data.error || 'Error al guardar el ajuste');
             }
@@ -1618,5 +1924,708 @@ function pollInflationStatus(batchId) {
         clearInterval(pollInterval);
         console.log('Inflation status polling stopped after 5 minutes');
     }, 300000);
+}
+
+// Formula Configuration and Simulation Functions
+let formulaConfig = {
+    roundTripMultiplier: 2,
+    minimumCharge: 0
+};
+
+// Initialize formula configuration when page loads (only for guia-traslados)
+document.addEventListener('DOMContentLoaded', function() {
+    if (currentSection === 'guia-traslados') {
+        initializeFormulaConfiguration();
+        initializeFormulaSimulation();
+        initializeFormulaBuilder();
+    }
+});
+
+// Initialize tab handlers for guia-traslados section
+function initializeTabHandlers() {
+    const historyTab = document.getElementById('history-tab');
+    const configTab = document.getElementById('config-tab');
+    
+    if (historyTab) {
+        historyTab.addEventListener('shown.bs.tab', function (e) {
+            // Reinitialize DataTable when History tab is shown
+            const tableId = currentSection === 'guia-traslados' ? '#adjustmentsHistoryTableTabbed' : '#adjustmentsHistoryTable';
+            const table = $(tableId).DataTable();
+            if (table) {
+                table.columns.adjust().draw();
+            }
+        });
+    }
+    
+    if (configTab) {
+        configTab.addEventListener('shown.bs.tab', function (e) {
+            // Refresh configuration and simulation display if needed
+            updateFormulaDisplayText();
+            updateSimulation();
+        });
+    }
+}
+
+function initializeFormulaConfiguration() {
+    // Load current formula configuration
+    loadFormulaConfiguration();
+    
+    // Set up form handlers
+    const formulaConfigForm = document.getElementById('formulaConfigForm');
+    if (formulaConfigForm) {
+        formulaConfigForm.addEventListener('submit', saveFormulaConfiguration);
+    }
+    
+    // Set up real-time formula preview
+    const multiplierInput = document.getElementById('roundTripMultiplier');
+    if (multiplierInput) {
+        multiplierInput.addEventListener('input', updateFormulaPreview);
+    }
+}
+
+function initializeFormulaSimulation() {
+    // Set up simulation event handlers
+    const durationInput = document.getElementById('simulationDuration');
+    const rateInput = document.getElementById('simulationRate');
+    const baseCostInput = document.getElementById('simulationBaseCost');
+    
+    if (durationInput) {
+        durationInput.addEventListener('input', updateSimulation);
+    }
+    
+    if (baseCostInput) {
+        baseCostInput.addEventListener('input', updateSimulation);
+    }
+    
+    // Set up scenario buttons
+    const scenarioButtons = document.querySelectorAll('.scenario-btn');
+    scenarioButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const duration = parseInt(this.dataset.duration);
+            setSimulationDuration(duration);
+        });
+    });
+    
+    // Load current rate for simulation
+    loadCurrentRateForSimulation();
+    
+    // Run initial simulation
+    updateSimulation();
+}
+
+async function loadFormulaConfiguration() {
+    try {
+        const response = await fetch('/api/guide-transport-rate/formula', {
+            headers: {
+                'Authorization': `Bearer ${getAccessToken()}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Loaded formula configuration from API:', data);
+            
+            if (data.success) {
+                formulaConfig = data.config;
+                
+                // Check if we have formula components
+                if (formulaConfig.formulaComponents && formulaConfig.formulaComponents.length > 0) {
+                    console.log('Using saved formula components:', formulaConfig.formulaComponents);
+                    currentFormulaComponents = formulaConfig.formulaComponents;
+                } else {
+                    // No components exist, create them from the current multiplier
+                    console.log('No saved components found, generating defaults');
+                    const multiplier = formulaConfig.roundTripMultiplier || 2;
+                    currentFormulaComponents = [
+                        { type: 'duration_hours', label: 'Duración (hrs)', id: 'comp_1' },
+                        { type: 'operator', value: '*', label: '×', id: 'op_1' },
+                        { type: 'fixed', value: multiplier, label: String(multiplier), editable: true, id: 'comp_2' },
+                        { type: 'operator', value: '*', label: '×', id: 'op_2' },
+                        { type: 'rate', label: 'Tarifa Guía', id: 'comp_3' }
+                    ];
+                }
+                
+                // Always display the components for advanced mode
+                displayFormulaComponents();
+                updateFormulaDisplayText();
+                
+                // Update UI
+                const multiplierInput = document.getElementById('roundTripMultiplier');
+                
+                if (multiplierInput) multiplierInput.value = formulaConfig.roundTripMultiplier || 2;
+                
+                updateFormulaPreview();
+            }
+        }
+    } catch (error) {
+        console.log('Using default formula configuration:', error);
+        // Use defaults if API not available yet
+        formulaConfig = { roundTripMultiplier: 2, minimumCharge: 0, formulaComponents: [] };
+        
+        // Create default formula components
+        currentFormulaComponents = [
+            { type: 'duration_hours', label: 'Duración (hrs)', id: 'comp_1' },
+            { type: 'operator', value: '*', label: '×', id: 'op_1' },
+            { type: 'fixed', value: 2, label: '2', editable: true, id: 'comp_2' },
+            { type: 'operator', value: '*', label: '×', id: 'op_2' },
+            { type: 'rate', label: 'Tarifa Guía', id: 'comp_3' }
+        ];
+        
+        displayFormulaComponents();
+        updateFormulaDisplayText();
+        updateFormulaPreview();
+    }
+}
+
+async function saveFormulaConfiguration(e) {
+    e.preventDefault();
+    
+    const submitBtn = document.getElementById('saveFormulaBtn');
+    const originalText = submitBtn.innerHTML;
+    
+    try {
+        // Disable button and show loading
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="ti ti-loader ti-spin me-2"></i>Guardando...';
+        
+        const formData = {
+            roundTripMultiplier: parseFloat(document.getElementById('roundTripMultiplier').value),
+            minimumCharge: 0 // Always 0 since we removed the field
+        };
+        
+        const response = await fetch('/api/guide-transport-rate/formula', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getAccessToken()}`
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update config with response data (which includes the converted components)
+            formulaConfig = data.config || formData;
+            
+            // Update the components based on the multiplier
+            const multiplier = parseFloat(document.getElementById('roundTripMultiplier').value) || 2;
+            currentFormulaComponents = [
+                { type: 'duration_hours', label: 'Duración (hrs)', id: 'comp_1' },
+                { type: 'operator', value: '*', label: '×', id: 'op_1' },
+                { type: 'fixed', value: multiplier, label: String(multiplier), editable: true, id: 'comp_2' },
+                { type: 'operator', value: '*', label: '×', id: 'op_2' },
+                { type: 'rate', label: 'Tarifa Guía', id: 'comp_3' }
+            ];
+            
+            // Update displays
+            displayFormulaComponents();
+            updateFormulaDisplayText();
+            updateFormulaPreview();
+            updateSimulation();
+            showAlert('success', 'Configuración de fórmula guardada exitosamente');
+            
+            // Also clear the cache in the generic evaluator if available
+            if (typeof GuideFormulaEvaluator !== 'undefined') {
+                GuideFormulaEvaluator.clearCache();
+                GuideFormulaEvaluator.loadFormula(); // Reload the new formula
+            }
+        } else {
+            showAlert('danger', data.error || 'Error al guardar la configuración');
+        }
+        
+    } catch (error) {
+        console.error('Error saving formula configuration:', error);
+        showAlert('danger', 'Error al guardar la configuración de fórmula');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    }
+}
+
+function updateFormulaPreview() {
+    const multiplier = parseFloat(document.getElementById('roundTripMultiplier').value) || 2;
+    
+    // Update formula display
+    const formulaMultiplierSpan = document.getElementById('formulaMultiplier');
+    const formulaMultiplierText = document.getElementById('formulaMultiplierText');
+    
+    if (formulaMultiplierSpan) formulaMultiplierSpan.textContent = multiplier;
+    if (formulaMultiplierText) formulaMultiplierText.textContent = multiplier;
+    
+    // Update simulation
+    updateSimulation();
+}
+
+async function loadCurrentRateForSimulation() {
+    try {
+        const response = await fetch('/api/guide-transport-rate/current', {
+            headers: {
+                'Authorization': `Bearer ${getAccessToken()}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+                const rateInput = document.getElementById('simulationRate');
+                if (rateInput) {
+                    rateInput.value = data.data.value;
+                    updateSimulation();
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading current rate:', error);
+        // Set default rate for simulation
+        const rateInput = document.getElementById('simulationRate');
+        if (rateInput) rateInput.value = 400;
+    }
+}
+
+function updateSimulation() {
+    const duration = parseFloat(document.getElementById('simulationDuration').value) || 0;
+    const rate = parseFloat(document.getElementById('simulationRate').value) || 400;
+    const baseCost = parseFloat(document.getElementById('simulationBaseCost').value) || 0;
+    
+    let guideCost;
+    let breakdown;
+    
+    // Check if we're using advanced formula
+    if (currentFormulaComponents && currentFormulaComponents.length > 0) {
+        // Use component-based formula
+        const result = evaluateFormulaForSimulation(currentFormulaComponents, duration, rate);
+        guideCost = result.value;
+        breakdown = `Fórmula: ${result.formula} = $${guideCost.toFixed(2)}`;
+    } else {
+        // Use simple formula
+        const multiplier = formulaConfig.roundTripMultiplier || 2;
+        const durationHours = duration / 60;
+        guideCost = durationHours * multiplier * rate;
+        breakdown = `Fórmula: (${duration} ÷ 60) × ${multiplier} × $${rate.toFixed(2)} = $${guideCost.toFixed(2)}`;
+    }
+    
+    // Calculate total cost
+    const totalCost = guideCost + baseCost;
+    
+    // Update result display
+    const guideResultElement = document.getElementById('simulationGuideResult');
+    const totalResultElement = document.getElementById('simulationResult');
+    const breakdownElement = document.getElementById('simulationBreakdown');
+    
+    if (guideResultElement) {
+        guideResultElement.textContent = `$${guideCost.toFixed(2)} MXN`;
+    }
+    
+    if (totalResultElement) {
+        totalResultElement.textContent = `$${totalCost.toFixed(2)} MXN`;
+    }
+    
+    if (breakdownElement) {
+        let fullBreakdown = breakdown;
+        if (baseCost > 0) {
+            fullBreakdown += ` + Base: $${baseCost.toFixed(2)} = Total: $${totalCost.toFixed(2)}`;
+        }
+        breakdownElement.textContent = fullBreakdown;
+    }
+}
+
+function evaluateFormulaForSimulation(components, durationMinutes, rate) {
+    let formulaString = '';
+    let expression = '';
+    
+    const values = {
+        duration_minutes: durationMinutes,
+        duration_hours: durationMinutes / 60,
+        rate: rate
+    };
+
+    for (const comp of components) {
+        if (comp.type === 'operator') {
+            expression += ` ${comp.value} `;
+            formulaString += ` ${comp.label || comp.value} `;
+        } else if (comp.type === 'parenthesis') {
+            expression += comp.value;
+            formulaString += comp.value;
+        } else if (comp.type === 'fixed') {
+            expression += comp.value;
+            formulaString += comp.value;
+        } else if (values[comp.type] !== undefined) {
+            expression += values[comp.type];
+            formulaString += `${values[comp.type].toFixed(2)}`;
+        }
+    }
+
+    // Safely evaluate the expression
+    let result;
+    try {
+        // Use Function constructor for safe evaluation
+        result = new Function('return ' + expression)();
+    } catch (error) {
+        console.error('Error evaluating formula expression:', error);
+        result = 0;
+    }
+
+    return {
+        value: result,
+        formula: formulaString.trim(),
+        expression: expression.trim()
+    };
+}
+
+function setSimulationDuration(minutes) {
+    const durationInput = document.getElementById('simulationDuration');
+    if (durationInput) {
+        durationInput.value = minutes;
+        // Trigger input event to update simulation
+        durationInput.dispatchEvent(new Event('input'));
+        updateSimulation();
+    }
+}
+
+// Formula Builder Functions for Advanced Mode
+let currentFormulaComponents = [];
+
+function initializeFormulaBuilder() {
+    // Mode toggle handlers
+    const simpleModeBtn = document.getElementById('simpleModeBtn');
+    const advancedModeBtn = document.getElementById('advancedModeBtn');
+    
+    if (simpleModeBtn && advancedModeBtn) {
+        simpleModeBtn.addEventListener('change', () => toggleFormulaMode('simple'));
+        advancedModeBtn.addEventListener('change', () => toggleFormulaMode('advanced'));
+        
+        // Check if Advanced Mode is already selected on page load
+        if (advancedModeBtn.checked) {
+            // Ensure formula components are displayed
+            setTimeout(() => {
+                if (!currentFormulaComponents || currentFormulaComponents.length === 0) {
+                    // Load default formula based on current multiplier
+                    const multiplier = formulaConfig.roundTripMultiplier || 2;
+                    currentFormulaComponents = [
+                        { type: 'duration_hours', label: 'Duración (hrs)', id: 'comp_1' },
+                        { type: 'operator', value: '*', label: '×', id: 'op_1' },
+                        { type: 'fixed', value: multiplier, label: String(multiplier), editable: true, id: 'comp_2' },
+                        { type: 'operator', value: '*', label: '×', id: 'op_2' },
+                        { type: 'rate', label: 'Tarifa Guía', id: 'comp_3' }
+                    ];
+                }
+                displayFormulaComponents();
+                updateFormulaDisplayText();
+            }, 100); // Small delay to ensure DOM is ready
+        }
+    }
+    
+    // Component buttons
+    const componentBtns = document.querySelectorAll('.component-btn');
+    componentBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const type = e.currentTarget.dataset.type;
+            addComponentToFormula(type);
+        });
+    });
+    
+    // Clear and reset buttons
+    const clearBtn = document.getElementById('clearFormulaBtn');
+    const resetBtn = document.getElementById('resetToDefaultBtn');
+    const saveAdvancedBtn = document.getElementById('saveAdvancedFormulaBtn');
+    
+    if (clearBtn) clearBtn.addEventListener('click', clearFormula);
+    if (resetBtn) resetBtn.addEventListener('click', resetToDefaultFormula);
+    if (saveAdvancedBtn) saveAdvancedBtn.addEventListener('click', saveAdvancedFormula);
+}
+
+function toggleFormulaMode(mode) {
+    const simpleForm = document.getElementById('formulaConfigForm');
+    const advancedBuilder = document.getElementById('advancedFormulaBuilder');
+    
+    if (mode === 'simple') {
+        if (simpleForm) simpleForm.style.display = 'block';
+        if (advancedBuilder) advancedBuilder.style.display = 'none';
+    } else {
+        if (simpleForm) simpleForm.style.display = 'none';
+        if (advancedBuilder) {
+            advancedBuilder.style.display = 'block';
+            // Ensure formula components are displayed when switching to advanced mode
+            if (currentFormulaComponents && currentFormulaComponents.length > 0) {
+                displayFormulaComponents();
+                updateFormulaDisplayText();
+            } else {
+                // If no components, load the default based on current multiplier
+                const multiplier = formulaConfig.roundTripMultiplier || 2;
+                currentFormulaComponents = [
+                    { type: 'duration_hours', label: 'Duración (hrs)', id: 'comp_1' },
+                    { type: 'operator', value: '*', label: '×', id: 'op_1' },
+                    { type: 'fixed', value: multiplier, label: String(multiplier), editable: true, id: 'comp_2' },
+                    { type: 'operator', value: '*', label: '×', id: 'op_2' },
+                    { type: 'rate', label: 'Tarifa Guía', id: 'comp_3' }
+                ];
+                displayFormulaComponents();
+                updateFormulaDisplayText();
+            }
+        }
+    }
+}
+
+function addComponentToFormula(type) {
+    const placeholder = document.getElementById('formulaPlaceholder');
+    if (placeholder) placeholder.style.display = 'none';
+    
+    let component = {};
+    const componentId = `comp_${Date.now()}`;
+    
+    // Handle different component types
+    switch(type) {
+        case 'duration_minutes':
+            component = { type: 'duration_minutes', label: 'Duración (min)', id: componentId };
+            break;
+        case 'duration_hours':
+            component = { type: 'duration_hours', label: 'Duración (hrs)', id: componentId };
+            break;
+        case 'rate':
+            component = { type: 'rate', label: 'Tarifa Guía', id: componentId };
+            break;
+        case 'fixed':
+            const value = prompt('Ingrese el valor fijo:', '2');
+            if (value === null) return;
+            component = { 
+                type: 'fixed', 
+                value: parseFloat(value) || 1, 
+                label: value,
+                editable: true,
+                id: componentId 
+            };
+            break;
+        case 'parenthesis_open':
+            component = { type: 'parenthesis', value: '(', label: '(', id: componentId };
+            break;
+        case 'parenthesis_close':
+            component = { type: 'parenthesis', value: ')', label: ')', id: componentId };
+            break;
+    }
+    
+    // Add operator if needed (between values)
+    if (currentFormulaComponents.length > 0 && 
+        type !== 'parenthesis_open' && type !== 'parenthesis_close' &&
+        currentFormulaComponents[currentFormulaComponents.length - 1].type !== 'operator' &&
+        currentFormulaComponents[currentFormulaComponents.length - 1].type !== 'parenthesis') {
+        
+        // Check if last component is not an opening parenthesis
+        const lastComp = currentFormulaComponents[currentFormulaComponents.length - 1];
+        if (!(lastComp.type === 'parenthesis' && lastComp.value === '(')) {
+            // Add default operator
+            currentFormulaComponents.push({
+                type: 'operator',
+                value: '*',
+                label: '×',
+                id: `op_${Date.now()}`
+            });
+        }
+    }
+    
+    currentFormulaComponents.push(component);
+    displayFormulaComponents();
+    updateFormulaDisplayText();
+}
+
+function displayFormulaComponents() {
+    const container = document.getElementById('formulaComponents');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    if (currentFormulaComponents.length === 0) {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'text-muted';
+        placeholder.id = 'formulaPlaceholder';
+        placeholder.innerHTML = '<i class="ti ti-drag-drop me-1"></i>Arrastra componentes aquí o haz clic en ellos para agregar';
+        container.appendChild(placeholder);
+        return;
+    }
+    
+    currentFormulaComponents.forEach((comp, index) => {
+        const element = document.createElement('div');
+        element.className = 'd-inline-flex align-items-center';
+        
+        if (comp.type === 'operator') {
+            // Create operator dropdown
+            const select = document.createElement('select');
+            select.className = 'form-select form-select-sm mx-1';
+            select.style.width = '60px';
+            select.innerHTML = `
+                <option value="+" ${comp.value === '+' ? 'selected' : ''}>+</option>
+                <option value="-" ${comp.value === '-' ? 'selected' : ''}>−</option>
+                <option value="*" ${comp.value === '*' ? 'selected' : ''}>×</option>
+                <option value="/" ${comp.value === '/' ? 'selected' : ''}>÷</option>
+            `;
+            select.addEventListener('change', (e) => {
+                currentFormulaComponents[index].value = e.target.value;
+                currentFormulaComponents[index].label = e.target.options[e.target.selectedIndex].text;
+                updateFormulaDisplayText();
+            });
+            element.appendChild(select);
+        } else if (comp.type === 'fixed' && comp.editable) {
+            // Create editable fixed value
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-primary position-relative me-3';
+            badge.style.cursor = 'pointer';
+            badge.style.paddingRight = '25px';
+            badge.innerHTML = `
+                ${comp.label}
+                <button type="button" class="btn-close btn-close-white position-absolute" 
+                        style="width: 16px; height: 16px; top: 50%; transform: translateY(-50%); right: 5px;" 
+                        data-index="${index}"></button>
+            `;
+            badge.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('btn-close')) {
+                    const newValue = prompt('Ingrese el nuevo valor:', comp.value);
+                    if (newValue !== null) {
+                        currentFormulaComponents[index].value = parseFloat(newValue) || 1;
+                        currentFormulaComponents[index].label = newValue;
+                        displayFormulaComponents();
+                        updateFormulaDisplayText();
+                    }
+                }
+            });
+            element.appendChild(badge);
+        } else {
+            // Create non-editable component
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-secondary position-relative me-3';
+            badge.style.paddingRight = '25px';
+            badge.innerHTML = `
+                ${comp.label}
+                <button type="button" class="btn-close btn-close-white position-absolute" 
+                        style="width: 16px; height: 16px; top: 50%; transform: translateY(-50%); right: 5px;" 
+                        data-index="${index}"></button>
+            `;
+            element.appendChild(badge);
+        }
+        
+        // Add remove button handler
+        const closeBtn = element.querySelector('.btn-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                currentFormulaComponents.splice(index, 1);
+                displayFormulaComponents();
+                updateFormulaDisplayText();
+            });
+        }
+        
+        container.appendChild(element);
+    });
+}
+
+function updateFormulaDisplayText() {
+    const display = document.getElementById('formulaDisplayText');
+    if (!display) return;
+    
+    if (currentFormulaComponents.length === 0) {
+        display.textContent = 'Costo = duración_horas × 2 × tarifa_guía';
+        return;
+    }
+    
+    let formula = 'Costo = ';
+    currentFormulaComponents.forEach(comp => {
+        if (comp.type === 'operator') {
+            formula += ` ${comp.label} `;
+        } else if (comp.type === 'duration_minutes') {
+            formula += 'duración_minutos';
+        } else if (comp.type === 'duration_hours') {
+            formula += 'duración_horas';
+        } else if (comp.type === 'rate') {
+            formula += 'tarifa_guía';
+        } else if (comp.type === 'fixed') {
+            formula += comp.value;
+        } else if (comp.type === 'parenthesis') {
+            formula += comp.value;
+        }
+    });
+    
+    display.textContent = formula;
+    
+    // Also update simulation if on advanced mode
+    if (document.getElementById('advancedModeBtn')?.checked) {
+        updateSimulation();
+    }
+}
+
+function clearFormula() {
+    currentFormulaComponents = [];
+    displayFormulaComponents();
+    updateFormulaDisplayText();
+}
+
+function resetToDefaultFormula() {
+    currentFormulaComponents = [
+        { type: 'duration_hours', label: 'Duración (hrs)', id: 'comp_1' },
+        { type: 'operator', value: '*', label: '×', id: 'op_1' },
+        { type: 'fixed', value: 2, label: '2', editable: true, id: 'comp_2' },
+        { type: 'operator', value: '*', label: '×', id: 'op_2' },
+        { type: 'rate', label: 'Tarifa Guía', id: 'comp_3' }
+    ];
+    displayFormulaComponents();
+    updateFormulaDisplayText();
+}
+
+async function saveAdvancedFormula() {
+    const saveBtn = document.getElementById('saveAdvancedFormulaBtn');
+    const originalText = saveBtn.innerHTML;
+    
+    try {
+        // Validate formula has components
+        if (currentFormulaComponents.length === 0) {
+            showAlert('warning', 'La fórmula no puede estar vacía');
+            return;
+        }
+        
+        // Disable button and show loading
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="ti ti-loader ti-spin me-2"></i>Guardando...';
+        
+        // No minimum charge since we removed the field
+        const response = await fetch('/api/guide-transport-rate/formula', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getAccessToken()}`
+            },
+            body: JSON.stringify({
+                formulaComponents: currentFormulaComponents,
+                minimumCharge: 0 // Always 0 since we removed the field
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            console.log('Formula saved successfully, response:', data);
+            formulaConfig = data.config;
+            // Update the current components if returned
+            if (data.config && data.config.formulaComponents) {
+                console.log('Updating currentFormulaComponents with saved data:', data.config.formulaComponents);
+                currentFormulaComponents = data.config.formulaComponents;
+            }
+            displayFormulaComponents();
+            updateFormulaDisplayText();
+            updateSimulation();
+            showAlert('success', 'Fórmula avanzada guardada exitosamente');
+            
+            // Also clear the cache in the generic evaluator if available
+            if (typeof GuideFormulaEvaluator !== 'undefined') {
+                GuideFormulaEvaluator.clearCache();
+                GuideFormulaEvaluator.loadFormula(); // Reload the new formula
+            }
+        } else {
+            showAlert('danger', data.error || 'Error al guardar la fórmula');
+        }
+        
+    } catch (error) {
+        console.error('Error saving advanced formula:', error);
+        showAlert('danger', 'Error al guardar la fórmula avanzada');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+    }
 }
 </script>
