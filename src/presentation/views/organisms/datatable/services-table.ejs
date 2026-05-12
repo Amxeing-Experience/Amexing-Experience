@@ -1975,16 +1975,13 @@ table.dataTable thead th:nth-child(2) select {
                         priceElement.data('original-price', originalPrice);
                     }
                     
-                    let finalPrice = originalPrice;
+                    // Start with the original price (don't apply payment rates yet)
+                    let basePrice = originalPrice;
                     
-                    // Apply appropriate rate based on payment type
-                    if (paymentType === 'transferencia') {
-                        finalPrice = applyTransferRate(finalPrice);
-                    } else if (paymentType === 'tarjeta') {
-                        finalPrice = applyAgencyRate(finalPrice);
-                    }
+                    // Extract numeric value from base price
+                    const baseNumeric = parseFloat(basePrice.replace(/[^0-9.]/g, ''));
                     
-                    // Calculate additional costs (guide + greeter) separately, then apply special rounding to final total
+                    // Calculate additional costs (guide + greeter)
                     let additionalCosts = 0;
                     
                     // Apply guide cost if enabled
@@ -2031,29 +2028,33 @@ table.dataTable thead th:nth-child(2) select {
                         additionalCosts += greeterCost;
                     }
                     
-                    // Apply additional costs and special rounding if any additional services are enabled
-                    if (additionalCosts > 0) {
-                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                        if (priceMatch) {
-                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                            const subtotal = numericPrice + additionalCosts;
-                            
-                            // Apply special rounding to final total (includes guide + greeter + base price)
-                            const finalRoundedPrice = applySpecialRounding(subtotal);
-                            
-                            console.log('💰 DataTable: Final service total with rounding:', {
-                                basePrice: numericPrice,
-                                additionalCosts,
-                                subtotal,
-                                finalRoundedPrice,
-                                formula: `${numericPrice} + ${additionalCosts} = ${subtotal} → ${finalRoundedPrice}`
-                            });
-                            
-                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, finalRoundedPrice.toLocaleString());
-                        }
+                    // Calculate subtotal (base + additional costs)
+                    let subtotal = baseNumeric + additionalCosts;
+                    
+                    // Apply special rounding if greeter is included
+                    if (includeGreeter && additionalCosts > 0) {
+                        const beforeRounding = subtotal;
+                        subtotal = applySpecialRounding(subtotal);
+                        
+                        console.log('💰 DataTable: Special rounding for greeter:', {
+                            basePrice: baseNumeric,
+                            additionalCosts,
+                            beforeRounding,
+                            afterRounding: subtotal
+                        });
                     }
                     
-                    // Always apply currency conversion/formatting
+                    // Format as price string
+                    let finalPrice = `$${subtotal.toLocaleString()} MXN`;
+                    
+                    // NOW apply payment type rates to the TOTAL
+                    if (paymentType === 'transferencia') {
+                        finalPrice = applyTransferRate(finalPrice);
+                    } else if (paymentType === 'tarjeta') {
+                        finalPrice = applyAgencyRate(finalPrice);
+                    }
+                    
+                    // Always apply currency conversion/formatting for consistent decimal display
                     finalPrice = applyCurrencyConversion(finalPrice, currency);
                     
                     priceElement.text(finalPrice);
@@ -2109,15 +2110,14 @@ table.dataTable thead th:nth-child(2) select {
                     priceElement.attr('data-original-price', originalPrice);
                 }
                 
-                // Start from the clean original price
-                let finalPrice = originalPrice;
+                // Start from the clean original price (don't apply payment rates yet)
+                let basePrice = originalPrice;
                 
-                // Apply appropriate rate based on payment type
-                if (paymentType === 'transferencia') {
-                    finalPrice = applyTransferRate(finalPrice);
-                } else if (paymentType === 'tarjeta') {
-                    finalPrice = applyAgencyRate(finalPrice);
-                }
+                // Extract numeric value from base price
+                const baseNumeric = parseFloat(basePrice.replace(/[^0-9.]/g, ''));
+                
+                // Calculate additional costs (guide + greeter)
+                let additionalCosts = 0;
                 
                 // Apply guide cost if enabled
                 if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
@@ -2129,50 +2129,64 @@ table.dataTable thead th:nth-child(2) select {
                         if (config.formulaComponents && config.formulaComponents.length > 0) {
                             guideCost = GuideFormulaEvaluator.evaluateComponents(config.formulaComponents, routeDuration * 60, currentGuideRate);
                             if (isDevelopment) {
-                                console.log(`📊 [Edit Mode] Custom formula: ${routeDuration}h @ $${currentGuideRate}/hr = $${guideCost}`);
+                                console.log(`📊 [Expanded] Custom formula: ${routeDuration}h @ $${currentGuideRate}/hr = $${guideCost}`);
                             }
                         } else if (config.roundTripMultiplier) {
                             guideCost = routeDuration * config.roundTripMultiplier * currentGuideRate;
                             if (isDevelopment) {
-                                console.log(`📊 [Edit Mode] Simple formula: ${routeDuration}h × ${config.roundTripMultiplier} × $${currentGuideRate} = $${guideCost}`);
+                                console.log(`📊 [Expanded] Simple formula: ${routeDuration}h × ${config.roundTripMultiplier} × $${currentGuideRate} = $${guideCost}`);
                             }
                         }
                     }
                     
-                    // Extract numeric value from price string
-                    const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                    if (priceMatch) {
-                        const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                        const newPrice = numericPrice + guideCost;
-                        finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                    }
+                    additionalCosts += guideCost;
                 }
                 
                 // Apply greeter cost if enabled
                 if (includeGreeter && routeDuration > 0) {
                     // Ensure greeter cache is loaded before calculating
                     if (!greeterRateCache) {
-                        console.log('⚡ DataTable: Greeter cache missing, triggering load for price calculation');
+                        console.log('⚡ DataTable: Greeter cache missing, triggering load for expanded calculation');
                         loadGreeterRateConfiguration().catch(error => {
-                            console.error('Failed to load greeter config during calculation:', error);
+                            console.error('Failed to load greeter config during expanded calculation:', error);
                         });
                     }
                     
-                    // Calculate greeter cost using configurable formula
+                    // Calculate greeter cost using configurable formula (no rounding)
                     const greeterCost = calculateGreeterPrice(routeDuration);
-                    
-                    if (greeterCost > 0) {
-                        // Extract numeric value from price string
-                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                        if (priceMatch) {
-                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                            const newPrice = numericPrice + greeterCost;
-                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                        }
-                    }
+                    additionalCosts += greeterCost;
                 }
                 
-                // Always apply currency conversion/formatting
+                // Calculate subtotal (base + additional costs)
+                let subtotal = baseNumeric + additionalCosts;
+                
+                // Apply special rounding if greeter is included
+                if (includeGreeter && additionalCosts > 0) {
+                    const beforeRounding = subtotal;
+                    subtotal = applySpecialRounding(subtotal);
+                    
+                    console.log('💰 DataTable Expanded: Special rounding for greeter:', {
+                        basePrice: baseNumeric,
+                        additionalCosts,
+                        beforeRounding,
+                        afterRounding: subtotal
+                    });
+                }
+                
+                // Format as price string
+                let finalPrice = `$${subtotal.toLocaleString()} MXN`;
+                
+                // NOW apply payment type rates to the TOTAL
+                let hasPaymentRate = false;
+                if (paymentType === 'transferencia') {
+                    finalPrice = applyTransferRate(finalPrice);
+                    hasPaymentRate = true;
+                } else if (paymentType === 'tarjeta') {
+                    finalPrice = applyAgencyRate(finalPrice);
+                    hasPaymentRate = true;
+                }
+                
+                // Always apply currency conversion/formatting for consistent decimal display
                 finalPrice = applyCurrencyConversion(finalPrice, currency);
                 
                 priceElement.text(finalPrice);
@@ -2193,8 +2207,8 @@ table.dataTable thead th:nth-child(2) select {
             // Update label text
             label.text(includeGuide ? 'Con Guía' : 'Sin Guía');
             
-            // Get current filter states (greeter will always be false if guide is true)
-            const includeGreeter = false; // Greeter is always off when Guide is on
+            // Get current filter states - get actual greeter state (will be false if we just turned guide on)
+            const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
             const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             
@@ -2244,32 +2258,35 @@ table.dataTable thead th:nth-child(2) select {
             // Update label text
             label.text(includeGreeter ? 'Con Greeter' : 'Sin Greeter');
             
-            // Get current filter states (guide will always be false if greeter is true)
+            // Get current filter states - get actual guide state (will be false if we just turned greeter on)
             const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
-            const includeGuide = false; // Guide is always off when Greeter is on
+            const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
             
             // Auto-refresh expanded rows if any
             const expandedRows = $('.expand-services-prices-btn.expanded');
             if (expandedRows.length > 0) {
+                
+                // Close and re-open each expanded row to get fresh prices (same as guide handler)
                 expandedRows.each(function() {
                     const button = $(this);
-                    const serviceId = button.attr('data-service-id');
+                    const rowId = button.data('row-id');
                     
-                    // Find the row and simulate collapse/expand to refresh
-                    const row = button.closest('tr');
-                    const nextRow = row.next('tr.child');
+                    // Find the DataTable row
+                    const row = dataTable.rows().nodes().to$().filter(function() {
+                        return $(this).find('[data-row-id="' + rowId + '"]').length > 0;
+                    }).first();
                     
-                    if (nextRow.length > 0) {
-                        // First collapse
-                        nextRow.remove();
-                        button.removeClass('expanded').html('<i class="ti ti-chevron-down me-1"></i>Ver todos');
-                        
-                        // Then expand again after a short delay
-                        setTimeout(() => {
-                            button.trigger('click');
-                        }, 100);
-                    }
+                    const dtRow = dataTable.row(row);
+                    
+                    // Close the row
+                    dtRow.child.hide();
+                    button.removeClass('expanded');
+                    
+                    // Re-open with updated prices
+                    setTimeout(() => {
+                        button.click();
+                    }, 100);
                 });
             }
             
@@ -2555,6 +2572,7 @@ table.dataTable thead th:nth-child(2) select {
             const rowId = button.data('row-id');
             const isExpanded = button.hasClass('expanded');
             
+            
             // Find the DataTable row
             const row = dataTable.rows().nodes().to$().filter(function() {
                 return $(this).find('[data-row-id="' + rowId + '"]').length > 0;
@@ -2621,11 +2639,12 @@ table.dataTable thead th:nth-child(2) select {
                                 pricesByRate[rateName].push(item);
                             });
                             
-                            // Get current filter states
+                            // Get current filter states - read fresh values each time
                             const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
                             const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
                             const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
                             const currentCurrency = $(`#currencyFilter-${tableId}`).val();
+                            
                             let routeDuration = 0;
                             
                             // Find duration from the parent row's 3rd column
@@ -2705,37 +2724,32 @@ table.dataTable thead th:nth-child(2) select {
                                     const vehicleCode = p.vehicleType?.code || 'N/A';
                                     const vehicleName = p.vehicleType?.name || 'Vehículo';
                                     
-                                    // Apply all price transformations in correct order
-                                    let finalPrice = `$${p.price.toLocaleString()} MXN`;
+                                    // Start with base price (don't apply payment rates yet)
+                                    const basePrice = p.price;
                                     
-                                    // 1. Apply payment type rates
+                                    // Calculate total with additional costs
+                                    const additionalCosts = guideCost + greeterCost;
+                                    let subtotal = basePrice + additionalCosts;
+                                    
+                                    // Apply special rounding if greeter is included
+                                    if (includeGreeter && greeterCost > 0) {
+                                        subtotal = applySpecialRounding(subtotal);
+                                    }
+                                    
+                                    // Format as price string
+                                    let finalPrice = `$${subtotal.toLocaleString()} MXN`;
+                                    
+                                    // NOW apply payment type rates to the TOTAL
+                                    let hasPaymentRate = false;
                                     if (currentPaymentType === 'transferencia') {
                                         finalPrice = applyTransferRate(finalPrice);
+                                        hasPaymentRate = true;
                                     } else if (currentPaymentType === 'tarjeta') {
                                         finalPrice = applyAgencyRate(finalPrice);
+                                        hasPaymentRate = true;
                                     }
                                     
-                                    // 2. Apply guide cost
-                                    if (guideCost > 0) {
-                                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                                        if (priceMatch) {
-                                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                                            const newPrice = numericPrice + guideCost;
-                                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                                        }
-                                    }
-                                    
-                                    // 3. Apply greeter cost
-                                    if (greeterCost > 0) {
-                                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                                        if (priceMatch) {
-                                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                                            const newPrice = numericPrice + greeterCost;
-                                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                                        }
-                                    }
-                                    
-                                    // 4. Apply currency conversion
+                                    // Always apply currency conversion for consistent decimal display
                                     finalPrice = applyCurrencyConversion(finalPrice, currentCurrency);
                                     
                                     
@@ -2744,7 +2758,7 @@ table.dataTable thead th:nth-child(2) select {
                                     const trunkCapacity = p.vehicleType?.trunkCapacity || 2;
                                     
                                     // Reduce capacity by 1 if guide is active (guide takes a seat)
-                                    const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
+                                    // includeGreeter is already defined at line 2654
                                     if (includeGuide && defaultCapacity > 1) {
                                         defaultCapacity = defaultCapacity - 1;
                                     }

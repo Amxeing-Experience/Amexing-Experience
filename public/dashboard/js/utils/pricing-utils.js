@@ -104,49 +104,11 @@ window.PricingUtils = (function () {
     return price;
   }
 
-  /**
-   * Convert and format price based on currency and payment method.
-   * @param {number|string} priceInput - Base price (MXN).
-   * @param {string} currency - Target currency ('MXN' or 'USD').
-   * @param {string} paymentType - Payment method.
-   * @param {number} exchangeRate - Current USD exchange rate.
-   * @returns {string} Formatted price string.
-   * @example
-   * convertPrice(100, 'USD', 'efectivo', 20); // Returns: "$5.00 USD"
-   */
-  function convertPrice(priceInput, currency, paymentType, exchangeRate) {
-    let numericValue;
-    if (typeof priceInput === 'string') {
-      numericValue = parseFloat(priceInput.replace(/[,$]/g, ''));
-    } else {
-      numericValue = parseFloat(priceInput);
-    }
-
-    if (Number.isNaN(numericValue) || numericValue <= 0) {
-      return currency === 'USD' ? '$0 USD' : '$0.00 MXN';
-    }
-
-    // For now, use default rates - can be extended later
-    const transferRate = 3.0;
-    const agencyRate = 5.0;
-
-    if (currency === 'USD') {
-      const convertedValue = numericValue / exchangeRate;
-      const finalValue = applyPaymentRate(convertedValue, paymentType, transferRate, agencyRate);
-      const roundedValue = applyUSDRoundingRules(finalValue);
-      return formatPriceWithCurrency(roundedValue, 'USD');
-    }
-
-    const finalValue = applyPaymentRate(numericValue, paymentType, transferRate, agencyRate);
-    return formatPriceWithCurrency(Math.round(finalValue), 'MXN');
-  }
-
   // Public API
   return {
     applyUSDRoundingRules,
     applyPaymentRate,
     formatPriceWithCurrency,
     loadCurrentRates,
-    convertPrice,
   };
 }());
