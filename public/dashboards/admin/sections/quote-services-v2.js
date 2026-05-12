@@ -558,11 +558,7 @@ class ItineraryBuilder {
     // Payment type change listener
     priceTypeSelect?.addEventListener('change', (e) => {
       sessionStorage.setItem(`quoteServices_paymentType_${quoteKey}`, e.target.value);
-      this.renderDaysContent();
-      this.updateTotals();
-      this.updateServicePriceBreakdown();
-      this.hasUnsavedChanges = true;
-      this.scheduleAutoSave();
+      this.handlePaymentTypeChange(e.target.value);
     });
 
     // Experience selection handler
@@ -4963,6 +4959,16 @@ class ItineraryBuilder {
     const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
     const currency = document.getElementById('currencySelect')?.value || 'MXN';
 
+    // Debug: Log payment type and rates
+    console.log('💰 getDisplayPrice DEBUG:', {
+      inputPrice: mxnPrice,
+      paymentType,
+      currency,
+      transferRate: this.transferRate,
+      agencyRate: this.agencyRate,
+      exchangeRate: this.exchangeRate
+    });
+
     // Step 1: Apply cash rounding for efectivo payments
     let priceToProcess = mxnPrice;
     if (paymentType === 'efectivo' && currency === 'MXN' && window.PricingUtils && window.PricingUtils.applyCashRounding) {
@@ -4982,9 +4988,102 @@ class ItineraryBuilder {
     // Step 3: Currency conversion
     if (currency === 'USD' && this.exchangeRate > 0) {
       const usdPrice = withSurcharge / this.exchangeRate;
-      return window.PricingUtils ? PricingUtils.applyUSDRoundingRules(usdPrice) : Math.round(usdPrice);
+      const finalPrice = window.PricingUtils ? PricingUtils.applyUSDRoundingRules(usdPrice) : Math.round(usdPrice);
+      console.log('💰 getDisplayPrice RESULT (USD):', {
+        originalMXN: mxnPrice,
+        withSurcharge,
+        usdPrice: finalPrice,
+        exchangeRate: this.exchangeRate
+      });
+      return finalPrice;
     }
+    
+    console.log('💰 getDisplayPrice RESULT (MXN):', {
+      originalMXN: mxnPrice,
+      finalPrice: withSurcharge,
+      surchargeApplied: withSurcharge - priceToProcess
+    });
     return withSurcharge;
+  }
+
+  getBasePriceOnly(priceData, currency = 'MXN') {
+    if (!priceData) {
+      return 0;
+    }
+
+    let basePrice = 0;
+
+    // Extract raw database price based on service type
+    if (typeof priceData === 'number') {
+      basePrice = priceData;
+    } else if (typeof priceData === 'object') {
+      // For service objects with different pricing structures
+      if (priceData.price) {
+        basePrice = parseFloat(priceData.price);
+      } else if (priceData.priceAdult) {
+        basePrice = parseFloat(priceData.priceAdult);
+      } else if (priceData.priceMXN) {
+        basePrice = parseFloat(priceData.priceMXN);
+      } else if (priceData.priceUSD) {
+        // If requesting MXN but only USD available, convert
+        if (currency === 'MXN' && this.exchangeRate > 0) {
+          basePrice = parseFloat(priceData.priceUSD) * this.exchangeRate;
+        } else if (currency === 'USD') {
+          basePrice = parseFloat(priceData.priceUSD);
+        }
+      }
+    } else if (typeof priceData === 'string') {
+      basePrice = parseFloat(priceData);
+    }
+
+    // Return raw price without any surcharges, IVA, or additional processing
+    return Math.max(0, basePrice || 0);
+  }
+
+  calculatePaymentSurcharge(baseAmount, paymentType) {
+    if (paymentType === 'efectivo') {
+      return 0; // No surcharge for cash
+    }
+
+    let surchargedAmount = baseAmount;
+    if (window.PricingUtils) {
+      surchargedAmount = PricingUtils.applyPaymentRate(baseAmount, paymentType, this.transferRate, this.agencyRate);
+    } else if (paymentType === 'transferencia' && this.transferRate > 0) {
+      surchargedAmount = baseAmount * (1 + this.transferRate / 100);
+    } else if (paymentType === 'tarjeta' && this.agencyRate > 0) {
+      surchargedAmount = baseAmount * (1 + this.agencyRate / 100);
+    }
+
+    return surchargedAmount - baseAmount; // Return only the surcharge amount
+  }
+
+  getSurchargePercentage(paymentType) {
+    if (paymentType === 'efectivo') {
+      return 0;
+    } else if (paymentType === 'transferencia') {
+      return this.transferRate || 0;
+    } else if (paymentType === 'tarjeta') {
+      return this.agencyRate || 0;
+    }
+    return 0;
+  }
+
+  handlePaymentTypeChange(paymentType) {
+    console.log('💰 Payment type changed to:', paymentType);
+    
+    // Update price field to reflect new payment surcharge for current service
+    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+    if (serviceType === 'tour') {
+      this.recalculateTourPrice();
+    } else if (serviceType === 'transport') {
+      this.recalculateTransportPrice();
+    }
+    
+    this.renderDaysContent();
+    this.updateTotals();
+    this.updateServicePriceBreakdown();
+    this.hasUnsavedChanges = true;
+    this.scheduleAutoSave();
   }
 
   formatMinutesToHoursAndMinutes(minutes) {
@@ -7551,9 +7650,18 @@ class ItineraryBuilder {
           quantity: serviceQuantity,
         };
         const vehicleOnlyCost = this.getVehicleCost(tempService2);
-        servicePriceField.value = vehicleOnlyCost.toFixed(2);
-        this.lastValidTourPrice = vehicleOnlyCost.toFixed(2); // Store for readonly enforcement
-        console.log('✅ Updated tour price field to vehicle cost:', vehicleOnlyCost.toFixed(2));
+        const baseVehicleCost = this.getBasePriceOnly(vehicleOnlyCost);
+        
+        // Apply payment surcharge to base vehicle cost for price field display
+        const priceWithSurcharge = this.getDisplayPrice(baseVehicleCost);
+        
+        servicePriceField.value = priceWithSurcharge.toFixed(2);
+        this.lastValidTourPrice = priceWithSurcharge.toFixed(2); // Store for readonly enforcement
+        console.log('✅ Updated tour price field with payment surcharge:', {
+          baseCost: baseVehicleCost,
+          withSurcharge: priceWithSurcharge,
+          paymentType: document.getElementById('priceTypeSelect')?.value || 'efectivo'
+        });
         // console.log('💰 Setting price field to vehicle cost only:', vehicleOnlyCost);
       } else {
         // No vehicle selected, show 0
@@ -8264,25 +8372,49 @@ class ItineraryBuilder {
           items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precios personalizados</span>', amountMXN: 0 });
         }
 
-        // Vehicle cost (multiplied by duration)
+        // Vehicle cost breakdown - show price field value (includes surcharge) without separate surcharge line
         const vehicleSelect = document.getElementById('vehicleSelect');
         const vehicleQty = parseInt(document.getElementById('serviceQuantity')?.value || 1);
+        const isGuideIncluded = document.getElementById('includeGuide')?.checked;
+        
         if (vehicleSelect?.value) {
-          const vehicleCost = parseFloat(document.getElementById('servicePrice')?.value || 0);
-          if (vehicleCost > 0) {
-            const displayUnit = this.getDisplayPrice(vehicleCost);
-            items.push({
-              label: `Vehículo (${vehicleQty} × ${this.formatCurrency(displayUnit)} × ${tourDuration}h)`,
-              amountMXN: vehicleCost * vehicleQty * tourDuration,
+          const vehicleCostWithSurcharge = parseFloat(document.getElementById('servicePrice')?.value || 0);
+          if (vehicleCostWithSurcharge > 0) {
+            const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+            const totalVehicleCostWithSurcharge = vehicleCostWithSurcharge * vehicleQty * tourDuration;
+            
+            // Show vehicle cost using price field value (which includes surcharge for selected payment type)
+            console.log('💰 Breakdown using price field value:', {
+              paymentType,
+              priceFieldValue: vehicleCostWithSurcharge,
+              displayInFormula: this.formatCurrency(vehicleCostWithSurcharge)
             });
-          }
-        }
+            
+            items.push({
+              label: `Vehículo - Precio base (${vehicleQty} × ${this.formatCurrency(vehicleCostWithSurcharge)} × ${tourDuration}h)`,
+              amountMXN: totalVehicleCostWithSurcharge,
+            });
 
-        // Driver tour rate (Guía + Chofer)
-        if (document.getElementById('includeGuide')?.checked && this.driverTourRateCache) {
-          const driverRate = this.driverTourRateCache.value || 0;
-          if (driverRate > 0) {
-            items.push({ label: 'Guía + Chofer', amountMXN: driverRate });
+            // Add guide cost as separate line item if included
+            if (isGuideIncluded && this.driverTourRateCache) {
+              const driverRate = this.driverTourRateCache.value || 0;
+              const baseDriverRate = this.getBasePriceOnly(driverRate);
+              
+              items.push({
+                label: `Guía + Chofer - Precio base`,
+                amountMXN: baseDriverRate,
+              });
+
+              // Add guide payment surcharges
+              const guideSurcharge = this.calculatePaymentSurcharge(baseDriverRate, paymentType);
+              if (guideSurcharge > 0) {
+                const surchargePercentage = this.getSurchargePercentage(paymentType);
+                items.push({
+                  label: `Recargo ${paymentType} - Guía + Chofer (+${surchargePercentage}%)`,
+                  amountMXN: guideSurcharge,
+                });
+              }
+            }
           }
         }
       } // end if (!isWalkingTourBreakdown)
@@ -8393,6 +8525,18 @@ class ItineraryBuilder {
     // Get payment type
     const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
 
+    // Update Desglose title with payment type
+    const desgloseTitle = document.getElementById('desgloseTitle');
+    if (desgloseTitle) {
+      const paymentLabels = { 
+        efectivo: 'Efectivo', 
+        transferencia: 'Transferencia', 
+        tarjeta: 'Tarjeta de Crédito/Débito' 
+      };
+      const paymentLabel = paymentLabels[paymentType] || paymentType;
+      desgloseTitle.innerHTML = `<i class="ti ti-list-details me-1"></i>Desglose ${paymentLabel.toLowerCase()}`;
+    }
+
     // Render all service-specific breakdown items first
     let itemsHTML = items.map((item) => {
       const displayAmt = this.getDisplayPrice(item.amountMXN);
@@ -8437,11 +8581,15 @@ class ItineraryBuilder {
     // paymentType already declared above at line 8354
     const priceLabel = document.querySelector('label[for="servicePrice"]');
     if (priceLabel) {
-      if (currency !== 'MXN' || paymentType !== 'efectivo') {
-        priceLabel.innerHTML = 'Precio base <small class="text-muted">(MXN)</small> <span class="text-danger">*</span>';
-      } else {
-        priceLabel.innerHTML = 'Precio <span class="text-danger">*</span>';
-      }
+      const paymentLabels = { 
+        efectivo: 'Efectivo', 
+        transferencia: 'Transferencia', 
+        tarjeta: 'Tarjeta de Crédito/Débito' 
+      };
+      const paymentLabel = paymentLabels[paymentType] || paymentType;
+      
+      // Show price label with selected payment type
+      priceLabel.innerHTML = `Precio base <small class="text-muted">(MXN - ${paymentLabel})</small> <span class="text-danger">*</span>`;
     }
   }
 

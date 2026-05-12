@@ -884,22 +884,35 @@ async function getAccessToken() {
         function loadAllTours() {
             return new Promise((resolve, reject) => {
                 const finalClientId = getClientIdFromContext();
-                const url = new URL(apiEndpoint, window.location.origin);
                 
+                // Start with the original apiEndpoint to preserve all parameters (including includeInactive)
+                let requestUrl = apiEndpoint;
                 
-                // Add clientId parameter if we're in client context
+                // Add clientId parameter if needed
                 if (finalClientId) {
-                    url.searchParams.append('clientId', finalClientId);
-
+                    const separator = apiEndpoint.includes('?') ? '&' : '?';
+                    requestUrl += `${separator}clientId=${finalClientId}`;
                 }
                 
                 // Note: No API filtering needed - we'll filter client-side by isWalkingTour
                 
                 
                 $.ajax({
-                    url: url.toString(),
+                    url: requestUrl,
                     type: 'GET',
                     success: function(response) {
+                        console.log('🔍 [TOURS FRONTEND DEBUG] Raw API Response:', {
+                            url: requestUrl,
+                            totalReceived: response.data?.length || 0,
+                            activeCount: response.data?.filter(t => t.active).length || 0,
+                            inactiveCount: response.data?.filter(t => !t.active).length || 0,
+                            sampleTours: response.data?.slice(0, 3).map(t => ({
+                                name: t.destinationPOI?.name,
+                                active: t.active,
+                                isWalkingTour: t.isWalkingTour
+                            })) || []
+                        });
+                        
                         if (response.success && response.data) {
                             // Preserve existing priceData if available
                             const newToursData = response.data;
@@ -942,6 +955,16 @@ async function getAccessToken() {
                             allToursData = vehicleOnlyTours;
                             filteredData = allToursData; // Show filtered vehicle tours by default
                             
+                            console.log('🔍 [TOURS FRONTEND DEBUG] After client-side filtering:', {
+                                finalCount: filteredData.length,
+                                activeCount: filteredData.filter(t => t.active).length,
+                                inactiveCount: filteredData.filter(t => !t.active).length,
+                                inactiveTours: filteredData.filter(t => !t.active).map(t => ({
+                                    name: t.destinationPOI?.name,
+                                    active: t.active,
+                                    id: t.id
+                                }))
+                            });
                             
                             resolve(allToursData);
                         } else {
@@ -1388,9 +1411,26 @@ async function getAccessToken() {
                 });
                 
                 // Clear existing data and add sorted data
+                console.log('🔍 [TOURS FRONTEND DEBUG] About to add to DataTable:', {
+                    totalToAdd: filteredData.length,
+                    activeToAdd: filteredData.filter(t => t.active).length,
+                    inactiveToAdd: filteredData.filter(t => !t.active).length,
+                    tourIds: filteredData.map(t => ({ id: t.id, name: t.destinationPOI?.name, active: t.active })),
+                    duplicateNames: filteredData.map(t => t.destinationPOI?.name).filter((name, index, arr) => arr.indexOf(name) !== index)
+                });
+
                 dataTable.clear();
                 dataTable.rows.add(filteredData);
                 dataTable.draw();
+
+                console.log('🔍 [TOURS FRONTEND DEBUG] DataTable after adding data:', {
+                    displayedRows: dataTable.rows().count(),
+                    dataTableData: dataTable.rows().data().toArray().slice(0, 5).map(t => ({ 
+                        id: t.id, 
+                        name: t.destinationPOI?.name, 
+                        active: t.active 
+                    }))
+                });
 
             } catch (error) {
                 console.error('Error initializing table:', error);

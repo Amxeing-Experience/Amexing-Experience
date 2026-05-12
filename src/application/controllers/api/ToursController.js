@@ -92,8 +92,9 @@ class ToursController {
       // Check for client ID to include client-specific prices
       const { clientId } = req.query;
 
-      // Extract tour type filter
+      // Extract tour type filter and includeInactive parameter (for admin views)
       const { tourType } = req.query; // 'walking', 'vehicle', or undefined (all)
+      const includeInactive = req.query.includeInactive === 'true';
 
       // Column mapping for sorting (matches frontend columns order)
       const columns = ['destinationPOI', 'time', 'availability', 'active'];
@@ -102,7 +103,9 @@ class ToursController {
       // Get total records count (with tour type filter but without search filter)
       const totalRecordsQuery = new Parse.Query('Tour');
       totalRecordsQuery.equalTo('exists', true);
-      totalRecordsQuery.equalTo('active', true);
+      if (!includeInactive) {
+        totalRecordsQuery.equalTo('active', true);
+      }
 
       // Apply tour type filter to total count
       if (tourType === 'walking') {
@@ -115,10 +118,12 @@ class ToursController {
         useMasterKey: true,
       });
 
-      // Build base query for all active existing records
+      // Build base query for existing records (optionally include inactive)
       const baseQuery = new Parse.Query('Tour');
       baseQuery.equalTo('exists', true);
-      baseQuery.equalTo('active', true);
+      if (!includeInactive) {
+        baseQuery.equalTo('active', true);
+      }
       baseQuery.include(['destinationPOI']);
 
       // Apply tour type filter if provided
@@ -275,6 +280,20 @@ class ToursController {
           clientPrices: Object.keys(tourClientPrices).length > 0 ? tourClientPrices : {},
           hasClientPrices: Object.keys(tourClientPrices).length > 0,
         };
+      });
+
+      // Debug logging before sending response
+      console.log('🔍 [TOURS API DEBUG]', {
+        tourType,
+        includeInactive,
+        totalTours: data.length,
+        activeTours: data.filter((t) => t.active).length,
+        inactiveTours: data.filter((t) => !t.active).length,
+        tourSample: data.slice(0, 3).map((t) => ({
+          name: t.destinationPOI?.name,
+          active: t.active,
+          isWalkingTour: t.isWalkingTour,
+        })),
       });
 
       // Send DataTables response (standardized format matching Services)
