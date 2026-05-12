@@ -104,10 +104,109 @@ window.PricingUtils = (function () {
     return price;
   }
 
+  /**
+   * Apply cash rounding rules for efectivo payments.
+   * Rounds to nearest 5 pesos to eliminate cents and facilitate cash transactions.
+   * - Amounts with <= 0.50 centavos: Round down to nearest 5.
+   * - Amounts with > 0.50 centavos: Round up to nearest 5.
+   * @param {number} price - Price to round for cash payment.
+   * @returns {number} Rounded price suitable for cash (multiple of 5).
+   * @example
+   * applyCashRounding(17.00); // Returns: 15
+   * applyCashRounding(17.30); // Returns: 15
+   * applyCashRounding(17.60); // Returns: 20
+   * applyCashRounding(22.50); // Returns: 20
+   * applyCashRounding(22.51); // Returns: 25
+   */
+  function applyCashRounding(price) {
+    const integerPart = Math.floor(price);
+    const decimalPart = price - integerPart;
+
+    if (decimalPart <= 0.50) {
+      // Round down to nearest multiple of 5
+      return Math.floor(integerPart / 5) * 5;
+    }
+    // Round up to nearest multiple of 5
+    if (integerPart === 0) {
+      return 5; // Special case: 0.xx rounds up to 5
+    }
+    return Math.ceil(integerPart / 5) * 5;
+  }
+
+  // Cash rounding setting management
+  let cashRoundingEnabled = true; // Default to enabled for backward compatibility
+  let cashRoundingSettingCached = false;
+
+  /**
+   * Check if cash rounding is enabled via admin settings
+   * @returns {Promise<boolean>} True if cash rounding is enabled, false otherwise
+   * @example
+   * if (await isCashRoundingEnabled()) {
+   *   price = applyCashRounding(price);
+   * }
+   */
+  async function isCashRoundingEnabled() {
+    if (cashRoundingSettingCached) {
+      return cashRoundingEnabled;
+    }
+
+    try {
+      const response = await fetch('/api/settings/cash-rounding', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          cashRoundingEnabled = data.data.enabled;
+          cashRoundingSettingCached = true;
+          
+          // Cache for 5 minutes to reduce API calls
+          setTimeout(() => {
+            cashRoundingSettingCached = false;
+          }, 5 * 60 * 1000);
+          
+          return cashRoundingEnabled;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load cash rounding setting, using default:', error);
+    }
+
+    // Default to enabled for backward compatibility
+    return true;
+  }
+
+  /**
+   * Synchronous version that returns cached value or default
+   * Use this in scenarios where async calls are not practical
+   * @returns {boolean} Cached cash rounding setting or default (true)
+   */
+  function isCashRoundingEnabledSync() {
+    return cashRoundingSettingCached ? cashRoundingEnabled : true;
+  }
+
+  /**
+   * Refresh the cash rounding setting cache
+   * Call this when the setting is updated in admin panel
+   */
+  async function refreshCashRoundingSetting() {
+    cashRoundingSettingCached = false;
+    return await isCashRoundingEnabled();
+  }
+
   // Public API
   return {
     applyUSDRoundingRules,
     applyPaymentRate,
+    applyCashRounding,
+    isCashRoundingEnabled,
+    isCashRoundingEnabledSync,
+    refreshCashRoundingSetting,
     formatPriceWithCurrency,
     loadCurrentRates,
   };

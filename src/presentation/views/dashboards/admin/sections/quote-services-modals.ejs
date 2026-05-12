@@ -25,9 +25,9 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                 
                 <form id="dayForm">
                     <div class="mb-3">
-                        <label for="dayTitle" class="form-label">Título del Día <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="dayTitle" placeholder="Ej: Llegada y City Tour" required>
-                        <div class="form-text">Dale un nombre descriptivo a este día del itinerario</div>
+                        <label for="dayTitle" class="form-label">Título del Día</label>
+                        <input type="text" class="form-control" id="dayTitle" placeholder="Ej: Llegada y City Tour">
+                        <div class="form-text">Opcional: Dale un nombre descriptivo a este día del itinerario. Si se deja vacío, se generará automáticamente como "Día X"</div>
                     </div>
                     
                     <div class="mb-3">

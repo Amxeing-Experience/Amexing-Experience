@@ -621,7 +621,7 @@
                         <span class="sm-quote-info-value" id="summaryContactPerson">-</span>
                     </div>
                     <div class="sm-quote-info-item">
-                        <span class="sm-quote-info-label">Evento</span>
+                        <span class="sm-quote-info-label">Motivo de viaje</span>
                         <span class="sm-quote-info-value" id="summaryEventType">-</span>
                     </div>
                     <div class="sm-quote-info-item">
@@ -634,7 +634,7 @@
             <!-- Services & Itinerary -->
             <div class="sm-services-section">
                 <div class="sm-section-title">
-                    <i class="ti ti-calendar-event me-2"></i>Servicios e Itinerario
+                    <i class="ti ti-calendar-event me-2"></i>Servicios
                 </div>
                 <div id="summaryServicesCards">
                     <div class="sm-empty-state">No hay servicios agregados</div>
@@ -656,7 +656,7 @@
                     <span>Subtotal</span>
                     <span id="summarySubtotal">$0.00</span>
                 </div>
-                <div class="sm-totals-row">
+                <div class="sm-totals-row" id="summaryIVARow">
                     <span>IVA (16%)</span>
                     <span id="summaryIVA">$0.00</span>
                 </div>
@@ -699,12 +699,125 @@
         return new Date(date).toLocaleDateString('es-MX', options);
     }
 
-    // Get access token
+    // Get access token with retry logic
     function getAccessToken() {
         return document.cookie
             .split('; ')
             .find(row => row.startsWith('accessToken='))
             ?.split('=')[1];
+    }
+
+    // Wait for access token to be available (handles timing issues on page reload)
+    async function waitForAccessToken(maxRetries = 5, delayMs = 100) {
+        for (let i = 0; i < maxRetries; i++) {
+            const token = getAccessToken();
+            if (token) {
+                console.debug('Access token found for summary cache loading');
+                return token;
+            }
+            console.debug(`Waiting for access token... attempt ${i + 1}/${maxRetries}`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        console.warn('Access token not available after retries - cache loading may fail');
+        return null;
+    }
+
+    // Experience cache variables
+    let experiencesCache = [];
+    let providerExperiencesCache = [];
+
+    // Load regular experiences cache with enhanced error handling
+    async function loadExperiencesCache() {
+        try {
+            console.debug('Loading experiences cache for summary...');
+            const token = await waitForAccessToken();
+            if (!token) {
+                console.warn('No access token available - skipping experiences cache loading');
+                experiencesCache = [];
+                return;
+            }
+
+            const response = await fetch('/api/experiences?draw=1&start=0&length=1000&search[value]=', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                experiencesCache = result.data || [];
+                console.debug(`Loaded ${experiencesCache.length} experiences for summary`);
+                
+                // Validate data structure
+                if (experiencesCache.length > 0) {
+                    const sampleExp = experiencesCache[0];
+                    console.debug('Sample experience data:', { 
+                        id: sampleExp.id, 
+                        hasProvider: !!sampleExp.provider,
+                        providerType: sampleExp.provider?.type 
+                    });
+                }
+            } else {
+                console.warn(`Failed to load experiences: ${response.status} ${response.statusText}`);
+                experiencesCache = [];
+            }
+        } catch (error) {
+            console.error('Error loading experiences cache for summary:', error);
+            experiencesCache = [];
+        }
+    }
+
+    // Load provider experiences cache with enhanced error handling
+    async function loadProviderExperiencesCache() {
+        try {
+            console.debug('Loading provider experiences cache for summary...');
+            const token = await waitForAccessToken();
+            if (!token) {
+                console.warn('No access token available - skipping provider experiences cache loading');
+                providerExperiencesCache = [];
+                return;
+            }
+
+            const response = await fetch('/api/provider-experiencias/all', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success && result.data) {
+                    providerExperiencesCache = result.data;
+                } else if (result.data && Array.isArray(result.data)) {
+                    providerExperiencesCache = result.data;
+                } else if (Array.isArray(result)) {
+                    providerExperiencesCache = result;
+                } else {
+                    console.warn('Unexpected provider experiences response format:', result);
+                    providerExperiencesCache = [];
+                }
+                
+                console.debug(`Loaded ${providerExperiencesCache.length} provider experiences for summary`);
+                
+                // Validate data structure
+                if (providerExperiencesCache.length > 0) {
+                    const sampleExp = providerExperiencesCache[0];
+                    console.debug('Sample provider experience data:', { 
+                        id: sampleExp.id, 
+                        hasProvider: !!sampleExp.provider,
+                        providerType: sampleExp.provider?.type 
+                    });
+                }
+            } else {
+                console.warn(`Failed to load provider experiences: ${response.status} ${response.statusText}`);
+                providerExperiencesCache = [];
+            }
+        } catch (error) {
+            console.error('Error loading provider experiences cache for summary:', error);
+            providerExperiencesCache = [];
+        }
     }
 
     // Load quote summary
@@ -763,11 +876,21 @@
             if (quote.client) {
                 if (quote.client.companyName) {
                     clientName = quote.client.companyName;
+                } else if (quote.client.name) {
+                    clientName = quote.client.name;
                 } else if (quote.client.firstName || quote.client.lastName) {
                     clientName = `${quote.client.firstName || ''} ${quote.client.lastName || ''}`.trim();
                 }
             }
             document.getElementById('summaryClientName').textContent = clientName;
+
+            // Load experience caches for establishment detection (only for authenticated views)
+            <% if (!locals.isPublicView) { %>
+            await Promise.all([
+                loadExperiencesCache(),
+                loadProviderExperiencesCache()
+            ]);
+            <% } %>
 
             // Render services table
             renderServicesTable(quote.serviceItems, quote.numberOfPeople || 0);
@@ -866,6 +989,59 @@
         // Normalize type to check transport/experience regardless of language
         function isTransport(type) { return type === 'traslado' || type === 'transport'; }
         function isExperience(type) { return type === 'experiencia' || type === 'experience'; }
+        
+        // Helper function to determine if an experience service is from an establishment provider
+        function getExperienceLabel(serviceItem) {
+            if (!isExperience(serviceItem.type)) return typeLabels[serviceItem.type] || serviceItem.type || 'Servicio';
+            
+            console.debug('Checking experience label for:', { 
+                experienceId: serviceItem.experienceId, 
+                providerType: serviceItem.providerType,
+                cachesSizes: {
+                    experiences: experiencesCache.length,
+                    providerExperiences: providerExperiencesCache.length
+                }
+            });
+            
+            // Tier 1: Check if this service has providerType saved (new services)
+            if (serviceItem.providerType && serviceItem.providerType.toLowerCase() === 'establishment') {
+                console.debug('Found Establishment via Tier 1 (saved providerType)');
+                return 'Establecimiento';
+            }
+            
+            // Tier 2: Fallback to experienceId lookup in cache (existing services)
+            if (serviceItem.experienceId) {
+                // Check provider experiences cache first
+                if (providerExperiencesCache && Array.isArray(providerExperiencesCache)) {
+                    const experience = providerExperiencesCache.find(exp => 
+                        (exp.id === serviceItem.experienceId || exp.objectId === serviceItem.experienceId) &&
+                        exp.provider?.type && exp.provider.type.toLowerCase() === 'establishment'
+                    );
+                    if (experience) {
+                        console.debug('Found Establishment via Tier 2 (provider experiences cache)');
+                        return 'Establecimiento';
+                    }
+                }
+                
+                // Check regular experiences cache
+                if (experiencesCache && Array.isArray(experiencesCache)) {
+                    const experience = experiencesCache.find(exp => 
+                        (exp.id === serviceItem.experienceId || exp.objectId === serviceItem.experienceId) &&
+                        exp.provider?.type && exp.provider.type.toLowerCase() === 'establishment'
+                    );
+                    if (experience) {
+                        console.debug('Found Establishment via Tier 3 (regular experiences cache)');
+                        return 'Establecimiento';
+                    }
+                }
+                
+                console.debug('No establishment provider found for experienceId:', serviceItem.experienceId);
+            }
+            
+            // Tier 3: Default to regular experience label
+            console.debug('Using default Experiencia label');
+            return 'Experiencia';
+        }
 
         let html = '';
 
@@ -888,7 +1064,7 @@
             if (day.subconcepts && day.subconcepts.length > 0) {
                 day.subconcepts.forEach((sc) => {
                     const color = typeColors[sc.type] || '#6c757d';
-                    const label = typeLabels[sc.type] || sc.type || 'Servicio';
+                    const label = getExperienceLabel(sc);
                     const total = sc.total != null ? currencyFormatter.format(sc.total) : '-';
 
                     const paymentHtml = '';
@@ -969,17 +1145,36 @@
         container.innerHTML = html;
 
         // Calculate totals
-        let actualSubtotal = 0;
+        let serviceTotal = 0;
         serviceItems.days.forEach(day => {
             if (day.subconcepts && day.subconcepts.length > 0) {
                 day.subconcepts.forEach(sc => {
-                    if (sc.total != null) actualSubtotal += sc.total;
+                    if (sc.total != null) serviceTotal += sc.total;
                 });
             }
         });
 
-        const actualIVA = actualSubtotal * 0.16;
-        const actualTotal = actualSubtotal + actualIVA;
+        // Apply same logic as quote-services-v2.js
+        const ivaRow = document.getElementById('summaryIVARow');
+        
+        let actualSubtotal, actualIVA, actualTotal;
+        
+        if (savedPayment === 'efectivo') {
+            // For cash: no IVA
+            actualSubtotal = serviceTotal;
+            actualIVA = 0;
+            actualTotal = serviceTotal;
+            // Hide IVA row
+            if (ivaRow) ivaRow.style.display = 'none';
+        } else {
+            // For transferencia/tarjeta: extract IVA from total
+            // Services already include IVA, so: Base = Total ÷ 1.16
+            actualSubtotal = serviceTotal / 1.16;
+            actualIVA = serviceTotal - actualSubtotal;
+            actualTotal = serviceTotal;
+            // Show IVA row
+            if (ivaRow) ivaRow.style.display = '';
+        }
 
         document.getElementById('summarySubtotal').textContent = currencyFormatter.format(actualSubtotal);
         document.getElementById('summaryIVA').textContent = currencyFormatter.format(actualIVA);
@@ -1065,59 +1260,72 @@
         });
     }
 
-    // Export to PDF function with fallback support
+    // Export to PDF function
     function exportToPdf() {
-        // Try jsPDF first
-        if (tryJsPDFExport()) {
-            return;
-        }
-        
-        // Fallback to html2pdf if jsPDF fails
-        console.log('Falling back to html2pdf...');
-        tryHtml2PdfExport();
+        // Use html2pdf directly
+        exportWithHtml2Pdf();
     }
 
-    // Try jsPDF approach
-    function tryJsPDFExport() {
-        // Check if jsPDF is loaded with multiple possible locations
-        let jsPDF;
-        if (typeof window.jsPDF !== 'undefined') {
-            jsPDF = window.jsPDF.jsPDF || window.jsPDF;
-        } else if (typeof window.jsPDF === 'undefined' && typeof jsPDF !== 'undefined') {
-            // Global jsPDF variable
-        } else {
-            console.log('jsPDF not available, will try html2pdf fallback');
-            return false;
+    // Simple html2pdf export - restored to working state
+    function exportWithHtml2Pdf() {
+        if (typeof html2pdf === 'undefined') {
+            alert('No se pudo cargar la librería de PDF. Por favor recargue la página.');
+            return;
         }
 
+        const element = document.getElementById('summaryContent');
         const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
         const filename = `Cotizacion_${folio.replace(/\s+/g, '_')}.pdf`;
-        // Apply PDF export mode to original element
-        element.classList.add('pdf-export-mode');
 
-        // Create wrapper using percentage-based width for dynamic PDF sizing
-        // 100% width adapts to page size automatically
-        const wrapper = document.createElement('div');
-        wrapper.id = 'pdf-generation-wrapper';
-        wrapper.style.cssText = `
-            width: 100%;
-            max-width: 100%;
-            margin: 0;
-            padding: 10px;
-            background: #ffffff;
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        `;
+        // Check if element exists
+        if (!element) {
+            alert('Error: No se encontró el contenido del resumen.');
+            return;
+        }
 
-        // Move original content into wrapper temporarily
-        const parent = element.parentNode;
-        const nextSibling = element.nextSibling;
+        // UI feedback
+        const btn = document.getElementById('exportPdfBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando PDF...';
+        btn.disabled = true;
 
-        wrapper.appendChild(element);
-        document.body.appendChild(wrapper);
+        // Simple html2pdf options (restored to working version)
+        const opt = {
+            margin: 10,
+            filename: filename,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { 
+                scale: 2,
+                useCORS: true
+            },
+            jsPDF: { 
+                unit: 'mm', 
+                format: 'a4', 
+                orientation: 'portrait' 
+            }
+        };
 
-        // PDF generation options using percentage-based sizing
-        // Letter page: 215.9mm x 279.4mm - dynamic width calculation
+        html2pdf()
+            .set(opt)
+            .from(element)
+            .save()
+            .then(() => {
+                console.log('PDF generated successfully');
+            })
+            .catch((error) => {
+                console.error('Error generating PDF:', error);
+                alert('Error al generar el PDF. Por favor intente nuevamente.');
+            })
+            .finally(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+    }
+
+    // Send quote email - modal with multiple recipients
+    function showSendEmailModal(quoteObj) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emails = [];
         const opt = {
             margin:       [8, 8, 8, 8], // Balanced margins (8mm) for centered content
             filename:     filename,
@@ -1369,7 +1577,7 @@
         }
     }
 
-    // Fallback html2pdf approach (simplified)
+    // html2pdf approach with content loading and visibility handling
     function tryHtml2PdfExport() {
         if (typeof html2pdf === 'undefined') {
             alert('No se pudo cargar ninguna librería de PDF. Por favor recargue la página.');
@@ -1377,8 +1585,15 @@
         }
 
         const element = document.getElementById('summaryContent');
+        const loadingElement = document.getElementById('summaryLoading');
         const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
         const filename = `Cotizacion_${folio.replace(/\s+/g, '_')}.pdf`;
+
+        // Check if element exists
+        if (!element) {
+            alert('Error: No se encontró el contenido del resumen.');
+            return;
+        }
 
         // UI feedback
         const btn = document.getElementById('exportPdfBtn');
@@ -1386,30 +1601,104 @@
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando PDF...';
         btn.disabled = true;
 
-        // Simple html2pdf options
-        const opt = {
-            margin: 10,
-            filename: filename,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 1, useCORS: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        html2pdf()
-            .set(opt)
-            .from(element)
-            .save()
-            .then(() => {
-                console.log('PDF generated successfully with html2pdf fallback');
-            })
-            .catch((error) => {
-                console.error('Error generating PDF with html2pdf:', error);
-                alert('Error al generar el PDF. Por favor intente nuevamente.');
-            })
-            .finally(() => {
+        // Check if content is loaded and visible
+        const isContentVisible = element.style.display !== 'none';
+        const isLoading = loadingElement && loadingElement.style.display !== 'none';
+        
+        if (!isContentVisible || isLoading) {
+            // Content not ready - trigger loading and wait
+            console.log('Content not ready, loading quote summary...');
+            
+            loadQuoteSummary().then(() => {
+                // Wait a bit more for rendering to complete
+                setTimeout(() => {
+                    proceedWithPdfExport();
+                }, 500);
+            }).catch(error => {
+                console.error('Error loading quote summary:', error);
                 btn.innerHTML = originalText;
                 btn.disabled = false;
+                alert('Error al cargar el contenido. Por favor intente nuevamente.');
             });
+            return;
+        }
+
+        // Content is ready, proceed immediately
+        proceedWithPdfExport();
+
+        function proceedWithPdfExport() {
+            // Store original visibility for restoration
+            const originalDisplay = element.style.display;
+            
+            try {
+                // Ensure element is visible for PDF generation
+                if (element.style.display === 'none') {
+                    element.style.display = 'block';
+                }
+
+                // High-quality html2pdf options
+                const opt = {
+                    margin: 10,
+                    filename: filename,
+                    image: { type: 'png', quality: 1.0 },
+                    html2canvas: { 
+                        scale: 3,                    // High resolution (3x for crisp text)
+                        useCORS: true,              // Allow external images 
+                        allowTaint: false,          // Better CORS handling
+                        letterRendering: true,      // Better text rendering
+                        logging: false,             // Disable console logs
+                        windowWidth: 1200,          // Higher reference width
+                        windowHeight: 800,          // Adequate height
+                        scrollX: 0,
+                        scrollY: 0,
+                        backgroundColor: '#ffffff',
+                        foreignObjectRendering: true, // Better for complex layouts
+                        imageTimeout: 15000,        // Wait longer for images
+                        removeContainer: true       // Clean up after rendering
+                    },
+                    jsPDF: { 
+                        unit: 'mm', 
+                        format: 'letter',           // US Letter for consistency 
+                        orientation: 'portrait',
+                        compress: true,
+                        precision: 16               // Higher precision for better quality
+                    }
+                };
+
+                html2pdf()
+                    .set(opt)
+                    .from(element)
+                    .save()
+                    .then(() => {
+                        console.log('PDF generated successfully with html2pdf');
+                    })
+                    .catch((error) => {
+                        console.error('Error generating PDF:', error);
+                        alert('Error al generar el PDF. Por favor intente nuevamente.');
+                    })
+                    .finally(() => {
+                        // Restore original visibility
+                        if (originalDisplay) {
+                            element.style.display = originalDisplay;
+                        }
+                        
+                        // Restore button
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    });
+            } catch (error) {
+                console.error('Error in PDF export setup:', error);
+                // Restore original visibility
+                if (originalDisplay) {
+                    element.style.display = originalDisplay;
+                }
+                
+                // Restore button
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                alert('Error al configurar la exportación PDF.');
+            }
+        }
     }
 
     // Send quote email - modal with multiple recipients

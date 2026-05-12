@@ -4758,7 +4758,13 @@ function updatePricesVanilla(paymentType = 'efectivo', currency = 'MXN', include
                 finalPrice *= (1 + agencyRate / 100);
             }
             
-            // Step 3: Apply currency conversion if needed
+            // Step 3: Apply cash rounding for efectivo payments (MXN only)
+            if (paymentType === 'efectivo' && currency === 'MXN' && typeof window.PricingUtils !== 'undefined' && 
+                window.PricingUtils.applyCashRounding && window.PricingUtils.isCashRoundingEnabledSync()) {
+                finalPrice = window.PricingUtils.applyCashRounding(finalPrice);
+            }
+            
+            // Step 4: Apply currency conversion if needed
             const exchangeRate = TourPricingState.getExchangeRate();
             if (currency === 'USD' && exchangeRate > 0) {
                 finalPrice /= exchangeRate;
@@ -4912,7 +4918,13 @@ function updateExpandedRowPrices(paymentType = 'efectivo', currency = 'MXN', inc
                 }
             }
             
-            // Step 3: Apply currency conversion
+            // Step 3: Apply cash rounding for efectivo payments (MXN only)
+            if (paymentType === 'efectivo' && currency === 'MXN' && typeof window.PricingUtils !== 'undefined' && 
+                window.PricingUtils.applyCashRounding && window.PricingUtils.isCashRoundingEnabledSync()) {
+                finalPrice = window.PricingUtils.applyCashRounding(finalPrice);
+            }
+            
+            // Step 4: Apply currency conversion
             if (currency === 'USD') {
                 const exchangeRate = TourPricingState.getExchangeRate();
                 if (exchangeRate > 0) {

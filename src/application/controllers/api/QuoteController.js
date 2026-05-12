@@ -898,10 +898,10 @@ class QuoteController {
             id: client.id,
             firstName: client.get('firstName') || '',
             lastName: client.get('lastName') || '',
-            companyName: client.get('companyName') || '',
+            companyName: client.get('contextualData')?.companyName || client.get('name') || '',
             email: client.get('email') || '',
             phone: client.get('phone') || '',
-            fullName: client.get('companyName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+            fullName: client.get('contextualData')?.companyName || client.get('name') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
             contextualData: client.get('contextualData') || null,
           }
           : null,

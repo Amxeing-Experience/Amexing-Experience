@@ -13,11 +13,9 @@ Estimado/a {{NOMBRE_CLIENTE}},
 DETALLES DE SU SERVICIO
 ═══════════════════════════════════════════════════════════════
 
-Número de reserva:     {{NUMERO_RESERVA}}
-Servicio:              {{TIPO_SERVICIO}}
-Fecha:                 {{FECHA}}
-Hora:                  {{HORA}}
-Lugar de encuentro:    {{LUGAR}}
+Número de cotización:     {{NUMERO_RESERVA}}
+Fecha(s):                 {{FECHA}}
+No. Personas:             {{HORA}}
 
 ═══════════════════════════════════════════════════════════════
 

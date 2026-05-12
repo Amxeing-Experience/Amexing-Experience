@@ -2044,6 +2044,12 @@ table.dataTable thead th:nth-child(2) select {
                         });
                     }
                     
+                    // Apply cash rounding for efectivo payments
+                    if (paymentType === 'efectivo' && typeof window.PricingUtils !== 'undefined' && 
+                        window.PricingUtils.applyCashRounding && window.PricingUtils.isCashRoundingEnabledSync()) {
+                        subtotal = window.PricingUtils.applyCashRounding(subtotal);
+                    }
+                    
                     // Format as price string
                     let finalPrice = `$${subtotal.toLocaleString()} MXN`;
                     
@@ -2171,6 +2177,11 @@ table.dataTable thead th:nth-child(2) select {
                         beforeRounding,
                         afterRounding: subtotal
                     });
+                }
+                
+                // Apply cash rounding for efectivo payments
+                if (paymentType === 'efectivo' && typeof window.PricingUtils !== 'undefined' && window.PricingUtils.applyCashRounding) {
+                    subtotal = window.PricingUtils.applyCashRounding(subtotal);
                 }
                 
                 // Format as price string
@@ -2734,6 +2745,12 @@ table.dataTable thead th:nth-child(2) select {
                                     // Apply special rounding if greeter is included
                                     if (includeGreeter && greeterCost > 0) {
                                         subtotal = applySpecialRounding(subtotal);
+                                    }
+                                    
+                                    // Apply cash rounding for efectivo payments
+                                    if (currentPaymentType === 'efectivo' && typeof window.PricingUtils !== 'undefined' && 
+                                        window.PricingUtils.applyCashRounding && window.PricingUtils.isCashRoundingEnabledSync()) {
+                                        subtotal = window.PricingUtils.applyCashRounding(subtotal);
                                     }
                                     
                                     // Format as price string

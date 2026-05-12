@@ -1387,6 +1387,31 @@ class AdminController extends RoleBasedController {
   }
 
   /**
+   * Cash rounding settings page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   * @example
+   */
+  async cashRounding(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'cash-rounding', {
+        title: 'Configuración de Redondeo para Efectivo',
+        breadcrumb: {
+          title: 'Redondeo Efectivo',
+          items: [
+            { name: 'Dashboard', link: '/dashboard/admin', active: false },
+            { name: 'Ajustes', link: '/dashboard/admin/price-settings', active: false },
+            { name: 'Redondeo Efectivo', link: '#', active: true },
+          ],
+        },
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Forms builder page.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
