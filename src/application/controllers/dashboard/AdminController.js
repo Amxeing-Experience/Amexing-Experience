@@ -1216,6 +1216,7 @@ class AdminController extends RoleBasedController {
       const TransferRate = require('../../../domain/models/TransferRate');
       const DriverTourRate = require('../../../domain/models/DriverTourRate');
       const GuideTransportRate = require('../../../domain/models/GuideTransportRate');
+      const GreeterRate = require('../../../domain/models/GreeterRate');
 
       // Get current rates
       let currentExchangeRate = await ExchangeRate.getCurrentExchangeRate();
@@ -1224,6 +1225,7 @@ class AdminController extends RoleBasedController {
       let currentTransferRate = await TransferRate.getCurrentTransferRate();
       let currentDriverTourRate = await DriverTourRate.getCurrentDriverTourRate();
       let currentGuideTransportRate = await GuideTransportRate.getCurrentRate();
+      let currentGreeterRate = await GreeterRate.getCurrentRate();
 
       // Create default inflation rate if none exists
       if (!currentInflationRate) {
@@ -1286,6 +1288,15 @@ class AdminController extends RoleBasedController {
         }
       }
 
+      // Create default greeter rate if none exists
+      if (!currentGreeterRate) {
+        try {
+          currentGreeterRate = await GreeterRate.createDefaultIfNotExists();
+        } catch (error) {
+          console.warn('Could not create default greeter rate:', error.message);
+        }
+      }
+
       // Create default exchange rate if none exists
       if (!currentExchangeRate) {
         try {
@@ -1305,6 +1316,8 @@ class AdminController extends RoleBasedController {
       const transferValue = currentTransferRate ? currentTransferRate.get('value') : 3.0;
       const driverTourValue = currentDriverTourRate ? currentDriverTourRate.get('value') : 635.0;
       const guideTransportValue = currentGuideTransportRate ? currentGuideTransportRate.get('value') : 400.0;
+      const greeterBasePrice = currentGreeterRate ? currentGreeterRate.get('basePrice') : 760.0;
+      const greeterHourlyRate = currentGreeterRate ? currentGreeterRate.get('hourlyRate') : 640.0;
 
       await this.renderRoleView(req, res, 'price-settings', {
         title: 'Ajustes de Precio',
@@ -1346,6 +1359,15 @@ class AdminController extends RoleBasedController {
             ? currentGuideTransportRate.get('effectiveDate') || currentGuideTransportRate.get('createdAt')
             : new Date(),
           id: currentGuideTransportRate ? currentGuideTransportRate.id : null,
+        },
+        currentGreeterRate: {
+          basePrice: greeterBasePrice,
+          hourlyRate: greeterHourlyRate,
+          formatted: currentGreeterRate ? currentGreeterRate.getFormattedValue() : '$760.00 MXN (base) + $640.00 MXN/hr',
+          lastUpdated: currentGreeterRate
+            ? currentGreeterRate.get('effectiveDate') || currentGreeterRate.get('createdAt')
+            : new Date(),
+          id: currentGreeterRate ? currentGreeterRate.id : null,
         },
         breadcrumb: null, // Disable automatic breadcrumb
         pageStyles: [

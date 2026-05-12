@@ -618,43 +618,111 @@ table.dataTable thead th:nth-child(2) select {
             clientId
         });
 
-        // Calculate greeter price based on duration
-        // Formula: 760 + (640 * duration)
-        // Special rounding: If last two digits < 50, round down to nearest 100; otherwise round up
+        // Greeter rate cache variables
+        let greeterRateCache = null;
+        let greeterRateCacheTime = null;
+        const greeterRateCacheDuration = 5 * 60 * 1000; // 5 minutes cache
+        
+        // Function to manually refresh greeter cache (for testing/debugging)
+        window.refreshDataTableGreeterCache = function() {
+            console.log('🔄 Manually clearing DataTable greeter cache...');
+            greeterRateCache = null;
+            greeterRateCacheTime = null;
+            return loadGreeterRateConfiguration();
+        };
+        
+        // Load current greeter rate configuration from API
+        function loadGreeterRateConfiguration() {
+            return new Promise((resolve) => {
+                // Check cache validity
+                const now = Date.now();
+                if (greeterRateCache && greeterRateCacheTime && 
+                    (now - greeterRateCacheTime) < greeterRateCacheDuration) {
+                    console.log('🔒 DataTable: Greeter rate cache still valid');
+                    resolve(greeterRateCache);
+                    return;
+                }
+
+                console.log('📥 DataTable: Loading greeter rate configuration...');
+                $.ajax({
+                    url: '/api/greeter-rate/formula',
+                    type: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    success: function(response) {
+                        console.log('📦 DataTable: Greeter rate API response:', response);
+                        
+                        if (response.success && response.data) {
+                            greeterRateCache = {
+                                basePrice: response.data.basePrice || 760,
+                                hourlyRate: response.data.hourlyRate || 640
+                            };
+                            greeterRateCacheTime = now;
+                            console.log('✅ DataTable: Greeter rate configuration loaded from API:', greeterRateCache);
+                            resolve(greeterRateCache);
+                        } else {
+                            console.warn('⚠️ DataTable: API response missing data field, using defaults');
+                            greeterRateCache = { basePrice: 760, hourlyRate: 640 };
+                            greeterRateCacheTime = now;
+                            resolve(greeterRateCache);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('❌ DataTable: Error loading greeter rate configuration:', error);
+                        // Fallback to defaults
+                        greeterRateCache = { basePrice: 760, hourlyRate: 640 };
+                        greeterRateCacheTime = now;
+                        resolve(greeterRateCache);
+                    }
+                });
+            });
+        }
+
+        // Calculate greeter price using configurable rates
+        // Formula: basePrice + (hourlyRate * duration)
+        // Note: Special rounding now applied to final service total, not individual greeter calculation
         function calculateGreeterPrice(durationInHours) {
+            // Use cached values or fallback to defaults
+            const basePrice = greeterRateCache?.basePrice || 760;
+            const hourlyRate = greeterRateCache?.hourlyRate || 640;
+            const isUsingCache = !!greeterRateCache;
+            
             // Validate duration
             if (!durationInHours || durationInHours <= 0) {
-                return 760; // Return base price if no duration
+                console.log('🔍 DataTable: No duration, returning base price:', basePrice);
+                return basePrice;
             }
 
-            // Calculate raw price using formula: 760 + (640 * duration)
-            const rawPrice = 760 + (640 * durationInHours);
+            // Calculate final price using configurable formula (no rounding here)
+            const finalPrice = basePrice + (hourlyRate * durationInHours);
             
-            // Apply special rounding logic
-            // Get the last two digits of the integer part
+            console.log('💰 DataTable: Greeter price calculated (unrounded):', {
+                durationInHours,
+                basePrice,
+                hourlyRate,
+                finalPrice,
+                formula: `${basePrice} + (${hourlyRate} × ${durationInHours}h) = ${finalPrice}`,
+                source: isUsingCache ? '[API]' : '[Default]'
+            });
+            
+            return finalPrice;
+        }
+
+        // Apply special rounding logic to final service totals
+        // Same logic as used in greeter calculation: if last two digits < 50, round down to nearest 100; otherwise round up
+        function applySpecialRounding(rawPrice) {
             const integerPart = Math.floor(rawPrice);
             const lastTwoDigits = integerPart % 100;
             
-            // If last two digits < 50, round down to nearest 100; otherwise round up
-            let roundedPrice;
             if (lastTwoDigits === 0) {
-                // Already a multiple of 100
-                roundedPrice = integerPart;
+                return integerPart;
             } else if (lastTwoDigits < 50) {
-                // Round down to nearest 100
-                roundedPrice = Math.floor(integerPart / 100) * 100;
+                return Math.floor(integerPart / 100) * 100;
             } else {
-                // Round up to nearest 100
-                roundedPrice = Math.ceil(integerPart / 100) * 100;
+                return Math.ceil(integerPart / 100) * 100;
             }
-            
-            console.log('Greeter price calculated:', {
-                durationInHours,
-                rawPrice,
-                roundedPrice
-            });
-            
-            return roundedPrice;
         }
 
         // Get JWT token from server-side template context
@@ -1916,6 +1984,9 @@ table.dataTable thead th:nth-child(2) select {
                         finalPrice = applyAgencyRate(finalPrice);
                     }
                     
+                    // Calculate additional costs (guide + greeter) separately, then apply special rounding to final total
+                    let additionalCosts = 0;
+                    
                     // Apply guide cost if enabled
                     if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
                         // Calculate guide cost using generic evaluator (synchronous fallback for now)
@@ -1942,28 +2013,43 @@ table.dataTable thead th:nth-child(2) select {
                             console.log(`⚠️ Formula evaluator not available, using fallback: ${routeDuration}h × 2 × $${currentGuideRate} = $${guideCost}`);
                         }
                         
-                        // Extract numeric value from price string
-                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                        if (priceMatch) {
-                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                            const newPrice = numericPrice + guideCost;
-                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                        }
+                        additionalCosts += guideCost;
                     }
                     
                     // Apply greeter cost if enabled
                     if (includeGreeter && routeDuration > 0) {
-                        // Calculate greeter cost using formula based on duration
-                        const greeterCost = calculateGreeterPrice(routeDuration);
+                        // Ensure greeter cache is loaded before calculating
+                        if (!greeterRateCache) {
+                            console.log('⚡ DataTable: Greeter cache missing, triggering load for expanded view calculation');
+                            loadGreeterRateConfiguration().catch(error => {
+                                console.error('Failed to load greeter config during expanded calculation:', error);
+                            });
+                        }
                         
-                        if (greeterCost > 0) {
-                            // Extract numeric value from price string
-                            const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                            if (priceMatch) {
-                                const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                                const newPrice = numericPrice + greeterCost;
-                                finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                            }
+                        // Calculate greeter cost using configurable formula (no rounding)
+                        const greeterCost = calculateGreeterPrice(routeDuration);
+                        additionalCosts += greeterCost;
+                    }
+                    
+                    // Apply additional costs and special rounding if any additional services are enabled
+                    if (additionalCosts > 0) {
+                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
+                        if (priceMatch) {
+                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
+                            const subtotal = numericPrice + additionalCosts;
+                            
+                            // Apply special rounding to final total (includes guide + greeter + base price)
+                            const finalRoundedPrice = applySpecialRounding(subtotal);
+                            
+                            console.log('💰 DataTable: Final service total with rounding:', {
+                                basePrice: numericPrice,
+                                additionalCosts,
+                                subtotal,
+                                finalRoundedPrice,
+                                formula: `${numericPrice} + ${additionalCosts} = ${subtotal} → ${finalRoundedPrice}`
+                            });
+                            
+                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, finalRoundedPrice.toLocaleString());
                         }
                     }
                     
@@ -2064,7 +2150,15 @@ table.dataTable thead th:nth-child(2) select {
                 
                 // Apply greeter cost if enabled
                 if (includeGreeter && routeDuration > 0) {
-                    // Calculate greeter cost using formula based on duration
+                    // Ensure greeter cache is loaded before calculating
+                    if (!greeterRateCache) {
+                        console.log('⚡ DataTable: Greeter cache missing, triggering load for price calculation');
+                        loadGreeterRateConfiguration().catch(error => {
+                            console.error('Failed to load greeter config during calculation:', error);
+                        });
+                    }
+                    
+                    // Calculate greeter cost using configurable formula
                     const greeterCost = calculateGreeterPrice(routeDuration);
                     
                     if (greeterCost > 0) {
@@ -2441,6 +2535,11 @@ table.dataTable thead th:nth-child(2) select {
         loadCurrentAgencyRate().then(() => {
             // Load exchange rate
             loadCurrentExchangeRate();
+            
+            // Load greeter rate configuration
+            loadGreeterRateConfiguration().then(() => {
+                console.log('🎯 DataTable: All rate configurations loaded');
+            });
             
             // Load rates for the header filter (this will auto-select and load data)
             loadRatesForFilter();

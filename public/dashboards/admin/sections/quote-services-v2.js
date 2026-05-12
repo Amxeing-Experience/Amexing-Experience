@@ -124,6 +124,8 @@ class ItineraryBuilder {
     this.driverTourRateCache = null;
     this.guideTransportRateCache = null;
     this.guideFormulaConfigCache = null;
+    this.greeterRateCache = null;
+    this.greeterRateCacheTime = null;
     this.transferRateCache = null;
 
     // Loading states to prevent duplicate API calls
@@ -259,6 +261,7 @@ class ItineraryBuilder {
         this.loadDriverTourRate(),
         this.loadGuideTransportRate(),
         this.loadGuideFormulaConfiguration(),
+        this.loadGreeterRateConfiguration(),
         this.loadVehicleRatePrices(),
       ]);
 
@@ -4347,7 +4350,7 @@ class ItineraryBuilder {
                                         <div class="row g-2 text-info small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-users me-1"></i>
-                                                <strong>Incluye Greeter</strong>
+                                                <strong>Incluye Greeter ${service.routeDuration ? this.formatGreeterFormula(service.routeDuration, this.calculateGreeterPrice(service.routeDuration)) : ''}</strong>
                                             </div>
                                         </div>
                                     ` : ''}
@@ -4475,7 +4478,7 @@ class ItineraryBuilder {
                             ${service.includeGreeter ? `
                                 <div class="d-flex align-items-center text-info small mt-1">
                                     <i class="ti ti-users me-1"></i>
-                                    <strong>Incluye Greeter</strong>
+                                    <strong>Incluye Greeter ${service.routeDuration ? this.formatGreeterFormula(service.routeDuration, this.calculateGreeterPrice(service.routeDuration)) : ''}</strong>
                                 </div>
                             ` : ''}
                             ${service.waitingTimeHours > 0 ? `
@@ -4655,6 +4658,21 @@ class ItineraryBuilder {
           totalPrice += service.waitingTimePricePerHour * service.waitingTimeHours;
         }
 
+        // Apply special rounding to final total if greeter is included
+        if (service.includeGreeter) {
+          const originalTotal = totalPrice;
+          totalPrice = this.applySpecialRounding(totalPrice);
+          
+          console.log('💰 Transport service with greeter rounding (custom price):', {
+            basePrice: basePrice * quantity,
+            includeGuide: service.includeGuide,
+            includeGreeter: service.includeGreeter,
+            originalTotal,
+            finalRoundedTotal: totalPrice,
+            formula: `${originalTotal} → ${totalPrice}`
+          });
+        }
+
         return totalPrice;
       }
 
@@ -4673,6 +4691,21 @@ class ItineraryBuilder {
       // Waiting time (Tiempo de espera)
       if (service.waitingTimeHours > 0 && service.waitingTimePricePerHour > 0) {
         totalPrice += service.waitingTimePricePerHour * service.waitingTimeHours;
+      }
+
+      // Apply special rounding to final total if greeter is included
+      if (service.includeGreeter) {
+        const originalTotal = totalPrice;
+        totalPrice = this.applySpecialRounding(totalPrice);
+        
+        console.log('💰 Transport service with greeter rounding:', {
+          basePrice: vehiclePrice * quantity,
+          includeGuide: service.includeGuide,
+          includeGreeter: service.includeGreeter,
+          originalTotal,
+          finalRoundedTotal: totalPrice,
+          formula: `${originalTotal} → ${totalPrice}`
+        });
       }
 
       return totalPrice;
@@ -4854,6 +4887,29 @@ class ItineraryBuilder {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+  }
+
+  /**
+   * Format greeter formula for display in price breakdown.
+   * Shows the exact formula being used with values and calculation.
+   * @param {number} durationMinutes - Route duration in minutes
+   * @param {number} finalPrice - The calculated final price
+   * @returns {string} Formatted formula display
+   * @example
+   * formatGreeterFormula(90, 1320) // Returns: "($760 + $640×1.5h = $1,320)"
+   */
+  formatGreeterFormula(durationMinutes, finalPrice) {
+    const basePrice = this.greeterRateCache?.basePrice || 760;
+    const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
+    const isUsingCache = !!this.greeterRateCache;
+    const durationHours = durationMinutes / 60;
+    
+    const source = isUsingCache ? '[API]' : '[Default]';
+    const formattedBase = this.formatCurrency(basePrice);
+    const formattedHourly = this.formatCurrency(hourlyRate);
+    const formattedFinal = this.formatCurrency(finalPrice);
+    
+    return `(${formattedBase} + ${formattedHourly}×${durationHours.toFixed(1)}h = ${formattedFinal}) ${source}`;
   }
 
   /**
@@ -6482,6 +6538,85 @@ class ItineraryBuilder {
     }
   }
 
+  async loadGreeterRateConfiguration() {
+    // Check cache validity (5 minutes cache)
+    const now = Date.now();
+    const cacheValidDuration = 5 * 60 * 1000; // 5 minutes
+    if (this.greeterRateCache && this.greeterRateCacheTime && 
+        (now - this.greeterRateCacheTime) < cacheValidDuration) {
+      console.log('🔒 Greeter rate config cache still valid, skipping API call');
+      return this.greeterRateCache;
+    }
+
+    try {
+      console.log('📥 Loading greeter rate configuration...');
+      const token = this.getAccessToken();
+      console.log('🔑 Using access token:', token ? 'Present' : 'Missing');
+      
+      const response = await fetch('/api/greeter-rate/formula', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log('🌐 API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('📦 API Response Data:', result);
+        
+        if (result.success && result.data) {
+          this.greeterRateCache = {
+            basePrice: result.data.basePrice || 760,
+            hourlyRate: result.data.hourlyRate || 640
+          };
+          this.greeterRateCacheTime = now;
+          console.log('✅ Quote Services: Greeter rate configuration loaded from API:', this.greeterRateCache);
+          return this.greeterRateCache;
+        } else {
+          console.warn('⚠️ Quote Services: API response missing data field:', result);
+        }
+      } else if (response.status === 404) {
+        // Use defaults if config not found
+        this.greeterRateCache = { basePrice: 760, hourlyRate: 640 };
+        this.greeterRateCacheTime = now;
+        console.log('⚠️ No greeter rate config found (404), using defaults');
+        return this.greeterRateCache;
+      } else {
+        const responseText = await response.text();
+        console.warn(`❌ Greeter rate config API returned ${response.status}: ${response.statusText}`, responseText);
+      }
+    } catch (error) {
+      console.error('❌ Error loading greeter rate configuration:', error);
+    }
+
+    // Fallback to defaults on error
+    this.greeterRateCache = { basePrice: 760, hourlyRate: 640 };
+    this.greeterRateCacheTime = now;
+    console.log('🔄 Using fallback greeter rate configuration');
+    return this.greeterRateCache;
+  }
+
+  /**
+   * Refresh greeter rate cache by forcing a reload from the API.
+   * Call this when greeter rates might have been updated.
+   * Can also be called from browser console: window.quoteServices.refreshGreeterRateCache()
+   */
+  async refreshGreeterRateCache() {
+    console.log('🔄 Quote Services: Manually refreshing greeter rate cache...');
+    this.greeterRateCache = null;
+    this.greeterRateCacheTime = null;
+    const result = await this.loadGreeterRateConfiguration();
+    console.log('🎯 Quote Services: Cache refreshed, new values:', result);
+    return result;
+  }
+
   async loadTransferRate() {
     try {
       const accessToken = this.getAccessToken();
@@ -7935,7 +8070,9 @@ class ItineraryBuilder {
       }
       if (document.getElementById('includeGreeter')?.checked && routeDuration) {
         const greeterCost = this.calculateGreeterPrice(routeDuration) * brkLegMultiplier;
-        items.push({ label: `Greeter${legSuffix}`, amountMXN: greeterCost });
+        const baseGreeterCost = this.calculateGreeterPrice(routeDuration); // Cost before leg multiplier
+        const formulaDisplay = this.formatGreeterFormula(routeDuration, baseGreeterCost);
+        items.push({ label: `Greeter ${formulaDisplay}${legSuffix}`, amountMXN: greeterCost });
       }
       // Tiempo de espera
       const brkWaitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
@@ -8500,17 +8637,59 @@ class ItineraryBuilder {
    * @returns {number} Greeter price.
    * @example
    */
-  calculateGreeterPrice(durationMinutes) {
-    const durationHours = durationMinutes / 60;
-    if (!durationHours || durationHours <= 0) return 760;
-
-    const rawPrice = 760 + (640 * durationHours);
+  // Apply special rounding logic to final service totals when greeter is included
+  // Same logic as used in original greeter calculation: if last two digits < 50, round down to nearest 100; otherwise round up
+  applySpecialRounding(rawPrice) {
     const integerPart = Math.floor(rawPrice);
     const lastTwoDigits = integerPart % 100;
+    
+    if (lastTwoDigits === 0) {
+      return integerPart;
+    } else if (lastTwoDigits < 50) {
+      return Math.floor(integerPart / 100) * 100;
+    } else {
+      return Math.ceil(integerPart / 100) * 100;
+    }
+  }
 
-    if (lastTwoDigits === 0) return integerPart;
-    if (lastTwoDigits < 50) return Math.floor(integerPart / 100) * 100;
-    return Math.ceil(integerPart / 100) * 100;
+  calculateGreeterPrice(durationMinutes) {
+    // Trigger cache loading if not available
+    if (!this.greeterRateCache) {
+      console.log('⚡ Greeter cache missing, triggering immediate load');
+      // Trigger async load but don't wait for it - use defaults for now
+      this.loadGreeterRateConfiguration().catch(error => {
+        console.error('Failed to load greeter config in background:', error);
+      });
+    }
+    
+    // Use cached values or fallback to defaults
+    const basePrice = this.greeterRateCache?.basePrice || 760;
+    const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
+    
+    // Debug: Log what values are being used
+    console.log('🔍 calculateGreeterPrice DEBUG:', {
+      durationMinutes,
+      greeterRateCache: this.greeterRateCache,
+      basePrice,
+      hourlyRate,
+      cacheTime: this.greeterRateCacheTime,
+      isUsingCache: !!this.greeterRateCache,
+      isUsingDefaults: !this.greeterRateCache
+    });
+
+    const durationHours = durationMinutes / 60;
+    if (!durationHours || durationHours <= 0) return basePrice;
+
+    // Calculate final price using configurable formula (no special rounding here)
+    // Note: Special rounding now applied to final service total, not individual greeter calculation
+    const finalPrice = basePrice + (hourlyRate * durationHours);
+    
+    console.log('💰 calculateGreeterPrice RESULT (unrounded):', {
+      finalPrice,
+      formula: `${basePrice} + (${hourlyRate} × ${durationHours.toFixed(2)}h) = ${finalPrice}`
+    });
+
+    return finalPrice;
   }
 
   /**
@@ -8578,6 +8757,11 @@ class ItineraryBuilder {
    * @example
    */
   recalculateTransportPrice() {
+    // Refresh greeter cache in case rates were updated recently
+    this.refreshGreeterRateCache().catch(error => {
+      console.warn('Could not refresh greeter cache during transport recalculation:', error);
+    });
+
     const vehicleSelect = document.getElementById('vehicleSelect');
     const selectedVehicleId = vehicleSelect?.value;
     let basePrice = 0;
@@ -10962,7 +11146,7 @@ class ItineraryBuilder {
           ${service.selectedSchedule || service.startTime ? `<div class="pv-service-detail"><i class="ti ti-clock"></i>${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}</div>` : ''}
           ${hasVehicle ? `<div class="pv-service-detail"><i class="ti ti-car"></i>${this.getVehicleDisplayName(service)}${service.quantity > 1 ? ` x${service.quantity}` : ''}</div>` : ''}
           ${service.type === 'tour' && service.includeGuide ? '<div class="pv-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Guía + Chofer</div>' : ''}
-          ${(service.type === 'tour' || service.type === 'transport') && service.includeGreeter ? '<div class="pv-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>' : ''}
+          ${(service.type === 'tour' || service.type === 'transport') && service.includeGreeter ? `<div class="pv-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter ${service.routeDuration ? this.formatGreeterFormula(service.routeDuration, this.calculateGreeterPrice(service.routeDuration)) : ''}</div>` : ''}
           ${service.notes ? `<div class="pv-notes"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
         </div>
         <div class="pv-price ${isExcluded ? 'pv-excluded' : ''}">${this.formatCurrency(displayPrice)}</div>

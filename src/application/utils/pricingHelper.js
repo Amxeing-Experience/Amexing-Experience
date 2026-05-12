@@ -41,6 +41,7 @@
  */
 
 const SettingsService = require('../services/SettingsService');
+const GreeterRate = require('../../domain/models/GreeterRate');
 const logger = require('../../infrastructure/logger');
 
 /**
@@ -55,6 +56,11 @@ class PricingHelper {
 
     // Setting key for surcharge percentage
     this.surchargeSettingKey = 'paymentSurchargePercentage';
+
+    // Greeter rate caching
+    this.greeterRateCache = null;
+    this.greeterRateCacheTime = null;
+    this.greeterRateCacheDuration = 5 * 60 * 1000; // 5 minutes cache
   }
 
   // ============================================================
@@ -204,56 +210,95 @@ class PricingHelper {
   // ============================================================
 
   /**
-   * Calculate greeter service price based on duration.
-   * Formula: 760 + (640 * duration)
-   * Special rounding: If last two digits < 50, round down to nearest 100; otherwise round up.
-   * @param {number} duration - Duration in hours (can be decimal).
-   * @returns {number} Calculated and rounded greeter price.
+   * Get current greeter rate configuration with caching.
+   * @returns {Promise<object>} Greeter rate configuration with basePrice and hourlyRate.
    * @example
-   * pricingHelper.calculateGreeterPrice(0.5);  // 760 + (640 * 0.5) = 1080, rounds to 1100
-   * pricingHelper.calculateGreeterPrice(0.45); // 760 + (640 * 0.45) = 1048, rounds to 1000
-   * pricingHelper.calculateGreeterPrice(1);    // 760 + (640 * 1) = 1400, stays 1400
-   * pricingHelper.calculateGreeterPrice(0.48); // 760 + (640 * 0.48) = 1067.2, rounds to 1100
+   * const config = await pricingHelper.getCurrentGreeterRate();
+   * // Returns: { basePrice: 760, hourlyRate: 640 }
    */
-  calculateGreeterPrice(duration) {
+  async getCurrentGreeterRate() {
+    // Check if cache is still valid
+    const now = Date.now();
+    if (this.greeterRateCache
+        && this.greeterRateCacheTime
+        && (now - this.greeterRateCacheTime) < this.greeterRateCacheDuration) {
+      return this.greeterRateCache;
+    }
+
+    try {
+      // Fetch current greeter rate from database
+      const currentRate = await GreeterRate.getCurrentRate();
+
+      if (currentRate) {
+        this.greeterRateCache = {
+          basePrice: currentRate.get('basePrice') || 760,
+          hourlyRate: currentRate.get('hourlyRate') || 640,
+        };
+      } else {
+        // Fallback to default values
+        this.greeterRateCache = {
+          basePrice: 760,
+          hourlyRate: 640,
+        };
+      }
+
+      this.greeterRateCacheTime = now;
+
+      logger.debug('Greeter rate configuration loaded', {
+        cached: this.greeterRateCache,
+        cacheTime: this.greeterRateCacheTime,
+      });
+
+      return this.greeterRateCache;
+    } catch (error) {
+      logger.error('Failed to load greeter rate configuration, using fallback', {
+        error: error.message,
+      });
+
+      // Return fallback values on error
+      const fallback = { basePrice: 760, hourlyRate: 640 };
+      this.greeterRateCache = fallback;
+      this.greeterRateCacheTime = now;
+
+      return fallback;
+    }
+  }
+
+  /**
+   * Calculate greeter service price based on duration using configurable rates.
+   * Formula: basePrice + (hourlyRate * duration)
+   * Note: Special rounding is now applied to final service totals, not individual greeter calculations.
+   * @param {number} duration - Duration in hours (can be decimal).
+   * @returns {Promise<number>} Calculated greeter price (unrounded).
+   * @example
+   * const price = await pricingHelper.calculateGreeterPrice(0.5);
+   * // Uses current configured rates, e.g.: 760 + (640 * 0.5) = 1080 (unrounded)
+   */
+  async calculateGreeterPrice(duration) {
+    // Get current greeter configuration
+    const config = await this.getCurrentGreeterRate();
+    const { basePrice, hourlyRate } = config;
+
     // Validate duration
     if (!duration || duration <= 0) {
       logger.debug('Duration is zero or negative, returning base greeter price', {
         duration,
+        basePrice,
       });
-      return 760; // Return base price if no duration
+      return basePrice;
     }
 
-    // Calculate raw price using formula: 760 + (640 * duration)
-    const rawPrice = 760 + (640 * duration);
+    // Calculate final price using configurable formula (no special rounding applied here)
+    const finalPrice = basePrice + (hourlyRate * duration);
 
-    // Apply special rounding logic
-    // Get the last two digits of the integer part
-    const integerPart = Math.floor(rawPrice);
-    const lastTwoDigits = integerPart % 100;
-
-    // If last two digits < 50, round down to nearest 100; otherwise round up
-    let roundedPrice;
-    if (lastTwoDigits === 0) {
-      // Already a multiple of 100
-      roundedPrice = integerPart;
-    } else if (lastTwoDigits < 50) {
-      // Round down to nearest 100
-      roundedPrice = Math.floor(integerPart / 100) * 100;
-    } else {
-      // Round up to nearest 100
-      roundedPrice = Math.ceil(integerPart / 100) * 100;
-    }
-
-    logger.debug('Greeter price calculated', {
+    logger.debug('Greeter price calculated with configurable rates (unrounded)', {
       duration,
-      rawPrice,
-      integerPart,
-      lastTwoDigits,
-      roundedPrice,
+      basePrice,
+      hourlyRate,
+      finalPrice,
     });
 
-    return roundedPrice;
+    return finalPrice;
   }
 
   /**
