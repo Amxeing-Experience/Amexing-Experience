@@ -19,7 +19,6 @@ class SettingsController {
    * @returns {Promise<void>} Express response with cash rounding setting.
    * @example
    * // GET /api/settings/cash-rounding
-   * // Returns: { success: true, data: { enabled: true, lastUpdated: "2024-01-01" } }
    */
   async getCashRoundingSetting(req, res) {
     try {
