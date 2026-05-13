@@ -838,6 +838,33 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <span class="input-group-text">MXN</span>
                             </div>
                             
+                            <!-- Development Mode: Payment Type Prices Display -->
+                            <div id="devPaymentPrices" class="d-none mt-3">
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small">💰 Precio Efectivo (base)</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">$</span>
+                                            <input type="text" class="form-control" id="devPriceEfectivo" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small">🏦 Precio Transferencia</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">$</span>
+                                            <input type="text" class="form-control" id="devPriceTransferencia" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small">💳 Precio Tarjeta</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">$</span>
+                                            <input type="text" class="form-control" id="devPriceTarjeta" readonly>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <!-- Tour Vehicle Price Override Toggle (Admin Only) -->
                             <% if (canEditPrices) { %>
                             <div class="form-check mt-2 d-none" id="tourVehicleOverridePricesContainer">
@@ -986,6 +1013,32 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             <span>Total servicio</span>
                             <span id="breakdownTotal"></span>
                         </div>
+                    </div>
+
+                    <!-- Development Mode: Payment Type Breakdown Display -->
+                    <div id="devPaymentBreakdown" class="d-none mb-3">
+                        <div class="fw-semibold mb-2 text-muted">
+                            <i class="ti ti-calculator me-1"></i>Desglose por Tipo de Pago (Dev)
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small">💰 Desglose Efectivo</label>
+                                <textarea class="form-control form-control-sm" id="devBreakdownEfectivo" rows="3" readonly style="font-size: 0.75rem; font-family: monospace;"></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small">🏦 Desglose Transferencia</label>
+                                <textarea class="form-control form-control-sm" id="devBreakdownTransferencia" rows="3" readonly style="font-size: 0.75rem; font-family: monospace;"></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small">💳 Desglose Tarjeta</label>
+                                <textarea class="form-control form-control-sm" id="devBreakdownTarjeta" rows="3" readonly style="font-size: 0.75rem; font-family: monospace;"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Debug Payment Types Section (Development Mode Only) -->
+                    <div id="debugPaymentTypes" class="d-none mb-3">
+                        <!-- Content will be populated by JavaScript -->
                     </div>
 
                     <div class="form-check mb-3" id="includeInTotalContainer" style="display: none;">

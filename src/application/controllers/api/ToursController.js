@@ -331,15 +331,38 @@ class ToursController {
         return this.sendError(res, 'ID de tour requerido', 400);
       }
 
+      // Support includeInactive parameter for admin views
+      const includeInactive = req.query.includeInactive === 'true';
+
+      logger.info('getTourById called:', { tourId, includeInactive, user: currentUser.id });
+
       const query = new Parse.Query('Tour');
       query.equalTo('exists', true);
+
+      // Only filter by active status if includeInactive is not true
+      if (!includeInactive) {
+        query.equalTo('active', true);
+      }
+
       query.include(['destinationPOI']);
 
       const tour = await query.get(tourId, { useMasterKey: true });
 
       if (!tour) {
+        logger.warn('Tour not found:', {
+          tourId, includeInactive, exists: true, active: !includeInactive,
+        });
         return this.sendError(res, 'Tour no encontrado', 404);
       }
+
+      logger.info('Tour found successfully:', {
+        tourId,
+        tourActive: tour.get('active'),
+        tourExists: tour.get('exists'),
+        destinationPOIRaw: tour.get('destinationPOI'),
+        destinationPOIId: tour.get('destinationPOI')?.id,
+        destinationPOIName: tour.get('destinationPOI')?.get?.('name'),
+      });
 
       const destinationPOI = tour.get('destinationPOI');
 
@@ -1093,7 +1116,7 @@ class ToursController {
    */
   async getToursWithRatePrices(req, res) {
     try {
-      const { rateId, clientId } = req.query;
+      const { rateId, clientId, includeInactive } = req.query;
 
       if (!rateId) {
         return res.status(400).json({
@@ -1103,9 +1126,14 @@ class ToursController {
         });
       }
 
-      // Get all active tours
+      // Get tours based on includeInactive parameter
       const toursQuery = new Parse.Query('Tour');
-      toursQuery.equalTo('active', true);
+
+      // Only filter by active status if includeInactive is not true
+      if (includeInactive !== 'true') {
+        toursQuery.equalTo('active', true);
+      }
+
       toursQuery.equalTo('exists', true);
       toursQuery.include(['destinationPOI']);
       toursQuery.ascending('destinationPOI.name');

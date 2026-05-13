@@ -892,6 +892,9 @@
             ]);
             <% } %>
 
+            // Store quote data globally for payment type changes
+            window.currentQuoteData = quote;
+            
             // Render services table
             renderServicesTable(quote.serviceItems, quote.numberOfPeople || 0);
 
@@ -1049,7 +1052,12 @@
             let dayTotal = 0;
             if (day.subconcepts && day.subconcepts.length > 0) {
                 day.subconcepts.forEach(sc => {
-                    if (sc.total != null) dayTotal += sc.total;
+                    // Use pricesByType if available for day total calculation
+                    let servicePrice = sc.total;
+                    if (sc.pricesByType && typeof sc.pricesByType === 'object' && savedPayment) {
+                        servicePrice = sc.pricesByType[savedPayment] || sc.total;
+                    }
+                    if (servicePrice != null) dayTotal += servicePrice;
                 });
             }
 
@@ -1065,7 +1073,13 @@
                 day.subconcepts.forEach((sc) => {
                     const color = typeColors[sc.type] || '#6c757d';
                     const label = getExperienceLabel(sc);
-                    const total = sc.total != null ? currencyFormatter.format(sc.total) : '-';
+                    
+                    // Use pricesByType if available, fallback to original total
+                    let servicePrice = sc.total;
+                    if (sc.pricesByType && typeof sc.pricesByType === 'object' && savedPayment) {
+                        servicePrice = sc.pricesByType[savedPayment] || sc.total;
+                    }
+                    const total = servicePrice != null ? currencyFormatter.format(servicePrice) : '-';
 
                     const paymentHtml = '';
 
@@ -1144,12 +1158,17 @@
 
         container.innerHTML = html;
 
-        // Calculate totals
+        // Calculate totals using payment-specific prices
         let serviceTotal = 0;
         serviceItems.days.forEach(day => {
             if (day.subconcepts && day.subconcepts.length > 0) {
                 day.subconcepts.forEach(sc => {
-                    if (sc.total != null) serviceTotal += sc.total;
+                    // Use pricesByType if available for total calculation
+                    let servicePrice = sc.total;
+                    if (sc.pricesByType && typeof sc.pricesByType === 'object' && savedPayment) {
+                        servicePrice = sc.pricesByType[savedPayment] || sc.total;
+                    }
+                    if (servicePrice != null) serviceTotal += servicePrice;
                 });
             }
         });
@@ -1183,6 +1202,30 @@
         const perPersonTotal = numberOfPeople > 0 ? actualTotal / numberOfPeople : 0;
         document.getElementById('summaryPerPerson').textContent = currencyFormatter.format(perPersonTotal);
         document.getElementById('summaryPersonCount').textContent = `(${numberOfPeople})`;
+    }
+
+    // Function to handle payment type changes and recalculate totals
+    function handlePaymentTypeChange(newPaymentType) {
+        console.log('Payment type changed to:', newPaymentType);
+        
+        // Update the displayed payment type
+        const paymentLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta de Crédito/Débito' };
+        document.getElementById('summaryPaymentType').textContent = paymentLabels[newPaymentType] || newPaymentType;
+        
+        // Get current serviceItems and re-render with new payment type
+        const currentServiceItems = window.currentQuoteData?.serviceItems;
+        if (currentServiceItems) {
+            // Temporarily update payment type for calculation
+            const originalPaymentType = currentServiceItems.paymentType;
+            currentServiceItems.paymentType = newPaymentType;
+            
+            // Re-render the services table with new payment type
+            const numberOfPeople = parseInt(document.getElementById('summaryNumberOfPeople').textContent) || 0;
+            renderServicesTable(currentServiceItems, numberOfPeople);
+            
+            // Restore original payment type (don't modify the source data)
+            currentServiceItems.paymentType = originalPaymentType;
+        }
     }
 
     function renderSummaryTransport(sc) {
