@@ -1457,6 +1457,168 @@ class QuoteController {
   }
 
   /**
+   * POST /api/quotes/:id/convert-to-reservation - Convert quote to reservation.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * // Convert quote to reservation
+   * // Request body: { currentStatus: 'quoted' }
+   * // Response: { success: true, message: 'Reservación creada exitosamente', data: {...} }
+   */
+  async convertToReservation(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const quoteId = req.params.id;
+      if (!quoteId) {
+        return this.sendError(res, 'El ID de la cotización es requerido', 400);
+      }
+
+      const { currentStatus } = req.body;
+
+      logger.info('🔄 Converting quote to reservation', {
+        quoteId,
+        currentStatus,
+        userId: currentUser.id,
+        userEmail: currentUser.get('email'),
+      });
+
+      // Fetch the quote
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      query.include('client');
+      query.include('rate');
+      const quote = await query.get(quoteId, { useMasterKey: true });
+
+      if (!quote) {
+        return this.sendError(res, 'Cotización no encontrada', 404);
+      }
+
+      const quoteFolio = quote.get('folio');
+      const quoteStatus = quote.get('status');
+
+      // Check if quote can be converted (must be quoted or requested)
+      if (quoteStatus !== 'quoted' && quoteStatus !== 'requested') {
+        return this.sendError(
+          res,
+          `La cotización debe estar en estado "COTIZADO" o "SOLICITADO" para convertirse en reservación. Estado actual: ${quoteStatus}`,
+          400
+        );
+      }
+
+      let reservationData = null;
+      let statusChanged = false;
+
+      // If quote is in 'quoted' status, first update it to 'requested'
+      if (quoteStatus === 'quoted') {
+        logger.info('📝 Updating quote status from quoted to requested', {
+          quoteId,
+          quoteFolio,
+        });
+
+        // Update status to requested using the service
+        const statusResult = await this.quoteService.updateQuoteStatus(
+          currentUser,
+          quoteId,
+          'requested',
+          'Converted to reservation via button',
+          req.userRole
+        );
+
+        if (!statusResult.success) {
+          return this.sendError(res, statusResult.error || 'Error al actualizar el estado de la cotización', 500);
+        }
+
+        statusChanged = true;
+
+        // The updateQuoteStatus method already creates the reservation when changing to 'requested'
+        reservationData = statusResult.data?.reservation;
+      } else {
+        // Quote is already 'requested', check if reservation exists
+        logger.info('📋 Quote already in requested status, checking for existing reservation', {
+          quoteId,
+          quoteFolio,
+        });
+
+        // Check if reservation already exists
+        const reservationQuery = new Parse.Query('Reservation');
+        reservationQuery.equalTo('quoteFolio', quoteFolio);
+        reservationQuery.equalTo('exists', true);
+        const existingReservation = await reservationQuery.first({ useMasterKey: true });
+
+        if (existingReservation) {
+          logger.info('✅ Reservation already exists for this quote', {
+            quoteId,
+            quoteFolio,
+            reservationId: existingReservation.id,
+            reservationFolio: existingReservation.get('folio'),
+          });
+
+          reservationData = {
+            id: existingReservation.id,
+            folio: existingReservation.get('folio'),
+            servicesCount: 0, // Would need to count services if needed
+          };
+        } else {
+          // Create reservation manually if it doesn't exist
+          logger.info('🆕 Creating new reservation for requested quote', {
+            quoteId,
+            quoteFolio,
+          });
+
+          reservationData = await this.quoteService.createReservationFromQuote(quote, currentUser);
+        }
+      }
+
+      // Prepare response
+      const response = {
+        success: true,
+        message: reservationData ? 'Reservación creada exitosamente' : 'Estado actualizado a SOLICITADO',
+        data: {
+          quoteId: quote.id,
+          quoteFolio,
+          quoteStatus: statusChanged ? 'requested' : quoteStatus,
+          statusChanged,
+        },
+      };
+
+      // Add reservation data if available
+      if (reservationData) {
+        response.data.reservationId = reservationData.id;
+        response.data.reservationFolio = reservationData.folio;
+        response.data.servicesCount = reservationData.servicesCount || 0;
+      }
+
+      logger.info('✅ Quote conversion completed', {
+        quoteId,
+        quoteFolio,
+        reservationCreated: !!reservationData,
+        statusChanged,
+        response: response.data,
+      });
+
+      return res.json(response);
+    } catch (error) {
+      logger.error('Error in QuoteController.convertToReservation', {
+        error: error.message,
+        stack: error.stack,
+        quoteId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al convertir la cotización en reservación',
+        500
+      );
+    }
+  }
+
+  /**
    * DELETE /api/quotes/:id - Soft delete quote.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
