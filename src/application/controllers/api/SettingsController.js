@@ -215,7 +215,6 @@ class SettingsController {
    * @returns {Promise<void>} Express response with all pricing settings.
    * @example
    * // GET /api/settings/pricing
-   * // Returns: { success: true, data: [{ key: 'cashRoundingEnabled', value: true }, ...] }
    */
   async getPricingSettings(req, res) {
     try {
