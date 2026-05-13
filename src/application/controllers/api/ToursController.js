@@ -92,8 +92,9 @@ class ToursController {
       // Check for client ID to include client-specific prices
       const { clientId } = req.query;
 
-      // Extract tour type filter
+      // Extract tour type filter and includeInactive parameter (for admin views)
       const { tourType } = req.query; // 'walking', 'vehicle', or undefined (all)
+      const includeInactive = req.query.includeInactive === 'true';
 
       // Column mapping for sorting (matches frontend columns order)
       const columns = ['destinationPOI', 'time', 'availability', 'active'];
@@ -102,7 +103,9 @@ class ToursController {
       // Get total records count (with tour type filter but without search filter)
       const totalRecordsQuery = new Parse.Query('Tour');
       totalRecordsQuery.equalTo('exists', true);
-      totalRecordsQuery.equalTo('active', true);
+      if (!includeInactive) {
+        totalRecordsQuery.equalTo('active', true);
+      }
 
       // Apply tour type filter to total count
       if (tourType === 'walking') {
@@ -115,10 +118,12 @@ class ToursController {
         useMasterKey: true,
       });
 
-      // Build base query for all active existing records
+      // Build base query for existing records (optionally include inactive)
       const baseQuery = new Parse.Query('Tour');
       baseQuery.equalTo('exists', true);
-      baseQuery.equalTo('active', true);
+      if (!includeInactive) {
+        baseQuery.equalTo('active', true);
+      }
       baseQuery.include(['destinationPOI']);
 
       // Apply tour type filter if provided
@@ -277,6 +282,20 @@ class ToursController {
         };
       });
 
+      // Debug logging before sending response
+      console.log('🔍 [TOURS API DEBUG]', {
+        tourType,
+        includeInactive,
+        totalTours: data.length,
+        activeTours: data.filter((t) => t.active).length,
+        inactiveTours: data.filter((t) => !t.active).length,
+        tourSample: data.slice(0, 3).map((t) => ({
+          name: t.destinationPOI?.name,
+          active: t.active,
+          isWalkingTour: t.isWalkingTour,
+        })),
+      });
+
       // Send DataTables response (standardized format matching Services)
       res.json({
         success: true,
@@ -312,15 +331,38 @@ class ToursController {
         return this.sendError(res, 'ID de tour requerido', 400);
       }
 
+      // Support includeInactive parameter for admin views
+      const includeInactive = req.query.includeInactive === 'true';
+
+      logger.info('getTourById called:', { tourId, includeInactive, user: currentUser.id });
+
       const query = new Parse.Query('Tour');
       query.equalTo('exists', true);
+
+      // Only filter by active status if includeInactive is not true
+      if (!includeInactive) {
+        query.equalTo('active', true);
+      }
+
       query.include(['destinationPOI']);
 
       const tour = await query.get(tourId, { useMasterKey: true });
 
       if (!tour) {
+        logger.warn('Tour not found:', {
+          tourId, includeInactive, exists: true, active: !includeInactive,
+        });
         return this.sendError(res, 'Tour no encontrado', 404);
       }
+
+      logger.info('Tour found successfully:', {
+        tourId,
+        tourActive: tour.get('active'),
+        tourExists: tour.get('exists'),
+        destinationPOIRaw: tour.get('destinationPOI'),
+        destinationPOIId: tour.get('destinationPOI')?.id,
+        destinationPOIName: tour.get('destinationPOI')?.get?.('name'),
+      });
 
       const destinationPOI = tour.get('destinationPOI');
 
@@ -1074,7 +1116,7 @@ class ToursController {
    */
   async getToursWithRatePrices(req, res) {
     try {
-      const { rateId, clientId } = req.query;
+      const { rateId, clientId, includeInactive } = req.query;
 
       if (!rateId) {
         return res.status(400).json({
@@ -1084,9 +1126,14 @@ class ToursController {
         });
       }
 
-      // Get all active tours
+      // Get tours based on includeInactive parameter
       const toursQuery = new Parse.Query('Tour');
-      toursQuery.equalTo('active', true);
+
+      // Only filter by active status if includeInactive is not true
+      if (includeInactive !== 'true') {
+        toursQuery.equalTo('active', true);
+      }
+
       toursQuery.equalTo('exists', true);
       toursQuery.include(['destinationPOI']);
       toursQuery.ascending('destinationPOI.name');

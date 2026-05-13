@@ -111,7 +111,7 @@
                     <tr>
                         <td align="center"
                             style="background-color: #2e2e2d; padding: 40px 20px 40px 20px; border-radius: 10px 10px 0 0;">
-                            <img src="{{LOGO_URL}}" alt="Amexing Experience"
+                            <img src="http://localhost:1337/img/amexing_logo_hblanco.avif" alt="Amexing Experience"
                                 style="display: block; max-width: 200px; width: 100%; height: auto;">
                         </td>
                     </tr>
@@ -127,19 +127,30 @@
                             <!-- Título del mensaje -->
                             <h1
                                 style="color: #1a1a1a; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; margin: 0 0 20px 0; text-align: center;">
-                                {{TITULO_PRINCIPAL}}
+                                Confirmación de Reserva
                             </h1>
 
                             <!-- Saludo -->
                             <p
                                 style="color: #333333; font-family: Arial, sans-serif; font-size: 16px; line-height: 24px; margin: 0 0 20px 0;">
-                                Estimado/a {{NOMBRE_CLIENTE}},
+                                Estimado/a Dennis Maldonado,
                             </p>
 
                             <!-- Contenido del mensaje -->
                             <div
                                 style="color: #555555; font-family: Arial, sans-serif; font-size: 15px; line-height: 24px; margin: 0 0 30px 0;">
-                                {{CONTENIDO_MENSAJE}}
+
+                                Nos complace confirmar su reservación para nuestro tour por el Centro Histórico de San
+                                Miguel de Allende.
+                                <br><br>
+                                Su experiencia incluye:
+                                <ul>
+                                    <li>🚶‍♀️ Walking Tour guiado de 2 horas</li>
+                                    <li>📸 Sesión fotográfica en ubicaciones emblemáticas</li>
+                                    <li>🏛️ Acceso a sitios históricos especiales</li>
+                                    <li>🍹 Bebida de bienvenida en ubicación secreta</li>
+                                </ul>
+
                             </div>
 
                             <!-- Sección de detalles (para reservas/confirmaciones) -->
@@ -159,7 +170,7 @@
                                         </td>
                                         <td style="padding: 8px 0; text-align: right;">
                                             <span
-                                                style="color: #2e2e2d; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;">{{NUMERO_RESERVA}}</span>
+                                                style="color: #2e2e2d; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;">AMX-TEST-2026-001</span>
                                         </td>
                                     </tr>
                                     <tr>
@@ -169,7 +180,8 @@
                                         </td>
                                         <td style="padding: 8px 0; text-align: right;">
                                             <span
-                                                style="color: #555555; font-family: Arial, sans-serif; font-size: 14px;">{{FECHA}}</span>
+                                                style="color: #555555; font-family: Arial, sans-serif; font-size: 14px;">Viernes,
+                                                14 de Mayo, 2026</span>
                                         </td>
                                     </tr>
                                     <tr>
@@ -180,7 +192,8 @@
                                         </td>
                                         <td style="padding: 8px 0; text-align: right;">
                                             <span
-                                                style="color: #555555; font-family: Arial, sans-serif; font-size: 14px;">{{HORA}}</span>
+                                                style="color: #555555; font-family: Arial, sans-serif; font-size: 14px;">4
+                                                personas</span>
                                         </td>
                                     </tr>
                                 </table>
@@ -188,16 +201,17 @@
 
                             <!-- Botón de acción -->
                             <div style="text-align: center; margin: 0 0 30px 0;">
-                                <a href="{{URL_BOTON}}"
+                                <a href="https://amexingexperience.com/reservations/AMX-TEST-2026-001"
                                     style="background-color: #2e2e2d; color: #ffffff; display: inline-block; font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; line-height: 50px; text-align: center; text-decoration: none; width: 250px; -webkit-text-size-adjust: none; border-radius: 25px;">
-                                    {{TEXTO_BOTON}}
+                                    Ver Mi Reservación
                                 </a>
                             </div>
 
                             <!-- Mensaje adicional -->
                             <p
                                 style="color: #555555; font-family: Arial, sans-serif; font-size: 14px; line-height: 22px; margin: 0 0 20px 0; text-align: center;">
-                                {{MENSAJE_ADICIONAL}}
+                                Este es un email de prueba para verificar los nuevos colores del template. Los fondos
+                                rojos han sido cambiados a #2e2e2d.
                             </p>
                         </td>
                     </tr>
@@ -220,7 +234,8 @@
                                                         style="color: #555555; font-family: Arial, sans-serif; font-size: 14px; margin: 0;">
                                                         <strong>Teléfono:</strong><br>
                                                         <a href="tel:+524151533818"
-                                                            style="color: #2e2e2d; text-decoration: none;">{{TELEFONO}}</a>
+                                                            style="color: #2e2e2d; text-decoration: none;">+52 (415) 167
+                                                            39 90</a>
                                                     </p>
                                                 </td>
                                                 <td style="padding: 0 15px;">
@@ -228,7 +243,7 @@
                                                         style="color: #555555; font-family: Arial, sans-serif; font-size: 14px; margin: 0;">
                                                         <strong>Email:</strong><br>
                                                         <a href="mailto:contact@amexingexperience.com"
-                                                            style="color: #2e2e2d; text-decoration: none;">{{EMAIL_CONTACTO}}</a>
+                                                            style="color: #2e2e2d; text-decoration: none;">contact@amexingexperience.com</a>
                                                     </p>
                                                 </td>
                                             </tr>
@@ -240,7 +255,7 @@
                             <p
                                 style="color: #555555; font-family: Arial, sans-serif; font-size: 13px; margin: 20px 0 0 0; text-align: center;">
                                 <strong>Emergencias 24/7:</strong> <a href="tel:+524151535067"
-                                    style="color: #2e2e2d; text-decoration: none;">{{TELEFONO_EMERGENCIAS}}</a>
+                                    style="color: #2e2e2d; text-decoration: none;">+52 (415) 153 50 67</a>
                             </p>
                         </td>
                     </tr>
@@ -251,7 +266,7 @@
                             <!-- Tagline -->
                             <p
                                 style="color: #ffffff; font-family: Arial, sans-serif; font-size: 16px; font-style: italic; margin: 0 0 20px 0; text-align: center;">
-                                "{{TAGLINE}}"
+                                "Elevamos la experiencia de viaje en San Miguel de Allende"
                             </p>
 
                             <!-- Redes sociales -->
@@ -261,14 +276,16 @@
                                         <table cellpadding="0" cellspacing="0" border="0">
                                             <tr>
                                                 <td style="padding: 0 10px;">
-                                                    <a href="{{INSTAGRAM}}" style="text-decoration: none;">
+                                                    <a href="https://www.instagram.com/amexingexperience/"
+                                                        style="text-decoration: none;">
                                                         <img src="https://cdn-icons-png.flaticon.com/512/174/174855.png"
                                                             alt="Instagram" width="30" height="30"
                                                             style="display: block;">
                                                     </a>
                                                 </td>
                                                 <td style="padding: 0 10px;">
-                                                    <a href="{{FACEBOOK}}" style="text-decoration: none;">
+                                                    <a href="https://www.facebook.com/amexingexperience/"
+                                                        style="text-decoration: none;">
                                                         <img src="https://cdn-icons-png.flaticon.com/512/174/174848.png"
                                                             alt="Facebook" width="30" height="30"
                                                             style="display: block;">
@@ -280,7 +297,7 @@
                                                         <tr>
                                                             <td align="center" valign="middle"
                                                                 style="width: 30px; height: 30px; line-height: 30px;">
-                                                                <a href="{{TRIPADVISOR}}"
+                                                                <a href="https://www.tripadvisor.com.mx/Attraction_Review-g151932-d19425238-Reviews-Amexing_Experience_by_Angelica_Tours-San_Miguel_de_Allende_Central_Mexico_and_Gu.html"
                                                                     style="color: white; font-weight: bold; font-size: 16px; font-family: Arial, sans-serif; text-decoration: none; display: block;">T</a>
                                                             </td>
                                                         </tr>
@@ -298,9 +315,10 @@
                                     <td align="center">
                                         <p
                                             style="color: #cccccc; font-family: Arial, sans-serif; font-size: 13px; margin: 0;">
-                                            <a href="{{SITIO_WEB}}" style="color: #2e2e2d; text-decoration: none;">Sitio
+                                            <a href="https://www.amexingexperience.com"
+                                                style="color: #2e2e2d; text-decoration: none;">Sitio
                                                 web</a> |
-                                            <a href="{{AVISO_PRIVACIDAD}}"
+                                            <a href="https://www.amexingexperience.com/privacidad"
                                                 style="color: #2e2e2d; text-decoration: none;">Aviso de privacidad</a>
                                         </p>
                                     </td>
@@ -310,7 +328,7 @@
                             <!-- Copyright -->
                             <p
                                 style="color: #999999; font-family: Arial, sans-serif; font-size: 12px; margin: 20px 0 0 0; text-align: center;">
-                                © {{AÑO}} Amexing Experience. Todos los derechos reservados.
+                                © 2026 Amexing Experience. Todos los derechos reservados.
                             </p>
                         </td>
                     </tr>

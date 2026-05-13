@@ -255,6 +255,214 @@ class GuideTransportRateController {
       });
     }
   }
+
+  /**
+   * Get current formula configuration.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Express response with formula configuration.
+   * @example
+   * // GET /api/guide-transport-rate/formula
+   * // Returns current formula configuration
+   */
+  async getFormulaConfiguration(req, res) {
+    try {
+      const config = await GuideTransportRate.getFormulaConfiguration();
+
+      res.json({
+        success: true,
+        config,
+      });
+    } catch (error) {
+      logger.error('Error getting formula configuration:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error retrieving formula configuration',
+      });
+    }
+  }
+
+  /**
+   * Update formula configuration.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Express response with updated configuration.
+   * @example
+   * // PUT /api/guide-transport-rate/formula
+   * // Body: { formulaComponents: [...], minimumCharge: 100 }
+   * // Updates formula configuration for current active rate
+   */
+  async updateFormulaConfiguration(req, res) {
+    try {
+      const { formulaComponents, roundTripMultiplier, minimumCharge } = req.body;
+
+      // Check if we're updating with new component-based formula
+      if (formulaComponents) {
+        // Validate formula components
+        try {
+          GuideTransportRate.validateFormulaComponents(formulaComponents);
+        } catch (validationError) {
+          return res.status(400).json({
+            success: false,
+            error: `Formula validation failed: ${validationError.message}`,
+          });
+        }
+
+        // Validate minimum charge if provided
+        const numMinimum = parseFloat(minimumCharge) || 0;
+        if (numMinimum < 0 || numMinimum > 10000) {
+          return res.status(400).json({
+            success: false,
+            error: 'Minimum charge must be between 0 and 10000',
+          });
+        }
+
+        // Get user from authenticated request
+        const user = req.user || null;
+
+        // Ensure default rate exists before updating formula
+        await GuideTransportRate.createDefaultIfNotExists();
+
+        // Update formula configuration with components
+        const updatedRate = await GuideTransportRate.updateFormulaConfiguration({
+          formulaComponents,
+          minimumCharge: numMinimum,
+        }, user);
+
+        logger.info('Formula configuration updated with components', {
+          userId: user?.id,
+          rateId: updatedRate.id,
+          componentsCount: formulaComponents.length,
+          minimumCharge: numMinimum,
+        });
+
+        // Get updated configuration
+        const config = await GuideTransportRate.getFormulaConfiguration();
+
+        res.json({
+          success: true,
+          message: 'Formula configuration updated successfully',
+          config,
+        });
+      } else if (roundTripMultiplier !== undefined && roundTripMultiplier !== null) {
+        // Legacy update with multiplier
+        const numMultiplier = parseFloat(roundTripMultiplier);
+        const numMinimum = parseFloat(minimumCharge) || 0;
+
+        if (numMultiplier < 1 || numMultiplier > 5) {
+          return res.status(400).json({
+            success: false,
+            error: 'Round trip multiplier must be between 1 and 5',
+          });
+        }
+
+        if (numMinimum < 0 || numMinimum > 10000) {
+          return res.status(400).json({
+            success: false,
+            error: 'Minimum charge must be between 0 and 10000',
+          });
+        }
+
+        // Get user from authenticated request
+        const user = req.user || null;
+
+        // Ensure default rate exists before updating formula
+        await GuideTransportRate.createDefaultIfNotExists();
+
+        // Update formula configuration
+        const updatedRate = await GuideTransportRate.updateFormulaConfiguration({
+          roundTripMultiplier: numMultiplier,
+          minimumCharge: numMinimum,
+        }, user);
+
+        logger.info('Formula configuration updated', {
+          userId: user?.id,
+          rateId: updatedRate.id,
+          roundTripMultiplier: numMultiplier,
+          minimumCharge: numMinimum,
+        });
+
+        // Get updated configuration
+        const config = await GuideTransportRate.getFormulaConfiguration();
+
+        res.json({
+          success: true,
+          message: 'Formula configuration updated successfully',
+          config,
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'Either formulaComponents or roundTripMultiplier is required',
+        });
+      }
+    } catch (error) {
+      logger.error('Error updating formula configuration:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error updating formula configuration',
+      });
+    }
+  }
+
+  /**
+   * Simulate formula calculation with given parameters.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Express response with calculation result.
+   * @example
+   * // POST /api/guide-transport-rate/simulate
+   * // Body: { durationMinutes: 30, customRate: 450 }
+   * // Returns calculation result using current formula
+   */
+  async simulateCalculation(req, res) {
+    try {
+      const { durationMinutes, customRate } = req.body;
+
+      // Validate required fields
+      if (!durationMinutes || Number.isNaN(Number(durationMinutes))) {
+        return res.status(400).json({
+          success: false,
+          error: 'Valid duration in minutes is required',
+        });
+      }
+
+      // Validate duration range
+      const numDuration = parseFloat(durationMinutes);
+      if (numDuration <= 0 || numDuration > 1440) { // 1440 = 24 hours
+        return res.status(400).json({
+          success: false,
+          error: 'Duration must be between 1 and 1440 minutes',
+        });
+      }
+
+      // Validate custom rate if provided
+      let numRate = null;
+      if (customRate !== undefined && customRate !== null) {
+        numRate = parseFloat(customRate);
+        if (Number.isNaN(numRate) || numRate <= 0 || numRate > 10000) {
+          return res.status(400).json({
+            success: false,
+            error: 'Custom rate must be between 1 and 10000',
+          });
+        }
+      }
+
+      // Calculate using current formula
+      const result = await GuideTransportRate.calculateCost(numDuration, numRate);
+
+      res.json({
+        success: true,
+        calculation: result,
+      });
+    } catch (error) {
+      logger.error('Error simulating formula calculation:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error performing calculation simulation',
+      });
+    }
+  }
 }
 
 module.exports = new GuideTransportRateController();

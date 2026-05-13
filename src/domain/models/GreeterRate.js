@@ -1,71 +1,70 @@
 /**
- * GuideTransportRate Parse Object Model
- * Manages guide pricing rates for transportation services
+ * GreeterRate Parse Object Model
+ * Manages greeter pricing rates and formula configuration
  * Created by Denisse Maldonado.
  */
 
 const Parse = require('parse/node');
 
 /**
- * GuideTransportRate class for managing guide transport pricing.
+ * GreeterRate class for managing greeter pricing.
  */
-class GuideTransportRate extends Parse.Object {
+class GreeterRate extends Parse.Object {
   constructor() {
-    super('GuideTransportRate');
+    super('GreeterRate');
   }
 
   /**
-   * Get current active guide transport rate.
-   * @returns {Promise<GuideTransportRate|null>} Current rate or null.
+   * Get current active greeter rate.
+   * @returns {Promise<GreeterRate|null>} Current rate or null.
    * @example
-   * const currentRate = await GuideTransportRate.getCurrentRate();
+   * const currentRate = await GreeterRate.getCurrentRate();
    */
   static async getCurrentRate() {
     try {
-      const query = new Parse.Query(GuideTransportRate);
+      const query = new Parse.Query(GreeterRate);
       query.equalTo('active', true);
       query.equalTo('exists', true);
       query.descending('effectiveDate');
       query.limit(1);
-      // Don't use select to ensure all fields are fetched including arrays
       query.include('createdBy');
 
       const result = await query.first({ useMasterKey: true });
 
-      // Debug logging to trace the issue
       if (result) {
-        console.log('getCurrentRate - Retrieved rate:', {
+        console.log('getCurrentRate - Retrieved greeter rate:', {
           id: result.id,
           hasFormulaComponents: !!result.get('formulaComponents'),
           formulaComponentsLength: result.get('formulaComponents')?.length || 0,
           formulaVersion: result.get('formulaVersion'),
-          roundTripMultiplier: result.get('roundTripMultiplier'),
+          basePrice: result.get('basePrice'),
+          hourlyRate: result.get('hourlyRate'),
         });
       }
 
       return result;
     } catch (error) {
-      // Use logger instead of console for production
       const logger = require('../../infrastructure/logger');
-      logger.error('Error getting current guide transport rate:', error);
+      logger.error('Error getting current greeter rate:', error);
       return null;
     }
   }
 
   /**
-   * Create a new guide transport rate.
-   * @param {number} value - Rate value in MXN.
+   * Create a new greeter rate.
+   * @param {number} basePrice - Base price (default: 760 MXN).
+   * @param {number} hourlyRate - Hourly rate (default: 640 MXN).
    * @param {Date} effectiveDate - When the rate becomes effective.
    * @param {Parse.User} createdBy - User creating the rate.
    * @param {string} notes - Optional notes.
-   * @returns {Promise<GuideTransportRate>} Created rate.
+   * @returns {Promise<GreeterRate>} Created rate.
    * @example
-   * const rate = await GuideTransportRate.createRate(450, new Date(), user, 'New rate');
+   * const rate = await GreeterRate.createRate(760, 640, new Date(), user, 'New rate');
    */
-  static async createRate(value, effectiveDate, createdBy, notes = '') {
+  static async createRate(basePrice, hourlyRate, effectiveDate, createdBy, notes = '') {
     try {
       // Deactivate any existing active rates
-      const activeRatesQuery = new Parse.Query(GuideTransportRate);
+      const activeRatesQuery = new Parse.Query(GreeterRate);
       activeRatesQuery.equalTo('active', true);
       activeRatesQuery.equalTo('exists', true);
 
@@ -79,25 +78,24 @@ class GuideTransportRate extends Parse.Object {
       await Promise.all(deactivatePromises);
 
       // Create new rate
-      const newRate = new GuideTransportRate();
-      newRate.set('value', parseFloat(value));
+      const newRate = new GreeterRate();
+      newRate.set('basePrice', parseFloat(basePrice) || 760);
+      newRate.set('hourlyRate', parseFloat(hourlyRate) || 640);
       newRate.set('effectiveDate', new Date(effectiveDate));
       newRate.set('notes', notes || '');
       newRate.set('active', true);
       newRate.set('exists', true);
       newRate.set('createdBy', createdBy);
 
-      // Set default formula configuration if not provided
-      newRate.set('roundTripMultiplier', 2);
-      newRate.set('minimumCharge', 0);
+      // Set default formula configuration
       newRate.set('formulaVersion', '1.0');
+      newRate.set('hasSpecialRounding', true);
 
       const savedRate = await newRate.save(null, { useMasterKey: true });
       return savedRate;
     } catch (error) {
-      // Use logger instead of console for production
       const logger = require('../../infrastructure/logger');
-      logger.error('Error creating guide transport rate:', error);
+      logger.error('Error creating greeter rate:', error);
       throw error;
     }
   }
@@ -108,11 +106,11 @@ class GuideTransportRate extends Parse.Object {
    * @param {number} limit - Number of items per page.
    * @returns {Promise<{data: Array, total: number}>} Paginated results.
    * @example
-   * const history = await GuideTransportRate.getHistory(0, 10);
+   * const history = await GreeterRate.getHistory(0, 10);
    */
   static async getHistory(page = 0, limit = 10) {
     try {
-      const query = new Parse.Query(GuideTransportRate);
+      const query = new Parse.Query(GreeterRate);
       query.equalTo('exists', true);
       query.descending('effectiveDate');
       query.include('createdBy');
@@ -122,7 +120,7 @@ class GuideTransportRate extends Parse.Object {
       const results = await query.find({ useMasterKey: true });
 
       // Get total count
-      const countQuery = new Parse.Query(GuideTransportRate);
+      const countQuery = new Parse.Query(GreeterRate);
       countQuery.equalTo('exists', true);
       const total = await countQuery.count({ useMasterKey: true });
 
@@ -131,45 +129,42 @@ class GuideTransportRate extends Parse.Object {
         total,
       };
     } catch (error) {
-      // Use logger instead of console for production
       const logger = require('../../infrastructure/logger');
-      logger.error('Error getting guide transport rate history:', error);
+      logger.error('Error getting greeter rate history:', error);
       throw error;
     }
   }
 
   /**
    * Create default rate if none exists.
-   * @returns {Promise<GuideTransportRate|null>} Created default rate or null if already exists.
+   * @returns {Promise<GreeterRate|null>} Created default rate or null if already exists.
    * @example
-   * const defaultRate = await GuideTransportRate.createDefaultIfNotExists();
+   * const defaultRate = await GreeterRate.createDefaultIfNotExists();
    */
   static async createDefaultIfNotExists() {
     try {
-      const currentRate = await GuideTransportRate.getCurrentRate();
+      const currentRate = await GreeterRate.getCurrentRate();
 
       if (!currentRate) {
-        // Create default rate of 400 MXN
         const defaultUser = (await new Parse.Query(Parse.User).equalTo('username', 'system').first({ useMasterKey: true })) || null;
 
-        const defaultRate = await GuideTransportRate.createRate(
-          400.0,
+        const defaultRate = await GreeterRate.createRate(
+          760.0, // Base price
+          640.0, // Hourly rate
           new Date(),
           defaultUser,
           'Tarifa por defecto creada automáticamente'
         );
 
-        // Use logger instead of console for production
         const logger = require('../../infrastructure/logger');
-        logger.info('✅ Default guide transport rate created:', { value: 400, currency: 'MXN' });
+        logger.info('✅ Default greeter rate created:', { basePrice: 760, hourlyRate: 640, currency: 'MXN' });
         return defaultRate;
       }
 
       return null;
     } catch (error) {
-      // Use logger instead of console for production
       const logger = require('../../infrastructure/logger');
-      logger.error('Error creating default guide transport rate:', error);
+      logger.error('Error creating default greeter rate:', error);
       throw error;
     }
   }
@@ -178,18 +173,16 @@ class GuideTransportRate extends Parse.Object {
    * Get current formula configuration.
    * @returns {Promise<object>} Current formula configuration.
    * @example
-   * const config = await GuideTransportRate.getFormulaConfiguration();
+   * const config = await GreeterRate.getFormulaConfiguration();
    */
   static async getFormulaConfiguration() {
     try {
-      const currentRate = await GuideTransportRate.getCurrentRate();
+      const currentRate = await GreeterRate.getCurrentRate();
 
       if (currentRate) {
-        // Check if we have the new formula components structure
         const formulaComponents = currentRate.get('formulaComponents');
 
-        // Debug logging
-        console.log('getFormulaConfiguration - Formula data:', {
+        console.log('getFormulaConfiguration - Greeter formula data:', {
           hasComponents: !!formulaComponents,
           componentsLength: formulaComponents?.length || 0,
           firstComponent: formulaComponents?.[0],
@@ -199,33 +192,36 @@ class GuideTransportRate extends Parse.Object {
         if (formulaComponents && formulaComponents.length > 0) {
           return {
             formulaComponents,
-            minimumCharge: currentRate.get('minimumCharge') || 0,
+            basePrice: currentRate.get('basePrice') || 760,
+            hourlyRate: currentRate.get('hourlyRate') || 640,
+            hasSpecialRounding: currentRate.get('hasSpecialRounding') !== false,
             formulaVersion: currentRate.get('formulaVersion') || '2.0',
-            // Keep legacy fields for backward compatibility
-            roundTripMultiplier: currentRate.get('roundTripMultiplier') || 2,
           };
         }
 
         // Legacy format - convert to new structure
-        const multiplier = currentRate.get('roundTripMultiplier') || 2;
+        const basePrice = currentRate.get('basePrice') || 760;
+        const hourlyRate = currentRate.get('hourlyRate') || 640;
         return {
-          formulaComponents: GuideTransportRate.getDefaultFormulaComponents(multiplier),
-          minimumCharge: currentRate.get('minimumCharge') || 0,
+          formulaComponents: GreeterRate.getDefaultFormulaComponents(basePrice, hourlyRate),
+          basePrice,
+          hourlyRate,
+          hasSpecialRounding: currentRate.get('hasSpecialRounding') !== false,
           formulaVersion: currentRate.get('formulaVersion') || '1.0',
-          roundTripMultiplier: multiplier,
         };
       }
 
       // Return defaults if no rate exists
       return {
-        formulaComponents: GuideTransportRate.getDefaultFormulaComponents(),
-        minimumCharge: 0,
+        formulaComponents: GreeterRate.getDefaultFormulaComponents(),
+        basePrice: 760,
+        hourlyRate: 640,
+        hasSpecialRounding: true,
         formulaVersion: '2.0',
-        roundTripMultiplier: 2,
       };
     } catch (error) {
       const logger = require('../../infrastructure/logger');
-      logger.error('Error getting formula configuration:', error);
+      logger.error('Error getting greeter formula configuration:', error);
       throw error;
     }
   }
@@ -234,156 +230,199 @@ class GuideTransportRate extends Parse.Object {
    * Update formula configuration for current active rate.
    * @param {object} config - Formula configuration object.
    * @param {Array} config.formulaComponents - Array of formula components.
-   * @param {number} config.minimumCharge - Minimum charge amount.
-   * @param {number} config.roundTripMultiplier - Legacy: Round trip multiplier.
+   * @param {number} config.basePrice - Base price amount.
+   * @param {number} config.hourlyRate - Hourly rate amount.
+   * @param {boolean} config.hasSpecialRounding - Whether to apply special rounding.
    * @param {Parse.User} updatedBy - User updating the configuration.
-   * @returns {Promise<GuideTransportRate>} Updated rate object.
+   * @returns {Promise<GreeterRate>} Updated rate object.
    * @example
-   * const updated = await GuideTransportRate.updateFormulaConfiguration({
-   *   formulaComponents: [{type: 'duration_hours', operator: '*'}, ...],
-   *   minimumCharge: 100
+   * const updated = await GreeterRate.updateFormulaConfiguration({
+   *   formulaComponents: [{type: 'basePrice', operator: '+', value: 760}, ...],
+   *   basePrice: 760,
+   *   hourlyRate: 640
    * }, user);
    */
   static async updateFormulaConfiguration(config, updatedBy) {
     try {
-      const currentRate = await GuideTransportRate.getCurrentRate();
+      const currentRate = await GreeterRate.getCurrentRate();
 
       if (!currentRate) {
         throw new Error('No active rate found to update formula configuration');
       }
 
-      // Validate formula components if provided
+      // Extract values for the new rate
+      const newBasePrice = parseFloat(config.basePrice) || 760;
+      const newHourlyRate = parseFloat(config.hourlyRate) || 640;
+      let formulaComponents;
+
+      // Validate and prepare formula components
       if (config.formulaComponents) {
-        GuideTransportRate.validateFormulaComponents(config.formulaComponents);
-        currentRate.set('formulaComponents', config.formulaComponents);
-        currentRate.set('formulaVersion', '2.0'); // New version for component-based formula
-      } else if (config.roundTripMultiplier !== undefined) {
+        GreeterRate.validateFormulaComponents(config.formulaComponents);
+        ({ formulaComponents } = config);
+      } else {
         // Legacy update - convert to components
-        const multiplier = parseFloat(config.roundTripMultiplier) || 2;
-        currentRate.set('formulaComponents', GuideTransportRate.getDefaultFormulaComponents(multiplier));
-        currentRate.set('roundTripMultiplier', multiplier);
-        currentRate.set('formulaVersion', '2.0');
+        formulaComponents = GreeterRate.getDefaultFormulaComponents(newBasePrice, newHourlyRate);
       }
 
-      // Update other configuration
-      if (config.minimumCharge !== undefined) {
-        currentRate.set('minimumCharge', parseFloat(config.minimumCharge) || 0);
-      }
-
+      // Deactivate the current rate to preserve history
+      currentRate.set('active', false);
       currentRate.set('lastUpdated', new Date());
       currentRate.set('lastUpdatedBy', updatedBy);
+      await currentRate.save(null, { useMasterKey: true });
 
-      const updatedRate = await currentRate.save(null, { useMasterKey: true });
-
-      // Debug logging to confirm save
-      console.log('updateFormulaConfiguration - Saved formula:', {
-        id: updatedRate.id,
-        formulaComponentsLength: updatedRate.get('formulaComponents')?.length || 0,
-        formulaVersion: updatedRate.get('formulaVersion'),
-        minimumCharge: updatedRate.get('minimumCharge'),
+      console.log('updateFormulaConfiguration - Deactivated old rate:', {
+        oldId: currentRate.id,
+        oldBasePrice: currentRate.get('basePrice'),
+        oldHourlyRate: currentRate.get('hourlyRate'),
       });
 
-      // Fetch the rate again to verify it was saved correctly
-      const verifyQuery = new Parse.Query(GuideTransportRate);
-      verifyQuery.equalTo('objectId', updatedRate.id);
-      const verifiedRate = await verifyQuery.first({ useMasterKey: true });
+      // Create a new active rate with the updated configuration
+      const newRate = new GreeterRate();
+      newRate.set('basePrice', newBasePrice);
+      newRate.set('hourlyRate', newHourlyRate);
+      newRate.set('formulaComponents', formulaComponents);
+      newRate.set('formulaVersion', '2.0');
+      newRate.set('hasSpecialRounding', config.hasSpecialRounding !== undefined ? config.hasSpecialRounding : true);
+      newRate.set('effectiveDate', new Date());
+      newRate.set('currency', 'MXN');
+      newRate.set('active', true);
+      newRate.set('exists', true);
+      newRate.set('createdBy', updatedBy);
+      newRate.set('notes', 'Formula configuration updated');
 
-      if (verifiedRate) {
-        console.log('updateFormulaConfiguration - Verified saved data:', {
-          id: verifiedRate.id,
-          hasFormulaComponents: !!verifiedRate.get('formulaComponents'),
-          formulaComponentsLength: verifiedRate.get('formulaComponents')?.length || 0,
-          firstComponent: verifiedRate.get('formulaComponents')?.[0],
-        });
-      }
+      const savedNewRate = await newRate.save(null, { useMasterKey: true });
 
-      return updatedRate;
+      console.log('updateFormulaConfiguration - Created new rate:', {
+        newId: savedNewRate.id,
+        formulaComponentsLength: savedNewRate.get('formulaComponents')?.length || 0,
+        formulaVersion: savedNewRate.get('formulaVersion'),
+        basePrice: savedNewRate.get('basePrice'),
+        hourlyRate: savedNewRate.get('hourlyRate'),
+      });
+
+      return savedNewRate;
     } catch (error) {
       const logger = require('../../infrastructure/logger');
-      logger.error('Error updating formula configuration:', error);
+      logger.error('Error updating greeter formula configuration:', error);
       throw error;
     }
   }
 
   /**
-   * Calculate guide transport cost using current formula.
+   * Calculate greeter cost using current formula with special rounding.
    * @param {number} durationMinutes - Duration in minutes.
-   * @param {number} customRate - Optional custom rate (uses current if not provided).
+   * @param {number} customBasePrice - Optional custom base price.
+   * @param {number} customHourlyRate - Optional custom hourly rate.
    * @returns {Promise<object>} Calculation result with cost and breakdown.
    * @example
-   * const result = await GuideTransportRate.calculateCost(30);
+   * const result = await GreeterRate.calculateCost(90);
    */
-  static async calculateCost(durationMinutes, customRate = null) {
+  static async calculateCost(durationMinutes, customBasePrice = null, customHourlyRate = null) {
     try {
-      const config = await GuideTransportRate.getFormulaConfiguration();
-      const currentRate = customRate || (await GuideTransportRate.getCurrentRate());
-      const rate = customRate || (currentRate ? currentRate.get('value') : 400);
+      const config = await GreeterRate.getFormulaConfiguration();
+      const currentRate = await GreeterRate.getCurrentRate();
+
+      const basePrice = customBasePrice || config.basePrice;
+      const hourlyRate = customHourlyRate || config.hourlyRate;
 
       let calculatedCost;
       let formulaString;
 
       // Check if we have component-based formula
       if (config.formulaComponents && config.formulaComponents.length > 0) {
-        const result = GuideTransportRate.evaluateFormula(
+        const result = GreeterRate.evaluateFormula(
           config.formulaComponents,
           durationMinutes,
-          rate
+          basePrice,
+          hourlyRate
         );
         calculatedCost = result.value;
         formulaString = result.formula;
       } else {
-        // Legacy calculation
+        // Default greeter formula: basePrice + (hourlyRate * duration_hours)
         const durationHours = durationMinutes / 60;
-        calculatedCost = durationHours * config.roundTripMultiplier * rate;
-        formulaString = `(${durationMinutes} ÷ 60) × ${config.roundTripMultiplier} × ${rate}`;
+        if (!durationHours || durationHours <= 0) {
+          calculatedCost = basePrice;
+        } else {
+          calculatedCost = basePrice + (hourlyRate * durationHours);
+        }
+        formulaString = `${basePrice} + (${hourlyRate} × ${durationMinutes / 60})`;
       }
 
-      // Apply minimum charge if configured
-      const finalCost = Math.max(calculatedCost, config.minimumCharge);
+      // Apply special rounding if enabled
+      let finalCost = calculatedCost;
+      if (config.hasSpecialRounding) {
+        finalCost = GreeterRate.applySpecialRounding(calculatedCost);
+      }
 
       return {
         cost: finalCost,
         breakdown: {
           durationMinutes,
           durationHours: durationMinutes / 60,
-          rate,
+          basePrice,
+          hourlyRate,
           formulaComponents: config.formulaComponents,
           formulaString,
-          minimumCharge: config.minimumCharge,
+          hasSpecialRounding: config.hasSpecialRounding,
           calculatedCost,
           finalCost,
         },
       };
     } catch (error) {
       const logger = require('../../infrastructure/logger');
-      logger.error('Error calculating guide transport cost:', error);
+      logger.error('Error calculating greeter cost:', error);
       throw error;
     }
   }
 
   /**
+   * Apply special rounding logic (same as used in quote-services-v2.js).
+   * @param {number} rawPrice - Raw calculated price.
+   * @returns {number} Rounded price.
+   * @example
+   */
+  static applySpecialRounding(rawPrice) {
+    const integerPart = Math.floor(rawPrice);
+    const lastTwoDigits = integerPart % 100;
+
+    if (lastTwoDigits === 0) return integerPart;
+    if (lastTwoDigits < 50) return Math.floor(integerPart / 100) * 100;
+    return Math.ceil(integerPart / 100) * 100;
+  }
+
+  /**
    * Get default formula components.
-   * @param {number} multiplier - Optional multiplier value (default: 2).
+   * @param {number} basePrice - Base price value (default: 760).
+   * @param {number} hourlyRate - Hourly rate value (default: 640).
    * @returns {Array} Default formula components.
    * @example
    */
-  static getDefaultFormulaComponents(multiplier = 2) {
+  static getDefaultFormulaComponents(basePrice = 760, hourlyRate = 640) {
     return [
       {
-        type: 'duration_hours',
-        label: 'Duración (horas)',
+        type: 'fixed',
+        value: basePrice,
+        label: `${basePrice} (precio base)`,
+        editable: true,
         id: 'comp_1',
       },
       {
         type: 'operator',
-        value: '*',
-        label: '×',
+        value: '+',
+        label: '+',
         id: 'op_1',
       },
       {
+        type: 'parenthesis',
+        value: '(',
+        label: '(',
+        id: 'paren_1',
+      },
+      {
         type: 'fixed',
-        value: multiplier,
-        label: `${multiplier} (viaje redondo)`,
+        value: hourlyRate,
+        label: `${hourlyRate} (tarifa por hora)`,
         editable: true,
         id: 'comp_2',
       },
@@ -394,9 +433,15 @@ class GuideTransportRate extends Parse.Object {
         id: 'op_2',
       },
       {
-        type: 'rate',
-        label: 'Tarifa guía',
+        type: 'duration_hours',
+        label: 'Duración (horas)',
         id: 'comp_3',
+      },
+      {
+        type: 'parenthesis',
+        value: ')',
+        label: ')',
+        id: 'paren_2',
       },
     ];
   }
@@ -413,7 +458,7 @@ class GuideTransportRate extends Parse.Object {
     }
 
     let expectOperator = false;
-    const validTypes = ['duration_minutes', 'duration_hours', 'rate', 'fixed', 'operator', 'parenthesis'];
+    const validTypes = ['duration_minutes', 'duration_hours', 'basePrice', 'hourlyRate', 'fixed', 'operator', 'parenthesis'];
     const validOperators = ['+', '-', '*', '/'];
 
     for (let i = 0; i < components.length; i++) {
@@ -432,24 +477,20 @@ class GuideTransportRate extends Parse.Object {
         }
         expectOperator = false;
       } else if (comp.type === 'parenthesis') {
-        // Handle parenthesis validation
         if (comp.value !== '(' && comp.value !== ')') {
           throw new Error('Invalid parenthesis');
         }
       } else {
-        // It's a value component
-        if (expectOperator && i > 0) {
+        if (expectOperator && i > 0 && components[i - 1].type !== 'parenthesis') {
           throw new Error('Expected operator between values');
         }
         if (comp.type === 'fixed' && (Number.isNaN(Number(comp.value)) || comp.value === null)) {
           throw new Error('Fixed value must be a number');
         }
-        expectOperator = true;
+        if (comp.type !== 'parenthesis') {
+          expectOperator = true;
+        }
       }
-    }
-
-    if (!expectOperator && components[components.length - 1].type !== 'parenthesis') {
-      throw new Error('Formula cannot end with an operator');
     }
   }
 
@@ -457,18 +498,20 @@ class GuideTransportRate extends Parse.Object {
    * Evaluate formula with given values.
    * @param {Array} components - Formula components.
    * @param {number} durationMinutes - Duration in minutes.
-   * @param {number} rate - Guide rate.
+   * @param {number} basePrice - Base price.
+   * @param {number} hourlyRate - Hourly rate.
    * @returns {object} Evaluation result with value and formula string.
    * @example
    */
-  static evaluateFormula(components, durationMinutes, rate) {
+  static evaluateFormula(components, durationMinutes, basePrice, hourlyRate) {
     let formulaString = '';
     let expression = '';
 
     const values = {
       duration_minutes: durationMinutes,
       duration_hours: durationMinutes / 60,
-      rate,
+      basePrice,
+      hourlyRate,
     };
 
     for (const comp of components) {
@@ -490,14 +533,11 @@ class GuideTransportRate extends Parse.Object {
     // Safely evaluate the expression
     let result;
     try {
-      // Use math expression parser to safely evaluate without eval
       // eslint-disable-next-line no-new-func
       result = new Function(`return ${expression}`)();
-      // Note: In production, consider using a proper math expression parser library
-      // like math.js or expr-eval for better security
     } catch (error) {
       const logger = require('../../infrastructure/logger');
-      logger.error('Error evaluating formula expression:', error);
+      logger.error('Error evaluating greeter formula expression:', error);
       throw new Error('Invalid formula expression');
     }
 
@@ -512,19 +552,23 @@ class GuideTransportRate extends Parse.Object {
    * Format rate value for display.
    * @returns {string} Formatted rate.
    * @example
-   * const formattedValue = rate.getFormattedValue(); // "$400.00 MXN"
+   * const formattedValue = rate.getFormattedValue(); // "$760.00 MXN (base) + $640.00 MXN/hr"
    */
   getFormattedValue() {
-    const value = this.get('value') || 0;
-    return new Intl.NumberFormat('es-MX', {
+    const basePrice = this.get('basePrice') || 760;
+    const hourlyRate = this.get('hourlyRate') || 640;
+
+    const formatCurrency = (value) => new Intl.NumberFormat('es-MX', {
       style: 'currency',
       currency: 'MXN',
       minimumFractionDigits: 2,
     }).format(value);
+
+    return `${formatCurrency(basePrice)} (base) + ${formatCurrency(hourlyRate)}/hr`;
   }
 }
 
 // Register the subclass
-Parse.Object.registerSubclass('GuideTransportRate', GuideTransportRate);
+Parse.Object.registerSubclass('GreeterRate', GreeterRate);
 
-module.exports = GuideTransportRate;
+module.exports = GreeterRate;

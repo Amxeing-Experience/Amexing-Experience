@@ -32,6 +32,11 @@ class PublicQuoteController {
     // Bind methods to maintain 'this' context
     this.viewPublicQuote = this.viewPublicQuote.bind(this);
     this.preparePublicQuoteData = this.preparePublicQuoteData.bind(this);
+
+    // Initialize experience caches for provider detection
+    this.experiencesCache = null;
+    this.providerExperiencesCache = null;
+    this.cacheLoadPromise = null;
   }
 
   /**
@@ -55,7 +60,7 @@ class PublicQuoteController {
       if (!quote) return;
 
       this.logPublicAccess(quote, req);
-      const quoteData = this.preparePublicQuoteData(quote);
+      const quoteData = await this.preparePublicQuoteData(quote);
 
       // Fetch primary images for tours and experiences
       await this.injectServiceImages(quoteData);
@@ -172,11 +177,11 @@ class PublicQuoteController {
    * Prepare quote data for public view.
    * Filters sensitive internal data before rendering.
    * @param {Quote} quote - Quote Parse object.
-   * @returns {object} Filtered quote data for public display.
+   * @returns {Promise<object>} Filtered quote data for public display.
    * @example
-   * const quoteData = controller.preparePublicQuoteData(quote);
+   * const quoteData = await controller.preparePublicQuoteData(quote);
    */
-  preparePublicQuoteData(quote) {
+  async preparePublicQuoteData(quote) {
     const rate = quote.getRate();
     const client = quote.getClient();
     const serviceItems = quote.getServiceItems() || {};
@@ -192,7 +197,7 @@ class PublicQuoteController {
       numberOfPeople: quote.getNumberOfPeople() || 1,
       eventType: quote.getEventType() || '',
       rate: this.formatRateData(rate),
-      serviceItems: this.formatServiceItems(serviceItems),
+      serviceItems: await this.formatServiceItems(serviceItems),
       createdAt: quote.get('createdAt') || null,
       updatedAt: quote.get('updatedAt') || null,
     };
@@ -212,7 +217,7 @@ class PublicQuoteController {
         lastName: client.get('lastName') || '',
         email: client.get('email') || '',
         phone: client.get('phone') || '',
-        companyName: client.get('contextualData')?.companyName || '',
+        companyName: client.get('contextualData')?.companyName || client.get('name') || '',
       }
       : null;
   }
@@ -240,13 +245,15 @@ class PublicQuoteController {
   /**
    * Format service items for public view.
    * @param {object} serviceItems - Service items object.
-   * @returns {object} Formatted service items.
+   * @returns {Promise<object>} Formatted service items.
    * @example
-   * const formattedItems = this.formatServiceItems(serviceItems);
+   * const formattedItems = await this.formatServiceItems(serviceItems);
    */
-  formatServiceItems(serviceItems) {
+  async formatServiceItems(serviceItems) {
+    const days = await Promise.all((serviceItems.days || []).map((day) => this.formatDayData(day)));
+
     return {
-      days: (serviceItems.days || []).map((day) => this.formatDayData(day)),
+      days,
       subtotal: serviceItems.subtotal || 0,
       iva: serviceItems.iva || 0,
       total: serviceItems.total || 0,
@@ -256,27 +263,30 @@ class PublicQuoteController {
   /**
    * Format day data for public view.
    * @param {object} day - Day object.
-   * @returns {object} Formatted day data.
+   * @returns {Promise<object>} Formatted day data.
    * @example
-   * const dayData = this.formatDayData(day);
+   * const dayData = await this.formatDayData(day);
    */
-  formatDayData(day) {
+  async formatDayData(day) {
+    const subconcepts = await Promise.all((day.subconcepts || []).map((sub) => this.formatSubconcept(sub)));
+
     return {
       dayNumber: day.dayNumber || 0,
       date: day.date || '',
       city: day.city || '',
-      subconcepts: (day.subconcepts || []).map((sub) => this.formatSubconcept(sub)),
+      description: day.description || '',
+      subconcepts,
     };
   }
 
   /**
    * Format subconcept data for public view.
    * @param {object} sub - Subconcept object.
-   * @returns {object} Formatted subconcept data.
+   * @returns {Promise<object>} Formatted subconcept data.
    * @example
-   * const subData = this.formatSubconcept(subconcept);
+   * const subData = await this.formatSubconcept(subconcept);
    */
-  formatSubconcept(sub) {
+  async formatSubconcept(sub) {
     // For tours, prioritize destination name over empty concept
     let concept = sub.concept || '';
     if (sub.type === 'tour' && (!concept || concept.trim() === '')) {
@@ -293,17 +303,28 @@ class PublicQuoteController {
       serviceType = 'Experiencia';
     }
 
+    // Detect provider type for establishment labeling
+    const providerType = await this.getProviderType(sub);
+
+    // Update serviceType based on providerType for experiences
+    if (sub.type === 'experiencia' && providerType === 'Establishment') {
+      serviceType = 'Establecimiento';
+    }
+
     return {
       id: sub.id || '',
       type: sub.type || '',
       concept,
       serviceType,
       vehicleType: sub.vehicleType || '',
+      vehicleTypeName: sub.vehicleTypeName || '',
       vehicleTypeId: sub.vehicleTypeId || '',
       vehicleCapacity: sub.vehicleCapacity || null,
       vehicleMultiplier: sub.vehicleMultiplier || 1,
       startTime: sub.startTime || '',
       endTime: sub.endTime || '',
+      time: sub.time || '',
+      selectedSchedule: sub.selectedSchedule || '',
       hours: sub.hours || 0,
       unitPrice: sub.unitPrice || 0,
       isPerPerson: sub.isPerPerson || false,
@@ -311,11 +332,30 @@ class PublicQuoteController {
       total: sub.total || 0,
       destinationPOI: sub.destinationPOI || '',
       destination: sub.destination || '',
+      origin: sub.origin || '',
+      originName: sub.originName || '',
+      flightNumber: sub.flightNumber || '',
+      airline: sub.airline || '',
+      includeGuide: sub.includeGuide || false,
+      includeGreeter: sub.includeGreeter || false,
+      waitingTimeHours: sub.waitingTimeHours || 0,
+      transportType: sub.transportType || '',
+      directionType: sub.directionType || '',
+      isPackage: sub.isPackage || false,
+      includedExperiences: sub.includedExperiences || [],
       isCashPayment: sub.isCashPayment || false,
       tourId: sub.tourId || '',
       experienceId: sub.experienceId || '',
+      providerType,
       imageUrl: sub.imageUrl || '',
-      // EXCLUDE: notes (business decision)
+      // Include all missing service data fields for complete parity with admin views
+      notes: sub.notes || '',
+      adultsQuantity: sub.adultsQuantity || 0,
+      childrenQuantity: sub.childrenQuantity || 0,
+      adultsNoAlcoholQuantity: sub.adultsNoAlcoholQuantity || 0,
+      customPrice: sub.customPrice || null,
+      priceOverride: sub.priceOverride || false,
+      customPrices: sub.customPrices || null,
     };
   }
 
@@ -410,6 +450,204 @@ class PublicQuoteController {
     } catch (err) {
       logger.warn('Failed to inject service images for public quote', { error: err.message });
     }
+  }
+
+  /**
+   * Load experience caches for provider detection.
+   * Uses singleton pattern to avoid multiple loads.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async loadExperienceCaches() {
+    // Use singleton pattern to avoid multiple concurrent loads
+    if (this.cacheLoadPromise) {
+      return this.cacheLoadPromise;
+    }
+
+    // eslint-disable-next-line no-underscore-dangle
+    this.cacheLoadPromise = this._loadExperienceCachesInternal();
+    return this.cacheLoadPromise;
+  }
+
+  /**
+   * Internal method to load experience and provider caches.
+   * @private
+   * @returns {Promise<void>}
+   * @example
+   */
+  async _loadExperienceCachesInternal() {
+    try {
+      // Load both caches in parallel
+      /* eslint-disable no-underscore-dangle */
+      await Promise.all([
+        this._loadExperiences(),
+        this._loadProviderExperiences(),
+      ]);
+      /* eslint-enable no-underscore-dangle */
+
+      logger.debug('Experience caches loaded successfully', {
+        experiencesCount: this.experiencesCache?.length || 0,
+        providerExperiencesCount: this.providerExperiencesCache?.length || 0,
+      });
+    } catch (error) {
+      logger.warn('Failed to load experience caches for public quote', { error: error.message });
+      // Set empty arrays to prevent errors in detection logic
+      this.experiencesCache = [];
+      this.providerExperiencesCache = [];
+    }
+  }
+
+  /**
+   * Load regular experiences from Parse.
+   * @private
+   * @returns {Promise<void>}
+   * @example
+   */
+  async _loadExperiences() {
+    try {
+      const Experience = Parse.Object.extend('Experience');
+      const query = new Parse.Query(Experience);
+      query.include('provider');
+      query.include('destinationPOI');
+      query.equalTo('active', true);
+      query.limit(1000);
+
+      const results = await query.find({ useMasterKey: true });
+      this.experiencesCache = results.map((exp) => ({
+        id: exp.id,
+        objectId: exp.id,
+        title: exp.get('title') || exp.get('name'),
+        name: exp.get('name') || exp.get('title'),
+        provider: exp.get('provider') ? {
+          id: exp.get('provider').id,
+          name: exp.get('provider').get('name'),
+          type: exp.get('provider').get('type'),
+        } : null,
+      }));
+    } catch (error) {
+      logger.warn('Failed to load experiences for public quote', { error: error.message });
+      this.experiencesCache = [];
+    }
+  }
+
+  /**
+   * Load provider experiences from Parse.
+   * @private
+   * @returns {Promise<void>}
+   * @example
+   */
+  async _loadProviderExperiences() {
+    try {
+      const ProviderExperiencia = Parse.Object.extend('ProviderExperiencia');
+      const query = new Parse.Query(ProviderExperiencia);
+      query.include('provider');
+      query.equalTo('active', true);
+      query.limit(1000);
+
+      const results = await query.find({ useMasterKey: true });
+      this.providerExperiencesCache = results.map((exp) => ({
+        id: exp.id,
+        objectId: exp.id,
+        title: exp.get('title') || exp.get('experienceName'),
+        name: exp.get('experienceName') || exp.get('title'),
+        provider: exp.get('provider') ? {
+          id: exp.get('provider').id,
+          name: exp.get('provider').get('name'),
+          type: exp.get('provider').get('type'),
+        } : null,
+      }));
+    } catch (error) {
+      logger.warn('Failed to load provider experiences for public quote', { error: error.message });
+      this.providerExperiencesCache = [];
+    }
+  }
+
+  /**
+   * Detect provider type from experienceId.
+   * @param {object} subconcept - Service subconcept object.
+   * @returns {Promise<string|null>} Provider type or null.
+   * @example
+   */
+  async getProviderType(subconcept) {
+    // Ensure caches are loaded
+    await this.loadExperienceCaches();
+
+    console.log('🔍 getProviderType debug:', {
+      experienceId: subconcept.experienceId,
+      type: subconcept.type,
+      savedProviderType: subconcept.providerType,
+      cacheSizes: {
+        experiences: this.experiencesCache?.length || 0,
+        providerExperiences: this.providerExperiencesCache?.length || 0,
+      },
+    });
+
+    // Tier 1: Check if providerType is already saved (new services)
+    if (subconcept.providerType === 'Establishment') {
+      console.log('✅ Found Establishment via Tier 1 (saved providerType)');
+      return 'Establishment';
+    }
+
+    // Tier 2: Fallback to experienceId lookup (existing services)
+    if (subconcept.experienceId && subconcept.type === 'experiencia') {
+      // Check provider experiences cache first
+      if (this.providerExperiencesCache && Array.isArray(this.providerExperiencesCache)) {
+        const experience = this.providerExperiencesCache.find(
+          (exp) => (exp.id === subconcept.experienceId || exp.objectId === subconcept.experienceId)
+            && exp.provider?.type === 'Establishment'
+        );
+        if (experience) {
+          console.log('✅ Found Establishment via Tier 2 (providerExperiences cache)');
+          return 'Establishment';
+        }
+      }
+
+      // Check regular experiences cache
+      if (this.experiencesCache && Array.isArray(this.experiencesCache)) {
+        const experience = this.experiencesCache.find(
+          (exp) => (exp.id === subconcept.experienceId || exp.objectId === subconcept.experienceId)
+            && exp.provider?.type === 'Establishment'
+        );
+        if (experience) {
+          console.log('✅ Found Establishment via Tier 2 (experiences cache)');
+          return 'Establishment';
+        }
+      }
+    }
+
+    // Tier 3: Direct database lookup as fallback
+    if (subconcept.experienceId && subconcept.type === 'experiencia') {
+      try {
+        console.log(`🔍 Tier 3: Attempting direct database lookup for experienceId: ${subconcept.experienceId}`);
+
+        const Experience = Parse.Object.extend('Experience');
+        const query = new Parse.Query(Experience);
+        query.include('provider');
+
+        const experience = await query.get(subconcept.experienceId);
+        if (experience) {
+          const provider = experience.get('provider');
+          const providerType = provider?.get('type');
+
+          console.log('✅ Found experience in database:', {
+            experienceId: subconcept.experienceId,
+            providerType,
+            providerName: provider?.get('name') || 'Unknown',
+          });
+
+          if (providerType === 'Establishment') {
+            console.log('✅ Found Establishment via Tier 3 (direct database lookup)');
+            return 'Establishment';
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error in direct database lookup for experienceId ${subconcept.experienceId}:`, error.message);
+      }
+    }
+
+    // Tier 4: Default (no establishment provider detected)
+    console.log('❌ No Establishment provider found, defaulting to null');
+    return null;
   }
 }
 
