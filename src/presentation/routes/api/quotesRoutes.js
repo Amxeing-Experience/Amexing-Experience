@@ -593,6 +593,40 @@ router.post(
 );
 
 /**
+ * POST /api/quotes/:id/convert-to-reservation - Convert a quote to reservation.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ *
+ * Converts a quote to a reservation by:
+ * - Changing status to "requested" if currently "quoted"
+ * - Creating a new Reservation record
+ * - Creating ReservationService records for each service in the quote
+ * - Returns reservation details including folio and ID.
+ *
+ * Request body (optional):
+ * - currentStatus: string - Current status of the quote.
+ * @returns {object} Response with reservation data.
+ * @example
+ * // Response structure:
+ * {
+ *   success: true,
+ *   message: 'Reservación creada exitosamente',
+ *   data: {
+ *     reservationId: 'abc123',
+ *     reservationFolio: 'RES-2024-0001',
+ *     servicesCount: 5,
+ *     quoteStatus: 'requested'
+ *   }
+ * }
+ */
+router.post(
+  '/:id/convert-to-reservation',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  (req, res) => QuoteController.convertToReservation(req, res)
+);
+
+/**
  * POST /api/quotes/:id/share-link - Generate shareable public link.
  * Private access (Department Manager, Admin and SuperAdmin).
  *
