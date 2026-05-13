@@ -898,10 +898,10 @@ class QuoteController {
             id: client.id,
             firstName: client.get('firstName') || '',
             lastName: client.get('lastName') || '',
-            companyName: client.get('companyName') || '',
+            companyName: client.get('contextualData')?.companyName || client.get('name') || '',
             email: client.get('email') || '',
             phone: client.get('phone') || '',
-            fullName: client.get('companyName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+            fullName: client.get('contextualData')?.companyName || client.get('name') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
             contextualData: client.get('contextualData') || null,
           }
           : null,
@@ -1540,19 +1540,7 @@ class QuoteController {
         return this.sendError(res, 'El subtotal debe ser un número positivo', 400);
       }
 
-      // Validate IVA calculation (should be 16% of subtotal)
-      const expectedIva = Math.round(subtotal * 0.16 * 100) / 100;
-      const ivaRounded = Math.round(iva * 100) / 100;
-      if (Math.abs(ivaRounded - expectedIva) > 0.01) {
-        return this.sendError(res, 'El IVA debe ser el 16% del subtotal', 400);
-      }
-
-      // Validate total calculation
-      const expectedTotal = Math.round((subtotal + iva) * 100) / 100;
-      const totalRounded = Math.round(total * 100) / 100;
-      if (Math.abs(totalRounded - expectedTotal) > 0.01) {
-        return this.sendError(res, 'El total debe ser la suma del subtotal + IVA', 400);
-      }
+      // IVA validation removed - modal value is the final value that already includes everything
 
       // Validate day structure with new subconcepts format
       for (let i = 0; i < days.length; i++) {

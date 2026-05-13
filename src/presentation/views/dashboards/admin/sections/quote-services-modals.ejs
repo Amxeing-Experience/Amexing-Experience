@@ -25,9 +25,9 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                 
                 <form id="dayForm">
                     <div class="mb-3">
-                        <label for="dayTitle" class="form-label">Título del Día <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="dayTitle" placeholder="Ej: Llegada y City Tour" required>
-                        <div class="form-text">Dale un nombre descriptivo a este día del itinerario</div>
+                        <label for="dayTitle" class="form-label">Título del Día</label>
+                        <input type="text" class="form-control" id="dayTitle" placeholder="Ej: Llegada y City Tour">
+                        <div class="form-text">Opcional: Dale un nombre descriptivo a este día del itinerario. Si se deja vacío, se generará automáticamente como "Día X"</div>
                     </div>
                     
                     <div class="mb-3">
@@ -838,6 +838,33 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <span class="input-group-text">MXN</span>
                             </div>
                             
+                            <!-- Development Mode: Payment Type Prices Display -->
+                            <div id="devPaymentPrices" class="d-none mt-3">
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small">💰 Precio Efectivo (base)</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">$</span>
+                                            <input type="text" class="form-control" id="devPriceEfectivo" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small">🏦 Precio Transferencia</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">$</span>
+                                            <input type="text" class="form-control" id="devPriceTransferencia" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small">💳 Precio Tarjeta</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">$</span>
+                                            <input type="text" class="form-control" id="devPriceTarjeta" readonly>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <!-- Tour Vehicle Price Override Toggle (Admin Only) -->
                             <% if (canEditPrices) { %>
                             <div class="form-check mt-2 d-none" id="tourVehicleOverridePricesContainer">
@@ -979,13 +1006,39 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                     
 
                     <div id="servicePriceBreakdown" class="d-none mb-3 p-2 bg-light rounded small">
-                        <div class="fw-semibold mb-1 text-muted"><i class="ti ti-list-details me-1"></i>Desglose</div>
+                        <div id="desgloseTitle" class="fw-semibold mb-1 text-muted"><i class="ti ti-list-details me-1"></i>Desglose</div>
                         <div id="breakdownItems"></div>
                         <hr class="my-1">
                         <div class="d-flex justify-content-between fw-bold">
                             <span>Total servicio</span>
                             <span id="breakdownTotal"></span>
                         </div>
+                    </div>
+
+                    <!-- Development Mode: Payment Type Breakdown Display -->
+                    <div id="devPaymentBreakdown" class="d-none mb-3">
+                        <div class="fw-semibold mb-2 text-muted">
+                            <i class="ti ti-calculator me-1"></i>Desglose por Tipo de Pago (Dev)
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small">💰 Desglose Efectivo</label>
+                                <textarea class="form-control form-control-sm" id="devBreakdownEfectivo" rows="3" readonly style="font-size: 0.75rem; font-family: monospace;"></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small">🏦 Desglose Transferencia</label>
+                                <textarea class="form-control form-control-sm" id="devBreakdownTransferencia" rows="3" readonly style="font-size: 0.75rem; font-family: monospace;"></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small">💳 Desglose Tarjeta</label>
+                                <textarea class="form-control form-control-sm" id="devBreakdownTarjeta" rows="3" readonly style="font-size: 0.75rem; font-family: monospace;"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Debug Payment Types Section (Development Mode Only) -->
+                    <div id="debugPaymentTypes" class="d-none mb-3">
+                        <!-- Content will be populated by JavaScript -->
                     </div>
 
                     <div class="form-check mb-3" id="includeInTotalContainer" style="display: none;">

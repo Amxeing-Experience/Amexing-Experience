@@ -89,18 +89,34 @@ module.exports = async () => {
     process.env.PARSE_SERVER_URL = 'http://localhost:1339/parse';
     console.log('   ✅ Test environment variables set (NODE_ENV, JWT_SECRET, PARSE_*)');
 
-    // ALWAYS use Memory Server for tests (even if TEST_DATABASE_URI is set)
-    console.log('📦 Starting MongoDB Memory Server...');
-
-    const mongod = new MongoMemoryServer({
-      instance: {
-        dbName: 'AmexingTEST',
-        port: 27018, // Different port to avoid conflicts
-      },
+    // Check if MongoDB Memory Server is already running on port 27018
+    const { exec } = require('child_process');
+    const isPortInUse = await new Promise((resolve) => {
+      exec('lsof -i :27018', (error, stdout) => {
+        resolve(stdout.includes('mongod'));
+      });
     });
 
-    await mongod.start();
-    const uri = mongod.getUri();
+    let mongod;
+    let uri;
+    
+    if (isPortInUse) {
+      console.log('📦 MongoDB Memory Server already running, reusing existing instance...');
+      uri = 'mongodb://127.0.0.1:27018/AmexingTEST';
+      console.log('   ✅ Reusing existing MongoDB Memory Server');
+    } else {
+      console.log('📦 Starting new MongoDB Memory Server...');
+      mongod = new MongoMemoryServer({
+        instance: {
+          dbName: 'AmexingTEST',
+          port: 27018, // Different port to avoid conflicts
+        },
+      });
+
+      await mongod.start();
+      uri = mongod.getUri();
+      console.log('   ✅ MongoDB Memory Server started');
+    }
 
     // Store MongoDB instance and URI in global for cleanup
     global.__MONGOD__ = mongod;
@@ -110,7 +126,6 @@ module.exports = async () => {
     process.env.TEST_DATABASE_URI = uri;
     process.env.DATABASE_URI = uri;
 
-    console.log('   ✅ MongoDB Memory Server started');
     console.log(`   ℹ️  URI: ${uri}`);
     console.log('\n⚠️  CRITICAL: Using IN-MEMORY database ONLY');
     console.log('   ⚠️  NO connections to local MongoDB (localhost:27017)');

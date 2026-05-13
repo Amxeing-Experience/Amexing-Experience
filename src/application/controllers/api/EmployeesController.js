@@ -109,9 +109,20 @@ class EmployeesController {
         };
       }
 
+      // Add pagination information
+      const pagination = {
+        currentPage: options.page,
+        pageSize: options.limit,
+        totalItems: result.total || result.users.length,
+        totalPages: Math.ceil((result.total || result.users.length) / options.limit),
+        hasNextPage: options.page < Math.ceil((result.total || result.users.length) / options.limit),
+        hasPrevPage: options.page > 1,
+      };
+
       // Add metadata for frontend consumption
       const response = {
-        ...result,
+        users: result.users,
+        pagination,
         requestMetadata: {
           endpoint: 'getEmployees',
           requestedBy: currentUser.id,

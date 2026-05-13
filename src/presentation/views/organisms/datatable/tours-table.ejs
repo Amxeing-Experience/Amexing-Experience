@@ -884,22 +884,24 @@ async function getAccessToken() {
         function loadAllTours() {
             return new Promise((resolve, reject) => {
                 const finalClientId = getClientIdFromContext();
-                const url = new URL(apiEndpoint, window.location.origin);
                 
+                // Start with the original apiEndpoint to preserve all parameters (including includeInactive)
+                let requestUrl = apiEndpoint;
                 
-                // Add clientId parameter if we're in client context
+                // Add clientId parameter if needed
                 if (finalClientId) {
-                    url.searchParams.append('clientId', finalClientId);
-
+                    const separator = apiEndpoint.includes('?') ? '&' : '?';
+                    requestUrl += `${separator}clientId=${finalClientId}`;
                 }
                 
                 // Note: No API filtering needed - we'll filter client-side by isWalkingTour
                 
                 
                 $.ajax({
-                    url: url.toString(),
+                    url: requestUrl,
                     type: 'GET',
                     success: function(response) {
+                        
                         if (response.success && response.data) {
                             // Preserve existing priceData if available
                             const newToursData = response.data;
@@ -941,7 +943,6 @@ async function getAccessToken() {
                             
                             allToursData = vehicleOnlyTours;
                             filteredData = allToursData; // Show filtered vehicle tours by default
-                            
                             
                             resolve(allToursData);
                         } else {
@@ -1727,7 +1728,10 @@ async function getAccessToken() {
 
                     // Get clientId for client-specific pricing
                     const modalClientId = getClientIdFromContext();
-                    const requestData = { rateId: selectedRate };
+                    const requestData = { 
+                        rateId: selectedRate,
+                        includeInactive: '<%= dtApiEndpoint.includes("includeInactive=true") ? "true" : "false" %>'
+                    };
                     
                     if (modalClientId) {
                         requestData.clientId = modalClientId;
@@ -2276,6 +2280,8 @@ async function getAccessToken() {
         function loadDropdownData(retryCount = 0) {
             console.log('🔧 POI Loading: Starting loadDropdownData, retry count:', retryCount);
             
+            return new Promise((resolve, reject) => {
+            
             // Check if target element exists
             const targetElement = document.getElementById('destinationPOI');
             console.log('🔧 POI Loading: destinationPOI element exists:', !!targetElement);
@@ -2284,8 +2290,8 @@ async function getAccessToken() {
             if (targetElement) {
                 // Clear custom select if available
                 if (targetElement.customSelect) {
+                    console.log('🔧 [POI LOADING] Clearing destinationPOI CustomSelect during POI data load');
                     targetElement.customSelect.setValue('');
-                    console.log('🔧 POI Loading: Cleared existing selection (custom select)');
                 }
                 // Clear TomSelect if available
                 if (targetElement.tomselect) {
@@ -2329,8 +2335,17 @@ async function getAccessToken() {
                         console.log('🔧 POI Loading: About to load options into TomSelect...');
                         await loadOptionsIntoTomSelect('destinationPOI', data.data);
                         console.log('✅ POI Loading: Successfully loaded POI options into destinationPOI');
+                        
+                        // Verify CustomSelect is ready (simplified check)
+                        const destElement = document.getElementById('destinationPOI');
+                        if (destElement && destElement.customSelect) {
+                            console.log('✅ POI Loading: CustomSelect component is ready and options have been loaded');
+                        }
+                        
+                        resolve(data.data); // Resolve promise with POI data
                     } else {
                         console.error('🔧 POI Loading: Invalid API response structure:', data);
+                        reject(new Error('Invalid POI API response structure'));
                     }
                 },
                 error: function(xhr, status, error) {
@@ -2343,18 +2358,29 @@ async function getAccessToken() {
                     });
                     if (xhr.status === 401 && retryCount < maxRetries) {
                         console.log('🔧 POI Loading: Retrying due to 401 error...');
-                        setTimeout(function() { loadDropdownData(retryCount + 1); }, 1000);
-                    } else if (retryCount >= maxRetries) {
-                        console.error('❌ POI Loading: Max retries exceeded, giving up');
+                        setTimeout(async function() { 
+                            try {
+                                const result = await loadDropdownData(retryCount + 1);
+                                resolve(result);
+                            } catch (err) {
+                                reject(err);
+                            }
+                        }, 1000);
+                    } else {
+                        if (retryCount >= maxRetries) {
+                            console.error('❌ POI Loading: Max retries exceeded, giving up');
+                        }
+                        reject(new Error(`POI loading failed: ${error}`));
                     }
                 }
             });
+            }); // Close Promise constructor
         }
 
 
         // Event Handlers
-        $('#createTourBtn').on('click', function() {
-            openTourModal();
+        $('#createTourBtn').on('click', async function() {
+            await openTourModal();
         });
 
         // Helper function to wait for Tom Select or Custom Select to be initialized
@@ -2409,6 +2435,7 @@ async function getAccessToken() {
             if (destElement) {
                 // Clear custom select if available
                 if (destElement.customSelect) {
+                    console.log('🔧 [MODAL CLEAR] Clearing destinationPOI CustomSelect in openTourModal');
                     destElement.customSelect.setValue('');
                 }
                 // Clear TomSelect if available
@@ -2428,7 +2455,14 @@ async function getAccessToken() {
 
             // Load POI data when modal opens (proper timing)
             console.log('🔧 Tour modal opened, loading POI data...');
-            loadDropdownData();
+            
+            try {
+                await loadDropdownData();
+                console.log('✅ POI loading completed in openTourModal');
+            } catch (error) {
+                console.error('❌ POI loading failed in openTourModal:', error);
+            }
+            
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Tour');
             
             // Reset save button state (ensure it's not disabled from previous operations)
@@ -2455,7 +2489,7 @@ async function getAccessToken() {
             } else {
                 // Load empty pricing structure for new tours
                 $('#basePricingSection').show();
-                loadEmptyPricingStructure();
+                await loadEmptyPricingStructure();
             }
 
             // POI dropdown clearing is now handled at the beginning of the function
@@ -2654,8 +2688,26 @@ async function getAccessToken() {
                 
                 // Load rates and vehicle types
                 const [ratesResponse, vehiclesResponse] = await Promise.all([
-                    $.ajax({ url: '/api/rates/active', type: 'GET' }),
-                    $.ajax({ url: '/api/vehicle-types/active', type: 'GET' })
+                    $.ajax({ 
+                        url: '/api/rates/active', 
+                        type: 'GET',
+                        beforeSend: function(xhr) {
+                            const token = getAccessTokenSync();
+                            if (token) {
+                                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                            }
+                        }
+                    }),
+                    $.ajax({ 
+                        url: '/api/vehicle-types/active', 
+                        type: 'GET',
+                        beforeSend: function(xhr) {
+                            const token = getAccessTokenSync();
+                            if (token) {
+                                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                            }
+                        }
+                    })
                 ]);
                 
                 container.empty(); // Clear loading indicator
@@ -3096,22 +3148,132 @@ async function getAccessToken() {
         }
 
         async function loadTourData(tourId) {
-            // Open modal first in edit mode (this will reset the form)
+            console.log('🚀 [LOAD TOUR] Starting loadTourData with tourId:', tourId);
+            
+            // Open modal first in edit mode (this will reset the form and load POI options)
             await openTourModal(true);
+            console.log('🚀 [LOAD TOUR] Modal opened and POI loading completed, starting tour data fetch...');
+            
+            // Verify CustomSelect is ready
+            const destElement = document.getElementById('destinationPOI');
+            if (destElement && destElement.customSelect) {
+                console.log('🚀 [LOAD TOUR] Pre-check - CustomSelect component is ready for setValue operations');
+            }
+            
+            // Extract base API endpoint without query parameters for individual tour requests
+            const baseApiEndpoint = apiEndpoint.split('?')[0]; // '/api/tours?params' -> '/api/tours'
+            const tourUrl = `${baseApiEndpoint}/${tourId}?includeInactive=true`;
+            
+            console.log('🚀 [LOAD TOUR] Modal opened, starting AJAX request to:', tourUrl);
+            
+            const token = getAccessTokenSync();
+            console.log('🚀 [LOAD TOUR] JWT token available:', !!token, token ? `(length: ${token.length})` : '(no token)');
 
             $.ajax({
-                url: `${apiEndpoint}/${tourId}`,
+                url: tourUrl,
                 type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessTokenSync();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        console.log('🚀 [LOAD TOUR] Authorization header added to request');
+                    } else {
+                        console.log('❌ [LOAD TOUR] No token available for authorization');
+                    }
+                },
                 success: async function(response) {
-                    if (response.success && response.data) {
+                    console.log('✅ [LOAD TOUR] AJAX request successful, response:', response);
+                    if (response.success && response.data && response.data.tour) {
                         const tour = response.data.tour;
 
-                        // Tom Select (non-critical for photos/fields)
+                        console.log('🔍 [TOUR DEBUG] Tour data loaded:', {
+                            tourId: tour.id,
+                            destinationPOI: tour.destinationPOI,
+                            destinationPOIId: tour.destinationPOI?.id,
+                            destinationPOIName: tour.destinationPOI?.name
+                        });
+
+                        // Wait for dropdown component (TomSelect or CustomSelect)
                         const destTS = await waitForTomSelect('destinationPOI');
-                        if (destTS && tour.destinationPOI?.id) {
-                            destTS.setValue(tour.destinationPOI.id);
-                        } else if (tour.destinationPOI?.id) {
-                            $('#destinationPOI').val(tour.destinationPOI.id);
+                        
+                        if (tour.destinationPOI?.id && tour.destinationPOI.id.trim() !== '') {
+                            console.log('🔍 [TOUR DEBUG] Tour has valid destinationPOI, attempting to set:', tour.destinationPOI.id);
+                            
+                            // Check for CustomSelect first since that's what's being used
+                            const destElement = document.getElementById('destinationPOI');
+                            if (destElement && destElement.customSelect && destElement.customSelect.setValue) {
+                                console.log('✅ [TOUR LOADING] CustomSelect component found, attempting direct setValue...');
+                                
+                                try {
+                                    // Check if option exists using getOption method (if available)
+                                    let optionExists = false;
+                                    if (destElement.customSelect.getOption && typeof destElement.customSelect.getOption === 'function') {
+                                        const existingOption = destElement.customSelect.getOption(tour.destinationPOI.id);
+                                        optionExists = !!existingOption;
+                                        console.log('🔍 [TOUR LOADING] getOption check:', {
+                                            poiId: tour.destinationPOI.id,
+                                            optionFound: optionExists,
+                                            optionData: existingOption
+                                        });
+                                    }
+                                    
+                                    // Attempt to set value directly - let CustomSelect handle validation
+                                    console.log('🚀 [TOUR LOADING] Setting CustomSelect value directly:', {
+                                        poiId: tour.destinationPOI.id,
+                                        poiName: tour.destinationPOI.name
+                                    });
+                                    
+                                    destElement.customSelect.setValue(tour.destinationPOI.id);
+                                    
+                                    // Verify if the value was actually set
+                                    const currentValue = destElement.customSelect.getValue ? destElement.customSelect.getValue() : null;
+                                    if (currentValue === tour.destinationPOI.id) {
+                                        console.log('✅ [TOUR LOADING] CustomSelect value set successfully:', {
+                                            setValue: tour.destinationPOI.id,
+                                            currentValue: currentValue,
+                                            poiName: tour.destinationPOI.name
+                                        });
+                                    } else {
+                                        console.log('⚠️ [TOUR LOADING] setValue called but value not set:', {
+                                            attempted: tour.destinationPOI.id,
+                                            actual: currentValue
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error('❌ [TOUR LOADING] Error setting CustomSelect value:', error);
+                                }
+                            }
+                            // Fallback to TomSelect if CustomSelect not found
+                            else if (destTS && destTS.setValue && typeof destTS.setValue === 'function') {
+                                // Check if the option exists in the dropdown
+                                const hasOption = destTS.options && destTS.options[tour.destinationPOI.id];
+                                const availableOptions = Object.keys(destTS.options || {});
+                                
+                                console.log('🔍 [TOUR DEBUG] TomSelect found, checking options:', {
+                                    tourPOIId: tour.destinationPOI.id,
+                                    tourPOIName: tour.destinationPOI.name,
+                                    optionExists: hasOption,
+                                    availableOptionIds: availableOptions,
+                                    totalOptions: availableOptions.length
+                                });
+                                
+                                if (hasOption) {
+                                    destTS.setValue(tour.destinationPOI.id);
+                                    console.log('✅ [TOUR DEBUG] Successfully set destinationPOI via TomSelect');
+                                } else {
+                                    console.log('❌ [TOUR DEBUG] POI not found in TomSelect options');
+                                }
+                            } else {
+                                console.log('🔍 [TOUR DEBUG] No compatible dropdown component found, using jQuery fallback');
+                                $('#destinationPOI').val(tour.destinationPOI.id);
+                            }
+                        } else {
+                            console.log('🔍 [TOUR DEBUG] Tour destinationPOI is invalid:', {
+                                destinationPOI: tour.destinationPOI,
+                                hasId: !!tour.destinationPOI?.id,
+                                idValue: tour.destinationPOI?.id,
+                                isEmpty: tour.destinationPOI?.id === '' || !tour.destinationPOI?.id?.trim()
+                            });
                         }
 
                         // Populate the form with the data
@@ -3195,11 +3357,20 @@ async function getAccessToken() {
                             console.error('Error loading base pricing:', error);
                         }
                     } else {
-                        showErrorAlert('Formato de respuesta inválido');
+                        const errorMsg = !response.data ? 'No se recibieron datos del servidor' : 
+                                       !response.data.tour ? 'Tour no encontrado' : 
+                                       'Formato de respuesta inválido';
+                        showModalError(errorMsg);
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('AJAX Error:', { xhr, status, error });
+                    console.error('❌ [LOAD TOUR] AJAX request failed:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        error: error,
+                        responseText: xhr.responseText,
+                        url: tourUrl
+                    });
                     const errorMessage = xhr.responseJSON?.error || 'Error al cargar el tour';
                     showModalError(errorMessage);
                 }
@@ -3600,12 +3771,19 @@ async function getAccessToken() {
 
                                             setTimeout(async () => {
                                                 try {
+                                                    const baseApiEndpoint = apiEndpoint.split('?')[0];
                                                     const response = await $.ajax({
-                                                        url: `${apiEndpoint}/${tourId}`,
-                                                        type: 'GET'
+                                                        url: `${baseApiEndpoint}/${tourId}?includeInactive=true`,
+                                                        type: 'GET',
+                                                        beforeSend: function(xhr) {
+                                                            const token = getAccessTokenSync();
+                                                            if (token) {
+                                                                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                                                            }
+                                                        }
                                                     });
                                                     
-                                                    if (response.success && response.data.tour.photos) {
+                                                    if (response.success && response.data && response.data.tour && response.data.tour.photos) {
                                                         const photosContainer = $('#tourModal .photos-preview-container');
                                                         photosContainer.empty();
                                                         
@@ -4758,7 +4936,13 @@ function updatePricesVanilla(paymentType = 'efectivo', currency = 'MXN', include
                 finalPrice *= (1 + agencyRate / 100);
             }
             
-            // Step 3: Apply currency conversion if needed
+            // Step 3: Apply cash rounding for efectivo payments (MXN only)
+            if (paymentType === 'efectivo' && currency === 'MXN' && typeof window.PricingUtils !== 'undefined' && 
+                window.PricingUtils.applyCashRounding && window.PricingUtils.isCashRoundingEnabledSync()) {
+                finalPrice = window.PricingUtils.applyCashRounding(finalPrice);
+            }
+            
+            // Step 4: Apply currency conversion if needed
             const exchangeRate = TourPricingState.getExchangeRate();
             if (currency === 'USD' && exchangeRate > 0) {
                 finalPrice /= exchangeRate;
@@ -4912,7 +5096,13 @@ function updateExpandedRowPrices(paymentType = 'efectivo', currency = 'MXN', inc
                 }
             }
             
-            // Step 3: Apply currency conversion
+            // Step 3: Apply cash rounding for efectivo payments (MXN only)
+            if (paymentType === 'efectivo' && currency === 'MXN' && typeof window.PricingUtils !== 'undefined' && 
+                window.PricingUtils.applyCashRounding && window.PricingUtils.isCashRoundingEnabledSync()) {
+                finalPrice = window.PricingUtils.applyCashRounding(finalPrice);
+            }
+            
+            // Step 4: Apply currency conversion
             if (currency === 'USD') {
                 const exchangeRate = TourPricingState.getExchangeRate();
                 if (exchangeRate > 0) {

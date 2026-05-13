@@ -59,6 +59,7 @@ router.get('/admin/bookings', dashboardAuth.requireRole('admin'), (req, res) => 
 router.get('/admin/bookings/:id', dashboardAuth.requireRole('admin'), (req, res) => adminController.bookingDetail(req, res));
 router.get('/admin/vehicles', dashboardAuth.requireRole('admin'), (req, res) => adminController.vehicles(req, res));
 router.get('/admin/price-settings', dashboardAuth.requireRole('admin'), (req, res) => adminController.priceSettings(req, res));
+router.get('/admin/cash-rounding', dashboardAuth.requireRole('admin'), (req, res) => adminController.cashRounding(req, res));
 router.get('/admin/pois', dashboardAuth.requireRole('admin'), (req, res) => adminController.pois(req, res));
 router.get('/admin/services', dashboardAuth.requireRole('admin'), (req, res) => adminController.services(req, res));
 router.get('/admin/a-disposicion', dashboardAuth.requireRole('admin'), (req, res) => adminController.aDisposicion(req, res));

@@ -633,6 +633,12 @@ function convertWalkingTourPrice(priceInput, currency, paymentType) {
         adjustedPrice = numericValue * (1 + walkingCurrentAgencyRate / 100);
     }
     
+    // Apply cash rounding for efectivo payments (MXN only)
+    if (paymentType === 'efectivo' && currency === 'MXN' && typeof PricingUtils !== 'undefined' && 
+        PricingUtils.applyCashRounding && PricingUtils.isCashRoundingEnabledSync()) {
+        adjustedPrice = PricingUtils.applyCashRounding(adjustedPrice);
+    }
+    
     // Then convert currency if needed
     if (currency === 'USD' && walkingCurrentExchangeRate > 0) {
         const convertedValue = adjustedPrice / walkingCurrentExchangeRate;

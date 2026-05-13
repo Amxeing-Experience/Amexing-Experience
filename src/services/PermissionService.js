@@ -17,6 +17,7 @@
  * // Returns: { success: true, data: {...} }
  */
 
+const { v4: uuidv4 } = require('uuid');
 const logger = require('../infrastructure/logger');
 
 /**
@@ -574,7 +575,7 @@ class PermissionService {
       }
 
       const userPermission = {
-        id: require('uuid').v4(),
+        id: uuidv4(),
         userId,
         permissionId: permission.id,
         granted: true,
@@ -798,7 +799,7 @@ class PermissionService {
    */
   async logPermissionChange(changeData) {
     const auditLog = {
-      id: require('uuid').v4(),
+      id: uuidv4(),
       entityType: 'Permission',
       entityId: changeData.userId,
       action: changeData.action,

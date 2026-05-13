@@ -49,8 +49,10 @@ describe('Services Edit Transfer Modal Frontend Integration', () => {
     it('should render services dashboard with modal HTML', async () => {
       const response = await request(app)
         .get('/dashboard/admin/services')
-        .set('Cookie', `sessionId=${adminToken}`)
-        .expect(200);
+        .set('Cookie', `accessToken=${adminToken}`)
+        .redirects(1);
+
+      expect(response.status).toBe(200);
 
       expect(response.text).toContain('serviceModal');
       expect(response.text).toContain('Editar Traslado');
@@ -62,8 +64,10 @@ describe('Services Edit Transfer Modal Frontend Integration', () => {
     it('should include pricing grid components', async () => {
       const response = await request(app)
         .get('/dashboard/admin/services')
-        .set('Cookie', `sessionId=${adminToken}`)
-        .expect(200);
+        .set('Cookie', `accessToken=${adminToken}`)
+        .redirects(1);
+
+      expect(response.status).toBe(200);
 
       expect(response.text).toContain('basePricingSection');
       expect(response.text).toContain('newServiceRatesSection');
@@ -73,8 +77,10 @@ describe('Services Edit Transfer Modal Frontend Integration', () => {
     it('should load required JavaScript libraries', async () => {
       const response = await request(app)
         .get('/dashboard/admin/services')
-        .set('Cookie', `sessionId=${adminToken}`)
-        .expect(200);
+        .set('Cookie', `accessToken=${adminToken}`)
+        .redirects(1);
+
+      expect(response.status).toBe(200);
 
       expect(response.text).toContain('DataTables');
       expect(response.text).toContain('Bootstrap');
@@ -88,7 +94,9 @@ describe('Services Edit Transfer Modal Frontend Integration', () => {
       const response = await request(app)
         .get(`/api/services/${testService.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+        .redirects(1);
+
+      expect(response.status).toBe(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.objectId).toBe(testService.id);
@@ -102,7 +110,9 @@ describe('Services Edit Transfer Modal Frontend Integration', () => {
       const response = await request(app)
         .get(`/api/services/${testService.id}/rate-prices`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+        .redirects(1);
+
+      expect(response.status).toBe(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.length).toBeGreaterThan(0);

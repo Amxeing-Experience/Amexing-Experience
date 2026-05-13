@@ -145,7 +145,7 @@ const isClient = dtUserRole === 'client';
                 <!-- Currency Dropdown -->
                 <div class="d-flex align-items-center gap-1">
                     <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
-                    <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
+                    <select class="form-select mobile-filter-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
                         <option value="MXN" selected>MXN</option>
                         <option value="USD">USD</option>
                     </select>
@@ -154,7 +154,7 @@ const isClient = dtUserRole === 'client';
                 <!-- Payment Type Dropdown -->
                 <div class="d-flex align-items-center gap-1">
                     <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
-                    <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
+                    <select class="form-select mobile-filter-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
                         <% if (isDepartmentManager || isClient) { %>
                             <option value="efectivo">Efectivo</option>
                             <option value="transferencia" selected>Transferencia</option>
@@ -1314,6 +1314,7 @@ const isClient = dtUserRole === 'client';
             ordering: false, // Disable all column sorting UI
             pageLength: 10,
             searchDelay: 300,
+            responsive: true,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
             drawCallback: function() {
                 const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -2962,3 +2963,72 @@ const isClient = dtUserRole === 'client';
     }
 })();
 </script>
+
+<!-- Mobile Filter Styles -->
+<style>
+/* Fix mobile filter dropdown visibility */
+@media (max-width: 991.98px) {
+    .mobile-filter-select {
+        color: #212529 !important;
+        background-color: #fff !important;
+        border: 1px solid #ced4da !important;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    
+    .mobile-filter-select option {
+        color: #212529 !important;
+        background-color: #fff !important;
+    }
+    
+    /* Enhanced visibility for labels */
+    .mobile-filter-select + label,
+    label[for*="currencyFilter"],
+    label[for*="paymentTypeFilter"] {
+        color: #495057 !important;
+        font-weight: 600 !important;
+        font-size: 0.875rem;
+    }
+    
+    /* Container styling for better visibility */
+    .d-flex.gap-2.align-items-center {
+        background: rgba(248, 249, 250, 0.8);
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        margin-bottom: 1rem;
+    }
+    
+    /* Improve spacing between dropdown groups */
+    .d-flex.align-items-center.gap-1 {
+        padding: 0.5rem;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+        min-width: max-content;
+    }
+}
+
+/* Small phone adjustments */
+@media (max-width: 575.98px) {
+    .d-flex.gap-2.align-items-center {
+        flex-direction: column;
+        gap: 0.75rem !important;
+        align-items: stretch !important;
+    }
+    
+    .d-flex.align-items-center.gap-1 {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.5rem !important;
+        text-align: center;
+    }
+    
+    .mobile-filter-select {
+        width: 100% !important;
+        min-width: auto !important;
+        text-align: center;
+        font-size: 1rem;
+    }
+}
+</style>

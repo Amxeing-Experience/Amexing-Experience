@@ -1,0 +1,677 @@
+<%
+/**
+ * Mobile Experiences DataTable Organism
+ * Simplified mobile-optimized DataTable for experiences management
+ *
+ * Atomic Design Level: Organism
+ * Category: Mobile Dashboard Data Tables
+ * 
+ * Created by Denisse Maldonado
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'experiences-table-mobile';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/experiences';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<!-- Mobile Experiences Table Card -->
+<div class="mobile-table-card">
+    <!-- Mobile Table Header -->
+    <div class="mobile-table-header">
+        <div class="mobile-table-title">
+            <h3><i class="ti ti-star me-2"></i>Experiencias</h3>
+            <span class="mobile-table-count" id="experiences-count">Cargando...</span>
+        </div>
+        <% if (canCreate) { %>
+        <button class="mobile-add-btn" id="add-experience-mobile">
+            <i class="ti ti-plus"></i>
+            <span>Agregar</span>
+        </button>
+        <% } %>
+    </div>
+
+    <!-- Mobile Search and Filters -->
+    <div class="mobile-filters">
+        <div class="mobile-search-container">
+            <i class="ti ti-search"></i>
+            <input type="text" class="mobile-search" id="mobile-search-experiences" placeholder="Buscar experiencias...">
+        </div>
+        
+        <button class="mobile-filter-toggle" id="mobile-filter-toggle">
+            <i class="ti ti-filter"></i>
+            <span>Filtros</span>
+        </button>
+    </div>
+
+    <!-- Collapsible Filter Panel -->
+    <div class="mobile-filter-panel" id="mobile-filter-panel">
+        <div class="mobile-filter-group">
+            <label for="mobile-category-filter">Categoría</label>
+            <select class="form-select" id="mobile-category-filter">
+                <option value="">Todas las categorías</option>
+                <option value="adventure">Aventura</option>
+                <option value="culture">Cultura</option>
+                <option value="gastronomy">Gastronomía</option>
+                <option value="nature">Naturaleza</option>
+            </select>
+        </div>
+        
+        <div class="mobile-filter-group">
+            <label for="mobile-status-filter">Estado</label>
+            <select class="form-select" id="mobile-status-filter">
+                <option value="">Todos los estados</option>
+                <option value="active">Activo</option>
+                <option value="inactive">Inactivo</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Mobile View Toggle -->
+    <div class="mobile-view-toggle">
+        <button class="view-toggle-btn active" data-view="cards">
+            <i class="ti ti-layout-cards"></i>
+            <span>Tarjetas</span>
+        </button>
+        <button class="view-toggle-btn" data-view="list">
+            <i class="ti ti-list"></i>
+            <span>Lista</span>
+        </button>
+    </div>
+
+    <!-- Loading State -->
+    <div class="mobile-loading" id="mobile-loading">
+        <div class="loading-spinner"></div>
+        <span>Cargando experiencias...</span>
+    </div>
+
+    <!-- Mobile Cards View -->
+    <div class="mobile-cards-container" id="mobile-cards-view">
+        <!-- Cards will be populated by JavaScript -->
+    </div>
+
+    <!-- Mobile List View -->
+    <div class="mobile-list-container" id="mobile-list-view" style="display: none;">
+        <!-- Simplified DataTable for list view -->
+        <div class="table-responsive">
+            <table class="table mobile-table" id="<%= dtTableId %>">
+                <thead>
+                    <tr>
+                        <th>Experiencia</th>
+                        <th>Precio</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                        <th>Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Populated by DataTable -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="mobile-empty-state" id="mobile-empty-state" style="display: none;">
+        <div class="empty-state-icon">
+            <i class="ti ti-star-off"></i>
+        </div>
+        <h4>No hay experiencias</h4>
+        <p>No se encontraron experiencias que coincidan con los filtros seleccionados.</p>
+        <% if (canCreate) { %>
+        <button class="btn btn-primary" onclick="document.getElementById('add-experience-mobile').click()">
+            <i class="ti ti-plus me-2"></i>Crear primera experiencia
+        </button>
+        <% } %>
+    </div>
+</div>
+
+<!-- Mobile Experience Card Template -->
+<template id="mobile-experience-card-template">
+    <div class="mobile-experience-card">
+        <div class="mobile-card-image">
+            <img src="/placeholder-experience.jpg" alt="Experience" class="card-image">
+            <div class="card-status-badge">
+                <span class="status-text">Activo</span>
+            </div>
+        </div>
+        <div class="mobile-card-content">
+            <h4 class="card-title">Nombre de la Experiencia</h4>
+            <div class="card-meta">
+                <span class="card-category">
+                    <i class="ti ti-tag"></i>
+                    <span class="category-text">Categoría</span>
+                </span>
+                <span class="card-price">
+                    <i class="ti ti-currency-dollar"></i>
+                    <span class="price-text">$0.00</span>
+                </span>
+            </div>
+            <div class="card-location">
+                <i class="ti ti-map-pin"></i>
+                <span class="location-text">Ubicación</span>
+            </div>
+        </div>
+        <% if (dtShowActions) { %>
+        <div class="mobile-card-actions">
+            <% if (canEdit) { %>
+            <button class="card-action-btn edit-btn" data-action="edit">
+                <i class="ti ti-edit"></i>
+                <span>Editar</span>
+            </button>
+            <% } %>
+            <button class="card-action-btn view-btn" data-action="view">
+                <i class="ti ti-eye"></i>
+                <span>Ver</span>
+            </button>
+            <% if (canDelete) { %>
+            <button class="card-action-btn delete-btn" data-action="delete">
+                <i class="ti ti-trash"></i>
+                <span>Eliminar</span>
+            </button>
+            <% } %>
+        </div>
+        <% } %>
+    </div>
+</template>
+
+<!-- Mobile Experiences Table Styles -->
+<style>
+/* Mobile Table Card */
+.mobile-table-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.mobile-table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 1rem;
+    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+    color: white;
+}
+
+.mobile-table-title h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.mobile-table-count {
+    font-size: 0.875rem;
+    opacity: 0.9;
+}
+
+.mobile-add-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.mobile-add-btn:active {
+    background: rgba(255,255,255,0.3);
+}
+
+/* Mobile Filters */
+.mobile-filters {
+    padding: 1rem;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.mobile-search-container {
+    flex: 1;
+    position: relative;
+}
+
+.mobile-search-container i {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+}
+
+.mobile-search {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    background: white;
+}
+
+.mobile-filter-toggle {
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #6b7280;
+    font-size: 0.875rem;
+    min-width: max-content;
+}
+
+/* Filter Panel */
+.mobile-filter-panel {
+    padding: 1rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    display: none;
+}
+
+.mobile-filter-panel.show {
+    display: block;
+}
+
+.mobile-filter-group {
+    margin-bottom: 1rem;
+}
+
+.mobile-filter-group:last-child {
+    margin-bottom: 0;
+}
+
+.mobile-filter-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+/* View Toggle */
+.mobile-view-toggle {
+    display: flex;
+    padding: 1rem;
+    gap: 0.5rem;
+    background: #f9fafb;
+}
+
+.view-toggle-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    background: white;
+    color: #6b7280;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.view-toggle-btn.active {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
+}
+
+/* Loading State */
+.mobile-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    color: #6b7280;
+}
+
+.loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e5e7eb;
+    border-top: 3px solid #f59e0b;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Cards Container */
+.mobile-cards-container {
+    padding: 1rem;
+    display: grid;
+    gap: 1rem;
+}
+
+/* Experience Card */
+.mobile-experience-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.mobile-experience-card:active {
+    transform: scale(0.98);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.mobile-card-image {
+    position: relative;
+    height: 120px;
+    overflow: hidden;
+}
+
+.card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.card-status-badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.mobile-card-content {
+    padding: 1rem;
+}
+
+.card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem 0;
+    color: #111827;
+    line-height: 1.3;
+}
+
+.card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.card-category,
+.card-price {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: #6b7280;
+}
+
+.card-price {
+    color: #10b981;
+    font-weight: 600;
+}
+
+.card-location {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.mobile-card-actions {
+    padding: 1rem;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.card-action-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.edit-btn:active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.view-btn:active {
+    background: #10b981;
+    color: white;
+    border-color: #10b981;
+}
+
+.delete-btn:active {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+}
+
+/* Mobile List View */
+.mobile-list-container {
+    padding: 1rem;
+}
+
+.mobile-table {
+    font-size: 0.875rem;
+}
+
+.mobile-table th,
+.mobile-table td {
+    padding: 0.75rem 0.5rem;
+    vertical-align: middle;
+}
+
+.mobile-table th {
+    background: #f9fafb;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+/* Empty State */
+.mobile-empty-state {
+    padding: 3rem 2rem;
+    text-align: center;
+    color: #6b7280;
+}
+
+.empty-state-icon i {
+    font-size: 3rem;
+    color: #d1d5db;
+    margin-bottom: 1rem;
+}
+
+.mobile-empty-state h4 {
+    font-size: 1.25rem;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.mobile-empty-state p {
+    margin-bottom: 1.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .mobile-cards-container {
+        padding: 0.5rem;
+    }
+    
+    .mobile-card-content {
+        padding: 0.75rem;
+    }
+}
+</style>
+
+<!-- Mobile Experiences Table Script -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initMobileExperiencesTable();
+});
+
+function initMobileExperiencesTable() {
+    const mobileFilterToggle = document.getElementById('mobile-filter-toggle');
+    const mobileFilterPanel = document.getElementById('mobile-filter-panel');
+    const viewToggleBtns = document.querySelectorAll('.view-toggle-btn');
+    const cardsView = document.getElementById('mobile-cards-view');
+    const listView = document.getElementById('mobile-list-view');
+    const mobileSearch = document.getElementById('mobile-search-experiences');
+    const mobileLoading = document.getElementById('mobile-loading');
+    
+    // Filter toggle
+    if (mobileFilterToggle && mobileFilterPanel) {
+        mobileFilterToggle.addEventListener('click', function() {
+            mobileFilterPanel.classList.toggle('show');
+            const isOpen = mobileFilterPanel.classList.contains('show');
+            this.querySelector('i').className = isOpen ? 'ti ti-filter-off' : 'ti ti-filter';
+        });
+    }
+    
+    // View toggle
+    viewToggleBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const view = this.dataset.view;
+            
+            // Update active state
+            viewToggleBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Toggle views
+            if (view === 'cards') {
+                cardsView.style.display = 'block';
+                listView.style.display = 'none';
+            } else {
+                cardsView.style.display = 'none';
+                listView.style.display = 'block';
+            }
+        });
+    });
+    
+    // Initialize with mock data for now
+    setTimeout(() => {
+        mobileLoading.style.display = 'none';
+        loadMockExperiences();
+    }, 1500);
+}
+
+function loadMockExperiences() {
+    // Mock data for demonstration
+    const mockExperiences = [
+        {
+            id: 1,
+            title: 'Tour Teotihuacán',
+            category: 'Cultura',
+            price: '$850.00',
+            location: 'Estado de México',
+            status: 'Activo',
+            image: '/placeholder-experience.jpg'
+        },
+        {
+            id: 2,
+            title: 'Degustación Tequila',
+            category: 'Gastronomía', 
+            price: '$1,200.00',
+            location: 'Jalisco',
+            status: 'Activo',
+            image: '/placeholder-experience.jpg'
+        },
+        {
+            id: 3,
+            title: 'Rappel en Cascada',
+            category: 'Aventura',
+            price: '$600.00',
+            location: 'Veracruz',
+            status: 'Inactivo',
+            image: '/placeholder-experience.jpg'
+        }
+    ];
+    
+    const cardsContainer = document.getElementById('mobile-cards-view');
+    const template = document.getElementById('mobile-experience-card-template');
+    const countElement = document.getElementById('experiences-count');
+    
+    if (cardsContainer && template && countElement) {
+        cardsContainer.innerHTML = '';
+        countElement.textContent = `${mockExperiences.length} experiencias`;
+        
+        mockExperiences.forEach(experience => {
+            const cardElement = template.content.cloneNode(true);
+            
+            // Populate card data
+            cardElement.querySelector('.card-title').textContent = experience.title;
+            cardElement.querySelector('.category-text').textContent = experience.category;
+            cardElement.querySelector('.price-text').textContent = experience.price;
+            cardElement.querySelector('.location-text').textContent = experience.location;
+            cardElement.querySelector('.status-text').textContent = experience.status;
+            cardElement.querySelector('.card-image').src = experience.image;
+            cardElement.querySelector('.card-image').alt = experience.title;
+            
+            // Add status styling
+            const statusBadge = cardElement.querySelector('.card-status-badge');
+            if (experience.status === 'Inactivo') {
+                statusBadge.style.background = 'rgba(239, 68, 68, 0.9)';
+            } else {
+                statusBadge.style.background = 'rgba(16, 185, 129, 0.9)';
+            }
+            
+            // Add action listeners
+            const actionBtns = cardElement.querySelectorAll('.card-action-btn');
+            actionBtns.forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const action = this.dataset.action;
+                    handleExperienceAction(action, experience);
+                });
+            });
+            
+            cardsContainer.appendChild(cardElement);
+        });
+    }
+}
+
+function handleExperienceAction(action, experience) {
+    console.log(`Action: ${action} on experience:`, experience);
+    // TODO: Implement actual action handlers
+    // For now, just show an alert
+    alert(`Acción "${action}" en experiencia "${experience.title}"`);
+}
+</script>

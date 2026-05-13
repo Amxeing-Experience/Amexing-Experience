@@ -514,8 +514,10 @@ const agencyRateRoutes = require('./api/agencyRateRoutes');
 const transferRateRoutes = require('./api/transferRateRoutes');
 const driverTourRateRoutes = require('./api/driverTourRateRoutes');
 const guideTransportRateRoutes = require('./api/guideTransportRateRoutes');
+const greeterRateRoutes = require('./api/greeterRateRoutes');
 const vehicleRatePricesRoutes = require('./api/vehicleRatePricesRoutes');
 const disposablePricesRoutes = require('./api/disposablePricesRoutes');
+const settingsRoutes = require('./api/settingsRoutes');
 // Notifications API controller
 const NotificationsController = require('../../application/controllers/api/NotificationsController');
 
@@ -558,8 +560,10 @@ router.use('/agency-rate', agencyRateRoutes); // Agency rate management endpoint
 router.use('/transfer-rate', transferRateRoutes); // Transfer rate management endpoints
 router.use('/driver-tour-rate', driverTourRateRoutes); // Driver tour rate management endpoints
 router.use('/guide-transport-rate', guideTransportRateRoutes); // Guide transport rate management endpoints
+router.use('/greeter-rate', greeterRateRoutes); // Greeter rate management endpoints
 router.use('/vehicle-rate-prices', vehicleRatePricesRoutes); // Vehicle rate prices management endpoints
 router.use('/disposable-prices', disposablePricesRoutes); // Disposable prices (A Disposición) management endpoints
+router.use('/settings', settingsRoutes); // Settings management endpoints
 router.use('/reservations', require('./api/reservationRoutes')); // Reservation management endpoints
 
 // Tarifario Export - Department Manager and above

@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 
-describe.skip('Change Password Form - UI structure tests need updating after form refactor', () => {
+describe('Change Password Form', () => {
   let formHTML;
   let mockDocument;
   let mockWindow;
@@ -71,23 +71,23 @@ describe.skip('Change Password Form - UI structure tests need updating after for
     });
 
     it('should have password visibility toggle buttons', () => {
-      expect(formHTML).toContain('togglePassword');
+      expect(formHTML).toContain('data-toggle-field');
       expect(formHTML).toContain('ti-eye');
       expect(formHTML).toContain('ti-eye-off');
     });
 
-    it('should include password strength indicator', () => {
-      expect(formHTML).toContain('password-strength');
-      expect(formHTML).toContain('strength-bar');
+    it('should include password validation feedback', () => {
+      expect(formHTML).toContain('validatePassword');
+      expect(formHTML).toContain('is-valid');
+      expect(formHTML).toContain('is-invalid');
     });
 
-    it('should have password requirements list', () => {
-      expect(formHTML).toContain('password-requirements');
-      expect(formHTML).toContain('At least 8 characters');
-      expect(formHTML).toContain('One uppercase letter');
-      expect(formHTML).toContain('One lowercase letter');
-      expect(formHTML).toContain('One number');
-      expect(formHTML).toContain('One special character');
+    it('should have password requirements message', () => {
+      expect(formHTML).toContain('at least 8 characters');
+      expect(formHTML).toContain('uppercase');
+      expect(formHTML).toContain('lowercase');
+      expect(formHTML).toContain('number');
+      expect(formHTML).toContain('special character');
     });
   });
 
@@ -96,11 +96,10 @@ describe.skip('Change Password Form - UI structure tests need updating after for
 
     beforeAll(() => {
       // Extract the validatePassword function from the script
-      const scriptMatch = formHTML.match(/function validatePassword\(password\) \{([\s\S]*?)\}/);
+      const scriptMatch = formHTML.match(/function validatePassword\(password\) \{([\s\S]*?)return \{[\s\S]*?\};\s*\}/);
       if (scriptMatch) {
-        const functionBody = scriptMatch[1];
         // Create the function for testing
-        validatePasswordFunction = new Function('password', functionBody + 'return { isValid, issues };');
+        validatePasswordFunction = eval(`(${scriptMatch[0]})`);
       }
     });
 
@@ -206,31 +205,31 @@ describe.skip('Change Password Form - UI structure tests need updating after for
     });
 
     it('should setup event listeners on form load', () => {
-      expect(formHTML).toContain('DOMContentLoaded');
       expect(formHTML).toContain('addEventListener');
+      expect(formHTML).toContain('change-password-form');
     });
 
     it('should validate passwords match when confirming', () => {
       expect(formHTML).toContain('confirmPassword');
-      expect(formHTML).toContain('passwords match');
+      expect(formHTML).toContain('Passwords do not match');
     });
 
-    it('should update password strength indicator', () => {
-      expect(formHTML).toContain('updatePasswordStrength');
-      expect(formHTML).toContain('strength-bar');
+    it('should have real-time password validation', () => {
+      expect(formHTML).toContain("addEventListener('input'");
+      expect(formHTML).toContain('validatePassword');
     });
 
     it('should toggle password visibility', () => {
-      expect(formHTML).toContain('togglePasswordVisibility');
-      expect(formHTML).toContain('type="password"');
-      expect(formHTML).toContain('type="text"');
+      expect(formHTML).toContain('togglePassword');
+      expect(formHTML).toContain("type = 'password'");
+      expect(formHTML).toContain("type = 'text'");
     });
   });
 
   describe('Form Submission', () => {
     it('should prevent submission with invalid passwords', () => {
       expect(formHTML).toContain('preventDefault');
-      expect(formHTML).toContain('form submission');
+      expect(formHTML).toContain('was-validated');
     });
 
     it('should show loading state during submission', () => {
@@ -251,7 +250,7 @@ describe.skip('Change Password Form - UI structure tests need updating after for
     it('should make POST request to correct endpoint', () => {
       expect(formHTML).toContain('/auth/change-password');
       expect(formHTML).toContain('fetch');
-      expect(formHTML).toContain('method: "POST"');
+      expect(formHTML).toContain("method: 'POST'");
     });
 
     it('should include CSRF token in request', () => {
@@ -261,26 +260,24 @@ describe.skip('Change Password Form - UI structure tests need updating after for
   });
 
   describe('Password Requirements UI', () => {
-    it('should display all password requirements', () => {
-      expect(formHTML).toContain('At least 8 characters');
-      expect(formHTML).toContain('One uppercase letter (A-Z)');
-      expect(formHTML).toContain('One lowercase letter (a-z)');
-      expect(formHTML).toContain('One number (0-9)');
-      expect(formHTML).toContain('One special character (!@#$%^&*)');
+    it('should display password requirements help text', () => {
+      expect(formHTML).toContain('at least 8 characters');
+      expect(formHTML).toContain('uppercase');
+      expect(formHTML).toContain('lowercase');
+      expect(formHTML).toContain('number');
+      expect(formHTML).toContain('special character');
     });
 
-    it('should update requirement status based on validation', () => {
-      expect(formHTML).toContain('valid');
-      expect(formHTML).toContain('invalid');
-      expect(formHTML).toContain('ti-check');
-      expect(formHTML).toContain('ti-x');
+    it('should show real-time validation feedback', () => {
+      expect(formHTML).toContain('is-valid');
+      expect(formHTML).toContain('is-invalid');
+      expect(formHTML).toContain('setCustomValidity');
     });
   });
 
   describe('Accessibility Features', () => {
-    it('should have proper ARIA labels', () => {
-      expect(formHTML).toContain('aria-label');
-      expect(formHTML).toContain('aria-describedby');
+    it('should have proper alert roles', () => {
+      expect(formHTML).toContain('role="alert"');
     });
 
     it('should have proper form labels', () => {
@@ -295,9 +292,9 @@ describe.skip('Change Password Form - UI structure tests need updating after for
       expect(formHTML).toContain('*');
     });
 
-    it('should have password visibility toggle accessibility', () => {
-      expect(formHTML).toContain('Toggle password visibility');
-      expect(formHTML).toContain('aria-label');
+    it('should have password visibility toggle buttons', () => {
+      expect(formHTML).toContain('data-toggle-field');
+      expect(formHTML).toContain('btn-outline-secondary');
     });
   });
 
@@ -327,7 +324,7 @@ describe.skip('Change Password Form - UI structure tests need updating after for
 
     it('should have mobile-friendly input groups', () => {
       expect(formHTML).toContain('input-group');
-      expect(formHTML).toContain('input-group-text');
+      expect(formHTML).toContain('btn-outline-secondary');
     });
   });
 });

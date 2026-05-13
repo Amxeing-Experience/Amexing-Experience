@@ -60,7 +60,7 @@ const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
  *       400:
  *         description: Rate ID required
  */
-router.get('/with-rate-prices', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getToursWithRatePrices(req, res));
+router.get('/with-rate-prices', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getToursWithRatePrices(req, res));
 
 /**
  * @swagger
@@ -132,7 +132,7 @@ router.get('/with-rate-prices', jwtMiddleware.requireRoleLevel(4), (req, res) =>
  *       403:
  *         $ref: '#/components/responses/ForbiddenError'
  */
-router.get('/', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getTours(req, res));
+router.get('/', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getTours(req, res));
 
 // =================
 // WRITE ROUTES (require admin/superadmin)
@@ -192,7 +192,7 @@ router.get('/', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController
  *       403:
  *         $ref: '#/components/responses/ForbiddenError'
  */
-router.post('/', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.createTour(req, res));
+router.post('/', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.createTour(req, res));
 
 /**
  * @swagger
@@ -237,7 +237,7 @@ router.post('/', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursControlle
  *       404:
  *         description: Tour not found
  */
-router.get('/:id', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getTourById(req, res));
+router.get('/:id', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getTourById(req, res));
 
 /**
  * @swagger
@@ -294,7 +294,7 @@ router.get('/:id', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursControl
  *       404:
  *         description: Tour not found
  */
-router.get('/:id/all-prices', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getAllTourPrices(req, res));
+router.get('/:id/all-prices', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getAllTourPrices(req, res));
 
 /**
  * @swagger
@@ -346,7 +346,7 @@ router.get('/:id/all-prices', jwtMiddleware.requireRoleLevel(4), (req, res) => T
  *       404:
  *         description: Tour not found
  */
-router.get('/:id/all-rate-prices-with-client-prices', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getAllRatePricesForTourWithClientPrices(req, res));
+router.get('/:id/all-rate-prices-with-client-prices', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getAllRatePricesForTourWithClientPrices(req, res));
 
 /**
  * @swagger
@@ -419,7 +419,7 @@ router.get('/:id/all-rate-prices-with-client-prices', jwtMiddleware.requireRoleL
  *       404:
  *         description: Tour not found
  */
-router.get('/:id/price-history', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.getPriceHistory(req, res));
+router.get('/:id/price-history', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.getPriceHistory(req, res));
 
 /**
  * @swagger
@@ -476,7 +476,7 @@ router.get('/:id/price-history', jwtMiddleware.requireRoleLevel(6), (req, res) =
  *       403:
  *         $ref: '#/components/responses/ForbiddenError'
  */
-router.post('/client-prices', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.saveTourClientPrices(req, res));
+router.post('/client-prices', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.saveTourClientPrices(req, res));
 
 /**
  * @swagger
@@ -568,8 +568,8 @@ router.post('/client-prices', jwtMiddleware.requireRoleLevel(6), (req, res) => T
  *       404:
  *         description: Tour not found
  */
-router.put('/:id', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.updateTour(req, res));
-router.delete('/:id', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.deleteTour(req, res));
+router.put('/:id', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.updateTour(req, res));
+router.delete('/:id', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.deleteTour(req, res));
 
 /**
  * @swagger
@@ -616,7 +616,7 @@ router.delete('/:id', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursCont
  *       404:
  *         description: Tour not found
  */
-router.patch('/:id/toggle-status', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.toggleTourStatus(req, res));
+router.patch('/:id/toggle-status', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.toggleTourStatus(req, res));
 
 /**
  * @swagger
@@ -687,6 +687,6 @@ router.patch('/:id/toggle-status', jwtMiddleware.requireRoleLevel(6), (req, res)
  *       500:
  *         description: Internal server error
  */
-router.post('/:id/update-base-prices', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.updateBasePrices(req, res));
+router.post('/:id/update-base-prices', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.updateBasePrices(req, res));
 
 module.exports = router;
