@@ -2,18 +2,22 @@
 /**
  * Admin Experiences Management Page
  * Manages experiences catalog and experience categories
+ * Features responsive detection for mobile optimization
  *
  * Layout Structure:
- * - Vertical navigation menu (collapsible)
- * - Two sections: Experiencias (experiences list) and Categorías (categories management)
- * - Section-based content rendering
+ * - Responsive detection and conditional loading
+ * - Desktop: Vertical navigation menu (collapsible) + complex DataTables
+ * - Mobile: Simplified mobile-first interface
  *
  * Note: DataTables CSS/JS libraries are loaded via controller
+ * Created by Denisse Maldonado
  */
 
 // Page configuration
 const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const activeSection = typeof section !== 'undefined' ? section : 'experiences';
+const userAgent = typeof req !== 'undefined' ? req.get('User-Agent') : '';
+const isMobileRequest = typeof req !== 'undefined' ? req.get('User-Agent').match(/Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i) : false;
 
 // Menu items configuration
 const menuItems = [
@@ -21,7 +25,116 @@ const menuItems = [
     { label: 'Proveedores', icon: 'building-store', section: 'providers', href: '/dashboard/admin/experiences?section=providers' },
     { label: 'Establecimientos', icon: 'building', section: 'establishments', href: '/dashboard/admin/experiences?section=establishments' }
 ];
+
+// Check if mobile version should be rendered
+const forceMobile = typeof req !== 'undefined' ? req.query.mobile === 'true' : false;
+const forceDesktop = typeof req !== 'undefined' ? req.query.desktop === 'true' : false;
+const shouldRenderMobile = (forceMobile || isMobileRequest) && !forceDesktop;
 %>
+
+<!-- Mobile Detection and Conditional Loading -->
+<script>
+(function() {
+    'use strict';
+    
+    // Check if we're already processing a mobile redirect
+    const isProcessingRedirect = sessionStorage.getItem('mobileRedirectProcessing');
+    if (isProcessingRedirect === 'true') {
+        console.log('Mobile redirect already in progress, skipping...');
+        return;
+    }
+    
+    // Client-side mobile detection
+    const MOBILE_BREAKPOINT = 992;
+    const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
+    const isMobileDevice = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const shouldUseMobile = isMobile || isMobileDevice;
+    
+    // Check URL parameters for manual override
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceMobile = urlParams.get('mobile') === 'true';
+    const forceDesktop = urlParams.get('desktop') === 'true';
+    
+    // Check if mobile version is already loaded server-side
+    const mobileHeader = document.querySelector('.mobile-header');
+    const isMobileVersionLoaded = !!mobileHeader;
+    
+    console.log('Mobile detection:', {
+        isMobile,
+        isMobileDevice,
+        shouldUseMobile,
+        forceMobile,
+        forceDesktop,
+        isMobileVersionLoaded
+    });
+    
+    // Only redirect if we need mobile but don't have it, or vice versa
+    if ((shouldUseMobile || forceMobile) && !forceDesktop && !isMobileVersionLoaded) {
+        console.log('Switching to mobile experiences view...');
+        
+        // Set processing flag to prevent loops
+        sessionStorage.setItem('mobileRedirectProcessing', 'true');
+        
+        // Show loading indicator
+        document.body.innerHTML = `
+            <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; color: #6b7280;">
+                <div style="width: 40px; height: 40px; border: 4px solid #f3f4f6; border-top: 4px solid #f59e0b; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1rem;"></div>
+                <span>Optimizando para móvil...</span>
+            </div>
+            <style>
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+        `;
+        
+        // Switch to mobile version after short delay
+        setTimeout(() => {
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.set('mobile', 'true');
+            window.location.href = currentUrl.toString();
+        }, 800);
+        
+        return; // Stop execution
+    }
+    
+    // If we have mobile version but shouldn't (desktop override)
+    if ((!shouldUseMobile || forceDesktop) && isMobileVersionLoaded && !forceMobile) {
+        console.log('Switching to desktop experiences view...');
+        
+        // Set processing flag to prevent loops
+        sessionStorage.setItem('mobileRedirectProcessing', 'true');
+        
+        setTimeout(() => {
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.delete('mobile');
+            if (forceDesktop) {
+                currentUrl.searchParams.set('desktop', 'true');
+            }
+            window.location.href = currentUrl.toString();
+        }, 100);
+        
+        return;
+    }
+    
+    // Clear processing flag if no redirect needed
+    sessionStorage.removeItem('mobileRedirectProcessing');
+    
+    // Mark body with appropriate class
+    if (isMobileVersionLoaded) {
+        document.body.classList.add('mobile-experiences');
+    } else {
+        document.body.classList.add('desktop-experiences');
+    }
+})();
+</script>
+
+<% if (shouldRenderMobile) { %>
+    <!-- Load Mobile Version -->
+    <%- include('./experiences-mobile', {
+        userRole: currentUserRole,
+        section: activeSection
+    }) %>
+<% } else { %>
+    <!-- Load Desktop Version -->
 
 <!-- Page Header with Breadcrumb -->
 <div class="row mb-4">
@@ -271,3 +384,67 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Load Dropzone.js from CDN -->
 <script src="https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone-min.js"></script>
 <link href="https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone.css" rel="stylesheet" type="text/css" />
+
+<!-- Mobile Detection Enhancement Script -->
+<script>
+// Add desktop experience enhancements
+if (window.innerWidth >= 992) {
+    document.body.classList.add('desktop-experiences');
+    
+    // Add desktop-specific features
+    console.log('Desktop experiences view loaded');
+    
+    // Add toggle for mobile preview (dev feature)
+    if (typeof isDevelopment !== 'undefined' && isDevelopment) {
+        const mobilePreviewBtn = document.createElement('button');
+        mobilePreviewBtn.innerHTML = '<i class="ti ti-device-mobile me-1"></i>Vista Móvil';
+        mobilePreviewBtn.className = 'btn btn-outline-info btn-sm position-fixed';
+        mobilePreviewBtn.style.cssText = 'top: 20px; right: 20px; z-index: 9999;';
+        mobilePreviewBtn.onclick = () => {
+            const url = new URL(window.location);
+            url.searchParams.set('mobile', 'true');
+            window.location.href = url.toString();
+        };
+        document.body.appendChild(mobilePreviewBtn);
+    }
+}
+</script>
+
+<% } /* End desktop version conditional */ %>
+
+<!-- Responsive Detection Enhancement -->
+<style>
+/* Ensure smooth transitions between mobile and desktop */
+body.switching-to-mobile {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* Desktop indicator */
+@media (min-width: 992px) {
+    body.desktop-experiences::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, #f59e0b, #fbbf24);
+        z-index: 9999;
+    }
+}
+
+/* Mobile optimization indicator */
+@media (max-width: 991.98px) {
+    body.mobile-experiences::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, #10b981, #34d399);
+        z-index: 9999;
+    }
+}
+</style>

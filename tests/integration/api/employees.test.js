@@ -112,8 +112,8 @@ describe('Employees API Integration Tests', () => {
         .query({ page: 1, limit: 2 });
 
       expect(page1Response.status).toBe(200);
-      expect(page1Response.body.data.pagination.page).toBe(1);
-      expect(page1Response.body.data.pagination.limit).toBe(2);
+      expect(page1Response.body.data.pagination.currentPage).toBe(1);
+      expect(page1Response.body.data.pagination.pageSize).toBe(2);
     });
   });
 

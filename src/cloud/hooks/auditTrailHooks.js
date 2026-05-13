@@ -685,6 +685,7 @@ function registerAuditHooks(includedClasses = null) {
         'Employee',
         'Driver',
         'AmexingUser',
+        '_User',
         'Department',
         'Vehicle',
         'VehicleType',

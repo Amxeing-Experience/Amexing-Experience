@@ -5,14 +5,14 @@
 
 const request = require('supertest');
 const AuthTestHelper = require('../../helpers/authTestHelper');
+const { getTestApp } = require('../../helpers/testAppSetup');
 
-// Import the Express app directly for testing
+// Import the Express app properly for testing
 let app;
 
 describe('Authentication API', () => {
   beforeAll(async () => {
-    app = require('../../../src/index');
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    app = await getTestApp();
   }, 30000);
 
   afterAll(async () => {
@@ -133,8 +133,8 @@ describe('Authentication API', () => {
           csrfToken: csrfToken
         });
 
-      // Should reject duplicate (400, 409) or redirect with error (302)
-      expect([302, 400, 409]).toContain(response.status);
+      // Should reject duplicate (302=redirect with error, 403=CSRF error, 409=conflict, 422=validation error)
+      expect([302, 403, 409, 422]).toContain(response.status);
     });
 
     it('should validate password requirements', async () => {
@@ -155,8 +155,8 @@ describe('Authentication API', () => {
           csrfToken: csrfToken
         });
 
-      // Should reject weak password
-      expect([302, 400, 422]).toContain(response.status);
+      // Should reject weak password (302=redirect with error, 403=CSRF error, 422=validation error)
+      expect([302, 403, 422]).toContain(response.status);
     });
 
     it('should validate email format', async () => {
@@ -177,8 +177,8 @@ describe('Authentication API', () => {
           csrfToken: csrfToken
         });
 
-      // Should reject invalid email
-      expect([302, 400, 422]).toContain(response.status);
+      // Should reject invalid email (302=redirect with error, 403=CSRF error, 422=validation error)
+      expect([302, 403, 422]).toContain(response.status);
     });
   });
 

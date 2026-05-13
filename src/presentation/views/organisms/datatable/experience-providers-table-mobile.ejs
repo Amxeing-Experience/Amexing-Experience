@@ -1,0 +1,544 @@
+<%
+/**
+ * Mobile Experience Providers DataTable Organism
+ * Simplified mobile-optimized DataTable for experience providers management
+ *
+ * Atomic Design Level: Organism
+ * Category: Mobile Dashboard Data Tables
+ * 
+ * Created by Denisse Maldonado
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'experience-providers-table-mobile';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/experiences';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<!-- Mobile Providers Table Card -->
+<div class="mobile-table-card">
+    <!-- Mobile Table Header -->
+    <div class="mobile-table-header">
+        <div class="mobile-table-title">
+            <h3><i class="ti ti-building-store me-2"></i>Proveedores</h3>
+            <span class="mobile-table-count" id="providers-count">Cargando...</span>
+        </div>
+        <% if (canCreate) { %>
+        <button class="mobile-add-btn" id="add-provider-mobile">
+            <i class="ti ti-plus"></i>
+            <span>Agregar</span>
+        </button>
+        <% } %>
+    </div>
+
+    <!-- Mobile Search and Filters -->
+    <div class="mobile-filters">
+        <div class="mobile-search-container">
+            <i class="ti ti-search"></i>
+            <input type="text" class="mobile-search" id="mobile-search-providers" placeholder="Buscar proveedores...">
+        </div>
+        
+        <button class="mobile-filter-toggle" id="mobile-provider-filter-toggle">
+            <i class="ti ti-filter"></i>
+            <span>Filtros</span>
+        </button>
+    </div>
+
+    <!-- Collapsible Filter Panel -->
+    <div class="mobile-filter-panel" id="mobile-provider-filter-panel">
+        <div class="mobile-filter-group">
+            <label for="mobile-provider-type-filter">Tipo de Proveedor</label>
+            <select class="form-select" id="mobile-provider-type-filter">
+                <option value="">Todos los tipos</option>
+                <option value="individual">Individual</option>
+                <option value="company">Empresa</option>
+                <option value="cooperative">Cooperativa</option>
+            </select>
+        </div>
+        
+        <div class="mobile-filter-group">
+            <label for="mobile-provider-status-filter">Estado</label>
+            <select class="form-select" id="mobile-provider-status-filter">
+                <option value="">Todos los estados</option>
+                <option value="active">Activo</option>
+                <option value="inactive">Inactivo</option>
+                <option value="pending">Pendiente</option>
+            </select>
+        </div>
+
+        <div class="mobile-filter-group">
+            <label for="mobile-provider-location-filter">Ubicación</label>
+            <select class="form-select" id="mobile-provider-location-filter">
+                <option value="">Todas las ubicaciones</option>
+                <option value="cdmx">Ciudad de México</option>
+                <option value="jalisco">Jalisco</option>
+                <option value="veracruz">Veracruz</option>
+                <option value="yucatan">Yucatán</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Mobile View Toggle -->
+    <div class="mobile-view-toggle">
+        <button class="view-toggle-btn active" data-view="cards">
+            <i class="ti ti-layout-cards"></i>
+            <span>Tarjetas</span>
+        </button>
+        <button class="view-toggle-btn" data-view="list">
+            <i class="ti ti-list"></i>
+            <span>Lista</span>
+        </button>
+    </div>
+
+    <!-- Loading State -->
+    <div class="mobile-loading" id="mobile-providers-loading">
+        <div class="loading-spinner"></div>
+        <span>Cargando proveedores...</span>
+    </div>
+
+    <!-- Mobile Cards View -->
+    <div class="mobile-cards-container" id="mobile-providers-cards-view">
+        <!-- Cards will be populated by JavaScript -->
+    </div>
+
+    <!-- Mobile List View -->
+    <div class="mobile-list-container" id="mobile-providers-list-view" style="display: none;">
+        <!-- Simplified DataTable for list view -->
+        <div class="table-responsive">
+            <table class="table mobile-table" id="<%= dtTableId %>">
+                <thead>
+                    <tr>
+                        <th>Proveedor</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                        <th>Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Populated by DataTable -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="mobile-empty-state" id="mobile-providers-empty-state" style="display: none;">
+        <div class="empty-state-icon">
+            <i class="ti ti-building-store-off"></i>
+        </div>
+        <h4>No hay proveedores</h4>
+        <p>No se encontraron proveedores que coincidan con los filtros seleccionados.</p>
+        <% if (canCreate) { %>
+        <button class="btn btn-primary" onclick="document.getElementById('add-provider-mobile').click()">
+            <i class="ti ti-plus me-2"></i>Registrar primer proveedor
+        </button>
+        <% } %>
+    </div>
+</div>
+
+<!-- Mobile Provider Card Template -->
+<template id="mobile-provider-card-template">
+    <div class="mobile-provider-card">
+        <div class="mobile-provider-header">
+            <div class="provider-avatar">
+                <i class="ti ti-building-store"></i>
+            </div>
+            <div class="provider-info">
+                <h4 class="provider-name">Nombre del Proveedor</h4>
+                <span class="provider-type">Tipo de Proveedor</span>
+            </div>
+            <div class="provider-status-badge">
+                <span class="status-text">Activo</span>
+            </div>
+        </div>
+        <div class="mobile-provider-content">
+            <div class="provider-details">
+                <div class="provider-detail">
+                    <i class="ti ti-map-pin"></i>
+                    <span class="detail-label">Ubicación:</span>
+                    <span class="detail-value location-text">Ciudad</span>
+                </div>
+                <div class="provider-detail">
+                    <i class="ti ti-phone"></i>
+                    <span class="detail-label">Teléfono:</span>
+                    <span class="detail-value phone-text">+52 55 1234 5678</span>
+                </div>
+                <div class="provider-detail">
+                    <i class="ti ti-mail"></i>
+                    <span class="detail-label">Email:</span>
+                    <span class="detail-value email-text">email@example.com</span>
+                </div>
+                <div class="provider-detail">
+                    <i class="ti ti-star"></i>
+                    <span class="detail-label">Experiencias:</span>
+                    <span class="detail-value experiences-count">0</span>
+                </div>
+            </div>
+        </div>
+        <% if (dtShowActions) { %>
+        <div class="mobile-provider-actions">
+            <% if (canEdit) { %>
+            <button class="provider-action-btn edit-btn" data-action="edit">
+                <i class="ti ti-edit"></i>
+                <span>Editar</span>
+            </button>
+            <% } %>
+            <button class="provider-action-btn view-btn" data-action="view">
+                <i class="ti ti-eye"></i>
+                <span>Ver</span>
+            </button>
+            <button class="provider-action-btn contact-btn" data-action="contact">
+                <i class="ti ti-message"></i>
+                <span>Contactar</span>
+            </button>
+            <% if (canDelete) { %>
+            <button class="provider-action-btn delete-btn" data-action="delete">
+                <i class="ti ti-trash"></i>
+                <span>Eliminar</span>
+            </button>
+            <% } %>
+        </div>
+        <% } %>
+    </div>
+</template>
+
+<!-- Mobile Providers Table Styles -->
+<style>
+/* Provider-specific card styles */
+.mobile-provider-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.2s;
+    margin-bottom: 1rem;
+}
+
+.mobile-provider-card:active {
+    transform: scale(0.98);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.mobile-provider-header {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+    color: white;
+    gap: 1rem;
+}
+
+.provider-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.provider-info {
+    flex: 1;
+}
+
+.provider-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 0.25rem 0;
+    line-height: 1.3;
+}
+
+.provider-type {
+    font-size: 0.875rem;
+    opacity: 0.9;
+}
+
+.provider-status-badge {
+    background: rgba(0,0,0,0.2);
+    padding: 0.375rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.mobile-provider-content {
+    padding: 1rem;
+}
+
+.provider-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.provider-detail {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.provider-detail i {
+    color: #6b7280;
+    width: 1.25rem;
+    flex-shrink: 0;
+}
+
+.detail-label {
+    color: #6b7280;
+    min-width: 80px;
+}
+
+.detail-value {
+    color: #111827;
+    font-weight: 500;
+}
+
+.mobile-provider-actions {
+    padding: 1rem;
+    border-top: 1px solid #e5e7eb;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.provider-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+    color: #6b7280;
+}
+
+.edit-btn:active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.view-btn:active {
+    background: #10b981;
+    color: white;
+    border-color: #10b981;
+}
+
+.contact-btn:active {
+    background: #8b5cf6;
+    color: white;
+    border-color: #8b5cf6;
+}
+
+.delete-btn:active {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+}
+
+/* Status specific styling */
+.provider-status-badge .status-text[data-status="active"] {
+    color: #10b981;
+}
+
+.provider-status-badge .status-text[data-status="inactive"] {
+    color: #ef4444;
+}
+
+.provider-status-badge .status-text[data-status="pending"] {
+    color: #f59e0b;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .mobile-provider-actions {
+        grid-template-columns: 1fr;
+    }
+    
+    .mobile-provider-header {
+        padding: 0.75rem;
+    }
+    
+    .provider-avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 1.25rem;
+    }
+    
+    .provider-name {
+        font-size: 1rem;
+    }
+}
+</style>
+
+<!-- Mobile Providers Table Script -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initMobileProvidersTable();
+});
+
+function initMobileProvidersTable() {
+    const mobileFilterToggle = document.getElementById('mobile-provider-filter-toggle');
+    const mobileFilterPanel = document.getElementById('mobile-provider-filter-panel');
+    const viewToggleBtns = document.querySelectorAll('#mobile-providers-cards-view').parentElement.querySelectorAll('.view-toggle-btn');
+    const cardsView = document.getElementById('mobile-providers-cards-view');
+    const listView = document.getElementById('mobile-providers-list-view');
+    const mobileSearch = document.getElementById('mobile-search-providers');
+    const mobileLoading = document.getElementById('mobile-providers-loading');
+    
+    // Filter toggle
+    if (mobileFilterToggle && mobileFilterPanel) {
+        mobileFilterToggle.addEventListener('click', function() {
+            mobileFilterPanel.classList.toggle('show');
+            const isOpen = mobileFilterPanel.classList.contains('show');
+            this.querySelector('i').className = isOpen ? 'ti ti-filter-off' : 'ti ti-filter';
+        });
+    }
+    
+    // View toggle
+    viewToggleBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const view = this.dataset.view;
+            
+            // Update active state
+            viewToggleBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Toggle views
+            if (view === 'cards') {
+                cardsView.style.display = 'block';
+                listView.style.display = 'none';
+            } else {
+                cardsView.style.display = 'none';
+                listView.style.display = 'block';
+            }
+        });
+    });
+    
+    // Initialize with mock data for now
+    setTimeout(() => {
+        if (mobileLoading) {
+            mobileLoading.style.display = 'none';
+        }
+        loadMockProviders();
+    }, 1500);
+}
+
+function loadMockProviders() {
+    // Mock data for demonstration
+    const mockProviders = [
+        {
+            id: 1,
+            name: 'Aventuras Extremas SA',
+            type: 'Empresa',
+            status: 'Activo',
+            location: 'Veracruz',
+            phone: '+52 229 123 4567',
+            email: 'contacto@aventurasextremas.com',
+            experiencesCount: 5
+        },
+        {
+            id: 2,
+            name: 'María González Tours',
+            type: 'Individual',
+            status: 'Activo', 
+            location: 'Jalisco',
+            phone: '+52 33 987 6543',
+            email: 'maria@gonzaleztours.com',
+            experiencesCount: 3
+        },
+        {
+            id: 3,
+            name: 'Cooperativa Ecoturismo',
+            type: 'Cooperativa',
+            status: 'Pendiente',
+            location: 'Yucatán',
+            phone: '+52 999 555 0123',
+            email: 'info@ecoturismocooperativa.com',
+            experiencesCount: 0
+        },
+        {
+            id: 4,
+            name: 'Gastro Experiences',
+            type: 'Empresa',
+            status: 'Inactivo',
+            location: 'Ciudad de México',
+            phone: '+52 55 111 2233',
+            email: 'hola@gastroexperiences.mx',
+            experiencesCount: 2
+        }
+    ];
+    
+    const cardsContainer = document.getElementById('mobile-providers-cards-view');
+    const template = document.getElementById('mobile-provider-card-template');
+    const countElement = document.getElementById('providers-count');
+    
+    if (cardsContainer && template && countElement) {
+        cardsContainer.innerHTML = '';
+        countElement.textContent = `${mockProviders.length} proveedores`;
+        
+        mockProviders.forEach(provider => {
+            const cardElement = template.content.cloneNode(true);
+            
+            // Populate card data
+            cardElement.querySelector('.provider-name').textContent = provider.name;
+            cardElement.querySelector('.provider-type').textContent = provider.type;
+            cardElement.querySelector('.status-text').textContent = provider.status;
+            cardElement.querySelector('.location-text').textContent = provider.location;
+            cardElement.querySelector('.phone-text').textContent = provider.phone;
+            cardElement.querySelector('.email-text').textContent = provider.email;
+            cardElement.querySelector('.experiences-count').textContent = `${provider.experiencesCount} experiencias`;
+            
+            // Add status styling
+            const statusText = cardElement.querySelector('.status-text');
+            statusText.dataset.status = provider.status.toLowerCase();
+            
+            const statusBadge = cardElement.querySelector('.provider-status-badge');
+            if (provider.status === 'Inactivo') {
+                statusBadge.style.background = 'rgba(239, 68, 68, 0.9)';
+            } else if (provider.status === 'Pendiente') {
+                statusBadge.style.background = 'rgba(245, 158, 11, 0.9)';
+            } else {
+                statusBadge.style.background = 'rgba(16, 185, 129, 0.9)';
+            }
+            
+            // Add action listeners
+            const actionBtns = cardElement.querySelectorAll('.provider-action-btn');
+            actionBtns.forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const action = this.dataset.action;
+                    handleProviderAction(action, provider);
+                });
+            });
+            
+            cardsContainer.appendChild(cardElement);
+        });
+    }
+}
+
+function handleProviderAction(action, provider) {
+    console.log(`Action: ${action} on provider:`, provider);
+    // TODO: Implement actual action handlers
+    // For now, just show an alert
+    alert(`Acción "${action}" en proveedor "${provider.name}"`);
+}
+</script>

@@ -42,7 +42,7 @@ const currentPath = '/dashboard/admin/tours';
     <div class="col-12">
         <%- include('../../organisms/tours/walking-tours-section', {
             walkingToursId: 'admin-walking-tours',
-            walkingApiEndpoint: '/api/tours',
+            walkingApiEndpoint: '/api/tours?includeInactive=true&tourType=walking',
             defaultPaymentType: 'efectivo',
             userRole: currentUserRole
         }) %>
@@ -61,7 +61,7 @@ const currentPath = '/dashboard/admin/tours';
             <div class="card-body">
                 <%- include('../../organisms/datatable/tours-table', {
                     tableId: 'tours-table',
-                    apiEndpoint: '/api/tours',
+                    apiEndpoint: '/api/tours?includeInactive=true&tourType=vehicle',
                     userRole: currentUserRole,
                     showActions: true,
                     showClientPricing: false

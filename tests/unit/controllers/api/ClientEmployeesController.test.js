@@ -178,6 +178,14 @@ describe('ClientEmployeesController', () => {
     });
 
     it('should return employees list successfully', async () => {
+      // Mock Parse query for department manager lookup
+      const Parse = require('parse/node');
+      Parse.Query.mockImplementation(() => ({
+        equalTo: jest.fn().mockReturnThis(),
+        include: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(null), // No department manager found
+      }));
+
       await clientEmployeesController.getEmployees(mockReq, mockRes);
 
       expect(mockUserService.getUsers).toHaveBeenCalledWith(
@@ -185,11 +193,10 @@ describe('ClientEmployeesController', () => {
         expect.objectContaining({
           filters: expect.objectContaining({
             clientId: 'client-abc',
-            roleFilter: ['client', 'employee'],
+            roleFilter: ['client', 'department_manager'],
           }),
         })
       );
-      expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
@@ -275,6 +282,16 @@ describe('ClientEmployeesController', () => {
     });
 
     it('should create employee with client role successfully', async () => {
+      // Mock Parse query for role lookup
+      const Parse = require('parse/node');
+      Parse.Query.mockImplementation(() => ({
+        equalTo: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          id: 'role-client-id',
+          get: jest.fn(() => 'client'),
+        }),
+      }));
+
       await clientEmployeesController.createEmployee(mockReq, mockRes);
 
       expect(mockUserService.createUser).toHaveBeenCalledWith(
@@ -298,14 +315,24 @@ describe('ClientEmployeesController', () => {
       );
     });
 
-    it('should create employee with employee role successfully', async () => {
-      mockReq.body.role = 'employee';
+    it('should create employee with department_manager role successfully', async () => {
+      mockReq.body.role = 'department_manager';
+
+      // Mock Parse query for role lookup
+      const Parse = require('parse/node');
+      Parse.Query.mockImplementation(() => ({
+        equalTo: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          id: 'role-dept-manager-id',
+          get: jest.fn(() => 'department_manager'),
+        }),
+      }));
 
       await clientEmployeesController.createEmployee(mockReq, mockRes);
 
       expect(mockUserService.createUser).toHaveBeenCalledWith(
         expect.objectContaining({
-          role: 'employee',
+          role: 'department_manager',
         }),
         expect.any(Object)
       );

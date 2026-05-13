@@ -308,6 +308,9 @@ table.dataTable thead th:nth-child(2) select {
             </div>
         </div>
 
+        <!-- Include Generic Guide Formula Evaluator -->
+        <script src="/js/guide-formula-evaluator.js"></script>
+        
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">
@@ -568,7 +571,7 @@ table.dataTable thead th:nth-child(2) select {
     const isDevelopment = <%= dtIsDevelopment ? 'true' : 'false' %>;
     
     // Wait for DOM and all dependencies to be ready
-    function initWhenReady() {
+    async function initWhenReady() {
         // Check if jQuery and DataTables are loaded
         if (typeof jQuery === 'undefined') {
             setTimeout(initWhenReady, 100);
@@ -578,6 +581,19 @@ table.dataTable thead th:nth-child(2) select {
         if (!jQuery.fn.dataTable) {
             setTimeout(initWhenReady, 100);
             return;
+        }
+
+        // Wait for GuideFormulaEvaluator to be ready
+        if (typeof GuideFormulaEvaluator !== 'undefined') {
+            console.log('⏳ Waiting for guide formula to load...');
+            try {
+                await GuideFormulaEvaluator.ready();
+                console.log('✅ Guide formula loaded, initializing services table');
+            } catch (error) {
+                console.warn('⚠️ Could not load guide formula, using defaults:', error);
+            }
+        } else {
+            console.warn('⚠️ GuideFormulaEvaluator not available');
         }
 
         initServicesTable();
@@ -602,43 +618,111 @@ table.dataTable thead th:nth-child(2) select {
             clientId
         });
 
-        // Calculate greeter price based on duration
-        // Formula: 760 + (640 * duration)
-        // Special rounding: If last two digits < 50, round down to nearest 100; otherwise round up
+        // Greeter rate cache variables
+        let greeterRateCache = null;
+        let greeterRateCacheTime = null;
+        const greeterRateCacheDuration = 5 * 60 * 1000; // 5 minutes cache
+        
+        // Function to manually refresh greeter cache (for testing/debugging)
+        window.refreshDataTableGreeterCache = function() {
+            console.log('🔄 Manually clearing DataTable greeter cache...');
+            greeterRateCache = null;
+            greeterRateCacheTime = null;
+            return loadGreeterRateConfiguration();
+        };
+        
+        // Load current greeter rate configuration from API
+        function loadGreeterRateConfiguration() {
+            return new Promise((resolve) => {
+                // Check cache validity
+                const now = Date.now();
+                if (greeterRateCache && greeterRateCacheTime && 
+                    (now - greeterRateCacheTime) < greeterRateCacheDuration) {
+                    console.log('🔒 DataTable: Greeter rate cache still valid');
+                    resolve(greeterRateCache);
+                    return;
+                }
+
+                console.log('📥 DataTable: Loading greeter rate configuration...');
+                $.ajax({
+                    url: '/api/greeter-rate/formula',
+                    type: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    success: function(response) {
+                        console.log('📦 DataTable: Greeter rate API response:', response);
+                        
+                        if (response.success && response.data) {
+                            greeterRateCache = {
+                                basePrice: response.data.basePrice || 760,
+                                hourlyRate: response.data.hourlyRate || 640
+                            };
+                            greeterRateCacheTime = now;
+                            console.log('✅ DataTable: Greeter rate configuration loaded from API:', greeterRateCache);
+                            resolve(greeterRateCache);
+                        } else {
+                            console.warn('⚠️ DataTable: API response missing data field, using defaults');
+                            greeterRateCache = { basePrice: 760, hourlyRate: 640 };
+                            greeterRateCacheTime = now;
+                            resolve(greeterRateCache);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('❌ DataTable: Error loading greeter rate configuration:', error);
+                        // Fallback to defaults
+                        greeterRateCache = { basePrice: 760, hourlyRate: 640 };
+                        greeterRateCacheTime = now;
+                        resolve(greeterRateCache);
+                    }
+                });
+            });
+        }
+
+        // Calculate greeter price using configurable rates
+        // Formula: basePrice + (hourlyRate * duration)
+        // Note: Special rounding now applied to final service total, not individual greeter calculation
         function calculateGreeterPrice(durationInHours) {
+            // Use cached values or fallback to defaults
+            const basePrice = greeterRateCache?.basePrice || 760;
+            const hourlyRate = greeterRateCache?.hourlyRate || 640;
+            const isUsingCache = !!greeterRateCache;
+            
             // Validate duration
             if (!durationInHours || durationInHours <= 0) {
-                return 760; // Return base price if no duration
+                console.log('🔍 DataTable: No duration, returning base price:', basePrice);
+                return basePrice;
             }
 
-            // Calculate raw price using formula: 760 + (640 * duration)
-            const rawPrice = 760 + (640 * durationInHours);
+            // Calculate final price using configurable formula (no rounding here)
+            const finalPrice = basePrice + (hourlyRate * durationInHours);
             
-            // Apply special rounding logic
-            // Get the last two digits of the integer part
+            console.log('💰 DataTable: Greeter price calculated (unrounded):', {
+                durationInHours,
+                basePrice,
+                hourlyRate,
+                finalPrice,
+                formula: `${basePrice} + (${hourlyRate} × ${durationInHours}h) = ${finalPrice}`,
+                source: isUsingCache ? '[API]' : '[Default]'
+            });
+            
+            return finalPrice;
+        }
+
+        // Apply special rounding logic to final service totals
+        // Same logic as used in greeter calculation: if last two digits < 50, round down to nearest 100; otherwise round up
+        function applySpecialRounding(rawPrice) {
             const integerPart = Math.floor(rawPrice);
             const lastTwoDigits = integerPart % 100;
             
-            // If last two digits < 50, round down to nearest 100; otherwise round up
-            let roundedPrice;
             if (lastTwoDigits === 0) {
-                // Already a multiple of 100
-                roundedPrice = integerPart;
+                return integerPart;
             } else if (lastTwoDigits < 50) {
-                // Round down to nearest 100
-                roundedPrice = Math.floor(integerPart / 100) * 100;
+                return Math.floor(integerPart / 100) * 100;
             } else {
-                // Round up to nearest 100
-                roundedPrice = Math.ceil(integerPart / 100) * 100;
+                return Math.ceil(integerPart / 100) * 100;
             }
-            
-            console.log('Greeter price calculated:', {
-                durationInHours,
-                rawPrice,
-                roundedPrice
-            });
-            
-            return roundedPrice;
         }
 
         // Get JWT token from server-side template context
@@ -1891,46 +1975,92 @@ table.dataTable thead th:nth-child(2) select {
                         priceElement.data('original-price', originalPrice);
                     }
                     
-                    let finalPrice = originalPrice;
+                    // Start with the original price (don't apply payment rates yet)
+                    let basePrice = originalPrice;
                     
-                    // Apply appropriate rate based on payment type
+                    // Extract numeric value from base price
+                    const baseNumeric = parseFloat(basePrice.replace(/[^0-9.]/g, ''));
+                    
+                    // Calculate additional costs (guide + greeter)
+                    let additionalCosts = 0;
+                    
+                    // Apply guide cost if enabled
+                    if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
+                        // Calculate guide cost using generic evaluator (synchronous fallback for now)
+                        // Convert hours to minutes for the evaluator
+                        // Note: Using promise with immediate resolution for synchronous context
+                        let guideCost = routeDuration * 2 * currentGuideRate; // Fallback calculation
+                        
+                        // Try to use the formula evaluator if available
+                        if (typeof GuideFormulaEvaluator !== 'undefined' && GuideFormulaEvaluator.formulaConfig) {
+                            const config = GuideFormulaEvaluator.formulaConfig;
+                            if (config.formulaComponents && config.formulaComponents.length > 0) {
+                                const beforeCost = guideCost;
+                                guideCost = GuideFormulaEvaluator.evaluateComponents(config.formulaComponents, routeDuration * 60, currentGuideRate);
+                                if (isDevelopment) {
+                                    console.log(`📊 Using custom formula: ${routeDuration}h (${routeDuration * 60}min) @ $${currentGuideRate}/hr = $${guideCost} (was: $${beforeCost})`);
+                                }
+                            } else if (config.roundTripMultiplier) {
+                                guideCost = routeDuration * config.roundTripMultiplier * currentGuideRate;
+                                if (isDevelopment) {
+                                    console.log(`📊 Using simple formula: ${routeDuration}h × ${config.roundTripMultiplier} × $${currentGuideRate} = $${guideCost}`);
+                                }
+                            }
+                        } else if (isDevelopment) {
+                            console.log(`⚠️ Formula evaluator not available, using fallback: ${routeDuration}h × 2 × $${currentGuideRate} = $${guideCost}`);
+                        }
+                        
+                        additionalCosts += guideCost;
+                    }
+                    
+                    // Apply greeter cost if enabled
+                    if (includeGreeter && routeDuration > 0) {
+                        // Ensure greeter cache is loaded before calculating
+                        if (!greeterRateCache) {
+                            console.log('⚡ DataTable: Greeter cache missing, triggering load for expanded view calculation');
+                            loadGreeterRateConfiguration().catch(error => {
+                                console.error('Failed to load greeter config during expanded calculation:', error);
+                            });
+                        }
+                        
+                        // Calculate greeter cost using configurable formula (no rounding)
+                        const greeterCost = calculateGreeterPrice(routeDuration);
+                        additionalCosts += greeterCost;
+                    }
+                    
+                    // Calculate subtotal (base + additional costs)
+                    let subtotal = baseNumeric + additionalCosts;
+                    
+                    // Apply special rounding if greeter is included
+                    if (includeGreeter && additionalCosts > 0) {
+                        const beforeRounding = subtotal;
+                        subtotal = applySpecialRounding(subtotal);
+                        
+                        console.log('💰 DataTable: Special rounding for greeter:', {
+                            basePrice: baseNumeric,
+                            additionalCosts,
+                            beforeRounding,
+                            afterRounding: subtotal
+                        });
+                    }
+                    
+                    // Apply cash rounding for efectivo payments
+                    if (paymentType === 'efectivo' && typeof window.PricingUtils !== 'undefined' && 
+                        window.PricingUtils.applyCashRounding && window.PricingUtils.isCashRoundingEnabledSync()) {
+                        subtotal = window.PricingUtils.applyCashRounding(subtotal);
+                    }
+                    
+                    // Format as price string
+                    let finalPrice = `$${subtotal.toLocaleString()} MXN`;
+                    
+                    // NOW apply payment type rates to the TOTAL
                     if (paymentType === 'transferencia') {
                         finalPrice = applyTransferRate(finalPrice);
                     } else if (paymentType === 'tarjeta') {
                         finalPrice = applyAgencyRate(finalPrice);
                     }
                     
-                    // Apply guide cost if enabled
-                    if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
-                        // Calculate guide cost: duration * 2 * hourly_rate
-                        const guideCost = routeDuration * 2 * currentGuideRate;
-                        
-                        // Extract numeric value from price string
-                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                        if (priceMatch) {
-                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                            const newPrice = numericPrice + guideCost;
-                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                        }
-                    }
-                    
-                    // Apply greeter cost if enabled
-                    if (includeGreeter && routeDuration > 0) {
-                        // Calculate greeter cost using formula based on duration
-                        const greeterCost = calculateGreeterPrice(routeDuration);
-                        
-                        if (greeterCost > 0) {
-                            // Extract numeric value from price string
-                            const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                            if (priceMatch) {
-                                const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                                const newPrice = numericPrice + greeterCost;
-                                finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                            }
-                        }
-                    }
-                    
-                    // Always apply currency conversion/formatting
+                    // Always apply currency conversion/formatting for consistent decimal display
                     finalPrice = applyCurrencyConversion(finalPrice, currency);
                     
                     priceElement.text(finalPrice);
@@ -1986,47 +2116,88 @@ table.dataTable thead th:nth-child(2) select {
                     priceElement.attr('data-original-price', originalPrice);
                 }
                 
-                // Start from the clean original price
-                let finalPrice = originalPrice;
+                // Start from the clean original price (don't apply payment rates yet)
+                let basePrice = originalPrice;
                 
-                // Apply appropriate rate based on payment type
-                if (paymentType === 'transferencia') {
-                    finalPrice = applyTransferRate(finalPrice);
-                } else if (paymentType === 'tarjeta') {
-                    finalPrice = applyAgencyRate(finalPrice);
-                }
+                // Extract numeric value from base price
+                const baseNumeric = parseFloat(basePrice.replace(/[^0-9.]/g, ''));
+                
+                // Calculate additional costs (guide + greeter)
+                let additionalCosts = 0;
                 
                 // Apply guide cost if enabled
                 if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
-                    // Calculate guide cost: duration * 2 * hourly_rate
-                    const guideCost = routeDuration * 2 * currentGuideRate;
+                    // Calculate guide cost using generic evaluator
+                    let guideCost = routeDuration * 2 * currentGuideRate; // Fallback
                     
-                    // Extract numeric value from price string
-                    const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                    if (priceMatch) {
-                        const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                        const newPrice = numericPrice + guideCost;
-                        finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
+                    if (typeof GuideFormulaEvaluator !== 'undefined' && GuideFormulaEvaluator.formulaConfig) {
+                        const config = GuideFormulaEvaluator.formulaConfig;
+                        if (config.formulaComponents && config.formulaComponents.length > 0) {
+                            guideCost = GuideFormulaEvaluator.evaluateComponents(config.formulaComponents, routeDuration * 60, currentGuideRate);
+                            if (isDevelopment) {
+                                console.log(`📊 [Expanded] Custom formula: ${routeDuration}h @ $${currentGuideRate}/hr = $${guideCost}`);
+                            }
+                        } else if (config.roundTripMultiplier) {
+                            guideCost = routeDuration * config.roundTripMultiplier * currentGuideRate;
+                            if (isDevelopment) {
+                                console.log(`📊 [Expanded] Simple formula: ${routeDuration}h × ${config.roundTripMultiplier} × $${currentGuideRate} = $${guideCost}`);
+                            }
+                        }
                     }
+                    
+                    additionalCosts += guideCost;
                 }
                 
                 // Apply greeter cost if enabled
                 if (includeGreeter && routeDuration > 0) {
-                    // Calculate greeter cost using formula based on duration
-                    const greeterCost = calculateGreeterPrice(routeDuration);
-                    
-                    if (greeterCost > 0) {
-                        // Extract numeric value from price string
-                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                        if (priceMatch) {
-                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                            const newPrice = numericPrice + greeterCost;
-                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                        }
+                    // Ensure greeter cache is loaded before calculating
+                    if (!greeterRateCache) {
+                        console.log('⚡ DataTable: Greeter cache missing, triggering load for expanded calculation');
+                        loadGreeterRateConfiguration().catch(error => {
+                            console.error('Failed to load greeter config during expanded calculation:', error);
+                        });
                     }
+                    
+                    // Calculate greeter cost using configurable formula (no rounding)
+                    const greeterCost = calculateGreeterPrice(routeDuration);
+                    additionalCosts += greeterCost;
                 }
                 
-                // Always apply currency conversion/formatting
+                // Calculate subtotal (base + additional costs)
+                let subtotal = baseNumeric + additionalCosts;
+                
+                // Apply special rounding if greeter is included
+                if (includeGreeter && additionalCosts > 0) {
+                    const beforeRounding = subtotal;
+                    subtotal = applySpecialRounding(subtotal);
+                    
+                    console.log('💰 DataTable Expanded: Special rounding for greeter:', {
+                        basePrice: baseNumeric,
+                        additionalCosts,
+                        beforeRounding,
+                        afterRounding: subtotal
+                    });
+                }
+                
+                // Apply cash rounding for efectivo payments
+                if (paymentType === 'efectivo' && typeof window.PricingUtils !== 'undefined' && window.PricingUtils.applyCashRounding) {
+                    subtotal = window.PricingUtils.applyCashRounding(subtotal);
+                }
+                
+                // Format as price string
+                let finalPrice = `$${subtotal.toLocaleString()} MXN`;
+                
+                // NOW apply payment type rates to the TOTAL
+                let hasPaymentRate = false;
+                if (paymentType === 'transferencia') {
+                    finalPrice = applyTransferRate(finalPrice);
+                    hasPaymentRate = true;
+                } else if (paymentType === 'tarjeta') {
+                    finalPrice = applyAgencyRate(finalPrice);
+                    hasPaymentRate = true;
+                }
+                
+                // Always apply currency conversion/formatting for consistent decimal display
                 finalPrice = applyCurrencyConversion(finalPrice, currency);
                 
                 priceElement.text(finalPrice);
@@ -2047,8 +2218,8 @@ table.dataTable thead th:nth-child(2) select {
             // Update label text
             label.text(includeGuide ? 'Con Guía' : 'Sin Guía');
             
-            // Get current filter states (greeter will always be false if guide is true)
-            const includeGreeter = false; // Greeter is always off when Guide is on
+            // Get current filter states - get actual greeter state (will be false if we just turned guide on)
+            const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
             const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             
@@ -2098,32 +2269,35 @@ table.dataTable thead th:nth-child(2) select {
             // Update label text
             label.text(includeGreeter ? 'Con Greeter' : 'Sin Greeter');
             
-            // Get current filter states (guide will always be false if greeter is true)
+            // Get current filter states - get actual guide state (will be false if we just turned greeter on)
             const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
-            const includeGuide = false; // Guide is always off when Greeter is on
+            const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
             
             // Auto-refresh expanded rows if any
             const expandedRows = $('.expand-services-prices-btn.expanded');
             if (expandedRows.length > 0) {
+                
+                // Close and re-open each expanded row to get fresh prices (same as guide handler)
                 expandedRows.each(function() {
                     const button = $(this);
-                    const serviceId = button.attr('data-service-id');
+                    const rowId = button.data('row-id');
                     
-                    // Find the row and simulate collapse/expand to refresh
-                    const row = button.closest('tr');
-                    const nextRow = row.next('tr.child');
+                    // Find the DataTable row
+                    const row = dataTable.rows().nodes().to$().filter(function() {
+                        return $(this).find('[data-row-id="' + rowId + '"]').length > 0;
+                    }).first();
                     
-                    if (nextRow.length > 0) {
-                        // First collapse
-                        nextRow.remove();
-                        button.removeClass('expanded').html('<i class="ti ti-chevron-down me-1"></i>Ver todos');
-                        
-                        // Then expand again after a short delay
-                        setTimeout(() => {
-                            button.trigger('click');
-                        }, 100);
-                    }
+                    const dtRow = dataTable.row(row);
+                    
+                    // Close the row
+                    dtRow.child.hide();
+                    button.removeClass('expanded');
+                    
+                    // Re-open with updated prices
+                    setTimeout(() => {
+                        button.click();
+                    }, 100);
                 });
             }
             
@@ -2390,6 +2564,11 @@ table.dataTable thead th:nth-child(2) select {
             // Load exchange rate
             loadCurrentExchangeRate();
             
+            // Load greeter rate configuration
+            loadGreeterRateConfiguration().then(() => {
+                console.log('🎯 DataTable: All rate configurations loaded');
+            });
+            
             // Load rates for the header filter (this will auto-select and load data)
             loadRatesForFilter();
             
@@ -2403,6 +2582,7 @@ table.dataTable thead th:nth-child(2) select {
             const button = $(this);
             const rowId = button.data('row-id');
             const isExpanded = button.hasClass('expanded');
+            
             
             // Find the DataTable row
             const row = dataTable.rows().nodes().to$().filter(function() {
@@ -2470,11 +2650,12 @@ table.dataTable thead th:nth-child(2) select {
                                 pricesByRate[rateName].push(item);
                             });
                             
-                            // Get current filter states
+                            // Get current filter states - read fresh values each time
                             const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
                             const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
                             const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
                             const currentCurrency = $(`#currencyFilter-${tableId}`).val();
+                            
                             let routeDuration = 0;
                             
                             // Find duration from the parent row's 3rd column
@@ -2506,7 +2687,23 @@ table.dataTable thead th:nth-child(2) select {
                             // Calculate guide cost if needed
                             let guideCost = 0;
                             if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
-                                guideCost = routeDuration * 2 * currentGuideRate;
+                                guideCost = routeDuration * 2 * currentGuideRate; // Fallback
+                                
+                                // Use formula evaluator if available
+                                if (typeof GuideFormulaEvaluator !== 'undefined' && GuideFormulaEvaluator.formulaConfig) {
+                                    const config = GuideFormulaEvaluator.formulaConfig;
+                                    if (config.formulaComponents && config.formulaComponents.length > 0) {
+                                        guideCost = GuideFormulaEvaluator.evaluateComponents(config.formulaComponents, routeDuration * 60, currentGuideRate);
+                                        if (isDevelopment) {
+                                            console.log(`📊 [Render] Custom formula: ${routeDuration}h @ $${currentGuideRate}/hr = $${guideCost}`);
+                                        }
+                                    } else if (config.roundTripMultiplier) {
+                                        guideCost = routeDuration * config.roundTripMultiplier * currentGuideRate;
+                                        if (isDevelopment) {
+                                            console.log(`📊 [Render] Simple formula: ${routeDuration}h × ${config.roundTripMultiplier} × $${currentGuideRate} = $${guideCost}`);
+                                        }
+                                    }
+                                }
                             }
                             
                             // Calculate greeter cost if needed
@@ -2538,37 +2735,38 @@ table.dataTable thead th:nth-child(2) select {
                                     const vehicleCode = p.vehicleType?.code || 'N/A';
                                     const vehicleName = p.vehicleType?.name || 'Vehículo';
                                     
-                                    // Apply all price transformations in correct order
-                                    let finalPrice = `$${p.price.toLocaleString()} MXN`;
+                                    // Start with base price (don't apply payment rates yet)
+                                    const basePrice = p.price;
                                     
-                                    // 1. Apply payment type rates
+                                    // Calculate total with additional costs
+                                    const additionalCosts = guideCost + greeterCost;
+                                    let subtotal = basePrice + additionalCosts;
+                                    
+                                    // Apply special rounding if greeter is included
+                                    if (includeGreeter && greeterCost > 0) {
+                                        subtotal = applySpecialRounding(subtotal);
+                                    }
+                                    
+                                    // Apply cash rounding for efectivo payments
+                                    if (currentPaymentType === 'efectivo' && typeof window.PricingUtils !== 'undefined' && 
+                                        window.PricingUtils.applyCashRounding && window.PricingUtils.isCashRoundingEnabledSync()) {
+                                        subtotal = window.PricingUtils.applyCashRounding(subtotal);
+                                    }
+                                    
+                                    // Format as price string
+                                    let finalPrice = `$${subtotal.toLocaleString()} MXN`;
+                                    
+                                    // NOW apply payment type rates to the TOTAL
+                                    let hasPaymentRate = false;
                                     if (currentPaymentType === 'transferencia') {
                                         finalPrice = applyTransferRate(finalPrice);
+                                        hasPaymentRate = true;
                                     } else if (currentPaymentType === 'tarjeta') {
                                         finalPrice = applyAgencyRate(finalPrice);
+                                        hasPaymentRate = true;
                                     }
                                     
-                                    // 2. Apply guide cost
-                                    if (guideCost > 0) {
-                                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                                        if (priceMatch) {
-                                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                                            const newPrice = numericPrice + guideCost;
-                                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                                        }
-                                    }
-                                    
-                                    // 3. Apply greeter cost
-                                    if (greeterCost > 0) {
-                                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
-                                        if (priceMatch) {
-                                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
-                                            const newPrice = numericPrice + greeterCost;
-                                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
-                                        }
-                                    }
-                                    
-                                    // 4. Apply currency conversion
+                                    // Always apply currency conversion for consistent decimal display
                                     finalPrice = applyCurrencyConversion(finalPrice, currentCurrency);
                                     
                                     
@@ -2577,7 +2775,7 @@ table.dataTable thead th:nth-child(2) select {
                                     const trunkCapacity = p.vehicleType?.trunkCapacity || 2;
                                     
                                     // Reduce capacity by 1 if guide is active (guide takes a seat)
-                                    const includeGreeter = $(`#greeterToggle-${tableId}`).is(':checked');
+                                    // includeGreeter is already defined at line 2654
                                     if (includeGuide && defaultCapacity > 1) {
                                         defaultCapacity = defaultCapacity - 1;
                                     }

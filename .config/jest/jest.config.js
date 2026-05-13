@@ -56,7 +56,7 @@ module.exports = {
   },
 
   // Module directories
-  moduleDirectories: ['node_modules', 'src'],
+  moduleDirectories: ['node_modules', 'src', '<rootDir>/tests/__mocks__'],
 
   // Test timeout
   testTimeout: 30000,
@@ -86,6 +86,11 @@ module.exports = {
   transform: {
     '\\.ejs$': '<rootDir>/tests/transformers/ejsTransformer.js'
   },
+
+  // Transform ignore patterns
+  transformIgnorePatterns: [
+    'node_modules/'
+  ],
 
   // Module file extensions
   moduleFileExtensions: ['js', 'json', 'ejs'],

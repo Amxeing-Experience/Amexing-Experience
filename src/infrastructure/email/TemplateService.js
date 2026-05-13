@@ -86,7 +86,7 @@ class TemplateService {
    * // Returns: http://localhost:1337/img/amexing_logo_horizontal.avif (dev)
    * // Returns: https://amexingexperience.com/img/amexing_logo_horizontal.avif (prod)
    */
-  static getLogoUrl(logoPath = '/img/amexing_logo_horizontal.avif') {
+  static getLogoUrl(logoPath = '/img/amexing_logo_hblanco.avif') {
     const instance = new TemplateService();
     const baseUrl = instance.getBaseUrl();
     return `${baseUrl}${logoPath}`;
@@ -385,10 +385,10 @@ class TemplateService {
    */
   static getCommonVariables() {
     return {
-      LOGO_URL: this.getLogoUrl('/img/amexing_logo_vertical.avif'),
+      LOGO_URL: this.getLogoUrl('/img/amexing_logo_hblanco.avif'),
       AÑO: new Date().getFullYear(),
-      TELEFONO: '+52 (415) 167 39 90',
-      TELEFONO_EMERGENCIAS: '+52 (415) 153 50 67',
+      TELEFONO: '+52 (415) 153 38 18',
+      TELEFONO_EMERGENCIAS: '+52 (415) 153 38 18',
       EMAIL_CONTACTO: 'contact@amexingexperience.com',
       SITIO_WEB: 'https://www.amexingexperience.com',
       AVISO_PRIVACIDAD: 'https://www.amexingexperience.com/privacidad',

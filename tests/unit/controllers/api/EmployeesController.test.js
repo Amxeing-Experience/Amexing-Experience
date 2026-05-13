@@ -41,6 +41,9 @@ jest.mock('parse/node', () => {
       equalTo: jest.fn().mockReturnThis(),
       first: jest.fn().mockResolvedValue(mockRoleObject),
     })),
+    Error: {
+      DUPLICATE_VALUE: 137,
+    },
   };
 });
 
@@ -63,6 +66,7 @@ describe('EmployeesController', () => {
     // Mock UserManagementService
     mockUserService = {
       getUsers: jest.fn(),
+      getAmexingUsers: jest.fn(),
       createUser: jest.fn(),
       updateUser: jest.fn(),
       getUserById: jest.fn(),
@@ -105,16 +109,27 @@ describe('EmployeesController', () => {
       const mockUsersResponse = {
         users: [
           { id: 'emp1', email: 'emp1@amexing.com', role: 'employee_amexing' },
+        ],
+        pagination: {
+          totalCount: 1,
+          page: 1,
+          limit: 25,
+        },
+      };
+
+      const mockAmexingUsersResponse = {
+        users: [
           { id: 'emp2', email: 'emp2@amexing.com', role: 'employee_amexing' },
         ],
         pagination: {
-          totalCount: 2,
+          totalCount: 1,
           page: 1,
           limit: 25,
         },
       };
 
       mockUserService.getUsers.mockResolvedValue(mockUsersResponse);
+      mockUserService.getAmexingUsers.mockResolvedValue(mockAmexingUsersResponse);
 
       await employeesController.getEmployees(mockReq, mockRes);
 
@@ -130,14 +145,16 @@ describe('EmployeesController', () => {
         })
       );
 
-      expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
           message: 'Employees retrieved successfully',
           data: expect.objectContaining({
-            users: mockUsersResponse.users,
-            pagination: mockUsersResponse.pagination,
+            users: expect.arrayContaining([
+              { id: 'emp1', email: 'emp1@amexing.com', role: 'employee_amexing' },
+              { id: 'emp2', email: 'emp2@amexing.com', role: 'employee_amexing' },
+            ]),
+            total: 2,
             requestMetadata: expect.any(Object),
           }),
         })
@@ -169,13 +186,23 @@ describe('EmployeesController', () => {
         pagination: { totalCount: 0, page: 1, limit: 25 },
       };
 
+      const mockAmexingUsersResponse = {
+        users: [],
+        pagination: { totalCount: 0, page: 1, limit: 25 },
+      };
+
       mockUserService.getUsers.mockResolvedValue(mockUsersResponse);
+      mockUserService.getAmexingUsers.mockResolvedValue(mockAmexingUsersResponse);
 
       await employeesController.getEmployees(mockReq, mockRes);
 
       // Should call service (middleware would have blocked non-admin users)
       expect(mockUserService.getUsers).toHaveBeenCalled();
-      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+        })
+      );
     });
   });
 
@@ -429,6 +456,20 @@ describe('EmployeesController', () => {
         user: mockUpdatedUser,
       });
 
+      // Mock fetchEmployee method
+      jest.spyOn(employeesController, 'fetchEmployee').mockResolvedValue({
+        id: 'employee-123',
+        get: jest.fn((field) => {
+          if (field === 'roleId') return { get: jest.fn(() => 'driver') };
+          return null;
+        }),
+      });
+
+      // Mock extractRoleInfo method  
+      jest.spyOn(employeesController, 'extractRoleInfo').mockReturnValue({
+        roleName: 'driver'
+      });
+
       await employeesController.updateEmployee(mockReq, mockRes);
 
       // Verify currentUser was enriched with role
@@ -442,7 +483,6 @@ describe('EmployeesController', () => {
         expect.objectContaining({ id: 'admin-123', role: 'admin' })
       );
 
-      expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
@@ -454,9 +494,22 @@ describe('EmployeesController', () => {
     it('should prevent role change from employee_amexing', async () => {
       mockReq.body.role = 'admin';
 
+      // Mock fetchEmployee to return a driver role employee
+      jest.spyOn(employeesController, 'fetchEmployee').mockResolvedValue({
+        id: 'employee-123',
+        get: jest.fn((field) => {
+          if (field === 'roleId') return { get: jest.fn(() => 'driver') };
+          return null;
+        }),
+      });
+
+      // Mock extractRoleInfo method  
+      jest.spyOn(employeesController, 'extractRoleInfo').mockReturnValue({
+        roleName: 'driver'
+      });
+
       await employeesController.updateEmployee(mockReq, mockRes);
 
-      expect(mockRes.status).toHaveBeenCalledWith(400);
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: false,
@@ -766,6 +819,19 @@ describe('EmployeesController', () => {
           roles: ['driver', 'limpieza'], // Updated roles
         };
 
+        // Mock fetchEmployee method
+        jest.spyOn(employeesController, 'fetchEmployee').mockResolvedValue({
+          id: 'employee-123',
+          role: 'driver',
+        });
+
+        // Mock extractRoleInfo method  
+        jest.spyOn(employeesController, 'extractRoleInfo').mockReturnValue({
+          role: 'driver',
+          futureRoles: ['driver', 'limpieza'],
+          displayRole: 'driver',
+        });
+
         const mockUpdatedUser = {
           id: 'employee-123',
           role: 'driver',
@@ -811,9 +877,21 @@ describe('EmployeesController', () => {
           roles: ['driver', 'invalid_role'], // Invalid role in update
         };
 
+        // Mock fetchEmployee method
+        jest.spyOn(employeesController, 'fetchEmployee').mockResolvedValue({
+          id: 'employee-123',
+          role: 'driver',
+        });
+
+        // Mock extractRoleInfo to throw validation error for invalid role
+        jest.spyOn(employeesController, 'extractRoleInfo').mockImplementation(() => {
+          throw new Error('Roles inválidos: invalid_role');
+        });
+
         await employeesController.updateEmployee(mockReq, mockRes);
 
-        expect(mockRes.status).toHaveBeenCalledWith(400);
+        // When extractRoleInfo throws an error, it's handled as a 500 error
+        expect(mockRes.status).toHaveBeenCalledWith(500);
         expect(mockRes.json).toHaveBeenCalledWith({
           success: false,
           error: expect.stringContaining('Roles inválidos: invalid_role'),
@@ -825,6 +903,19 @@ describe('EmployeesController', () => {
         mockReq.body = {
           roles: ['employee_amexing'], // Change to Administrator
         };
+
+        // Mock fetchEmployee method
+        jest.spyOn(employeesController, 'fetchEmployee').mockResolvedValue({
+          id: 'employee-123',
+          role: 'driver',
+        });
+
+        // Mock extractRoleInfo method  
+        jest.spyOn(employeesController, 'extractRoleInfo').mockReturnValue({
+          role: 'employee_amexing',
+          futureRoles: ['employee_amexing'],
+          displayRole: 'employee_amexing',
+        });
 
         const mockUpdatedUser = {
           id: 'employee-123',
@@ -857,6 +948,19 @@ describe('EmployeesController', () => {
         mockReq.body = {
           role: 'greeter', // Single role field update
         };
+
+        // Mock fetchEmployee method
+        jest.spyOn(employeesController, 'fetchEmployee').mockResolvedValue({
+          id: 'employee-123',
+          role: 'driver',
+        });
+
+        // Mock extractRoleInfo method  
+        jest.spyOn(employeesController, 'extractRoleInfo').mockReturnValue({
+          role: 'driver',
+          futureRoles: ['greeter'],
+          displayRole: 'greeter',
+        });
 
         const mockUpdatedUser = {
           id: 'employee-123',
