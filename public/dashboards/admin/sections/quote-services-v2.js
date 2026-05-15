@@ -698,12 +698,15 @@ class ItineraryBuilder {
     document.getElementById('aDisposicionGuide')?.addEventListener('change', (e) => {
       this.serviceModified = true; // Mark as modified when user changes guide checkbox
       console.log('🚗 A Disposición guide checkbox changed:', e.target.checked);
-      
+
       // Recalculate price with guide rate
       this.calculateADisposicionPrice();
-      
+
       // Update breakdown to show guide details
       this.updateServicePriceBreakdown();
+
+      // Explicitly update dev payment breakdown for guide changes
+      this.updateDevPaymentBreakdown();
     });
 
     // Price input listener - update conversion preview when user types a price
@@ -801,15 +804,19 @@ class ItineraryBuilder {
 
     // A Disposición - rate, vehicle, hours, vehicle count
     document.getElementById('aDisposicionRate')?.addEventListener('change', (e) => {
+      this.serviceModified = true; // Mark as modified when user changes rate
       this.handleADisposicionRateChange(e.target.value);
     });
     document.getElementById('aDisposicionVehicle')?.addEventListener('change', () => {
+      this.serviceModified = true; // Mark as modified when user changes vehicle
       this.calculateADisposicionPrice();
     });
     document.getElementById('aDisposicionHours')?.addEventListener('input', () => {
+      this.serviceModified = true; // Mark as modified when user changes hours
       this.calculateADisposicionPrice();
     });
     document.getElementById('aDisposicionVehicleCount')?.addEventListener('input', () => {
+      this.serviceModified = true; // Mark as modified when user changes vehicle count
       this.calculateADisposicionPrice();
     });
 
@@ -1209,7 +1216,7 @@ class ItineraryBuilder {
 
       document.getElementById('serviceModalLabel').innerHTML = `<i class="ti ti-pencil me-2"></i>Editar Servicio${dayLabel}`;
       this.populateServiceForm(service);
-      
+
       // Update dev payment prices and breakdown after populating form with saved data
       // Note: populateServiceForm now includes price sync with payment type
       if (this.isDevelopmentMode) {
@@ -1264,7 +1271,7 @@ class ItineraryBuilder {
     }
 
     modal.show();
-    
+
     // Force show dev payment prices in development mode after modal is shown
     if (this.isDevelopmentMode) {
       setTimeout(() => {
@@ -1273,7 +1280,7 @@ class ItineraryBuilder {
           console.log('💰 Forcing dev payment prices to be visible in modal');
           devContainer.classList.remove('d-none');
           devContainer.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important; margin-top: 1rem !important;';
-          
+
           // Also trigger an update to populate the fields
           this.updateDevPaymentPrices();
           this.updateDevPaymentBreakdown();
@@ -2439,7 +2446,7 @@ class ItineraryBuilder {
 
     // Ensure breakdown is calculated before collecting data
     this.updateServicePriceBreakdown();
-    
+
     const serviceData = this.collectServiceData();
 
     // Log collected data for debugging price persistence
@@ -2502,10 +2509,10 @@ class ItineraryBuilder {
           serviceId: this.currentServiceId,
           serviceBefore: existingService,
           serviceDataFromModal: serviceData,
-          updatedService: updatedService,
+          updatedService,
           pricesByTypePresent: updatedService.pricesByType && typeof updatedService.pricesByType === 'object',
           pricesByTypeData: updatedService.pricesByType,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
 
         this.services.set(this.currentServiceId, updatedService);
@@ -2513,7 +2520,7 @@ class ItineraryBuilder {
         console.log('✅ SAVE SERVICE - Service UPDATED in Map:', {
           serviceId: this.currentServiceId,
           serviceAfterSave: this.services.get(this.currentServiceId),
-          pricesByTypeAfterSave: this.services.get(this.currentServiceId)?.pricesByType
+          pricesByTypeAfterSave: this.services.get(this.currentServiceId)?.pricesByType,
         });
 
         // Recalculate overlaps for this day since service time might have changed
@@ -2536,7 +2543,7 @@ class ItineraryBuilder {
           serviceDataFromModal: serviceData,
           pricesByTypePresent: newServiceData.pricesByType && typeof newServiceData.pricesByType === 'object',
           pricesByTypeData: newServiceData.pricesByType,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
 
         this.services.set(newServiceId, newServiceData);
@@ -2544,7 +2551,7 @@ class ItineraryBuilder {
         console.log('✅ SAVE SERVICE - New service CREATED in Map:', {
           serviceId: newServiceId,
           serviceAfterSave: this.services.get(newServiceId),
-          pricesByTypeAfterSave: this.services.get(newServiceId)?.pricesByType
+          pricesByTypeAfterSave: this.services.get(newServiceId)?.pricesByType,
         });
 
         // Add service to day
@@ -2748,22 +2755,22 @@ class ItineraryBuilder {
     // Collect base price from the field
     const servicePriceField = document.getElementById('servicePrice');
     const basePrice = parseFloat(servicePriceField?.value || 0);
-    
+
     // Use the display total from breakdown if available, otherwise use field value
     const finalPrice = this.currentServiceTotal || basePrice;
-    
+
     // Calculate and store base (efectivo) price for accurate recalculation when payment type changes
     let basePriceEfectivo = finalPrice; // Default fallback
-    
+
     console.log('🔍 COLLECT SERVICE DATA - Price calculation step 1:', {
       finalPrice,
       currentPaymentType: document.getElementById('priceTypeSelect')?.value,
       getBasePriceFromCurrentExists: typeof this.getBasePriceFromCurrent === 'function',
       getDisplayPriceForTypeExists: typeof this.getDisplayPriceForType === 'function',
       transferRate: this.transferRate,
-      agencyRate: this.agencyRate
+      agencyRate: this.agencyRate,
     });
-    
+
     try {
       if (typeof this.getBasePriceFromCurrent === 'function') {
         basePriceEfectivo = this.getBasePriceFromCurrent(finalPrice);
@@ -2775,29 +2782,43 @@ class ItineraryBuilder {
       console.error('❌ getBasePriceFromCurrent failed:', error);
       basePriceEfectivo = finalPrice; // Fallback
     }
-    
+
     // Calculate all 3 payment type prices for debugging and storage
     let pricesByType = {};
-    
-    if (typeof this.getDisplayPriceForType === 'function') {
+
+    // Special handling for A Disposición - use breakdown totals that include volume discounts
+    if (type === 'a-disposicion' && this._aDisposicionBreakdownTotals) {
+      pricesByType = {
+        efectivo: this._aDisposicionBreakdownTotals.efectivo,
+        transferencia: this._aDisposicionBreakdownTotals.transferencia,
+        tarjeta: this._aDisposicionBreakdownTotals.tarjeta,
+      };
+
+      console.log('✅ COLLECT SERVICE DATA - A Disposición pricesByType from breakdown totals (includes discounts):', {
+        pricesByType,
+        source: 'breakdown calculation with volume discounts',
+        isValidObject: typeof pricesByType === 'object' && pricesByType !== null,
+        hasAllTypes: pricesByType.efectivo !== undefined && pricesByType.transferencia !== undefined && pricesByType.tarjeta !== undefined,
+      });
+    } else if (typeof this.getDisplayPriceForType === 'function') {
       try {
         pricesByType = {
           efectivo: basePriceEfectivo,
           transferencia: this.getDisplayPriceForType(basePriceEfectivo, 'transferencia'),
-          tarjeta: this.getDisplayPriceForType(basePriceEfectivo, 'tarjeta')
+          tarjeta: this.getDisplayPriceForType(basePriceEfectivo, 'tarjeta'),
         };
-        
+
         console.log('✅ COLLECT SERVICE DATA - pricesByType created successfully:', {
           pricesByType,
           isValidObject: typeof pricesByType === 'object' && pricesByType !== null,
-          hasAllTypes: pricesByType.efectivo !== undefined && pricesByType.transferencia !== undefined && pricesByType.tarjeta !== undefined
+          hasAllTypes: pricesByType.efectivo !== undefined && pricesByType.transferencia !== undefined && pricesByType.tarjeta !== undefined,
         });
       } catch (error) {
         console.error('❌ COLLECT SERVICE DATA - getDisplayPriceForType failed:', error);
         pricesByType = {
           efectivo: basePriceEfectivo,
           transferencia: basePriceEfectivo,
-          tarjeta: basePriceEfectivo
+          tarjeta: basePriceEfectivo,
         };
         console.log('🔧 COLLECT SERVICE DATA - Using fallback pricesByType after function error:', pricesByType);
       }
@@ -2806,37 +2827,37 @@ class ItineraryBuilder {
       pricesByType = {
         efectivo: basePriceEfectivo,
         transferencia: basePriceEfectivo,
-        tarjeta: basePriceEfectivo
+        tarjeta: basePriceEfectivo,
       };
       console.log('🔧 COLLECT SERVICE DATA - Using simple fallback pricesByType (no function):', pricesByType);
     }
-    
+
     // Update debug display for development
     this.updateDebugPriceDisplay(pricesByType);
-    
+
     // For tours, store individual base rate components for accurate recalculation
     let vehicleRatePerHour = 0;
     let guideRatePerHour = 0;
     let tourQuantity = 1;
     let tourDuration = 1;
-    
+
     if (type === 'tour') {
       const includeGuide = document.getElementById('includeGuide')?.checked;
       tourQuantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
       tourDuration = parseInt(document.getElementById('tourDuration')?.value || 1);
-      
+
       // Extract base vehicle rate from tour pricing (efectivo rate)
       const tourId = document.getElementById('tourSelect')?.value;
       const vehicleType = document.getElementById('vehicleSelect')?.value;
       if (tourId && vehicleType) {
         vehicleRatePerHour = this.getVehicleBaseRate(tourId, vehicleType);
       }
-      
+
       // Extract base guide rate (no payment surcharge)
       if (includeGuide && this.driverTourRateCache) {
         guideRatePerHour = this.driverTourRateCache.value || 0;
       }
-      
+
       // Debug tour component collection
       console.log('💾 Tour components collected:', {
         tourId,
@@ -2847,13 +2868,13 @@ class ItineraryBuilder {
         tourDuration,
         includeGuide,
         finalPrice,
-        basePriceEfectivo
+        basePriceEfectivo,
       });
-      
+
       // Fallback: If rate extraction failed, estimate from existing calculation
       if (vehicleRatePerHour === 0 && basePriceEfectivo > 0) {
         console.log('🔄 Rate extraction failed, using fallback calculation');
-        
+
         // If guide is included, subtract guide cost from total to get vehicle rate
         if (includeGuide && guideRatePerHour > 0) {
           const totalPerHour = basePriceEfectivo / (tourQuantity * tourDuration);
@@ -2861,7 +2882,7 @@ class ItineraryBuilder {
           console.log('🔄 Fallback with guide:', {
             totalPerHour,
             guideRate: guideRatePerHour,
-            calculatedVehicleRate: vehicleRatePerHour
+            calculatedVehicleRate: vehicleRatePerHour,
           });
         } else {
           // No guide, entire rate is vehicle rate
@@ -2870,7 +2891,7 @@ class ItineraryBuilder {
             basePriceEfectivo,
             tourQuantity,
             tourDuration,
-            calculatedVehicleRate: vehicleRatePerHour
+            calculatedVehicleRate: vehicleRatePerHour,
           });
         }
       }
@@ -2878,14 +2899,14 @@ class ItineraryBuilder {
 
     const data = {
       type,
-      price: finalPrice,        // Final display price with current payment surcharges
-      basePrice: basePriceEfectivo,  // Base efectivo price for recalculation (backward compatibility)
-      pricesByType,             // All 3 payment type prices for easy switching
+      price: finalPrice, // Final display price with current payment surcharges
+      basePrice: basePriceEfectivo, // Base efectivo price for recalculation (backward compatibility)
+      pricesByType, // All 3 payment type prices for easy switching
       // Tour formula components
-      vehicleRatePerHour,       // Base vehicle rate per hour (efectivo)
-      guideRatePerHour,         // Base guide rate per hour (no surcharge)
-      tourQuantity,             // Number of vehicles
-      tourDuration,             // Duration in hours
+      vehicleRatePerHour, // Base vehicle rate per hour (efectivo)
+      guideRatePerHour, // Base guide rate per hour (no surcharge)
+      tourQuantity, // Number of vehicles
+      tourDuration, // Duration in hours
       quantity: type === 'concepto' ? 1
         : (type === 'transport' || (type === 'tour' && document.getElementById('tourRequiresTransport')?.checked))
           ? (document.getElementById('additionalVehicleCheckbox')?.checked ? 2 : 1)
@@ -2918,7 +2939,7 @@ class ItineraryBuilder {
         data.adultsQuantity = parseInt(document.getElementById('adultsQuantity')?.value || 0);
         data.childrenQuantity = parseInt(document.getElementById('childrenQuantity')?.value || 0);
         data.adultsNoAlcoholQuantity = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
-        
+
         // Always capture provider type from selected dropdown option
         const selectedOption = document.getElementById('experienceSelect')?.selectedOptions[0];
         if (selectedOption?.dataset.providerType) {
@@ -2926,7 +2947,7 @@ class ItineraryBuilder {
           console.debug('💾 Saving experience with provider type:', {
             experienceId: data.experienceId,
             providerType: data.providerType,
-            providerName: selectedOption.dataset.providerName
+            providerName: selectedOption.dataset.providerName,
           });
         }
 
@@ -3320,7 +3341,7 @@ class ItineraryBuilder {
         data.hours = parseFloat(document.getElementById('aDisposicionHours')?.value || 4);
         data.hourlyPrice = this._disposicionHourlyRate || 0;
         data.discountPercent = this.getADisposicionDiscount(data.hours);
-        
+
         // Collect includeGuide checkbox state for A disposición
         data.includeGuide = document.getElementById('aDisposicionGuide')?.checked || false;
 
@@ -3403,7 +3424,7 @@ class ItineraryBuilder {
       pricesByTypeValid: data.pricesByType && typeof data.pricesByType === 'object',
       pricesByTypeKeys: data.pricesByType ? Object.keys(data.pricesByType) : 'none',
       completeDataObject: data,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return data;
@@ -3491,6 +3512,50 @@ class ItineraryBuilder {
 
   async populateServiceForm(service) {
     if (!service) return;
+
+    // COMPREHENSIVE DEBUG: Log entire service object when editing
+    console.log('📋 EDIT SERVICE - Complete service object received:', {
+      serviceId: service.id,
+      type: service.type,
+      concept: service.concept,
+      price: service.price,
+      pricesByType: service.pricesByType,
+      basePrice: service.basePrice,
+      customPrice: service.customPrice,
+      priceOverride: service.priceOverride,
+      // A Disposición specific fields
+      hours: service.hours,
+      vehicleCount: service.vehicleCount,
+      vehicleType: service.vehicleType,
+      vehicleTypeName: service.vehicleTypeName,
+      rateId: service.rateId,
+      includeGuide: service.includeGuide,
+      startTime: service.startTime,
+      endTime: service.endTime,
+      // Transport specific
+      transportType: service.transportType,
+      tripType: service.tripType,
+      origin: service.origin,
+      destination: service.destination,
+      // Tour specific
+      tourId: service.tourId,
+      tourName: service.tourName,
+      isWalkingTour: service.isWalkingTour,
+      adultsQuantity: service.adultsQuantity,
+      childrenQuantity: service.childrenQuantity,
+      infantsQuantity: service.infantsQuantity,
+      // Common fields
+      quantity: service.quantity,
+      currency: service.currency,
+      paymentType: service.paymentType,
+      serviceDescription: service.serviceDescription,
+      internalNotes: service.internalNotes,
+      clientNotes: service.clientNotes,
+      providerNotes: service.providerNotes,
+      teamNotes: service.teamNotes,
+      // Full object for reference
+      fullServiceObject: service,
+    });
 
     // Debug: Log service object at the start of populateServiceForm for walking tours
     if (service.isWalkingTour) {
@@ -3624,33 +3689,79 @@ class ItineraryBuilder {
           if (currentValue !== String(basePrice)) {
             console.error('❌ Price was overwritten! Expected:', basePrice, 'Got:', currentValue);
             // Force restore it
-            document.getElementById('servicePrice').value = basePrice;
+            document.getElementById('servicePrice').value = parseFloat(basePrice).toFixed(2);
             console.log('🔄 Force restored price to:', basePrice);
           }
         }, 100);
       } else if (service.vehicleId || service.vehicleType || service.vehicleTypeName) {
         // For tours without override, show vehicle cost (not people costs)
         const vehicleCost = this.getVehicleCost(service);
-        document.getElementById('servicePrice').value = vehicleCost || 0;
+        document.getElementById('servicePrice').value = (vehicleCost || 0).toFixed(2);
         console.log('📊 Using calculated vehicle cost:', vehicleCost);
       } else {
-        document.getElementById('servicePrice').value = 0; // No vehicle, show 0
+        document.getElementById('servicePrice').value = '0.00'; // No vehicle, show 0
         console.log('⚠️ No vehicle selected, using 0');
       }
     } else {
       // Check if service has price override enabled
       if (service.priceOverride && service.customPrice !== undefined) {
         // For transport and a-disposicion services with custom price
-        document.getElementById('servicePrice').value = service.customPrice;
+        document.getElementById('servicePrice').value = service.customPrice.toFixed(2);
       } else if (service.priceOverride && service.customPrices) {
         // For experiences with custom prices, use adult price as base
-        document.getElementById('servicePrice').value = service.customPrices.adult || 0;
+        document.getElementById('servicePrice').value = (service.customPrices.adult || 0).toFixed(2);
       } else if (service.priceOverride && service.adultPrice !== undefined) {
         // For tours with custom individual prices, use adult price as base
-        document.getElementById('servicePrice').value = service.adultPrice || 0;
+        document.getElementById('servicePrice').value = (service.adultPrice || 0).toFixed(2);
       } else {
-        // Use calculated price when no custom prices are set
-        document.getElementById('servicePrice').value = this.calculateServicePrice(service);
+        // Use base (efectivo) price when available, otherwise calculate
+        let priceToShow = 0;
+
+        // Special case for A Disposición: show base hourly rate instead of total calculated price
+        if (service.type === 'a-disposicion' && service.pricesByType && service.pricesByType.efectivo) {
+          // For A Disposición, calculate back to base hourly rate from the efectivo total
+          const baseTotalPrice = service.pricesByType.efectivo; // Total for all hours/vehicles without surcharge
+          const hours = service.hours || 4;
+          const vehicleCount = service.vehicleCount || 1;
+          const includeGuide = service.includeGuide || false;
+
+          let baseHourlyRate = baseTotalPrice / (hours * vehicleCount);
+
+          // If guide was included, subtract guide cost to get vehicle-only hourly rate
+          if (includeGuide && this.driverTourRateCache && this.driverTourRateCache.value > 0) {
+            const guideRatePerHour = this.driverTourRateCache.value || 0;
+            baseHourlyRate -= guideRatePerHour;
+          }
+
+          priceToShow = baseHourlyRate;
+
+          console.log('🚗 A Disposición: Calculated base hourly rate for price field:', {
+            baseTotalPrice,
+            hours,
+            vehicleCount,
+            includeGuide,
+            guideRate: includeGuide ? this.driverTourRateCache?.value : 0,
+            baseHourlyRate,
+            totalWouldHaveBeen: this.calculateServicePrice(service),
+          });
+        } else if (service.pricesByType && service.pricesByType.efectivo !== undefined) {
+          // For regular services with saved prices, use the base efectivo price
+          priceToShow = service.pricesByType.efectivo;
+          console.log('💰 Loading base efectivo price for service field:', {
+            serviceType: service.type,
+            efectivoPrice: service.pricesByType.efectivo,
+            allPrices: service.pricesByType,
+          });
+        } else {
+          // Fallback: calculate price when no saved data available
+          priceToShow = this.calculateServicePrice(service);
+          console.log('⚠️ No pricesByType data, using calculated price:', {
+            serviceType: service.type,
+            calculatedPrice: priceToShow,
+          });
+        }
+
+        document.getElementById('servicePrice').value = priceToShow.toFixed(2);
       }
     }
     document.getElementById('serviceQuantity').value = service.quantity || 1;
@@ -4288,7 +4399,7 @@ class ItineraryBuilder {
               }
             }
             // Restore price (populateTransportVehicleDropdown resets it to 0)
-            document.getElementById('servicePrice').value = savedPrice;
+            document.getElementById('servicePrice').value = parseFloat(savedPrice).toFixed(2);
             // Update capacity note now that vehicle is populated
             this.updateVehicleCapacityNote();
             // Restore waiting time
@@ -4331,7 +4442,7 @@ class ItineraryBuilder {
         if (service.hours) {
           document.getElementById('aDisposicionHours').value = service.hours;
         }
-        
+
         // Restore includeGuide checkbox state for A disposición
         const aDisposicionGuideCheckbox = document.getElementById('aDisposicionGuide');
         if (aDisposicionGuideCheckbox) {
@@ -4340,7 +4451,12 @@ class ItineraryBuilder {
 
         // Only recalculate price if no custom price override is set
         if (!service.priceOverride || service.customPrice === undefined) {
-          await this.calculateADisposicionPrice();
+          // Always calculate price from API to get current rates
+          // Add a delay to ensure vehicle dropdown is populated first
+          setTimeout(async () => {
+            await this.calculateADisposicionPrice();
+            console.log('🔧 A Disposición: Calculated price from API after loading all fields');
+          }, 100);
         } else {
           // For services with custom price override, restore the custom price with multiple timeout attempts
           const { customPrice } = service;
@@ -4363,9 +4479,20 @@ class ItineraryBuilder {
               } else if (currentField) {
                 console.log(`✅ Timeout ${index + 1} (${delay}ms): Custom price already correct:`, currentField.value);
               }
+              
+              // Refresh service breakdown after final custom price restoration
+              if (index === 3) { // Last timeout (500ms)
+                this.updateServicePriceBreakdown();
+                console.log('🔧 A Disposición: Updated service breakdown after custom price restoration');
+              }
             }, delay);
           });
         }
+
+        // No longer needed - calculateADisposicionPrice now correctly sets base price
+
+        // Dev price fields will be updated by calculateADisposicionPrice() after API call completes
+        // No need to call updateDevPaymentPrices() here as it would run before API data is available
         break;
       case 'concepto':
         document.getElementById('conceptoConcept').value = service.concept || '';
@@ -4441,25 +4568,36 @@ class ItineraryBuilder {
 
     // Show the price breakdown after populating the service form for editing
     this.updateServicePriceBreakdown();
-    
+
     // CRITICAL FIX: Update price field to match current payment type when editing
     // This ensures the displayed price matches the selected payment type immediately
     if (this.currentServiceId && service.pricesByType && !this.serviceModified) {
       const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
       const priceField = document.getElementById('servicePrice');
-      
+
       if (priceField && service.pricesByType[currentPaymentType] !== undefined) {
         // Use the saved price for the current payment type
-        const correctPrice = service.pricesByType[currentPaymentType];
-        
+        let correctPrice = service.pricesByType[currentPaymentType];
+
+        // Special case for A Disposición: always show base (efectivo) price in "Precio Base" field
+        if (service.type === 'a-disposicion' && service.pricesByType.efectivo !== undefined) {
+          correctPrice = service.pricesByType.efectivo;
+          console.log('🚗 A Disposición: Using base (efectivo) price for Precio Base field:', {
+            selectedPaymentType: currentPaymentType,
+            basePriceUsed: correctPrice,
+            pricesByType: service.pricesByType,
+          });
+        }
+
         // Only update if the price is different to avoid unnecessary changes
         if (Math.abs(parseFloat(priceField.value) - correctPrice) > 0.01) {
           priceField.value = correctPrice.toFixed(2);
           console.log('💰 Synced price field with current payment type on load:', {
             serviceId: service.id,
             paymentType: currentPaymentType,
-            correctPrice: correctPrice,
-            pricesByType: service.pricesByType
+            correctPrice,
+            pricesByType: service.pricesByType,
+            isADisposicion: service.type === 'a-disposicion',
           });
         }
       }
@@ -4596,7 +4734,7 @@ class ItineraryBuilder {
     } else if (service.type === 'experience' && this.isExperienceFromEstablishment(service.experienceId)) {
       badgeLabel = 'Establecimiento';
     }
-    
+
     const typeLabels = {
       experience: 'Experiencia',
       tour: 'Tour',
@@ -4640,11 +4778,11 @@ class ItineraryBuilder {
                                             </div>
                                         </div>
                                     ` : ''}
-                                    ${service.type === 'tour' && service.includeGuide ? `
+                                    ${(service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide ? `
                                         <div class="row g-2 text-success small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-user me-1"></i>
-                                                <strong>Incluye Guía + Chofer</strong>
+                                                <strong>Incluye Chofer</strong>
                                             </div>
                                         </div>
                                     ` : ''}
@@ -4775,7 +4913,7 @@ class ItineraryBuilder {
                             ${service.includeGuide ? `
                                 <div class="d-flex align-items-center text-success small mt-1">
                                     <i class="ti ti-user me-1"></i>
-                                    <strong>Incluye Guía + Chofer</strong>
+                                    <strong>Incluye Chofer</strong>
                                 </div>
                             ` : ''}
                             ${service.includeGreeter ? `
@@ -4966,14 +5104,14 @@ class ItineraryBuilder {
         if (service.includeGreeter) {
           const originalTotal = totalPrice;
           totalPrice = this.applySpecialRounding(totalPrice);
-          
+
           console.log('💰 Transport service with greeter rounding (custom price):', {
             basePrice: basePrice * quantity,
             includeGuide: service.includeGuide,
             includeGreeter: service.includeGreeter,
             originalTotal,
             finalRoundedTotal: totalPrice,
-            formula: `${originalTotal} → ${totalPrice}`
+            formula: `${originalTotal} → ${totalPrice}`,
           });
         }
 
@@ -5001,14 +5139,14 @@ class ItineraryBuilder {
       if (service.includeGreeter) {
         const originalTotal = totalPrice;
         totalPrice = this.applySpecialRounding(totalPrice);
-        
+
         console.log('💰 Transport service with greeter rounding:', {
           basePrice: vehiclePrice * quantity,
           includeGuide: service.includeGuide,
           includeGreeter: service.includeGreeter,
           originalTotal,
           finalRoundedTotal: totalPrice,
-          formula: `${originalTotal} → ${totalPrice}`
+          formula: `${originalTotal} → ${totalPrice}`,
         });
       }
 
@@ -5068,13 +5206,14 @@ class ItineraryBuilder {
 
   /**
    * Get base vehicle rate per hour (efectivo price) for tour recalculation.
-   * @param {string} tourId - Tour ID
-   * @param {string} vehicleType - Vehicle type ID
-   * @returns {number} Base vehicle rate per hour
+   * @param {string} tourId - Tour ID.
+   * @param {string} vehicleType - Vehicle type ID.
+   * @returns {number} Base vehicle rate per hour.
+   * @example
    */
   getVehicleBaseRate(tourId, vehicleType) {
     console.log('🔍 getVehicleBaseRate called:', { tourId, vehicleType, clientId: this.clientId });
-    
+
     if (!tourId || !vehicleType) {
       console.log('❌ getVehicleBaseRate: Missing tourId or vehicleType');
       return 0;
@@ -5141,8 +5280,104 @@ class ItineraryBuilder {
   }
 
   /**
+   * Get the current base vehicle cost per hour for A Disposición services
+   * Uses same logic as devPaymentPrices to ensure consistency
+   * @returns {number} Base vehicle cost per hour (efectivo rate)
+   */
+  getADisposicionBaseVehicleCost() {
+    const isOverride = document.getElementById('aDisposicionOverridePrices')?.checked || false;
+    const hours = parseFloat(document.getElementById('aDisposicionHours')?.value || 1);
+    const vehicleCount = parseInt(document.getElementById('aDisposicionVehicleCount')?.value || 1, 10);
+    
+    let vehicleBaseCost = 0;
+    
+    // Always use fresh API data for accurate breakdown calculations
+    // Removed flawed saved prices logic that caused incorrect base rates
+    
+    // If override, use price field
+    if (isOverride) {
+      const currentPrice = parseFloat(document.getElementById('servicePrice')?.value || 0);
+      const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+      
+      // Reverse-calculate to get base efectivo rate
+      let baseHourlyRate = currentPrice;
+      if (currentPaymentType === 'transferencia' && this.transferRate > 0) {
+        baseHourlyRate = currentPrice / (1 + (this.transferRate / 100));
+      } else if (currentPaymentType === 'tarjeta' && this.agencyRate > 0) {
+        baseHourlyRate = currentPrice / (1 + (this.agencyRate / 100));
+      }
+      
+      vehicleBaseCost = baseHourlyRate;
+      console.log('📊 Using override rate:', vehicleBaseCost);
+      return vehicleBaseCost;
+    }
+    
+    // Otherwise use calculated rate from API
+    vehicleBaseCost = this._disposicionHourlyRate || 0;
+    console.log('📊 Using calculated rate:', vehicleBaseCost);
+    return vehicleBaseCost;
+  }
+
+  /**
+   * Unified A Disposición pricing calculation - eliminates code duplication
+   * @param {string} paymentType - 'efectivo', 'transferencia', or 'tarjeta'
+   * @param {number} baseVehicleCostPerHour - Base hourly rate per vehicle (before surcharge)
+   * @param {number} hours - Duration in hours
+   * @param {number} vehicleQuantity - Number of vehicles
+   * @param {number} guideRate - Guide rate per hour (optional)
+   * @returns {Object} Standardized pricing object with 2-decimal precision
+   */
+  calculateADisposicionPricing(paymentType, baseVehicleCostPerHour, hours, vehicleQuantity, guideRate = 0) {
+    // Calculate base vehicle cost (total for all vehicles and hours)
+    const baseVehicleTotal = Math.round((baseVehicleCostPerHour * hours * vehicleQuantity) * 100) / 100;
+    
+    // Apply surcharge based on payment type
+    const originalPaymentType = document.getElementById('priceTypeSelect')?.value;
+    document.getElementById('priceTypeSelect').value = paymentType;
+    const vehicleTotalWithSurcharge = Math.round(this.getDisplayPrice(baseVehicleTotal) * 100) / 100;
+    // Restore original payment type
+    if (originalPaymentType) document.getElementById('priceTypeSelect').value = originalPaymentType;
+    
+    // Calculate guide cost (no surcharge applied to guide)
+    const guideTotalCost = Math.round((guideRate * hours * vehicleQuantity) * 100) / 100;
+    
+    // Calculate base total (vehicle + guide)
+    const baseTotal = Math.round((vehicleTotalWithSurcharge + guideTotalCost) * 100) / 100;
+    
+    // Calculate discount if applicable
+    let discountAmount = 0;
+    if (hours > 0) {
+      const discountPercentage = this.getADisposicionDiscount(hours);
+      if (discountPercentage > 0) {
+        const finalCost = Math.round((baseVehicleTotal + guideTotalCost) * 100) / 100;
+        discountAmount = Math.round((finalCost * (discountPercentage / 100)) * 100) / 100;
+      }
+    }
+    
+    // Calculate final amounts
+    const subtotal = Math.round((baseTotal - discountAmount) * 100) / 100;
+    const finalTotal = subtotal;
+    
+    // Calculate hourly rate for display (per vehicle)
+    const hourlyRatePerVehicle = Math.round((vehicleTotalWithSurcharge / (hours * vehicleQuantity)) * 100) / 100;
+    
+    return {
+      baseVehicleTotal,
+      vehicleTotalWithSurcharge,
+      guideTotalCost,
+      baseTotal,
+      discountAmount,
+      subtotal,
+      finalTotal,
+      hourlyRatePerVehicle,
+      paymentType
+    };
+  }
+
+  /**
    * Update development mode payment price displays
-   * Shows efectivo (base), transferencia, and tarjeta prices
+   * Shows efectivo (base), transferencia, and tarjeta prices.
+   * @example
    */
   updateDevPaymentPrices() {
     // Only run in development mode
@@ -5151,12 +5386,12 @@ class ItineraryBuilder {
       console.log('💰 Dev Payment Prices: Not in development mode');
       return;
     }
-    
+
     // Try to find container in both modals
     let devPricesContainer = null;
     const serviceModal = document.getElementById('serviceModal');
     const addServiceModal = document.getElementById('addServiceModal');
-    
+
     // Check which modal is visible and find the container
     if (serviceModal && serviceModal.classList.contains('show')) {
       devPricesContainer = serviceModal.querySelector('#devPaymentPrices');
@@ -5165,21 +5400,21 @@ class ItineraryBuilder {
       devPricesContainer = addServiceModal.querySelector('#devPaymentPrices');
       console.log('💰 Looking in addServiceModal:', !!devPricesContainer);
     }
-    
+
     // Fallback to global search
     if (!devPricesContainer) {
       devPricesContainer = document.getElementById('devPaymentPrices');
     }
-    
+
     if (!devPricesContainer) {
       console.log('💰 Dev Payment Prices: Container not found in any modal');
       return;
     }
-    
+
     // Check if we're editing and have saved pricesByType data
     let useSavedPrices = false;
     let savedPrices = null;
-    
+
     // Only use saved prices if editing AND user hasn't modified anything yet
     if (this.currentServiceId && this.services.has(this.currentServiceId) && !this.serviceModified) {
       const editingService = this.services.get(this.currentServiceId);
@@ -5191,69 +5426,81 @@ class ItineraryBuilder {
     } else if (this.serviceModified) {
       console.log('💰 Service modified by user - recalculating prices instead of using saved data');
     }
-    
+
     console.log('💰 Dev Payment Prices: Showing container');
     // Force show with inline styles to override any CSS
     devPricesContainer.classList.remove('d-none');
     devPricesContainer.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important; margin-top: 1rem !important;';
-    
+
     // Get the current price from the main price field
     const servicePriceField = document.getElementById('servicePrice');
     const currentPrice = parseFloat(servicePriceField?.value || 0);
-    
+
     // Get field references
     const efectivoField = document.getElementById('devPriceEfectivo');
     const transferenciaField = document.getElementById('devPriceTransferencia');
     const tarjetaField = document.getElementById('devPriceTarjeta');
-    
+
+    // Get service type for logic decisions
+    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+
     // If we have saved prices AND user hasn't modified, use them directly
+    // A Disposición services will try fresh API rates first, then fall back to saved prices
     if (useSavedPrices && savedPrices && !this.serviceModified) {
-      if (efectivoField) efectivoField.value = (savedPrices.efectivo || 0).toFixed(2);
-      if (transferenciaField) transferenciaField.value = (savedPrices.transferencia || 0).toFixed(2);
-      if (tarjetaField) tarjetaField.value = (savedPrices.tarjeta || 0).toFixed(2);
-      
-      console.log('💰 Dev Payment Prices Updated from saved data:', {
-        efectivo: savedPrices.efectivo,
-        transferencia: savedPrices.transferencia,
-        tarjeta: savedPrices.tarjeta,
-        source: 'backend saved pricesByType (unmodified)'
-      });
-      return;
+      // For A Disposición, only use saved prices if fresh API rate is not available
+      if (serviceType === 'a-disposicion' && this._disposicionHourlyRate) {
+        // Fresh API rate available for A Disposición - skip saved prices and use API rate below
+        console.log('💰 A Disposición: Fresh API rate available, skipping saved prices for now');
+      } else {
+        // Use saved prices for non-A Disposición services OR A Disposición without fresh API rate
+        if (efectivoField) efectivoField.value = (savedPrices.efectivo || 0).toFixed(2);
+        if (transferenciaField) transferenciaField.value = (savedPrices.transferencia || 0).toFixed(2);
+        if (tarjetaField) tarjetaField.value = (savedPrices.tarjeta || 0).toFixed(2);
+
+        console.log('💰 Dev Payment Prices Updated from saved data:', {
+          efectivo: savedPrices.efectivo,
+          transferencia: savedPrices.transferencia,
+          tarjeta: savedPrices.tarjeta,
+          source: 'backend saved pricesByType (unmodified)',
+          serviceType,
+          note: serviceType === 'a-disposicion' ? 'A Disposición fallback - no fresh API rate' : 'Regular saved price usage',
+        });
+        return;
+      }
     }
-    
+
     if (currentPrice <= 0) {
       // Show 0.00 instead of empty fields
       if (efectivoField) efectivoField.value = '0.00';
       if (transferenciaField) transferenciaField.value = '0.00';
       if (tarjetaField) tarjetaField.value = '0.00';
-      
+
       console.log('💰 Dev Payment Prices: Showing 0.00 for empty price');
       return;
     }
-    
+
     // Get current payment type to understand what the current price represents
     const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-    
+
     // Check if guide is included (for tours)
     const includeGuideCheckbox = document.getElementById('includeGuide');
     const isGuideIncluded = includeGuideCheckbox?.checked && this.driverTourRateCache;
     const guideRate = isGuideIncluded ? (this.driverTourRateCache.value || 0) : 0;
-    
+
     // Calculate base total depending on service type
     let baseTotal = 0;
-    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
-    
+
     if (serviceType === 'tour') {
       // For tours, get vehicle base cost directly
       const vehicleSelect = document.getElementById('vehicleSelect');
       const tourSelect = document.getElementById('tourSelect');
       const rateSelect = document.getElementById('transportCategory');
-      
+
       // Get the actual quantity (2 if additional vehicle is checked, otherwise 1)
       const additionalVehicleCheckbox = document.getElementById('additionalVehicleCheckbox');
       const tourRequiresTransport = document.getElementById('tourRequiresTransport')?.checked;
       const vehicleQuantity = (tourRequiresTransport && additionalVehicleCheckbox?.checked) ? 2 : 1;
-      
+
       if (vehicleSelect?.value && tourSelect?.value) {
         // Create temp service to get vehicle base cost (for ONE vehicle)
         const tempService = {
@@ -5262,46 +5509,76 @@ class ItineraryBuilder {
           rateId: rateSelect?.value || null,
           vehicleId: vehicleSelect.value,
           vehicleType: vehicleSelect.value,
-          quantity: 1
+          quantity: 1,
         };
         const singleVehicleCost = this.getVehicleCost(tempService) || 0;
         // Multiply by the actual quantity
         baseTotal = singleVehicleCost * vehicleQuantity;
-        
+
         console.log('💰 Vehicle cost calculation:', {
           singleVehicleCost,
           vehicleQuantity,
           totalVehicleCost: baseTotal,
-          additionalVehicleChecked: additionalVehicleCheckbox?.checked
+          additionalVehicleChecked: additionalVehicleCheckbox?.checked,
         });
       }
-      
+
       // Add guide if checked
       if (isGuideIncluded) {
         baseTotal += guideRate;
       }
-    } else {
-      // For non-tour services, use current price field and reverse calculate if needed
-      const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-      baseTotal = currentPrice;
-      
-      if (currentPaymentType === 'transferencia' && this.transferRate > 0) {
-        baseTotal = currentPrice / (1 + (this.transferRate / 100));
-      } else if (currentPaymentType === 'tarjeta' && this.agencyRate > 0) {
-        baseTotal = currentPrice / (1 + (this.agencyRate / 100));
+    } else if (serviceType === 'a-disposicion') {
+      try {
+        // A Disposición: Reverse-calculate base efectivo price from servicePrice
+        // servicePrice may have surcharges applied, but devPriceEfectivo should show base price
+        const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+        let baseEfectivoPrice = currentPrice || 0;
+        
+        // If payment type has surcharges, reverse-calculate to get base efectivo price
+        if (currentPaymentType === 'transferencia' && this.transferRate > 0) {
+          baseEfectivoPrice = currentPrice / (1 + (this.transferRate / 100));
+        } else if (currentPaymentType === 'tarjeta' && this.agencyRate > 0) {
+          baseEfectivoPrice = currentPrice / (1 + (this.agencyRate / 100));
+        }
+        // If payment type is 'efectivo', use currentPrice directly (no surcharge to remove)
+        
+        baseTotal = baseEfectivoPrice;
+        
+        console.log('💰 A Disposición reverse-calculated base efectivo price:', {
+          servicePriceFieldValue: currentPrice,
+          currentPaymentType,
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          calculatedBaseEfectivo: baseEfectivoPrice,
+          baseTotal
+        });
+      } catch (error) {
+        console.warn('💰 A Disposición price calculation fallback due to error:', error);
+        baseTotal = currentPrice || 0; // Safe fallback
       }
+    } else {
+      // For other non-tour, non-A Disposición services
+      // The servicePrice field should ALWAYS contain the base (efectivo) price
+      // So we use it directly as the base
+      baseTotal = currentPrice;
+
+      console.log('💰 Using servicePrice field as base (efectivo) price:', {
+        serviceType,
+        servicePriceFieldValue: currentPrice,
+        baseTotal,
+      });
     }
-    
+
     // Calculate all three prices
     const efectivoPrice = baseTotal;
     const transferenciaPrice = baseTotal * (1 + (this.transferRate / 100));
     const tarjetaPrice = baseTotal * (1 + (this.agencyRate / 100));
-    
+
     // Update the fields with formatted prices
     if (efectivoField) efectivoField.value = efectivoPrice.toFixed(2);
     if (transferenciaField) transferenciaField.value = transferenciaPrice.toFixed(2);
     if (tarjetaField) tarjetaField.value = tarjetaPrice.toFixed(2);
-    
+
     console.log('💰 Dev Payment Prices Updated:', {
       serviceType,
       currentPriceInField: currentPrice,
@@ -5312,102 +5589,85 @@ class ItineraryBuilder {
       transferencia: transferenciaPrice,
       tarjeta: tarjetaPrice,
       transferRate: this.transferRate,
-      agencyRate: this.agencyRate
+      agencyRate: this.agencyRate,
     });
   }
 
   /**
    * Update development mode payment breakdown displays
-   * Shows detailed breakdown for efectivo, transferencia, and tarjeta
+   * Shows detailed breakdown for efectivo, transferencia, and tarjeta.
+   * @example
    */
   updateDevPaymentBreakdown() {
+    console.log('📊 updateDevPaymentBreakdown called');
+
     // Only run in development mode
     const isDev = window.location.hostname === 'localhost' && window.location.port === '1337';
+    console.log('📊 Development mode check:', { isDev, hostname: window.location.hostname, port: window.location.port });
+
     if (!isDev) {
+      console.log('📊 Not in development mode, skipping');
       return;
     }
-    
+
     // Find container in the modal
     let breakdownContainer = null;
     const serviceModal = document.getElementById('serviceModal');
     const addServiceModal = document.getElementById('addServiceModal');
-    
+
     // Check which modal is visible and find the container
     if (serviceModal && serviceModal.classList.contains('show')) {
       breakdownContainer = serviceModal.querySelector('#devPaymentBreakdown');
     } else if (addServiceModal && addServiceModal.classList.contains('show')) {
       breakdownContainer = addServiceModal.querySelector('#devPaymentBreakdown');
     }
-    
+
     // Fallback to global search
     if (!breakdownContainer) {
       breakdownContainer = document.getElementById('devPaymentBreakdown');
     }
-    
+
     if (!breakdownContainer) {
       return;
     }
-    
+
     // Force show with inline styles
     breakdownContainer.classList.remove('d-none');
     breakdownContainer.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important; margin-bottom: 1rem !important;';
-    
-    // Check if we're editing and have saved pricesByType data
-    let useSavedPrices = false;
-    let savedPrices = null;
-    
-    // Only use saved prices if editing AND user hasn't modified anything yet
+
+    // Always use live calculation for consistency with servicePriceBreakdown
+    // This ensures both breakdown systems show identical real-time values
     if (this.currentServiceId && this.services.has(this.currentServiceId) && !this.serviceModified) {
-      const editingService = this.services.get(this.currentServiceId);
-      if (editingService.pricesByType && typeof editingService.pricesByType === 'object') {
-        useSavedPrices = true;
-        savedPrices = editingService.pricesByType;
-        
-        // Use saved prices for breakdown display
-        const efectivoTextarea = document.getElementById('devBreakdownEfectivo');
-        const transferenciaTextarea = document.getElementById('devBreakdownTransferencia');
-        const tarjetaTextarea = document.getElementById('devBreakdownTarjeta');
-        
-        if (efectivoTextarea) {
-          efectivoTextarea.value = `Total Efectivo:\n$${(savedPrices.efectivo || 0).toFixed(2)} MXN\n\n(Datos guardados - sin modificar)`;
-        }
-        if (transferenciaTextarea) {
-          transferenciaTextarea.value = `Total Transferencia:\n$${(savedPrices.transferencia || 0).toFixed(2)} MXN\n+${this.transferRate}% surcharge\n\n(Datos guardados - sin modificar)`;
-        }
-        if (tarjetaTextarea) {
-          tarjetaTextarea.value = `Total Tarjeta:\n$${(savedPrices.tarjeta || 0).toFixed(2)} MXN\n+${this.agencyRate}% surcharge\n\n(Datos guardados - sin modificar)`;
-        }
-        
-        console.log('💰 Dev Payment Breakdown using saved pricesByType (unmodified)');
-        return;
-      }
+      console.log('💰 Editing unmodified service - using live calculation for consistency');
     } else if (this.serviceModified) {
-      console.log('💰 Service modified - recalculating breakdown instead of using saved data');
+      console.log('💰 Service modified - using live calculation');
     }
-    
+
     // Check if guide is included
     const includeGuideCheckbox = document.getElementById('includeGuide');
     const isGuideIncluded = includeGuideCheckbox?.checked && this.driverTourRateCache;
-    const guideRate = isGuideIncluded ? (this.driverTourRateCache.value || 0) : 0;
-    
+    let guideRate = isGuideIncluded ? (this.driverTourRateCache.value || 0) : 0;
+
     // Get vehicle base cost for tours
     let vehicleBaseCost = 0;
     let tourDuration = 1;
     let vehicleQuantity = 1;
     const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
-    
+
+    console.log('📊 Service type detected:', serviceType);
+
     if (serviceType === 'tour') {
       const vehicleSelect = document.getElementById('vehicleSelect');
       const tourSelect = document.getElementById('tourSelect');
-      
+
       // Get tour duration
       tourDuration = parseFloat(document.getElementById('tourDuration')?.value || 1);
-      
+
       // Get the actual quantity (2 if additional vehicle is checked, otherwise 1)
       const additionalVehicleCheckbox = document.getElementById('additionalVehicleCheckbox');
       const tourRequiresTransport = document.getElementById('tourRequiresTransport')?.checked;
       vehicleQuantity = (tourRequiresTransport && additionalVehicleCheckbox?.checked) ? 2 : 1;
-      
+
       if (vehicleSelect?.value && tourSelect?.value) {
         const tempService = {
           type: 'tour',
@@ -5415,69 +5675,266 @@ class ItineraryBuilder {
           rateId: document.getElementById('transportCategory')?.value,
           vehicleId: vehicleSelect.value,
           vehicleType: vehicleSelect.value,
-          quantity: 1
+          quantity: 1,
         };
         // Get cost for ONE vehicle
         const singleVehicleCost = this.getVehicleCost(tempService) || 0;
         // Total vehicle cost = single vehicle cost × quantity
         vehicleBaseCost = singleVehicleCost * vehicleQuantity;
-        
+
         console.log('🧮 Breakdown vehicle calculation:', {
           singleVehicleCost,
           vehicleQuantity,
           vehicleBaseCost,
-          additionalVehicleChecked: additionalVehicleCheckbox?.checked
+          additionalVehicleChecked: additionalVehicleCheckbox?.checked,
         });
       }
+    } else if (serviceType === 'a-disposicion') {
+      console.log('📊 Processing A Disposición breakdown');
+
+      // Handle A Disposición service breakdown - use same logic as servicePriceBreakdown
+      const hours = parseFloat(document.getElementById('aDisposicionHours')?.value || 0);
+      const vehicleCount = parseInt(document.getElementById('aDisposicionVehicleCount')?.value || 1, 10);
+      const includeGuide = document.getElementById('aDisposicionGuide')?.checked || false;
+      
+      // Use helper method to get consistent base vehicle cost
+      vehicleBaseCost = this.getADisposicionBaseVehicleCost();
+
+      // Set consistent values
+      tourDuration = hours; // Use hours as duration for consistency
+      vehicleQuantity = vehicleCount;
+
+      // A Disposición guide handling - explicitly set or reset guide rate
+      if (includeGuide && this.driverTourRateCache) {
+        guideRate = this.driverTourRateCache.value || 0;
+        console.log('🚗 A Disposición guide INCLUDED, setting guideRate:', guideRate);
+      } else {
+        guideRate = 0; // Reset to 0 when guide is not included
+        console.log('🚗 A Disposición guide EXCLUDED, resetting guideRate to 0');
+      }
+      
+      console.log('📊 A Disposición unified calculation:', {
+        vehicleBaseCost,
+        hours,
+        vehicleCount,
+        includeGuide,
+        guideRate,
+        note: 'Using same logic as servicePriceBreakdown via helper method'
+      });
+    }
+
+    // Calculate breakdown for each payment type (multiply by duration for tours/hours for A Disposición)
+    const vehicleTotal = vehicleBaseCost * tourDuration * vehicleQuantity;
+    const guideTotal = guideRate * tourDuration * vehicleQuantity; // Guide cost also multiplied by vehicle quantity for A Disposición
+    const baseTotal = vehicleTotal + guideTotal;
+
+    console.log('📊 Final breakdown calculations:', {
+      vehicleBaseCost,
+      guideRate,
+      tourDuration,
+      vehicleQuantity,
+      vehicleTotal,
+      guideTotal,
+      baseTotal,
+    });
+
+    // Use unified calculation method for all payment types - eliminates code duplication and ensures identical results
+    const efectivoPricing = this.calculateADisposicionPricing('efectivo', vehicleBaseCost, tourDuration, vehicleQuantity, guideRate);
+    const transferPricing = this.calculateADisposicionPricing('transferencia', vehicleBaseCost, tourDuration, vehicleQuantity, guideRate);
+    const cardPricing = this.calculateADisposicionPricing('tarjeta', vehicleBaseCost, tourDuration, vehicleQuantity, guideRate);
+    
+    // Extract values for compatibility with existing code
+    const vehicleTotalEfectivo = efectivoPricing.vehicleTotalWithSurcharge;
+    const guideTotalEfectivo = efectivoPricing.guideTotalCost;
+    const efectivoBaseTotal = efectivoPricing.baseTotal;
+    const efectivoSubtotal = efectivoPricing.subtotal;
+    const efectivoTotal = efectivoPricing.finalTotal;
+    const efectivoHourlyRate = efectivoPricing.hourlyRatePerVehicle;
+    
+    const vehicleTotalTransfer = transferPricing.vehicleTotalWithSurcharge;
+    const guideTotalTransfer = transferPricing.guideTotalCost;
+    const transferBaseTotal = transferPricing.baseTotal;
+    const transferSubtotal = transferPricing.subtotal;
+    const transferTotal = transferPricing.finalTotal;
+    const transferHourlyRate = transferPricing.hourlyRatePerVehicle;
+    
+    const vehicleTotalCard = cardPricing.vehicleTotalWithSurcharge;
+    const guideTotalCard = cardPricing.guideTotalCost;
+    const cardBaseTotal = cardPricing.baseTotal;
+    const cardSubtotal = cardPricing.subtotal;
+    const cardTotal = cardPricing.finalTotal;
+    const cardHourlyRate = cardPricing.hourlyRatePerVehicle;
+    
+    // Discount amount (same for all payment types)
+    const discountAmount = efectivoPricing.discountAmount;
+    
+    // Debugging - now using unified calculation
+    if (serviceType === 'a-disposicion') {
+      console.log('🎯 Unified calculation results:', {
+        efectivoPricing,
+        transferPricing,
+        cardPricing,
+        discountAmount,
+        note: 'All calculations now use identical unified method'
+      });
     }
     
-    // Calculate breakdown for each payment type (multiply by duration for tours)
-    const vehicleTotal = vehicleBaseCost * tourDuration;
-    const guideTotal = guideRate * tourDuration;
-    const baseTotal = vehicleTotal + guideTotal;
-    
-    // Efectivo (no surcharge)
-    const efectivoBreakdown = this.formatPaymentBreakdown('Efectivo', vehicleBaseCost, guideRate, vehicleTotal, guideTotal, baseTotal, 0, baseTotal, tourDuration, vehicleQuantity);
-    
-    // Transferencia
-    const transferSurcharge = baseTotal * (this.transferRate / 100);
-    const transferTotal = baseTotal + transferSurcharge;
-    const transferenciaBreakdown = this.formatPaymentBreakdown('Transferencia', vehicleBaseCost, guideRate, vehicleTotal, guideTotal, baseTotal, transferSurcharge, transferTotal, tourDuration, vehicleQuantity);
-    
-    // Tarjeta
-    const cardSurcharge = baseTotal * (this.agencyRate / 100);
-    const cardTotal = baseTotal + cardSurcharge;
-    const tarjetaBreakdown = this.formatPaymentBreakdown('Tarjeta', vehicleBaseCost, guideRate, vehicleTotal, guideTotal, baseTotal, cardSurcharge, cardTotal, tourDuration, vehicleQuantity);
-    
+    const efectivoBreakdown = this.formatPaymentBreakdown('Efectivo', efectivoHourlyRate, guideRate, vehicleTotalEfectivo, guideTotalEfectivo, efectivoBaseTotal, discountAmount, efectivoSubtotal, efectivoTotal, tourDuration, vehicleQuantity);
+    const transferenciaBreakdown = this.formatPaymentBreakdown('Transferencia', transferHourlyRate, guideRate, vehicleTotalTransfer, guideTotalTransfer, transferBaseTotal, discountAmount, transferSubtotal, transferTotal, tourDuration, vehicleQuantity);
+    const tarjetaBreakdown = this.formatPaymentBreakdown('Tarjeta', cardHourlyRate, guideRate, vehicleTotalCard, guideTotalCard, cardBaseTotal, discountAmount, cardSubtotal, cardTotal, tourDuration, vehicleQuantity);
+
+    // Comprehensive debugging for A Disposición breakdown calculations
+    if (serviceType === 'a-disposicion') {
+      console.log('📊 A DISPOSICIÓN BREAKDOWN DETAILED ANALYSIS:', {
+        inputValues: {
+          hours: tourDuration,
+          vehicleCount: vehicleQuantity,
+          includeGuide: document.getElementById('aDisposicionGuide')?.checked,
+          isOverride: document.getElementById('aDisposicionOverridePrices')?.checked,
+          servicePriceField: document.getElementById('servicePrice')?.value,
+          currentPaymentType: document.getElementById('priceTypeSelect')?.value,
+          isEditing: !!this.currentServiceId,
+          serviceModified: this.serviceModified,
+        },
+        calculatedValues: {
+          vehicleBaseCost,
+          guideRate,
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          discountAmount,
+        },
+        breakdownResults: {
+          efectivo: {
+            hourlyRate: efectivoHourlyRate.toFixed(2),
+            vehicleTotal: vehicleTotal.toFixed(2),
+            guideTotal: guideTotal.toFixed(2),
+            subtotal: efectivoSubtotal.toFixed(2),
+            total: efectivoTotal.toFixed(2),
+            formula: `${tourDuration}h × $${vehicleBaseCost.toFixed(2)} × ${vehicleQuantity} vehículo = $${vehicleTotal.toFixed(2)}`,
+          },
+          transferencia: {
+            hourlyRate: transferHourlyRate.toFixed(2),
+            hourlyRateCalculation: `${vehicleBaseCost.toFixed(2)} × (1 + ${this.transferRate}%) = ${transferHourlyRate.toFixed(2)}`,
+            vehicleTotal: vehicleTotalTransfer.toFixed(2),
+            guideTotal: guideTotalTransfer.toFixed(2),
+            subtotal: transferSubtotal.toFixed(2),
+            total: transferTotal.toFixed(2),
+            formula: `${tourDuration}h × $${transferHourlyRate.toFixed(2)} × ${vehicleQuantity} vehículo = $${vehicleTotalTransfer.toFixed(2)}`,
+          },
+          tarjeta: {
+            hourlyRate: cardHourlyRate.toFixed(2),
+            hourlyRateCalculation: `${vehicleBaseCost.toFixed(2)} × (1 + ${this.agencyRate}%) = ${cardHourlyRate.toFixed(2)}`,
+            vehicleTotal: vehicleTotalCard.toFixed(2),
+            guideTotal: guideTotalCard.toFixed(2),
+            subtotal: cardSubtotal.toFixed(2),
+            total: cardTotal.toFixed(2),
+            formula: `${tourDuration}h × $${cardHourlyRate.toFixed(2)} × ${vehicleQuantity} vehículo = $${vehicleTotalCard.toFixed(2)}`,
+          },
+        },
+        expectedOrder: {
+          note: 'Efectivo should be base (lowest surcharge), Transferencia higher, Tarjeta highest',
+          efectivoRate: efectivoHourlyRate.toFixed(2),
+          transferenciaRate: transferHourlyRate.toFixed(2),
+          tarjetaRate: cardHourlyRate.toFixed(2),
+          ratesAreCorrectOrder: efectivoHourlyRate <= transferHourlyRate && transferHourlyRate <= cardHourlyRate,
+        },
+      });
+
+      // Validate that breakdown totals match expected values
+      if (this.currentServiceId && this.services.has(this.currentServiceId)) {
+        const editingService = this.services.get(this.currentServiceId);
+        if (editingService.pricesByType) {
+          console.log('📊 VALIDATION - Comparing breakdown totals with saved pricesByType:', {
+            savedPrices: editingService.pricesByType,
+            calculatedTotals: {
+              efectivo: efectivoTotal.toFixed(2),
+              transferencia: transferTotal.toFixed(2),
+              tarjeta: cardTotal.toFixed(2),
+            },
+            matches: {
+              efectivo: Math.abs(efectivoTotal - (editingService.pricesByType.efectivo || 0)) < 0.01,
+              transferencia: Math.abs(transferTotal - (editingService.pricesByType.transferencia || 0)) < 0.01,
+              tarjeta: Math.abs(cardTotal - (editingService.pricesByType.tarjeta || 0)) < 0.01,
+            },
+          });
+        }
+      }
+    }
+
+    // Store A Disposición breakdown totals for use in collectServiceData
+    if (serviceType === 'a-disposicion') {
+      this._aDisposicionBreakdownTotals = {
+        efectivo: efectivoTotal,
+        transferencia: transferTotal,
+        tarjeta: cardTotal,
+      };
+      console.log('💾 Stored A Disposición breakdown totals for pricesByType:', this._aDisposicionBreakdownTotals);
+    }
+
     // Update the fields
     const efectivoField = document.getElementById('devBreakdownEfectivo');
     const transferenciaField = document.getElementById('devBreakdownTransferencia');
     const tarjetaField = document.getElementById('devBreakdownTarjeta');
-    
+
     if (efectivoField) efectivoField.value = efectivoBreakdown;
     if (transferenciaField) transferenciaField.value = transferenciaBreakdown;
     if (tarjetaField) tarjetaField.value = tarjetaBreakdown;
-    
+
     console.log('🧮 Dev Payment Breakdown Updated:', {
       vehicleBase: vehicleBaseCost,
       guideRate,
       baseTotal,
       transferRate: this.transferRate,
-      agencyRate: this.agencyRate
+      agencyRate: this.agencyRate,
     });
   }
 
   /**
-   * Format payment breakdown text for display
+   * Format payment breakdown text for display.
+   * @param paymentType
+   * @param vehicleCostPerHour
+   * @param guideCostPerHour
+   * @param vehicleTotal
+   * @param guideTotal
+   * @param baseTotal
+   * @param discountAmount
+   * @param subtotal
+   * @param total
+   * @param duration
+   * @param vehicleQuantity
+   * @example
    */
-  formatPaymentBreakdown(paymentType, vehicleCostPerHour, guideCostPerHour, vehicleTotal, guideTotal, subtotal, surcharge, total, duration = 1, vehicleQuantity = 1) {
+  formatPaymentBreakdown(paymentType, vehicleCostPerHour, guideCostPerHour, vehicleTotal, guideTotal, baseTotal, discountAmount, subtotal, total, duration = 1, vehicleQuantity = 1) {
     let breakdown = '';
-    
+
+    // Check if this is A Disposición (duration represents hours and vehicleCostPerHour is the base rate)
+    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+    const isADisposicion = serviceType === 'a-disposicion';
+
     if (vehicleCostPerHour > 0) {
       // Show vehicle cost with quantity and duration
       const vehicleLabel = vehicleQuantity > 1 ? `${vehicleQuantity} Vehículos` : 'Vehículo';
-      
-      if (vehicleQuantity > 1 && duration > 1) {
+
+      if (isADisposicion) {
+        // For A Disposición: combine vehicle and guide if both exist
+        if (guideCostPerHour > 0) {
+          // Combine vehicle and guide rates
+          const combinedRate = vehicleCostPerHour + guideCostPerHour;
+          const combinedTotal = vehicleTotal + guideTotal;
+          if (vehicleQuantity > 1) {
+            breakdown += `${duration}h × $${combinedRate.toFixed(2)} × ${vehicleQuantity} vehículos = $${combinedTotal.toFixed(2)}\n`;
+          } else {
+            breakdown += `${duration}h × $${combinedRate.toFixed(2)} × 1 vehículo = $${combinedTotal.toFixed(2)}\n`;
+          }
+        } else {
+          // No guide, show vehicle only
+          if (vehicleQuantity > 1) {
+            breakdown += `${duration}h × $${vehicleCostPerHour.toFixed(2)} × ${vehicleQuantity} vehículos = $${vehicleTotal.toFixed(2)}\n`;
+          } else {
+            breakdown += `${duration}h × $${vehicleCostPerHour.toFixed(2)} × 1 vehículo = $${vehicleTotal.toFixed(2)}\n`;
+          }
+        }
+      } else if (vehicleQuantity > 1 && duration > 1) {
         // Show: 2 Vehículos: $X (por vehículo) × 2 × 3h = $Total
         const singleVehicleCost = vehicleCostPerHour / vehicleQuantity;
         breakdown += `${vehicleLabel}: $${singleVehicleCost.toFixed(2)} × ${vehicleQuantity} × ${duration}h = $${vehicleTotal.toFixed(2)}\n`;
@@ -5493,35 +5950,35 @@ class ItineraryBuilder {
         breakdown += `${vehicleLabel}: $${vehicleTotal.toFixed(2)}\n`;
       }
     }
-    
+
     if (guideCostPerHour > 0) {
-      if (duration > 1) {
+      if (isADisposicion) {
+        // For A Disposición: guide is already included in the combined formula above, skip separate line
+      } else if (duration > 1) {
         breakdown += `Guía: $${guideCostPerHour.toFixed(2)} × ${duration}h = $${guideTotal.toFixed(2)}\n`;
       } else {
         breakdown += `Guía: $${guideTotal.toFixed(2)}\n`;
       }
     }
-    
-    breakdown += `Subtotal: $${subtotal.toFixed(2)}\n`;
-    
-    if (surcharge > 0) {
-      const surchargeRate = paymentType === 'Transferencia' ? this.transferRate : this.agencyRate;
-      breakdown += `Recargo (${surchargeRate}%): $${surcharge.toFixed(2)}\n`;
-    } else {
-      breakdown += `Recargo: $0.00\n`;
+
+    // Add volume discount line if applicable
+    if (discountAmount > 0) {
+      breakdown += `Descuento por volumen: -$${discountAmount.toFixed(2)}\n`;
     }
-    
+
+    breakdown += `Subtotal: $${subtotal.toFixed(2)}\n`;
     breakdown += `Total: $${total.toFixed(2)}`;
-    
+
     return breakdown;
   }
 
   /**
-   * Get base vehicle rate from cache data (always returns efectivo base rate)
-   * @param {string} tourId 
-   * @param {string} rateId 
-   * @param {string} vehicleType 
-   * @returns {number} Base efectivo rate (surcharges calculated separately)
+   * Get base vehicle rate from cache data (always returns efectivo base rate).
+   * @param {string} tourId
+   * @param {string} rateId
+   * @param {string} vehicleType
+   * @returns {number} Base efectivo rate (surcharges calculated separately).
+   * @example
    */
   getVehicleBaseRateFromCache(tourId, rateId, vehicleType) {
     if (!tourId || !vehicleType) {
@@ -5671,9 +6128,9 @@ class ItineraryBuilder {
   /**
    * Format greeter formula for display in price breakdown.
    * Shows the exact formula being used with values and calculation.
-   * @param {number} durationMinutes - Route duration in minutes
-   * @param {number} finalPrice - The calculated final price
-   * @returns {string} Formatted formula display
+   * @param {number} durationMinutes - Route duration in minutes.
+   * @param {number} finalPrice - The calculated final price.
+   * @returns {string} Formatted formula display.
    * @example
    * formatGreeterFormula(90, 1320) // Returns: "($760 + $640×1.5h = $1,320)"
    */
@@ -5682,12 +6139,12 @@ class ItineraryBuilder {
     const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
     const isUsingCache = !!this.greeterRateCache;
     const durationHours = durationMinutes / 60;
-    
+
     const source = isUsingCache ? '[API]' : '[Default]';
     const formattedBase = this.formatCurrency(basePrice);
     const formattedHourly = this.formatCurrency(hourlyRate);
     const formattedFinal = this.formatCurrency(finalPrice);
-    
+
     return `(${formattedBase} + ${formattedHourly}×${durationHours.toFixed(1)}h = ${formattedFinal}) ${source}`;
   }
 
@@ -5708,7 +6165,7 @@ class ItineraryBuilder {
       currency,
       transferRate: this.transferRate,
       agencyRate: this.agencyRate,
-      exchangeRate: this.exchangeRate
+      exchangeRate: this.exchangeRate,
     });
 
     // Step 1: Apply cash rounding for efectivo payments
@@ -5735,15 +6192,15 @@ class ItineraryBuilder {
         originalMXN: mxnPrice,
         withSurcharge,
         usdPrice: finalPrice,
-        exchangeRate: this.exchangeRate
+        exchangeRate: this.exchangeRate,
       });
       return finalPrice;
     }
-    
+
     console.log('💰 getDisplayPrice RESULT (MXN):', {
       originalMXN: mxnPrice,
       finalPrice: withSurcharge,
-      surchargeApplied: withSurcharge - priceToProcess
+      surchargeApplied: withSurcharge - priceToProcess,
     });
     return withSurcharge;
   }
@@ -5802,9 +6259,9 @@ class ItineraryBuilder {
   getSurchargePercentage(paymentType) {
     if (paymentType === 'efectivo') {
       return 0;
-    } else if (paymentType === 'transferencia') {
+    } if (paymentType === 'transferencia') {
       return this.transferRate || 0;
-    } else if (paymentType === 'tarjeta') {
+    } if (paymentType === 'tarjeta') {
       return this.agencyRate || 0;
     }
     return 0;
@@ -5815,18 +6272,18 @@ class ItineraryBuilder {
       newPaymentType: paymentType,
       currentServices: this.services.size,
       timestamp: new Date().toISOString(),
-      trigger: 'User action or programmatic restoration'
+      trigger: 'User action or programmatic restoration',
     });
-    
+
     // Update dev payment prices when payment type changes
     this.updateDevPaymentPrices();
     this.updateDevPaymentBreakdown();
-    
+
     // Update price field to reflect new payment surcharge for current service
     const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
     if (serviceType === 'tour') {
       this.recalculateTourPrice();
-      
+
       // If recalculateTourPrice didn't update the field (no vehicle/tour selected),
       // update it based on current field value + payment surcharge
       const servicePriceField = document.getElementById('servicePrice');
@@ -5841,39 +6298,44 @@ class ItineraryBuilder {
             console.log('✅ Applied payment surcharge to existing price:', {
               originalValue: currentValue,
               newValue: expectedWithSurcharge,
-              paymentType
+              paymentType,
             });
           }
         }
       }
     } else if (serviceType === 'transport') {
       this.recalculateTransportPrice();
+    } else if (serviceType === 'a-disposicion') {
+      // Recalculate A Disposición price with new payment type
+      this.calculateADisposicionPrice();
+      console.log('💰 Recalculated A Disposición price for payment type:', paymentType);
     }
-    
+
     // Recalculate all saved services with new payment type
     this.recalculateAllSavedServices();
-    
+
     this.renderDaysContent();
     this.updateTotals();
     this.updateServicePriceBreakdown();
     // Auto-save is now safe because we load with correct prices initially
     this.hasUnsavedChanges = true;
     this.scheduleAutoSave();
-    
+
     console.log('✅ PAYMENT CHANGE - Payment type change handling completed:', {
       newPaymentType: paymentType,
       servicesProcessed: this.services.size,
       pricesUpdated: 'via recalculateAllSavedServices()',
       uiUpdated: 'renderDaysContent() called',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
   /**
    * Reverse-calculate base (efectivo) price from stored price.
-   * @param {number} storedPrice - Current stored price
-   * @param {string} originalPaymentType - Payment type when service was saved
-   * @returns {number} Base efectivo price
+   * @param {number} storedPrice - Current stored price.
+   * @param {string} originalPaymentType - Payment type when service was saved.
+   * @returns {number} Base efectivo price.
+   * @example
    */
   getBasePriceFromStored(storedPrice, originalPaymentType) {
     if (originalPaymentType === 'transferencia' && this.transferRate > 0) {
@@ -5887,8 +6349,9 @@ class ItineraryBuilder {
 
   /**
    * Calculate base (efectivo) price from current final price based on current payment type.
-   * @param {number} currentPrice - Current final price with any surcharges
-   * @returns {number} Base efectivo price
+   * @param {number} currentPrice - Current final price with any surcharges.
+   * @returns {number} Base efectivo price.
+   * @example
    */
   getBasePriceFromCurrent(currentPrice) {
     const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
@@ -5903,9 +6366,10 @@ class ItineraryBuilder {
 
   /**
    * Calculate display price for a specific payment type from base efectivo price.
-   * @param {number} basePrice - Base efectivo price
-   * @param {string} paymentType - Payment type ('efectivo', 'transferencia', 'tarjeta')
-   * @returns {number} Price with appropriate surcharge applied
+   * @param {number} basePrice - Base efectivo price.
+   * @param {string} paymentType - Payment type ('efectivo', 'transferencia', 'tarjeta').
+   * @returns {number} Price with appropriate surcharge applied.
+   * @example
    */
   getDisplayPriceForType(basePrice, paymentType) {
     if (paymentType === 'transferencia' && this.transferRate > 0) {
@@ -5923,57 +6387,54 @@ class ItineraryBuilder {
    * @param {Array} items - Breakdown items from desglose 
    * @param {string} currentPaymentType - Currently selected payment type
    * @returns {Object} Payment type calculations with component details
+   * @example
    */
   getComponentBasedPaymentCalculations(items, currentPaymentType) {
     console.log('🧮 getComponentBasedPaymentCalculations called with:', { items, currentPaymentType });
-    
+
     const paymentTypes = ['efectivo', 'transferencia', 'tarjeta'];
     const result = {};
-    
+
     // Check for combined vehicle+guide pricing (tours OR A disposición)
-    const hasVehicleGuideCombo = items.some(item => 
-      item.label.toLowerCase().includes('vehículo') || item.label.toLowerCase().includes('vehicle') ||
-      item.label.toLowerCase().includes('tarifa')
-    ) && items.some(item => 
-      item.label.toLowerCase().includes('guía') || 
-      item.label.toLowerCase().includes('guide') || 
-      item.label.toLowerCase().includes('chofer')
-    );
-    
+    const hasVehicleGuideCombo = items.some((item) => item.label.toLowerCase().includes('vehículo') || item.label.toLowerCase().includes('vehicle')
+      || item.label.toLowerCase().includes('tarifa')) && items.some((item) => item.label.toLowerCase().includes('guía')
+      || item.label.toLowerCase().includes('guide')
+      || item.label.toLowerCase().includes('chofer'));
+
     // Determine if this is a tour or A disposición service
-    const isTourService = items.some(item => item.label.toLowerCase().includes('vehículo'));
-    const isADisposicionService = items.some(item => item.label.toLowerCase().includes('tarifa'));
+    const isTourService = items.some((item) => item.label.toLowerCase().includes('vehículo'));
+    const isADisposicionService = items.some((item) => item.label.toLowerCase().includes('tarifa'));
     const isTourWithCombinedVehicleGuide = hasVehicleGuideCombo && isTourService;
-    
-    console.log('🧮 Component analysis:', { 
+
+    console.log('🧮 Component analysis:', {
       isTourWithCombinedVehicleGuide,
       isADisposicionService,
       hasVehicleGuideCombo,
       itemCount: items.length,
-      items: items.map(i => i.label)
+      items: items.map((i) => i.label),
     });
-    
+
     // Get configuration once, outside the loop (tours only)
     let tourConfig = null;
     if (isTourWithCombinedVehicleGuide) {
       const includeGuide = document.getElementById('includeGuide')?.checked || false;
       const tourQuantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
       const tourDuration = parseInt(document.getElementById('tourDuration')?.value || 1);
-      
+
       // Get correct tier-based rate (not additive)
       const tourId = document.getElementById('tourSelect')?.value;
       const vehicleType = document.getElementById('vehicleSelect')?.value;
       let tierBaseRate = 0;
       let vehicleOnlyRate = 0;
       let guideOnlyRate = 0;
-      
+
       console.log('🔍 Getting tier-based tour rate:', { tourId, vehicleType, includeGuide });
-      
+
       if (tourId && vehicleType) {
         // CORRECT APPROACH: Get rate from cache (which is already payment-adjusted)
         const rateId = document.getElementById('transportCategory')?.value;
         const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-        
+
         // Get the vehicle cost using the working method (returns rate for current payment type)
         const tempService = {
           type: 'tour',
@@ -5981,11 +6442,11 @@ class ItineraryBuilder {
           rateId,
           vehicleId: vehicleType,
           vehicleType,
-          quantity: 1
+          quantity: 1,
         };
-        
+
         const vehicleRateForCurrentPayment = this.getVehicleCost(tempService);
-        
+
         // Reverse calculate to get base efectivo rate
         let baseEfectivoRate = vehicleRateForCurrentPayment;
         if (currentPaymentType === 'transferencia' && this.transferRate > 0) {
@@ -5993,66 +6454,64 @@ class ItineraryBuilder {
         } else if (currentPaymentType === 'tarjeta' && this.agencyRate > 0) {
           baseEfectivoRate = vehicleRateForCurrentPayment / (1 + (this.agencyRate / 100));
         }
-        
+
         vehicleOnlyRate = baseEfectivoRate || 0;
-        
+
         console.log('🔍 Rate retrieval and base calculation:', {
           currentPaymentType,
           vehicleRateForCurrentPayment,
           baseEfectivoRate: vehicleOnlyRate,
-          reverseCalculation: currentPaymentType !== 'efectivo' ? 
-            `${vehicleRateForCurrentPayment} ÷ ${currentPaymentType === 'transferencia' ? 
-              (1 + this.transferRate/100) : (1 + this.agencyRate/100)}` : 'No reverse needed',
+          reverseCalculation: currentPaymentType !== 'efectivo'
+            ? `${vehicleRateForCurrentPayment} ÷ ${currentPaymentType === 'transferencia'
+              ? (1 + this.transferRate / 100) : (1 + this.agencyRate / 100)}` : 'No reverse needed',
           rateId,
           tourId,
-          vehicleType
+          vehicleType,
         });
-        
+
         if (includeGuide) {
           // Get guide rate for additive calculation
           guideOnlyRate = this.driverTourRateCache?.value || 0;
-          
+
           // Calculate base tier rate (efectivo)
           tierBaseRate = vehicleOnlyRate + guideOnlyRate;
-          
+
           console.log('🔍 Base tier calculation (efectivo):', {
             vehicleOnlyRate,
-            guideOnlyRate, 
+            guideOnlyRate,
             tierBaseRate,
             currentPaymentType,
-            note: `Base efectivo rate - reversed from ${currentPaymentType} rate if needed`
+            note: `Base efectivo rate - reversed from ${currentPaymentType} rate if needed`,
           });
-          
         } else {
           // Tier 1: Vehicle only
           tierBaseRate = vehicleOnlyRate;
           console.log('🔍 Vehicle-only tier (efectivo):', tierBaseRate);
         }
-        
       } else {
         console.warn('🔍 Missing tourId or vehicleType for tier calculation');
       }
-      
+
       tourConfig = {
         includeGuide,
         tourQuantity,
         tourDuration,
-        vehicleOnlyRate,        // Vehicle-only component (for display)
-        guideOnlyRate,         // Guide-only component (for display) 
-        tierBaseRate,          // Actual rate to use for calculation
-        combinedBaseRate: tierBaseRate,  // Use tier rate, not additive
-        tourId,                // Add tourId for payment-specific rate lookup
-        vehicleType,           // Add vehicleType for payment-specific rate lookup
-        rateId: document.getElementById('transportCategory')?.value // Add rateId
+        vehicleOnlyRate, // Vehicle-only component (for display)
+        guideOnlyRate, // Guide-only component (for display)
+        tierBaseRate, // Actual rate to use for calculation
+        combinedBaseRate: tierBaseRate, // Use tier rate, not additive
+        tourId, // Add tourId for payment-specific rate lookup
+        vehicleType, // Add vehicleType for payment-specific rate lookup
+        rateId: document.getElementById('transportCategory')?.value, // Add rateId
       };
-      
+
       console.log('🧮 Tour configuration (tier-based):', tourConfig);
     }
 
-    paymentTypes.forEach(paymentType => {
+    paymentTypes.forEach((paymentType) => {
       let total = 0;
       const componentDetails = [];
-      
+
       if (isTourWithCombinedVehicleGuide && tourConfig) {
         // Debug: Show actual rate values
         console.log('💳 Payment rate debugging:', {
@@ -6061,35 +6520,35 @@ class ItineraryBuilder {
           agencyRateValue: this.agencyRate,
           transferRatePercent: (this.transferRate / 100),
           agencyRatePercent: (this.agencyRate / 100),
-          note: 'transferencia should be 16.3%, tarjeta should be 23.2%'
+          note: 'transferencia should be 16.3%, tarjeta should be 23.2%',
         });
-        
+
         // Simplified approach: Calculate each payment type directly from base rates
-        
+
         // CORRECT APPROACH: Get base rate and apply payment surcharges
-        
+
         // Step 1: Get base tier rate (efectivo)
         const baseTierRate = tourConfig.tierBaseRate; // This is vehicle + guide base rate
-        
+
         // Step 2: Apply payment multiplier to the base tier rate
-        const multiplier = paymentType === 'efectivo' ? 1.0 : 
-                          paymentType === 'transferencia' ? (1 + (this.transferRate / 100)) :
-                          (1 + (this.agencyRate / 100));
-        
+        const multiplier = paymentType === 'efectivo' ? 1.0
+          : paymentType === 'transferencia' ? (1 + (this.transferRate / 100))
+            : (1 + (this.agencyRate / 100));
+
         console.log('🧮 Payment calculation for', paymentType, ':', {
           multiplier,
           transferRate: this.transferRate,
           agencyRate: this.agencyRate,
           tierBaseRate: tourConfig.tierBaseRate,
-          calculationFormula: `${baseTierRate} × ${multiplier} × ${tourConfig.tourQuantity} × ${tourConfig.tourDuration}`
+          calculationFormula: `${baseTierRate} × ${multiplier} × ${tourConfig.tourQuantity} × ${tourConfig.tourDuration}`,
         });
-        
+
         // Step 3: Calculate payment-specific tier rate
         // For current payment type, use the actual rate from database
         // For other payment types, calculate from base
         let tierRateForPayment;
         const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-        
+
         if (paymentType === currentPaymentType && tourConfig.vehicleType) {
           // For current payment type, get the actual rate from database
           const tempService = {
@@ -6098,16 +6557,16 @@ class ItineraryBuilder {
             rateId: tourConfig.rateId,
             vehicleId: tourConfig.vehicleType,
             vehicleType: tourConfig.vehicleType,
-            quantity: 1
+            quantity: 1,
           };
           const vehicleRateFromDb = this.getVehicleCost(tempService);
           const guideRateFromDb = tourConfig.includeGuide ? tourConfig.guideOnlyRate : 0;
           tierRateForPayment = vehicleRateFromDb + guideRateFromDb;
-          
+
           console.log(`📊 Using actual ${paymentType} rate from database:`, {
             vehicleRateFromDb,
             guideRateFromDb,
-            tierRateForPayment
+            tierRateForPayment,
           });
         } else {
           // For other payment types, calculate from base
@@ -6115,14 +6574,14 @@ class ItineraryBuilder {
           console.log(`📊 Calculating ${paymentType} rate from base:`, {
             baseTierRate,
             multiplier,
-            tierRateForPayment
+            tierRateForPayment,
           });
         }
-        
+
         // Step 4: Calculate total
         const baseTotal = baseTierRate * tourConfig.tourQuantity * tourConfig.tourDuration;
         total = tierRateForPayment * tourConfig.tourQuantity * tourConfig.tourDuration;
-        
+
         console.log('🧮 Corrected payment calculation:', {
           paymentType,
           baseTierRate,
@@ -6132,11 +6591,11 @@ class ItineraryBuilder {
           finalTotal: total,
           includeGuide: tourConfig.includeGuide,
           formula: `${baseTierRate} × ${multiplier} × ${tourConfig.tourQuantity} × ${tourConfig.tourDuration}`,
-          note: 'Base rate × payment multiplier approach'
+          note: 'Base rate × payment multiplier approach',
         });
-        
+
         // Step 3: Show tier-based components (for breakdown display)
-        
+
         if (tourConfig.includeGuide) {
           // Tier 2: Show as single "Vehicle + Guide" component with calculated rate
           componentDetails.push({
@@ -6144,9 +6603,9 @@ class ItineraryBuilder {
             baseAmount: baseTotal,
             finalAmount: total,
             surchargeInfo: paymentType === 'efectivo' ? ' (base rate)' : ` (base × ${multiplier})`,
-            shouldHaveSurcharge: paymentType !== 'efectivo'
+            shouldHaveSurcharge: paymentType !== 'efectivo',
           });
-          
+
           // Add breakdown for reference (show base calculation)
           if (tourConfig.vehicleOnlyRate > 0 && tourConfig.guideOnlyRate > 0) {
             const vehicleWithSurcharge = tourConfig.vehicleOnlyRate * multiplier;
@@ -6155,12 +6614,11 @@ class ItineraryBuilder {
               label: `  ↳ Breakdown: Vehículo $${tourConfig.vehicleOnlyRate} × ${multiplier} + Guía $${tourConfig.guideOnlyRate} × ${multiplier} = $${tierRateForPayment.toFixed(2)}/h`,
               baseAmount: 0,
               finalAmount: 0,
-              surchargeInfo: ` (base rates × payment multiplier)`,
+              surchargeInfo: ' (base rates × payment multiplier)',
               shouldHaveSurcharge: false,
-              isBreakdown: true
+              isBreakdown: true,
             });
           }
-          
         } else {
           // Tier 1: Vehicle only with calculated rate
           componentDetails.push({
@@ -6168,31 +6626,31 @@ class ItineraryBuilder {
             baseAmount: baseTotal,
             finalAmount: total,
             surchargeInfo: paymentType === 'efectivo' ? ' (base rate)' : ` (base × ${multiplier})`,
-            shouldHaveSurcharge: paymentType !== 'efectivo'
+            shouldHaveSurcharge: paymentType !== 'efectivo',
           });
         }
-        
+
         // Add formula display showing base × multiplier calculation
         const tierLabel = tourConfig.includeGuide ? '(Vehicle+Guide Tier)' : '(Vehicle Only)';
-        const surchargeText = paymentType === 'efectivo' ? 'base' : 
-                             paymentType === 'transferencia' ? `base × ${multiplier} (+${this.transferRate}%)` :
-                             `base × ${multiplier} (+${this.agencyRate}%)`;
+        const surchargeText = paymentType === 'efectivo' ? 'base'
+          : paymentType === 'transferencia' ? `base × ${multiplier} (+${this.transferRate}%)`
+            : `base × ${multiplier} (+${this.agencyRate}%)`;
         componentDetails.push({
           label: `💫 Formula ${tierLabel}: ${this.formatCurrency(baseTierRate)} × ${multiplier} × ${tourConfig.tourQuantity} × ${tourConfig.tourDuration}h = ${this.formatCurrency(total)}`,
           baseAmount: baseTotal,
           finalAmount: total,
           surchargeInfo: ` (${surchargeText})`,
           shouldHaveSurcharge: false,
-          isFormula: true
+          isFormula: true,
         });
-        
+
         // Handle other components (not vehicle/guide)
-        items.forEach(item => {
+        items.forEach((item) => {
           const label = item.label.toLowerCase();
-          const isVehicleOrGuide = label.includes('vehículo') || label.includes('vehicle') ||
-                                  label.includes('guía') || label.includes('guide') || 
-                                  label.includes('chofer');
-          
+          const isVehicleOrGuide = label.includes('vehículo') || label.includes('vehicle')
+                                  || label.includes('guía') || label.includes('guide')
+                                  || label.includes('chofer');
+
           if (!isVehicleOrGuide) {
             // Check if item is already surcharged (for A disposición guide totals)
             if (item.alreadySurcharged) {
@@ -6203,7 +6661,7 @@ class ItineraryBuilder {
                 finalAmount: item.amountMXN,
                 surchargeInfo: ' (already surcharged)',
                 shouldHaveSurcharge: false,
-                alreadySurcharged: true
+                alreadySurcharged: true,
               });
               total += item.amountMXN;
             } else {
@@ -6211,7 +6669,7 @@ class ItineraryBuilder {
               let finalAmount = item.amountMXN;
               const shouldHaveSurcharge = label.includes('tiempo de espera') || label.includes('waiting time');
               let surchargeInfo = '';
-              
+
               if (shouldHaveSurcharge) {
                 const baseAmount = this.getBasePriceFromCurrentForSinglePayment(item.amountMXN, currentPaymentType);
                 finalAmount = this.getDisplayPriceForType(baseAmount, paymentType);
@@ -6219,29 +6677,28 @@ class ItineraryBuilder {
               } else {
                 surchargeInfo = ' (constant)';
               }
-              
+
               componentDetails.push({
                 label: item.label,
                 baseAmount: item.amountMXN,
                 finalAmount,
                 surchargeInfo,
-                shouldHaveSurcharge
+                shouldHaveSurcharge,
               });
-              
+
               total += finalAmount;
             }
           }
         });
-        
       } else if (hasVehicleGuideCombo && isADisposicionService) {
         // A Disposición service with guide - handle separately from tours
         console.log('🚗 Processing A Disposición service with guide');
-        
-        items.forEach(item => {
+
+        items.forEach((item) => {
           if (item.alreadySurcharged) {
             // This is our A disposición guide total, we need to break it down by payment type
             const baseAmount = item.amountMXN; // This is already the correct amount for the current payment type
-            
+
             // Calculate what the base (efectivo) amount would be
             let efectivoBase = baseAmount;
             if (currentPaymentType === 'transferencia' && this.transferRate > 0) {
@@ -6249,11 +6706,11 @@ class ItineraryBuilder {
             } else if (currentPaymentType === 'tarjeta' && this.agencyRate > 0) {
               efectivoBase = baseAmount / (1 + (this.agencyRate / 100));
             }
-            
+
             // Calculate final amount for this specific payment type
             let finalAmount = efectivoBase;
             let surchargeInfo = ' (base rate)';
-            
+
             if (paymentType === 'transferencia' && this.transferRate > 0) {
               finalAmount = efectivoBase * (1 + (this.transferRate / 100));
               surchargeInfo = ` (+${this.transferRate}% transferencia)`;
@@ -6261,16 +6718,16 @@ class ItineraryBuilder {
               finalAmount = efectivoBase * (1 + (this.agencyRate / 100));
               surchargeInfo = ` (+${this.agencyRate}% tarjeta)`;
             }
-            
+
             componentDetails.push({
               label: item.label,
               baseAmount: efectivoBase,
-              finalAmount: finalAmount,
-              surchargeInfo: surchargeInfo,
+              finalAmount,
+              surchargeInfo,
               shouldHaveSurcharge: paymentType !== 'efectivo',
-              alreadySurcharged: true
+              alreadySurcharged: true,
             });
-            
+
             total += finalAmount;
           } else {
             // Handle other items normally
@@ -6279,16 +6736,15 @@ class ItineraryBuilder {
               baseAmount: item.amountMXN,
               finalAmount: item.amountMXN,
               surchargeInfo: ' (standard)',
-              shouldHaveSurcharge: false
+              shouldHaveSurcharge: false,
             });
-            
+
             total += item.amountMXN;
           }
         });
-        
       } else {
         // Original logic for non-tour components (transport, experience, etc.)
-        items.forEach(item => {
+        items.forEach((item) => {
           // Check if item is already surcharged (for A disposición guide totals)
           if (item.alreadySurcharged) {
             // Item is already properly surcharged, use as-is
@@ -6298,23 +6754,23 @@ class ItineraryBuilder {
               finalAmount: item.amountMXN,
               surchargeInfo: ' (already surcharged)',
               shouldHaveSurcharge: false,
-              alreadySurcharged: true
+              alreadySurcharged: true,
             });
             total += item.amountMXN;
           } else {
             const label = item.label.toLowerCase();
             const baseAmount = item.amountMXN;
-            
+
             // Define which components get payment surcharges
             const surchargeableKeywords = ['vehículo', 'vehicle', 'tiempo de espera', 'waiting time'];
             const constantKeywords = ['guía', 'guide', 'chofer', 'driver', 'greeter'];
-            
-            const shouldHaveSurcharge = surchargeableKeywords.some(keyword => label.includes(keyword));
-            const isConstantComponent = constantKeywords.some(keyword => label.includes(keyword));
-            
+
+            const shouldHaveSurcharge = surchargeableKeywords.some((keyword) => label.includes(keyword));
+            const isConstantComponent = constantKeywords.some((keyword) => label.includes(keyword));
+
             let finalAmount = baseAmount;
             let surchargeInfo = '';
-            
+
             if (shouldHaveSurcharge && !isConstantComponent) {
               // Apply payment surcharge to this component
               const basePriceForThisComponent = this.getBasePriceFromCurrentForSinglePayment(baseAmount, currentPaymentType);
@@ -6325,35 +6781,36 @@ class ItineraryBuilder {
               finalAmount = baseAmount;
               surchargeInfo = ' (constant)';
             }
-            
+
             componentDetails.push({
               label: item.label,
               baseAmount,
               finalAmount,
               surchargeInfo,
-              shouldHaveSurcharge
+              shouldHaveSurcharge,
             });
-            
+
             total += finalAmount;
           }
         });
       }
-      
+
       result[paymentType] = {
         total,
-        componentDetails
+        componentDetails,
       };
     });
-    
+
     console.log('🧮 Component-based calculations result:', result);
     return result;
   }
 
   /**
    * Get base price from current amount for a single payment type (not assuming current selection).
-   * @param {number} currentPrice - Current price with surcharge
-   * @param {string} originalPaymentType - The payment type this price is currently calculated for
-   * @returns {number} Base efectivo price
+   * @param {number} currentPrice - Current price with surcharge.
+   * @param {string} originalPaymentType - The payment type this price is currently calculated for.
+   * @returns {number} Base efectivo price.
+   * @example
    */
   getBasePriceFromCurrentForSinglePayment(currentPrice, originalPaymentType) {
     if (originalPaymentType === 'transferencia' && this.transferRate > 0) {
@@ -6368,7 +6825,8 @@ class ItineraryBuilder {
   /**
    * Update debug price display in modal for development.
    * Shows all 3 payment type variations for easy verification.
-   * @param {object} pricesByType - Object with efectivo, transferencia, tarjeta prices
+   * @param {object} pricesByType - Object with efectivo, transferencia, tarjeta prices.
+   * @example
    */
   updateDebugPriceDisplay(pricesByType) {
     const debugSection = document.getElementById('debugPrices');
@@ -6401,52 +6859,53 @@ class ItineraryBuilder {
           </small>
         </div>
       `;
-      
+
       // Show debug section in development
-      const isDevelopment = window.location.hostname === 'localhost' || 
-                           window.location.search.includes('debug=true') ||
-                           window.location.port === '1337';
+      const isDevelopment = window.location.hostname === 'localhost'
+                           || window.location.search.includes('debug=true')
+                           || window.location.port === '1337';
       debugSection.style.display = isDevelopment ? 'block' : 'none';
     }
   }
 
   /**
    * Generate detailed component breakdown HTML for debug display.
-   * @param {Object} componentCalculations - Component-based calculations
-   * @param {string} currentPaymentType - Current payment type
-   * @returns {string} HTML string
+   * @param {object} componentCalculations - Component-based calculations.
+   * @param {string} currentPaymentType - Current payment type.
+   * @returns {string} HTML string.
+   * @example
    */
   generateComponentBreakdownHTML(componentCalculations, currentPaymentType) {
     if (!componentCalculations) return '';
-    
+
     const paymentTypes = ['efectivo', 'transferencia', 'tarjeta'];
     const emojis = { efectivo: '💰', transferencia: '🏦', tarjeta: '💳' };
-    
+
     let html = '<div class="mt-2"><small class="fw-bold text-info">📋 Desglose por componentes:</small>';
-    
-    paymentTypes.forEach(paymentType => {
+
+    paymentTypes.forEach((paymentType) => {
       const calc = componentCalculations[paymentType];
       const isActive = paymentType === currentPaymentType;
-      
+
       html += `
         <div class="mt-1 p-1 rounded ${isActive ? 'bg-info bg-opacity-10 border border-info' : 'bg-light'}">
           <small class="fw-bold">${emojis[paymentType]} ${paymentType.charAt(0).toUpperCase() + paymentType.slice(1)}: ${this.formatCurrency(calc.total)}</small>
           <div class="ms-2">
       `;
-      
-      calc.componentDetails.forEach(component => {
-        const changeIcon = component.shouldHaveSurcharge ? 
-          (paymentType === 'efectivo' ? '🔹' : '📈') : '📌';
+
+      calc.componentDetails.forEach((component) => {
+        const changeIcon = component.shouldHaveSurcharge
+          ? (paymentType === 'efectivo' ? '🔹' : '📈') : '📌';
         html += `
           <small class="d-block text-muted">
             ${changeIcon} ${component.label}: ${this.formatCurrency(component.finalAmount)}${component.surchargeInfo}
           </small>
         `;
       });
-      
+
       html += '</div></div>';
     });
-    
+
     html += '</div>';
     return html;
   }
@@ -6454,59 +6913,58 @@ class ItineraryBuilder {
   /**
    * Update debug payment types display in modal for development.
    * Shows payment type calculations below the desglose in development mode.
-   * @param {object} pricesByType - Object with efectivo, transferencia, tarjeta prices
-   * @param {Array} items - Breakdown items from desglose for component analysis
+   * @param {object} pricesByType - Object with efectivo, transferencia, tarjeta prices.
+   * @param {Array} items - Breakdown items from desglose for component analysis.
+   * @example
    */
   updateModalDebugPaymentTypes(pricesByType, items = []) {
     console.log('🔍 updateModalDebugPaymentTypes called with:', pricesByType);
-    
+
     const debugPaymentSection = document.getElementById('debugPaymentTypes');
     console.log('🔍 debugPaymentTypes element found:', !!debugPaymentSection);
-    
+
     if (debugPaymentSection) {
       const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
       console.log('🔍 Current payment type:', currentPaymentType);
-      
+
       // Log current rate values for debugging
       console.log('🔍 Current rates:', {
         transferRate: this.transferRate,
         agencyRate: this.agencyRate,
-        exchangeRate: this.exchangeRate
+        exchangeRate: this.exchangeRate,
       });
-      
+
       // Check development mode detection
-      const hostname = window.location.hostname;
-      const port = window.location.port;
+      const { hostname } = window.location;
+      const { port } = window.location;
       const hasDebugParam = window.location.search.includes('debug=true');
       const isDevelopment = hostname === 'localhost' || hasDebugParam || port === '1337';
-      
+
       console.log('🔍 Development mode check:', {
         hostname,
         port,
         hasDebugParam,
-        isDevelopment
+        isDevelopment,
       });
-      
+
       // Add fallback rates if they're 0 (not loaded)
       const transferRateDisplay = this.transferRate > 0 ? this.transferRate : '⚠️ Not loaded';
       const agencyRateDisplay = this.agencyRate > 0 ? this.agencyRate : '⚠️ Not loaded';
-      
+
       // Use component-based calculations if breakdown items are available
       let componentCalculations = null;
       let useComponentBased = false;
-      
+
       if (items && items.length > 0) {
         componentCalculations = this.getComponentBasedPaymentCalculations(items, currentPaymentType);
         // Use component-based if we have multiple components or any component contains guide/chofer
-        const hasComplexComponents = items.length > 1 || items.some(item => 
-          item.label.toLowerCase().includes('guía') || 
-          item.label.toLowerCase().includes('chofer') ||
-          item.label.toLowerCase().includes('guide')
-        );
+        const hasComplexComponents = items.length > 1 || items.some((item) => item.label.toLowerCase().includes('guía')
+          || item.label.toLowerCase().includes('chofer')
+          || item.label.toLowerCase().includes('guide'));
         useComponentBased = hasComplexComponents;
         console.log('🔍 Using component-based calculations:', useComponentBased);
       }
-      
+
       // Generate payment type displays
       const paymentDisplays = {};
       if (useComponentBased && componentCalculations) {
@@ -6518,17 +6976,40 @@ class ItineraryBuilder {
         paymentDisplays.transferencia = pricesByType.transferencia;
         paymentDisplays.tarjeta = pricesByType.tarjeta;
       }
-      
-      // Generate the component breakdown HTML only (remove the unused payment cards)
-      debugPaymentSection.innerHTML = useComponentBased ? this.generateComponentBreakdownHTML(componentCalculations, currentPaymentType) : '';
-      
-      // Show debug section only in development
-      if (isDevelopment) {
-        debugPaymentSection.classList.remove('d-none');
-        console.log('🔍 Debug section shown (d-none class removed)');
-      } else {
-        debugPaymentSection.classList.add('d-none');
-        console.log('🔍 Debug section hidden (d-none class added)');
+
+      // Display payment type totals
+      const paymentTotalsHTML = `
+        <div class="payment-type-totals">
+          <small class="fw-bold text-muted d-block mb-2">Totales por Tipo de Pago:</small>
+          <div class="d-flex justify-content-between gap-3">
+            <div class="text-center flex-fill">
+              <div class="small text-muted">💰 Efectivo</div>
+              <div class="fw-bold">${this.formatCurrency(paymentDisplays.efectivo)}</div>
+            </div>
+            <div class="text-center flex-fill">
+              <div class="small text-muted">🏦 Transferencia</div>
+              <div class="fw-bold">${this.formatCurrency(paymentDisplays.transferencia)}</div>
+            </div>
+            <div class="text-center flex-fill">
+              <div class="small text-muted">💳 Tarjeta</div>
+              <div class="fw-bold">${this.formatCurrency(paymentDisplays.tarjeta)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      debugPaymentSection.innerHTML = paymentTotalsHTML;
+
+      // Always show the payment totals section
+      debugPaymentSection.classList.remove('d-none');
+      console.log('🔍 Payment totals section displayed');
+
+      // Check if this is A Disposición service and update breakdown fields
+      const serviceType = document.getElementById('serviceType')?.value;
+      if (serviceType === 'a-disposicion') {
+        this.updateModalDebugPaymentTypesADisposicion(paymentDisplays, items);
+        // Also update the dev payment breakdown
+        this.updateDevPaymentBreakdown();
       }
     } else {
       console.warn('🔍 debugPaymentTypes element not found in DOM');
@@ -6536,10 +7017,92 @@ class ItineraryBuilder {
   }
 
   /**
+   * Update the breakdown fields specifically for A Disposición services.
+   * Extracts vehicle quantity, hours, and guide information from items to calculate proper breakdowns.
+   * @param {object} paymentDisplays - Object with efectivo, transferencia, tarjeta totals.
+   * @param {Array} items - Breakdown items from desglose.
+   * @example
+   */
+  updateModalDebugPaymentTypesADisposicion(paymentDisplays, items = []) {
+    console.log('🚗 Updating A Disposición breakdown fields', { paymentDisplays, items });
+
+    // Get the breakdown textarea fields
+    const efectivoField = document.getElementById('devBreakdownEfectivo');
+    const transferenciaField = document.getElementById('devBreakdownTransferencia');
+    const tarjetaField = document.getElementById('devBreakdownTarjeta');
+
+    if (!efectivoField || !transferenciaField || !tarjetaField) {
+      console.warn('⚠️ Breakdown fields not found');
+      return;
+    }
+
+    // If paymentDisplays are all zero, try to calculate from items
+    if ((!paymentDisplays.efectivo || paymentDisplays.efectivo === 0) && items.length > 0) {
+      console.log('⚠️ Payment displays are zero, calculating from items');
+
+      // Calculate the base total from items
+      let baseTotal = 0;
+      items.forEach((item) => {
+        if (item.alreadySurcharged) {
+          // For already surcharged items (like guide with vehicle), we need to reverse-calculate
+          const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+          let baseAmount = item.amountMXN;
+
+          // If current payment type has surcharge, reverse it to get base
+          if (currentPaymentType === 'transferencia' && this.transferRate > 0) {
+            // This is the transferencia amount, calculate back to efectivo
+            baseAmount = item.amountMXN / (1 + (this.transferRate / 100));
+          } else if (currentPaymentType === 'tarjeta' && this.agencyRate > 0) {
+            // This is the tarjeta amount, calculate back to efectivo
+            baseAmount = item.amountMXN / (1 + (this.agencyRate / 100));
+          }
+
+          baseTotal += baseAmount;
+        } else {
+          baseTotal += item.amountMXN;
+        }
+      });
+
+      // Now calculate the totals for each payment type
+      paymentDisplays = {
+        efectivo: baseTotal,
+        transferencia: baseTotal * (1 + (this.transferRate / 100)),
+        tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+      };
+
+      console.log('📊 Recalculated payment displays from items:', paymentDisplays);
+    }
+
+    // Calculate base amount (efectivo is always the base)
+    const baseAmount = paymentDisplays.efectivo || 0;
+
+    // Calculate surcharges
+    const transferenciaSurcharge = (paymentDisplays.transferencia || 0) - baseAmount;
+    const tarjetaSurcharge = (paymentDisplays.tarjeta || 0) - baseAmount;
+
+    // Format the breakdown for each payment type
+    efectivoField.value = `Subtotal: ${this.formatCurrency(baseAmount)}\nTotal: ${this.formatCurrency(baseAmount)}`;
+
+    transferenciaField.value = `Subtotal: ${this.formatCurrency(baseAmount)}\nTotal: ${this.formatCurrency(paymentDisplays.transferencia || 0)}`;
+
+    tarjetaField.value = `Subtotal: ${this.formatCurrency(baseAmount)}\nTotal: ${this.formatCurrency(paymentDisplays.tarjeta || 0)}`;
+
+    console.log('✅ A Disposición breakdown fields updated', {
+      baseAmount,
+      transferenciaSurcharge,
+      tarjetaSurcharge,
+      totals: paymentDisplays,
+      transferRate: this.transferRate,
+      agencyRate: this.agencyRate,
+    });
+  }
+
+  /**
    * Get the correct price for the current payment type when loading from backend.
-   * @param {Object} subconcept - Subconcept data from backend
-   * @param {string} backendPaymentType - Payment type from backend data (primary source)
-   * @returns {number} Price for current payment type
+   * @param {object} subconcept - Subconcept data from backend.
+   * @param {string} backendPaymentType - Payment type from backend data (primary source).
+   * @returns {number} Price for current payment type.
+   * @example
    */
   getCorrectPriceForPaymentType(subconcept, backendPaymentType = null) {
     // Priority 1: Use backend payment type if provided
@@ -6547,7 +7110,7 @@ class ItineraryBuilder {
     // Priority 3: Default to 'efectivo'
     const currentPaymentType = backendPaymentType || document.getElementById('priceTypeSelect')?.value || 'efectivo';
     const dropdownValue = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-    
+
     console.log('🔍 PRICE SELECTION - Payment type determination:', {
       serviceId: subconcept.id,
       concept: subconcept.concept,
@@ -6555,14 +7118,14 @@ class ItineraryBuilder {
       dropdownValue,
       selectedPaymentType: currentPaymentType,
       paymentTypeSource: backendPaymentType ? 'backend' : 'dropdown',
-      pricesByTypeAvailable: !!(subconcept.pricesByType && typeof subconcept.pricesByType === 'object')
+      pricesByTypeAvailable: !!(subconcept.pricesByType && typeof subconcept.pricesByType === 'object'),
     });
-    
+
     // Use pricesByType if available (preferred method)
     if (subconcept.pricesByType && typeof subconcept.pricesByType === 'object') {
       const selectedPrice = subconcept.pricesByType[currentPaymentType];
       const fallbackPrice = subconcept.total || subconcept.unitPrice || 0;
-      
+
       console.log('💰 PRICE SELECTION - Using pricesByType:', {
         serviceId: subconcept.id,
         concept: subconcept.concept,
@@ -6570,12 +7133,12 @@ class ItineraryBuilder {
         selectedPrice,
         fallbackPrice,
         pricesByType: subconcept.pricesByType,
-        finalPrice: selectedPrice || fallbackPrice
+        finalPrice: selectedPrice || fallbackPrice,
       });
-      
+
       return selectedPrice || fallbackPrice;
     }
-    
+
     // Fallback: use original price
     const fallbackPrice = subconcept.total || subconcept.unitPrice || 0;
     console.log('⚠️ PRICE SELECTION - No pricesByType, using fallback:', {
@@ -6584,40 +7147,41 @@ class ItineraryBuilder {
       paymentType: currentPaymentType,
       fallbackPrice,
       total: subconcept.total,
-      unitPrice: subconcept.unitPrice
+      unitPrice: subconcept.unitPrice,
     });
-    
+
     return fallbackPrice;
   }
 
   /**
    * Recalculate all saved services when payment type changes.
    * FIXED: No longer modifies service.price - only triggers display update.
+   * @example
    */
   recalculateAllSavedServices() {
     const newPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
     let servicesUpdated = 0;
-    
+
     console.log('🔄 RECALCULATE SERVICES - Starting price synchronization:', {
       targetPaymentType: newPaymentType,
       totalServices: this.services.size,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
+
     this.services.forEach((service, serviceId) => {
       // ONLY use stored pricesByType values - no calculations whatsoever
       if (service.pricesByType && typeof service.pricesByType === 'object') {
         const storedPrice = service.pricesByType[newPaymentType];
-        
+
         if (storedPrice !== undefined && Math.abs(service.price - storedPrice) > 0.01) {
           console.log('💰 Using stored price for payment type:', {
             serviceId,
             concept: service.concept,
             paymentType: newPaymentType,
             oldPrice: service.price,
-            newPrice: storedPrice
+            newPrice: storedPrice,
           });
-          
+
           service.price = storedPrice;
           servicesUpdated++;
         }
@@ -6625,7 +7189,7 @@ class ItineraryBuilder {
         // Check for alternative price properties
         let alternativePriceFound = false;
         let alternativeSource = '';
-        
+
         // Try customPrices first (might have payment type structure)
         if (service.customPrices && typeof service.customPrices === 'object') {
           if (service.customPrices[newPaymentType] !== undefined) {
@@ -6640,12 +7204,12 @@ class ItineraryBuilder {
                 concept: service.concept,
                 paymentType: newPaymentType,
                 newPrice: alternativePrice,
-                source: 'customPrices'
+                source: 'customPrices',
               });
             }
           }
         }
-        
+
         // If no alternative found, check if service has a base price we can calculate from
         if (!alternativePriceFound && service.basePrice && service.basePrice > 0) {
           // Try to calculate payment type price from base price
@@ -6662,21 +7226,21 @@ class ItineraryBuilder {
                 paymentType: newPaymentType,
                 basePrice: service.basePrice,
                 calculatedPrice,
-                source: 'basePrice calculation'
+                source: 'basePrice calculation',
               });
             }
           } catch (error) {
             console.warn('⚠️ Failed to calculate price from basePrice:', error);
           }
         }
-        
+
         if (!alternativePriceFound) {
           console.warn('⚠️ Service has no pricesByType data, keeping current price:', {
             serviceId,
             concept: service.concept,
-            currentPrice: service.price
+            currentPrice: service.price,
           });
-          
+
           // DEBUG: Complete service object structure for troubleshooting
           console.log('🔍 COMPLETE SERVICE OBJECT DEBUG:', {
             serviceId,
@@ -6692,25 +7256,24 @@ class ItineraryBuilder {
               total: service.total,
               unitPrice: service.unitPrice,
               vehicleRatePerHour: service.vehicleRatePerHour,
-              guideRatePerHour: service.guideRatePerHour
-            }
+              guideRatePerHour: service.guideRatePerHour,
+            },
           });
         }
       }
     });
-    
-    console.log(`✅ RECALCULATE SERVICES - Completed price synchronization:`, {
+
+    console.log('✅ RECALCULATE SERVICES - Completed price synchronization:', {
       targetPaymentType: newPaymentType,
       servicesUpdated,
       totalServices: this.services.size,
       successRate: `${servicesUpdated}/${this.services.size}`,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
   // DELETED: All the complex fallback calculation logic has been removed
   // Services now only use stored pricesByType values without any calculations
-
 
   formatMinutesToHoursAndMinutes(minutes) {
     if (!minutes || minutes === 0) {
@@ -7084,12 +7647,12 @@ class ItineraryBuilder {
     // Find the tour from cache
     const tours = this.toursCache.get('all');
     const tour = tours.find((t) => t.id === tourId || t.objectId === tourId);
-    
+
     if (!tour) {
       console.warn('⚠️ GET TOUR NAME - Tour not found in cache:', {
         searchedTourId: tourId,
-        availableTourIds: tours.slice(0, 5).map(t => ({ id: t.id, objectId: t.objectId, name: t.name || t.title })),
-        totalToursInCache: tours.length
+        availableTourIds: tours.slice(0, 5).map((t) => ({ id: t.id, objectId: t.objectId, name: t.name || t.title })),
+        totalToursInCache: tours.length,
       });
       return 'Tour';
     }
@@ -7123,15 +7686,15 @@ class ItineraryBuilder {
     }
 
     const finalName = destinationName || tour.name || tour.title || 'Tour';
-    
+
     console.debug('🎯 GET TOUR NAME - Successfully resolved:', {
       tourId,
       resolvedName: finalName,
-      tourData: { 
-        name: tour.name, 
-        title: tour.title, 
-        destinationPOI: typeof destinationPOI === 'string' ? destinationPOI : (destinationPOI?.name || 'object') 
-      }
+      tourData: {
+        name: tour.name,
+        title: tour.title,
+        destinationPOI: typeof destinationPOI === 'string' ? destinationPOI : (destinationPOI?.name || 'object'),
+      },
     });
 
     return finalName;
@@ -7178,13 +7741,14 @@ class ItineraryBuilder {
 
     // Don't apply any additional surcharges - prices are already final
     const finalTotal = totalMXN;
-    
+
     // Calculate IVA breakdown based on payment type
     const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
     const ivaRow = document.getElementById('ivaRow');
-    
-    let displaySubtotal, iva;
-    
+
+    let displaySubtotal; let
+      iva;
+
     if (paymentType === 'efectivo') {
       // Efectivo: no IVA breakdown
       displaySubtotal = finalTotal;
@@ -7200,7 +7764,7 @@ class ItineraryBuilder {
         ivaRow.classList.remove('d-none');
       }
     }
-    
+
     const passengers = this.numberOfPeople || 0;
     const perPerson = passengers > 0 ? finalTotal / passengers : 0;
 
@@ -7349,19 +7913,19 @@ class ItineraryBuilder {
     // Debug: Log data received from backend
     console.log('📥 PROCESS SERVICE ITEMS - Data from backend:', {
       totalDaysReceived: serviceItemsData.days.length,
-      daysReceived: serviceItemsData.days.map(d => ({ 
-        id: d.id, 
-        dayNumber: d.dayNumber, 
-        dayTitle: d.dayTitle || d.title, 
-        subconcepts: d.subconcepts?.length || 0 
+      daysReceived: serviceItemsData.days.map((d) => ({
+        id: d.id,
+        dayNumber: d.dayNumber,
+        dayTitle: d.dayTitle || d.title,
+        subconcepts: d.subconcepts?.length || 0,
       })),
       total: serviceItemsData.total,
-      subtotal: serviceItemsData.subtotal
+      subtotal: serviceItemsData.subtotal,
     });
 
     // Restore saved currency and payment type to dropdowns with proper event triggering
     const quoteKey = this.quoteId || 'default';
-    
+
     // Currency restoration - DISABLED
     // Currency dropdown is disabled, always force to MXN
     const currencyEl = document.getElementById('currencySelect');
@@ -7370,7 +7934,7 @@ class ItineraryBuilder {
       currencyEl.value = 'MXN';
       console.log('💱 DROPDOWN RESTORE - Currency dropdown disabled, forced to MXN');
     }
-    
+
     // Payment type restoration with change event
     let paymentTypeRestored = false;
     if (serviceItemsData.paymentType) {
@@ -7378,29 +7942,29 @@ class ItineraryBuilder {
       if (paymentEl) {
         const currentValue = paymentEl.value;
         const backendValue = serviceItemsData.paymentType;
-        
+
         console.log('💰 DROPDOWN RESTORE - Payment type restoration check:', {
           currentDropdownValue: currentValue,
           backendPaymentType: backendValue,
           sessionStorageValue: sessionStorage.getItem(`quoteServices_paymentType_${quoteKey}`),
           needsRestore: currentValue !== backendValue,
-          sessionStorageExists: !!sessionStorage.getItem(`quoteServices_paymentType_${quoteKey}`)
+          sessionStorageExists: !!sessionStorage.getItem(`quoteServices_paymentType_${quoteKey}`),
         });
-        
+
         // Restore if different from current value (prioritize backend over sessionStorage in some cases)
         if (currentValue !== backendValue) {
           console.log('🔄 DROPDOWN RESTORE - Restoring payment type and triggering change event:', {
             from: currentValue,
             to: backendValue,
-            reason: 'Backend value differs from dropdown'
+            reason: 'Backend value differs from dropdown',
           });
-          
+
           paymentEl.value = backendValue;
           paymentTypeRestored = true;
-          
+
           // CRITICAL: Trigger change event to ensure handlePaymentTypeChange is called
           paymentEl.dispatchEvent(new Event('change', { bubbles: true }));
-          
+
           // Update sessionStorage to reflect the restored value
           sessionStorage.setItem(`quoteServices_paymentType_${quoteKey}`, backendValue);
         }
@@ -7443,8 +8007,8 @@ class ItineraryBuilder {
                 unitPrice: subconcept.unitPrice,
                 basePrice: subconcept.basePrice,
                 vehicleRatePerHour: subconcept.vehicleRatePerHour,
-                guideRatePerHour: subconcept.guideRatePerHour
-              }
+                guideRatePerHour: subconcept.guideRatePerHour,
+              },
             });
           }
 
@@ -7586,43 +8150,43 @@ class ItineraryBuilder {
     // Debug: Log final processed state
     console.log('📥 PROCESS SERVICE ITEMS - Final processed state:', {
       totalDaysProcessed: this.days.length,
-      dayIdsProcessed: this.days.map(d => ({ id: d.id, title: d.title })),
-      totalServicesProcessed: this.services.size
+      dayIdsProcessed: this.days.map((d) => ({ id: d.id, title: d.title })),
+      totalServicesProcessed: this.services.size,
     });
-    
+
     // PAYMENT TYPE VALIDATION: Ensure loaded prices match final dropdown state
     const backendPaymentType = serviceItemsData.paymentType;
     const finalDropdownValue = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-    
+
     console.log('🔍 PAYMENT TYPE SYNC - Validating payment type consistency:', {
       backendPaymentType,
       finalDropdownValue,
       paymentTypeWasRestored: paymentTypeRestored,
-      needsSync: !paymentTypeRestored && backendPaymentType !== finalDropdownValue
+      needsSync: !paymentTypeRestored && backendPaymentType !== finalDropdownValue,
     });
-    
+
     // Only recalculate if dropdown wasn't restored (meaning change event wasn't triggered)
     // If dropdown was restored, handlePaymentTypeChange already handled the recalculation
     if (!paymentTypeRestored && backendPaymentType && backendPaymentType !== finalDropdownValue) {
       console.log('🔄 PAYMENT TYPE SYNC - Mismatch detected without restoration, recalculating services:', {
         from: backendPaymentType,
         to: finalDropdownValue,
-        reason: 'Backend and dropdown payment types differ and restoration did not occur'
+        reason: 'Backend and dropdown payment types differ and restoration did not occur',
       });
-      
+
       // Use the recalculate function to sync all prices to dropdown value
       this.recalculateAllSavedServices();
     } else if (paymentTypeRestored) {
       console.log('✅ PAYMENT TYPE SYNC - Restoration handled synchronization via change event');
     }
-    
+
     // Services now load with correct prices from the start based on current payment type
     const currentPaymentType = finalDropdownValue;
     console.log(`✅ Loaded ${this.services.size} services with prices for payment type: ${currentPaymentType}`);
-    
+
     // Ensure tours cache is loaded before rendering to prevent generic "Tour" names
     await this.ensureToursCache();
-    
+
     // Now render the itinerary with the correct prices and tour names
     this.renderItinerary();
   }
@@ -8319,11 +8883,11 @@ class ItineraryBuilder {
     }
 
     console.log('🔍 TOURS CACHE - Not found, loading tours before rendering...');
-    
+
     try {
       // Load tours cache if not already loaded
       await this.loadAllTours();
-      
+
       if (this.toursCache.has('all')) {
         console.log('✅ TOURS CACHE - Successfully loaded for service rendering');
       } else {
@@ -8530,8 +9094,8 @@ class ItineraryBuilder {
     // Check cache validity (5 minutes cache)
     const now = Date.now();
     const cacheValidDuration = 5 * 60 * 1000; // 5 minutes
-    if (this.greeterRateCache && this.greeterRateCacheTime && 
-        (now - this.greeterRateCacheTime) < cacheValidDuration) {
+    if (this.greeterRateCache && this.greeterRateCacheTime
+        && (now - this.greeterRateCacheTime) < cacheValidDuration) {
       console.log('🔒 Greeter rate config cache still valid, skipping API call');
       return this.greeterRateCache;
     }
@@ -8540,7 +9104,7 @@ class ItineraryBuilder {
       console.log('📥 Loading greeter rate configuration...');
       const token = this.getAccessToken();
       console.log('🔑 Using access token:', token ? 'Present' : 'Missing');
-      
+
       const response = await fetch('/api/greeter-rate/formula', {
         method: 'GET',
         headers: {
@@ -8552,24 +9116,23 @@ class ItineraryBuilder {
       console.log('🌐 API Response:', {
         status: response.status,
         statusText: response.statusText,
-        ok: response.ok
+        ok: response.ok,
       });
 
       if (response.ok) {
         const result = await response.json();
         console.log('📦 API Response Data:', result);
-        
+
         if (result.success && result.data) {
           this.greeterRateCache = {
             basePrice: result.data.basePrice || 760,
-            hourlyRate: result.data.hourlyRate || 640
+            hourlyRate: result.data.hourlyRate || 640,
           };
           this.greeterRateCacheTime = now;
           console.log('✅ Quote Services: Greeter rate configuration loaded from API:', this.greeterRateCache);
           return this.greeterRateCache;
-        } else {
-          console.warn('⚠️ Quote Services: API response missing data field:', result);
         }
+        console.warn('⚠️ Quote Services: API response missing data field:', result);
       } else if (response.status === 404) {
         // Use defaults if config not found
         this.greeterRateCache = { basePrice: 760, hourlyRate: 640 };
@@ -8594,7 +9157,8 @@ class ItineraryBuilder {
   /**
    * Refresh greeter rate cache by forcing a reload from the API.
    * Call this when greeter rates might have been updated.
-   * Can also be called from browser console: window.quoteServices.refreshGreeterRateCache()
+   * Can also be called from browser console: window.quoteServices.refreshGreeterRateCache().
+   * @example
    */
   async refreshGreeterRateCache() {
     console.log('🔄 Quote Services: Manually refreshing greeter rate cache...');
@@ -8660,7 +9224,7 @@ class ItineraryBuilder {
       console.log('🔍 API responses:', {
         exchangeRes: exchangeRes.status,
         transferRes: transferRes.status,
-        agencyRes: agencyRes.status
+        agencyRes: agencyRes.status,
       });
 
       if (exchangeRes.ok) {
@@ -8813,7 +9377,7 @@ class ItineraryBuilder {
   handleExperienceSelection(experienceId) {
     if (!experienceId) {
       // Clear price and details when no experience is selected
-      document.getElementById('servicePrice').value = 0;
+      document.getElementById('servicePrice').value = '0.00';
       this.clearExperienceDetails();
       this.currentServiceAvailabilityPending = false;
       return;
@@ -8848,7 +9412,7 @@ class ItineraryBuilder {
         const price = this.getPriceForService(experienceId, null) || selectedExperience.price || 0;
 
         // Update the price field
-        document.getElementById('servicePrice').value = price;
+        document.getElementById('servicePrice').value = price.toFixed(2);
 
         // Auto-fill experience-specific fields with default values
         this.fillExperienceFields(selectedExperience);
@@ -8857,12 +9421,12 @@ class ItineraryBuilder {
         this.showExperienceDetails(selectedExperience);
       } else {
         console.warn('Experience not found in cache:', experienceId);
-        document.getElementById('servicePrice').value = 0;
+        document.getElementById('servicePrice').value = '0.00';
         this.clearExperienceDetails();
       }
     } catch (error) {
       console.error('Error handling experience selection:', error);
-      document.getElementById('servicePrice').value = 0;
+      document.getElementById('servicePrice').value = '0.00';
       this.clearExperienceDetails();
     }
   }
@@ -9455,35 +10019,35 @@ class ItineraryBuilder {
         };
         const vehicleOnlyCost = this.getVehicleCost(tempService2);
         const baseVehicleCost = this.getBasePriceOnly(vehicleOnlyCost);
-        
+
         // Start with base vehicle cost
         let baseTotalCost = baseVehicleCost;
-        
+
         // If Guía + Chofer is checked, add guide to base total
         const includeGuideCheckbox = document.getElementById('includeGuide');
         if (includeGuideCheckbox && includeGuideCheckbox.checked && this.driverTourRateCache) {
           const driverRate = this.driverTourRateCache.value || 0;
           baseTotalCost += driverRate; // Add guide to base total
-          
+
           console.log('✅ Added guide cost to base total:', {
             vehicleBase: baseVehicleCost,
             guideCost: driverRate,
-            baseTotalCost: baseTotalCost,
-            paymentType: document.getElementById('priceTypeSelect')?.value || 'efectivo'
+            baseTotalCost,
+            paymentType: document.getElementById('priceTypeSelect')?.value || 'efectivo',
           });
         }
-        
+
         // Apply payment surcharge to the total (vehicle + guide)
-        let finalPricePerHour = this.getDisplayPrice(baseTotalCost);
-        
+        const finalPricePerHour = this.getDisplayPrice(baseTotalCost);
+
         servicePriceField.value = finalPricePerHour.toFixed(2);
         this.lastValidTourPrice = finalPricePerHour.toFixed(2); // Store for readonly enforcement
         console.log('✅ Updated tour price field:', {
-          baseTotalCost: baseTotalCost,
+          baseTotalCost,
           finalPriceWithSurcharge: finalPricePerHour,
           guideBase: includeGuideCheckbox?.checked ? (this.driverTourRateCache?.value || 0) : 0,
           finalPrice: finalPricePerHour,
-          includesGuide: includeGuideCheckbox?.checked || false
+          includesGuide: includeGuideCheckbox?.checked || false,
         });
         // console.log('💰 Setting price field to vehicle cost only:', vehicleOnlyCost);
       } else {
@@ -10041,24 +10605,47 @@ class ItineraryBuilder {
    */
   updateServicePriceBreakdown() {
     console.log('🔍 updateServicePriceBreakdown called');
+
+    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+    console.log('🔍 Service type in updateServicePriceBreakdown:', serviceType);
+
+    // Find container in the correct modal (like dev breakdown methods)
+    let container = null;
+    let itemsDiv = null;
+    let totalSpan = null;
     
-    // Update dev payment prices whenever breakdown is updated
-    this.updateDevPaymentPrices();
-    this.updateDevPaymentBreakdown();
+    const serviceModal = document.getElementById('serviceModal');
+    const addServiceModal = document.getElementById('addServiceModal');
     
-    const container = document.getElementById('servicePriceBreakdown');
-    const itemsDiv = document.getElementById('breakdownItems');
-    const totalSpan = document.getElementById('breakdownTotal');
+    // Check which modal is visible and find the containers
+    if (serviceModal && serviceModal.classList.contains('show')) {
+      container = serviceModal.querySelector('#servicePriceBreakdown');
+      itemsDiv = container?.querySelector('#breakdownItems');
+      totalSpan = container?.querySelector('#breakdownTotal');
+    } else if (addServiceModal && addServiceModal.classList.contains('show')) {
+      container = addServiceModal.querySelector('#servicePriceBreakdown');
+      itemsDiv = container?.querySelector('#breakdownItems');
+      totalSpan = container?.querySelector('#breakdownTotal');
+    }
+    
+    // Fallback to global search
+    if (!container) {
+      container = document.getElementById('servicePriceBreakdown');
+      itemsDiv = document.getElementById('breakdownItems');
+      totalSpan = document.getElementById('breakdownTotal');
+    }
+    
     if (!container || !itemsDiv || !totalSpan) {
       console.warn('🔍 updateServicePriceBreakdown: Required elements not found', {
         container: !!container,
         itemsDiv: !!itemsDiv,
-        totalSpan: !!totalSpan
+        totalSpan: !!totalSpan,
+        serviceModalVisible: serviceModal?.classList.contains('show'),
+        addModalVisible: addServiceModal?.classList.contains('show'),
       });
       return;
     }
 
-    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
     const items = []; // {label, amountMXN}
     let totalMXN = 0;
 
@@ -10212,45 +10799,45 @@ class ItineraryBuilder {
         const vehicleSelect = document.getElementById('vehicleSelect');
         const vehicleQty = parseInt(document.getElementById('serviceQuantity')?.value || 1);
         const isGuideIncluded = document.getElementById('includeGuide')?.checked;
-        
+
         if (vehicleSelect?.value) {
           // Get the price directly from the field (already processed with surcharges)
           const priceFieldValue = parseFloat(document.getElementById('servicePrice')?.value || 0);
-          
+
           console.log('💰 Breakdown calculation DEBUG (SIMPLIFIED):', {
             paymentType: document.getElementById('priceTypeSelect')?.value || 'efectivo',
             priceFieldValue,
             vehicleQty,
             tourDuration,
-            includesGuide: isGuideIncluded
+            includesGuide: isGuideIncluded,
           });
-          
+
           // Only show breakdown if we have a valid price
           if (priceFieldValue > 0) {
             // Calculate what the rendering needs to show the correct final amount
             const unitPriceForDisplay = priceFieldValue; // For formula display ($1,232)
             const totalFinalCost = priceFieldValue * vehicleQty * tourDuration; // Final amount ($3,696)
-            
+
             // Since rendering applies getDisplayPrice(), calculate the base amount needed
             const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
             let amountForRendering = totalFinalCost;
-            
+
             // Calculate base amount that when processed by getDisplayPrice() gives totalFinalCost
             if (paymentType === 'transferencia' && this.transferRate > 0) {
               amountForRendering = totalFinalCost / (1 + (this.transferRate / 100));
             } else if (paymentType === 'tarjeta' && this.agencyRate > 0) {
               amountForRendering = totalFinalCost / (1 + (this.agencyRate / 100));
             }
-            
+
             console.log('💰 Breakdown calculation FINAL:', {
               priceFieldValue, // $1,232 (with surcharge)
               totalFinalCost, // $3,696 desired final
               amountForRendering, // $3,000 base to pass to rendering
               paymentType,
               agencyRate: this.agencyRate,
-              note: 'Rendering will apply getDisplayPrice() to amountForRendering'
+              note: 'Rendering will apply getDisplayPrice() to amountForRendering',
             });
-            
+
             if (isGuideIncluded && this.driverTourRateCache) {
               // When guide is included, show combined (Vehicle + Guide) in one line
               items.push({
@@ -10309,28 +10896,28 @@ class ItineraryBuilder {
         const includeGuide = document.getElementById('aDisposicionGuide')?.checked || false;
 
         if (hourlyRate > 0 && hours > 0) {
-          let vehicleBaseCost = hourlyRate * hours * vehicleCount;
+          const vehicleBaseCost = hourlyRate * hours * vehicleCount;
           const discount = this.getADisposicionDiscount(hours);
 
           if (includeGuide && this.driverTourRateCache) {
             // Show only combined rate calculation when guide is included
             const driverTourRate = this.driverTourRateCache.value || 0;
             const guideHourlyRate = driverTourRate; // Guide rate is already hourly, no division needed
-            
+
             // For custom override: surcharge only vehicle portion, guide stays raw
             const surchargedVehicleRate = this.getDisplayPrice(hourlyRate);
             const displayCombinedRate = surchargedVehicleRate + guideHourlyRate;
-            
+
             // Calculate using formula: (Vehicle Rate + Guide Rate) × Hours × Vehicle Count
             const baseCombinedHourlyCustom = hourlyRate + guideHourlyRate;
             const baseTotalCostCustom = baseCombinedHourlyCustom * hours * vehicleCount;
-            
+
             // Apply surcharge only to vehicle portion: (VehicleRate × Hours × VehicleCount)
             const baseVehicleCostCustom = hourlyRate * hours * vehicleCount;
             const surchargedVehicleCostCustom = this.getDisplayPrice(baseVehicleCostCustom);
             const baseGuideCostCustom = guideHourlyRate * hours * vehicleCount; // Guide portion, no surcharge
             const totalCost = surchargedVehicleCostCustom + baseGuideCostCustom;
-            
+
             console.log('💰 A Disposición guide calculation (custom override):', {
               customHourlyRate: hourlyRate,
               driverTourRate,
@@ -10343,9 +10930,9 @@ class ItineraryBuilder {
               baseGuideCostCustom,
               totalCost,
               paymentType: document.getElementById('priceTypeSelect')?.value,
-              calculation: `Formula: (${hourlyRate} + ${guideHourlyRate}) × ${hours}h × ${vehicleCount} = ${baseTotalCostCustom}. Surcharge: Vehicle ${surchargedVehicleCostCustom} + Guide ${baseGuideCostCustom} = ${totalCost}`
+              calculation: `Formula: (${hourlyRate} + ${guideHourlyRate}) × ${hours}h × ${vehicleCount} = ${baseTotalCostCustom}. Surcharge: Vehicle ${surchargedVehicleCostCustom} + Guide ${baseGuideCostCustom} = ${totalCost}`,
             });
-            
+
             if (vehicleCount > 1) {
               items.push({ label: `(Tarifa + Guía): ${this.formatCurrency(displayCombinedRate)}/h × ${hours}h × ${vehicleCount} vehículos`, amountMXN: totalCost, alreadySurcharged: true });
             } else {
@@ -10356,24 +10943,24 @@ class ItineraryBuilder {
             // Reverse-calculate base amount for proper rendering
             const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
             let baseHourlyForRendering = hourlyRate;
-            
+
             // If not efectivo, reverse-calculate to get base rate
             if (paymentType === 'transferencia' && this.transferRate > 0) {
               baseHourlyForRendering = hourlyRate / (1 + (this.transferRate / 100));
             } else if (paymentType === 'tarjeta' && this.agencyRate > 0) {
               baseHourlyForRendering = hourlyRate / (1 + (this.agencyRate / 100));
             }
-            
+
             const baseVehicleCostForRendering = baseHourlyForRendering * hours * vehicleCount;
-            
+
             console.log('💰 A Disposición custom override combined calculation (no guide):', {
               userInput: hourlyRate,
               paymentType,
               baseHourlyForRendering,
               baseVehicleCostForRendering,
-              note: 'Show only combined calculation to avoid double counting'
+              note: 'Show only combined calculation to avoid double counting',
             });
-            
+
             if (vehicleCount > 1) {
               items.push({ label: `${hours}h × ${vehicleCount} vehículos × ${this.formatCurrency(hourlyRate)}`, amountMXN: baseVehicleCostForRendering });
             } else {
@@ -10381,12 +10968,12 @@ class ItineraryBuilder {
             }
           }
 
-          // Add discount if applicable (apply to final total)
+          // Add discount if applicable (apply to final total) with 2-decimal rounding
           if (discount > 0) {
-            const finalCost = includeGuide && this.driverTourRateCache 
-              ? vehicleBaseCost + (this.driverTourRateCache.value || 0)
+            const finalCost = includeGuide && this.driverTourRateCache
+              ? Math.round((vehicleBaseCost + (this.driverTourRateCache.value || 0)) * 100) / 100
               : vehicleBaseCost;
-            const discountAmount = finalCost * (discount / 100);
+            const discountAmount = Math.round((finalCost * (discount / 100)) * 100) / 100;
             items.push({ label: `Descuento por volumen (-${discount}%)`, amountMXN: -discountAmount });
           }
         } else if (hourlyRate > 0) {
@@ -10399,92 +10986,53 @@ class ItineraryBuilder {
           items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precio personalizado</span>', amountMXN: 0 });
         }
       } else {
-        // Use calculated pricing when override is not checked
-        const baseHourlyRate = this._disposicionHourlyRate || 0;
+        // Use calculated pricing when override is not checked - now using unified calculation method
+        const baseHourlyRate = this.getADisposicionBaseVehicleCost(); // Use same logic as devPaymentPrices
         const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-        
-        // Apply payment type surcharge to hourly rate
-        let hourlyRate = baseHourlyRate;
-        if (paymentType === 'transferencia' && this.transferRate > 0) {
-          hourlyRate = baseHourlyRate * (1 + (this.transferRate / 100));
-        } else if (paymentType === 'tarjeta' && this.agencyRate > 0) {
-          hourlyRate = baseHourlyRate * (1 + (this.agencyRate / 100));
-        }
-        
         const hours = parseFloat(document.getElementById('aDisposicionHours')?.value || 0);
         const vehicleCount = parseInt(document.getElementById('aDisposicionVehicleCount')?.value || 1, 10);
         const includeGuide = document.getElementById('aDisposicionGuide')?.checked || false;
-        const discount = this.getADisposicionDiscount(hours);
+        const guideRate = includeGuide && this.driverTourRateCache ? (this.driverTourRateCache.value || 0) : 0;
 
-        if (hourlyRate > 0 && hours > 0) {
-          const vehicleBaseCost = hourlyRate * hours * vehicleCount;
+        if (baseHourlyRate > 0 && hours > 0) {
+          // Use unified calculation method - guarantees identical results with devPaymentPrices
+          const pricing = this.calculateADisposicionPricing(paymentType, baseHourlyRate, hours, vehicleCount, guideRate);
+          
+          console.log('💰 A Disposición calculation (using unified method):', {
+            baseHourlyRate,
+            paymentType,
+            hours,
+            vehicleCount,
+            includeGuide,
+            guideRate,
+            pricing,
+            note: 'Now uses same calculation as devPaymentPrices - guaranteed identical results'
+          });
 
-          if (includeGuide && this.driverTourRateCache) {
-            // Show only combined rate calculation when guide is included
-            const driverTourRate = this.driverTourRateCache.value || 0;
-            const guideHourlyRate = driverTourRate; // Guide rate is already hourly, no division needed
-            
-            // Calculate display rate: surcharge only vehicle portion, guide stays raw
-            const surchargedVehicleRate = this.getDisplayPrice(baseHourlyRate);
-            const displayCombinedRate = surchargedVehicleRate + guideHourlyRate;
-            
-            // Calculate using formula: (Vehicle Rate + Guide Rate) × Hours × Vehicle Count
-            const baseCombinedHourly = baseHourlyRate + guideHourlyRate;
-            const baseTotalCost = baseCombinedHourly * hours * vehicleCount;
-            
-            // Apply surcharge only to vehicle portion: (VehicleRate × Hours × VehicleCount)
-            const baseVehicleCost = baseHourlyRate * hours * vehicleCount;
-            const surchargedVehicleCost = this.getDisplayPrice(baseVehicleCost);
-            const baseGuideCost = guideHourlyRate * hours * vehicleCount; // Guide portion, no surcharge
-            const totalCost = surchargedVehicleCost + baseGuideCost;
-            
-            console.log('💰 A Disposición guide calculation (calculated pricing):', {
-              baseHourlyRate,
-              driverTourRate,
-              guideHourlyRate,
-              baseCombinedHourly,
-              baseTotalCost,
-              surchargedVehicleRate,
-              displayCombinedRate,
-              baseVehicleCost,
-              baseGuideCost,
-              totalCost,
-              paymentType: document.getElementById('priceTypeSelect')?.value,
-              calculation: `Formula: (${baseHourlyRate} + ${guideHourlyRate}) × ${hours}h × ${vehicleCount} = ${baseTotalCost}. Surcharge: Vehicle ${surchargedVehicleCost} + Guide ${baseGuideCost} = ${totalCost}`
-            });
+          if (includeGuide && guideRate > 0) {
+            // Use unified calculation result for consistency with devPaymentBreakdown
+            const displayCombinedRate = pricing.hourlyRatePerVehicle + guideRate;
             
             if (vehicleCount > 1) {
-              items.push({ label: `(Tarifa + Guía): ${this.formatCurrency(displayCombinedRate)}/h × ${hours}h × ${vehicleCount} vehículos`, amountMXN: totalCost, alreadySurcharged: true });
+              items.push({ label: `(Tarifa + Guía): ${this.formatCurrency(displayCombinedRate)}/h × ${hours}h × ${vehicleCount} vehículos`, amountMXN: pricing.vehicleTotalWithSurcharge + pricing.guideTotalCost, alreadySurcharged: true });
             } else {
-              items.push({ label: `(Tarifa + Guía): ${this.formatCurrency(displayCombinedRate)}/h × ${hours}h`, amountMXN: totalCost, alreadySurcharged: true });
+              items.push({ label: `(Tarifa + Guía): ${this.formatCurrency(displayCombinedRate)}/h × ${hours}h`, amountMXN: pricing.vehicleTotalWithSurcharge + pricing.guideTotalCost, alreadySurcharged: true });
             }
           } else {
-            // Show combined hours calculation only (no separate hourly rate to avoid double counting)
-            const baseVehicleCost = baseHourlyRate * hours * vehicleCount;
-            
-            console.log('💰 A Disposición combined calculation (no guide):', {
-              hourlyRate, // Surcharged rate for display
-              baseHourlyRate, // Base rate for calculation
-              hours,
-              vehicleCount,
-              baseVehicleCost,
-              note: 'Show only combined calculation to avoid double counting'
-            });
+            // Vehicle only - use hourlyRatePerVehicle from unified calculation (already includes surcharges)
+            const displayRate = pricing.hourlyRatePerVehicle;
             
             if (vehicleCount > 1) {
-              items.push({ label: `${hours}h × ${vehicleCount} vehículos × ${this.formatCurrency(hourlyRate)}`, amountMXN: baseVehicleCost });
+              items.push({ label: `${hours}h × ${vehicleCount} vehículos × ${this.formatCurrency(displayRate)}`, amountMXN: pricing.vehicleTotalWithSurcharge, alreadySurcharged: true });
             } else {
-              items.push({ label: `${hours}h × ${this.formatCurrency(hourlyRate)}`, amountMXN: baseVehicleCost });
+              items.push({ label: `${hours}h × ${this.formatCurrency(displayRate)}`, amountMXN: pricing.vehicleTotalWithSurcharge, alreadySurcharged: true });
             }
           }
 
-          // Add discount if applicable (apply to final total)
-          if (discount > 0) {
-            const finalCost = includeGuide && this.driverTourRateCache 
-              ? vehicleBaseCost + (this.driverTourRateCache.value || 0)
-              : vehicleBaseCost;
-            const discountAmount = finalCost * (discount / 100);
-            items.push({ label: `Descuento por volumen (-${discount}%)`, amountMXN: -discountAmount });
+          // Add discount if applicable
+          if (pricing.discountAmount > 0) {
+            const discountPercentage = this.getADisposicionDiscount(hours);
+            items.push({ label: `Descuento por volumen (-${discountPercentage}%)`, amountMXN: -pricing.discountAmount });
           }
         }
       }
@@ -10498,15 +11046,15 @@ class ItineraryBuilder {
     // Calculate total with proper handling of mixed surcharge states
     let alreadySurchargedTotal = 0;
     let baseTotalNeedingSurcharge = 0;
-    
-    items.forEach(item => {
+
+    items.forEach((item) => {
       if (item.alreadySurcharged) {
         alreadySurchargedTotal += item.amountMXN;
       } else {
         baseTotalNeedingSurcharge += item.amountMXN;
       }
     });
-    
+
     // Calculate final total: already surcharged items + newly surcharged base items
     const surchargedBaseTotal = this.getDisplayPrice(baseTotalNeedingSurcharge);
     totalMXN = alreadySurchargedTotal + surchargedBaseTotal;
@@ -10523,17 +11071,17 @@ class ItineraryBuilder {
     // Update Desglose title with payment type
     const desgloseTitle = document.getElementById('desgloseTitle');
     if (desgloseTitle) {
-      const paymentLabels = { 
-        efectivo: 'Efectivo', 
-        transferencia: 'Transferencia', 
-        tarjeta: 'Tarjeta de Crédito/Débito' 
+      const paymentLabels = {
+        efectivo: 'Efectivo',
+        transferencia: 'Transferencia',
+        tarjeta: 'Tarjeta de Crédito/Débito',
       };
       const paymentLabel = paymentLabels[paymentType] || paymentType;
       desgloseTitle.innerHTML = `<i class="ti ti-list-details me-1"></i>Desglose ${paymentLabel.toLowerCase()}`;
     }
 
     // Render all service-specific breakdown items first
-    let itemsHTML = items.map((item) => {
+    const itemsHTML = items.map((item) => {
       // Check if amount is already surcharged (for guide totals)
       const displayAmt = item.alreadySurcharged ? item.amountMXN : this.getDisplayPrice(item.amountMXN);
       return `<div class="d-flex justify-content-between">
@@ -10544,7 +11092,7 @@ class ItineraryBuilder {
 
     // totalMXN is already the properly calculated total (no additional surcharging needed)
     const displayTotal = totalMXN;
-    
+
     // Store the display total for use when saving
     this.currentServiceTotal = displayTotal;
 
@@ -10562,11 +11110,15 @@ class ItineraryBuilder {
       const pricesByType = {
         efectivo: baseTotalForDebug,
         transferencia: this.getDisplayPriceForType ? this.getDisplayPriceForType(baseTotalForDebug, 'transferencia') : baseTotalForDebug,
-        tarjeta: this.getDisplayPriceForType ? this.getDisplayPriceForType(baseTotalForDebug, 'tarjeta') : baseTotalForDebug
+        tarjeta: this.getDisplayPriceForType ? this.getDisplayPriceForType(baseTotalForDebug, 'tarjeta') : baseTotalForDebug,
       };
-      
+
       // Call debug payment breakdown with items for component analysis
       this.updateModalDebugPaymentTypes(pricesByType, items);
+
+      // Update dev payment prices and breakdown AFTER we have all the data
+      this.updateDevPaymentPrices();
+      this.updateDevPaymentBreakdown();
     } catch (error) {
       console.warn('⚠️ Debug payment section update failed:', error);
     }
@@ -10576,56 +11128,56 @@ class ItineraryBuilder {
     // paymentType already declared above at line 8354
     const priceLabel = document.querySelector('label[for="servicePrice"]');
     if (priceLabel) {
-      const paymentLabels = { 
-        efectivo: 'Efectivo', 
-        transferencia: 'Transferencia', 
-        tarjeta: 'Tarjeta de Crédito/Débito' 
+      const paymentLabels = {
+        efectivo: 'Efectivo',
+        transferencia: 'Transferencia',
+        tarjeta: 'Tarjeta de Crédito/Débito',
       };
       const paymentLabel = paymentLabels[paymentType] || paymentType;
-      
+
       // Show price label with selected payment type
       priceLabel.innerHTML = `Precio base <small class="text-muted">(MXN - ${paymentLabel})</small> <span class="text-danger">*</span>`;
     }
-    
+
     // Update debug price display for development
     const servicePriceField = document.getElementById('servicePrice');
     const currentPrice = parseFloat(servicePriceField?.value || 0);
-    
+
     // Show debug info if we have a display total > 0 (from any calculation)
     if (displayTotal > 0) {
       console.log('🔧 updateBreakdown: displayTotal > 0, showing debug info', {
         displayTotal,
         currentPrice,
         totalMXN,
-        paymentType
+        paymentType,
       });
-      
+
       const basePriceEfectivo = this.getBasePriceFromCurrent(displayTotal);
       const pricesByType = {
         efectivo: basePriceEfectivo,
         transferencia: this.getDisplayPriceForType(basePriceEfectivo, 'transferencia'),
-        tarjeta: this.getDisplayPriceForType(basePriceEfectivo, 'tarjeta')
+        tarjeta: this.getDisplayPriceForType(basePriceEfectivo, 'tarjeta'),
       };
-      
+
       console.log('🔧 Generated pricesByType:', pricesByType);
-      
+
       // Update debug price display (existing functionality)
       this.updateDebugPriceDisplay(pricesByType);
-      
+
       // REMOVED: Debug payment breakdown (desglose) - too complex
       // Removed - using simple input fields instead
     } else {
       console.log('🔧 updateBreakdown: displayTotal is 0 or negative, not showing debug info', {
         displayTotal,
         currentPrice,
-        totalMXN
+        totalMXN,
       });
-      
+
       // Still call debug function to show rate loading status
       const fallbackPrices = {
         efectivo: 0,
         transferencia: 0,
-        tarjeta: 0
+        tarjeta: 0,
       };
       // Removed debug breakdown - using simple input fields instead
     }
@@ -10948,6 +11500,7 @@ class ItineraryBuilder {
    * Calculate greeter price based on route duration.
    * Formula: 760 + (640 * durationHours) with special rounding.
    * @param {number} durationMinutes - Route duration in minutes.
+   * @param rawPrice
    * @returns {number} Greeter price.
    * @example
    */
@@ -10956,14 +11509,13 @@ class ItineraryBuilder {
   applySpecialRounding(rawPrice) {
     const integerPart = Math.floor(rawPrice);
     const lastTwoDigits = integerPart % 100;
-    
+
     if (lastTwoDigits === 0) {
       return integerPart;
-    } else if (lastTwoDigits < 50) {
+    } if (lastTwoDigits < 50) {
       return Math.floor(integerPart / 100) * 100;
-    } else {
-      return Math.ceil(integerPart / 100) * 100;
     }
+    return Math.ceil(integerPart / 100) * 100;
   }
 
   calculateGreeterPrice(durationMinutes) {
@@ -10971,15 +11523,15 @@ class ItineraryBuilder {
     if (!this.greeterRateCache) {
       console.log('⚡ Greeter cache missing, triggering immediate load');
       // Trigger async load but don't wait for it - use defaults for now
-      this.loadGreeterRateConfiguration().catch(error => {
+      this.loadGreeterRateConfiguration().catch((error) => {
         console.error('Failed to load greeter config in background:', error);
       });
     }
-    
+
     // Use cached values or fallback to defaults
     const basePrice = this.greeterRateCache?.basePrice || 760;
     const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
-    
+
     // Debug: Log what values are being used
     console.log('🔍 calculateGreeterPrice DEBUG:', {
       durationMinutes,
@@ -10988,7 +11540,7 @@ class ItineraryBuilder {
       hourlyRate,
       cacheTime: this.greeterRateCacheTime,
       isUsingCache: !!this.greeterRateCache,
-      isUsingDefaults: !this.greeterRateCache
+      isUsingDefaults: !this.greeterRateCache,
     });
 
     const durationHours = durationMinutes / 60;
@@ -10997,10 +11549,10 @@ class ItineraryBuilder {
     // Calculate final price using configurable formula (no special rounding here)
     // Note: Special rounding now applied to final service total, not individual greeter calculation
     const finalPrice = basePrice + (hourlyRate * durationHours);
-    
+
     console.log('💰 calculateGreeterPrice RESULT (unrounded):', {
       finalPrice,
-      formula: `${basePrice} + (${hourlyRate} × ${durationHours.toFixed(2)}h) = ${finalPrice}`
+      formula: `${basePrice} + (${hourlyRate} × ${durationHours.toFixed(2)}h) = ${finalPrice}`,
     });
 
     return finalPrice;
@@ -11072,7 +11624,7 @@ class ItineraryBuilder {
    */
   recalculateTransportPrice() {
     // Refresh greeter cache in case rates were updated recently
-    this.refreshGreeterRateCache().catch(error => {
+    this.refreshGreeterRateCache().catch((error) => {
       console.warn('Could not refresh greeter cache during transport recalculation:', error);
     });
 
@@ -11236,31 +11788,28 @@ class ItineraryBuilder {
       const discount = this.getADisposicionDiscount(hours);
       const basePrice = this._disposicionHourlyRate;
 
-      // Apply payment type surcharge to base price
+      // Apply payment type surcharge using unified calculation method for consistency
       const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-      let displayPrice = basePrice;
-      
-      if (paymentType === 'transferencia' && this.transferRate > 0) {
-        displayPrice = basePrice * (1 + (this.transferRate / 100));
-      } else if (paymentType === 'tarjeta' && this.agencyRate > 0) {
-        displayPrice = basePrice * (1 + (this.agencyRate / 100));
-      }
+      const displayPrice = this.getDisplayPrice(basePrice);
 
       console.log('💰 A Disposición pricing calculation:', {
         basePrice,
-        paymentType,
-        transferRate: this.transferRate,
-        agencyRate: this.agencyRate,
         displayPrice,
-        calculation: paymentType === 'efectivo' ? 'no surcharge' : 
-                    paymentType === 'transferencia' ? `${basePrice} × (1 + ${this.transferRate}/100)` :
-                    `${basePrice} × (1 + ${this.agencyRate}/100)`
+        note: 'Using unified getDisplayPrice() method for consistency with breakdowns',
       });
 
       // Only update price field if price override is not active
       const isOverrideActive = document.getElementById('aDisposicionOverridePrices')?.checked || false;
       if (priceField && !isOverrideActive) {
-        priceField.value = displayPrice;
+        // Show price WITH payment type surcharges
+        priceField.value = displayPrice.toFixed(2);
+        console.log('💰 A Disposición price field set with payment surcharge:', {
+          basePrice,
+          displayPrice,
+          paymentType,
+          surchargeApplied: displayPrice !== basePrice,
+          priceFieldValue: displayPrice.toFixed(2),
+        });
       }
 
       // Set currency to match
@@ -11275,6 +11824,14 @@ class ItineraryBuilder {
       }
 
       this.updateServicePriceBreakdown();
+
+      // Update dev payment prices and breakdown for A Disposición changes
+      // This ensures dev price fields show the correct API rates after they're loaded
+      if (this.isDevelopmentMode) {
+        this.updateDevPaymentPrices();
+        this.updateDevPaymentBreakdown();
+        console.log('🔧 A Disposición: Updated dev price fields after API rate loaded');
+      }
     } catch (error) {
       console.error('Error calculating A Disposición price:', error);
     }
@@ -11481,7 +12038,7 @@ class ItineraryBuilder {
     if (servicePriceField) {
       const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
       const mxnPrice = this.getWalkingTourPrice(tour, peopleCount, duration);
-      servicePriceField.value = mxnPrice;
+      servicePriceField.value = mxnPrice.toFixed(2);
     }
   }
 
@@ -11609,7 +12166,7 @@ class ItineraryBuilder {
       const tourChildrenQuantityField = document.getElementById('tourChildrenQuantity');
       const tourAdultsNoAlcoholQuantityField = document.getElementById('tourAdultsNoAlcoholQuantity');
 
-      if (servicePriceField) servicePriceField.value = 0;
+      if (servicePriceField) servicePriceField.value = '0.00';
 
       // Clear and show all price and quantity fields when no tour is selected
       if (adultPriceField) {
@@ -11746,7 +12303,7 @@ class ItineraryBuilder {
 
         // Fill price fields - for tours, set to 0 initially (vehicle cost will be added when vehicle is selected)
         if (servicePriceField) {
-          servicePriceField.value = 0; // Tours should show 0 until a vehicle is selected
+          servicePriceField.value = '0.00'; // Tours should show 0 until a vehicle is selected
         }
 
         // Check if price override is active for tours
@@ -11952,13 +12509,13 @@ class ItineraryBuilder {
         this.updateServicePriceBreakdown();
       } else {
         console.warn('Tour not found in cache:', tourId);
-        document.getElementById('servicePrice').value = 0;
+        document.getElementById('servicePrice').value = '0.00';
         this.clearTourDetails();
         this.clearTourSchedule();
       }
     } catch (error) {
       console.error('Error handling tour selection:', error);
-      document.getElementById('servicePrice').value = 0;
+      document.getElementById('servicePrice').value = '0.00';
       this.clearTourDetails();
       this.clearTourSchedule();
     }
@@ -12507,7 +13064,7 @@ class ItineraryBuilder {
         option.dataset.providerId = exp.provider?.id || '';
         option.dataset.providerName = exp.provider?.name || '';
         option.dataset.providerType = exp.provider?.type || '';
-        
+
         // Debug: Log establishment experiences for troubleshooting
         if (exp.provider?.type === 'Establishment') {
           console.debug('🏪 Establishment experience added to dropdown:', {
@@ -12515,10 +13072,10 @@ class ItineraryBuilder {
             title: exp.title,
             providerName: exp.provider.name,
             providerType: exp.provider.type,
-            displayTitle: displayTitle
+            displayTitle,
           });
         }
-        
+
         experienceSelect.appendChild(option);
       });
     } catch (error) {
@@ -12887,9 +13444,9 @@ class ItineraryBuilder {
     // Debug: Log current state before saving
     console.log('💾 SAVE TO BACKEND - Current state:', {
       totalDays: this.days.length,
-      dayIds: this.days.map(d => ({ id: d.id, title: d.title })),
+      dayIds: this.days.map((d) => ({ id: d.id, title: d.title })),
       totalServices: this.services.size,
-      quoteId: this.quoteId
+      quoteId: this.quoteId,
     });
 
     // Totals will be calculated from display prices (with surcharge + currency)
@@ -12908,13 +13465,13 @@ class ItineraryBuilder {
           const servicePrice = service.price || 0;
           const serviceTotal = servicePrice;
           dayTotal += serviceTotal;
-          
+
           console.log('📊 Service total calculation:', {
             serviceType: service.type,
             servicePrice,
             quantity: service.quantity,
             serviceTotal,
-            note: 'Using price directly from modal'
+            note: 'Using price directly from modal',
           });
 
           const subconcept = {
@@ -13012,18 +13569,18 @@ class ItineraryBuilder {
               unitPrice: servicePrice,
               duration: service.duration,
               pricesByType: service.pricesByType,
-              pricesByTypeIncluded: subconcept.pricesByType !== null && subconcept.pricesByType !== undefined
+              pricesByTypeIncluded: subconcept.pricesByType !== null && subconcept.pricesByType !== undefined,
             });
           }
-          
-          // Debug logging specifically for services that previously lacked pricesByType  
+
+          // Debug logging specifically for services that previously lacked pricesByType
           if (!service.pricesByType || service.concept === 'Mineral de Pozos') {
             console.log('🔍 BACKEND PAYLOAD - Service that previously lacked pricesByType:', {
               serviceId,
               concept: service.concept,
               frontendPricesByType: service.pricesByType,
               backendPayloadPricesByType: subconcept.pricesByType,
-              payloadIncludesPricesByType: subconcept.pricesByType !== null && subconcept.pricesByType !== undefined
+              payloadIncludesPricesByType: subconcept.pricesByType !== null && subconcept.pricesByType !== undefined,
             });
           }
 
@@ -13052,38 +13609,38 @@ class ItineraryBuilder {
     };
 
     // Calculate totals from display-price day totals
-    serviceItemsData.days.forEach((day) => { 
-      grandSubtotal += day.dayTotal; 
+    serviceItemsData.days.forEach((day) => {
+      grandSubtotal += day.dayTotal;
     });
-    
+
     // The modal total is the final value - it already includes everything (base + surcharge + IVA)
     // We should NOT decompose it into subtotal + IVA
     const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-    
+
     console.log('💰 Setting totals from modal:', {
       paymentType,
       modalTotal: grandSubtotal,
-      note: 'Modal value is final - no IVA decomposition'
+      note: 'Modal value is final - no IVA decomposition',
     });
-    
+
     // For ALL payment types, the modal value IS the final value
     serviceItemsData.subtotal = Math.round(grandSubtotal * 100) / 100;
-    serviceItemsData.iva = 0;  // IVA is already included in the modal total
+    serviceItemsData.iva = 0; // IVA is already included in the modal total
     serviceItemsData.total = serviceItemsData.subtotal;
 
     // Debug: Log the transformed data being sent to backend
     console.log('💾 SAVE TO BACKEND - Data being sent:', {
       totalDaysInPayload: serviceItemsData.days.length,
-      daysData: serviceItemsData.days.map(d => ({ 
-        id: d.id, 
-        dayNumber: d.dayNumber, 
-        dayTitle: d.dayTitle, 
-        subconcepts: d.subconcepts?.length || 0 
+      daysData: serviceItemsData.days.map((d) => ({
+        id: d.id,
+        dayNumber: d.dayNumber,
+        dayTitle: d.dayTitle,
+        subconcepts: d.subconcepts?.length || 0,
       })),
       subtotal: serviceItemsData.subtotal,
       iva: serviceItemsData.iva,
       total: serviceItemsData.total,
-      paymentType: serviceItemsData.paymentType
+      paymentType: serviceItemsData.paymentType,
     });
 
     // Get access token from cookie
@@ -13171,7 +13728,7 @@ class ItineraryBuilder {
     // Debug: Confirm successful save
     console.log('✅ SAVE TO BACKEND - Successfully saved to database', {
       success: result.success,
-      quoteId: this.quoteId
+      quoteId: this.quoteId,
     });
 
     return result;
@@ -13328,8 +13885,8 @@ class ItineraryBuilder {
       console.log('🗑️ DELETE DAY - Before deletion:', {
         currentDayId: this.currentDayId,
         totalDays: this.days.length,
-        dayIds: this.days.map(d => ({ id: d.id, title: d.title })),
-        totalServices: this.services.size
+        dayIds: this.days.map((d) => ({ id: d.id, title: d.title })),
+        totalServices: this.services.size,
       });
 
       this.days = this.days.filter((d) => d.id !== this.currentDayId);
@@ -13350,9 +13907,9 @@ class ItineraryBuilder {
 
       console.log('🗑️ DELETE DAY - After deletion:', {
         totalDays: this.days.length,
-        dayIds: this.days.map(d => ({ id: d.id, title: d.title })),
+        dayIds: this.days.map((d) => ({ id: d.id, title: d.title })),
         deletedServices: deletedServicesCount,
-        remainingServices: this.services.size
+        remainingServices: this.services.size,
       });
     } else if (this.currentServiceId) {
       // Delete service
@@ -13561,7 +14118,7 @@ class ItineraryBuilder {
           ${service.selectedSchedule || service.startTime ? `<div class="pv-service-detail"><i class="ti ti-clock"></i>${service.selectedSchedule || service.startTime}</div>` : ''}
           ${hasVehicle ? `<div class="pv-service-detail"><i class="ti ti-car"></i>${vehicleName}${service.quantity > 1 ? ` x${service.quantity}` : ''}</div>` : ''}
           ${service.flightNumber ? `<div class="pv-service-detail"><i class="ti ti-plane"></i>${service.flightNumber}${service.airline ? ` · ${service.airline}` : ''}</div>` : ''}
-          ${service.includeGuide ? '<div class="pv-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Guía + Chofer</div>' : ''}
+          ${service.includeGuide ? '<div class="pv-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Chofer</div>' : ''}
           ${service.includeGreeter ? '<div class="pv-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>' : ''}
           ${service.waitingTimeHours > 0 ? `<div class="pv-service-detail" style="color: #fd7e14;"><i class="ti ti-clock"></i>Tiempo de espera: ${service.waitingTimeHours}h</div>` : ''}
           ${service.notes ? `<div class="pv-notes"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
@@ -13590,7 +14147,7 @@ class ItineraryBuilder {
           </div>
           ${service.selectedSchedule || service.startTime ? `<div class="pv-service-detail"><i class="ti ti-clock"></i>${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}</div>` : ''}
           ${hasVehicle ? `<div class="pv-service-detail"><i class="ti ti-car"></i>${this.getVehicleDisplayName(service)}${service.quantity > 1 ? ` x${service.quantity}` : ''}</div>` : ''}
-          ${(service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide ? '<div class="pv-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Guía + Chofer</div>' : ''}
+          ${(service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide ? '<div class="pv-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Chofer</div>' : ''}
           ${(service.type === 'tour' || service.type === 'transport') && service.includeGreeter ? `<div class="pv-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter ${service.routeDuration ? this.formatGreeterFormula(service.routeDuration, this.calculateGreeterPrice(service.routeDuration)) : ''}</div>` : ''}
           ${service.notes ? `<div class="pv-notes"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
         </div>
@@ -15373,7 +15930,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Initialize the modal state based on selected service type
       initializeModalState();
-      
+
       // Initialize dev payment prices in development mode
       if (manager.isDevelopmentMode) {
         manager.updateDevPaymentPrices();
