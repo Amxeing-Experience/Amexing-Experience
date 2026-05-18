@@ -706,6 +706,26 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <input type="text" class="form-control" id="conceptoConcept" placeholder="Describe el servicio...">
                             </div>
                             
+                            <!-- Client Price and Surcharge Control -->
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="conceptoClientPrice" class="form-label">Precio al Cliente <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="conceptoClientPrice" placeholder="0.00" step="0.01" min="0">
+                                    <small class="text-muted">Precio que se cobrará al cliente</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check mt-4">
+                                        <input class="form-check-input" type="checkbox" id="conceptoApplySurcharges" checked>
+                                        <label class="form-check-label" for="conceptoApplySurcharges">
+                                            <i class="ti ti-percentage me-1"></i>Aplicar recargos por tipo de pago
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">
+                                        Si está activo, se aplicarán recargos automáticos según el tipo de pago
+                                    </small>
+                                </div>
+                            </div>
+                            
                             <!-- Schedule Toggle -->
                             <div class="mb-3">
                                 <div class="form-check">

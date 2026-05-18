@@ -748,6 +748,25 @@ class ItineraryBuilder {
         this.updateServicePriceBreakdown();
       });
     });
+    
+    // Concepto client price and surcharge listeners
+    const conceptoClientPriceField = document.getElementById('conceptoClientPrice');
+    if (conceptoClientPriceField) {
+      conceptoClientPriceField.addEventListener('input', (e) => {
+        validatePriceInput(e);
+        this.updateConceptoServicePrice();
+        this.updateServicePriceBreakdown();
+      });
+      conceptoClientPriceField.addEventListener('keydown', preventInvalidPriceChars);
+    }
+    
+    const conceptoApplySurchargesCheckbox = document.getElementById('conceptoApplySurcharges');
+    if (conceptoApplySurchargesCheckbox) {
+      conceptoApplySurchargesCheckbox.addEventListener('change', () => {
+        this.updateConceptoServicePrice();
+        this.updateServicePriceBreakdown();
+      });
+    }
 
     // Tour start time listener - auto-calculate end time
     document.getElementById('tourStartTime')?.addEventListener('change', () => {
@@ -2786,8 +2805,39 @@ class ItineraryBuilder {
     // Calculate all 3 payment type prices for debugging and storage
     let pricesByType = {};
 
-    // Special handling for A Disposición - use breakdown totals that include volume discounts
-    if (type === 'a-disposicion' && this._aDisposicionBreakdownTotals) {
+    // Special handling for concepto - use clientPrice as the base
+    if (type === 'concepto') {
+      const conceptoClientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
+      const conceptoApplySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
+      
+      if (conceptoApplySurcharges) {
+        // Calculate prices with surcharges from client price
+        pricesByType = {
+          efectivo: conceptoClientPrice,
+          transferencia: conceptoClientPrice * (1 + (this.transferRate / 100)),
+          tarjeta: conceptoClientPrice * (1 + (this.agencyRate / 100))
+        };
+      } else {
+        // No surcharges - all payment types have the same price
+        pricesByType = {
+          efectivo: conceptoClientPrice,
+          transferencia: conceptoClientPrice,
+          tarjeta: conceptoClientPrice
+        };
+      }
+      
+      // Override the base price to be the client price for concepto
+      basePriceEfectivo = conceptoClientPrice;
+      
+      console.log('✅ COLLECT SERVICE DATA - Concepto pricesByType from clientPrice:', {
+        clientPrice: conceptoClientPrice,
+        applySurcharges: conceptoApplySurcharges,
+        pricesByType,
+        transferRate: this.transferRate,
+        agencyRate: this.agencyRate
+      });
+    } else if (type === 'a-disposicion' && this._aDisposicionBreakdownTotals) {
+      // Special handling for A Disposición - use breakdown totals that include volume discounts
       pricesByType = {
         efectivo: this._aDisposicionBreakdownTotals.efectivo,
         transferencia: this._aDisposicionBreakdownTotals.transferencia,
@@ -2899,7 +2949,9 @@ class ItineraryBuilder {
 
     const data = {
       type,
-      price: finalPrice, // Final display price with current payment surcharges
+      price: type === 'concepto' 
+        ? (pricesByType[document.getElementById('priceTypeSelect')?.value || 'efectivo'] || finalPrice)
+        : finalPrice, // For concepto, use the correct price for current payment type
       basePrice: basePriceEfectivo, // Base efectivo price for recalculation (backward compatibility)
       pricesByType, // All 3 payment type prices for easy switching
       // Tour formula components
@@ -3379,6 +3431,16 @@ class ItineraryBuilder {
         data.adultsQuantity = parseInt(document.getElementById('conceptoAdultsQuantity')?.value || 0);
         data.childrenQuantity = parseInt(document.getElementById('conceptoChildrenQuantity')?.value || 0);
         data.adultsNoAlcoholQuantity = parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0);
+
+        // Collect client price and surcharge settings for concepto
+        data.clientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
+        data.applySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
+        
+        console.log('💾 Collecting concepto data:', {
+          clientPrice: data.clientPrice,
+          applySurcharges: data.applySurcharges,
+          price: data.price
+        });
 
         // Collect schedule data if checkbox is checked
         const hasSchedule = document.getElementById('conceptoHasSchedule')?.checked;
@@ -4512,6 +4574,23 @@ class ItineraryBuilder {
           conceptoAdultsNoAlcoholQuantityField.value = service.adultsNoAlcoholQuantity;
         }
 
+        // Populate client price and surcharge settings
+        const conceptoClientPriceField = document.getElementById('conceptoClientPrice');
+        const conceptoApplySurchargesCheckbox = document.getElementById('conceptoApplySurcharges');
+        
+        if (conceptoClientPriceField && service.clientPrice !== undefined) {
+          conceptoClientPriceField.value = service.clientPrice;
+        }
+        if (conceptoApplySurchargesCheckbox && service.applySurcharges !== undefined) {
+          conceptoApplySurchargesCheckbox.checked = service.applySurcharges;
+        }
+        
+        console.log('📝 Restoring concepto data:', {
+          clientPrice: service.clientPrice,
+          applySurcharges: service.applySurcharges,
+          price: service.price
+        });
+
         // Populate schedule fields if service has schedule data
         const hasScheduleCheckbox = document.getElementById('conceptoHasSchedule');
         const startTimeField = document.getElementById('conceptoStartTime');
@@ -5556,8 +5635,48 @@ class ItineraryBuilder {
         console.warn('💰 A Disposición price calculation fallback due to error:', error);
         baseTotal = currentPrice || 0; // Safe fallback
       }
+    } else if (serviceType === 'concepto') {
+      // For Concepto: Use CLIENT price as the base, not servicePrice
+      const clientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
+      const applySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
+      
+      // If surcharges are NOT applied, all payment types should be the same
+      if (!applySurcharges) {
+        // Set all fields to the same price (no surcharges)
+        if (efectivoField) efectivoField.value = clientPrice.toFixed(2);
+        if (transferenciaField) transferenciaField.value = clientPrice.toFixed(2);
+        if (tarjetaField) tarjetaField.value = clientPrice.toFixed(2);
+        
+        console.log('💰 Concepto without surcharges - all payment types same:', {
+          clientPrice,
+          applySurcharges: false,
+          allPrices: clientPrice
+        });
+        return; // Exit early
+      }
+      
+      // If surcharges ARE applied, calculate from client price base
+      const efectivoPrice = clientPrice;
+      const transferenciaPrice = clientPrice * (1 + (this.transferRate / 100));
+      const tarjetaPrice = clientPrice * (1 + (this.agencyRate / 100));
+      
+      // Set the calculated prices
+      if (efectivoField) efectivoField.value = efectivoPrice.toFixed(2);
+      if (transferenciaField) transferenciaField.value = transferenciaPrice.toFixed(2);
+      if (tarjetaField) tarjetaField.value = tarjetaPrice.toFixed(2);
+      
+      console.log('💰 Concepto with surcharges - calculated from client price:', {
+        clientPrice,
+        applySurcharges: true,
+        efectivo: efectivoPrice,
+        transferencia: transferenciaPrice,
+        tarjeta: tarjetaPrice,
+        transferRate: this.transferRate,
+        agencyRate: this.agencyRate
+      });
+      return; // Exit early - don't continue to general calculation
     } else {
-      // For other non-tour, non-A Disposición services
+      // For other non-tour, non-A Disposición, non-concepto services
       // The servicePrice field should ALWAYS contain the base (efectivo) price
       // So we use it directly as the base
       baseTotal = currentPrice;
@@ -5721,6 +5840,101 @@ class ItineraryBuilder {
         guideRate,
         note: 'Using same logic as servicePriceBreakdown via helper method'
       });
+    } else if (serviceType === 'concepto') {
+      console.log('📊 Processing Concepto breakdown');
+      
+      // Handle Concepto service breakdown - get the CLIENT price, not the service price
+      const clientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
+      const applySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
+      const adultsQty = parseInt(document.getElementById('conceptoAdultsQuantity')?.value || 0);
+      const childrenQty = parseInt(document.getElementById('conceptoChildrenQuantity')?.value || 0);
+      const noAlcoholQty = parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0);
+      
+      // For concepto, use the CLIENT price as the base
+      vehicleBaseCost = clientPrice; // Use client price, not service price
+      tourDuration = 1; // Concepto is not time-based
+      vehicleQuantity = 1; // Concepto is not vehicle-based
+      guideRate = 0; // No guide for concepto
+      
+      console.log('📊 Concepto calculation:', {
+        clientPrice,
+        applySurcharges,
+        adultsQty,
+        childrenQty,
+        noAlcoholQty,
+        vehicleBaseCost,
+        note: 'Using client price as base'
+      });
+      
+      // Handle concepto separately - it's simpler than other services
+      // Get people context for display
+      const peopleContext = [];
+      if (adultsQty > 0) peopleContext.push(`${adultsQty} adulto${adultsQty > 1 ? 's' : ''}`);
+      if (childrenQty > 0) peopleContext.push(`${childrenQty} niño${childrenQty > 1 ? 's' : ''}`);
+      if (noAlcoholQty > 0) peopleContext.push(`${noAlcoholQty} sin alcohol`);
+      const contextText = peopleContext.length > 0 ? ` (${peopleContext.join(', ')})` : '';
+      
+      // Update dev payment fields
+      const devPriceEfectivoField = document.getElementById('devPriceEfectivo');
+      const devPriceTransferenciaField = document.getElementById('devPriceTransferencia');
+      const devPriceTarjetaField = document.getElementById('devPriceTarjeta');
+      
+      // Update dev breakdown text fields
+      const devBreakdownEfectivoField = document.getElementById('devBreakdownEfectivo');
+      const devBreakdownTransferenciaField = document.getElementById('devBreakdownTransferencia');
+      const devBreakdownTarjetaField = document.getElementById('devBreakdownTarjeta');
+      
+      if (!applySurcharges) {
+        // Without surcharges - all payment types show the same price
+        const simpleBreakdown = `Concepto${contextText}: $${clientPrice.toFixed(2)}\nTotal: $${clientPrice.toFixed(2)}`;
+        
+        // Update dev payment prices
+        if (devPriceEfectivoField) devPriceEfectivoField.value = clientPrice.toFixed(2);
+        if (devPriceTransferenciaField) devPriceTransferenciaField.value = clientPrice.toFixed(2);
+        if (devPriceTarjetaField) devPriceTarjetaField.value = clientPrice.toFixed(2);
+        
+        // Update dev breakdown texts
+        if (devBreakdownEfectivoField) devBreakdownEfectivoField.value = simpleBreakdown;
+        if (devBreakdownTransferenciaField) devBreakdownTransferenciaField.value = simpleBreakdown;
+        if (devBreakdownTarjetaField) devBreakdownTarjetaField.value = simpleBreakdown;
+        
+        console.log('📊 Concepto without surcharges - all payment types show same price:', clientPrice);
+        return; // Exit early, we're done
+      }
+      
+      // With surcharges - calculate different prices for each payment type
+      const efectivoPrice = clientPrice;
+      const transferenciaPrice = clientPrice * (1 + (this.transferRate / 100));
+      const tarjetaPrice = clientPrice * (1 + (this.agencyRate / 100));
+      
+      // Create breakdown texts for each payment type
+      const efectivoBreakdown = `Concepto${contextText}: $${efectivoPrice.toFixed(2)}\nTotal: $${efectivoPrice.toFixed(2)}`;
+      
+      const transferenciaBreakdown = `Concepto${contextText}: $${clientPrice.toFixed(2)}\n` +
+        `Recargo transferencia (${this.transferRate}%): $${(transferenciaPrice - clientPrice).toFixed(2)}\n` +
+        `Total: $${transferenciaPrice.toFixed(2)}`;
+      
+      const tarjetaBreakdown = `Concepto${contextText}: $${clientPrice.toFixed(2)}\n` +
+        `Recargo tarjeta (${this.agencyRate}%): $${(tarjetaPrice - clientPrice).toFixed(2)}\n` +
+        `Total: $${tarjetaPrice.toFixed(2)}`;
+      
+      // Update dev payment prices
+      if (devPriceEfectivoField) devPriceEfectivoField.value = efectivoPrice.toFixed(2);
+      if (devPriceTransferenciaField) devPriceTransferenciaField.value = transferenciaPrice.toFixed(2);
+      if (devPriceTarjetaField) devPriceTarjetaField.value = tarjetaPrice.toFixed(2);
+      
+      // Update dev breakdown texts
+      if (devBreakdownEfectivoField) devBreakdownEfectivoField.value = efectivoBreakdown;
+      if (devBreakdownTransferenciaField) devBreakdownTransferenciaField.value = transferenciaBreakdown;
+      if (devBreakdownTarjetaField) devBreakdownTarjetaField.value = tarjetaBreakdown;
+      
+      console.log('📊 Concepto with surcharges - different prices per payment type:', {
+        clientPrice,
+        efectivo: efectivoPrice,
+        transferencia: transferenciaPrice,
+        tarjeta: tarjetaPrice
+      });
+      return; // Exit early, we're done with concepto
     }
 
     // Calculate breakdown for each payment type (multiply by duration for tours/hours for A Disposición)
@@ -5907,9 +6121,10 @@ class ItineraryBuilder {
   formatPaymentBreakdown(paymentType, vehicleCostPerHour, guideCostPerHour, vehicleTotal, guideTotal, baseTotal, discountAmount, subtotal, total, duration = 1, vehicleQuantity = 1) {
     let breakdown = '';
 
-    // Check if this is A Disposición (duration represents hours and vehicleCostPerHour is the base rate)
+    // Check service type for specific formatting
     const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
     const isADisposicion = serviceType === 'a-disposicion';
+    const isConcepto = serviceType === 'concepto';
 
     if (vehicleCostPerHour > 0) {
       // Show vehicle cost with quantity and duration
@@ -5934,6 +6149,19 @@ class ItineraryBuilder {
             breakdown += `${duration}h × $${vehicleCostPerHour.toFixed(2)} × 1 vehículo = $${vehicleTotal.toFixed(2)}\n`;
           }
         }
+      } else if (isConcepto) {
+        // For Concepto: show people context and price
+        const adultsQty = parseInt(document.getElementById('conceptoAdultsQuantity')?.value || 0);
+        const childrenQty = parseInt(document.getElementById('conceptoChildrenQuantity')?.value || 0);
+        const noAlcoholQty = parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0);
+        
+        const peopleContext = [];
+        if (adultsQty > 0) peopleContext.push(`${adultsQty} adulto${adultsQty > 1 ? 's' : ''}`);
+        if (childrenQty > 0) peopleContext.push(`${childrenQty} niño${childrenQty > 1 ? 's' : ''}`);
+        if (noAlcoholQty > 0) peopleContext.push(`${noAlcoholQty} sin alcohol`);
+        
+        const contextText = peopleContext.length > 0 ? ` (${peopleContext.join(', ')})` : '';
+        breakdown += `Concepto${contextText} = $${vehicleTotal.toFixed(2)}\n`;
       } else if (vehicleQuantity > 1 && duration > 1) {
         // Show: 2 Vehículos: $X (por vehículo) × 2 × 3h = $Total
         const singleVehicleCost = vehicleCostPerHour / vehicleQuantity;
@@ -6309,6 +6537,10 @@ class ItineraryBuilder {
       // Recalculate A Disposición price with new payment type
       this.calculateADisposicionPrice();
       console.log('💰 Recalculated A Disposición price for payment type:', paymentType);
+    } else if (serviceType === 'concepto') {
+      // Recalculate concepto price with new payment type if surcharges are enabled
+      this.updateConceptoServicePrice();
+      console.log('💰 Recalculated concepto price for payment type:', paymentType);
     }
 
     // Recalculate all saved services with new payment type
@@ -10095,6 +10327,34 @@ class ItineraryBuilder {
     this.updateServicePriceBreakdown();
   }
 
+  updateConceptoServicePrice() {
+    const clientPriceField = document.getElementById('conceptoClientPrice');
+    const applySurchargesCheckbox = document.getElementById('conceptoApplySurcharges');
+    const servicePriceField = document.getElementById('servicePrice');
+    
+    if (!clientPriceField || !servicePriceField) return;
+    
+    const clientPrice = parseFloat(clientPriceField.value) || 0;
+    const applySurcharges = applySurchargesCheckbox?.checked ?? true;
+    
+    // If surcharges should be applied, use getDisplayPrice to add payment type surcharge
+    // Otherwise, use the client price as-is
+    const finalPrice = applySurcharges ? this.getDisplayPrice(clientPrice) : clientPrice;
+    
+    servicePriceField.value = finalPrice.toFixed(2);
+    
+    console.log('💰 Updated concepto service price:', {
+      clientPrice,
+      applySurcharges,
+      paymentType: document.getElementById('priceTypeSelect')?.value || 'efectivo',
+      finalPrice
+    });
+    
+    // Update breakdowns
+    this.updateServicePriceBreakdown();
+    this.updateDevPaymentBreakdown();
+  }
+
   /**
    * Handle rate selection for tour vehicles.
    * @param rateId
@@ -11039,7 +11299,13 @@ class ItineraryBuilder {
     } else if (serviceType === 'concepto') {
       const price = parseFloat(document.getElementById('servicePrice')?.value || 0);
       if (price > 0) {
-        items.push({ label: 'Precio', amountMXN: price });
+        // For concepto, the servicePrice already contains the final price (with or without surcharges)
+        // Mark it as alreadySurcharged to prevent double surcharging
+        items.push({ 
+          label: 'Precio', 
+          amountMXN: price,
+          alreadySurcharged: true // Prevent additional surcharging
+        });
       }
     }
 
