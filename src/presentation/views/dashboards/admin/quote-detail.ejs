@@ -531,8 +531,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ status: newStatus })
             });
             const result = await response.json();
+            
+            // DEBUG: Log the full response
+            console.log('🔍 Status change response:', {
+                newStatus,
+                previousStatus,
+                success: result.success,
+                error: result.error,
+                data: result.data,
+                fullResult: result
+            });
+            
             if (result.success) {
                 showScheduleLoader(false);
+                // Update currentStatus only after successful change
+                currentStatus = newStatus;
                 
                 // Show reservation created notification for "requested" status
                 if (newStatus === 'requested' && result.data?.reservation) {
@@ -581,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
         radio.addEventListener('change', function() {
             const newStatus = this.value;
             const previousStatus = currentStatus;
-            currentStatus = newStatus;
+            // Don't update currentStatus yet - wait until confirmed
 
             if (newStatus === 'requested') {
                 // Update email in modal from current form value
@@ -590,12 +603,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (email && emailAddr) {
                     emailAddr.textContent = email;
                 }
+                
+                // Track if user confirmed
+                let wasConfirmed = false;
+                
                 // Show confirmation modal
                 requestModal.show();
 
                 // Confirm button
                 const confirmBtn = document.getElementById('confirmRequestBtn');
                 const handler = () => {
+                    wasConfirmed = true;  // Mark as confirmed
                     requestModal.hide();
                     applyStatusChange(newStatus, previousStatus);
                     confirmBtn.removeEventListener('click', handler);
@@ -604,13 +622,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // On modal dismiss (cancel or X), revert
                 document.getElementById('confirmRequestModal').addEventListener('hidden.bs.modal', function onHidden() {
-                    if (currentStatus === 'requested') {
-                        // Only revert if the confirm button wasn't clicked
-                        const overlay = document.getElementById('requestLoadingOverlay');
-                        if (!overlay || overlay.style.display === 'none') {
-                            // Not processing — revert
-                            revertStatus(previousStatus);
-                        }
+                    // Only revert if user didn't confirm
+                    if (!wasConfirmed) {
+                        // User canceled, revert the UI
+                        revertStatus(previousStatus);
                     }
                     this.removeEventListener('hidden.bs.modal', onHidden);
                 });
@@ -625,12 +640,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else if (emailNote) {
                     emailNote.style.display = 'none';
                 }
+                
+                // Track if user confirmed
+                let wasConfirmed = false;
+                
                 // Show confirmation modal
                 scheduleModal.show();
 
                 // Confirm button
                 const confirmBtn = document.getElementById('confirmScheduleBtn');
                 const handler = () => {
+                    wasConfirmed = true;  // Mark as confirmed
                     scheduleModal.hide();
                     applyStatusChange(newStatus, previousStatus);
                     confirmBtn.removeEventListener('click', handler);
@@ -639,13 +659,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // On modal dismiss (cancel or X), revert
                 document.getElementById('confirmScheduleModal').addEventListener('hidden.bs.modal', function onHidden() {
-                    if (currentStatus === 'scheduled') {
-                        // Only revert if the confirm button wasn't clicked
-                        const segments = document.querySelectorAll('.quote-status-seg.disabled');
-                        if (segments.length === 0) {
-                            // Not yet confirmed — revert
-                            revertStatus(previousStatus);
-                        }
+                    // Only revert if user didn't confirm
+                    if (!wasConfirmed) {
+                        // User canceled, revert the UI
+                        revertStatus(previousStatus);
                     }
                     this.removeEventListener('hidden.bs.modal', onHidden);
                 });

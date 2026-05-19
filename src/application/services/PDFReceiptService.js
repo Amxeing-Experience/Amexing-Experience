@@ -366,6 +366,12 @@ class PDFReceiptService {
         description += `${item.vehicleType}`;
       }
 
+      // Add additional vehicle information if available
+      if (item.additionalVehicleTypeName) {
+        const cleanAdditionalVehicleName = this.cleanVehicleName(item.additionalVehicleTypeName);
+        description += `\nVehículo adicional: ${cleanAdditionalVehicleName}`;
+      }
+
       if (item.notes) {
         description += `\n${item.notes}`;
       }
@@ -628,6 +634,17 @@ class PDFReceiptService {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+  }
+
+  /**
+   * Clean vehicle name by removing ObjectId in parentheses.
+   * @param {string} vehicleName - Vehicle name to clean.
+   * @returns {string} Clean vehicle name.
+   * @example
+   */
+  cleanVehicleName(vehicleName) {
+    if (!vehicleName) return '';
+    return vehicleName.replace(/\s*\([^)]*\)/g, '').trim();
   }
 
   /**

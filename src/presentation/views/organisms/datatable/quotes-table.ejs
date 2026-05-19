@@ -606,13 +606,24 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                             return `<span class="badge ${statusObj.class} px-3 py-2" style="font-size: 0.75rem;">${statusObj.text}</span>`;
                         }
 
-                        let select = `<select class="form-select form-select-sm status-selector" data-id="${row.id}" data-folio="${row.folio}" data-email="${row.contactEmail || (row.createdBy && row.createdBy.email) || ''}" style="font-size: 0.75rem; cursor: pointer;">`;
+                        // Wrap select in a div for loader positioning
+                        let html = `<div class="status-select-wrapper position-relative">`;
+                        html += `<select class="form-select form-select-sm status-selector" data-id="${row.id}" data-folio="${row.folio}" data-email="${row.contactEmail || (row.createdBy && row.createdBy.email) || ''}" style="font-size: 0.75rem; cursor: pointer;">`;
                         statuses.forEach(status => {
                             const selected = status.value === data ? 'selected' : '';
-                            select += `<option value="${status.value}" ${selected}>${status.text}</option>`;
+                            html += `<option value="${status.value}" ${selected}>${status.text}</option>`;
                         });
-                        select += '</select>';
-                        return select;
+                        html += '</select>';
+                        // Hidden loader overlay
+                        html += `<div class="status-loader position-absolute top-0 start-0 w-100 h-100 d-none" style="background: rgba(255,255,255,0.8); border-radius: 0.25rem; z-index: 10;">`;
+                        html += `<div class="d-flex align-items-center justify-content-center h-100">`;
+                        html += `<div class="spinner-border spinner-border-sm text-primary" role="status">`;
+                        html += `<span class="visually-hidden">Cargando...</span>`;
+                        html += `</div>`;
+                        html += `</div>`;
+                        html += `</div>`;
+                        html += `</div>`;
+                        return html;
                     }
                 },
                 {
@@ -862,8 +873,8 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
             const newStatus = $select.val();
             const oldStatus = $select.data('previous-status') || 'requested';
 
-            if (newStatus === 'requested' && oldStatus === 'quoted') {
-                // Show confirmation modal when changing from COTIZADO to SOLICITADO
+            if (newStatus === 'requested' || newStatus === 'scheduled') {
+                // Show confirmation modal for SOLICITADO or AGENDADO
                 pendingSchedule = { quoteId, quoteFolio, newStatus, oldStatus, $select };
                 const email = $select.data('email') || '';
                 const emailNote = document.getElementById('scheduleListEmailNote');
@@ -874,11 +885,37 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 } else if (emailNote) {
                     emailNote.style.display = 'none';
                 }
-                const modal = new bootstrap.Modal(document.getElementById('confirmScheduleListModal'));
-                modal.show();
+                
+                // Update modal content based on status
+                const modal = document.getElementById('confirmScheduleListModal');
+                const modalTitle = modal.querySelector('.modal-title');
+                const modalBody = modal.querySelector('.modal-body p:first-child');
+                const confirmBtn = document.getElementById('confirmScheduleListBtn');
+                const loadingText = document.getElementById('scheduleListLoadingOverlay').querySelector('small');
+                
+                if (newStatus === 'requested') {
+                    modalTitle.textContent = 'Confirmar solicitud';
+                    modalBody.textContent = '¿El cliente ha solicitado estos servicios? Se creará una reservación.';
+                    confirmBtn.textContent = 'Confirmar solicitud';
+                    loadingText.textContent = 'Creando reservación...';
+                } else if (newStatus === 'scheduled') {
+                    modalTitle.textContent = 'Agendar reservación';
+                    modalBody.textContent = '¿Confirma que desea agendar esta reservación?';
+                    confirmBtn.textContent = 'Agendar';
+                    loadingText.textContent = 'Agendando...';
+                }
+                
+                const bootstrapModal = new bootstrap.Modal(modal);
+                bootstrapModal.show();
             } else {
+                // Show loader and disable select
+                const $wrapper = $select.closest('.status-select-wrapper');
+                const $loader = $wrapper.find('.status-loader');
+                $loader.removeClass('d-none');
+                $select.prop('disabled', true);
+                
                 $select.data('previous-status', newStatus);
-                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus);
+                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, false, $select);
             }
         });
 
@@ -890,13 +927,22 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         // Confirm schedule from list modal
         $(document).on('click', '#confirmScheduleListBtn', function() {
             if (pendingSchedule) {
-                const { quoteId, quoteFolio, newStatus, oldStatus } = pendingSchedule;
+                const { quoteId, quoteFolio, newStatus, oldStatus, $select } = pendingSchedule;
                 // Show loader
                 const overlay = document.getElementById('scheduleListLoadingOverlay');
                 const btn = document.getElementById('confirmScheduleListBtn');
                 if (overlay) overlay.style.display = 'block';
                 if (btn) btn.disabled = true;
-                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, true);
+                
+                // Show loader on the dropdown too
+                if ($select) {
+                    const $wrapper = $select.closest('.status-select-wrapper');
+                    const $loader = $wrapper.find('.status-loader');
+                    $loader.removeClass('d-none');
+                    $select.prop('disabled', true);
+                }
+                
+                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, true, $select);
                 pendingSchedule = null;
             }
         });
@@ -1009,7 +1055,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
 
         // Functions
 
-        function updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, isScheduling) {
+        function updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, isScheduling, $select) {
             $.ajax({
                 url: `${apiEndpoint}/${quoteId}`,
                 type: 'PUT',
@@ -1019,6 +1065,14 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     reason: `Status changed from ${oldStatus} to ${newStatus}`
                 }),
                 success: function(response) {
+                    // Hide dropdown loader if present
+                    if ($select) {
+                        const $wrapper = $select.closest('.status-select-wrapper');
+                        const $loader = $wrapper.find('.status-loader');
+                        $loader.addClass('d-none');
+                        $select.prop('disabled', false);
+                    }
+                    
                     // Hide schedule loader & close modal if scheduling
                     if (isScheduling) {
                         const overlay = document.getElementById('scheduleListLoadingOverlay');
@@ -1053,6 +1107,14 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     }
                 },
                 error: function(xhr) {
+                    // Hide dropdown loader if present
+                    if ($select) {
+                        const $wrapper = $select.closest('.status-select-wrapper');
+                        const $loader = $wrapper.find('.status-loader');
+                        $loader.addClass('d-none');
+                        $select.prop('disabled', false);
+                    }
+                    
                     // Hide schedule loader if scheduling
                     if (isScheduling) {
                         const overlay = document.getElementById('scheduleListLoadingOverlay');

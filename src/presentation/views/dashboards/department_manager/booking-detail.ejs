@@ -434,6 +434,17 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (sub.airline || sub.flightNumber) tags.push(tag('plane', `${sub.airline || ''} ${sub.flightNumber || ''}`.trim(), 'info'));
             if (sub.waitingTimeHours) tags.push(tag('clock-pause', `Espera: ${sub.waitingTimeHours}h`, 'warning'));
             if (sub.routeDuration) tags.push(tag('route', `Duración: ${sub.routeDuration} min`, 'secondary'));
+            
+            // Add suggested departure times for transport services
+            if (sub.flightDepartureTimeSuggested) {
+                tags.push(tag('clock-hour-4', `Salida sugerida: ${sub.flightDepartureTimeSuggested}`, 'success'));
+            }
+            if (sub.roundTripDepartureTimeSuggestedIda) {
+                tags.push(tag('clock-hour-4', `Ida sugerida: ${sub.roundTripDepartureTimeSuggestedIda}`, 'success'));
+            }
+            if (sub.roundTripDepartureTimeSuggestedVuelta) {
+                tags.push(tag('clock-hour-4', `Vuelta sugerida: ${sub.roundTripDepartureTimeSuggestedVuelta}`, 'success'));
+            }
         }
 
         // Tour-specific details

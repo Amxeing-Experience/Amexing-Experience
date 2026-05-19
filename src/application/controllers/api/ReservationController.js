@@ -495,6 +495,10 @@ class ReservationController {
               vehicleTypeName: svc.get('vehicleTypeName'),
               notes: svc.get('notes'),
               subconcept,
+              // Suggested departure time fields
+              flightDepartureTimeSuggested: svc.get('flightDepartureTimeSuggested'),
+              roundTripDepartureTimeSuggestedIda: svc.get('roundTripDepartureTimeSuggestedIda'),
+              roundTripDepartureTimeSuggestedVuelta: svc.get('roundTripDepartureTimeSuggestedVuelta'),
               assignedDriver: svc.get('assignedDriver') ? {
                 id: svc.get('assignedDriver').id,
                 fullName: svc.get('assignedDriver').get('fullName') || `${svc.get('assignedDriver').get('firstName') || ''} ${svc.get('assignedDriver').get('lastName') || ''}`.trim() || svc.get('assignedDriver').get('username'),
