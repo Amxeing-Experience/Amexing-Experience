@@ -62,7 +62,7 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
         <!-- Unified Services Table with Client-Side Filtering -->
         <%- include('../../organisms/datatable/services-table', {
             tableId: 'all-services-table',
-            apiEndpoint: '/api/services',
+            apiEndpoint: '/api/services?includeInactive=true',
             userRole: currentUserRole,
             showActions: true,
             showClientPricing: false,

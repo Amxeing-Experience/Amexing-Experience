@@ -2836,6 +2836,57 @@ class ItineraryBuilder {
         transferRate: this.transferRate,
         agencyRate: this.agencyRate
       });
+    } else if (type === 'transport' && this._transportBreakdownTotals) {
+      // Use breakdown totals that already include vehicle + waiting time with surcharges
+      pricesByType = {
+        efectivo: this._transportBreakdownTotals.efectivo,
+        transferencia: this._transportBreakdownTotals.transferencia,
+        tarjeta: this._transportBreakdownTotals.tarjeta
+      };
+      
+      console.log('✅ COLLECT SERVICE DATA - Transport pricesByType from breakdown totals (includes waiting time):', {
+        pricesByType,
+        source: 'transport breakdown totals'
+      });
+    } else if (type === 'transport') {
+      // Fallback for transport when breakdown totals aren't available (e.g., editing existing service)
+      // Calculate complete price including waiting time
+      const vehicleSelectValue = document.getElementById('vehicleSelect')?.value;
+      let vehicleBasePrice = basePriceEfectivo;
+      
+      if (vehicleSelectValue) {
+        vehicleBasePrice = this.getTransportVehiclePrice(vehicleSelectValue) || basePriceEfectivo;
+      }
+      
+      const quantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
+      const vehicleEfectivoTotal = vehicleBasePrice * quantity;
+      
+      // Add waiting time costs
+      const waitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
+      let waitingCostEfectivo = 0;
+      
+      if (waitingHours > 0) {
+        const wtPrice = this.getWaitingTimePrice();
+        if (wtPrice) {
+          waitingCostEfectivo = wtPrice.pricePerHour * waitingHours;
+        }
+      }
+      
+      const totalEfectivo = vehicleEfectivoTotal + waitingCostEfectivo;
+      
+      pricesByType = {
+        efectivo: totalEfectivo,
+        transferencia: totalEfectivo * (1 + (this.transferRate / 100)),
+        tarjeta: totalEfectivo * (1 + (this.agencyRate / 100))
+      };
+      
+      console.log('✅ COLLECT SERVICE DATA - Transport pricesByType fallback (includes waiting time):', {
+        vehicleEfectivoTotal,
+        waitingCostEfectivo,
+        totalEfectivo,
+        pricesByType,
+        source: 'transport fallback calculation'
+      });
     } else if (type === 'a-disposicion' && this._aDisposicionBreakdownTotals) {
       // Special handling for A Disposición - use breakdown totals that include volume discounts
       pricesByType = {
@@ -3806,6 +3857,21 @@ class ItineraryBuilder {
             baseHourlyRate,
             totalWouldHaveBeen: this.calculateServicePrice(service),
           });
+        } else if (service.type === 'transport' && service.baseVehiclePrice) {
+          // Use saved base vehicle price directly
+          priceToShow = service.baseVehiclePrice;
+          
+          console.log('🚛 Transport: Using saved base vehicle price:', {
+            baseVehiclePrice: service.baseVehiclePrice,
+            pricesByType: service.pricesByType
+          });
+        } else if (service.type === 'transport') {
+          // This shouldn't happen if data is saved correctly
+          console.warn('⚠️ FALLBACK: Transport service missing baseVehiclePrice', {
+            service: service,
+            pricesByType: service.pricesByType
+          });
+          priceToShow = service.pricesByType?.efectivo || 0;
         } else if (service.pricesByType && service.pricesByType.efectivo !== undefined) {
           // For regular services with saved prices, use the base efectivo price
           priceToShow = service.pricesByType.efectivo;
@@ -3816,8 +3882,9 @@ class ItineraryBuilder {
           });
         } else {
           // Fallback: calculate price when no saved data available
-          priceToShow = this.calculateServicePrice(service);
-          console.log('⚠️ No pricesByType data, using calculated price:', {
+          // Exclude waiting time for servicePrice field (waiting time shows in breakdown only)
+          priceToShow = this.calculateServicePrice(service, true);
+          console.log('⚠️ No pricesByType data, using calculated price (excluding waiting time):', {
             serviceType: service.type,
             calculatedPrice: priceToShow,
           });
@@ -4434,10 +4501,10 @@ class ItineraryBuilder {
         // Restore category/segmento and trigger vehicle population
         if (service.category) {
           document.getElementById('transportCategory').value = service.category;
-          // Use custom price if override is enabled, otherwise use service.price
+          // For transport: use baseVehiclePrice when not overridden
           const savedPrice = (service.priceOverride && service.customPrice !== undefined)
             ? service.customPrice
-            : (service.price || 0);
+            : (service.type === 'transport' && service.baseVehiclePrice ? service.baseVehiclePrice : service.price || 0);
           // Trigger rate selection to fetch and populate vehicles
           // Pass origin/destination from service data as fallback for race conditions
           // Strip specific location suffix from origin/destination for API lookup
@@ -4461,7 +4528,20 @@ class ItineraryBuilder {
               }
             }
             // Restore price (populateTransportVehicleDropdown resets it to 0)
-            document.getElementById('servicePrice').value = parseFloat(savedPrice).toFixed(2);
+            // Apply surcharge based on current payment type
+            const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+            let displayPrice = savedPrice;
+            
+            if (!service.priceOverride) {
+              // Apply surcharges only if not using custom price
+              if (currentPaymentType === 'transferencia') {
+                displayPrice = savedPrice * (1 + (this.transferRate / 100));
+              } else if (currentPaymentType === 'tarjeta') {
+                displayPrice = savedPrice * (1 + (this.agencyRate / 100));
+              }
+            }
+            
+            document.getElementById('servicePrice').value = parseFloat(displayPrice).toFixed(2);
             // Update capacity note now that vehicle is populated
             this.updateVehicleCapacityNote();
             // Restore waiting time
@@ -4470,6 +4550,10 @@ class ItineraryBuilder {
               if (wtHoursField) wtHoursField.value = service.waitingTimeHours;
             }
             this.updateWaitingTimeRateDisplay();
+            // Update dev payment breakdown now that transport data is loaded
+            this.updateDevPaymentBreakdown();
+            // Update service price breakdown now that transport data is loaded
+            this.updateServicePriceBreakdown();
             // Clear flag after async population is complete
             this._populatingTransportForm = false;
           });
@@ -5062,7 +5146,7 @@ class ItineraryBuilder {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  calculateServicePrice(service) {
+  calculateServicePrice(service, excludeWaitingTime = false) {
     // console.log('🔍 calculateServicePrice called for service:', service.type, service.id || 'no-id');
 
     // Walking tour: return the tier-based price (already includes duration multiplication)
@@ -5174,8 +5258,8 @@ class ItineraryBuilder {
           totalPrice += this.calculateGreeterPrice(service.routeDuration);
         }
 
-        // Add waiting time if applicable
-        if (service.waitingTimeHours > 0 && service.waitingTimePricePerHour > 0) {
+        // Add waiting time if applicable (unless excluded for price field)
+        if (!excludeWaitingTime && service.waitingTimeHours > 0 && service.waitingTimePricePerHour > 0) {
           totalPrice += service.waitingTimePricePerHour * service.waitingTimeHours;
         }
 
@@ -5209,8 +5293,8 @@ class ItineraryBuilder {
         totalPrice += this.calculateGreeterPrice(service.routeDuration);
       }
 
-      // Waiting time (Tiempo de espera)
-      if (service.waitingTimeHours > 0 && service.waitingTimePricePerHour > 0) {
+      // Waiting time (Tiempo de espera) - unless excluded for price field
+      if (!excludeWaitingTime && service.waitingTimeHours > 0 && service.waitingTimePricePerHour > 0) {
         totalPrice += service.waitingTimePricePerHour * service.waitingTimeHours;
       }
 
@@ -5935,6 +6019,200 @@ class ItineraryBuilder {
         tarjeta: tarjetaPrice
       });
       return; // Exit early, we're done with concepto
+    } else if (serviceType === 'transport') {
+      console.log('📊 Processing Transport breakdown');
+      
+      // Get trip type to apply round-trip multiplier (same logic as service breakdown)
+      const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+      const legMultiplier = tripType === 'round-trip' ? 2 : 1;
+      
+      // Handle Transport service breakdown - use the true efectivo base price
+      const selectedVehicleId = document.getElementById('vehicleSelect')?.value;
+      const quantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
+      
+      if (!selectedVehicleId || !this.transportPriceData?.vehicles) {
+        console.warn('⚠️ Transport breakdown: No vehicle selected or price data unavailable');
+        return;
+      }
+      
+      // Get the efectivo base price (originalMXN from database)
+      const efectivoBasePrice = this.getTransportVehiclePrice(selectedVehicleId) || 0;
+      if (efectivoBasePrice === 0) {
+        console.warn('⚠️ Transport breakdown: No base price found for selected vehicle');
+        return;
+      }
+      
+      // Calculate vehicle prices for each payment type
+      const vehicleTotalEfectivo = efectivoBasePrice * quantity;
+      const vehicleTotalTransferencia = vehicleTotalEfectivo * (1 + (this.transferRate / 100));
+      const vehicleTotalTarjeta = vehicleTotalEfectivo * (1 + (this.agencyRate / 100));
+      
+      // Calculate waiting time costs if applicable
+      const waitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
+      let waitingCostEfectivo = 0;
+      let waitingCostTransferencia = 0;
+      let waitingCostTarjeta = 0;
+      let waitingHourlyRate = 0;
+      
+      if (waitingHours > 0) {
+        const wtPrice = this.getWaitingTimePrice();
+        if (wtPrice) {
+          waitingHourlyRate = wtPrice.pricePerHour;
+          waitingCostEfectivo = waitingHourlyRate * waitingHours;
+          waitingCostTransferencia = waitingCostEfectivo * (1 + (this.transferRate / 100));
+          waitingCostTarjeta = waitingCostEfectivo * (1 + (this.agencyRate / 100));
+        }
+      }
+      
+      // Calculate guide costs if applicable
+      const includeGuide = document.getElementById('includeGuide')?.checked || false;
+      let guideCostEfectivo = 0;
+      let guideCostTransferencia = 0;
+      let guideCostTarjeta = 0;
+      let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
+      
+      // When editing, use saved route duration if available
+      if (this.currentServiceId && this.services.has(this.currentServiceId)) {
+        const currentService = this.services.get(this.currentServiceId);
+        if (currentService.routeDuration) {
+          routeDuration = currentService.routeDuration;
+        }
+      }
+      
+      if (includeGuide && routeDuration) {
+        guideCostEfectivo = this.calculateGuideTransportCost(routeDuration);
+        guideCostTransferencia = guideCostEfectivo; // Guide cost doesn't get surcharge
+        guideCostTarjeta = guideCostEfectivo; // Guide cost doesn't get surcharge
+      }
+      
+      // Calculate greeter costs if applicable
+      const includeGreeter = document.getElementById('includeGreeter')?.checked || false;
+      let greeterCostEfectivo = 0;
+      let greeterCostTransferencia = 0;
+      let greeterCostTarjeta = 0;
+      
+      if (includeGreeter && routeDuration) {
+        greeterCostEfectivo = this.calculateGreeterPrice(routeDuration);
+        greeterCostTransferencia = greeterCostEfectivo; // Greeter cost doesn't get surcharge
+        greeterCostTarjeta = greeterCostEfectivo; // Greeter cost doesn't get surcharge
+      }
+      
+      // Calculate total costs including waiting time, guide, and greeter
+      const totalEfectivo = vehicleTotalEfectivo + waitingCostEfectivo + guideCostEfectivo + greeterCostEfectivo;
+      const totalTransferencia = vehicleTotalTransferencia + waitingCostTransferencia + guideCostTransferencia + greeterCostTransferencia;
+      const totalTarjeta = vehicleTotalTarjeta + waitingCostTarjeta + guideCostTarjeta + greeterCostTarjeta;
+      
+      // Store totals for use in collectServiceData (like A Disposición does)
+      this._transportBreakdownTotals = {
+        efectivo: totalEfectivo,
+        transferencia: totalTransferencia,
+        tarjeta: totalTarjeta
+      };
+      
+      // Update dev payment fields  
+      const devPriceEfectivoField = document.getElementById('devPriceEfectivo');
+      const devPriceTransferenciaField = document.getElementById('devPriceTransferencia');
+      const devPriceTarjetaField = document.getElementById('devPriceTarjeta');
+      
+      // Update dev breakdown text fields
+      const devBreakdownEfectivoField = document.getElementById('devBreakdownEfectivo');
+      const devBreakdownTransferenciaField = document.getElementById('devBreakdownTransferencia');
+      const devBreakdownTarjetaField = document.getElementById('devBreakdownTarjeta');
+      
+      // Create breakdown texts for each payment type
+      const quantityText = quantity > 1 ? ` × ${quantity} vehículos` : '';
+      
+      // Build efectivo breakdown
+      let efectivoBreakdown = `Transporte: $${vehicleTotalEfectivo.toFixed(2)}`;
+      if (includeGuide && guideCostEfectivo > 0) {
+        const durationHours = (routeDuration / 60).toFixed(1);
+        const guideRate = this.guideTransportRateCache?.value || 400;
+        const formulaConfig = this.guideFormulaConfigCache || { roundTripMultiplier: 2, minimumCharge: 0 };
+        const multiplier = formulaConfig.roundTripMultiplier || 2;
+        efectivoBreakdown += `\nGuía + Chofer (${durationHours}h × ${multiplier} × $${guideRate}): $${guideCostEfectivo.toFixed(2)}`;
+      }
+      if (includeGreeter && greeterCostEfectivo > 0) {
+        const durationHours = (routeDuration / 60).toFixed(1);
+        const basePrice = this.greeterRateCache?.basePrice || 760;
+        const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
+        efectivoBreakdown += `\nGreeter ($${basePrice} + $${hourlyRate}×${durationHours}h = $${greeterCostEfectivo.toFixed(2)}): $${greeterCostEfectivo.toFixed(2)}`;
+      }
+      if (waitingHours > 0 && waitingHourlyRate > 0) {
+        efectivoBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingHourlyRate.toFixed(2)}): $${waitingCostEfectivo.toFixed(2)}`;
+      }
+      efectivoBreakdown += `\nTotal: $${totalEfectivo.toFixed(2)}`;
+      
+      // Build transferencia breakdown
+      let transferenciaBreakdown = `Transporte: $${vehicleTotalTransferencia.toFixed(2)}`;
+      if (includeGuide && guideCostTransferencia > 0) {
+        const durationHours = (routeDuration / 60).toFixed(1);
+        const guideRate = this.guideTransportRateCache?.value || 400;
+        const formulaConfig = this.guideFormulaConfigCache || { roundTripMultiplier: 2, minimumCharge: 0 };
+        const multiplier = formulaConfig.roundTripMultiplier || 2;
+        transferenciaBreakdown += `\nGuía + Chofer (${durationHours}h × ${multiplier} × $${guideRate}): $${guideCostTransferencia.toFixed(2)}`;
+      }
+      if (includeGreeter && greeterCostTransferencia > 0) {
+        const durationHours = (routeDuration / 60).toFixed(1);
+        const basePrice = this.greeterRateCache?.basePrice || 760;
+        const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
+        transferenciaBreakdown += `\nGreeter ($${basePrice} + $${hourlyRate}×${durationHours}h = $${greeterCostTransferencia.toFixed(2)}): $${greeterCostTransferencia.toFixed(2)}`;
+      }
+      if (waitingHours > 0 && waitingHourlyRate > 0) {
+        const waitingRateSurcharged = waitingHourlyRate * (1 + (this.transferRate / 100));
+        transferenciaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTransferencia.toFixed(2)}`;
+      }
+      transferenciaBreakdown += `\nRecargo transferencia (${this.transferRate}%): $${(totalTransferencia - totalEfectivo).toFixed(2)}`;
+      transferenciaBreakdown += `\nTotal: $${totalTransferencia.toFixed(2)}`;
+      
+      // Build tarjeta breakdown  
+      let tarjetaBreakdown = `Transporte: $${vehicleTotalTarjeta.toFixed(2)}`;
+      if (includeGuide && guideCostTarjeta > 0) {
+        const durationHours = (routeDuration / 60).toFixed(1);
+        const guideRate = this.guideTransportRateCache?.value || 400;
+        const formulaConfig = this.guideFormulaConfigCache || { roundTripMultiplier: 2, minimumCharge: 0 };
+        const multiplier = formulaConfig.roundTripMultiplier || 2;
+        tarjetaBreakdown += `\nGuía + Chofer (${durationHours}h × ${multiplier} × $${guideRate}): $${guideCostTarjeta.toFixed(2)}`;
+      }
+      if (includeGreeter && greeterCostTarjeta > 0) {
+        const durationHours = (routeDuration / 60).toFixed(1);
+        const basePrice = this.greeterRateCache?.basePrice || 760;
+        const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
+        tarjetaBreakdown += `\nGreeter ($${basePrice} + $${hourlyRate}×${durationHours}h = $${greeterCostTarjeta.toFixed(2)}): $${greeterCostTarjeta.toFixed(2)}`;
+      }
+      if (waitingHours > 0 && waitingHourlyRate > 0) {
+        const waitingRateSurcharged = waitingHourlyRate * (1 + (this.agencyRate / 100));
+        tarjetaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTarjeta.toFixed(2)}`;
+      }
+      tarjetaBreakdown += `\nRecargo tarjeta (${this.agencyRate}%): $${(totalTarjeta - totalEfectivo).toFixed(2)}`;
+      tarjetaBreakdown += `\nTotal: $${totalTarjeta.toFixed(2)}`;
+      
+      // Update dev payment prices with vehicle prices only (excluding waiting time)
+      if (devPriceEfectivoField) devPriceEfectivoField.value = vehicleTotalEfectivo.toFixed(2);
+      if (devPriceTransferenciaField) devPriceTransferenciaField.value = vehicleTotalTransferencia.toFixed(2);
+      if (devPriceTarjetaField) devPriceTarjetaField.value = vehicleTotalTarjeta.toFixed(2);
+      
+      // Update dev breakdown texts
+      if (devBreakdownEfectivoField) devBreakdownEfectivoField.value = efectivoBreakdown;
+      if (devBreakdownTransferenciaField) devBreakdownTransferenciaField.value = transferenciaBreakdown;
+      if (devBreakdownTarjetaField) devBreakdownTarjetaField.value = tarjetaBreakdown;
+      
+      console.log('📊 Transport breakdown - calculated from efectivo base price:', {
+        efectivoBasePrice,
+        quantity,
+        vehicleEfectivo: vehicleTotalEfectivo,
+        includeGuide,
+        guideCostEfectivo,
+        includeGreeter,
+        greeterCostEfectivo,
+        routeDuration,
+        waitingHours,
+        waitingHourlyRate,
+        waitingCostEfectivo,
+        totalEfectivo,
+        totalTransferencia,
+        totalTarjeta
+      });
+      return; // Exit early, we're done with transport
     }
 
     // Calculate breakdown for each payment type (multiply by duration for tours/hours for A Disposición)
@@ -6373,7 +6651,7 @@ class ItineraryBuilder {
     const formattedHourly = this.formatCurrency(hourlyRate);
     const formattedFinal = this.formatCurrency(finalPrice);
 
-    return `(${formattedBase} + ${formattedHourly}×${durationHours.toFixed(1)}h = ${formattedFinal}) ${source}`;
+    return `(${formattedBase} + ${formattedHourly}×${durationHours.toFixed(1)}h = ${formattedFinal})`;
   }
 
   /**
@@ -10932,34 +11210,53 @@ class ItineraryBuilder {
         }
       }
 
+      const routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
+      
+      // Get route duration - prioritize saved service data when editing
+      if (this.currentServiceId && this.services.has(this.currentServiceId)) {
+        const currentService = this.services.get(this.currentServiceId);
+        if (currentService.routeDuration) {
+          routeDuration = currentService.routeDuration;
+        }
+      }
+      
+      const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+      const brkLegMultiplier = tripType === 'round-trip' ? 2 : 1;
+      const legSuffix = tripType === 'round-trip' ? ' (×2 Ida y Regreso)' : '';
+
       if (unitPrice > 0) {
-        const displayUnit = this.getDisplayPrice(unitPrice);
-        const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
-        const vehicleLabel = tripType === 'round-trip'
-          ? `Vehículo Ida y Regreso (${quantity} × ${this.formatCurrency(displayUnit)})`
-          : `Vehículo (${quantity} × ${this.formatCurrency(displayUnit)})`;
-        items.push({ label: vehicleLabel, amountMXN: unitPrice * quantity });
+        const isGuideIncluded = document.getElementById('includeGuide')?.checked && routeDuration;
+        
+        if (isGuideIncluded) {
+          // Combined vehicle + guide line
+          const guideCost = this.calculateGuideTransportCost(routeDuration) * brkLegMultiplier;
+          const combinedTotal = (unitPrice * quantity) + guideCost;
+          const combinedUnitPrice = unitPrice + (guideCost / quantity);
+          const displayCombinedUnit = this.getDisplayPrice(combinedUnitPrice);
+          
+          const combinedLabel = tripType === 'round-trip'
+            ? `(Vehículo + Guía) Ida y Regreso (${quantity} × ${this.formatCurrency(displayCombinedUnit)})`
+            : `(Vehículo + Guía) (${quantity} × ${this.formatCurrency(displayCombinedUnit)})`;
+          items.push({ label: combinedLabel, amountMXN: combinedTotal });
+        } else {
+          // Vehicle only
+          const displayUnit = this.getDisplayPrice(unitPrice);
+          const vehicleLabel = tripType === 'round-trip'
+            ? `Vehículo Ida y Regreso (${quantity} × ${this.formatCurrency(displayUnit)})`
+            : `Vehículo (${quantity} × ${this.formatCurrency(displayUnit)})`;
+          items.push({ label: vehicleLabel, amountMXN: unitPrice * quantity });
+        }
       }
 
       // Add indicator if transport price is overridden
       if (isTransportPriceOverride && this.canEditPrices) {
         items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precio personalizado</span>', amountMXN: 0 });
       }
-
-      const routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
-      const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
-      const brkLegMultiplier = tripType === 'round-trip' ? 2 : 1;
-      const legSuffix = tripType === 'round-trip' ? ' (×2 Ida y Regreso)' : '';
-
-      if (document.getElementById('includeGuide')?.checked && routeDuration) {
-        const guideCost = this.calculateGuideTransportCost(routeDuration) * brkLegMultiplier;
-        items.push({ label: `Guía + Chofer${legSuffix}`, amountMXN: guideCost });
-      }
       if (document.getElementById('includeGreeter')?.checked && routeDuration) {
         const greeterCost = this.calculateGreeterPrice(routeDuration) * brkLegMultiplier;
         const baseGreeterCost = this.calculateGreeterPrice(routeDuration); // Cost before leg multiplier
         const formulaDisplay = this.formatGreeterFormula(routeDuration, baseGreeterCost);
-        items.push({ label: `Greeter ${formulaDisplay}${legSuffix}`, amountMXN: greeterCost });
+        items.push({ label: `Greeter${legSuffix}`, amountMXN: greeterCost });
       }
       // Tiempo de espera
       const brkWaitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
@@ -11571,10 +11868,16 @@ class ItineraryBuilder {
       userSelection: {
         direction,
         tripType,
+        transportType,
         originName,
         destinationName,
         rateId,
       },
+      willQueryAPI: {
+        origin: apiOrigin,
+        destination: apiDestination,
+        note: 'These values will be sent to /api/services/prices-by-route'
+      }
     });
 
     if (tripType !== 'round-trip' && direction === 'departure') {
@@ -11621,12 +11924,45 @@ class ItineraryBuilder {
         vehiclesReturned: result.data.vehicles?.length || 0,
         vehicles: result.data.vehicles?.map((v) => ({
           type: v.vehicleType,
+          vehicleTypeId: v.vehicleTypeId,
           basePrice: v.basePrice,
           clientPrice: v.clientPrice,
           finalPrice: v.finalPrice,
           isClientPrice: v.isClientPrice,
+          priceSource: v.isClientPrice ? 'CLIENT_SPECIFIC' : 'STANDARD_RATE',
+          // Database record identifiers
+          ratePriceId: v.ratePriceId || v.id || v.recordId,
+          routeId: v.routeId,
+          rateId: v.rateId,
+          // Show any other ID fields that might exist
+          allFields: Object.keys(v),
         })),
+        routeDuration: result.data.routeDuration,
+        rawResponse: result.data,
       });
+      
+      // Special logging for debugging San Miguel -> AGU price
+      if (apiOrigin.includes('San Miguel') && apiDestination.includes('AGU')) {
+        console.log('🔍 DEBUGGING San Miguel → AGU Price:', {
+          origin: apiOrigin,
+          destination: apiDestination, 
+          rate: rateId,
+          vehiclePrices: result.data.vehicles?.map(v => ({
+            vehicle: v.vehicleType,
+            vehicleTypeId: v.vehicleTypeId,
+            basePrice: v.basePrice,
+            clientPrice: v.clientPrice,
+            finalPrice: v.finalPrice,
+            calculation: v.isClientPrice ? 'Using client-specific price' : 'Using standard rate',
+            // Database record IDs for lookup
+            ratePriceId: v.ratePriceId || v.id || v.recordId || 'NO_ID_FOUND',
+            routeId: v.routeId || 'NO_ROUTE_ID',
+            rateId: v.rateId || 'NO_RATE_ID',
+            databaseLookup: 'Query RatePrices table with these IDs',
+            fullRecord: v, // Complete record for debugging
+          }))
+        });
+      }
 
       // Cache the transport price data for vehicle selection
       this.transportPriceData = result.data;
@@ -11705,8 +12041,37 @@ class ItineraryBuilder {
         clientPrice: vehicle.clientPrice,
         finalPrice: vehicle.finalPrice,
         isClientPrice: vehicle.isClientPrice,
+        priceUsed: 'finalPrice',
+        priceValue: vehicle.finalPrice,
       } : 'NOT FOUND',
+      allAvailableVehicles: this.transportPriceData.vehicles?.map(v => ({
+        id: v.vehicleTypeId,
+        type: v.vehicleType, 
+        finalPrice: v.finalPrice
+      }))
     });
+    
+    // Special debug for problematic price
+    if (vehicle && vehicle.finalPrice === 1624) {
+      console.log('⚠️ FOUND 1624 PRICE - INVESTIGATE SOURCE:', {
+        vehicleType: vehicle.vehicleType,
+        vehicleTypeId: vehicle.vehicleTypeId,
+        basePrice: vehicle.basePrice,
+        clientPrice: vehicle.clientPrice,
+        finalPrice: vehicle.finalPrice,
+        isClientPrice: vehicle.isClientPrice,
+        explanation: vehicle.isClientPrice 
+          ? 'This is a CLIENT-SPECIFIC price from the database'
+          : 'This is the STANDARD RATE from traslados table',
+        // Database record IDs for exact lookup
+        ratePriceId: vehicle.ratePriceId || vehicle.id || vehicle.recordId || 'NO_ID_FOUND',
+        routeId: vehicle.routeId || 'NO_ROUTE_ID',
+        rateId: vehicle.rateId || 'NO_RATE_ID', 
+        databaseQuery: 'SELECT * FROM RatePrices WHERE objectId = [ratePriceId]',
+        checkDatabase: 'Query RatePrices table with the ratePriceId above',
+        completeVehicleRecord: vehicle // Shows all available fields
+      });
+    }
 
     return vehicle ? vehicle.finalPrice : null;
   }
@@ -11878,7 +12243,8 @@ class ItineraryBuilder {
 
     const wtPrice = this.getWaitingTimePrice();
     if (wtPrice) {
-      rateEl.textContent = `$${wtPrice.pricePerHour.toLocaleString()} ${wtPrice.currency}/hora`;
+      const surcharged = this.getDisplayPrice(wtPrice.pricePerHour);
+      rateEl.textContent = `$${surcharged.toFixed(2)} ${wtPrice.currency}/hora`;
     } else {
       rateEl.textContent = '';
     }
@@ -11896,36 +12262,53 @@ class ItineraryBuilder {
 
     const vehicleSelect = document.getElementById('vehicleSelect');
     const selectedVehicleId = vehicleSelect?.value;
-    let basePrice = 0;
-
-    // Try to get vehicle base price from cached API data
+    
+    // Always get the true efectivo base price (originalMXN) from cached API data
+    let efectivoBasePrice = 0;
     if (selectedVehicleId && this.transportPriceData?.vehicles) {
-      basePrice = this.getTransportVehiclePrice(selectedVehicleId) || 0;
+      efectivoBasePrice = this.getTransportVehiclePrice(selectedVehicleId) || 0;
+      console.log('🔍 Transport base price source (efectivo from API):', {
+        vehicleId: selectedVehicleId,
+        efectivoBasePrice,
+        source: 'transportPriceData.vehicles'
+      });
     }
 
-    // Fallback: if no cached data, read current price field (which has the vehicle price)
-    if (basePrice === 0 && selectedVehicleId) {
-      if (!this._lastTransportBasePrice) {
-        const currentPrice = parseFloat(document.getElementById('servicePrice')?.value || 0);
-        basePrice = currentPrice;
-      } else {
-        basePrice = this._lastTransportBasePrice;
-      }
+    // If no cached data available, we cannot calculate properly - return early
+    if (efectivoBasePrice === 0 || !selectedVehicleId) {
+      console.warn('⚠️ No transport price data available - cannot calculate surcharged prices');
+      return;
     }
 
-    // Cache the base price for later use
-    if (basePrice > 0 && this.transportPriceData?.vehicles) {
-      this._lastTransportBasePrice = basePrice;
-    }
+    // Cache the efectivo base price for consistency
+    this._lastTransportBasePrice = efectivoBasePrice;
 
-    // Multiply vehicle price by quantity (number of vehicles)
+    // Multiply vehicle price by quantity (number of vehicles) 
     const quantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
-    const vehiclePrice = basePrice * quantity;
+    const vehicleEfectivoTotal = efectivoBasePrice * quantity;
 
-    // For the price field, we only show the vehicle price (client or base)
-    // Surcharges are calculated for the breakdown but not added to the field
-    console.log('🔧 Vehicle price (for field):', vehiclePrice);
-    this.updatePriceField(vehiclePrice);
+    // Calculate and display price based on selected payment type
+    const selectedPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    let displayPrice;
+
+    if (selectedPaymentType === 'efectivo') {
+      // Efectivo = base price (no surcharge)
+      displayPrice = vehicleEfectivoTotal;
+    } else {
+      // Other payment types = base price + surcharge
+      displayPrice = this.getDisplayPrice(vehicleEfectivoTotal);
+    }
+
+    console.log('🔧 Transport vehicle price calculation:', {
+      efectivoBasePrice,
+      quantity,
+      vehicleEfectivoTotal,
+      selectedPaymentType,
+      displayPrice,
+      surchargeApplied: displayPrice !== vehicleEfectivoTotal
+    });
+
+    this.updatePriceField(displayPrice);
 
     // Update breakdown after transport price recalculation
     this.updateServicePriceBreakdown();

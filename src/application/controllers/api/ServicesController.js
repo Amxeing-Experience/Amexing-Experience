@@ -339,8 +339,15 @@ class ServicesController {
       // Filter for aeropuerto services only
       const filterAeropuerto = req.query.filterAeropuerto === 'true';
 
-      // Optional active filter (true/false)
-      const activeFilter = req.query.active;
+      // Support includeInactive parameter for admin views (like tours)
+      const includeInactive = req.query.includeInactive === 'true';
+
+      // Debug logging
+      logger.info('ServicesController.getServices - Query parameters:', {
+        includeInactive,
+        filterAeropuerto,
+        userId: currentUser.id,
+      });
 
       // Column mapping for sorting (matches frontend columns order)
       const columns = [
@@ -412,11 +419,12 @@ class ServicesController {
           const originQuery = new Parse.Query('Services');
           originQuery.containedIn('originPOI', aeropuertoPOIs);
           originQuery.equalTo('exists', true);
-          // Default to active=true unless explicitly requesting inactive
-          if (activeFilter === 'false') {
-            originQuery.equalTo('active', false);
+          // Apply active filter based on includeInactive parameter (similar to tours)
+          if (includeInactive) {
+            // When includeInactive is true, don't filter by active status at all
+            // This shows both active and inactive services
           } else {
-            // Default behavior: show only active services
+            // Default behavior: only show active services
             originQuery.equalTo('active', true);
           }
           originQuery.include('originPOI');
@@ -429,11 +437,12 @@ class ServicesController {
           const destQuery = new Parse.Query('Services');
           destQuery.containedIn('destinationPOI', aeropuertoPOIs);
           destQuery.equalTo('exists', true);
-          // Default to active=true unless explicitly requesting inactive
-          if (activeFilter === 'false') {
-            destQuery.equalTo('active', false);
+          // Apply active filter based on includeInactive parameter (similar to tours)
+          if (includeInactive) {
+            // When includeInactive is true, don't filter by active status at all
+            // This shows both active and inactive services
           } else {
-            // Default behavior: show only active services
+            // Default behavior: only show active services
             destQuery.equalTo('active', true);
           }
           destQuery.include('originPOI');
@@ -449,11 +458,12 @@ class ServicesController {
           query = new Parse.Query('Services');
           // Apply common filters
           query.equalTo('exists', true);
-          // Default to active=true unless explicitly requesting inactive
-          if (activeFilter === 'false') {
-            query.equalTo('active', false);
+          // Apply active filter based on includeInactive parameter (similar to tours)
+          if (includeInactive) {
+            // When includeInactive is true, don't filter by active status at all
+            // This shows both active and inactive services
           } else {
-            // Default behavior: show only active services
+            // Default behavior: only show active services
             query.equalTo('active', true);
           }
           query.include('originPOI');
@@ -491,11 +501,12 @@ class ServicesController {
           query.include('vehicleType');
           query.include('rate');
 
-          // Default to active=true unless explicitly requesting inactive
-          if (activeFilter === 'false') {
-            query.equalTo('active', false);
+          // Apply active filter based on includeInactive parameter (similar to tours)
+          if (includeInactive) {
+            // When includeInactive is true, don't filter by active status at all
+            // This shows both active and inactive services
           } else {
-            // Default behavior: show only active services
+            // Default behavior: only show active services
             query.equalTo('active', true);
           }
 
@@ -1121,7 +1132,7 @@ class ServicesController {
         filteredRecords: recordsFiltered,
         searchValue: searchValue || null,
         filterAeropuerto,
-        activeFilter: activeFilter || null,
+        includeInactive,
       });
 
       // Add cache-busting headers to ensure fresh pricing data
