@@ -470,9 +470,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         </div>
                                     </div>
                                     <div class="row">
-                                        <div class="col-md-12 mb-3">
-                                            <label for="flightTime" class="form-label">Hora de Llegada</label>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="flightTime" class="form-label">Hora Vuelo</label>
                                             <input type="text" class="form-control time-input" id="flightTime" placeholder="__:__" maxlength="5">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="flightDepartureTimeSuggested" class="form-label">Hora de salida sugerida</label>
+                                            <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" placeholder="__:__" maxlength="5">
+                                            <small class="text-muted">Se calculará automáticamente al seleccionar un segmento</small>
                                         </div>
                                         <!-- Removed Número de Personas field as requested
                                         <div class="col-md-6 mb-3">
@@ -534,8 +539,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="date" class="form-control" id="roundTripDateIda">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripTimeIda" class="form-label" id="roundTripTimeIdaLabel">Hora de Llegada</label>
+                                            <label for="roundTripTimeIda" class="form-label" id="roundTripTimeIdaLabel">Hora Vuelo</label>
                                             <input type="text" class="form-control time-input" id="roundTripTimeIda" placeholder="__:__" maxlength="5">
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-12 mb-3">
+                                            <label for="roundTripDepartureTimeSuggestedIda" class="form-label">Hora de salida sugerida</label>
+                                            <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedIda" placeholder="__:__" maxlength="5">
+                                            <small class="text-muted">Se calculará automáticamente al seleccionar un segmento</small>
                                         </div>
                                     </div>
 
@@ -602,8 +614,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="date" class="form-control" id="roundTripDateVuelta">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripTimeVuelta" class="form-label" id="roundTripTimeVueltaLabel">Hora de Salida</label>
+                                            <label for="roundTripTimeVuelta" class="form-label" id="roundTripTimeVueltaLabel">Hora Vuelo</label>
                                             <input type="text" class="form-control time-input" id="roundTripTimeVuelta" placeholder="__:__" maxlength="5">
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-12 mb-3">
+                                            <label for="roundTripDepartureTimeSuggestedVuelta" class="form-label">Hora de salida sugerida</label>
+                                            <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedVuelta" placeholder="__:__" maxlength="5">
+                                            <small class="text-muted">Se calculará automáticamente al seleccionar un segmento</small>
                                         </div>
                                     </div>
 

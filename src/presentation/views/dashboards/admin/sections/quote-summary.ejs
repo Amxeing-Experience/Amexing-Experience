@@ -1129,6 +1129,33 @@
                         }
                         if (sc.includeGuide) html += '<div class="sm-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Guía + Chofer</div>';
                         if (sc.includeGreeter) html += '<div class="sm-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>';
+                        
+                        // Add additional vehicle information for tours
+                        if (sc.additionalVehicle || sc.additionalVehicleType || sc.additionalVehicleTypeName) {
+                            const additionalVehicleName = sc.additionalVehicleTypeName || sc.additionalVehicleType || 'Vehículo adicional';
+                            html += `<div class="sm-service-detail" style="color: #0d6efd;"><i class="ti ti-plus"></i>Adicional: ${additionalVehicleName}</div>`;
+                        }
+                    } else if (sc.type === 'a-disposicion') {
+                        const conceptName = sc.concept || sc.tourName || sc.serviceType || 'A Disposición';
+                        html += `<span class="sm-service-name">${conceptName}</span></div>`;
+                        if (sc.time) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.time}</div>`;
+                        
+                        // Add A Disposición specific details
+                        const hoursText = sc.hours ? `${sc.hours} horas` : '';
+                        const vehicleCountText = sc.vehicleCount && sc.vehicleCount > 1 ? `${sc.vehicleCount} vehículos` : '';
+                        
+                        if (hoursText && vehicleCountText) {
+                            html += `<div class="sm-service-detail"><i class="ti ti-clock-hour-4"></i>${hoursText} • <i class="ti ti-car"></i>${vehicleCountText}</div>`;
+                        } else if (hoursText) {
+                            html += `<div class="sm-service-detail"><i class="ti ti-clock-hour-4"></i>${hoursText}</div>`;
+                        } else if (vehicleCountText) {
+                            html += `<div class="sm-service-detail"><i class="ti ti-car"></i>${vehicleCountText}</div>`;
+                        }
+                        
+                        if (sc.vehicleType || sc.vehicleTypeName) {
+                            html += `<div class="sm-service-detail"><i class="ti ti-car"></i>${sc.vehicleTypeName || sc.vehicleType}</div>`;
+                        }
+                        if (sc.includeGuide) html += '<div class="sm-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Chofer</div>';
                     } else {
                         const conceptName = sc.concept || sc.tourName || sc.serviceType || 'Sin especificar';
                         html += `<span class="sm-service-name">${conceptName}</span></div>`;
@@ -1253,6 +1280,13 @@
         if (sc.includeGuide) html += '<div class="sm-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Guía + Chofer</div>';
         if (sc.includeGreeter) html += '<div class="sm-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>';
         if (sc.waitingTimeHours > 0) html += `<div class="sm-service-detail" style="color: #fd7e14;"><i class="ti ti-clock"></i>Tiempo de espera: ${sc.waitingTimeHours}h</div>`;
+        
+        // Add additional vehicle information for transport
+        if (sc.additionalVehicle || sc.additionalVehicleType || sc.additionalVehicleTypeName) {
+            const additionalVehicleName = sc.additionalVehicleTypeName || sc.additionalVehicleType || 'Vehículo adicional';
+            html += `<div class="sm-service-detail" style="color: #0d6efd;"><i class="ti ti-plus"></i>Adicional: ${additionalVehicleName}</div>`;
+        }
+        
         return html;
     }
 

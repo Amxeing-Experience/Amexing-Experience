@@ -318,6 +318,7 @@ class QuoteOwnership extends BaseModel {
     let originalEndDate = null;
     let originalCurrentFlag = null;
     let newOwnership = null;
+    let deactivatedCollaborations = [];
 
     try {
       currentOwnership = await currentQuery.first({ useMasterKey: true });
@@ -386,6 +387,52 @@ class QuoteOwnership extends BaseModel {
       await currentOwnership.save(null, { useMasterKey: true });
       logger.info('Previous ownership record updated', { currentOwnershipId: currentOwnership.id });
 
+      // Step 3: Deactivate any collaboration access for the previous owner
+      try {
+        const prevOwnerAccessQuery = new Parse.Query('QuoteAccess');
+        prevOwnerAccessQuery.equalTo('quote', quote);
+        prevOwnerAccessQuery.equalTo('agent', fromOwner);
+        prevOwnerAccessQuery.equalTo('active', true);
+        prevOwnerAccessQuery.equalTo('exists', true);
+
+        const prevOwnerAccess = await prevOwnerAccessQuery.find({ useMasterKey: true });
+
+        if (prevOwnerAccess.length > 0) {
+          logger.info('Deactivating collaboration access for previous owner', {
+            quoteId: quote.id,
+            fromOwnerId: fromOwner.id,
+            collaborationRecordsCount: prevOwnerAccess.length,
+          });
+
+          // Store original state for potential rollback
+          deactivatedCollaborations = prevOwnerAccess.map((access) => ({
+            id: access.id,
+            originalActive: access.get('active'),
+            originalExists: access.get('exists'),
+          }));
+
+          // Deactivate all collaboration records for previous owner
+          for (const access of prevOwnerAccess) {
+            access.set('active', false);
+            access.set('exists', false);
+            await access.save(null, { useMasterKey: true });
+          }
+
+          logger.info('Deactivated collaboration access for previous owner', {
+            quoteId: quote.id,
+            fromOwnerId: fromOwner.id,
+            deactivatedCount: prevOwnerAccess.length,
+          });
+        }
+      } catch (collaborationError) {
+        logger.warn('Failed to deactivate previous owner collaboration - continuing with transfer', {
+          error: collaborationError.message,
+          quoteId: quote.id,
+          fromOwnerId: fromOwner.id,
+        });
+        // Don't fail the entire transfer if collaboration cleanup fails
+      }
+
       logger.info('Transferred quote ownership successfully', {
         quoteId: quote.id,
         fromOwnerId: fromOwner.id,
@@ -419,6 +466,36 @@ class QuoteOwnership extends BaseModel {
           currentOwnership.setIsCurrent(originalCurrentFlag);
           await currentOwnership.save(null, { useMasterKey: true });
           logger.info('Rolled back: restored previous ownership record', { currentOwnershipId: currentOwnership.id });
+        }
+
+        // If collaboration was deactivated, restore it
+        if (deactivatedCollaborations.length > 0) {
+          logger.info('Rolling back collaboration deactivation', {
+            quoteId: quote.id,
+            fromOwnerId: fromOwner?.id,
+            collaborationsToRestore: deactivatedCollaborations.length,
+          });
+
+          for (const collaborationInfo of deactivatedCollaborations) {
+            try {
+              const QuoteAccess = Parse.Object.extend('QuoteAccess');
+              const accessRecord = QuoteAccess.createWithoutData(collaborationInfo.id);
+              accessRecord.set('active', collaborationInfo.originalActive);
+              accessRecord.set('exists', collaborationInfo.originalExists);
+              await accessRecord.save(null, { useMasterKey: true });
+            } catch (restoreError) {
+              logger.warn('Failed to restore individual collaboration record', {
+                collaborationId: collaborationInfo.id,
+                error: restoreError.message,
+              });
+            }
+          }
+
+          logger.info('Rolled back: restored collaboration access for previous owner', {
+            quoteId: quote.id,
+            fromOwnerId: fromOwner?.id,
+            restoredCount: deactivatedCollaborations.length,
+          });
         }
       } catch (rollbackError) {
         logger.error('Rollback failed - manual intervention required', {

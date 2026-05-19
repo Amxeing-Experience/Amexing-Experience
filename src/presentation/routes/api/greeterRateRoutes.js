@@ -65,7 +65,7 @@ router.get(
 router.get(
   '/formula',
   readRateLimit,
-  jwtMiddleware.requireRoleLevel(6), // Admin level and above
+  jwtMiddleware.requireRoleLevel(2), // Driver level and above (includes client, department_manager, admin, superadmin)
   (req, res) => greeterRateController.getFormulaConfiguration(req, res)
 );
 

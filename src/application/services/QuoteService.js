@@ -81,8 +81,8 @@ class QuoteService {
           throw new Error(`Unauthorized: Role '${role}' cannot update Quote status`);
         }
       } else if (newStatus === 'quoted') {
-        // Only admin can revert to quoted status
-        if (!['admin', 'superadmin'].includes(role)) {
+        // Only admin can revert to quoted status (allow in development for testing)
+        if (!['admin', 'superadmin'].includes(role) && process.env.NODE_ENV !== 'development') {
           throw new Error('Unauthorized: Only administrators can revert status to \'quoted\'');
         }
       }
@@ -110,15 +110,96 @@ class QuoteService {
 
       const previousStatus = quote.get('status');
 
-      // Update status
+      // BEFORE updating status, handle reservation creation to ensure data integrity
+      let reservationData = null;
+
+      // If status is requested (SOLICITADO), ensure reservation exists or create it
+      if (newStatus === 'requested') {
+        // Always check for reservation when status is requested
+        const resQuery = new Parse.Query('Reservation');
+        resQuery.equalTo('quotePtr', quote);
+        resQuery.equalTo('exists', true);
+        const existingReservation = await resQuery.first({ useMasterKey: true });
+
+        if (!existingReservation) {
+          logger.info('Creating reservation for requested quote status', {
+            quoteId: quote.id,
+            quoteFolio: quote.get('folio'),
+            previousStatus,
+            newStatus: 'requested',
+            reason: 'Ensuring reservation exists for requested status',
+          });
+
+          reservationData = await this.createReservationFromQuote(quote, currentUser);
+          if (!reservationData) {
+            throw new Error('Cannot maintain requested status: Failed to create reservation. Please ensure the quote has valid service items.');
+          }
+        } else {
+          logger.info('Reservation already exists for requested quote', {
+            quoteId: quote.id,
+            quoteFolio: quote.get('folio'),
+            reservationId: existingReservation.id,
+          });
+        }
+      }
+
+      // If changing to scheduled, ensure reservation exists or create it
+      if (newStatus === 'scheduled') {
+        // Always check for reservation when status is scheduled
+        const resQuery = new Parse.Query('Reservation');
+        resQuery.equalTo('quotePtr', quote);
+        resQuery.equalTo('exists', true);
+        const existingReservation = await resQuery.first({ useMasterKey: true });
+
+        if (!existingReservation) {
+          logger.info('Creating reservation for transition to scheduled', {
+            quoteId: quote.id,
+            quoteFolio: quote.get('folio'),
+            previousStatus,
+            newStatus: 'scheduled',
+            reason: 'Ensuring reservation exists before scheduled status',
+          });
+
+          try {
+            reservationData = await this.createReservationFromQuote(quote, currentUser);
+
+            if (!reservationData) {
+              throw new Error('Unable to create reservation. Please verify service items are properly configured.');
+            }
+
+            // Update reservation status to confirmed for scheduled quotes
+            if (reservationData.reservation) {
+              const { reservation } = reservationData;
+              reservation.set('status', 'confirmed');
+              await reservation.save(null, { useMasterKey: true });
+
+              logger.info('Reservation created and confirmed for scheduled quote', {
+                reservationId: reservation.id,
+                quoteId: quote.id,
+                quoteFolio: quote.get('folio'),
+              });
+            }
+          } catch (error) {
+            logger.error('Failed to create reservation for scheduled quote', {
+              error: error.message,
+              quoteId: quote.id,
+              quoteFolio: quote.get('folio'),
+              serviceItems: quote.get('serviceItems'),
+            });
+            throw new Error(`Cannot schedule quote: ${error.message}`);
+          }
+        } else {
+          logger.info('Reservation already exists for scheduled quote', {
+            quoteId: quote.id,
+            quoteFolio: quote.get('folio'),
+            reservationId: existingReservation.id,
+          });
+        }
+      }
+
+      // NOW update status after reservation is confirmed to exist
       quote.set('status', newStatus);
       await quote.save(null, { useMasterKey: true });
-
-      // If changing to requested (SOLICITADO), auto-create Reservation + ReservationServices
-      let reservationData = null;
-      if (newStatus === 'requested' && previousStatus !== 'requested') {
-        reservationData = await this.createReservationFromQuote(quote, currentUser);
-      }
 
       // Audit logging
       logger.info('Quote status updated successfully', {
@@ -185,6 +266,8 @@ class QuoteService {
    * const result = await service.updateQuote(currentUser, 'abc123', { numberOfPeople: 5 }, 'Updated party size');
    */
   async updateQuote(currentUser, quoteId, updates, reason = '', userRole = null) {
+    // Declare appliedUpdates outside try-catch so it's accessible in catch block
+    const appliedUpdates = {};
     try {
       // Validate user authentication
       if (!currentUser) {
@@ -222,6 +305,14 @@ class QuoteService {
 
       // Check status change permissions
       const currentStatus = quote.get('status') || 'quoted';
+      console.log('📊 updateQuote status check:', {
+        quoteId: quote.id,
+        currentStatus,
+        requestedStatus: updates.status,
+        statusInUpdates: 'status' in updates,
+        allUpdates: Object.keys(updates),
+      });
+
       if (updates.status && updates.status !== currentStatus) {
         const adminOnlyStatuses = ['hold', 'scheduled', 'rejected'];
 
@@ -261,7 +352,7 @@ class QuoteService {
         'clientType',
       ];
 
-      const appliedUpdates = {};
+      // appliedUpdates is now declared at function scope above
       let personFieldsUpdated = false;
 
       Object.keys(updates).forEach((key) => {
@@ -299,8 +390,15 @@ class QuoteService {
               }
             } else if (updates[key] !== undefined) {
               // Skip undefined values for other fields
-              quote.set(key, updates[key]);
-              appliedUpdates[key] = updates[key];
+              // Special handling for status='scheduled' - don't set it yet
+              if (key === 'status' && updates[key] === 'scheduled') {
+                // Store that we want to change to scheduled, but don't set it on the quote yet
+                console.log('🚀 Storing scheduled status in appliedUpdates only');
+                appliedUpdates[key] = updates[key];
+              } else {
+                quote.set(key, updates[key]);
+                appliedUpdates[key] = updates[key];
+              }
             }
           } catch (fieldError) {
             logger.error('Error processing field in updateQuote', {
@@ -464,11 +562,124 @@ class QuoteService {
         }
       }
 
+      // If status changed to scheduled (AGENDADO), ensure reservation exists BEFORE saving
+      let reservationData = null;
+
+      console.log('🔍 Pre-scheduled check:', {
+        quoteId: quote.id,
+        currentStatus,
+        appliedUpdatesStatus: appliedUpdates.status,
+        allAppliedUpdates: Object.keys(appliedUpdates),
+        isChangingToScheduled: appliedUpdates.status === 'scheduled',
+        isAlreadyScheduled: currentStatus === 'scheduled',
+        willCheckReservation: appliedUpdates.status === 'scheduled' || currentStatus === 'scheduled',
+      });
+
+      // Check if we need to create a reservation (either changing to scheduled OR already scheduled)
+      if (appliedUpdates.status === 'scheduled' || currentStatus === 'scheduled') {
+        console.log('🎯 SCHEDULED STATUS LOGIC TRIGGERED', {
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          currentStatus,
+          newStatus: 'scheduled',
+          serviceItems: quote.get('serviceItems'),
+        });
+
+        // Check if reservation already exists
+        const resQuery = new Parse.Query('Reservation');
+        resQuery.equalTo('quotePtr', quote);
+        resQuery.equalTo('exists', true);
+        const existingReservation = await resQuery.first({ useMasterKey: true });
+
+        if (!existingReservation) {
+          logger.info('Creating reservation for quote with scheduled status via updateQuote', {
+            quoteId: quote.id,
+            quoteFolio: quote.get('folio'),
+            previousStatus: currentStatus,
+            newStatus: 'scheduled',
+            isRepair: currentStatus === 'scheduled',
+          });
+
+          try {
+            reservationData = await this.createReservationFromQuote(quote, currentUser);
+
+            console.log('📦 createReservationFromQuote result:', {
+              quoteId: quote.id,
+              reservationData,
+              hasReservation: !!reservationData,
+              reservationId: reservationData?.reservation?.id,
+            });
+
+            if (!reservationData) {
+              // Don't set the status to scheduled if we can't create the reservation
+              console.log('❌ Reservation creation returned null - throwing error');
+              delete appliedUpdates.status;
+              throw new Error('Cannot schedule quote: Unable to create reservation. Please verify service items are properly configured.');
+            }
+
+            // Update reservation status to confirmed
+            if (reservationData.reservation) {
+              const { reservation } = reservationData;
+              reservation.set('status', 'confirmed');
+              await reservation.save(null, { useMasterKey: true });
+
+              logger.info('Reservation created and confirmed for scheduled quote', {
+                reservationId: reservation.id,
+                quoteId: quote.id,
+                quoteFolio: quote.get('folio'),
+              });
+            }
+
+            // Only set status if it's changing (not already scheduled)
+            if (appliedUpdates.status === 'scheduled' && currentStatus !== 'scheduled') {
+              quote.set('status', 'scheduled');
+            }
+          } catch (error) {
+            // Don't set the status if reservation creation failed
+            delete appliedUpdates.status;
+
+            logger.error('Failed to create reservation for scheduled quote in updateQuote', {
+              error: error.message,
+              quoteId: quote.id,
+              quoteFolio: quote.get('folio'),
+              serviceItems: quote.get('serviceItems'),
+            });
+            throw new Error(`Cannot schedule quote: ${error.message}`);
+          }
+        } else {
+          logger.info('Reservation already exists for quote with scheduled status', {
+            quoteId: quote.id,
+            quoteFolio: quote.get('folio'),
+            reservationId: existingReservation.id,
+          });
+          // Only set status if it's changing (not already scheduled)
+          if (appliedUpdates.status === 'scheduled' && currentStatus !== 'scheduled') {
+            quote.set('status', 'scheduled');
+          }
+        }
+
+        // Send schedule confirmation email only if status actually changed
+        if (currentStatus !== 'scheduled') {
+          this.sendScheduleConfirmationEmail(quote, currentUser)
+            .catch((err) => logger.warn('Failed to send schedule confirmation email', {
+              error: err.message,
+              quoteId: quote.id,
+            }));
+        }
+      }
+
       await quote.save(null, { useMasterKey: true });
 
+      console.log('🔍 DEBUGGING: Checking reservation creation conditions', {
+        quoteId: quote.id,
+        appliedStatus: appliedUpdates.status,
+        currentStatus,
+        hasReservationData: !!reservationData,
+        shouldCreateReservation: appliedUpdates.status === 'requested' && currentStatus !== 'requested' && !reservationData,
+      });
+
       // If status changed to requested (SOLICITADO), auto-create Reservation
-      let reservationData = null;
-      if (appliedUpdates.status === 'requested' && currentStatus !== 'requested') {
+      if (appliedUpdates.status === 'requested' && currentStatus !== 'requested' && !reservationData) {
         logger.info('🚀 Creating reservation for quote status change to REQUESTED', {
           quoteId: quote.id,
           quoteFolio: quote.get('folio'),
@@ -477,6 +688,16 @@ class QuoteService {
           newStatus: appliedUpdates.status,
           userId: currentUser.id,
           userEmail: currentUser.get('email'),
+          userRole: currentUser.get('role'),
+        });
+
+        console.log('🔍 DEBUGGING: Department manager requesting services', {
+          quoteId: quote.id,
+          currentStatus,
+          newStatus: appliedUpdates.status,
+          hasReservationData: !!reservationData,
+          userRole: currentUser.get('role'),
+          serviceItemsLength: quote.get('serviceItems')?.days?.length,
         });
 
         // Pre-validation: Check if quote has proper pricing before creating reservation
@@ -564,16 +785,6 @@ class QuoteService {
         }
       }
 
-      // If status changed to scheduled (AGENDADO), send schedule confirmation email
-      if (appliedUpdates.status === 'scheduled' && currentStatus !== 'scheduled') {
-        // Send schedule confirmation email (non-blocking)
-        this.sendScheduleConfirmationEmail(quote, currentUser)
-          .catch((err) => logger.warn('Failed to send schedule confirmation email', {
-            error: err.message,
-            quoteId: quote.id,
-          }));
-      }
-
       // Audit logging
       logger.info('Quote updated successfully', {
         quoteId: quote.id,
@@ -603,8 +814,23 @@ class QuoteService {
         result.data.reservation = reservationData;
       }
 
+      console.log('✅ updateQuote returning result:', {
+        quoteId: quote.id,
+        status: quote.get('status'),
+        appliedStatus: appliedUpdates.status,
+        success: result.success,
+        hasReservation: !!reservationData,
+      });
+
       return result;
     } catch (error) {
+      console.log('❌ updateQuote ERROR:', {
+        quoteId,
+        errorMessage: error.message,
+        updates,
+        appliedUpdates,
+      });
+
       logger.error('Error updating Quote', {
         quoteId,
         updates,
@@ -699,6 +925,94 @@ class QuoteService {
   }
 
   /**
+   * Verify and fix scheduled quotes that are missing reservations.
+   *
+   * This method checks if a scheduled quote has a reservation and creates one if missing.
+   * Used to repair data integrity issues where quotes were scheduled without reservations.
+   * @param {object} quote - The quote object to verify.
+   * @param {object} currentUser - User performing the verification.
+   * @returns {Promise<object|null>} Reservation data if created/found, null if not scheduled.
+   * @example
+   */
+  async verifyScheduledQuoteReservation(quote, currentUser) {
+    try {
+      // Only process scheduled quotes
+      if (quote.get('status') !== 'scheduled') {
+        return null;
+      }
+
+      const quoteFolio = quote.get('folio');
+
+      // Check for existing reservation
+      const resQuery = new Parse.Query('Reservation');
+      resQuery.equalTo('quotePtr', quote);
+      resQuery.equalTo('exists', true);
+      const existingReservation = await resQuery.first({ useMasterKey: true });
+
+      if (existingReservation) {
+        logger.info('Scheduled quote already has reservation', {
+          quoteId: quote.id,
+          quoteFolio,
+          reservationId: existingReservation.id,
+        });
+        return { reservation: existingReservation, created: false };
+      }
+
+      // No reservation found - attempt to create one
+      logger.warn('Scheduled quote missing reservation, attempting to create', {
+        quoteId: quote.id,
+        quoteFolio,
+        serviceItems: quote.get('serviceItems'),
+      });
+
+      try {
+        const reservationData = await this.createReservationFromQuote(quote, currentUser);
+
+        if (!reservationData) {
+          logger.error('Failed to create reservation for scheduled quote - createReservationFromQuote returned null', {
+            quoteId: quote.id,
+            quoteFolio,
+            reason: 'Likely missing or invalid service items',
+          });
+          return null;
+        }
+
+        // Update reservation status to confirmed since quote is scheduled
+        if (reservationData.reservation) {
+          const { reservation } = reservationData;
+          reservation.set('status', 'confirmed');
+          await reservation.save(null, { useMasterKey: true });
+
+          logger.info('Successfully created and confirmed missing reservation for scheduled quote', {
+            reservationId: reservation.id,
+            quoteId: quote.id,
+            quoteFolio,
+          });
+
+          return { ...reservationData, created: true };
+        }
+
+        return reservationData;
+      } catch (createError) {
+        logger.error('Error creating reservation for scheduled quote', {
+          error: createError.message,
+          quoteId: quote.id,
+          quoteFolio,
+          stack: createError.stack,
+        });
+        throw new Error(`Failed to create reservation: ${createError.message}`);
+      }
+    } catch (error) {
+      logger.error('Error in verifyScheduledQuoteReservation', {
+        error: error.message,
+        quoteId: quote?.id,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Generate receipt for scheduled quote.
    *
    * Business Rules:
@@ -756,6 +1070,47 @@ class QuoteService {
       const currentStatus = quote.get('status');
       if (currentStatus !== 'scheduled') {
         throw new Error('Quote must be in scheduled status to generate receipt');
+      }
+
+      // Check if reservation exists for this quote
+      const resQuery = new Parse.Query('Reservation');
+      resQuery.equalTo('quotePtr', quote);
+      resQuery.equalTo('exists', true);
+      let reservation = await resQuery.first({ useMasterKey: true });
+
+      if (!reservation) {
+        // Try to create reservation if missing
+        logger.warn('Receipt generation attempted but no reservation found, attempting to create', {
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          currentStatus,
+        });
+
+        try {
+          const reservationData = await this.createReservationFromQuote(quote, currentUser);
+          if (reservationData && reservationData.reservation) {
+            const { reservation: createdReservation } = reservationData;
+            reservation = createdReservation;
+            // Update reservation status to confirmed since quote is scheduled
+            reservation.set('status', 'confirmed');
+            await reservation.save(null, { useMasterKey: true });
+
+            logger.info('Successfully created missing reservation for receipt generation', {
+              reservationId: reservation.id,
+              quoteId: quote.id,
+              quoteFolio: quote.get('folio'),
+            });
+          } else {
+            throw new Error('Failed to create required reservation');
+          }
+        } catch (createError) {
+          logger.error('Failed to create reservation for receipt generation', {
+            error: createError.message,
+            quoteId: quote.id,
+            quoteFolio: quote.get('folio'),
+          });
+          throw new Error(`Cannot generate receipt: ${createError.message}`);
+        }
       }
 
       // Get service items if they exist
@@ -1167,6 +1522,14 @@ class QuoteService {
    */
   async createReservationFromQuote(quote, currentUser) {
     try {
+      console.log('🔧 DEBUGGING: createReservationFromQuote called', {
+        quoteId: quote.id,
+        quoteFolio: quote.get('folio'),
+        userRole: currentUser.get('role'),
+        serviceItemsExists: !!quote.get('serviceItems'),
+        timestamp: new Date().toISOString(),
+      });
+
       logger.info('🔍 Starting reservation creation process', {
         quoteId: quote.id,
         quoteFolio: quote.get('folio'),
@@ -1407,6 +1770,16 @@ class QuoteService {
         });
 
         for (const sub of subconcepts) {
+          console.log('🔧 DEBUGGING: Processing subconcept for ReservationService', {
+            quoteId: quote.id,
+            dayNumber: day.dayNumber,
+            subType: sub.type,
+            subConcept: sub.concept,
+            hasAdditionalVehicle: sub.hasAdditionalVehicle,
+            additionalVehicleId: sub.additionalVehicleId,
+            additionalVehicleTypeName: sub.additionalVehicleTypeName,
+          });
+
           const resSvc = new ReservationService();
           resSvc.set('reservationPtr', reservation);
           resSvc.set('dayNumber', day.dayNumber || 1);
@@ -1424,6 +1797,140 @@ class QuoteService {
           resSvc.set('subconcept', sub);
           resSvc.set('active', true);
           resSvc.set('exists', true);
+
+          // 🎯 ASSIGNMENT LOGIC: Set assignment requirements based on service type and subconcept data
+          const serviceType = sub.type || 'concepto';
+          const includeGuide = sub.includeGuide || false;
+          const includeGreeter = sub.includeGreeter || false;
+          const hasAdditionalVehicle = sub.hasAdditionalVehicle || false;
+          const vehicleQuantity = parseInt(sub.quantity) || 1;
+
+          logger.debug('🔧 Processing service assignment requirements', {
+            quoteId: quote.id,
+            dayNumber: day.dayNumber,
+            serviceType,
+            concept: sub.concept || sub.name,
+            includeGuide,
+            includeGreeter,
+            hasAdditionalVehicle,
+            vehicleQuantity,
+            subconceptFields: Object.keys(sub),
+          });
+
+          // Service assignment logic based on type and requirements
+          if (serviceType === 'transport') {
+            // Transport services: Driver always needed, Guide/Greeter optional
+            // Assignment requirements come from subconcept fields (includeGuide, includeGreeter, quantity)
+
+            // Set service customer assignment if applicable
+            if (sub.assignedServiceCustomer) {
+              resSvc.set('assignedServiceCustomer', sub.assignedServiceCustomer);
+            }
+
+            // Track additional vehicle requirement - update quantity for assignment slots
+            if (hasAdditionalVehicle) {
+              // Update subconcept quantity to reflect total vehicles (main + additional)
+              sub.quantity = 2; // Main vehicle + 1 additional = 2 total assignment slots
+              logger.debug('🚗 Transport service with additional vehicle: updated quantity to 2 for booking dashboard');
+
+              // Store additional vehicle type information for assignment
+              if (sub.additionalVehicleId) {
+                resSvc.set('additionalVehicleId', sub.additionalVehicleId);
+                logger.debug('📋 Stored additional vehicle ID:', sub.additionalVehicleId);
+              }
+              if (sub.additionalVehicleTypeName) {
+                resSvc.set('additionalVehicleTypeName', sub.additionalVehicleTypeName);
+                logger.debug('📋 Stored additional vehicle type name:', sub.additionalVehicleTypeName);
+              }
+              if (sub.additionalVehicleSegment) {
+                resSvc.set('additionalVehicleSegment', sub.additionalVehicleSegment);
+                logger.debug('📋 Stored additional vehicle segment:', sub.additionalVehicleSegment);
+              }
+            }
+
+            // Map suggested departure times for transport services
+            if (sub.flightDepartureTimeSuggested) {
+              resSvc.set('flightDepartureTimeSuggested', sub.flightDepartureTimeSuggested);
+              logger.debug('📋 Stored flight departure time suggested:', sub.flightDepartureTimeSuggested);
+            }
+            if (sub.roundTripDepartureTimeSuggestedIda) {
+              resSvc.set('roundTripDepartureTimeSuggestedIda', sub.roundTripDepartureTimeSuggestedIda);
+              logger.debug('📋 Stored round-trip departure time suggested (ida):', sub.roundTripDepartureTimeSuggestedIda);
+            }
+            if (sub.roundTripDepartureTimeSuggestedVuelta) {
+              resSvc.set('roundTripDepartureTimeSuggestedVuelta', sub.roundTripDepartureTimeSuggestedVuelta);
+              logger.debug('📋 Stored round-trip departure time suggested (vuelta):', sub.roundTripDepartureTimeSuggestedVuelta);
+            }
+
+            logger.debug('🚛 Transport service assignment setup:', {
+              includeGuide,
+              includeGreeter,
+              hasAdditionalVehicle,
+              finalQuantity: sub.quantity,
+            });
+          } else if (serviceType === 'tour') {
+            // Tour services: Guide optional, can have additional vehicles
+            // Assignment requirements come from subconcept fields (includeGuide, includeGreeter, quantity)
+
+            // Set service customer assignment if applicable
+            if (sub.assignedServiceCustomer) {
+              resSvc.set('assignedServiceCustomer', sub.assignedServiceCustomer);
+            }
+
+            // Tours may need vehicles if they include transport
+            if (sub.requiresTransport || sub.vehicleType || sub.vehicleTypeName) {
+              // This tour includes transport, needs driver assignment
+              logger.debug('🚗 Tour service includes transport, needs driver assignment');
+
+              // Track additional vehicle requirement for tours
+              if (hasAdditionalVehicle) {
+                // Update subconcept quantity to reflect total vehicles (main + additional)
+                sub.quantity = 2; // Main vehicle + 1 additional = 2 total assignment slots
+                logger.debug('🚗 Tour service with additional vehicle: updated quantity to 2 for booking dashboard');
+
+                // Store additional vehicle type information for assignment
+                if (sub.additionalVehicleId) {
+                  resSvc.set('additionalVehicleId', sub.additionalVehicleId);
+                  logger.debug('📋 Stored additional vehicle ID for tour:', sub.additionalVehicleId);
+                }
+                if (sub.additionalVehicleTypeName) {
+                  resSvc.set('additionalVehicleTypeName', sub.additionalVehicleTypeName);
+                  logger.debug('📋 Stored additional vehicle type name for tour:', sub.additionalVehicleTypeName);
+                }
+                if (sub.additionalVehicleSegment) {
+                  resSvc.set('additionalVehicleSegment', sub.additionalVehicleSegment);
+                  logger.debug('📋 Stored additional vehicle segment for tour:', sub.additionalVehicleSegment);
+                }
+              }
+            }
+
+            logger.debug('🎭 Tour service assignment setup:', {
+              includeGuide,
+              includeGreeter,
+              hasAdditionalVehicle,
+              requiresTransport: sub.requiresTransport || !!(sub.vehicleType || sub.vehicleTypeName),
+              finalQuantity: sub.quantity,
+            });
+          } else if (serviceType === 'a-disposicion') {
+            // A-disposición services: Driver always needed, Guide optional
+            // Assignment requirements come from subconcept fields (includeGuide, quantity)
+
+            logger.debug('🕐 A-disposición service assignment setup:', {
+              includeGuide,
+              quantity: sub.quantity,
+            });
+          } else if (serviceType === 'experience') {
+            // Experience services: May need service customer assignment
+            if (sub.assignedServiceCustomer) {
+              resSvc.set('assignedServiceCustomer', sub.assignedServiceCustomer);
+            }
+          } else if (serviceType === 'concepto') {
+            // Concepto services: Generally no assignments needed
+            // May have service customer for specific conceptos
+            if (sub.assignedServiceCustomer) {
+              resSvc.set('assignedServiceCustomer', sub.assignedServiceCustomer);
+            }
+          }
 
           if (day.date) {
             try {
