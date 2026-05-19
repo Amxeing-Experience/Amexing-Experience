@@ -2618,6 +2618,64 @@ class ItineraryBuilder {
       const transportLabel = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
       const typeLabel = transportLabel[serviceData.transportType] || 'Transporte';
 
+      // === PRICE SPLITTING LOGIC ===
+      console.log('💰 Starting round-trip price splitting:', {
+        originalPrice: serviceData.price,
+        originalBasePrice: serviceData.basePrice,
+        originalPricesByType: serviceData.pricesByType,
+        hasAdditionalVehicle: serviceData.hasAdditionalVehicle,
+        quantity: serviceData.quantity
+      });
+
+      // Validate input prices (handle edge cases)
+      const originalPrice = parseFloat(serviceData.price) || 0;
+      const originalBasePrice = parseFloat(serviceData.basePrice) || 0;
+      
+      if (originalPrice < 0 || originalBasePrice < 0) {
+        console.warn('⚠️ Negative prices detected, using absolute values:', { originalPrice, originalBasePrice });
+      }
+
+      // Calculate split prices (round to 2 decimal places to avoid floating point issues)
+      const splitPrice = Math.round((Math.abs(originalPrice) / 2) * 100) / 100;
+      const splitBasePrice = Math.round((Math.abs(originalBasePrice) / 2) * 100) / 100;
+      
+      // Split pricesByType object with validation
+      let splitPricesByType = {};
+      if (serviceData.pricesByType && typeof serviceData.pricesByType === 'object') {
+        splitPricesByType = {
+          efectivo: Math.round((parseFloat(serviceData.pricesByType.efectivo) || 0) / 2 * 100) / 100,
+          transferencia: Math.round((parseFloat(serviceData.pricesByType.transferencia) || 0) / 2 * 100) / 100,
+          tarjeta: Math.round((parseFloat(serviceData.pricesByType.tarjeta) || 0) / 2 * 100) / 100
+        };
+      } else {
+        // Fallback if pricesByType doesn't exist
+        console.warn('⚠️ pricesByType not found, creating fallback prices');
+        splitPricesByType = {
+          efectivo: splitBasePrice,
+          transferencia: splitPrice,
+          tarjeta: splitPrice
+        };
+      }
+
+      // Validation: Check if split prices add up to original (with small tolerance for rounding)
+      const priceValidation = {
+        originalTotal: originalPrice,
+        splitTotal: splitPrice * 2,
+        difference: Math.abs(originalPrice - (splitPrice * 2)),
+        isValid: Math.abs(originalPrice - (splitPrice * 2)) < 0.01
+      };
+
+      if (!priceValidation.isValid) {
+        console.warn('⚠️ Price splitting validation failed:', priceValidation);
+      }
+
+      console.log('✅ Price splitting results:', {
+        splitPrice,
+        splitBasePrice,
+        splitPricesByType,
+        validation: priceValidation
+      });
+
       // --- Ida leg ---
       const idaData = {
         ...serviceData,
@@ -2632,6 +2690,12 @@ class ItineraryBuilder {
         returnDestination: '',
         returnAirline: '',
         returnFlightNumber: '',
+        // === SPLIT PRICE FIELDS ===
+        price: splitPrice,
+        basePrice: splitBasePrice,
+        pricesByType: { ...splitPricesByType },
+        // Ensure quantity is appropriate for single leg (usually 1)
+        quantity: 1
       };
 
       // --- Vuelta leg ---
@@ -2653,6 +2717,12 @@ class ItineraryBuilder {
         returnDestination: '',
         returnAirline: '',
         returnFlightNumber: '',
+        // === SPLIT PRICE FIELDS ===
+        price: splitPrice,
+        basePrice: splitBasePrice,
+        pricesByType: { ...splitPricesByType },
+        // Ensure quantity is appropriate for single leg (usually 1)
+        quantity: 1
       };
 
       // Find or create days for each date
@@ -2704,6 +2774,29 @@ class ItineraryBuilder {
         return a.date.localeCompare(b.date);
       });
       this.days.forEach((d, i) => { d.number = i + 1; });
+
+      // === FINAL SUMMARY ===
+      console.log('🎉 Round-trip service successfully split into two services:');
+      console.log('📄 Ida Service:', {
+        concept: idaData.concept,
+        date: idaData.startDate,
+        price: idaData.price,
+        basePrice: idaData.basePrice,
+        pricesByType: idaData.pricesByType
+      });
+      console.log('📄 Vuelta Service:', {
+        concept: vueltaData.concept,
+        date: vueltaData.startDate,
+        price: vueltaData.price,
+        basePrice: vueltaData.basePrice,
+        pricesByType: vueltaData.pricesByType
+      });
+      console.log('💰 Price Split Summary:', {
+        originalRoundTripPrice: originalPrice,
+        splitPricePerLeg: splitPrice,
+        totalSplitPrice: splitPrice * 2,
+        priceDifference: Math.abs(originalPrice - (splitPrice * 2))
+      });
 
       await this.saveToBackend();
       this.renderItinerary();
@@ -4701,6 +4794,97 @@ class ItineraryBuilder {
             }
           }
         }
+        
+        // === RESTORE MISSING TRANSPORT FIELDS ===
+        console.log('📋 Restoring additional transport fields...');
+        
+        // 1. Restore passenger counts
+        if (service.transportAdults !== undefined) {
+          const adultsField = document.getElementById('transportAdults');
+          if (adultsField) {
+            adultsField.value = service.transportAdults;
+            console.log('✅ Restored transportAdults:', service.transportAdults);
+          }
+        }
+        if (service.transportChildren !== undefined) {
+          const childrenField = document.getElementById('transportChildren');
+          if (childrenField) {
+            childrenField.value = service.transportChildren;
+            console.log('✅ Restored transportChildren:', service.transportChildren);
+          }
+        }
+        if (service.transportInfants !== undefined) {
+          const infantsField = document.getElementById('transportInfants');
+          if (infantsField) {
+            infantsField.value = service.transportInfants;
+            console.log('✅ Restored transportInfants:', service.transportInfants);
+          }
+        }
+        
+        // 2. Restore direction type for one-way services
+        if (service.tripType === 'one-way' && service.directionType) {
+          const directionRadio = document.querySelector(`input[name="directionType"][value="${service.directionType}"]`);
+          if (directionRadio) {
+            directionRadio.checked = true;
+            console.log('✅ Restored directionType:', service.directionType);
+          } else {
+            console.warn('⚠️ Direction radio not found for:', service.directionType);
+          }
+        }
+        
+        // 3. Restore waiting time price per hour (for accurate calculations)
+        if (service.waitingTimePricePerHour !== undefined && service.waitingTimePricePerHour > 0) {
+          // Store the rate in a property for calculation consistency
+          this._restoredWaitingTimeRate = service.waitingTimePricePerHour;
+          console.log('✅ Restored waitingTimePricePerHour:', service.waitingTimePricePerHour);
+        }
+        
+        // 4. Restore round-trip flight details (for airport transport)
+        if (service.tripType === 'round-trip' && service.transportType === 'aeropuerto') {
+          // Ida (arrival) flight details
+          if (service.airline) {
+            const idaAirlineField = document.getElementById('roundTripAirlineIda');
+            if (idaAirlineField) {
+              idaAirlineField.value = service.airline;
+              console.log('✅ Restored Ida airline:', service.airline);
+            }
+          }
+          if (service.flightNumber) {
+            const idaFlightField = document.getElementById('roundTripFlightNumberIda');
+            if (idaFlightField) {
+              idaFlightField.value = service.flightNumber;
+              console.log('✅ Restored Ida flight number:', service.flightNumber);
+            }
+          }
+          
+          // Vuelta (departure) flight details  
+          if (service.returnAirline) {
+            const vueltaAirlineField = document.getElementById('roundTripAirlineVuelta');
+            if (vueltaAirlineField) {
+              vueltaAirlineField.value = service.returnAirline;
+              console.log('✅ Restored Vuelta airline:', service.returnAirline);
+            }
+          }
+          if (service.returnFlightNumber) {
+            const vueltaFlightField = document.getElementById('roundTripFlightNumberVuelta');
+            if (vueltaFlightField) {
+              vueltaFlightField.value = service.returnFlightNumber;
+              console.log('✅ Restored Vuelta flight number:', service.returnFlightNumber);
+            }
+          }
+        }
+        
+        // 5. Restore price override state
+        if (service.priceOverride) {
+          const priceOverrideCheckbox = document.getElementById('transportOverridePrices');
+          if (priceOverrideCheckbox) {
+            priceOverrideCheckbox.checked = true;
+            console.log('✅ Restored transport price override state:', service.priceOverride);
+            // Note: Custom price is already handled in the main price restoration section above
+          }
+        }
+        
+        console.log('✅ Completed restoring all missing transport fields');
         break;
 
       case 'a-disposicion':
@@ -6285,6 +6469,7 @@ class ItineraryBuilder {
       const totalEfectivo = vehicleTotalEfectivo + waitingCostEfectivo + guideCostEfectivo + greeterCostEfectivo + additionalVehicleCostEfectivo;
       const totalTransferencia = vehicleTotalTransferencia + waitingCostTransferencia + guideCostTransferencia + greeterCostTransferencia + additionalVehicleCostTransferencia;
       const totalTarjeta = vehicleTotalTarjeta + waitingCostTarjeta + guideCostTarjeta + greeterCostTarjeta + additionalVehicleCostTarjeta;
+      
       
       // Store totals for use in collectServiceData (like A Disposición does)
       this._transportBreakdownTotals = {
