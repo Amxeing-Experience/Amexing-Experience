@@ -3021,6 +3021,7 @@ class ItineraryBuilder {
       hasAdditionalVehicle: type === 'transport' && document.getElementById('additionalVehicleCheckbox')?.checked,
       additionalVehicleSegment: document.getElementById('additionalSegmentSelect')?.value || null,
       additionalVehicleId: document.getElementById('additionalVehicleSelect')?.value || null,
+      additionalVehicleTypeName: null, // Will be set below if additional vehicle is selected
       notes: document.getElementById('serviceNotes')?.value,
       includeInTotal: document.getElementById('includeInTotal')?.checked !== false,
       greeterInVehicle: document.getElementById('greeterInVehicle')?.checked || false,
@@ -3040,6 +3041,24 @@ class ItineraryBuilder {
     } else if (vehicleSelectValue) {
       // For other services, store as vehicleId
       data.vehicleId = vehicleSelectValue;
+    }
+
+    // Get additional vehicle name if additional vehicle is selected (transport only)
+    if (type === 'transport' && data.hasAdditionalVehicle && data.additionalVehicleId) {
+      // Try to get from additional transport data first, then main transport data
+      let additionalVehicle = null;
+      const additionalSegmentId = data.additionalVehicleSegment;
+      const mainSegmentId = document.getElementById('transportCategory')?.value;
+      
+      if (additionalSegmentId === mainSegmentId && this.transportPriceData?.vehicles) {
+        // Same segment - use main transport data
+        additionalVehicle = this.transportPriceData.vehicles.find(v => v.vehicleTypeId === data.additionalVehicleId);
+      } else if (this.additionalTransportPriceData?.vehicles) {
+        // Different segment - use additional transport data
+        additionalVehicle = this.additionalTransportPriceData.vehicles.find(v => v.vehicleTypeId === data.additionalVehicleId);
+      }
+      
+      data.additionalVehicleTypeName = additionalVehicle ? additionalVehicle.vehicleType : data.additionalVehicleId;
     }
 
     // Collect type-specific data
@@ -4572,6 +4591,116 @@ class ItineraryBuilder {
           }
           this._populatingTransportForm = false;
         }
+        
+        // Restore additional vehicle fields if service has them
+        if (service.hasAdditionalVehicle) {
+          console.log('🚗 Restoring additional vehicle fields:', {
+            hasAdditionalVehicle: service.hasAdditionalVehicle,
+            additionalVehicleSegment: service.additionalVehicleSegment,
+            additionalVehicleId: service.additionalVehicleId
+          });
+          
+          // Check the additional vehicle checkbox
+          const additionalVehicleCheckbox = document.getElementById('additionalVehicleCheckbox');
+          if (additionalVehicleCheckbox) {
+            additionalVehicleCheckbox.checked = true;
+            
+            // Show the additional segment and vehicle containers
+            const segmentContainer = document.getElementById('additionalSegmentContainer');
+            const vehicleContainer = document.getElementById('additionalVehicleSelectContainer');
+            
+            if (segmentContainer) {
+              segmentContainer.classList.remove('d-none');
+            }
+            if (vehicleContainer) {
+              vehicleContainer.classList.remove('d-none');
+            }
+            
+            // Set the additional segment value
+            const additionalSegmentSelect = document.getElementById('additionalSegmentSelect');
+            if (additionalSegmentSelect && service.additionalVehicleSegment) {
+              console.log('🔄 Starting additional vehicle restoration process...');
+              console.log('📊 Service data:', {
+                additionalVehicleSegment: service.additionalVehicleSegment,
+                additionalVehicleId: service.additionalVehicleId,
+                additionalVehicleTypeName: service.additionalVehicleTypeName
+              });
+              
+              // First populate the segment dropdown options from main segment
+              this.populateAdditionalSegmentDropdown();
+              
+              // Validate that segment options were populated
+              const segmentOptions = additionalSegmentSelect.options.length;
+              console.log(`📋 Segment dropdown populated with ${segmentOptions} options`);
+              
+              // Then set the saved segment value
+              additionalSegmentSelect.value = service.additionalVehicleSegment;
+              
+              // Validate that segment was actually selected
+              if (additionalSegmentSelect.value !== service.additionalVehicleSegment) {
+                console.error('❌ Failed to set segment value:', {
+                  expected: service.additionalVehicleSegment,
+                  actual: additionalSegmentSelect.value,
+                  availableOptions: Array.from(additionalSegmentSelect.options).map(opt => opt.value)
+                });
+              } else {
+                console.log('✅ Segment value set successfully:', additionalSegmentSelect.value);
+              }
+              
+              // Trigger segment change to load vehicles, then set the vehicle value
+              this.handleAdditionalSegmentChange({ target: additionalSegmentSelect }).then(async () => {
+                console.log('🚗 Attempting to restore vehicle selection...');
+                
+                // After vehicles are loaded, set the saved vehicle
+                const additionalVehicleSelect = document.getElementById('additionalVehicleSelect');
+                if (!additionalVehicleSelect) {
+                  console.error('❌ Additional vehicle select element not found');
+                  return;
+                }
+                
+                // Check if vehicles were actually loaded
+                const vehicleOptions = additionalVehicleSelect.options.length;
+                console.log(`🚗 Vehicle dropdown has ${vehicleOptions} options`);
+                
+                if (vehicleOptions <= 1) {
+                  console.error('❌ No vehicles loaded in dropdown');
+                  return;
+                }
+                
+                if (service.additionalVehicleId) {
+                  // Try to restore the vehicle with fallback mechanisms
+                  const restored = await this.restoreAdditionalVehicleWithFallbacks(
+                    additionalVehicleSelect, 
+                    service.additionalVehicleId, 
+                    service.additionalVehicleTypeName
+                  );
+                  
+                  if (restored) {
+                    console.log('✅ Additional vehicle restored successfully:', service.additionalVehicleId);
+                    
+                    // Trigger price recalculation now that additional vehicle is set
+                    this.updateServicePriceBreakdown();
+                    this.updateDevPaymentPrices();
+                  } else {
+                    console.error('❌ Failed to restore additional vehicle after all fallback attempts');
+                  }
+                } else {
+                  console.warn('⚠️ No additional vehicle ID to restore');
+                }
+              }).catch(error => {
+                console.error('❌ Error loading additional vehicles:', error);
+                console.error('Stack trace:', error.stack);
+              });
+            } else {
+              if (!additionalSegmentSelect) {
+                console.warn('⚠️ Additional segment select element not found');
+              }
+              if (!service.additionalVehicleSegment) {
+                console.log('ℹ️ No additional vehicle segment to restore');
+              }
+            }
+          }
+        }
         break;
 
       case 'a-disposicion':
@@ -5078,6 +5207,14 @@ class ItineraryBuilder {
                                     <i class="ti ti-car me-1"></i>
                                     ${vehicleName}
                                     ${service.quantity > 1 ? ` x${service.quantity}` : ''}
+                                </div>
+                            ` : ''}
+                            <!-- Additional Vehicle -->
+                            ${service.hasAdditionalVehicle && service.additionalVehicleId ? `
+                                <div class="d-flex align-items-center text-muted small mt-1">
+                                    <i class="ti ti-car-crane me-1"></i>
+                                    <span class="text-info">Vehículo adicional:</span>
+                                    <span class="ms-1">${this.getAdditionalVehicleDisplayName(service)}</span>
                                 </div>
                             ` : ''}
                             ${service.includeGuide ? `
@@ -6136,8 +6273,9 @@ class ItineraryBuilder {
           }
         }
         
-        // Calculate surcharged prices for other payment types
+        // Apply leg multiplier for round-trip and calculate surcharged prices
         if (additionalVehicleCostEfectivo > 0) {
+          additionalVehicleCostEfectivo = additionalVehicleCostEfectivo * legMultiplier;
           additionalVehicleCostTransferencia = additionalVehicleCostEfectivo * (1 + (this.transferRate / 100));
           additionalVehicleCostTarjeta = additionalVehicleCostEfectivo * (1 + (this.agencyRate / 100));
         }
@@ -8154,6 +8292,51 @@ class ItineraryBuilder {
     return 'Vehículo';
   }
 
+  getAdditionalVehicleDisplayName(service) {
+    // Get the display name for the additional vehicle
+    if (!service.additionalVehicleId) return 'Vehículo adicional';
+    
+    // First try to use the stored name
+    if (service.additionalVehicleTypeName) {
+      // If segments are different, include segment info
+      if (service.additionalVehicleSegment && service.additionalVehicleSegment !== service.category) {
+        const segmentName = this.getSegmentDisplayName(service.additionalVehicleSegment);
+        return `${service.additionalVehicleTypeName} (${segmentName})`;
+      }
+      return service.additionalVehicleTypeName;
+    }
+    
+    // Fallback: Try to get vehicle info from the vehicle types cache
+    const vehicleInfo = this.getVehicleTypeInfo(service.additionalVehicleId);
+    if (vehicleInfo && vehicleInfo.name) {
+      // If segments are different, include segment info
+      if (service.additionalVehicleSegment && service.additionalVehicleSegment !== service.category) {
+        // Get segment display name
+        const segmentName = this.getSegmentDisplayName(service.additionalVehicleSegment);
+        return `${vehicleInfo.name} (${segmentName})`;
+      }
+      return vehicleInfo.name;
+    }
+    
+    // Final fallback to the ID if no info found
+    return service.additionalVehicleId;
+  }
+
+  getSegmentDisplayName(segmentId) {
+    // Map segment IDs to display names
+    const segmentNames = {
+      'sma-leon': 'SMA-León',
+      'sma-gto': 'SMA-Guanajuato',
+      'sma-cdmx': 'SMA-CDMX',
+      'sma-qro': 'SMA-Querétaro',
+      'local-sma': 'Local SMA',
+      'local-gto': 'Local Guanajuato',
+      'local-leon': 'Local León'
+    };
+    
+    return segmentNames[segmentId] || segmentId;
+  }
+
   getExperienceName(experienceId) {
     if (!experienceId) return 'Experiencia';
 
@@ -8638,6 +8821,11 @@ class ItineraryBuilder {
             baseVehiclePrice: subconcept.baseVehiclePrice || null,
             waitingTimeHours: subconcept.waitingTimeHours || 0,
             waitingTimePricePerHour: subconcept.waitingTimePricePerHour || 0,
+            // Additional vehicle fields (from backend)
+            hasAdditionalVehicle: subconcept.hasAdditionalVehicle || false,
+            additionalVehicleSegment: subconcept.additionalVehicleSegment || null,
+            additionalVehicleId: subconcept.additionalVehicleId || null,
+            additionalVehicleTypeName: subconcept.additionalVehicleTypeName || null,
             // Round trip fields
             startDate: subconcept.startDate || null,
             endDate: subconcept.endDate || null,
@@ -11268,7 +11456,7 @@ class ItineraryBuilder {
         }
       }
 
-      const routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
+      let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
       
       // Get route duration - prioritize saved service data when editing
       if (this.currentServiceId && this.services.has(this.currentServiceId)) {
@@ -11287,13 +11475,14 @@ class ItineraryBuilder {
         
         if (isGuideIncluded) {
           // Combined vehicle + guide line - use raw prices to avoid cash rounding inconsistencies
-          const guideCost = this.calculateGuideTransportCost(routeDuration) * brkLegMultiplier;
-          const combinedTotal = (unitPrice * quantity) + guideCost;
-          const combinedUnitPrice = unitPrice + (guideCost / quantity);
+          const guideCost = this.calculateGuideTransportCost(routeDuration); // Remove extra multiplier
+          const roundTripVehiclePrice = unitPrice * brkLegMultiplier; // Apply round-trip to base vehicle price
+          const combinedUnitPrice = roundTripVehiclePrice + guideCost; // Add guide cost to round-trip vehicle price
+          const combinedTotal = combinedUnitPrice; // Don't multiply by quantity
           
           const combinedLabel = tripType === 'round-trip'
-            ? `(Vehículo + Guía) Ida y Regreso (${quantity} × ${this.formatCurrency(combinedUnitPrice)})`
-            : `(Vehículo + Guía) (${quantity} × ${this.formatCurrency(combinedUnitPrice)})`;
+            ? `(Vehículo + Guía) Ida y Regreso`
+            : `(Vehículo + Guía)`;
           items.push({ label: combinedLabel, amountMXN: combinedTotal });
         } else {
           // Vehicle only - use raw unitPrice to avoid cash rounding in display
@@ -11350,7 +11539,7 @@ class ItineraryBuilder {
           
           items.push({ 
             label: `Vehículo adicional${tripTypeLabel}: ${vehicleName} (${capacity} pax, ${trunk} carry-on)`, 
-            amountMXN: additionalVehiclePrice 
+            amountMXN: additionalVehiclePrice * brkLegMultiplier 
           });
           
           console.log('📊 SERVICE BREAKDOWN - Additional vehicle added:', {
@@ -12482,32 +12671,60 @@ class ItineraryBuilder {
     const segmentId = e.target.value;
     const additionalVehicleSelect = document.getElementById('additionalVehicleSelect');
     
-    if (!additionalVehicleSelect) return;
+    console.log('🔄 Starting handleAdditionalSegmentChange for segment:', segmentId);
+    
+    if (!additionalVehicleSelect) {
+      console.error('❌ Additional vehicle select element not found');
+      return Promise.reject(new Error('Additional vehicle select element not found'));
+    }
     
     if (!segmentId) {
+      console.log('ℹ️ No segment selected, clearing vehicle dropdown');
       additionalVehicleSelect.disabled = true;
       additionalVehicleSelect.innerHTML = '<option value="">Primero selecciona un segmento</option>';
-      return;
+      return Promise.resolve();
     }
     
     // Check if the selected segment matches the main segment
     const mainSegmentId = document.getElementById('transportCategory')?.value;
+    console.log('🔍 Checking segments:', { segmentId, mainSegmentId, hasCachedData: !!this.transportPriceData?.vehicles });
     
     if (segmentId === mainSegmentId && this.transportPriceData?.vehicles) {
       // Same segment - use cached data, no API call needed!
       console.log('🚀 Using cached vehicle data for additional segment');
-      this.populateAdditionalVehicleDropdown(this.transportPriceData.vehicles);
       
-      // Clear additional transport data since we're using main data
-      this.additionalTransportPriceData = null;
-      
-      // Setup change listener for additional vehicle selection
-      additionalVehicleSelect.removeEventListener('change', this.boundHandleAdditionalVehicleSelection);
-      this.boundHandleAdditionalVehicleSelection = this.handleAdditionalVehicleSelection.bind(this);
-      additionalVehicleSelect.addEventListener('change', this.boundHandleAdditionalVehicleSelection);
+      try {
+        const populationResult = await this.populateAdditionalVehicleDropdown(this.transportPriceData.vehicles);
+        
+        if (!populationResult) {
+          console.error('❌ Failed to populate vehicles from cached data');
+          return Promise.reject(new Error('Failed to populate vehicles from cached data'));
+        }
+        
+        // Validate that vehicles were actually populated
+        const vehicleCount = additionalVehicleSelect.options.length;
+        console.log(`✅ Successfully populated ${vehicleCount - 1} vehicles from cache`);
+        
+        // Clear additional transport data since we're using main data
+        this.additionalTransportPriceData = null;
+        
+        // Setup change listener for additional vehicle selection
+        additionalVehicleSelect.removeEventListener('change', this.boundHandleAdditionalVehicleSelection);
+        this.boundHandleAdditionalVehicleSelection = this.handleAdditionalVehicleSelection.bind(this);
+        additionalVehicleSelect.addEventListener('change', this.boundHandleAdditionalVehicleSelection);
+        
+        return Promise.resolve();
+        
+      } catch (error) {
+        console.error('❌ Error using cached data:', error);
+        additionalVehicleSelect.innerHTML = '<option value="">Error al cargar vehículos</option>';
+        return Promise.reject(error);
+      }
       
     } else {
       // Different segment - need to fetch vehicles for this segment
+      console.log('🌐 Fetching vehicles for different segment via API');
+      
       // Show loading state
       additionalVehicleSelect.disabled = true;
       additionalVehicleSelect.innerHTML = '<option value="">Cargando vehículos...</option>';
@@ -12562,8 +12779,10 @@ class ItineraryBuilder {
         }
         
         if (!originName || !destinationName) {
+          console.warn('⚠️ Missing origin or destination for API call:', { originName, destinationName });
           additionalVehicleSelect.innerHTML = '<option value="">Necesita origen y destino</option>';
-          return;
+          additionalVehicleSelect.disabled = true;
+          return Promise.resolve(); // Not an error, just incomplete data
         }
         
         // For departure, swap origin/destination for API
@@ -12573,6 +12792,16 @@ class ItineraryBuilder {
           apiOrigin = destinationName;
           apiDestination = originName;
         }
+        
+        console.log('🌐 Making API call with parameters:', {
+          segmentId,
+          apiOrigin,
+          apiDestination,
+          direction,
+          transportType,
+          tripType,
+          clientId: this.clientId
+        });
         
         // Call API to get vehicles for this segment
         const params = new URLSearchParams({
@@ -12585,24 +12814,55 @@ class ItineraryBuilder {
         }
         
         const accessToken = this.getAccessToken();
-        const response = await fetch(`/api/services/prices-by-route?${params.toString()}`, {
+        const apiUrl = `/api/services/prices-by-route?${params.toString()}`;
+        
+        console.log('📡 Fetching from:', apiUrl);
+        
+        const response = await fetch(apiUrl, {
           headers: {
             Authorization: `Bearer ${accessToken || ''}`,
+            'Content-Type': 'application/json'
           },
+          timeout: 10000 // 10 second timeout
         });
         
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          console.error('❌ API response not OK:', {
+            status: response.status,
+            statusText: response.statusText,
+            url: apiUrl
+          });
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
+        console.log('✅ API response OK, parsing JSON...');
         const result = await response.json();
+        
+        console.log('📊 API result:', {
+          success: result.success,
+          vehicleCount: result.data?.vehicles?.length || 0,
+          hasData: !!result.data
+        });
+        
         if (result.success && result.data?.vehicles) {
           // Store the additional transport price data for use in breakdown
           this.additionalTransportPriceData = result.data;
-          this.populateAdditionalVehicleDropdown(result.data.vehicles);
+          const populationResult = await this.populateAdditionalVehicleDropdown(result.data.vehicles);
+          
+          if (!populationResult) {
+            console.error('❌ API returned vehicles but dropdown not populated');
+            throw new Error('Failed to populate vehicle dropdown despite API success');
+          }
+          
+          // Validate that vehicles were actually populated
+          const vehicleCount = additionalVehicleSelect.options.length;
+          console.log(`✅ Successfully populated ${vehicleCount - 1} vehicles from API`);
+          
         } else {
+          console.warn('⚠️ API call successful but no vehicles returned');
           this.additionalTransportPriceData = null;
           additionalVehicleSelect.innerHTML = '<option value="">No hay vehículos disponibles</option>';
+          additionalVehicleSelect.disabled = true;
         }
         
         // Setup change listener for additional vehicle selection
@@ -12610,9 +12870,21 @@ class ItineraryBuilder {
         this.boundHandleAdditionalVehicleSelection = this.handleAdditionalVehicleSelection.bind(this);
         additionalVehicleSelect.addEventListener('change', this.boundHandleAdditionalVehicleSelection);
         
+        return Promise.resolve();
+        
       } catch (error) {
-        console.error('Error loading additional vehicles:', error);
+        console.error('❌ Error loading additional vehicles:', {
+          error: error.message,
+          stack: error.stack,
+          segmentId,
+          originName,
+          destinationName
+        });
+        
         additionalVehicleSelect.innerHTML = '<option value="">Error al cargar vehículos</option>';
+        additionalVehicleSelect.disabled = true;
+        
+        return Promise.reject(error);
       }
     }
   }
@@ -12631,31 +12903,191 @@ class ItineraryBuilder {
    * @param vehicles Array of vehicle objects from API
    */
   populateAdditionalVehicleDropdown(vehicles) {
+    console.log('🚗 Starting populateAdditionalVehicleDropdown with', vehicles?.length || 0, 'vehicles');
+    
     const additionalVehicleSelect = document.getElementById('additionalVehicleSelect');
-    if (!additionalVehicleSelect) return;
-    
-    additionalVehicleSelect.innerHTML = '<option value="">Seleccionar vehículo</option>';
-    
-    if (!vehicles || vehicles.length === 0) {
-      additionalVehicleSelect.innerHTML = '<option value="">No hay vehículos disponibles</option>';
-      additionalVehicleSelect.disabled = true;
-      return;
+    if (!additionalVehicleSelect) {
+      console.error('❌ Additional vehicle select element not found in populateAdditionalVehicleDropdown');
+      return false;
     }
     
+    // Clear existing options first
+    additionalVehicleSelect.innerHTML = '';
+    
+    // Add default option
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Seleccionar vehículo';
+    additionalVehicleSelect.appendChild(defaultOption);
+    
+    if (!vehicles || vehicles.length === 0) {
+      console.warn('⚠️ No vehicles provided to populate dropdown');
+      const noVehiclesOption = document.createElement('option');
+      noVehiclesOption.value = '';
+      noVehiclesOption.textContent = 'No hay vehículos disponibles';
+      additionalVehicleSelect.appendChild(noVehiclesOption);
+      additionalVehicleSelect.disabled = true;
+      return false;
+    }
+    
+    console.log('📋 Populating vehicles:', vehicles.map(v => ({ id: v.vehicleTypeId, type: v.vehicleType })));
+    
     // Populate with same format as main vehicle dropdown
-    vehicles.forEach((vehicle) => {
-      const option = document.createElement('option');
-      option.value = vehicle.vehicleTypeId;
-      
-      const pax = vehicle.capacity || 0;
-      const trunk = vehicle.trunkCapacity || 0;
-      const clientIndicator = vehicle.isClientPrice ? ' *' : '';
-      option.textContent = `${vehicle.vehicleType} - ${pax} pax, ${trunk} carry-on${clientIndicator}`;
-      
-      additionalVehicleSelect.appendChild(option);
+    let populatedCount = 0;
+    vehicles.forEach((vehicle, index) => {
+      try {
+        if (!vehicle.vehicleTypeId) {
+          console.warn(`⚠️ Skipping vehicle at index ${index} - missing vehicleTypeId:`, vehicle);
+          return;
+        }
+        
+        const option = document.createElement('option');
+        option.value = vehicle.vehicleTypeId;
+        
+        const pax = vehicle.capacity || 0;
+        const trunk = vehicle.trunkCapacity || 0;
+        const clientIndicator = vehicle.isClientPrice ? ' *' : '';
+        const vehicleType = vehicle.vehicleType || 'Vehículo desconocido';
+        
+        option.textContent = `${vehicleType} - ${pax} pax, ${trunk} carry-on${clientIndicator}`;
+        
+        additionalVehicleSelect.appendChild(option);
+        populatedCount++;
+        
+      } catch (error) {
+        console.error(`❌ Error creating option for vehicle at index ${index}:`, error, vehicle);
+      }
     });
     
+    // Validate population was successful
+    if (populatedCount === 0) {
+      console.error('❌ Failed to populate any vehicles');
+      const errorOption = document.createElement('option');
+      errorOption.value = '';
+      errorOption.textContent = 'Error al cargar vehículos';
+      additionalVehicleSelect.innerHTML = '';
+      additionalVehicleSelect.appendChild(errorOption);
+      additionalVehicleSelect.disabled = true;
+      return false;
+    }
+    
     additionalVehicleSelect.disabled = false;
+    console.log(`✅ Successfully populated ${populatedCount} vehicles in additional dropdown`);
+    
+    // Small delay to ensure DOM has updated before returning
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        console.log('🔍 Final dropdown state:', {
+          optionsCount: additionalVehicleSelect.options.length,
+          disabled: additionalVehicleSelect.disabled,
+          value: additionalVehicleSelect.value
+        });
+        resolve(true);
+      }, 10);
+    });
+  }
+
+  /**
+   * Restore additional vehicle with multiple fallback mechanisms
+   * @param {HTMLSelectElement} additionalVehicleSelect - The select element
+   * @param {string} vehicleId - The vehicle ID to restore
+   * @param {string} vehicleTypeName - The vehicle type name as fallback
+   * @returns {Promise<boolean>} - Whether restoration was successful
+   */
+  async restoreAdditionalVehicleWithFallbacks(additionalVehicleSelect, vehicleId, vehicleTypeName) {
+    console.log('🔄 Starting vehicle restoration with fallbacks:', { vehicleId, vehicleTypeName });
+    
+    // Attempt 1: Direct ID match
+    console.log('🎯 Attempt 1: Direct ID match');
+    const directMatch = Array.from(additionalVehicleSelect.options).find(opt => opt.value === vehicleId);
+    
+    if (directMatch) {
+      console.log('✅ Found direct match for vehicle ID');
+      additionalVehicleSelect.value = vehicleId;
+      
+      // Validate the selection took
+      if (additionalVehicleSelect.value === vehicleId) {
+        console.log('✅ Direct selection successful');
+        return true;
+      }
+    }
+    
+    console.log('❌ Direct ID match failed');
+    
+    // Attempt 2: Fuzzy match by vehicle type name
+    if (vehicleTypeName) {
+      console.log('🔍 Attempt 2: Fuzzy match by vehicle type name:', vehicleTypeName);
+      
+      const fuzzyMatch = Array.from(additionalVehicleSelect.options).find(opt => {
+        const optText = opt.textContent.toLowerCase();
+        const searchName = vehicleTypeName.toLowerCase();
+        return optText.includes(searchName) || searchName.includes(optText.split(' - ')[0]);
+      });
+      
+      if (fuzzyMatch && fuzzyMatch.value) {
+        console.log('✅ Found fuzzy match:', fuzzyMatch.textContent);
+        additionalVehicleSelect.value = fuzzyMatch.value;
+        
+        if (additionalVehicleSelect.value === fuzzyMatch.value) {
+          console.log('✅ Fuzzy selection successful');
+          return true;
+        }
+      }
+      
+      console.log('❌ Fuzzy match failed');
+    }
+    
+    // Attempt 3: Retry with small delay (in case of timing issues)
+    console.log('⏱️ Attempt 3: Retry after delay');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Check again if direct match exists after delay
+    const retryMatch = Array.from(additionalVehicleSelect.options).find(opt => opt.value === vehicleId);
+    if (retryMatch) {
+      console.log('✅ Found match after delay');
+      additionalVehicleSelect.value = vehicleId;
+      
+      if (additionalVehicleSelect.value === vehicleId) {
+        console.log('✅ Delayed selection successful');
+        return true;
+      }
+    }
+    
+    // Attempt 4: Try forcing DOM update and retry
+    console.log('🔄 Attempt 4: Force DOM update and retry');
+    additionalVehicleSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    additionalVehicleSelect.value = vehicleId;
+    if (additionalVehicleSelect.value === vehicleId) {
+      console.log('✅ Force update selection successful');
+      return true;
+    }
+    
+    // Final attempt: Log detailed debugging info for future troubleshooting
+    console.error('❌ All restoration attempts failed. Debug info:', {
+      targetVehicleId: vehicleId,
+      targetVehicleTypeName: vehicleTypeName,
+      dropdownState: {
+        optionsCount: additionalVehicleSelect.options.length,
+        disabled: additionalVehicleSelect.disabled,
+        currentValue: additionalVehicleSelect.value
+      },
+      availableOptions: Array.from(additionalVehicleSelect.options).map((opt, index) => ({
+        index,
+        value: opt.value,
+        text: opt.textContent,
+        isTarget: opt.value === vehicleId
+      })),
+      vehicleDataSources: {
+        hasTransportPriceData: !!this.transportPriceData?.vehicles,
+        hasAdditionalTransportPriceData: !!this.additionalTransportPriceData?.vehicles,
+        transportVehicleCount: this.transportPriceData?.vehicles?.length || 0,
+        additionalVehicleCount: this.additionalTransportPriceData?.vehicles?.length || 0
+      }
+    });
+    
+    return false;
   }
 
   // =====================
@@ -14526,6 +14958,11 @@ class ItineraryBuilder {
             baseVehiclePrice: service.baseVehiclePrice || null,
             waitingTimeHours: service.waitingTimeHours || 0,
             waitingTimePricePerHour: service.waitingTimePricePerHour || 0,
+            // Additional vehicle fields
+            hasAdditionalVehicle: service.hasAdditionalVehicle || false,
+            additionalVehicleSegment: service.additionalVehicleSegment || null,
+            additionalVehicleId: service.additionalVehicleId || null,
+            additionalVehicleTypeName: service.additionalVehicleTypeName || null,
             // Round trip fields
             startDate: service.startDate || null,
             endDate: service.endDate || null,
