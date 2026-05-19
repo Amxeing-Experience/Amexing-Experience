@@ -73,8 +73,19 @@ class ServiceController {
       // Optional serviceType filter (e.g., 'Aeropuerto', 'Punto a Punto', 'Local')
       const serviceTypeFilter = req.query.serviceType || null;
 
+      // Support includeInactive parameter for admin views (like tours)
+      const includeInactive = req.query.includeInactive === 'true';
+
       // Optional active filter (true/false)
       const activeFilter = req.query.active;
+
+      // Debug logging
+      logger.info('ServiceController.getServices - Query parameters:', {
+        includeInactive,
+        activeFilter,
+        serviceTypeFilter,
+        userId: currentUser.id,
+      });
 
       // Column mapping for sorting (matches frontend columns order)
       const columns = [
@@ -92,11 +103,22 @@ class ServiceController {
       const totalRecordsQuery = new Parse.Query('Service');
       totalRecordsQuery.equalTo('exists', true);
 
-      // Apply active filter if provided
-      if (activeFilter === 'true') {
+      // Apply active filter based on includeInactive parameter (similar to tours)
+      // If includeInactive is true, show all services regardless of active status
+      // Otherwise, check for explicit active filter or default to showing only active
+      if (includeInactive) {
+        // When includeInactive is true, don't filter by active status at all
+        // This shows both active and inactive services
+      } else if (activeFilter === 'true') {
+        // Explicit filter for active services only
         totalRecordsQuery.equalTo('active', true);
       } else if (activeFilter === 'false') {
+        // Explicit filter for inactive services only
         totalRecordsQuery.equalTo('active', false);
+      } else {
+        // Default behavior when no includeInactive and no explicit active filter
+        // Only show active services
+        totalRecordsQuery.equalTo('active', true);
       }
 
       // Apply serviceType filter if provided
@@ -125,11 +147,21 @@ class ServiceController {
       baseQuery.include('vehicleType');
       baseQuery.include('rate');
 
-      // Apply active filter to base query
-      if (activeFilter === 'true') {
+      // Apply active filter based on includeInactive parameter (similar to tours)
+      // Must match the logic used for totalRecordsQuery above
+      if (includeInactive) {
+        // When includeInactive is true, don't filter by active status at all
+        // This shows both active and inactive services
+      } else if (activeFilter === 'true') {
+        // Explicit filter for active services only
         baseQuery.equalTo('active', true);
       } else if (activeFilter === 'false') {
+        // Explicit filter for inactive services only
         baseQuery.equalTo('active', false);
+      } else {
+        // Default behavior when no includeInactive and no explicit active filter
+        // Only show active services
+        baseQuery.equalTo('active', true);
       }
 
       // Apply serviceType filter to base query

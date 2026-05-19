@@ -853,7 +853,39 @@ table.dataTable thead th:nth-child(2) select {
                         if (response.success && response.data) {
                             allServicesData = response.data;
                             
-                            // Debug: Log all service types
+                            // Debug: Log all service types and active/inactive counts
+                            const activeServices = allServicesData.filter(s => s.active === true);
+                            const inactiveServices = allServicesData.filter(s => s.active === false);
+                            
+                            // Log sample of all services to see their active status
+                            const sampleServices = allServicesData.slice(0, 5).map(s => ({
+                                id: s.id,
+                                origin: s.originPOI?.name,
+                                destination: s.destinationPOI?.name,
+                                active: s.active,
+                                exists: s.exists,
+                                rawActiveValue: typeof s.active + ': ' + s.active
+                            }));
+                            
+                            console.log('🔍 Service Status Summary:', {
+                                total: allServicesData.length,
+                                active: activeServices.length,
+                                inactive: inactiveServices.length,
+                                apiEndpoint: url,
+                                includesInactiveParam: url.includes('includeInactive=true'),
+                                sampleServices: sampleServices
+                            });
+                            
+                            // Log some inactive services if they exist
+                            if (inactiveServices.length > 0) {
+                                console.log('📋 Sample Inactive Services:', inactiveServices.slice(0, 3).map(s => ({
+                                    id: s.id,
+                                    origin: s.originPOI?.name,
+                                    destination: s.destinationPOI?.name,
+                                    active: s.active,
+                                    exists: s.exists
+                                })));
+                            }
                             
                             // Debug: Log a sample service to see its structure, especially priceData
                             if (allServicesData.length > 0) {
