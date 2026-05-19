@@ -942,6 +942,20 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <label class="form-check-label" for="additionalVehicleCheckbox">Vehículo adicional</label>
                             </div>
                         </div>
+                        
+                        <!-- Additional vehicle selection fields -->
+                        <div class="col-md-6 mb-3 d-none" id="additionalSegmentContainer">
+                            <label for="additionalSegmentSelect" class="form-label">Segmento adicional</label>
+                            <select class="form-select" id="additionalSegmentSelect">
+                                <option value="">Seleccionar segmento</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3 d-none" id="additionalVehicleSelectContainer">
+                            <label for="additionalVehicleSelect" class="form-label">Vehículo adicional</label>
+                            <select class="form-select" id="additionalVehicleSelect" disabled>
+                                <option value="">Primero selecciona un segmento</option>
+                            </select>
+                        </div>
                     </div>
                     <!-- Experience pricing with adult/child/no-alcohol options -->
                     <div id="experiencePricingSection" class="d-none">
