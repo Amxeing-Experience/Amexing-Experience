@@ -88,6 +88,30 @@ class ReservationService extends BaseModel {
     this.set('time', time);
   }
 
+  getFlightDepartureTimeSuggested() {
+    return this.get('flightDepartureTimeSuggested');
+  }
+
+  setFlightDepartureTimeSuggested(time) {
+    this.set('flightDepartureTimeSuggested', time);
+  }
+
+  getRoundTripDepartureTimeSuggestedIda() {
+    return this.get('roundTripDepartureTimeSuggestedIda');
+  }
+
+  setRoundTripDepartureTimeSuggestedIda(time) {
+    this.set('roundTripDepartureTimeSuggestedIda', time);
+  }
+
+  getRoundTripDepartureTimeSuggestedVuelta() {
+    return this.get('roundTripDepartureTimeSuggestedVuelta');
+  }
+
+  setRoundTripDepartureTimeSuggestedVuelta(time) {
+    this.set('roundTripDepartureTimeSuggestedVuelta', time);
+  }
+
   getStatus() {
     return this.get('status');
   }

@@ -470,9 +470,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         </div>
                                     </div>
                                     <div class="row">
-                                        <div class="col-md-12 mb-3">
-                                            <label for="flightTime" class="form-label">Hora de Llegada</label>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="flightTime" class="form-label">Hora Vuelo</label>
                                             <input type="text" class="form-control time-input" id="flightTime" placeholder="__:__" maxlength="5">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="flightDepartureTimeSuggested" class="form-label">Hora de salida sugerida</label>
+                                            <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" placeholder="__:__" maxlength="5">
+                                            <small class="text-muted">Se calculará automáticamente al seleccionar un segmento</small>
                                         </div>
                                         <!-- Removed Número de Personas field as requested
                                         <div class="col-md-6 mb-3">
@@ -534,8 +539,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="date" class="form-control" id="roundTripDateIda">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripTimeIda" class="form-label" id="roundTripTimeIdaLabel">Hora de Llegada</label>
+                                            <label for="roundTripTimeIda" class="form-label" id="roundTripTimeIdaLabel">Hora Vuelo</label>
                                             <input type="text" class="form-control time-input" id="roundTripTimeIda" placeholder="__:__" maxlength="5">
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-12 mb-3">
+                                            <label for="roundTripDepartureTimeSuggestedIda" class="form-label">Hora de salida sugerida</label>
+                                            <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedIda" placeholder="__:__" maxlength="5">
+                                            <small class="text-muted">Se calculará automáticamente al seleccionar un segmento</small>
                                         </div>
                                     </div>
 
@@ -602,8 +614,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="date" class="form-control" id="roundTripDateVuelta">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="roundTripTimeVuelta" class="form-label" id="roundTripTimeVueltaLabel">Hora de Salida</label>
+                                            <label for="roundTripTimeVuelta" class="form-label" id="roundTripTimeVueltaLabel">Hora Vuelo</label>
                                             <input type="text" class="form-control time-input" id="roundTripTimeVuelta" placeholder="__:__" maxlength="5">
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-12 mb-3">
+                                            <label for="roundTripDepartureTimeSuggestedVuelta" class="form-label">Hora de salida sugerida</label>
+                                            <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedVuelta" placeholder="__:__" maxlength="5">
+                                            <small class="text-muted">Se calculará automáticamente al seleccionar un segmento</small>
                                         </div>
                                     </div>
 
@@ -684,6 +703,19 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <small class="text-muted" id="aDisposicionDiscountInfo"></small>
                                 </div>
                             </div>
+
+                            <!-- Guía/Chofer Option -->
+                            <div class="row mb-3">
+                                <div class="col-md-12">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="aDisposicionGuide">
+                                        <label class="form-check-label" for="aDisposicionGuide">
+                                            <i class="ti ti-user me-1"></i>Incluir Chofer
+                                        </label>
+                                        <small class="text-muted d-block ms-4">Se agregará el costo del conductor turístico especializado</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Concepto Fields -->
@@ -691,6 +723,26 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             <div class="mb-3">
                                 <label for="conceptoConcept" class="form-label">Concepto <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="conceptoConcept" placeholder="Describe el servicio...">
+                            </div>
+                            
+                            <!-- Client Price and Surcharge Control -->
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="conceptoClientPrice" class="form-label">Precio al Cliente <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="conceptoClientPrice" placeholder="0.00" step="0.01" min="0">
+                                    <small class="text-muted">Precio que se cobrará al cliente</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check mt-4">
+                                        <input class="form-check-input" type="checkbox" id="conceptoApplySurcharges" checked>
+                                        <label class="form-check-label" for="conceptoApplySurcharges">
+                                            <i class="ti ti-percentage me-1"></i>Aplicar recargos por tipo de pago
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">
+                                        Si está activo, se aplicarán recargos automáticos según el tipo de pago
+                                    </small>
+                                </div>
                             </div>
                             
                             <!-- Schedule Toggle -->
@@ -908,6 +960,20 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <input class="form-check-input" type="checkbox" id="additionalVehicleCheckbox">
                                 <label class="form-check-label" for="additionalVehicleCheckbox">Vehículo adicional</label>
                             </div>
+                        </div>
+                        
+                        <!-- Additional vehicle selection fields -->
+                        <div class="col-md-6 mb-3 d-none" id="additionalSegmentContainer">
+                            <label for="additionalSegmentSelect" class="form-label">Segmento adicional</label>
+                            <select class="form-select" id="additionalSegmentSelect">
+                                <option value="">Seleccionar segmento</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3 d-none" id="additionalVehicleSelectContainer">
+                            <label for="additionalVehicleSelect" class="form-label">Vehículo adicional</label>
+                            <select class="form-select" id="additionalVehicleSelect" disabled>
+                                <option value="">Primero selecciona un segmento</option>
+                            </select>
                         </div>
                     </div>
                     <!-- Experience pricing with adult/child/no-alcohol options -->

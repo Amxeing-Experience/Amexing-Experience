@@ -227,24 +227,12 @@ class QuoteOwnershipService {
         }
       );
 
-      // Grant editor access to previous owner
-      await QuoteAccess.grantAccess(
-        quote,
-        currentOwner,
-        QuoteAccess.ROLES.EDITOR,
-        transferredBy,
-        {
-          reason: 'Previous owner - automatic editor access',
-        }
-      );
+      // Previous owner access is now handled by QuoteOwnership.transferOwnership()
+      // which deactivates their collaboration to ensure clean ownership transfers
+      console.log('Previous owner collaboration access has been deactivated by ownership transfer');
 
-      // Update collaborators list
-      const collaborators = quote.getCollaborators();
-      if (!collaborators.includes(currentOwner.id)) {
-        collaborators.push(currentOwner.id);
-        quote.setCollaborators(collaborators);
-        await quote.save(null, { useMasterKey: true });
-      }
+      // Previous owner is no longer automatically added to collaborators
+      // Clean ownership transfers require complete access removal
 
       // Remove new owner from collaborators if they exist there
       // (ownership supersedes collaboration)

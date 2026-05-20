@@ -283,6 +283,55 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
     </div>
 </div>
 
+<!-- Convert to Reservation Modal -->
+<div class="modal fade" id="convertReservationModal" tabindex="-1" aria-labelledby="convertReservationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="position: relative;">
+            <!-- Loading overlay -->
+            <div id="convertLoadingOverlay" style="display:none; position:absolute; inset:0; background:rgba(255,255,255,0.92); z-index:10; border-radius:0.5rem;">
+                <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                    <div class="spinner-border text-success mb-2" role="status"></div>
+                    <small class="text-muted">Creando reservación...</small>
+                </div>
+            </div>
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title text-white" id="convertReservationModalLabel">
+                    <i class="ti ti-calendar-plus me-2"></i>Convertir a Reservación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Desea convertir la cotización <strong id="convertQuoteFolio"></strong> en una reservación?</p>
+                
+                <div class="alert alert-info d-flex align-items-start" role="alert">
+                    <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                    <div>
+                        <strong>Información:</strong>
+                        <ul class="mb-0 mt-1 ps-3">
+                            <li>Se creará una nueva reservación con los servicios de la cotización</li>
+                            <li>El estatus cambiará a "SOLICITADO" si está en "COTIZADO"</li>
+                            <li>Se generará un nuevo folio de reservación</li>
+                            <li>Los servicios se copiarán automáticamente</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <p class="mb-0 text-muted" style="font-size: 0.85rem; display: none;" id="convertEmailNote">
+                    <i class="ti ti-mail me-1"></i>Se enviará un correo de confirmación a <strong id="convertEmailAddress"></strong>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-success" id="confirmConvertBtn">
+                    <i class="ti ti-calendar-plus me-1"></i>Convertir a Reservación
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Cancel Reservation Modal (same as quote summary) -->
 <!-- Note: Modal HTML will be dynamically generated to match quote summary implementation -->
 
@@ -330,6 +379,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         let generateReceiptQuoteId = null;
         let requestInvoiceQuoteId = null;
         let cancelReservationQuoteId = null;
+        let convertReservationData = null;
 
         /**
          * Calculate relative luminance of a color for contrast determination.
@@ -556,13 +606,24 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                             return `<span class="badge ${statusObj.class} px-3 py-2" style="font-size: 0.75rem;">${statusObj.text}</span>`;
                         }
 
-                        let select = `<select class="form-select form-select-sm status-selector" data-id="${row.id}" data-folio="${row.folio}" data-email="${row.contactEmail || (row.createdBy && row.createdBy.email) || ''}" style="font-size: 0.75rem; cursor: pointer;">`;
+                        // Wrap select in a div for loader positioning
+                        let html = `<div class="status-select-wrapper position-relative">`;
+                        html += `<select class="form-select form-select-sm status-selector" data-id="${row.id}" data-folio="${row.folio}" data-email="${row.contactEmail || (row.createdBy && row.createdBy.email) || ''}" style="font-size: 0.75rem; cursor: pointer;">`;
                         statuses.forEach(status => {
                             const selected = status.value === data ? 'selected' : '';
-                            select += `<option value="${status.value}" ${selected}>${status.text}</option>`;
+                            html += `<option value="${status.value}" ${selected}>${status.text}</option>`;
                         });
-                        select += '</select>';
-                        return select;
+                        html += '</select>';
+                        // Hidden loader overlay
+                        html += `<div class="status-loader position-absolute top-0 start-0 w-100 h-100 d-none" style="background: rgba(255,255,255,0.8); border-radius: 0.25rem; z-index: 10;">`;
+                        html += `<div class="d-flex align-items-center justify-content-center h-100">`;
+                        html += `<div class="spinner-border spinner-border-sm text-primary" role="status">`;
+                        html += `<span class="visually-hidden">Cargando...</span>`;
+                        html += `</div>`;
+                        html += `</div>`;
+                        html += `</div>`;
+                        html += `</div>`;
+                        return html;
                     }
                 },
                 {
@@ -717,6 +778,21 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         // Normal actions for non-scheduled quotes
                         let actions = '<div class="btn-group btn-group-sm" role="group">';
 
+                        // Convert to Reservation button (only for quoted or requested status)
+                        if ((data.status === 'quoted' || data.status === 'requested') && canEdit) {
+                            actions += `<button type="button"
+                                            class="btn btn-success convert-reservation-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-folio="${data.folio}"
+                                            data-email="${data.contactEmail || (data.createdBy && data.createdBy.email) || ''}"
+                                            data-status="${data.status}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Convertir a Reservación">
+                                            <i class="ti ti-calendar-plus"></i>
+                                        </button>`;
+                        }
+
                         if (canEdit) {
                             // Copy button (at the beginning)
                             actions += `<button type="button"
@@ -797,8 +873,8 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
             const newStatus = $select.val();
             const oldStatus = $select.data('previous-status') || 'requested';
 
-            if (newStatus === 'requested' && oldStatus === 'quoted') {
-                // Show confirmation modal when changing from COTIZADO to SOLICITADO
+            if (newStatus === 'requested' || newStatus === 'scheduled') {
+                // Show confirmation modal for SOLICITADO or AGENDADO
                 pendingSchedule = { quoteId, quoteFolio, newStatus, oldStatus, $select };
                 const email = $select.data('email') || '';
                 const emailNote = document.getElementById('scheduleListEmailNote');
@@ -809,11 +885,37 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 } else if (emailNote) {
                     emailNote.style.display = 'none';
                 }
-                const modal = new bootstrap.Modal(document.getElementById('confirmScheduleListModal'));
-                modal.show();
+                
+                // Update modal content based on status
+                const modal = document.getElementById('confirmScheduleListModal');
+                const modalTitle = modal.querySelector('.modal-title');
+                const modalBody = modal.querySelector('.modal-body p:first-child');
+                const confirmBtn = document.getElementById('confirmScheduleListBtn');
+                const loadingText = document.getElementById('scheduleListLoadingOverlay').querySelector('small');
+                
+                if (newStatus === 'requested') {
+                    modalTitle.textContent = 'Confirmar solicitud';
+                    modalBody.textContent = '¿El cliente ha solicitado estos servicios? Se creará una reservación.';
+                    confirmBtn.textContent = 'Confirmar solicitud';
+                    loadingText.textContent = 'Creando reservación...';
+                } else if (newStatus === 'scheduled') {
+                    modalTitle.textContent = 'Agendar reservación';
+                    modalBody.textContent = '¿Confirma que desea agendar esta reservación?';
+                    confirmBtn.textContent = 'Agendar';
+                    loadingText.textContent = 'Agendando...';
+                }
+                
+                const bootstrapModal = new bootstrap.Modal(modal);
+                bootstrapModal.show();
             } else {
+                // Show loader and disable select
+                const $wrapper = $select.closest('.status-select-wrapper');
+                const $loader = $wrapper.find('.status-loader');
+                $loader.removeClass('d-none');
+                $select.prop('disabled', true);
+                
                 $select.data('previous-status', newStatus);
-                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus);
+                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, false, $select);
             }
         });
 
@@ -825,13 +927,22 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         // Confirm schedule from list modal
         $(document).on('click', '#confirmScheduleListBtn', function() {
             if (pendingSchedule) {
-                const { quoteId, quoteFolio, newStatus, oldStatus } = pendingSchedule;
+                const { quoteId, quoteFolio, newStatus, oldStatus, $select } = pendingSchedule;
                 // Show loader
                 const overlay = document.getElementById('scheduleListLoadingOverlay');
                 const btn = document.getElementById('confirmScheduleListBtn');
                 if (overlay) overlay.style.display = 'block';
                 if (btn) btn.disabled = true;
-                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, true);
+                
+                // Show loader on the dropdown too
+                if ($select) {
+                    const $wrapper = $select.closest('.status-select-wrapper');
+                    const $loader = $wrapper.find('.status-loader');
+                    $loader.removeClass('d-none');
+                    $select.prop('disabled', true);
+                }
+                
+                updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, true, $select);
                 pendingSchedule = null;
             }
         });
@@ -847,6 +958,15 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
             const btn = document.getElementById('confirmScheduleListBtn');
             if (overlay) overlay.style.display = 'none';
             if (btn) btn.disabled = false;
+        });
+
+        // Convert to Reservation button click
+        $(`#${tableId}`).on('click', '.convert-reservation-btn', function() {
+            const quoteId = $(this).data('id');
+            const quoteFolio = $(this).data('folio');
+            const email = $(this).data('email');
+            const status = $(this).data('status');
+            openConvertModal(quoteId, quoteFolio, email, status);
         });
 
         // Copy Quote button click
@@ -869,6 +989,13 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         $('#confirmCopyQuoteBtn').on('click', function() {
             if (copyQuoteId) {
                 executeCopy(copyQuoteId);
+            }
+        });
+
+        // Confirm convert to reservation button
+        $('#confirmConvertBtn').on('click', function() {
+            if (convertReservationData) {
+                executeConvertToReservation(convertReservationData);
             }
         });
 
@@ -928,7 +1055,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
 
         // Functions
 
-        function updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, isScheduling) {
+        function updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus, isScheduling, $select) {
             $.ajax({
                 url: `${apiEndpoint}/${quoteId}`,
                 type: 'PUT',
@@ -938,6 +1065,14 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     reason: `Status changed from ${oldStatus} to ${newStatus}`
                 }),
                 success: function(response) {
+                    // Hide dropdown loader if present
+                    if ($select) {
+                        const $wrapper = $select.closest('.status-select-wrapper');
+                        const $loader = $wrapper.find('.status-loader');
+                        $loader.addClass('d-none');
+                        $select.prop('disabled', false);
+                    }
+                    
                     // Hide schedule loader & close modal if scheduling
                     if (isScheduling) {
                         const overlay = document.getElementById('scheduleListLoadingOverlay');
@@ -972,6 +1107,14 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     }
                 },
                 error: function(xhr) {
+                    // Hide dropdown loader if present
+                    if ($select) {
+                        const $wrapper = $select.closest('.status-select-wrapper');
+                        const $loader = $wrapper.find('.status-loader');
+                        $loader.addClass('d-none');
+                        $select.prop('disabled', false);
+                    }
+                    
                     // Hide schedule loader if scheduling
                     if (isScheduling) {
                         const overlay = document.getElementById('scheduleListLoadingOverlay');
@@ -985,6 +1128,104 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     dataTable.ajax.reload(null, false);
                 }
             });
+        }
+
+        /**
+         * Open convert to reservation modal
+         * @param {string} quoteId - Quote ID to convert
+         * @param {string} quoteFolio - Quote folio for display
+         * @param {string} email - Contact email
+         * @param {string} status - Current quote status
+         */
+        function openConvertModal(quoteId, quoteFolio, email, status) {
+            convertReservationData = { quoteId, quoteFolio, email, status };
+            $('#convertQuoteFolio').text(quoteFolio);
+            
+            // Show/hide email notification
+            const emailNote = document.getElementById('convertEmailNote');
+            const emailAddr = document.getElementById('convertEmailAddress');
+            if (email && emailNote && emailAddr) {
+                emailAddr.textContent = email;
+                emailNote.style.display = '';
+            } else if (emailNote) {
+                emailNote.style.display = 'none';
+            }
+            
+            const convertModal = new bootstrap.Modal(document.getElementById('convertReservationModal'));
+            convertModal.show();
+        }
+
+        /**
+         * Execute conversion to reservation
+         * @param {object} data - Conversion data with quoteId, quoteFolio, email, status
+         */
+        function executeConvertToReservation(data) {
+            // Show loading overlay
+            const overlay = document.getElementById('convertLoadingOverlay');
+            const btn = document.getElementById('confirmConvertBtn');
+            if (overlay) overlay.style.display = 'block';
+            if (btn) btn.disabled = true;
+
+            $.ajax({
+                url: `${apiEndpoint}/${data.quoteId}/convert-to-reservation`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    currentStatus: data.status
+                }),
+                success: function(response) {
+                    // Hide loader & close modal
+                    if (overlay) overlay.style.display = 'none';
+                    if (btn) btn.disabled = false;
+                    closeConvertModal();
+
+                    if (response.success && response.data) {
+                        // Show success notification with reservation details
+                        const resData = response.data;
+                        const toast = document.createElement('div');
+                        toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
+                        toast.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+                        toast.innerHTML = `
+                            <strong><i class="ti ti-check me-1"></i>Reservación creada exitosamente</strong>
+                            <p class="mb-1 mt-1">Folio: ${resData.reservationFolio || resData.folio || 'Nueva Reservación'}</p>
+                            ${resData.servicesCount ? `<p class="mb-1">Servicios creados: ${resData.servicesCount}</p>` : ''}
+                            ${resData.reservationId ? `<a href="/dashboard/admin/bookings/${resData.reservationId}" class="btn btn-sm btn-success">Ver Reservación</a>` : ''}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        `;
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 10000);
+
+                        // Reload table
+                        dataTable.ajax.reload(null, false);
+                        convertReservationData = null;
+                    } else {
+                        showErrorAlert(response.error || 'Error al convertir la cotización');
+                    }
+                },
+                error: function(xhr) {
+                    // Hide loader
+                    if (overlay) overlay.style.display = 'none';
+                    if (btn) btn.disabled = false;
+                    closeConvertModal();
+
+                    const errorMsg = xhr.responseJSON?.error || 'Error al convertir la cotización a reservación';
+                    showErrorAlert(errorMsg);
+                }
+            });
+        }
+
+        /**
+         * Close convert modal properly
+         */
+        function closeConvertModal() {
+            const modalElement = document.getElementById('convertReservationModal');
+            if (modalElement) {
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) {
+                    modal.hide();
+                }
+                cleanupModal();
+            }
         }
 
         /**

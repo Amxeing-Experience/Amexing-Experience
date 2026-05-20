@@ -6,6 +6,7 @@
 const Parse = require('parse/node');
 const Quote = require('../../../domain/models/Quote');
 const QuoteOwnership = require('../../../domain/models/QuoteOwnership');
+const ReservationService = require('../../../domain/models/ReservationService');
 const QuoteService = require('../../services/QuoteService');
 const QuoteOwnershipService = require('../../services/QuoteOwnershipService');
 const QuoteCollaborationService = require('../../services/QuoteCollaborationService');
@@ -533,10 +534,31 @@ class QuoteController {
 
       const sortField = columns[sortColumnIndex] || 'createdAt';
 
+      // First, get all quotes that have reservations
+      const reservationQuery = new Parse.Query('Reservation');
+      reservationQuery.equalTo('exists', true);
+      reservationQuery.select('quotePtr');
+      const reservations = await reservationQuery.find({ useMasterKey: true });
+      const quotesWithReservations = reservations
+        .filter((r) => r.get('quotePtr'))
+        .map((r) => r.get('quotePtr').id);
+
+      logger.info('Filtering quotes table - excluding quotes with reservations', {
+        totalReservations: reservations.length,
+        quotesWithReservations: quotesWithReservations.length,
+        excludedQuoteIds: quotesWithReservations,
+      });
+
       // Build base query for all active, existing records with role-based filtering
       const baseQuery = new Parse.Query('Quote');
       baseQuery.equalTo('active', true);
       baseQuery.equalTo('exists', true);
+
+      // EXCLUDE quotes that have reservations
+      if (quotesWithReservations.length > 0) {
+        baseQuery.notContainedIn('objectId', quotesWithReservations);
+      }
+
       baseQuery.include('client');
       baseQuery.include('companyClientPtr');
       baseQuery.include('rate');
@@ -549,6 +571,12 @@ class QuoteController {
       const totalRecordsQuery = new Parse.Query('Quote');
       totalRecordsQuery.equalTo('active', true);
       totalRecordsQuery.equalTo('exists', true);
+
+      // EXCLUDE quotes that have reservations from total count
+      if (quotesWithReservations.length > 0) {
+        totalRecordsQuery.notContainedIn('objectId', quotesWithReservations);
+      }
+
       await this.applyRoleBasedQuoteFilters(totalRecordsQuery, currentUser, req.userRole);
       const recordsTotal = await totalRecordsQuery.count({
         useMasterKey: true,
@@ -562,12 +590,24 @@ class QuoteController {
         folioQuery.equalTo('active', true);
         folioQuery.equalTo('exists', true);
         folioQuery.matches('folio', searchValue, 'i');
+
+        // EXCLUDE quotes with reservations from search
+        if (quotesWithReservations.length > 0) {
+          folioQuery.notContainedIn('objectId', quotesWithReservations);
+        }
+
         await this.applyRoleBasedQuoteFilters(folioQuery, currentUser, req.userRole);
 
         const contactQuery = new Parse.Query('Quote');
         contactQuery.equalTo('active', true);
         contactQuery.equalTo('exists', true);
         contactQuery.matches('contactPerson', searchValue, 'i');
+
+        // EXCLUDE quotes with reservations from search
+        if (quotesWithReservations.length > 0) {
+          contactQuery.notContainedIn('objectId', quotesWithReservations);
+        }
+
         await this.applyRoleBasedQuoteFilters(contactQuery, currentUser, req.userRole);
 
         filteredQuery = Parse.Query.or(folioQuery, contactQuery);
@@ -589,6 +629,23 @@ class QuoteController {
 
       // Execute query
       const quotes = await filteredQuery.find({ useMasterKey: true });
+
+      // DEBUGGING: Check if specific quote is in results
+      console.log('=== QUOTES RETURNED FROM DATABASE ===');
+      console.log('Total quotes found:', quotes.length);
+      console.log('User role:', req.userRole);
+      console.log('Current user ID:', currentUser.id);
+      const quoteFolios = quotes.map((q) => q.get('folio')).filter((f) => f);
+      console.log('Quote folios returned:', quoteFolios);
+
+      // Check for the specific problematic quote
+      const problemQuote = quotes.find((q) => q.id === 'pVYlMjqbfa');
+      if (problemQuote) {
+        console.log('🚨 PROBLEMATIC QUOTE FOUND IN RESULTS!');
+        console.log('Quote folio:', problemQuote.get('folio'));
+        console.log('Quote createdBy:', problemQuote.get('createdBy')?.id);
+        console.log('Quote client:', problemQuote.get('client')?.id);
+      }
 
       // Format data for DataTables and check for pending invoice requests
       const data = await Promise.all(
@@ -989,6 +1046,9 @@ class QuoteController {
         });
       });
 
+      // Fetch and merge suggested departure times from ReservationService records
+      await this.mergeSuggestedDepartureTimes(data);
+
       return res.json({
         success: true,
         data,
@@ -1171,6 +1231,33 @@ class QuoteController {
             userId: currentUser.id,
           });
         }
+      }
+
+      // If status is being updated, always use the reliable status update method (same as admin)
+      // This ensures consistent reservation creation logic between admin and department manager flows
+      if (updates.status) {
+        logger.info('🔄 Status change detected, delegating to updateQuoteStatus', {
+          quoteId,
+          status: updates.status,
+          reason: updates.reason,
+          userId: currentUser.id,
+          userRole: req.userRole,
+        });
+
+        const result = await this.quoteService.updateQuoteStatus(
+          currentUser,
+          quoteId,
+          updates.status,
+          updates.reason || 'Status updated',
+          req.userRole
+        );
+
+        // Add edit tracking info to result
+        result.editId = editRecord.id;
+        result.version = editRecord.version;
+        result.requiresApproval = editRecord.approvalStatus === 'pending';
+
+        return res.json(result);
       }
 
       // Call original service for backward compatibility
@@ -1457,6 +1544,168 @@ class QuoteController {
   }
 
   /**
+   * POST /api/quotes/:id/convert-to-reservation - Convert quote to reservation.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * // Convert quote to reservation
+   * // Request body: { currentStatus: 'quoted' }
+   * // Response: { success: true, message: 'Reservación creada exitosamente', data: {...} }
+   */
+  async convertToReservation(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const quoteId = req.params.id;
+      if (!quoteId) {
+        return this.sendError(res, 'El ID de la cotización es requerido', 400);
+      }
+
+      const { currentStatus } = req.body;
+
+      logger.info('🔄 Converting quote to reservation', {
+        quoteId,
+        currentStatus,
+        userId: currentUser.id,
+        userEmail: currentUser.get('email'),
+      });
+
+      // Fetch the quote
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      query.include('client');
+      query.include('rate');
+      const quote = await query.get(quoteId, { useMasterKey: true });
+
+      if (!quote) {
+        return this.sendError(res, 'Cotización no encontrada', 404);
+      }
+
+      const quoteFolio = quote.get('folio');
+      const quoteStatus = quote.get('status');
+
+      // Check if quote can be converted (must be quoted or requested)
+      if (quoteStatus !== 'quoted' && quoteStatus !== 'requested') {
+        return this.sendError(
+          res,
+          `La cotización debe estar en estado "COTIZADO" o "SOLICITADO" para convertirse en reservación. Estado actual: ${quoteStatus}`,
+          400
+        );
+      }
+
+      let reservationData = null;
+      let statusChanged = false;
+
+      // If quote is in 'quoted' status, first update it to 'requested'
+      if (quoteStatus === 'quoted') {
+        logger.info('📝 Updating quote status from quoted to requested', {
+          quoteId,
+          quoteFolio,
+        });
+
+        // Update status to requested using the service
+        const statusResult = await this.quoteService.updateQuoteStatus(
+          currentUser,
+          quoteId,
+          'requested',
+          'Converted to reservation via button',
+          req.userRole
+        );
+
+        if (!statusResult.success) {
+          return this.sendError(res, statusResult.error || 'Error al actualizar el estado de la cotización', 500);
+        }
+
+        statusChanged = true;
+
+        // The updateQuoteStatus method already creates the reservation when changing to 'requested'
+        reservationData = statusResult.data?.reservation;
+      } else {
+        // Quote is already 'requested', check if reservation exists
+        logger.info('📋 Quote already in requested status, checking for existing reservation', {
+          quoteId,
+          quoteFolio,
+        });
+
+        // Check if reservation already exists
+        const reservationQuery = new Parse.Query('Reservation');
+        reservationQuery.equalTo('quoteFolio', quoteFolio);
+        reservationQuery.equalTo('exists', true);
+        const existingReservation = await reservationQuery.first({ useMasterKey: true });
+
+        if (existingReservation) {
+          logger.info('✅ Reservation already exists for this quote', {
+            quoteId,
+            quoteFolio,
+            reservationId: existingReservation.id,
+            reservationFolio: existingReservation.get('folio'),
+          });
+
+          reservationData = {
+            id: existingReservation.id,
+            folio: existingReservation.get('folio'),
+            servicesCount: 0, // Would need to count services if needed
+          };
+        } else {
+          // Create reservation manually if it doesn't exist
+          logger.info('🆕 Creating new reservation for requested quote', {
+            quoteId,
+            quoteFolio,
+          });
+
+          reservationData = await this.quoteService.createReservationFromQuote(quote, currentUser);
+        }
+      }
+
+      // Prepare response
+      const response = {
+        success: true,
+        message: reservationData ? 'Reservación creada exitosamente' : 'Estado actualizado a SOLICITADO',
+        data: {
+          quoteId: quote.id,
+          quoteFolio,
+          quoteStatus: statusChanged ? 'requested' : quoteStatus,
+          statusChanged,
+        },
+      };
+
+      // Add reservation data if available
+      if (reservationData) {
+        response.data.reservationId = reservationData.id;
+        response.data.reservationFolio = reservationData.folio;
+        response.data.servicesCount = reservationData.servicesCount || 0;
+      }
+
+      logger.info('✅ Quote conversion completed', {
+        quoteId,
+        quoteFolio,
+        reservationCreated: !!reservationData,
+        statusChanged,
+        response: response.data,
+      });
+
+      return res.json(response);
+    } catch (error) {
+      logger.error('Error in QuoteController.convertToReservation', {
+        error: error.message,
+        stack: error.stack,
+        quoteId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al convertir la cotización en reservación',
+        500
+      );
+    }
+  }
+
+  /**
    * DELETE /api/quotes/:id - Soft delete quote.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
@@ -1665,6 +1914,30 @@ class QuoteController {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
 
+      // Debug: Log transport services with suggested departure time fields
+      days.forEach((day, dayIndex) => {
+        if (day.subconcepts) {
+          day.subconcepts.forEach((subconcept, subIndex) => {
+            if (subconcept.type === 'transport') {
+              logger.info('🔍 BACKEND DEBUG - Transport service received for saving:', {
+                dayIndex,
+                subIndex,
+                concept: subconcept.concept,
+                type: subconcept.type,
+                suggestedTimeFields: {
+                  flightDepartureTimeSuggested: subconcept.flightDepartureTimeSuggested,
+                  roundTripDepartureTimeSuggestedIda: subconcept.roundTripDepartureTimeSuggestedIda,
+                  roundTripDepartureTimeSuggestedVuelta: subconcept.roundTripDepartureTimeSuggestedVuelta,
+                },
+                allFieldsCount: Object.keys(subconcept).length,
+                hasFlightTime: !!subconcept.flightTime,
+                hasStartTime: !!subconcept.startTime,
+              });
+            }
+          });
+        }
+      });
+
       // Apply sorting and deduplication to days before saving
       const sortedAndCleanedDays = this.sortAndCleanServiceDays(days);
 
@@ -1692,6 +1965,9 @@ class QuoteController {
           },
         },
       });
+
+      // Create or update ReservationService records for transport services with suggested departure times
+      await this.persistSuggestedDepartureTimes(quote.id, sortedAndCleanedDays, currentUser);
 
       logger.info('Service items updated successfully', {
         quoteId: quote.id,
@@ -2837,17 +3113,143 @@ class QuoteController {
           }
         });
 
-        // Query 1: Quotes where client matches department/org users
-        const queryByClient = new Parse.Query('Quote');
-        queryByClient.containedIn('client', allUserPointers);
+        // Query 3: Quotes where department manager has collaboration access OR ownership
+        const currentUserPointer = {
+          __type: 'Pointer',
+          className: 'AmexingUser',
+          objectId: currentUser.id,
+        };
 
-        // Query 2: Quotes created by department/org users
-        const queryByCreator = new Parse.Query('Quote');
-        queryByCreator.containedIn('createdBy', allUserPointers);
+        // Check for collaboration access
+        const accessQuery = new Parse.Query('QuoteAccess');
+        accessQuery.equalTo('agent', currentUserPointer);
+        accessQuery.equalTo('active', true);
+        accessQuery.equalTo('exists', true);
+        const accessRecords = await accessQuery.find({ useMasterKey: true });
+
+        // Check for ownership
+        const ownershipQuery = new Parse.Query('QuoteOwnership');
+        ownershipQuery.equalTo('owner', currentUserPointer);
+        ownershipQuery.equalTo('isCurrent', true);
+        ownershipQuery.equalTo('exists', true);
+        const ownershipRecords = await ownershipQuery.find({ useMasterKey: true });
+
+        // Separate quotes into owned vs unowned for proper access control precedence
+        const allOwnershipQuery = new Parse.Query('QuoteOwnership');
+        allOwnershipQuery.equalTo('isCurrent', true);
+        allOwnershipQuery.equalTo('exists', true);
+        allOwnershipQuery.select('quote');
+        const allOwnedQuotes = await allOwnershipQuery.find({ useMasterKey: true });
+        const ownedQuoteIds = allOwnedQuotes
+          .map((ownership) => ownership.get('quote')?.id)
+          .filter((id) => id);
+
+        console.log('=== DEPARTMENT MANAGER ACCESS CONTROL REBUILD ===');
+        console.log('Total quotes with ownership:', ownedQuoteIds.length);
+        console.log('Current user ID:', currentUser.id);
+        console.log('User owns quotes directly:', ownershipRecords.length);
+        console.log('User has collaboration access:', accessRecords.length);
+
+        // Check specific problematic quote
+        const problemQuoteId = 'pVYlMjqbfa';
+        const isProblemQuoteOwned = ownedQuoteIds.includes(problemQuoteId);
+        const userOwnsProblematicQuote = ownershipRecords.some((r) => r.get('quote')?.id === problemQuoteId);
+        const userCollaboratesOnProblematicQuote = accessRecords.some((r) => r.get('quote')?.id === problemQuoteId);
+
+        console.log('🚨 PROBLEMATIC QUOTE DEBUGGING:');
+        console.log('- Quote ID:', problemQuoteId);
+        console.log('- Is owned (has ownership record):', isProblemQuoteOwned);
+        console.log('- User owns this quote:', userOwnsProblematicQuote);
+        console.log('- User collaborates on this quote:', userCollaboratesOnProblematicQuote);
+        console.log('- Should be excluded from legacy queries:', isProblemQuoteOwned);
+        console.log('- Should only be accessible via ownership/collaboration:', isProblemQuoteOwned);
+
+        const queries = [];
+
+        // PATH A: Quotes WITH established ownership - only check ownership + collaboration
+        // For owned quotes, ignore client and creator fields completely
+
+        // PATH B: Quotes WITHOUT established ownership - use legacy access (client + creator)
+        // Only for quotes that have no ownership records at all
+        if (ownedQuoteIds.length > 0) {
+          // Only check unowned quotes for client assignment
+          const queryByClient = new Parse.Query('Quote');
+          queryByClient.containedIn('client', allUserPointers);
+          queryByClient.notContainedIn('objectId', ownedQuoteIds);
+          queries.push(queryByClient);
+
+          // Only check unowned quotes for creator access
+          const queryByCreator = new Parse.Query('Quote');
+          queryByCreator.containedIn('createdBy', allUserPointers);
+          queryByCreator.notContainedIn('objectId', ownedQuoteIds);
+          queries.push(queryByCreator);
+
+          logger.info('Added legacy access filters (excluding owned quotes) for department manager', {
+            userId: currentUser.id,
+            excludedOwnedQuotes: ownedQuoteIds.length,
+          });
+        } else {
+          // No ownership system in use, use standard legacy queries
+          const queryByClient = new Parse.Query('Quote');
+          queryByClient.containedIn('client', allUserPointers);
+          queries.push(queryByClient);
+
+          const queryByCreator = new Parse.Query('Quote');
+          queryByCreator.containedIn('createdBy', allUserPointers);
+          queries.push(queryByCreator);
+
+          logger.info('Added legacy access filters (no ownership system) for department manager', {
+            userId: currentUser.id,
+          });
+        }
+
+        // Add collaboration-based quotes (only for quotes WITH ownership)
+        if (accessRecords.length > 0 && ownedQuoteIds.length > 0) {
+          const collaborativeQuotePointers = accessRecords
+            .map((access) => access.get('quote'))
+            .filter((quote) => quote && quote.id && ownedQuoteIds.includes(quote.id));
+
+          if (collaborativeQuotePointers.length > 0) {
+            const queryByCollaboration = new Parse.Query('Quote');
+            queryByCollaboration.containedIn('objectId', collaborativeQuotePointers.map((q) => q.id));
+            queries.push(queryByCollaboration);
+
+            logger.info('Added collaboration filter for owned quotes (department manager)', {
+              userId: currentUser.id,
+              collaborativeOwnedQuotesCount: collaborativeQuotePointers.length,
+            });
+          }
+        }
+
+        // Add ownership-based quotes (only for quotes the user directly owns)
+        if (ownershipRecords.length > 0) {
+          const ownedQuotePointers = ownershipRecords
+            .map((ownership) => ownership.get('quote'))
+            .filter((quote) => quote && quote.id);
+
+          if (ownedQuotePointers.length > 0) {
+            const queryByOwnership = new Parse.Query('Quote');
+            queryByOwnership.containedIn('objectId', ownedQuotePointers.map((q) => q.id));
+            queries.push(queryByOwnership);
+
+            logger.info('Added ownership filter for department manager', {
+              userId: currentUser.id,
+              ownedQuotesCount: ownedQuotePointers.length,
+            });
+          }
+        }
+
+        // DEBUGGING: Show final queries before execution
+        console.log('=== FINAL QUERY DEBUG FOR DEPT MANAGER ===');
+        console.log('Total OR queries built:', queries.length);
+        console.log('Current user ID:', currentUser.id);
+        queries.forEach((q, i) => {
+          console.log(`Query ${i + 1}:`, q.className, q.toJSON ? q.toJSON() : 'complex query');
+        });
 
         // Combine with OR
         // eslint-disable-next-line no-underscore-dangle
-        query._orQuery([queryByClient, queryByCreator]);
+        query._orQuery(queries);
 
         logger.info('Applied department filter to quotes query (client)', {
           userId: currentUser.id,
@@ -2899,17 +3301,111 @@ class QuoteController {
           clientUserPointers.push(currentUserPointer);
         }
 
-        // Query 1: Quotes where client pointer matches organization users
-        const queryByClient = new Parse.Query('Quote');
-        queryByClient.containedIn('client', clientUserPointers);
+        // Query 3: Quotes where client has collaboration access OR ownership
+        const accessQuery = new Parse.Query('QuoteAccess');
+        accessQuery.equalTo('agent', currentUserPointer);
+        accessQuery.equalTo('active', true);
+        accessQuery.equalTo('exists', true);
+        const accessRecords = await accessQuery.find({ useMasterKey: true });
 
-        // Query 2: Quotes created by the current user
-        const queryByCreator = new Parse.Query('Quote');
-        queryByCreator.equalTo('createdBy', currentUserPointer);
+        // Check for ownership
+        const ownershipQuery = new Parse.Query('QuoteOwnership');
+        ownershipQuery.equalTo('owner', currentUserPointer);
+        ownershipQuery.equalTo('isCurrent', true);
+        ownershipQuery.equalTo('exists', true);
+        const ownershipRecords = await ownershipQuery.find({ useMasterKey: true });
 
-        // Combine with OR — client sees quotes assigned to their org OR created by them
+        // Separate quotes into owned vs unowned for proper access control precedence
+        const allOwnershipQuery = new Parse.Query('QuoteOwnership');
+        allOwnershipQuery.equalTo('isCurrent', true);
+        allOwnershipQuery.equalTo('exists', true);
+        allOwnershipQuery.select('quote');
+        const allOwnedQuotes = await allOwnershipQuery.find({ useMasterKey: true });
+        const ownedQuoteIds = allOwnedQuotes
+          .map((ownership) => ownership.get('quote')?.id)
+          .filter((id) => id);
+
+        console.log('=== CLIENT ACCESS CONTROL REBUILD ===');
+        console.log('Total quotes with ownership:', ownedQuoteIds.length);
+        console.log('Current user ID:', currentUser.id);
+        console.log('User owns quotes directly:', ownershipRecords.length);
+        console.log('User has collaboration access:', accessRecords.length);
+
+        const queries = [];
+
+        // PATH B: Quotes WITHOUT established ownership - use legacy access (client + creator)
+        // Only for quotes that have no ownership records at all
+        if (ownedQuoteIds.length > 0) {
+          // Only check unowned quotes for client assignment
+          const queryByClient = new Parse.Query('Quote');
+          queryByClient.containedIn('client', clientUserPointers);
+          queryByClient.notContainedIn('objectId', ownedQuoteIds);
+          queries.push(queryByClient);
+
+          // Only check unowned quotes for creator access
+          const queryByCreator = new Parse.Query('Quote');
+          queryByCreator.equalTo('createdBy', currentUserPointer);
+          queryByCreator.notContainedIn('objectId', ownedQuoteIds);
+          queries.push(queryByCreator);
+
+          logger.info('Added legacy access filters (excluding owned quotes) for client', {
+            userId: currentUser.id,
+            excludedOwnedQuotes: ownedQuoteIds.length,
+          });
+        } else {
+          // No ownership system in use, use standard legacy queries
+          const queryByClient = new Parse.Query('Quote');
+          queryByClient.containedIn('client', clientUserPointers);
+          queries.push(queryByClient);
+
+          const queryByCreator = new Parse.Query('Quote');
+          queryByCreator.equalTo('createdBy', currentUserPointer);
+          queries.push(queryByCreator);
+
+          logger.info('Added legacy access filters (no ownership system) for client', {
+            userId: currentUser.id,
+          });
+        }
+
+        // Add collaboration-based quotes (only for quotes WITH ownership)
+        if (accessRecords.length > 0 && ownedQuoteIds.length > 0) {
+          const collaborativeQuotePointers = accessRecords
+            .map((access) => access.get('quote'))
+            .filter((quote) => quote && quote.id && ownedQuoteIds.includes(quote.id));
+
+          if (collaborativeQuotePointers.length > 0) {
+            const queryByCollaboration = new Parse.Query('Quote');
+            queryByCollaboration.containedIn('objectId', collaborativeQuotePointers.map((q) => q.id));
+            queries.push(queryByCollaboration);
+
+            logger.info('Added collaboration filter for owned quotes (client)', {
+              userId: currentUser.id,
+              collaborativeOwnedQuotesCount: collaborativeQuotePointers.length,
+            });
+          }
+        }
+
+        // Add ownership-based quotes (only for quotes the user directly owns)
+        if (ownershipRecords.length > 0) {
+          const ownedQuotePointers = ownershipRecords
+            .map((ownership) => ownership.get('quote'))
+            .filter((quote) => quote && quote.id);
+
+          if (ownedQuotePointers.length > 0) {
+            const queryByOwnership = new Parse.Query('Quote');
+            queryByOwnership.containedIn('objectId', ownedQuotePointers.map((q) => q.id));
+            queries.push(queryByOwnership);
+
+            logger.info('Added ownership filter for client', {
+              userId: currentUser.id,
+              ownedQuotesCount: ownedQuotePointers.length,
+            });
+          }
+        }
+
+        // Combine with OR — client sees quotes assigned to their org OR created by them OR shared via collaboration
         // eslint-disable-next-line no-underscore-dangle
-        query._orQuery([queryByClient, queryByCreator]);
+        query._orQuery(queries);
 
         logger.info('Applied client filter to quotes query (client)', {
           userId: currentUser.id,
@@ -3580,6 +4076,206 @@ class QuoteController {
 
       return minutesA - minutesB;
     });
+  }
+
+  /**
+   * Merge suggested departure times from ReservationService records back into quote data.
+   * @param {object} quoteData - Quote data object with serviceItems.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async mergeSuggestedDepartureTimes(quoteData) {
+    try {
+      if (!quoteData.serviceItems || !quoteData.serviceItems.days) {
+        return;
+      }
+
+      const quoteId = quoteData.id;
+
+      // Create Quote pointer
+      const quotePtr = new Parse.Object('Quote');
+      quotePtr.id = quoteId;
+
+      // Query all ReservationService records for this quote with suggested departure times
+      const query = new Parse.Query('ReservationService');
+      query.equalTo('reservationPtr', quotePtr);
+      query.equalTo('exists', true);
+      query.equalTo('type', 'transport');
+
+      // Only fetch records that have at least one suggested departure time field
+      const orQuery = Parse.Query.or(
+        query.exists('flightDepartureTimeSuggested'),
+        query.exists('roundTripDepartureTimeSuggestedIda'),
+        query.exists('roundTripDepartureTimeSuggestedVuelta')
+      );
+
+      const reservationServices = await orQuery.find({ useMasterKey: true });
+
+      if (reservationServices.length === 0) {
+        return;
+      }
+
+      // Create lookup map by day number and concept
+      const serviceMap = new Map();
+      reservationServices.forEach((resSvc) => {
+        const dayNumber = resSvc.getDayNumber();
+        const concept = resSvc.getConcept();
+        const key = `${dayNumber}_${concept}`;
+
+        serviceMap.set(key, {
+          flightDepartureTimeSuggested: resSvc.getFlightDepartureTimeSuggested(),
+          roundTripDepartureTimeSuggestedIda: resSvc.getRoundTripDepartureTimeSuggestedIda(),
+          roundTripDepartureTimeSuggestedVuelta: resSvc.getRoundTripDepartureTimeSuggestedVuelta(),
+        });
+      });
+
+      // Merge the suggested departure times back into serviceItems
+      quoteData.serviceItems.days.forEach((day) => {
+        (day.subconcepts || []).forEach((subconcept) => {
+          if (subconcept.type === 'transport') {
+            const key = `${day.dayNumber}_${subconcept.concept}`;
+            const suggestedTimes = serviceMap.get(key);
+
+            if (suggestedTimes) {
+              // Extract suggested times with shorter variable names
+              const {
+                flightDepartureTimeSuggested: flightTime,
+                roundTripDepartureTimeSuggestedIda: idaTime,
+                roundTripDepartureTimeSuggestedVuelta: vueltaTime,
+              } = suggestedTimes;
+
+              // Build object with only non-null suggested times
+              const timesToMerge = {};
+              if (flightTime) timesToMerge.flightDepartureTimeSuggested = flightTime;
+              if (idaTime) timesToMerge.roundTripDepartureTimeSuggestedIda = idaTime;
+              if (vueltaTime) timesToMerge.roundTripDepartureTimeSuggestedVuelta = vueltaTime;
+
+              // Merge times into subconcept using Object.assign to avoid param-reassign
+              Object.assign(subconcept, timesToMerge);
+
+              logger.debug('🔄 Merged suggested departure times for transport service', {
+                quoteId,
+                dayNumber: day.dayNumber,
+                concept: subconcept.concept,
+                flightDepartureTimeSuggested: suggestedTimes.flightDepartureTimeSuggested,
+                roundTripDepartureTimeSuggestedIda: suggestedTimes.roundTripDepartureTimeSuggestedIda,
+                roundTripDepartureTimeSuggestedVuelta: suggestedTimes.roundTripDepartureTimeSuggestedVuelta,
+              });
+            }
+          }
+        });
+      });
+    } catch (error) {
+      logger.error('❌ Error merging suggested departure times', {
+        error: error.message,
+        stack: error.stack,
+        quoteId: quoteData.id,
+      });
+      // Don't throw - this shouldn't block the main quote loading
+    }
+  }
+
+  /**
+   * Persist suggested departure times to ReservationService records.
+   * Creates or updates ReservationService records for transport services that have suggested departure times.
+   * @param {string} quoteId - Quote ID.
+   * @param {Array} days - Array of service days with subconcepts.
+   * @param {object} currentUser - Current user making the update.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async persistSuggestedDepartureTimes(quoteId, days, currentUser) {
+    try {
+      // Create Quote pointer
+      const quotePtr = new Parse.Object('Quote');
+      quotePtr.id = quoteId;
+
+      for (const day of days) {
+        for (let subIndex = 0; subIndex < (day.subconcepts || []).length; subIndex++) {
+          const subconcept = day.subconcepts[subIndex];
+
+          // Only process transport services with suggested departure times
+          if (subconcept.type === 'transport') {
+            const hasSuggestedTimes = subconcept.flightDepartureTimeSuggested
+                                    || subconcept.roundTripDepartureTimeSuggestedIda
+                                    || subconcept.roundTripDepartureTimeSuggestedVuelta;
+
+            if (hasSuggestedTimes) {
+              // Query for existing ReservationService record
+              const query = new Parse.Query('ReservationService');
+              query.equalTo('reservationPtr', quotePtr);
+              query.equalTo('dayNumber', day.dayNumber);
+              query.equalTo('concept', subconcept.concept);
+              query.equalTo('type', subconcept.type);
+              query.equalTo('exists', true);
+
+              let resSvc;
+              try {
+                resSvc = await query.first({ useMasterKey: true });
+              } catch (error) {
+                // Record doesn't exist, will create new one
+                resSvc = null;
+              }
+
+              if (!resSvc) {
+                // Create new ReservationService record
+                resSvc = new ReservationService();
+                resSvc.setReservationPtr(quotePtr);
+                resSvc.setDayNumber(day.dayNumber);
+                resSvc.setConcept(subconcept.concept);
+                resSvc.setType(subconcept.type);
+                resSvc.setTime(subconcept.time || null);
+                resSvc.setActive(true);
+                resSvc.setExists(true);
+                resSvc.setStatus('active');
+              }
+
+              // Update suggested departure time fields
+              if (subconcept.flightDepartureTimeSuggested) {
+                resSvc.setFlightDepartureTimeSuggested(subconcept.flightDepartureTimeSuggested);
+              }
+              if (subconcept.roundTripDepartureTimeSuggestedIda) {
+                resSvc.setRoundTripDepartureTimeSuggestedIda(subconcept.roundTripDepartureTimeSuggestedIda);
+              }
+              if (subconcept.roundTripDepartureTimeSuggestedVuelta) {
+                resSvc.setRoundTripDepartureTimeSuggestedVuelta(subconcept.roundTripDepartureTimeSuggestedVuelta);
+              }
+
+              // Save the service record
+              await resSvc.save(null, {
+                useMasterKey: true,
+                context: {
+                  user: {
+                    objectId: currentUser.id,
+                    id: currentUser.id,
+                    email: currentUser.get('email'),
+                    username: currentUser.get('username') || currentUser.get('email'),
+                  },
+                },
+              });
+
+              logger.info('✅ Persisted suggested departure times to ReservationService', {
+                quoteId,
+                dayNumber: day.dayNumber,
+                concept: subconcept.concept,
+                serviceId: resSvc.id,
+                flightDepartureTimeSuggested: subconcept.flightDepartureTimeSuggested,
+                roundTripDepartureTimeSuggestedIda: subconcept.roundTripDepartureTimeSuggestedIda,
+                roundTripDepartureTimeSuggestedVuelta: subconcept.roundTripDepartureTimeSuggestedVuelta,
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('❌ Error persisting suggested departure times', {
+        error: error.message,
+        stack: error.stack,
+        quoteId,
+        userId: currentUser.id,
+      });
+      // Don't throw - this shouldn't block the main serviceItems update
+    }
   }
 
   /**
