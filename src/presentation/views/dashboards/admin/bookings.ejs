@@ -82,27 +82,10 @@
     </div>
 </div>
 
-<!-- Cancel Reservation Modal -->
-<div class="modal fade" id="cancelReservationModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content">
-            <div class="modal-header border-0 pb-0">
-                <h6 class="modal-title fw-bold">Cancelar Reservación</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body pt-2">
-                <p>¿Estás seguro de cancelar esta reservación?</p>
-                <p class="text-muted mb-0" style="font-size: 0.85rem;">
-                    <i class="ti ti-alert-triangle me-1"></i>Esta acción cancelará todos los servicios asociados.
-                </p>
-            </div>
-            <div class="modal-footer border-0 pt-0">
-                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
-                <button class="btn btn-sm btn-danger" id="confirmCancelReservationBtn">Cancelar Reservación</button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Sophisticated cancel modal will be dynamically created by shared JavaScript utilities -->
+
+<!-- Shared cancel utilities -->
+<script src="/js/reservation-cancel-utils.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -241,35 +224,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Cancel reservation
+    // Cancel reservation - using shared utilities
     $(document).on('click', '.cancel-res-btn', function() {
-        pendingCancelId = $(this).data('id');
-        const modal = new bootstrap.Modal(document.getElementById('cancelReservationModal'));
-        modal.show();
-    });
-
-    document.getElementById('confirmCancelReservationBtn')?.addEventListener('click', async function() {
-        if (!pendingCancelId) return;
-        try {
-            const response = await fetch(`/api/reservations/${pendingCancelId}/cancel`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            });
-            const result = await response.json();
-            if (result.success) {
-                table.ajax.reload();
-                bootstrap.Modal.getInstance(document.getElementById('cancelReservationModal'))?.hide();
-            } else {
-                alert(result.error || 'Error al cancelar reservación');
-            }
-        } catch (err) {
-            console.error('Cancel error:', err);
-            alert('Error al cancelar reservación');
-        }
-        pendingCancelId = null;
+        const reservationId = $(this).data('id');
+        // Use shared utility with table reload callback
+        openReservationCancelModal(reservationId, () => {
+            table.ajax.reload();
+        });
     });
 });
 </script>

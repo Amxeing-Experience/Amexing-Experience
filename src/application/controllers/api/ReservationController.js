@@ -517,6 +517,7 @@ class ReservationController {
           client: client ? {
             id: client.id,
             fullName: client.get('fullName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+            companyName: client.get('contextualData')?.companyName || null,
             email: client.get('email'),
             phone: client.get('phone'),
           } : null,
@@ -1226,9 +1227,22 @@ class ReservationController {
    */
   static formatReservationRow(reservation, serviceCount) {
     const client = reservation.get('clientPtr');
-    const clientName = client
-      ? (client.get('fullName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim())
-      : (reservation.get('contactPerson') || 'N/A');
+
+    // Try to get company name from contextualData first, then fallback to name fields
+    let clientName = 'N/A';
+    if (client) {
+      const contextualData = client.get('contextualData');
+      if (contextualData && contextualData.companyName) {
+        clientName = contextualData.companyName;
+      } else {
+        clientName = client.get('fullName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim();
+      }
+    }
+
+    // Final fallback to contactPerson if no client data
+    if (clientName === 'N/A' || !clientName) {
+      clientName = reservation.get('contactPerson') || 'N/A';
+    }
 
     return {
       id: reservation.id,

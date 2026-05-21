@@ -71,7 +71,7 @@
                     <span id="infoContact">—</span>
                 </div>
                 <div class="col-md-3">
-                    <small class="text-muted d-block">Tipo de Evento</small>
+                    <small class="text-muted d-block">Motivo de viaje</small>
                     <span id="infoEventType">—</span>
                 </div>
                 <div class="col-md-3">
@@ -325,7 +325,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         document.getElementById('infoStatus').innerHTML = getStatusBadge(d.status);
         document.getElementById('infoCreatedAt').textContent = formatDate(d.createdAt);
-        document.getElementById('infoClient').textContent = d.client?.fullName || d.contactPerson || '—';
+        // Display company name first, then fallback to fullName or contactPerson
+        const clientDisplay = d.client?.companyName || d.client?.fullName || d.contactPerson || '—';
+        document.getElementById('infoClient').textContent = clientDisplay;
         document.getElementById('infoContact').innerHTML = `${d.contactEmail || ''}${d.contactPhone ? '<br>' + d.contactPhone : ''}`;
         document.getElementById('infoEventType').textContent = d.eventType || '—';
         document.getElementById('infoPeople').textContent = d.numberOfPeople || '—';

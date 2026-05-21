@@ -48,7 +48,7 @@
                     <strong id="infoFolio">&mdash;</strong>
                 </div>
                 <div class="col-md-3">
-                    <small class="text-muted d-block">Cotizacion</small>
+                    <small class="text-muted d-block">Cotización</small>
                     <a href="#" id="infoQuoteLink" class="fw-semibold text-decoration-none">&mdash;</a>
                 </div>
                 <div class="col-md-3">
@@ -56,7 +56,7 @@
                     <span id="infoStatus">&mdash;</span>
                 </div>
                 <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Creacion</small>
+                    <small class="text-muted d-block">Fecha Creación</small>
                     <span id="infoCreatedAt">&mdash;</span>
                 </div>
             </div>
@@ -71,7 +71,7 @@
                     <span id="infoContact">&mdash;</span>
                 </div>
                 <div class="col-md-3">
-                    <small class="text-muted d-block">Tipo de Evento</small>
+                    <small class="text-muted d-block">Motivo de viaje</small>
                     <span id="infoEventType">&mdash;</span>
                 </div>
                 <div class="col-md-3">
@@ -259,6 +259,9 @@
 }
 </style>
 
+<!-- Shared cancel utilities -->
+<script src="/js/reservation-cancel-utils.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -406,7 +409,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         document.getElementById('infoStatus').innerHTML = getStatusBadge(d.status);
         document.getElementById('infoCreatedAt').textContent = formatDate(d.createdAt);
-        document.getElementById('infoClient').textContent = d.client?.fullName || d.contactPerson || '—';
+        // Display company name first, then fallback to fullName or contactPerson
+        const clientDisplay = d.client?.companyName || d.client?.fullName || d.contactPerson || '—';
+        document.getElementById('infoClient').textContent = clientDisplay;
         document.getElementById('infoContact').innerHTML = `${d.contactEmail || ''}${d.contactPhone ? `<br>${d.contactPhone}` : ''}`;
         document.getElementById('infoEventType').textContent = d.eventType || '—';
         document.getElementById('infoPeople').textContent = d.numberOfPeople || '—';
@@ -446,7 +451,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         const actions = document.getElementById('headerActions');
         if (canAssign) {
             actions.innerHTML = `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservacion</button>`;
-            document.getElementById('cancelResBtn')?.addEventListener('click', cancelReservation);
+            document.getElementById('cancelResBtn')?.addEventListener('click', () => {
+                // Use shared utility with existing reservation data and loadReservation callback
+                openReservationCancelModalWithData(reservationData, loadReservation);
+            });
         } else {
             actions.innerHTML = '';
         }
@@ -824,7 +832,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         html += `
         <div class="assign-field-group mb-0" id="serviceCustomerGroup">
             <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="assign-icon bg-primary-subtle text-primary"><i class="ti ti-user-star"></i></span>
+                <span class="assign-icon bg-primary-subtle text-primary"><i class="ti ti-user"></i></span>
                 <label class="form-label mb-0 fw-semibold small">Seguidor de Servicio</label>
             </div>
             <select class="form-select form-select-sm" id="assignServiceCustomer">
@@ -1094,27 +1102,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         btn.disabled = false;
     });
 
-    async function cancelReservation() {
-        if (!confirm('Estas seguro de cancelar esta reservacion? Se cancelaran todos los servicios.')) return;
-        try {
-            const response = await fetch(`/api/reservations/${reservationId}/cancel`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            });
-            const result = await response.json();
-            if (result.success) {
-                await loadReservation();
-            } else {
-                alert(result.error || 'Error al cancelar');
-            }
-        } catch (err) {
-            console.error('Cancel error:', err);
-            alert('Error al cancelar reservacion');
-        }
-    }
+    // Cancel functionality now handled by shared utilities
 
     await loadReservation();
 });

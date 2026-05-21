@@ -78,6 +78,7 @@ router.get('/admin/settings', dashboardAuth.requireRole('admin'), (req, res) => 
 router.get('/admin/notifications', dashboardAuth.requireRole('admin'), (req, res) => adminController.notifications(req, res));
 router.get('/admin/forms', dashboardAuth.requireRole('admin'), (req, res) => adminController.forms(req, res));
 router.get('/admin/form-preview', dashboardAuth.requireRole('admin'), (req, res) => adminController.formPreview(req, res));
+router.get('/admin/cancellation-requests', dashboardAuth.requireRole('admin'), (req, res) => adminController.cancellationRequests(req, res));
 router.get('/admin/tarifario-export', dashboardAuth.requireRole('admin'), (req, res) => adminController.tarifarioExport(req, res));
 
 // Client Routes - Redirect to vehicles (first item in Servicios)
