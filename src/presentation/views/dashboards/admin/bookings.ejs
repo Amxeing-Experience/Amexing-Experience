@@ -21,16 +21,6 @@
                     Administra y gestiona todas las reservaciones del sistema
                 </p>
             </div>
-            <div>
-                <select id="statusFilter" class="form-select form-select-sm" style="width: 180px;">
-                    <option value="">Todos los estados</option>
-                    <option value="pending">Pendiente</option>
-                    <option value="assigned">Asignada</option>
-                    <option value="in_progress">En Progreso</option>
-                    <option value="completed">Completada</option>
-                    <option value="cancelled">Cancelada</option>
-                </select>
-            </div>
         </div>
     </div>
 </div>
@@ -52,6 +42,21 @@
                 </div>
 
                 <div class="card-body">
+                    <!-- Date Filter Pills -->
+                    <div class="mb-3">
+                        <div class="btn-group" role="group" aria-label="Filtro por fecha de reservaciones">
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterFuture" value="future" checked>
+                            <label class="btn btn-outline-primary" for="filterFuture">
+                                <i class="ti ti-calendar-forward me-1"></i>Próximas reservaciones
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterPrevious" value="previous">
+                            <label class="btn btn-outline-secondary" for="filterPrevious">
+                                <i class="ti ti-calendar-time me-1"></i>Reservaciones anteriores
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="table-responsive">
                         <table id="reservations-table" class="table table-hover" style="width:100%">
                             <thead class="table-light">
@@ -106,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function getStatusBadge(status) {
         const map = {
-            pending: { label: 'Pendiente', cls: 'bg-warning text-dark' },
+            pending: { label: 'Asignaciones pendientes', cls: 'bg-warning text-dark' },
             assigned: { label: 'Asignada', cls: 'bg-info text-white' },
             in_progress: { label: 'En Progreso', cls: 'bg-primary text-white' },
             completed: { label: 'Completada', cls: 'bg-success text-white' },
@@ -135,7 +140,11 @@ document.addEventListener('DOMContentLoaded', function() {
             type: 'GET',
             headers: { 'Authorization': `Bearer ${token}` },
             data: function(d) {
-                d.statusFilter = $('#statusFilter').val();
+                // Add date filter
+                const activeFilter = document.querySelector('input[name="dateFilter"]:checked');
+                if (activeFilter) {
+                    d.dateFilter = activeFilter.value;
+                }
                 return d;
             },
             error: function(xhr) {
@@ -172,17 +181,20 @@ document.addEventListener('DOMContentLoaded', function() {
             {
                 data: 'status',
                 className: 'text-center',
+                responsivePriority: 1,  // High priority - always show
                 render: function(data) { return getStatusBadge(data); }
             },
             {
                 data: 'createdAt',
                 className: 'text-center',
+                responsivePriority: 2,  // High priority
                 render: function(data) { return formatDate(data); }
             },
             {
                 data: null,
                 className: 'text-center',
                 orderable: false,
+                responsivePriority: 1,  // High priority for actions
                 render: function(data, type, row) {
                     let actions = `<a href="/dashboard/admin/bookings/${row.id}" class="btn btn-sm btn-outline-primary me-1" title="Ver detalle"><i class="ti ti-eye"></i></a>`;
                     if (row.quoteFolio) {
@@ -211,9 +223,22 @@ document.addEventListener('DOMContentLoaded', function() {
         pageLength: 10,
     });
 
-    // Status filter change
-    $('#statusFilter').on('change', function() {
-        table.ajax.reload();
+    // Date filter change
+    document.querySelectorAll('input[name="dateFilter"]').forEach(button => {
+        button.addEventListener('change', function() {
+            if (this.checked) {
+                // Force DataTable to recalculate columns and reload
+                table.ajax.reload(function() {
+                    // Callback after reload to ensure columns are properly rendered
+                    table.columns.adjust();
+                    // Force responsive to recalculate
+                    if (table.responsive) {
+                        table.responsive.recalc();
+                    }
+                    table.draw();
+                }, false);
+            }
+        });
     });
 
     // Cancel reservation

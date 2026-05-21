@@ -149,6 +149,9 @@ class ReservationController {
       // Status filter
       const statusFilter = req.query.statusFilter || '';
 
+      // Date filter
+      const dateFilter = req.query.dateFilter || 'future'; // Default to future
+
       // Get role-based filter pointers (null = no filter for admins)
       const roleFilterPointers = await ReservationController.getRoleFilterPointers(req);
 
@@ -163,6 +166,17 @@ class ReservationController {
         query.containedIn('clientPtr', roleFilterPointers);
       }
 
+      // Apply date filter based on startDate
+      if (dateFilter === 'future') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Start of today
+        query.greaterThanOrEqualTo('startDate', today);
+      } else if (dateFilter === 'previous') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Start of today
+        query.lessThan('startDate', today);
+      }
+
       // Total count (without search/status filters, but with role filter)
       const totalQuery = new Parse.Query('Reservation');
       totalQuery.equalTo('active', true);
@@ -170,6 +184,18 @@ class ReservationController {
       if (roleFilterPointers) {
         totalQuery.containedIn('clientPtr', roleFilterPointers);
       }
+
+      // Apply date filter to total count
+      if (dateFilter === 'future') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        totalQuery.greaterThanOrEqualTo('startDate', today);
+      } else if (dateFilter === 'previous') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        totalQuery.lessThan('startDate', today);
+      }
+
       const recordsTotal = await totalQuery.count({ useMasterKey: true });
 
       // Apply search filter
@@ -200,6 +226,23 @@ class ReservationController {
           contactQuery.containedIn('clientPtr', roleFilterPointers);
           eventQuery.containedIn('clientPtr', roleFilterPointers);
           emailQuery.containedIn('clientPtr', roleFilterPointers);
+        }
+
+        // Apply date filter to search queries
+        if (dateFilter === 'future') {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          folioQuery.greaterThanOrEqualTo('startDate', today);
+          contactQuery.greaterThanOrEqualTo('startDate', today);
+          eventQuery.greaterThanOrEqualTo('startDate', today);
+          emailQuery.greaterThanOrEqualTo('startDate', today);
+        } else if (dateFilter === 'previous') {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          folioQuery.lessThan('startDate', today);
+          contactQuery.lessThan('startDate', today);
+          eventQuery.lessThan('startDate', today);
+          emailQuery.lessThan('startDate', today);
         }
 
         const compoundQuery = Parse.Query.or(folioQuery, contactQuery, eventQuery, emailQuery);
@@ -250,6 +293,18 @@ class ReservationController {
       if (statusFilter) {
         countQuery.equalTo('status', statusFilter);
       }
+
+      // Apply date filter to count query
+      if (dateFilter === 'future') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        countQuery.greaterThanOrEqualTo('startDate', today);
+      } else if (dateFilter === 'previous') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        countQuery.lessThan('startDate', today);
+      }
+
       const recordsFiltered = await countQuery.count({ useMasterKey: true });
 
       // Sort
