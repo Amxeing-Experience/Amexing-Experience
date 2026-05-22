@@ -20,6 +20,7 @@ const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const canEdit = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
+const canConvertToReservation = ['superadmin', 'admin'].includes(dtUserRole);
 const canViewSummary = ['department_manager', 'client'].includes(dtUserRole);
 const showClientColumn = ['superadmin', 'admin'].includes(dtUserRole);
 
@@ -389,6 +390,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         const showActions = <%= dtShowActions %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
+        const canConvertToReservation = <%= canConvertToReservation %>;
         const basePath = '<%= baseDashboardPath %>';
 
         // Variables to store quote IDs for modal actions
@@ -868,8 +870,8 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         // Normal actions for non-scheduled quotes
                         let actions = '<div class="btn-group btn-group-sm" role="group">';
 
-                        // Convert to Reservation button (only for quoted or requested status)
-                        if ((data.status === 'quoted' || data.status === 'requested') && canEdit) {
+                        // Convert to Reservation button (only for quoted or requested status and admin roles)
+                        if ((data.status === 'quoted' || data.status === 'requested') && canConvertToReservation) {
                             actions += `<button type="button"
                                             class="btn btn-success convert-reservation-btn"
                                             data-id="${data.objectId || data.id}"
@@ -884,7 +886,16 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         }
 
                         if (canEdit) {
-                            // Copy button (at the beginning)
+                            // Edit button (goes to detail page)
+                            actions += `<a href="<%= baseDashboardPath %>/quotes/${data.objectId || data.id}"
+                                            class="btn btn-primary"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Editar Cotización">
+                                            <i class="ti ti-edit"></i>
+                                        </a>`;
+
+                            // Copy button (duplicate)
                             actions += `<button type="button"
                                             class="btn btn-info copy-quote-btn"
                                             data-id="${data.objectId || data.id}"
@@ -894,15 +905,6 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                                             title="Duplicar Cotización">
                                             <i class="ti ti-copy"></i>
                                         </button>`;
-
-                            // Edit button (goes to detail page)
-                            actions += `<a href="<%= baseDashboardPath %>/quotes/${data.objectId || data.id}"
-                                            class="btn btn-primary"
-                                            data-bs-toggle="tooltip"
-                                            data-bs-placement="top"
-                                            title="Editar Cotización">
-                                            <i class="ti ti-edit"></i>
-                                        </a>`;
                         }
 
                         if (canDelete) {

@@ -728,6 +728,104 @@ class ClientEmployeesController {
     }
   }
 
+  /**
+   * POST /api/clients/:clientId/employees/assign-manager - Assign agent as new department manager.
+   * Swaps personal data between agent and manager while preserving organizational structure.
+   * Only SuperAdmin and Admin can perform this operation.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * POST /api/clients/abc123/employees/assign-manager
+   * Body: { agentId: 'xyz789', preserveOldManager: true }
+   */
+  async assignAsManager(req, res) {
+    try {
+      const currentUser = req.user;
+      const { clientId } = req.params;
+      const { agentId, preserveOldManager = true } = req.body;
+
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      if (!clientId || !agentId) {
+        return this.sendError(res, 'Client ID and Agent ID are required', 400);
+      }
+
+      // Validate user role (only superadmin and admin)
+      const currentUserRole = req.userRole;
+      if (!currentUserRole || !['superadmin', 'admin'].includes(currentUserRole)) {
+        logger.warn('Unauthorized attempt to assign department manager', {
+          userId: currentUser.id,
+          userRole: currentUserRole,
+          targetClientId: clientId,
+          targetAgentId: agentId,
+        });
+        return this.sendError(res, 'Access denied. Only Admin and SuperAdmin can assign department managers.', 403);
+      }
+
+      // Validate client exists and is department_manager
+      const client = await this.validateClientExists(clientId);
+      const clientRole = client.get('role') || client.get('roleId')?.get?.('name');
+
+      if (clientRole !== 'department_manager') {
+        return this.sendError(res, 'Target must be a department_manager account', 400);
+      }
+
+      // Import the swap service
+      const DepartmentManagerSwapService = require('../../services/DepartmentManagerSwapService');
+      const swapService = new DepartmentManagerSwapService();
+
+      // Perform the swap
+      const result = await swapService.swapManagerWithAgent(
+        agentId,
+        clientId, // clientId is the department_manager ID
+        {
+          preserveOldManager,
+          auditLog: true,
+          requestedBy: currentUser.id,
+        }
+      );
+
+      logger.info('Department manager assignment completed', {
+        agentId,
+        clientId,
+        preserveOldManager,
+        requestedBy: currentUser.id,
+        result,
+      });
+
+      this.sendSuccess(
+        res,
+        result,
+        'Manager role transferred successfully. Both users need to log in again.',
+        200
+      );
+    } catch (error) {
+      logger.error('Error in ClientEmployeesController.assignAsManager', {
+        error: error.message,
+        stack: error.stack,
+        clientId: req.params.clientId,
+        agentId: req.body.agentId,
+        currentUser: req.user?.id,
+      });
+
+      // Send appropriate error message
+      if (error.message.includes('not found')) {
+        return this.sendError(res, error.message, 404);
+      } if (error.message.includes('not belong') || error.message.includes('role')) {
+        return this.sendError(res, error.message, 400);
+      }
+
+      this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? error.message : 'Failed to assign department manager',
+        500
+      );
+    }
+  }
+
   // ===== HELPER METHODS =====
 
   /**
