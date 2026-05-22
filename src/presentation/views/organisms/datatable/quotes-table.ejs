@@ -53,23 +53,41 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
     </div>
 
     <div class="card-body" id="quotes-content">
-        <!-- Date Filter Pills -->
+        <!-- Date Filter Pills and Status Filter Buttons -->
         <div class="mb-3">
-            <div class="btn-group" role="group" aria-label="Filtro por estado de servicios">
-                <input type="radio" class="btn-check" name="dateFilter" id="filterFuture" value="future" checked>
-                <label class="btn btn-outline-primary" for="filterFuture">
-                    <i class="ti ti-calendar-forward me-1"></i>Próximas cotizaciones
-                </label>
-                
-                <input type="radio" class="btn-check" name="dateFilter" id="filterPrevious" value="previous">
-                <label class="btn btn-outline-secondary" for="filterPrevious">
-                    <i class="ti ti-calendar-time me-1"></i>Cotizaciones anteriores
-                </label>
-                
-                <input type="radio" class="btn-check" name="dateFilter" id="filterNoServices" value="no-services">
-                <label class="btn btn-outline-warning" for="filterNoServices">
-                    <i class="ti ti-alert-triangle me-1"></i>Sin servicios
-                </label>
+            <div class="d-flex align-items-center gap-3">
+                <div class="btn-group" role="group" aria-label="Filtro por estado de servicios">
+                    <input type="radio" class="btn-check" name="dateFilter" id="filterFuture" value="future" checked>
+                    <label class="btn btn-outline-primary" for="filterFuture">
+                        <i class="ti ti-calendar-forward me-1"></i>Próximas cotizaciones
+                    </label>
+                    
+                    <input type="radio" class="btn-check" name="dateFilter" id="filterPrevious" value="previous">
+                    <label class="btn btn-outline-secondary" for="filterPrevious">
+                        <i class="ti ti-calendar-time me-1"></i>Cotizaciones anteriores
+                    </label>
+                    
+                    <input type="radio" class="btn-check" name="dateFilter" id="filterNoServices" value="no-services">
+                    <label class="btn btn-outline-warning" for="filterNoServices">
+                        <i class="ti ti-alert-triangle me-1"></i>Sin servicios
+                    </label>
+                </div>
+
+                <div class="d-inline-flex gap-2">
+                    <button type="button" class="btn btn-outline-info position-relative" id="filterCotizadas">
+                        <i class="ti ti-file-text me-1"></i>Cotizadas
+                        <span class="badge bg-info text-white position-absolute top-0 start-100 translate-middle" id="cotizadasCount">0</span>
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-primary position-relative" id="filterSolicitadas">
+                        <i class="ti ti-check me-1"></i>Solicitadas
+                        <span class="badge bg-primary text-white position-absolute top-0 start-100 translate-middle" id="solicitadasCount">0</span>
+                    </button>
+
+                    <button type="button" class="btn btn-sm btn-light" id="clearStatusFilter" style="display: none;">
+                        <i class="ti ti-x"></i> Limpiar filtro
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -431,10 +449,71 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
             }
         });
 
+        // Initialize filter states
+        window.solicitadoFilterActive = false;
+        window.activeStatusFilter = null; // Track active status filter: 'quoted', 'requested', or null
+
+        // Add custom search function for status filtering
+        $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+            // Only apply to our table
+            if (settings.nTable.id !== tableId) {
+                return true;
+            }
+            
+            // If no status filter is active, show all rows
+            if (!window.activeStatusFilter) {
+                return true;
+            }
+            
+            // Debug logging
+            if (dataIndex < 3) { // Log first 3 rows to avoid spam
+                console.log('Custom search debug:', {
+                    dataIndex,
+                    activeFilter: window.activeStatusFilter,
+                    dataArray: data,
+                    aoDataExists: !!settings.aoData[dataIndex],
+                    tableId: settings.nTable.id
+                });
+            }
+            
+            // Try different methods to access row data
+            let rowData = null;
+            
+            // Method 1: Try aoData
+            if (settings.aoData[dataIndex] && settings.aoData[dataIndex]._aData) {
+                rowData = settings.aoData[dataIndex]._aData;
+                if (dataIndex < 3) console.log('Method 1 - aoData:', rowData);
+            }
+            
+            // Method 2: Try DataTable API
+            if (!rowData) {
+                try {
+                    const table = $(settings.nTable).DataTable();
+                    rowData = table.row(dataIndex).data();
+                    if (dataIndex < 3) console.log('Method 2 - table.row():', rowData);
+                } catch (e) {
+                    if (dataIndex < 3) console.log('Method 2 failed:', e.message);
+                }
+            }
+            
+            // Method 3: Try from data array (might be string array)
+            if (!rowData && data && data.length > 6) {
+                // Assume status is at a specific column index
+                const statusColumnData = data[6]; // Adjust index as needed
+                if (dataIndex < 3) console.log('Method 3 - data array status column:', statusColumnData);
+            }
+            
+            // Check if the row's status matches the active filter
+            const result = rowData && rowData.status === window.activeStatusFilter;
+            if (dataIndex < 3) console.log('Filter result:', result, 'for status:', rowData?.status);
+            
+            return result || false;
+        });
+
         // DataTable Configuration
         const dataTable = $(`#${tableId}`).DataTable({
             processing: true,
-            serverSide: true,
+            serverSide: false, // Changed to client-side processing for filtering
             ajax: {
                 url: apiEndpoint,
                 type: 'GET',
@@ -444,9 +523,20 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     if (activeFilter) {
                         data.dateFilter = activeFilter.value;
                     }
+                    
+                    // Legacy solicitado filter support (keep for backwards compatibility)
+                    if (window.solicitadoFilterActive) {
+                        data.statusFilter = 'requested';
+                    }
+                    
                     return data;
                 },
                 dataSrc: function(json) {
+                    // Store status counts from server
+                    if (json.statusCounts) {
+                        window.serverStatusCounts = json.statusCounts;
+                        console.log('Received status counts from server:', json.statusCounts);
+                    }
                     return json.data || [];
                 },
                 error: function(xhr, error, thrown) {
@@ -849,9 +939,84 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 tooltipTriggerList.map(function (tooltipTriggerEl) {
                     return new bootstrap.Tooltip(tooltipTriggerEl);
                 });
+                
+                // Update status counters
+                updateStatusCounters();
             }
         });
 
+        // Function to update status counters
+        function updateStatusCounters() {
+            // Use server-provided counts instead of counting client-side
+            if (window.serverStatusCounts) {
+                const cotizadasCount = window.serverStatusCounts.quoted || 0;
+                const solicitadasCount = window.serverStatusCounts.requested || 0;
+                
+                // Update the badge counters
+                $('#cotizadasCount').text(cotizadasCount);
+                $('#solicitadasCount').text(solicitadasCount);
+                
+                console.log('Status counts updated from server - Cotizadas:', cotizadasCount, 'Solicitadas:', solicitadasCount);
+            } else {
+                // Fallback to counting from current data if server doesn't provide counts
+                const allData = dataTable.rows({search:'applied'}).data();
+                
+                let cotizadasCount = 0;
+                let solicitadasCount = 0;
+                
+                // Count quotes by status
+                allData.each(function(row) {
+                    if (row.status === 'quoted') {
+                        cotizadasCount++;
+                    } else if (row.status === 'requested') {
+                        solicitadasCount++;
+                    }
+                });
+                
+                // Update the badge counters
+                $('#cotizadasCount').text(cotizadasCount);
+                $('#solicitadasCount').text(solicitadasCount);
+                
+                console.log('Status counts updated from client - Cotizadas:', cotizadasCount, 'Solicitadas:', solicitadasCount);
+            }
+        }
+
+        // Handle solicitado filter click (legacy)
+        $('#solicitadoFilterAlert').on('click', function(e) {
+            // Don't trigger if clicking the clear button
+            if ($(e.target).closest('#clearSolicitadoFilter').length) {
+                return;
+            }
+            
+            // Only allow filtering if there are quotes to filter
+            const count = parseInt($('#solicitadoCount').text()) || 0;
+            if (count === 0) {
+                console.log('No quotes to filter');
+                return;
+            }
+            
+            // Activate filter
+            window.solicitadoFilterActive = true;
+            $('#clearSolicitadoFilter').show();
+            $(this).addClass('alert-warning').removeClass('alert-light');
+            
+            // Reload DataTable with filter
+            dataTable.ajax.reload();
+        });
+
+        // Handle clear filter button
+        $('#clearSolicitadoFilter').on('click', function(e) {
+            e.stopPropagation();
+            
+            // Deactivate filter
+            window.solicitadoFilterActive = false;
+            $(this).hide();
+            $('#solicitadoFilterAlert').removeClass('alert-warning').addClass('alert-light');
+            
+            // Reload DataTable without filter
+            dataTable.ajax.reload();
+        });
+        
         // Event Handlers
 
         // Date filter pill change events
@@ -862,6 +1027,51 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     dataTable.ajax.reload();
                 }
             });
+        });
+
+        // Status filter button handlers (client-side filtering using custom search)
+        $('#filterCotizadas').on('click', function() {
+            if (window.activeStatusFilter === 'quoted') {
+                // Already active, deactivate
+                window.activeStatusFilter = null;
+                $(this).removeClass('btn-info').addClass('btn-outline-info');
+                $('#clearStatusFilter').hide();
+            } else {
+                // Activate this filter
+                window.activeStatusFilter = 'quoted';
+                $(this).removeClass('btn-outline-info').addClass('btn-info');
+                $('#filterSolicitadas').removeClass('btn-primary').addClass('btn-outline-primary');
+                $('#clearStatusFilter').show();
+            }
+            // Trigger custom search function
+            dataTable.draw();
+        });
+
+        $('#filterSolicitadas').on('click', function() {
+            if (window.activeStatusFilter === 'requested') {
+                // Already active, deactivate
+                window.activeStatusFilter = null;
+                $(this).removeClass('btn-primary').addClass('btn-outline-primary');
+                $('#clearStatusFilter').hide();
+            } else {
+                // Activate this filter
+                window.activeStatusFilter = 'requested';
+                $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                $('#filterCotizadas').removeClass('btn-info').addClass('btn-outline-info');
+                $('#clearStatusFilter').show();
+            }
+            // Trigger custom search function
+            dataTable.draw();
+        });
+
+        // Clear status filter button
+        $('#clearStatusFilter').on('click', function() {
+            window.activeStatusFilter = null;
+            $('#filterCotizadas').removeClass('btn-info').addClass('btn-outline-info');
+            $('#filterSolicitadas').removeClass('btn-primary').addClass('btn-outline-primary');
+            $(this).hide();
+            // Trigger custom search function to show all rows
+            dataTable.draw();
         });
 
         // Status dropdown change
@@ -895,9 +1105,9 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 
                 if (newStatus === 'requested') {
                     modalTitle.textContent = 'Confirmar solicitud';
-                    modalBody.textContent = '¿El cliente ha solicitado estos servicios? Se creará una reservación.';
+                    modalBody.textContent = '¿El cliente ha solicitado estos servicios?';
                     confirmBtn.textContent = 'Confirmar solicitud';
-                    loadingText.textContent = 'Creando reservación...';
+                    loadingText.textContent = 'Procesando solicitud...';
                 } else if (newStatus === 'scheduled') {
                     modalTitle.textContent = 'Agendar reservación';
                     modalBody.textContent = '¿Confirma que desea agendar esta reservación?';

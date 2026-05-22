@@ -113,36 +113,6 @@ class QuoteService {
       // BEFORE updating status, handle reservation creation to ensure data integrity
       let reservationData = null;
 
-      // If status is requested (SOLICITADO), ensure reservation exists or create it
-      if (newStatus === 'requested') {
-        // Always check for reservation when status is requested
-        const resQuery = new Parse.Query('Reservation');
-        resQuery.equalTo('quotePtr', quote);
-        resQuery.equalTo('exists', true);
-        const existingReservation = await resQuery.first({ useMasterKey: true });
-
-        if (!existingReservation) {
-          logger.info('Creating reservation for requested quote status', {
-            quoteId: quote.id,
-            quoteFolio: quote.get('folio'),
-            previousStatus,
-            newStatus: 'requested',
-            reason: 'Ensuring reservation exists for requested status',
-          });
-
-          reservationData = await this.createReservationFromQuote(quote, currentUser);
-          if (!reservationData) {
-            throw new Error('Cannot maintain requested status: Failed to create reservation. Please ensure the quote has valid service items.');
-          }
-        } else {
-          logger.info('Reservation already exists for requested quote', {
-            quoteId: quote.id,
-            quoteFolio: quote.get('folio'),
-            reservationId: existingReservation.id,
-          });
-        }
-      }
-
       // If changing to scheduled, ensure reservation exists or create it
       if (newStatus === 'scheduled') {
         // Always check for reservation when status is scheduled
@@ -675,115 +645,10 @@ class QuoteService {
         appliedStatus: appliedUpdates.status,
         currentStatus,
         hasReservationData: !!reservationData,
-        shouldCreateReservation: appliedUpdates.status === 'requested' && currentStatus !== 'requested' && !reservationData,
       });
 
-      // If status changed to requested (SOLICITADO), auto-create Reservation
-      if (appliedUpdates.status === 'requested' && currentStatus !== 'requested' && !reservationData) {
-        logger.info('🚀 Creating reservation for quote status change to REQUESTED', {
-          quoteId: quote.id,
-          quoteFolio: quote.get('folio'),
-          serviceItems: quote.get('serviceItems'),
-          currentStatus,
-          newStatus: appliedUpdates.status,
-          userId: currentUser.id,
-          userEmail: currentUser.get('email'),
-          userRole: currentUser.get('role'),
-        });
-
-        console.log('🔍 DEBUGGING: Department manager requesting services', {
-          quoteId: quote.id,
-          currentStatus,
-          newStatus: appliedUpdates.status,
-          hasReservationData: !!reservationData,
-          userRole: currentUser.get('role'),
-          serviceItemsLength: quote.get('serviceItems')?.days?.length,
-        });
-
-        // Pre-validation: Check if quote has proper pricing before creating reservation
-        const serviceItems = quote.get('serviceItems') || {};
-        const totalAmount = serviceItems.total || 0;
-
-        logger.info('🔍 DEBUGGING: ServiceItems analysis for quote status change', {
-          quoteId: quote.id,
-          quoteFolio: quote.get('folio'),
-          serviceItemsRaw: serviceItems,
-          serviceItemsType: typeof serviceItems,
-          serviceItemsKeys: Object.keys(serviceItems),
-          totalAmount,
-          subtotal: serviceItems.subtotal,
-          currency: serviceItems.currency,
-          hasDays: !!serviceItems.days,
-          daysCount: serviceItems.days ? serviceItems.days.length : 0,
-          daysData: serviceItems.days || 'No days data',
-          userId: currentUser.id,
-          userEmail: currentUser.get('email'),
-          timestamp: new Date().toISOString(),
-        });
-
-        if (totalAmount <= 0) {
-          logger.warn('❌ Cannot create reservation for quote with zero value', {
-            quoteId: quote.id,
-            quoteFolio: quote.get('folio'),
-            totalAmount,
-            serviceItemsTotal: serviceItems.total,
-            subtotal: serviceItems.subtotal,
-            currency: serviceItems.currency,
-            serviceItemsComplete: serviceItems,
-            userId: currentUser.id,
-            contactEmail: quote.get('contactEmail'),
-            timestamp: new Date().toISOString(),
-          });
-
-          throw new Error('No se puede solicitar servicios para una cotización sin precio. Por favor, complete la cotización con servicios y precios válidos antes de solicitar.');
-        }
-
-        logger.info('✅ Quote pricing validation passed', {
-          quoteId: quote.id,
-          totalAmount,
-          currency: serviceItems.currency || 'MXN',
-        });
-
-        try {
-          reservationData = await this.createReservationFromQuote(quote, currentUser);
-
-          logger.info('✅ Reservation created successfully', {
-            quoteId: quote.id,
-            reservationData,
-            reservationId: reservationData?.id,
-            reservationFolio: reservationData?.folio,
-          });
-
-          // Send confirmation email with PDF (non-blocking)
-          this.sendRequestedConfirmationEmail(quote, currentUser, reservationData)
-            .then(() => {
-              logger.info('✅ Confirmation email sent successfully', {
-                quoteId: quote.id,
-                reservationId: reservationData?.id,
-                recipientEmail: quote.get('contactEmail'),
-              });
-            })
-            .catch((err) => {
-              logger.error('❌ Failed to send request confirmation email', {
-                error: err.message,
-                quoteId: quote.id,
-                reservationId: reservationData?.id,
-                stack: err.stack,
-              });
-            });
-        } catch (error) {
-          logger.error('❌ Failed to create reservation from quote', {
-            quoteId: quote.id,
-            quoteFolio: quote.get('folio'),
-            error: error.message,
-            stack: error.stack,
-            serviceItems: quote.get('serviceItems'),
-            userId: currentUser.id,
-          });
-          // Re-throw the error so it reaches the frontend
-          throw error;
-        }
-      }
+      // Removed automatic reservation creation for 'requested' status
+      // Quotes now remain as quotes when status changes to 'requested' (SOLICITADO)
 
       // Audit logging
       logger.info('Quote updated successfully', {

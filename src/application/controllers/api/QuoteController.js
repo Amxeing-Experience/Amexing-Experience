@@ -517,6 +517,7 @@ class QuoteController {
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'desc';
       const dateFilter = req.query.dateFilter || 'future';
+      const statusFilter = req.query.statusFilter || null;
 
       // Column mapping for sorting (must match frontend columns exactly)
       // Frontend columns depend on user role (admin/superadmin show client column)
@@ -534,50 +535,11 @@ class QuoteController {
 
       const sortField = columns[sortColumnIndex] || 'createdAt';
 
-      // First, get all quotes that have reservations
-      const reservationQuery = new Parse.Query('Reservation');
-      reservationQuery.equalTo('exists', true);
-      reservationQuery.select('quotePtr');
-      const reservations = await reservationQuery.find({ useMasterKey: true });
-      const quotesWithReservations = reservations
-        .filter((r) => r.get('quotePtr'))
-        .map((r) => r.get('quotePtr').id);
+      // Use the same base query logic as the counter for perfect consistency
+      const baseQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
 
-      logger.info('Filtering quotes table - excluding quotes with reservations', {
-        totalReservations: reservations.length,
-        quotesWithReservations: quotesWithReservations.length,
-        excludedQuoteIds: quotesWithReservations,
-      });
-
-      // Build base query for all active, existing records with role-based filtering
-      const baseQuery = new Parse.Query('Quote');
-      baseQuery.equalTo('active', true);
-      baseQuery.equalTo('exists', true);
-
-      // EXCLUDE quotes that have reservations
-      if (quotesWithReservations.length > 0) {
-        baseQuery.notContainedIn('objectId', quotesWithReservations);
-      }
-
-      baseQuery.include('client');
-      baseQuery.include('companyClientPtr');
-      baseQuery.include('rate');
-      baseQuery.include('createdBy');
-
-      // Apply role-based filters
-      await this.applyRoleBasedQuoteFilters(baseQuery, currentUser, req.userRole);
-
-      // Get total records count (without search filter but with role filters)
-      const totalRecordsQuery = new Parse.Query('Quote');
-      totalRecordsQuery.equalTo('active', true);
-      totalRecordsQuery.equalTo('exists', true);
-
-      // EXCLUDE quotes that have reservations from total count
-      if (quotesWithReservations.length > 0) {
-        totalRecordsQuery.notContainedIn('objectId', quotesWithReservations);
-      }
-
-      await this.applyRoleBasedQuoteFilters(totalRecordsQuery, currentUser, req.userRole);
+      // Get total records count using same base query logic
+      const totalRecordsQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
       const recordsTotal = await totalRecordsQuery.count({
         useMasterKey: true,
       });
@@ -585,35 +547,19 @@ class QuoteController {
       // Build filtered query with search
       let filteredQuery = baseQuery;
       if (searchValue) {
-        // Search in folio, client name, or contact person
-        const folioQuery = new Parse.Query('Quote');
-        folioQuery.equalTo('active', true);
-        folioQuery.equalTo('exists', true);
+        // Search in folio, client name, or contact person using same base query logic
+        const folioQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
         folioQuery.matches('folio', searchValue, 'i');
 
-        // EXCLUDE quotes with reservations from search
-        if (quotesWithReservations.length > 0) {
-          folioQuery.notContainedIn('objectId', quotesWithReservations);
-        }
-
-        await this.applyRoleBasedQuoteFilters(folioQuery, currentUser, req.userRole);
-
-        const contactQuery = new Parse.Query('Quote');
-        contactQuery.equalTo('active', true);
-        contactQuery.equalTo('exists', true);
+        const contactQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
         contactQuery.matches('contactPerson', searchValue, 'i');
-
-        // EXCLUDE quotes with reservations from search
-        if (quotesWithReservations.length > 0) {
-          contactQuery.notContainedIn('objectId', quotesWithReservations);
-        }
-
-        await this.applyRoleBasedQuoteFilters(contactQuery, currentUser, req.userRole);
 
         filteredQuery = Parse.Query.or(folioQuery, contactQuery);
         filteredQuery.include('client');
+        filteredQuery.include('companyClientPtr');
         filteredQuery.include('rate');
         filteredQuery.include('createdBy');
+        filteredQuery.include('serviceItems');
       }
 
       // Apply sorting
@@ -853,6 +799,20 @@ class QuoteController {
 
       // Update recordsFiltered count for DataTables based on date filtering
 
+      // Count statuses from the same filtered data that the DataTable will show
+      const statusCounts = {
+        quoted: 0,
+        requested: 0,
+      };
+
+      filteredData.forEach((quote) => {
+        if (quote.status === 'quoted') {
+          statusCounts.quoted++;
+        } else if (quote.status === 'requested') {
+          statusCounts.requested++;
+        }
+      });
+
       // DataTables response format
       const response = {
         success: true,
@@ -860,6 +820,7 @@ class QuoteController {
         recordsTotal,
         recordsFiltered: filteredData.length,
         data: filteredData,
+        statusCounts, // Include status counts for the UI
       };
 
       return res.json(response);
@@ -4275,6 +4236,117 @@ class QuoteController {
         userId: currentUser.id,
       });
       // Don't throw - this shouldn't block the main serviceItems update
+    }
+  }
+
+  /**
+   * Build base quote query with all filtering logic (reservations, role-based, etc.)
+   * This ensures consistency between DataTable and counter.
+   * @param {object} currentUser - Current user object.
+   * @param {string} userRole - User role string.
+   * @param {string} statusFilter - Optional status filter.
+   * @returns {Parse.Query} Configured base query.
+   * @example
+   */
+  async buildBaseQuoteQuery(currentUser, userRole, statusFilter = null) {
+    // Always exclude quotes with reservations to match counter behavior
+    const reservationQuery = new Parse.Query('Reservation');
+    reservationQuery.equalTo('exists', true);
+    reservationQuery.select('quotePtr');
+    const reservations = await reservationQuery.find({ useMasterKey: true });
+    const quotesWithReservations = reservations
+      .filter((r) => r.get('quotePtr'))
+      .map((r) => r.get('quotePtr').id);
+
+    // Build base query for all active, existing records with role-based filtering
+    const baseQuery = new Parse.Query('Quote');
+    baseQuery.equalTo('active', true);
+    baseQuery.equalTo('exists', true);
+
+    // ALWAYS exclude quotes that have reservations
+    if (quotesWithReservations.length > 0) {
+      baseQuery.notContainedIn('objectId', quotesWithReservations);
+    }
+
+    // Add status filter if specified
+    if (statusFilter) {
+      baseQuery.equalTo('status', statusFilter);
+    }
+
+    baseQuery.include('client');
+    baseQuery.include('companyClientPtr');
+    baseQuery.include('rate');
+    baseQuery.include('createdBy');
+    baseQuery.include('serviceItems');
+
+    // Apply role-based filters
+    await this.applyRoleBasedQuoteFilters(baseQuery, currentUser, userRole);
+
+    return baseQuery;
+  }
+
+  /**
+   * Get quotes count by status
+   * Returns count of quotes grouped by status, excluding quotes that have reservations.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {object} JSON response with status counts.
+   * @example
+   */
+  async getQuotesStatusCount(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      // Only allow admin and superadmin
+      if (!['admin', 'superadmin'].includes(req.userRole)) {
+        return this.sendError(res, 'Acceso no autorizado', 403);
+      }
+
+      // Count quotes by status (simple count since requested quotes no longer create reservations)
+      const statuses = ['draft', 'quoted', 'requested', 'scheduled', 'cancelled'];
+      const statusCounts = {};
+
+      for (const status of statuses) {
+        const query = new Parse.Query('Quote');
+        query.equalTo('active', true);
+        query.equalTo('exists', true);
+        query.equalTo('status', status);
+
+        const count = await query.count({ useMasterKey: true });
+        statusCounts[status] = count;
+      }
+
+      // Also get total count
+      const totalQuery = new Parse.Query('Quote');
+      totalQuery.equalTo('active', true);
+      totalQuery.equalTo('exists', true);
+      const totalCount = await totalQuery.count({ useMasterKey: true });
+
+      logger.info('Quote status counts retrieved', {
+        userId: currentUser.id,
+        userRole: req.userRole,
+        statusCounts,
+        totalCount,
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          statusCounts,
+          total: totalCount,
+        },
+      });
+    } catch (error) {
+      logger.error('Error getting quote status counts', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error al obtener conteo de cotizaciones', 500);
     }
   }
 
