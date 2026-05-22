@@ -103,6 +103,10 @@ class ItineraryBuilder {
     this.hasUnsavedChanges = false;
     this.saveInProgress = false;
 
+    // Track concepto field modifications to prevent unwanted overwrites
+    this.conceptoFieldManuallyCleared = false;
+    this.conceptoFieldManuallyModified = false;
+
     // Store field values for each service type to preserve user input
     this.serviceTypeFields = {
       experience: {},
@@ -273,6 +277,12 @@ class ItineraryBuilder {
 
       // Load pricing rates (exchange, transfer, agency) with auth
       await this.loadPricingRates();
+      
+      // Re-render services after rates load to fix segment display
+      console.log('🔍 Rates loaded, re-rendering services if they exist');
+      if (this.services.size > 0) {
+        this.renderItinerary(); // Re-render services now that rates are available
+      }
 
       // Load client-specific pricing if client is available
       if (this.clientId) {
@@ -752,6 +762,19 @@ class ItineraryBuilder {
       }
       this.updateServicePriceBreakdown();
     });
+    
+    // Experience quantity and price listeners - update breakdown when changed
+    const experienceFields = [
+      'adultsQuantity', 'childrenQuantity', 'adultsNoAlcoholQuantity',
+      'adultPrice', 'childPrice', 'noAlcoholPrice'
+    ];
+    
+    experienceFields.forEach(fieldId => {
+      document.getElementById(fieldId)?.addEventListener('input', () => {
+        this.updateServicePriceBreakdown();
+        this.updateDevPaymentBreakdown();
+      });
+    });
 
     // People quantity inputs - update breakdown when quantities change
     ['tourAdultsQuantity', 'tourChildrenQuantity', 'tourInfantsQuantity',
@@ -767,6 +790,18 @@ class ItineraryBuilder {
     if (conceptoClientPriceField) {
       conceptoClientPriceField.addEventListener('input', (e) => {
         validatePriceInput(e);
+        
+        // Track manual modifications - detect if user manually cleared the field
+        const fieldValue = e.target.value.trim();
+        this.conceptoFieldManuallyCleared = (fieldValue === '');
+        this.conceptoFieldManuallyModified = true;
+        
+        console.log('💭 Concepto field manually modified:', {
+          value: fieldValue,
+          manuallyCleared: this.conceptoFieldManuallyCleared,
+          manuallyModified: this.conceptoFieldManuallyModified
+        });
+        
         this.updateConceptoServicePrice();
         this.updateServicePriceBreakdown();
       });
@@ -1277,6 +1312,16 @@ class ItineraryBuilder {
     } else {
       document.getElementById('serviceModalLabel').innerHTML = `<i class="ti ti-plus-circle me-2"></i>Agregar Servicio${dayLabel}`;
       form.reset();
+
+      // Clear concepto price field explicitly to avoid cached values
+      const conceptoClientPriceField = document.getElementById('conceptoClientPrice');
+      if (conceptoClientPriceField) {
+        conceptoClientPriceField.value = '';
+      }
+
+      // Reset modification flags for new services
+      this.conceptoFieldManuallyCleared = false;
+      this.conceptoFieldManuallyModified = false;
 
       // Clear tour details when opening a new service modal
       const tourDetails = document.getElementById('tourDetails');
@@ -1941,6 +1986,20 @@ class ItineraryBuilder {
       // Set default values for service types when no saved data exists
       this.setDefaultValuesForServiceType(targetServiceType);
       return;
+    }
+
+    // For new services (not editing), clear price fields to avoid cached values
+    if (!this.currentServiceId && targetServiceType === 'concepto') {
+      const conceptoClientPriceField = document.getElementById('conceptoClientPrice');
+      if (conceptoClientPriceField) {
+        conceptoClientPriceField.value = '';
+      }
+      // Remove the price from saved fields to prevent restoration
+      delete savedFields.conceptoClientPrice;
+      
+      // Reset modification flags when switching to concepto type
+      this.conceptoFieldManuallyCleared = false;
+      this.conceptoFieldManuallyModified = false;
     }
 
     // Restore all saved fields
@@ -2952,7 +3011,18 @@ class ItineraryBuilder {
 
     // Special handling for concepto - use clientPrice as the base
     if (type === 'concepto') {
-      const conceptoClientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
+      let conceptoClientPrice;
+      
+      // Check if field was manually cleared by user
+      if (this.conceptoFieldManuallyCleared) {
+        // User intentionally cleared the field - force price to 0
+        conceptoClientPrice = 0;
+        console.log('💰 Concepto data collection - field manually cleared, using 0');
+      } else {
+        // Normal case - use field value or 0 if empty
+        conceptoClientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
+      }
+      
       const conceptoApplySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
 
       if (conceptoApplySurcharges) {
@@ -2977,6 +3047,39 @@ class ItineraryBuilder {
       console.log('✅ COLLECT SERVICE DATA - Concepto pricesByType from clientPrice:', {
         clientPrice: conceptoClientPrice,
         applySurcharges: conceptoApplySurcharges,
+        pricesByType,
+        transferRate: this.transferRate,
+        agencyRate: this.agencyRate,
+      });
+    } else if (type === 'experience') {
+      // Calculate experience totals from quantities and prices
+      const adultsQty = parseInt(document.getElementById('adultsQuantity')?.value || 0);
+      const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value || 0);
+      const noAlcoholQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
+      
+      const adultPrice = parseFloat(document.getElementById('adultPrice')?.value || 0);
+      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0);
+      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0);
+      
+      // Calculate base total (efectivo)
+      const baseTotal = (adultsQty * adultPrice) + 
+                        (childrenQty * childPrice) + 
+                        (noAlcoholQty * noAlcoholPrice);
+      
+      // Calculate all payment types
+      pricesByType = {
+        efectivo: baseTotal,
+        transferencia: baseTotal * (1 + (this.transferRate / 100)),
+        tarjeta: baseTotal * (1 + (this.agencyRate / 100))
+      };
+      
+      // Update basePriceEfectivo for consistency
+      basePriceEfectivo = baseTotal;
+      
+      console.log('✅ COLLECT SERVICE DATA - Experience pricesByType from quantities and prices:', {
+        quantities: { adultsQty, childrenQty, noAlcoholQty },
+        prices: { adultPrice, childPrice, noAlcoholPrice },
+        baseTotal,
         pricesByType,
         transferRate: this.transferRate,
         agencyRate: this.agencyRate,
@@ -3143,11 +3246,27 @@ class ItineraryBuilder {
       }
     }
 
+    // Calculate final price with special handling for concepto
+    let finalServicePrice;
+    if (type === 'concepto') {
+      // For concepto: use pricesByType, never fall back to finalPrice if manually cleared
+      const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+      if (this.conceptoFieldManuallyCleared) {
+        // User manually cleared - force to 0 regardless of payment type
+        finalServicePrice = 0;
+        console.log('💰 Final price for concepto - manually cleared, using 0');
+      } else {
+        // Use calculated price from pricesByType, fallback to 0 (not finalPrice)
+        finalServicePrice = pricesByType[currentPaymentType] || 0;
+        console.log('💰 Final price for concepto - from pricesByType:', finalServicePrice);
+      }
+    } else {
+      finalServicePrice = finalPrice;
+    }
+
     const data = {
       type,
-      price: type === 'concepto'
-        ? (pricesByType[document.getElementById('priceTypeSelect')?.value || 'efectivo'] || finalPrice)
-        : finalPrice, // For concepto, use the correct price for current payment type
+      price: finalServicePrice,
       basePrice: basePriceEfectivo, // Base efectivo price for recalculation (backward compatibility)
       pricesByType, // All 3 payment type prices for easy switching
       // Tour formula components
@@ -3617,6 +3736,13 @@ class ItineraryBuilder {
 
         // Shared transport fields (both one-way and round-trip)
         data.category = document.getElementById('transportCategory')?.value;
+        console.log('🔍 TRANSPORT CATEGORY DEBUG:', {
+          categoryField: document.getElementById('transportCategory'),
+          categoryValue: document.getElementById('transportCategory')?.value,
+          savedCategory: data.category,
+          fieldExists: !!document.getElementById('transportCategory'),
+          selectedIndex: document.getElementById('transportCategory')?.selectedIndex
+        });
 
         data.transportAdults = parseInt(document.getElementById('transportAdults')?.value || 0);
         data.transportChildren = parseInt(document.getElementById('transportChildren')?.value || 0);
@@ -3696,7 +3822,13 @@ class ItineraryBuilder {
         data.adultsNoAlcoholQuantity = parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0);
 
         // Collect client price and surcharge settings for concepto
-        data.clientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
+        // Use the same logic as price calculation to respect manually cleared fields
+        if (this.conceptoFieldManuallyCleared) {
+          data.clientPrice = 0;
+          console.log('💾 Concepto clientPrice - manually cleared, using 0');
+        } else {
+          data.clientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
+        }
         data.applySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
 
         console.log('💾 Collecting concepto data:', {
@@ -4209,12 +4341,44 @@ class ItineraryBuilder {
 
     switch (service.type) {
       case 'experience':
+        console.log('📝 EDIT EXPERIENCE DEBUG - Starting experience edit:', {
+          serviceId: service.id,
+          experienceId: service.experienceId,
+          serviceType: service.type
+        });
+        
+        // Ensure experience content is visible
+        const experienceContent = document.getElementById('experienceContent');
+        if (experienceContent) {
+          experienceContent.classList.remove('d-none');
+          console.log('📝 EDIT EXPERIENCE DEBUG - Experience content made visible');
+        } else {
+          console.error('❌ EDIT EXPERIENCE DEBUG - experienceContent element not found!');
+        }
+        
         const experienceSelect = document.getElementById('experienceSelect');
         if (experienceSelect && service.experienceId) {
           experienceSelect.value = service.experienceId;
+          console.log('📝 EDIT EXPERIENCE DEBUG - Experience selected in dropdown:', service.experienceId);
+          
           // Trigger the experience selection to show pricing section
           if (this.handleExperienceSelection) {
             this.handleExperienceSelection(service.experienceId);
+            
+            // Force show pricing section after selection
+            setTimeout(() => {
+              const experiencePricingSection = document.getElementById('experiencePricingSection');
+              const standardPricingSection = document.getElementById('standardPricingSection');
+              
+              if (experiencePricingSection) {
+                experiencePricingSection.classList.remove('d-none');
+                console.log('📝 EDIT EXPERIENCE DEBUG - Experience pricing section made visible');
+              }
+              if (standardPricingSection) {
+                standardPricingSection.classList.add('d-none');
+                console.log('📝 EDIT EXPERIENCE DEBUG - Standard pricing section hidden');
+              }
+            }, 100);
           }
         }
 
@@ -5111,6 +5275,10 @@ class ItineraryBuilder {
         const conceptoClientPriceField = document.getElementById('conceptoClientPrice');
         const conceptoApplySurchargesCheckbox = document.getElementById('conceptoApplySurcharges');
 
+        // Reset modification flags when loading a service
+        this.conceptoFieldManuallyCleared = false;
+        this.conceptoFieldManuallyModified = false;
+
         if (conceptoClientPriceField && service.clientPrice !== undefined) {
           conceptoClientPriceField.value = service.clientPrice;
         }
@@ -5262,7 +5430,7 @@ class ItineraryBuilder {
     const services = day.services.map((sid) => this.services.get(sid)).filter(Boolean);
     const dayTotalMXN = services.reduce((sum, service) => {
       if (service.includeInTotal === false) return sum;
-      return sum + (service.price || 0);
+      return sum + this.getServiceDisplayPrice(service);
     }, 0);
     const dayTotal = dayTotalMXN;
 
@@ -5362,7 +5530,7 @@ class ItineraryBuilder {
                         <div class="d-flex align-items-start mb-2">
                             <div class="flex-grow-1">
                                 <div class="d-flex align-items-center mb-1">
-                                    <span class="badge bg-light text-dark me-2">${badgeLabel || typeLabels[service.type] || service.type}</span>
+                                    ${service.type !== 'concepto' ? `<span class="badge bg-light text-dark me-2">${badgeLabel || typeLabels[service.type] || service.type}</span>` : ''}
                                     <h6 class="mb-0 service-title">${this.getServiceTitle(service)}</h6>
                                 </div>
                                 <div class="service-details">
@@ -5433,7 +5601,7 @@ class ItineraryBuilder {
                                     ${service.notes ? `
                                         <div class="service-notes mt-1 text-muted small d-flex align-items-start">
                                             <i class="ti ti-notes me-1"></i>
-                                            <span>${service.notes}</span>
+                                            <span style="white-space: pre-wrap;">${service.notes}</span>
                                         </div>
                                     ` : ''}
                                 </div>
@@ -5457,18 +5625,20 @@ class ItineraryBuilder {
                                 </button>
                             </div>
                         </div>
-                        ${service.includeInTotal === false ? `
-                        <span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span>
+                        ${!(service.type === 'concepto' && this.getServiceDisplayPrice(service) <= 0) ? `
+                            ${service.includeInTotal === false ? `
+                            <span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span>
+                            ` : ''}
+                            <div class="fw-semibold ${service.includeInTotal === false ? 'text-muted text-decoration-line-through' : 'text-primary'}">
+                                ${this.formatCurrency(this.getServiceDisplayPrice(service))}
+                                ${this.getPriceTypeLabel()}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
+                                    data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
+                                <i class="ti ${service.includeInTotal === false ? 'ti-circle-plus text-success' : 'ti-circle-minus text-muted'}" style="font-size: 0.85rem;"></i>
+                                <small class="${service.includeInTotal === false ? 'text-success' : 'text-muted'}" style="font-size: 0.7rem;">${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}</small>
+                            </button>
                         ` : ''}
-                        <div class="fw-semibold ${service.includeInTotal === false ? 'text-muted text-decoration-line-through' : 'text-primary'}">
-                            ${this.formatCurrency(service.price || 0)}
-                            ${this.getPriceTypeLabel()}
-                        </div>
-                        <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
-                                data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
-                            <i class="ti ${service.includeInTotal === false ? 'ti-circle-plus text-success' : 'ti-circle-minus text-muted'}" style="font-size: 0.85rem;"></i>
-                            <small class="${service.includeInTotal === false ? 'text-success' : 'text-muted'}" style="font-size: 0.7rem;">${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}</small>
-                        </button>
                     </div>
                 </div>
             </div>
@@ -5478,41 +5648,103 @@ class ItineraryBuilder {
   renderTransportServiceItem(service) {
     const transportTypes = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
     const transportLabel = transportTypes[service.transportType] || 'Transporte';
-    const origin = service.originName || service.origin || 'Origen';
-    const destination = service.destination || 'Destino';
+    
+    // Extract specific location from origin/destination if embedded
+    let origin = service.originName || service.origin || 'Origen';
+    let destination = service.destination || 'Destino';
+    let specificLocation = service.specificLocation || '';
+    
+    // If no explicit specificLocation, try to extract from origin/destination
+    if (!specificLocation) {
+      // Check if origin has embedded specific location (format: "City, Specific Location")
+      if (origin.includes(',')) {
+        const originParts = origin.split(',');
+        if (originParts.length === 2) {
+          origin = originParts[0].trim();
+          specificLocation = originParts[1].trim();
+        }
+      }
+      // Check destination if origin didn't have it
+      else if (destination.includes(',')) {
+        const destParts = destination.split(',');
+        if (destParts.length === 2) {
+          destination = destParts[0].trim();
+          specificLocation = destParts[1].trim();
+        }
+      }
+    }
+    
     const vehicleName = this.getVehicleDisplayName(service);
     const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
     const isAirport = service.transportType === 'aeropuerto';
+    
+    // Extract and round flight time for the header
+    let flightTime = '';
+    if (service.startTime) {
+      flightTime = service.startTime;
+    } else if (service.selectedSchedule) {
+      // Extract time from selectedSchedule (e.g., "13:39" or "13:39 - 14:30")
+      const timeMatch = service.selectedSchedule.match(/^(\d{1,2}:\d{2})/);
+      if (timeMatch) {
+        flightTime = timeMatch[1];
+      }
+    }
+    
+    // Round to nearest 15 minutes
+    const roundedTime = flightTime ? this.roundTimeToNearest15(flightTime) : '';
 
     return `
             <div class="service-item mb-3 p-3 border rounded hover-shadow ${service.hasOverlap ? 'has-overlap' : ''}" data-service-id="${service.id}">
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
-                        <div class="d-flex align-items-center mb-2">
-                            <span class="badge bg-light text-dark me-2">Transporte</span>
-                            <span class="badge bg-primary-subtle text-primary">${transportLabel}</span>
-                            ${service.directionType ? `<span class="badge ${service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">${(service.transportType === 'punto-a-punto' || service.transportType === 'local') ? (service.directionType === 'arrival' ? 'Ida' : 'Vuelta') : (service.directionType === 'arrival' ? 'Llegada' : 'Salida')}</span>` : ''}
+                        ${roundedTime ? `
+                        <div class="mb-2">
+                            <span class="badge bg-info text-white">
+                                <i class="ti ti-clock me-1"></i>Horario: ${roundedTime}
+                            </span>
                         </div>
+                        ` : ''}
                         <div class="service-details">
-                            <!-- Route display -->
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                                <div class="d-flex align-items-center gap-2 small" style="line-height: 1.6;">
-                                    <div class="d-flex flex-column align-items-center" style="min-width: 14px;">
-                                        <i class="ti ti-circle-filled text-success" style="font-size: 0.5rem;"></i>
-                                        <div style="width: 1.5px; height: 16px; background: linear-gradient(to bottom, #198754, #6c757d);"></div>
-                                        <i class="ti ti-map-pin-filled text-danger" style="font-size: 0.7rem;"></i>
-                                    </div>
-                                    <div class="d-flex flex-column">
-                                        <span class="fw-medium">${origin}</span>
-                                        <span class="fw-medium">${destination}</span>
-                                    </div>
-                                </div>
+                            <!-- Transport badges -->
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-light text-dark me-2">Transporte</span>
+                                <span class="badge bg-primary-subtle text-primary">${transportLabel}</span>
+                                ${service.directionType ? `<span class="badge ${service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">${(service.transportType === 'punto-a-punto' || service.transportType === 'local') ? (service.directionType === 'arrival' ? 'Ida' : 'Vuelta') : (service.directionType === 'arrival' ? 'Llegada' : 'Salida')}</span>` : ''}
                             </div>
-                            <!-- Time -->
+                            <!-- Passenger counts -->
+                            ${this.renderPeopleQuantities(service)}
+                            <!-- Origin and Destination -->
+                            <div class="d-flex align-items-center text-muted small mb-1">
+                                <i class="ti ti-circle-filled text-success me-1" style="font-size: 0.5rem;"></i>
+                                <span class="text-muted me-1">Desde:</span>
+                                ${origin}
+                            </div>
+                            <div class="d-flex align-items-center text-muted small mb-1">
+                                <i class="ti ti-map-pin-filled text-danger me-1" style="font-size: 0.7rem;"></i>
+                                <span class="text-muted me-1">Hacia:</span>
+                                ${destination}
+                            </div>
+                            <!-- Airline -->
+                            ${service.transportType === 'aeropuerto' && service.airline ? `
+                                <div class="d-flex align-items-center text-muted small mb-1">
+                                    <i class="ti ti-plane me-1"></i>
+                                    <span class="text-muted me-1">Aerolínea:</span>
+                                    ${service.airline}
+                                </div>
+                            ` : ''}
+                            <!-- Flight Number -->
+                            ${service.transportType === 'aeropuerto' && service.flightNumber ? `
+                                <div class="d-flex align-items-center text-muted small mb-1">
+                                    <i class="ti ti-ticket me-1"></i>
+                                    <span class="text-muted me-1">Número de vuelo:</span>
+                                    ${service.flightNumber}
+                                </div>
+                            ` : ''}
+                            <!-- Arrival/Departure Time -->
                             ${service.selectedSchedule || service.startTime ? `
                                 <div class="d-flex align-items-center text-muted small mb-1">
                                     <i class="ti ti-clock me-1"></i>
-                                    ${isAirport ? '<span class="text-muted me-1">Hora Vuelo:</span>' : ''}
+                                    <span class="text-muted me-1">${service.directionType === 'arrival' ? 'Hora de llegada:' : 'Horario de salida:'}</span>
                                     ${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}
                                     ${service.hasOverlap ? `
                                         <span class="text-danger ms-2" title="${this.getOverlapTooltip(service)}">
@@ -5522,6 +5754,14 @@ class ItineraryBuilder {
                                     ` : ''}
                                 </div>
                             ` : ''}
+                            <!-- Arrival Address -->
+                            ${specificLocation ? `
+                                <div class="d-flex align-items-center text-muted small mb-1">
+                                    <i class="ti ti-map-pin me-1"></i>
+                                    <span class="text-muted me-1">Dirección de llegada:</span>
+                                    ${specificLocation}
+                                </div>
+                            ` : ''}
                             ${(() => {
                                 // Fix: Check for actual time values (not null, not empty string)
                                 const hasFlightTime = service.flightDepartureTimeSuggested && service.flightDepartureTimeSuggested.trim();
@@ -5529,12 +5769,16 @@ class ItineraryBuilder {
                                 const hasVueltaTime = service.roundTripDepartureTimeSuggestedVuelta && service.roundTripDepartureTimeSuggestedVuelta.trim();
                                 const hasAnyTime = hasFlightTime || hasIdaTime || hasVueltaTime;
                                 
+                                // Only show departure time for departure services (not arrival)
+                                const shouldShowDepartureTime = service.type === 'transport' && hasAnyTime && service.directionType !== 'arrival';
+                                
                                 // Debug every transport service to see what's available
                                 if (service.type === 'transport') {
                                   console.log('🖼️ DISPLAY DEBUG - Transport service check:', {
                                     serviceId: service.id,
                                     concept: service.concept,
                                     type: service.type,
+                                    directionType: service.directionType,
                                     flightDepartureTimeSuggested: service.flightDepartureTimeSuggested,
                                     flightDepartureTimeSuggestedType: typeof service.flightDepartureTimeSuggested,
                                     roundTripDepartureTimeSuggestedIda: service.roundTripDepartureTimeSuggestedIda,
@@ -5542,10 +5786,10 @@ class ItineraryBuilder {
                                     roundTripDepartureTimeSuggestedVuelta: service.roundTripDepartureTimeSuggestedVuelta,
                                     roundTripDepartureTimeSuggestedVueltaType: typeof service.roundTripDepartureTimeSuggestedVuelta,
                                     hasAnyTime,
-                                    willRender: hasAnyTime
+                                    shouldShowDepartureTime
                                   });
                                 }
-                                return service.type === 'transport' && hasAnyTime;
+                                return shouldShowDepartureTime;
                               })() ? `
                                 <div class="d-flex align-items-center text-muted small mb-1">
                                     <i class="ti ti-clock me-1"></i>
@@ -5554,21 +5798,46 @@ class ItineraryBuilder {
                                     ${service.roundTripDepartureTimeSuggestedVuelta && service.roundTripDepartureTimeSuggestedVuelta !== service.roundTripDepartureTimeSuggestedIda ? ` / ${service.roundTripDepartureTimeSuggestedVuelta}` : ''}
                                 </div>
                             ` : ''}
-                            ${this.renderPeopleQuantities(service)}
-                            <!-- Vehicle -->
-                            ${hasVehicle ? `
-                                <div class="d-flex align-items-center text-muted small mt-1">
-                                    <i class="ti ti-car me-1"></i>
-                                    ${vehicleName}
-                                    ${service.quantity > 1 ? ` x${service.quantity}` : ''}
-                                </div>
-                            ` : ''}
-                            <!-- Additional Vehicle -->
-                            ${service.hasAdditionalVehicle && service.additionalVehicleId ? `
-                                <div class="d-flex align-items-center text-muted small mt-1">
-                                    <i class="ti ti-car-crane me-1"></i>
-                                    <span class="text-info">Vehículo adicional:</span>
-                                    <span class="ms-1">${this.getAdditionalVehicleDisplayName(service)}</span>
+                            <!-- Vehicles -->
+                            ${(hasVehicle || (service.hasAdditionalVehicle && service.additionalVehicleId)) ? `
+                                <div class="text-muted small mt-1">
+                                    <div class="mb-1">
+                                        <i class="ti ti-car me-1"></i><span class="text-muted">Vehículo(s):</span>
+                                    </div>
+                                    ${hasVehicle ? `
+                                        <div class="ms-3">
+                                            ${vehicleName}
+                                            ${service.quantity > 1 ? ` x${service.quantity}` : ''}
+                                            ${(() => {
+                                                const categoryName = service.category ? this.getCategoryName(service.category) : '';
+                                                console.log('🔍 RENDER TRANSPORT DEBUG:', {
+                                                  serviceId: service.id,
+                                                  serviceCategory: service.category,
+                                                  categoryName,
+                                                  willDisplay: !!service.category
+                                                });
+                                                return service.category ? ` - ${categoryName || 'Segmento'}` : '';
+                                            })()}
+                                        </div>
+                                    ` : ''}
+                                    ${service.hasAdditionalVehicle && service.additionalVehicleId ? `
+                                        <div class="ms-3">
+                                            ${(() => {
+                                                // Get actual additional vehicle name
+                                                let additionalVehicleName = 'Vehículo adicional';
+                                                if (service.additionalVehicleTypeName) {
+                                                    additionalVehicleName = this.cleanVehicleName(service.additionalVehicleTypeName);
+                                                } else {
+                                                    const vehicleInfo = this.getVehicleTypeInfo(service.additionalVehicleId);
+                                                    if (vehicleInfo && vehicleInfo.name) {
+                                                        additionalVehicleName = this.cleanVehicleName(vehicleInfo.name);
+                                                    }
+                                                }
+                                                const additionalSegmentName = service.additionalVehicleSegment ? this.getCategoryName(service.additionalVehicleSegment) : '';
+                                                return `${additionalVehicleName} - ${additionalSegmentName || 'Segmento'}`;
+                                            })()}
+                                        </div>
+                                    ` : ''}
                                 </div>
                             ` : ''}
                             ${service.includeGuide ? `
@@ -5596,10 +5865,12 @@ class ItineraryBuilder {
                                     </span>
                                 </div>
                             ` : ''}
+                            <!-- Notes -->
                             ${service.notes ? `
                                 <div class="service-notes mt-1 text-muted small d-flex align-items-start">
                                     <i class="ti ti-notes me-1"></i>
-                                    <span>${service.notes}</span>
+                                    <span class="text-muted me-1">Notas:</span>
+                                    <span style="white-space: pre-wrap;">${service.notes}</span>
                                 </div>
                             ` : ''}
                         </div>
@@ -5621,18 +5892,20 @@ class ItineraryBuilder {
                                 </button>
                             </div>
                         </div>
-                        ${service.includeInTotal === false ? `
-                        <span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span>
+                        ${!(service.type === 'concepto' && this.getServiceDisplayPrice(service) <= 0) ? `
+                            ${service.includeInTotal === false ? `
+                            <span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span>
+                            ` : ''}
+                            <div class="fw-semibold ${service.includeInTotal === false ? 'text-muted text-decoration-line-through' : 'text-primary'}">
+                                ${this.formatCurrency(this.getServiceDisplayPrice(service))}
+                                ${this.getPriceTypeLabel()}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
+                                    data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
+                                <i class="ti ${service.includeInTotal === false ? 'ti-circle-plus text-success' : 'ti-circle-minus text-muted'}" style="font-size: 0.85rem;"></i>
+                                <small class="${service.includeInTotal === false ? 'text-success' : 'text-muted'}" style="font-size: 0.7rem;">${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}</small>
+                            </button>
                         ` : ''}
-                        <div class="fw-semibold ${service.includeInTotal === false ? 'text-muted text-decoration-line-through' : 'text-primary'}">
-                            ${this.formatCurrency(service.price || 0)}
-                            ${this.getPriceTypeLabel()}
-                        </div>
-                        <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
-                                data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
-                            <i class="ti ${service.includeInTotal === false ? 'ti-circle-plus text-success' : 'ti-circle-minus text-muted'}" style="font-size: 0.85rem;"></i>
-                            <small class="${service.includeInTotal === false ? 'text-success' : 'text-muted'}" style="font-size: 0.7rem;">${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}</small>
-                        </button>
                     </div>
                 </div>
             </div>
@@ -6772,6 +7045,118 @@ class ItineraryBuilder {
         totalTarjeta,
       });
       return; // Exit early, we're done with transport
+    } else if (serviceType === 'experience') {
+      console.log('📊 Processing Experience breakdown');
+      
+      // Get quantities
+      const adultsQty = parseInt(document.getElementById('adultsQuantity')?.value || 0);
+      const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value || 0);
+      const noAlcoholQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
+      
+      // Get prices
+      const adultPrice = parseFloat(document.getElementById('adultPrice')?.value || 0);
+      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0);
+      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0);
+      
+      // Calculate base totals for each category
+      const adultsTotal = adultsQty * adultPrice;
+      const childrenTotal = childrenQty * childPrice;
+      const noAlcoholTotal = noAlcoholQty * noAlcoholPrice;
+      
+      // Calculate base total (efectivo)
+      const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal;
+      
+      // Calculate totals with surcharges
+      const efectivoTotal = baseTotal;
+      const transferenciaTotal = baseTotal * (1 + (this.transferRate / 100));
+      const tarjetaTotal = baseTotal * (1 + (this.agencyRate / 100));
+      
+      // Get dev payment fields
+      const devPriceEfectivoField = document.getElementById('devPriceEfectivo');
+      const devPriceTransferenciaField = document.getElementById('devPriceTransferencia');
+      const devPriceTarjetaField = document.getElementById('devPriceTarjeta');
+      
+      // Get dev breakdown text fields
+      const devBreakdownEfectivoField = document.getElementById('devBreakdownEfectivo');
+      const devBreakdownTransferenciaField = document.getElementById('devBreakdownTransferencia');
+      const devBreakdownTarjetaField = document.getElementById('devBreakdownTarjeta');
+      
+      // Build breakdown text for efectivo
+      let efectivoBreakdown = '';
+      if (adultsQty > 0 && adultPrice > 0) {
+        efectivoBreakdown += `Adultos: ${adultsQty} × $${adultPrice.toFixed(2)} = $${adultsTotal.toFixed(2)}`;
+      }
+      if (childrenQty > 0 && childPrice > 0) {
+        if (efectivoBreakdown) efectivoBreakdown += '\n';
+        efectivoBreakdown += `Niños: ${childrenQty} × $${childPrice.toFixed(2)} = $${childrenTotal.toFixed(2)}`;
+      }
+      if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
+        if (efectivoBreakdown) efectivoBreakdown += '\n';
+        efectivoBreakdown += `Sin alcohol: ${noAlcoholQty} × $${noAlcoholPrice.toFixed(2)} = $${noAlcoholTotal.toFixed(2)}`;
+      }
+      if (efectivoBreakdown) efectivoBreakdown += '\n';
+      efectivoBreakdown += `Total: $${efectivoTotal.toFixed(2)}`;
+      
+      // Build breakdown text for transferencia
+      let transferenciaBreakdown = '';
+      if (adultsQty > 0 && adultPrice > 0) {
+        transferenciaBreakdown += `Adultos: ${adultsQty} × $${adultPrice.toFixed(2)} = $${adultsTotal.toFixed(2)}`;
+      }
+      if (childrenQty > 0 && childPrice > 0) {
+        if (transferenciaBreakdown) transferenciaBreakdown += '\n';
+        transferenciaBreakdown += `Niños: ${childrenQty} × $${childPrice.toFixed(2)} = $${childrenTotal.toFixed(2)}`;
+      }
+      if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
+        if (transferenciaBreakdown) transferenciaBreakdown += '\n';
+        transferenciaBreakdown += `Sin alcohol: ${noAlcoholQty} × $${noAlcoholPrice.toFixed(2)} = $${noAlcoholTotal.toFixed(2)}`;
+      }
+      if (this.transferRate > 0) {
+        if (transferenciaBreakdown) transferenciaBreakdown += '\n';
+        transferenciaBreakdown += `Recargo transferencia (${this.transferRate}%): $${(transferenciaTotal - efectivoTotal).toFixed(2)}`;
+      }
+      if (transferenciaBreakdown) transferenciaBreakdown += '\n';
+      transferenciaBreakdown += `Total: $${transferenciaTotal.toFixed(2)}`;
+      
+      // Build breakdown text for tarjeta
+      let tarjetaBreakdown = '';
+      if (adultsQty > 0 && adultPrice > 0) {
+        tarjetaBreakdown += `Adultos: ${adultsQty} × $${adultPrice.toFixed(2)} = $${adultsTotal.toFixed(2)}`;
+      }
+      if (childrenQty > 0 && childPrice > 0) {
+        if (tarjetaBreakdown) tarjetaBreakdown += '\n';
+        tarjetaBreakdown += `Niños: ${childrenQty} × $${childPrice.toFixed(2)} = $${childrenTotal.toFixed(2)}`;
+      }
+      if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
+        if (tarjetaBreakdown) tarjetaBreakdown += '\n';
+        tarjetaBreakdown += `Sin alcohol: ${noAlcoholQty} × $${noAlcoholPrice.toFixed(2)} = $${noAlcoholTotal.toFixed(2)}`;
+      }
+      if (this.agencyRate > 0) {
+        if (tarjetaBreakdown) tarjetaBreakdown += '\n';
+        tarjetaBreakdown += `Recargo tarjeta (${this.agencyRate}%): $${(tarjetaTotal - efectivoTotal).toFixed(2)}`;
+      }
+      if (tarjetaBreakdown) tarjetaBreakdown += '\n';
+      tarjetaBreakdown += `Total: $${tarjetaTotal.toFixed(2)}`;
+      
+      // Update dev payment prices
+      if (devPriceEfectivoField) devPriceEfectivoField.value = efectivoTotal.toFixed(2);
+      if (devPriceTransferenciaField) devPriceTransferenciaField.value = transferenciaTotal.toFixed(2);
+      if (devPriceTarjetaField) devPriceTarjetaField.value = tarjetaTotal.toFixed(2);
+      
+      // Update dev breakdown texts
+      if (devBreakdownEfectivoField) devBreakdownEfectivoField.value = efectivoBreakdown;
+      if (devBreakdownTransferenciaField) devBreakdownTransferenciaField.value = transferenciaBreakdown;
+      if (devBreakdownTarjetaField) devBreakdownTarjetaField.value = tarjetaBreakdown;
+      
+      console.log('📊 Experience breakdown calculated:', {
+        quantities: { adultsQty, childrenQty, noAlcoholQty },
+        prices: { adultPrice, childPrice, noAlcoholPrice },
+        totals: {
+          efectivo: efectivoTotal,
+          transferencia: transferenciaTotal,
+          tarjeta: tarjetaTotal
+        }
+      });
+      return; // Exit early, we're done with experience
     }
 
     // Calculate breakdown for each payment type (multiply by duration for tours/hours for A Disposición)
@@ -7194,14 +7579,14 @@ class ItineraryBuilder {
       const infants = service.transportInfants || 0;
       if (adults > 0 || children > 0 || infants > 0) {
         const parts = [];
-        if (adults > 0) parts.push(`<span class="badge bg-primary-subtle text-primary d-inline-flex align-items-center gap-1 me-2 mb-1"><i class="ti ti-user fs-6"></i><span>${adults} adulto${adults > 1 ? 's' : ''}</span></span>`);
-        if (children > 0) parts.push(`<span class="badge bg-success-subtle text-success d-inline-flex align-items-center gap-1 me-2 mb-1"><i class="ti ti-mood-kid fs-6"></i><span>${children} niño${children > 1 ? 's' : ''} (3-12)</span></span>`);
-        if (infants > 0) parts.push(`<span class="badge bg-warning-subtle text-warning d-inline-flex align-items-center gap-1 me-2 mb-1"><i class="ti ti-baby-carriage fs-6"></i><span>${infants} infante${infants > 1 ? 's' : ''} (0-2)</span></span>`);
-        let flightHtml = '';
-        if (service.transportType === 'aeropuerto' && service.flightNumber) {
-          flightHtml = `<span class="badge bg-secondary-subtle text-secondary d-inline-flex align-items-center gap-1 me-2 mb-1"><i class="ti ti-plane fs-6"></i><span>${service.airline ? `${service.airline} ` : ''}${service.flightNumber}</span></span>`;
-        }
-        return `<div class="people-quantities mt-2 d-flex flex-wrap align-items-center">${parts.join('')}${flightHtml}</div>`;
+        if (adults > 0) parts.push(`<span class="badge bg-primary-subtle text-primary d-inline-flex align-items-center gap-1 me-1"><i class="ti ti-user fs-6"></i><span>${adults} adulto${adults > 1 ? 's' : ''}</span></span>`);
+        if (children > 0) parts.push(`<span class="badge bg-success-subtle text-success d-inline-flex align-items-center gap-1 me-1"><i class="ti ti-mood-kid fs-6"></i><span>${children} niño${children > 1 ? 's' : ''}</span></span>`);
+        if (infants > 0) parts.push(`<span class="badge bg-warning-subtle text-warning d-inline-flex align-items-center gap-1 me-1"><i class="ti ti-baby-carriage fs-6"></i><span>${infants} infante${infants > 1 ? 's' : ''}</span></span>`);
+        return `
+          <div class="d-flex align-items-center text-muted small mb-1">
+            ${parts.join('')}
+          </div>
+        `;
       }
       return '';
     }
@@ -7293,6 +7678,26 @@ class ItineraryBuilder {
       return '<small class="text-muted ms-1" style="font-size: 0.75rem;">(con IVA)</small>';
     }
     return '';
+  }
+  
+  /**
+   * Get the correct display price for a service based on current payment type
+   * @param {Object} service - The service object
+   * @returns {number} The price to display based on current payment type
+   */
+  getServiceDisplayPrice(service) {
+    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    
+    // Use pricesByType if available
+    if (service.pricesByType && typeof service.pricesByType === 'object') {
+      const price = service.pricesByType[paymentType];
+      if (price !== undefined) {
+        return price;
+      }
+    }
+    
+    // Fallback to service.price
+    return service.price || 0;
   }
 
   /**
@@ -7480,9 +7885,13 @@ class ItineraryBuilder {
       this.calculateADisposicionPrice();
       console.log('💰 Recalculated A Disposición price for payment type:', paymentType);
     } else if (serviceType === 'concepto') {
-      // Recalculate concepto price with new payment type if surcharges are enabled
-      this.updateConceptoServicePrice();
-      console.log('💰 Recalculated concepto price for payment type:', paymentType);
+      // Only recalculate concepto price if user hasn't manually cleared the field
+      if (!this.conceptoFieldManuallyCleared) {
+        this.updateConceptoServicePrice();
+        console.log('💰 Recalculated concepto price for payment type:', paymentType);
+      } else {
+        console.log('💰 Skipped concepto price recalculation - user manually cleared field');
+      }
     }
 
     // Recalculate all saved services with new payment type
@@ -8151,32 +8560,10 @@ class ItineraryBuilder {
         paymentDisplays.tarjeta = pricesByType.tarjeta;
       }
 
-      // Display payment type totals
-      const paymentTotalsHTML = `
-        <div class="payment-type-totals">
-          <small class="fw-bold text-muted d-block mb-2">Totales por Tipo de Pago:</small>
-          <div class="d-flex justify-content-between gap-3">
-            <div class="text-center flex-fill">
-              <div class="small text-muted">💰 Efectivo</div>
-              <div class="fw-bold">${this.formatCurrency(paymentDisplays.efectivo)}</div>
-            </div>
-            <div class="text-center flex-fill">
-              <div class="small text-muted">🏦 Transferencia</div>
-              <div class="fw-bold">${this.formatCurrency(paymentDisplays.transferencia)}</div>
-            </div>
-            <div class="text-center flex-fill">
-              <div class="small text-muted">💳 Tarjeta</div>
-              <div class="fw-bold">${this.formatCurrency(paymentDisplays.tarjeta)}</div>
-            </div>
-          </div>
-        </div>
-      `;
-
-      debugPaymentSection.innerHTML = paymentTotalsHTML;
-
-      // Always show the payment totals section
-      debugPaymentSection.classList.remove('d-none');
-      console.log('🔍 Payment totals section displayed');
+      // Payment type totals removed - no longer needed in modal
+      // Keep the div hidden
+      debugPaymentSection.innerHTML = '';
+      debugPaymentSection.classList.add('d-none');
 
       // Check if this is A Disposición service and update breakdown fields
       const serviceType = document.getElementById('serviceType')?.value;
@@ -8765,23 +9152,60 @@ class ItineraryBuilder {
     return vehicleName ? vehicleName.replace(/\s*\([^)]*\)/g, '').trim() : vehicleName;
   }
 
+  getCategoryName(categoryId) {
+    // Get the category/segment name from the rates cache
+    if (!categoryId || !this.ratesCache) {
+      console.log('🔍 GET CATEGORY NAME DEBUG - Early return:', {
+        categoryId,
+        hasCategoryId: !!categoryId,
+        hasRatesCache: !!this.ratesCache,
+        ratesCacheLength: this.ratesCache?.length || 0
+      });
+      return '';
+    }
+    
+    const rate = this.ratesCache.find(r => 
+      r.value === categoryId || 
+      r.objectId === categoryId || 
+      r.id === categoryId
+    );
+    
+    console.log('🔍 GET CATEGORY NAME DEBUG:', {
+      categoryId,
+      ratesCacheLength: this.ratesCache?.length || 0,
+      ratesCache: this.ratesCache?.slice(0, 3), // Show first 3 rates for structure
+      foundRate: rate,
+      rateName: rate ? (rate.label || rate.name) : 'NOT_FOUND'
+    });
+    
+    if (rate) {
+      return rate.label || rate.name || 'Segmento';
+    }
+    return '';
+  }
+
   getAdditionalVehicleDisplayName(service) {
     // Get the display name for the additional vehicle
     if (!service.additionalVehicleId) return 'Vehículo adicional';
 
+    // Get base vehicle name
+    let vehicleName = 'Vehículo adicional';
+    
     // First try to use the stored name (cleaned of parentheses)
     if (service.additionalVehicleTypeName) {
-      return this.cleanVehicleName(service.additionalVehicleTypeName);
+      vehicleName = this.cleanVehicleName(service.additionalVehicleTypeName);
+    } else {
+      // Fallback: Try to get vehicle info from the vehicle types cache (cleaned)
+      const vehicleInfo = this.getVehicleTypeInfo(service.additionalVehicleId);
+      if (vehicleInfo && vehicleInfo.name) {
+        vehicleName = this.cleanVehicleName(vehicleInfo.name);
+      }
     }
 
-    // Fallback: Try to get vehicle info from the vehicle types cache (cleaned)
-    const vehicleInfo = this.getVehicleTypeInfo(service.additionalVehicleId);
-    if (vehicleInfo && vehicleInfo.name) {
-      return this.cleanVehicleName(vehicleInfo.name);
-    }
-
-    // Final fallback to generic name instead of showing ObjectId
-    return 'Vehículo adicional';
+    // Add segment if available
+    const segmentName = service.additionalVehicleSegment ? this.getCategoryName(service.additionalVehicleSegment) : '';
+    
+    return segmentName ? `${vehicleName} · ${segmentName}` : vehicleName;
   }
 
   getSegmentDisplayName(segmentId) {
@@ -9343,6 +9767,20 @@ class ItineraryBuilder {
             tourQuantity: subconcept.tourQuantity || null,
             tourDuration: subconcept.tourDuration || null,
           };
+
+          // Debug: Log segment data loading from backend for transport services
+          if (serviceData.type === 'transport') {
+            console.log('🔍 BACKEND SEGMENT DEBUG:', {
+              serviceId,
+              concept: subconcept.concept,
+              categoryFromBackend: subconcept.category,
+              additionalVehicleSegmentFromBackend: subconcept.additionalVehicleSegment,
+              categoryMapped: serviceData.category,
+              additionalVehicleSegmentMapped: serviceData.additionalVehicleSegment,
+              hasCategory: !!serviceData.category,
+              hasAdditionalSegment: !!serviceData.additionalVehicleSegment
+            });
+          }
 
           // Debug: Log what gets stored in services Map for walking tours
           if (subconcept.isWalkingTour || (subconcept.concept && subconcept.concept.toLowerCase().includes('pie'))) {
@@ -11242,6 +11680,35 @@ class ItineraryBuilder {
   }
 
   /**
+   * Round a time to the nearest 15-minute interval.
+   * @param {string} timeString - Time in HH:MM format
+   * @returns {string} Time rounded to nearest 15 minutes in HH:MM format
+   */
+  roundTimeToNearest15(timeString) {
+    if (!timeString || !timeString.includes(':')) {
+      return timeString;
+    }
+
+    // Parse time
+    const [hours, minutes] = timeString.split(':').map(Number);
+    if (isNaN(hours) || isNaN(minutes)) {
+      return timeString;
+    }
+
+    // Convert to total minutes
+    let totalMinutes = hours * 60 + minutes;
+
+    // Round DOWN to previous 15 minutes (00, 15, 30, 45)
+    totalMinutes = Math.floor(totalMinutes / 15) * 15;
+
+    // Convert back to HH:MM
+    const roundedHours = Math.floor(totalMinutes / 60) % 24;
+    const roundedMinutes = totalMinutes % 60;
+    
+    return `${String(roundedHours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
+  }
+
+  /**
    * Update suggested departure time fields for transport services.
    * Called when flight time is entered or route duration is calculated.
    * @example
@@ -11498,6 +11965,16 @@ class ItineraryBuilder {
 
     if (!clientPriceField || !servicePriceField) return;
 
+    // Respect user intention if they manually cleared the field
+    if (this.conceptoFieldManuallyCleared) {
+      servicePriceField.value = '0.00';
+      console.log('💰 Concepto field manually cleared - setting servicePrice to 0:', {
+        userIntention: 'manually cleared field',
+        servicePriceSet: '0.00'
+      });
+      return;
+    }
+
     const clientPrice = parseFloat(clientPriceField.value) || 0;
     const applySurcharges = applySurchargesCheckbox?.checked ?? true;
 
@@ -11512,6 +11989,7 @@ class ItineraryBuilder {
       applySurcharges,
       paymentType: document.getElementById('priceTypeSelect')?.value || 'efectivo',
       finalPrice,
+      manuallyModified: this.conceptoFieldManuallyModified
     });
 
     // Update breakdowns
@@ -12510,23 +12988,52 @@ class ItineraryBuilder {
       // Check if prices are overridden
       const isPriceOverride = document.getElementById('experienceOverridePrices')?.checked || false;
 
+      // Calculate base totals for each category
+      const adultsTotal = adultsQty * adultPrice;
+      const childrenTotal = childrenQty * childPrice;
+      const noAlcoholTotal = noAlcoholQty * noAlcoholPrice;
+      
+      // Calculate base total (efectivo)
+      const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal;
+      
+      // Get current payment type
+      const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+      
+      // Calculate surcharged total based on payment type
+      let finalTotal = baseTotal;
+      if (paymentType === 'transferencia' && this.transferRate > 0) {
+        finalTotal = baseTotal * (1 + (this.transferRate / 100));
+      } else if (paymentType === 'tarjeta' && this.agencyRate > 0) {
+        finalTotal = baseTotal * (1 + (this.agencyRate / 100));
+      }
+
+      // Show detailed breakdown with final surcharged totals (without showing surcharge details)
       if (adultsQty > 0 && adultPrice > 0) {
-        const displayUnit = this.getDisplayPrice(adultPrice);
-        items.push({ label: `Adultos (${adultsQty} × ${this.formatCurrency(displayUnit)})`, amountMXN: adultsQty * adultPrice });
+        const finalAdultTotal = (adultsTotal / baseTotal) * finalTotal;
+        items.push({ label: `Adultos: ${adultsQty} × $${adultPrice.toFixed(2)} = $${finalAdultTotal.toFixed(2)}`, amountMXN: finalAdultTotal });
       }
       if (childrenQty > 0 && childPrice > 0) {
-        const displayUnit = this.getDisplayPrice(childPrice);
-        items.push({ label: `Niños (${childrenQty} × ${this.formatCurrency(displayUnit)})`, amountMXN: childrenQty * childPrice });
+        const finalChildTotal = (childrenTotal / baseTotal) * finalTotal;
+        items.push({ label: `Niños: ${childrenQty} × $${childPrice.toFixed(2)} = $${finalChildTotal.toFixed(2)}`, amountMXN: finalChildTotal });
       }
       if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
-        const displayUnit = this.getDisplayPrice(noAlcoholPrice);
-        items.push({ label: `Sin alcohol (${noAlcoholQty} × ${this.formatCurrency(displayUnit)})`, amountMXN: noAlcoholQty * noAlcoholPrice });
+        const finalNoAlcoholTotal = (noAlcoholTotal / baseTotal) * finalTotal;
+        items.push({ label: `Sin alcohol: ${noAlcoholQty} × $${noAlcoholPrice.toFixed(2)} = $${finalNoAlcoholTotal.toFixed(2)}`, amountMXN: finalNoAlcoholTotal });
       }
 
       // Add indicator if prices are overridden
       if (isPriceOverride && this.canEditPrices) {
         items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precios personalizados</span>', amountMXN: 0 });
       }
+
+      console.log('📊 Experience service breakdown calculated:', {
+        quantities: { adultsQty, childrenQty, noAlcoholQty },
+        prices: { adultPrice, childPrice, noAlcoholPrice },
+        baseTotal,
+        paymentType,
+        finalTotal,
+        surchargeApplied: finalTotal !== baseTotal
+      });
     } else if (serviceType === 'a-disposicion') {
       // Check if price is overridden for a disposición
       const isADisposicionPriceOverride = document.getElementById('aDisposicionOverridePrices')?.checked || false;
@@ -16574,10 +17081,39 @@ class ItineraryBuilder {
   renderPreviewTransport(service, color, displayPrice, isExcluded) {
     const transportTypes = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
     const transportLabel = transportTypes[service.transportType] || 'Transporte';
-    const origin = service.originName || service.origin || 'Origen';
-    const destination = service.destination || 'Destino';
+    
+    // Extract specific location from origin/destination if embedded
+    let origin = service.originName || service.origin || 'Origen';
+    let destination = service.destination || 'Destino';
+    let specificLocation = service.specificLocation || '';
+    
+    // If no explicit specificLocation, try to extract from origin/destination
+    if (!specificLocation) {
+      // Check if origin has embedded specific location (format: "City, Specific Location")
+      if (origin.includes(',')) {
+        const originParts = origin.split(',');
+        if (originParts.length === 2) {
+          origin = originParts[0].trim();
+          specificLocation = originParts[1].trim();
+        }
+      }
+      // Check destination if origin didn't have it
+      else if (destination.includes(',')) {
+        const destParts = destination.split(',');
+        if (destParts.length === 2) {
+          destination = destParts[0].trim();
+          specificLocation = destParts[1].trim();
+        }
+      }
+    }
+    
     const vehicleName = this.getVehicleDisplayName(service);
     const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
+    
+    // Get segment name for main vehicle
+    const segmentName = service.category ? this.getCategoryName(service.category) : '';
+    const segmentDisplay = segmentName ? ` · ${segmentName}` : '';
+    
     const directionLabels = {
       arrival: service.transportType === 'aeropuerto' ? 'Llegada' : 'Ida',
       departure: service.transportType === 'aeropuerto' ? 'Salida' : 'Vuelta',
@@ -16603,15 +17139,16 @@ class ItineraryBuilder {
               <div>${destination}</div>
             </div>
           </div>
+          ${specificLocation ? `<div class="pv-service-detail"><i class="ti ti-map-pin"></i>Dirección: ${specificLocation}</div>` : ''}
           ${service.selectedSchedule || service.startTime ? `<div class="pv-service-detail"><i class="ti ti-clock"></i>Hora Vuelo: ${service.selectedSchedule || service.startTime}</div>` : ''}
-          ${(service.flightDepartureTimeSuggested || service.roundTripDepartureTimeSuggestedIda || service.roundTripDepartureTimeSuggestedVuelta) ? `<div class="pv-service-detail"><i class="ti ti-clock"></i>Hora Salida: ${service.flightDepartureTimeSuggested || service.roundTripDepartureTimeSuggestedIda || service.roundTripDepartureTimeSuggestedVuelta}${service.roundTripDepartureTimeSuggestedVuelta && service.roundTripDepartureTimeSuggestedVuelta !== service.roundTripDepartureTimeSuggestedIda ? ` / ${service.roundTripDepartureTimeSuggestedVuelta}` : ''}</div>` : ''}
-          ${hasVehicle ? `<div class="pv-service-detail"><i class="ti ti-car"></i>${vehicleName}${service.quantity > 1 ? ` x${service.quantity}` : ''}</div>` : ''}
+          ${(service.flightDepartureTimeSuggested || service.roundTripDepartureTimeSuggestedIda || service.roundTripDepartureTimeSuggestedVuelta) && service.directionType !== 'arrival' ? `<div class="pv-service-detail"><i class="ti ti-clock"></i>Hora Salida: ${service.flightDepartureTimeSuggested || service.roundTripDepartureTimeSuggestedIda || service.roundTripDepartureTimeSuggestedVuelta}${service.roundTripDepartureTimeSuggestedVuelta && service.roundTripDepartureTimeSuggestedVuelta !== service.roundTripDepartureTimeSuggestedIda ? ` / ${service.roundTripDepartureTimeSuggestedVuelta}` : ''}</div>` : ''}
+          ${hasVehicle ? `<div class="pv-service-detail"><i class="ti ti-car"></i>${vehicleName}${segmentDisplay}${service.quantity > 1 ? ` x${service.quantity}` : ''}</div>` : ''}
           ${service.flightNumber ? `<div class="pv-service-detail"><i class="ti ti-plane"></i>${service.flightNumber}${service.airline ? ` · ${service.airline}` : ''}</div>` : ''}
           ${service.includeGuide ? '<div class="pv-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Chofer</div>' : ''}
           ${service.includeGreeter ? '<div class="pv-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>' : ''}
           ${service.waitingTimeHours > 0 ? `<div class="pv-service-detail" style="color: #fd7e14;"><i class="ti ti-clock"></i>Tiempo de espera: ${service.waitingTimeHours}h</div>` : ''}
           ${(service.hasAdditionalVehicle && service.additionalVehicleId) || service.additionalVehicleTypeName ? `<div class="pv-service-detail" style="color: #0d6efd;"><i class="ti ti-plus"></i>Adicional: ${this.cleanVehicleName(this.getAdditionalVehicleDisplayName(service))}</div>` : ''}
-          ${service.notes ? `<div class="pv-notes"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
+          ${service.notes ? `<div class="pv-notes" style="white-space: pre-wrap;"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
         </div>
         <div class="pv-price ${isExcluded ? 'pv-excluded' : ''}">${this.formatCurrency(displayPrice)}</div>
       </div>`;
@@ -16621,17 +17158,24 @@ class ItineraryBuilder {
     const label = typeLabels[service.type] || service.type;
     const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
     let badgeLabel = null;
+    
+    // Hide "Concepto" badge for concepto services (show service name instead)
+    const shouldShowBadge = service.type !== 'concepto';
+    
     if (service.type === 'tour' && service.isWalkingTour) {
       badgeLabel = 'Tour a Pie';
     } else if (service.type === 'experience' && this.isExperienceFromEstablishment(service.experienceId)) {
       badgeLabel = 'Establecimiento';
     }
+    
+    // Hide price section for concepto services with $0 price
+    const shouldShowPrice = !(service.type === 'concepto' && displayPrice === 0);
 
     return `
       <div class="pv-service" style="border-left-color: ${color};">
         <div class="pv-service-info">
           <div class="pv-service-header">
-            <span class="pv-badge" style="background: ${color}15; color: ${color};">${badgeLabel || label}</span>
+            ${shouldShowBadge ? `<span class="pv-badge" style="background: ${color}15; color: ${color};">${badgeLabel || label}</span>` : ''}
             ${isExcluded ? '<span class="pv-badge" style="background: #6c757d20; color: #6c757d;">Pago externo</span>' : ''}
             <span class="pv-service-name">${this.getServiceTitle(service)}</span>
           </div>
@@ -16640,9 +17184,9 @@ class ItineraryBuilder {
           ${(service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide ? '<div class="pv-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Chofer</div>' : ''}
           ${(service.type === 'tour' || service.type === 'transport') && service.includeGreeter ? `<div class="pv-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>` : ''}
           ${service.type === 'tour' && ((service.hasAdditionalVehicle && service.additionalVehicleId) || service.additionalVehicleTypeName) ? `<div class="pv-service-detail" style="color: #0d6efd;"><i class="ti ti-plus"></i>Adicional: ${this.cleanVehicleName(this.getAdditionalVehicleDisplayName(service))}</div>` : ''}
-          ${service.notes ? `<div class="pv-notes"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
+          ${service.notes ? `<div class="pv-notes" style="white-space: pre-wrap;"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
         </div>
-        <div class="pv-price ${isExcluded ? 'pv-excluded' : ''}">${this.formatCurrency(displayPrice)}</div>
+        ${shouldShowPrice ? `<div class="pv-price ${isExcluded ? 'pv-excluded' : ''}">${this.formatCurrency(displayPrice)}</div>` : ''}
       </div>`;
   }
 
@@ -18342,8 +18886,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // if (breakdownPanel) breakdownPanel.classList.add('d-none'); // Commented out - always show breakdown when editing
 
       // Clear tour schedule when switching away from tour
-      if (selectedType !== 'tour' && window.quoteServicesManager) {
-        window.quoteServicesManager.clearTourSchedule();
+      if (selectedType !== 'tour' && window.itineraryBuilder) {
+        window.itineraryBuilder.clearTourSchedule();
       }
 
       // Show appropriate content based on selection
@@ -18423,8 +18967,8 @@ document.addEventListener('DOMContentLoaded', () => {
       initializeModalState();
 
       // Initialize dev payment prices in development mode
-      if (manager.isDevelopmentMode) {
-        manager.updateDevPaymentPrices();
+      if (window.itineraryBuilder && window.itineraryBuilder.isDevelopmentMode) {
+        window.itineraryBuilder.updateDevPaymentPrices();
       }
 
       // Fix checkbox sync issues that can occur with Bootstrap modals
