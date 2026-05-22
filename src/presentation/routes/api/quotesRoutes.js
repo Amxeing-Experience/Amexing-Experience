@@ -128,37 +128,6 @@ router.get(
 );
 
 /**
- * GET /api/quotes/status-count - Get count of quotes by status.
- * Private access (Admin and SuperAdmin only).
- *
- * Returns count of quotes grouped by status, excluding quotes that have reservations.
- * @returns {object} Response with status counts.
- * @example
- * // Response structure:
- * {
- *   success: true,
- *   data: {
- *     statusCounts: {
- *       draft: 5,
- *       quoted: 10,
- *       requested: 3,
- *       scheduled: 2,
- *       cancelled: 1
- *     },
- *     total: 21,
- *     excludedReservations: 15
- *   }
- * }
- */
-router.get(
-  '/status-count',
-  readOperationsLimiter,
-  jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7) only
-  (req, res) => QuoteController.getQuotesStatusCount(req, res)
-);
-
-/**
  * GET /api/quotes/with-invoices - Get quotes with completed invoices for download.
  * Private access (Department Manager, Admin and SuperAdmin).
  *
