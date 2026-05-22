@@ -258,16 +258,31 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>`;
     }
 
-    function getStatusBadge(status) {
+    function getQuoteStatusBadge(status) {
+        if (!status) return '';
+        const map = {
+            scheduled: { label: 'Agendada', cls: 'bg-success text-white' },
+            hold: { label: 'Bloqueada', cls: 'bg-warning text-dark' },
+            requested: { label: 'Solicitada', cls: 'bg-info text-white' },
+            quoted: { label: 'Cotizada', cls: 'bg-primary text-white' },
+            rejected: { label: 'Rechazada', cls: 'bg-danger text-white' },
+        };
+        const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}" title="Estado de cotización origen">${s.label}</span>`;
+    }
+    
+    function getReservationStatusBadge(status) {
         const map = {
             pending: { label: 'Asignaciones pendientes', cls: 'bg-warning text-dark' },
             assigned: { label: 'Asignada', cls: 'bg-info text-white' },
             in_progress: { label: 'En Progreso', cls: 'bg-primary text-white' },
             completed: { label: 'Completada', cls: 'bg-success text-white' },
             cancelled: { label: 'Cancelada', cls: 'bg-danger text-white' },
+            confirmed: { label: 'Confirmada', cls: 'bg-success text-white' },
+            hold: { label: 'En Espera', cls: 'bg-warning text-dark' },
         };
         const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
-        return `<span class="badge ${s.cls}">${s.label}</span>`;
+        return `<span class="badge ${s.cls}" title="Estado operacional de reservación">${s.label}</span>`;
     }
 
     function formatDate(dateStr) {
@@ -323,7 +338,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             quoteLink.textContent = d.quoteFolio;
         }
 
-        document.getElementById('infoStatus').innerHTML = getStatusBadge(d.status);
+        const quoteBadge = getQuoteStatusBadge(d.quoteStatus);
+        const reservationBadge = getReservationStatusBadge(d.status);
+        document.getElementById('infoStatus').innerHTML = `${quoteBadge} ${reservationBadge}`;
         document.getElementById('infoCreatedAt').textContent = formatDate(d.createdAt);
         // Display company name first, then fallback to fullName or contactPerson
         const clientDisplay = d.client?.companyName || d.client?.fullName || d.contactPerson || '—';
@@ -528,7 +545,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        ${getStatusBadge(svc.status)}
+                        ${getReservationStatusBadge(svc.status)}
                         <span class="text-end" style="min-width: 80px;">${formatCurrency(svc.total, reservationData.currency)}</span>
                         ${canAssign ? `<button class="btn btn-sm btn-outline-primary assign-btn" data-service-id="${svc.id}" data-driver-id="${svc.assignedDriver?.id || ''}" data-guide-id="${svc.assignedGuide?.id || ''}" data-greeter-id="${svc.assignedGreeter?.id || ''}" data-vehicle-id="${svc.assignedVehicle?.id || ''}"><i class="ti ti-user-plus"></i></button>` : ''}
                     </div>

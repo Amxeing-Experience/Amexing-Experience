@@ -113,8 +113,8 @@ class QuoteService {
       // BEFORE updating status, handle reservation creation to ensure data integrity
       let reservationData = null;
 
-      // If changing to scheduled, ensure reservation exists or create it
-      if (newStatus === 'scheduled') {
+      // If changing to scheduled or hold, ensure reservation exists or create it
+      if (newStatus === 'scheduled' || newStatus === 'hold') {
         // Always check for reservation when status is scheduled
         const resQuery = new Parse.Query('Reservation');
         resQuery.equalTo('quotePtr', quote);
@@ -122,12 +122,12 @@ class QuoteService {
         const existingReservation = await resQuery.first({ useMasterKey: true });
 
         if (!existingReservation) {
-          logger.info('Creating reservation for transition to scheduled', {
+          logger.info('Creating reservation for transition to scheduled/hold status', {
             quoteId: quote.id,
             quoteFolio: quote.get('folio'),
             previousStatus,
-            newStatus: 'scheduled',
-            reason: 'Ensuring reservation exists before scheduled status',
+            newStatus,
+            reason: `Ensuring reservation exists before ${newStatus} status`,
           });
 
           try {
@@ -137,20 +137,26 @@ class QuoteService {
               throw new Error('Unable to create reservation. Please verify service items are properly configured.');
             }
 
-            // Update reservation status to confirmed for scheduled quotes
+            // Update reservation status based on quote status
             if (reservationData.reservation) {
               const { reservation } = reservationData;
-              reservation.set('status', 'confirmed');
+              if (newStatus === 'scheduled') {
+                reservation.set('status', 'confirmed');
+              } else if (newStatus === 'hold') {
+                reservation.set('status', 'hold');
+              }
               await reservation.save(null, { useMasterKey: true });
 
-              logger.info('Reservation created and confirmed for scheduled quote', {
+              const statusMessage = newStatus === 'scheduled' ? 'confirmed' : 'held';
+              logger.info(`Reservation created and ${statusMessage} for ${newStatus} quote`, {
                 reservationId: reservation.id,
                 quoteId: quote.id,
                 quoteFolio: quote.get('folio'),
+                reservationStatus: newStatus === 'scheduled' ? 'confirmed' : 'hold',
               });
             }
           } catch (error) {
-            logger.error('Failed to create reservation for scheduled quote', {
+            logger.error(`Failed to create reservation for ${newStatus} quote`, {
               error: error.message,
               quoteId: quote.id,
               quoteFolio: quote.get('folio'),

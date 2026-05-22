@@ -92,16 +92,31 @@ document.addEventListener('DOMContentLoaded', function() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     let pendingCancelId = null;
 
-    function getStatusBadge(status) {
+    function getQuoteStatusBadge(status) {
+        if (!status) return '';
+        const map = {
+            scheduled: { label: 'Agendada', cls: 'bg-success text-white' },
+            hold: { label: 'Bloqueada', cls: 'bg-warning text-dark' },
+            requested: { label: 'Solicitada', cls: 'bg-info text-white' },
+            quoted: { label: 'Cotizada', cls: 'bg-primary text-white' },
+            rejected: { label: 'Rechazada', cls: 'bg-danger text-white' },
+        };
+        const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}" title="Estado de cotización origen">${s.label}</span>`;
+    }
+    
+    function getReservationStatusBadge(status) {
         const map = {
             pending: { label: 'Asignaciones pendientes', cls: 'bg-warning text-dark' },
             assigned: { label: 'Asignada', cls: 'bg-info text-white' },
             in_progress: { label: 'En Progreso', cls: 'bg-primary text-white' },
             completed: { label: 'Completada', cls: 'bg-success text-white' },
             cancelled: { label: 'Cancelada', cls: 'bg-danger text-white' },
+            confirmed: { label: 'Confirmada', cls: 'bg-success text-white' },
+            hold: { label: 'En Espera', cls: 'bg-warning text-dark' },
         };
         const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
-        return `<span class="badge ${s.cls}">${s.label}</span>`;
+        return `<span class="badge ${s.cls}" title="Estado operacional de reservación">${s.label}</span>`;
     }
 
     function formatDate(dateStr) {
@@ -162,10 +177,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             },
             {
-                data: 'status',
+                data: null,
                 className: 'text-center',
                 responsivePriority: 1,  // High priority - always show
-                render: function(data) { return getStatusBadge(data); }
+                render: function(data, type, row) {
+                    const quoteBadge = getQuoteStatusBadge(row.quoteStatus);
+                    const reservationBadge = getReservationStatusBadge(row.status);
+                    return `${quoteBadge} ${reservationBadge}`;
+                }
             },
             {
                 data: 'createdAt',

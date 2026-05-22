@@ -500,6 +500,7 @@ class ReservationController {
           folio: reservation.get('folio'),
           quoteFolio: reservation.get('quotePtr')?.get('folio') || '',
           quoteId: reservation.get('quotePtr')?.id || '',
+          quoteStatus: reservation.get('quotePtr')?.get('status') || '',
           status: reservation.get('status'),
           startDate: reservation.get('startDate'),
           endDate: reservation.get('endDate'),
@@ -729,7 +730,7 @@ class ReservationController {
       const { id, serviceId } = req.params;
       const { status } = req.body;
 
-      const validStatuses = ['pending', 'assigned', 'completed', 'cancelled'];
+      const validStatuses = ['pending', 'assigned', 'in_progress', 'completed', 'cancelled', 'confirmed', 'hold'];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ success: false, error: `Estado inválido. Debe ser: ${validStatuses.join(', ')}` });
       }
@@ -1244,11 +1245,16 @@ class ReservationController {
       clientName = reservation.get('contactPerson') || 'N/A';
     }
 
+    const status = reservation.get('status');
+    const quoteStatus = reservation.get('quotePtr')?.get('status') || '';
+    console.log(`🔍 [API] Reservation ${reservation.get('folio')} - Quote status: ${quoteStatus}, Reservation status: ${status}`);
+
     return {
       id: reservation.id,
       folio: reservation.get('folio'),
       quoteId: reservation.get('quotePtr')?.id || '',
       quoteFolio: reservation.get('quotePtr')?.get('folio') || '',
+      quoteStatus,
       clientName,
       eventType: reservation.get('eventType') || '',
       startDate: reservation.get('startDate'),
@@ -1257,7 +1263,7 @@ class ReservationController {
       currency: reservation.get('currency'),
       totalServices: serviceCount.totalCount,
       assignedServices: serviceCount.assignedCount,
-      status: reservation.get('status'),
+      status,
       createdAt: reservation.createdAt,
     };
   }
@@ -1277,24 +1283,27 @@ class ReservationController {
 
     if (services.length === 0) return;
 
+    const currentStatus = reservation.get('status');
     const statuses = services.map((s) => s.get('status'));
     const allCompleted = statuses.every((s) => s === 'completed' || s === 'cancelled');
     const allAssigned = statuses.every((s) => s === 'assigned' || s === 'completed' || s === 'cancelled');
     const someInProgress = statuses.some((s) => s === 'in_progress');
 
-    let newStatus = reservation.get('status');
+    let newStatus = currentStatus;
 
+    // Preserve 'confirmed' and 'hold' statuses unless services are completed
     if (allCompleted) {
       newStatus = 'completed';
     } else if (someInProgress) {
       newStatus = 'in_progress';
-    } else if (allAssigned) {
+    } else if (allAssigned && !['confirmed', 'hold'].includes(currentStatus)) {
       newStatus = 'assigned';
-    } else {
+    } else if (!allAssigned && !['confirmed', 'hold'].includes(currentStatus)) {
       newStatus = 'pending';
     }
+    // For 'confirmed' and 'hold', only change to 'in_progress' or 'completed'
 
-    if (newStatus !== reservation.get('status')) {
+    if (newStatus !== currentStatus) {
       reservation.set('status', newStatus);
       await reservation.save(null, { useMasterKey: true });
     }
