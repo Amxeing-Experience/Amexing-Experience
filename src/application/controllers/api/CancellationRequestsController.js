@@ -254,10 +254,13 @@ class CancellationRequestsController {
       }
 
       // Validate review data
-      const validationError = this.validateReviewData(reviewData);
-      if (validationError) {
-        return this.sendError(res, validationError, 400);
+      const validationResult = this.validateReviewData(reviewData);
+      if (validationResult.error) {
+        return this.sendError(res, validationResult.error, 400);
       }
+
+      // Use normalized review data
+      const normalizedReviewData = validationResult.data;
 
       // Get cancellation request
       const request = await this.getCancellationRequestByIdData(requestId);
@@ -270,17 +273,17 @@ class CancellationRequestsController {
       }
 
       // Process review
-      const result = await this.processCancellationRequestReview(request, currentUser, reviewData);
+      const result = await this.processCancellationRequestReview(request, currentUser, normalizedReviewData);
 
       logger.info('Cancellation request reviewed', {
         requestId: request.id,
         quoteId: request.get('quote')?.id,
-        decision: reviewData.decision,
+        decision: normalizedReviewData.decision,
         reviewedBy: currentUser.id,
-        reviewComments: reviewData.comments ? '[COMMENTS_PROVIDED]' : null,
+        reviewComments: normalizedReviewData.comments ? '[COMMENTS_PROVIDED]' : null,
       });
 
-      this.sendSuccess(res, result, `Cancellation request ${reviewData.decision} successfully`);
+      this.sendSuccess(res, result, `Cancellation request ${normalizedReviewData.decision} successfully`);
     } catch (error) {
       logger.error('Error in CancellationRequestsController.reviewCancellationRequest', {
         error: error.message,
@@ -295,14 +298,26 @@ class CancellationRequestsController {
   // ===== HELPER METHODS =====
 
   /**
-   * Parse and validate query parameters.
+   * Parse and validate query parameters (supports both DataTables and custom formats).
    * @param {object} query - Query parameters from request.
    * @returns {object} - Parsed options object.
    * @example
    */
   parseQueryParams(query) {
-    const page = parseInt(query.page, 10) || 1;
-    let limit = parseInt(query.limit, 10) || this.defaultPageSize;
+    // Handle DataTables server-side processing parameters
+    let page; let
+      limit;
+
+    if (query.start !== undefined && query.length !== undefined) {
+      // DataTables format
+      const start = parseInt(query.start, 10) || 0;
+      limit = parseInt(query.length, 10) || this.defaultPageSize;
+      page = Math.floor(start / limit) + 1;
+    } else {
+      // Custom format
+      page = parseInt(query.page, 10) || 1;
+      limit = parseInt(query.limit, 10) || this.defaultPageSize;
+    }
 
     if (limit > this.maxPageSize) {
       limit = this.maxPageSize;
@@ -312,11 +327,19 @@ class CancellationRequestsController {
     if (query.status) {
       filters.status = query.status;
     }
+    if (query.type) {
+      filters.type = query.type;
+    }
     if (query.priority) {
       filters.priority = query.priority;
     }
     if (query.quoteFolio) {
       filters.quoteFolio = query.quoteFolio;
+    }
+
+    // Handle DataTables search
+    if (query['search[value]']) {
+      filters.search = query['search[value]'];
     }
 
     const sort = {
@@ -329,6 +352,7 @@ class CancellationRequestsController {
       limit,
       filters,
       sort,
+      draw: parseInt(query.draw, 10) || 1, // For DataTables
     };
   }
 
@@ -341,7 +365,7 @@ class CancellationRequestsController {
    */
   async getCancellationRequestsData(currentUser, options) {
     const {
-      page, limit, filters, sort,
+      page, limit, filters, sort, draw,
     } = options;
     const skip = (page - 1) * limit;
 
@@ -357,8 +381,29 @@ class CancellationRequestsController {
     if (filters.status) {
       query.equalTo('status', filters.status);
     }
+    if (filters.type) {
+      query.equalTo('cancellationType', filters.type);
+    }
     if (filters.priority) {
       query.equalTo('priority', filters.priority);
+    }
+
+    // Apply search if provided
+    if (filters.search && filters.search.trim()) {
+      const searchTerm = filters.search.trim();
+      const orQuery = new Parse.Query('CancellationRequest');
+      orQuery.contains('reason', searchTerm);
+
+      const quoteFolioQuery = new Parse.Query('CancellationRequest');
+      const quoteQuery = new Parse.Query('Quote');
+      quoteQuery.contains('folio', searchTerm);
+      quoteFolioQuery.matchesQuery('quote', quoteQuery);
+
+      const reservationFolioQuery = new Parse.Query('CancellationRequest');
+      reservationFolioQuery.contains('reservationFolio', searchTerm);
+
+      // eslint-disable-next-line no-underscore-dangle
+      query._orQuery([orQuery, quoteFolioQuery, reservationFolioQuery]);
     }
 
     // Apply sorting
@@ -369,19 +414,61 @@ class CancellationRequestsController {
     }
 
     try {
-      const [results, total] = await Promise.all([
+      // Get count query for total without filters for DataTables
+      const countQuery = new Parse.Query('CancellationRequest');
+      countQuery.equalTo('exists', true);
+
+      // Get filtered count query
+      const filteredCountQuery = new Parse.Query('CancellationRequest');
+      filteredCountQuery.equalTo('exists', true);
+      if (filters.status) {
+        filteredCountQuery.equalTo('status', filters.status);
+      }
+      if (filters.type) {
+        filteredCountQuery.equalTo('cancellationType', filters.type);
+      }
+      if (filters.priority) {
+        filteredCountQuery.equalTo('priority', filters.priority);
+      }
+      if (filters.search && filters.search.trim()) {
+        const searchTerm = filters.search.trim();
+        const orQuery = new Parse.Query('CancellationRequest');
+        orQuery.contains('reason', searchTerm);
+
+        const quoteFolioQuery = new Parse.Query('CancellationRequest');
+        const quoteQuery = new Parse.Query('Quote');
+        quoteQuery.contains('folio', searchTerm);
+        quoteFolioQuery.matchesQuery('quote', quoteQuery);
+
+        const reservationFolioQuery = new Parse.Query('CancellationRequest');
+        reservationFolioQuery.contains('reservationFolio', searchTerm);
+
+        // eslint-disable-next-line no-underscore-dangle
+        filteredCountQuery._orQuery([orQuery, quoteFolioQuery, reservationFolioQuery]);
+      }
+
+      const [results, total, filteredTotal] = await Promise.all([
         query.find({ useMasterKey: true }),
-        query.count({ useMasterKey: true }),
+        countQuery.count({ useMasterKey: true }),
+        filteredCountQuery.count({ useMasterKey: true }),
       ]);
 
+      // Transform data for DataTables
+      const transformedData = await this.transformRequestsForDataTables(results);
+
       return {
-        requests: results,
+        draw,
+        recordsTotal: total,
+        recordsFiltered: filteredTotal,
+        data: transformedData,
+        // Keep original format for backward compatibility
+        requests: transformedData,
         pagination: {
           page,
           limit,
-          total,
-          pages: Math.ceil(total / limit),
-          hasNext: page < Math.ceil(total / limit),
+          total: filteredTotal,
+          pages: Math.ceil(filteredTotal / limit),
+          hasNext: page < Math.ceil(filteredTotal / limit),
           hasPrev: page > 1,
         },
       };
@@ -445,26 +532,119 @@ class CancellationRequestsController {
   }
 
   /**
+   * Transform cancellation requests for DataTables display.
+   * @param {Array} requests - Array of CancellationRequest Parse objects.
+   * @returns {Promise<Array>} - Array of transformed objects.
+   * @example
+   */
+  async transformRequestsForDataTables(requests) {
+    const transformed = [];
+
+    for (const request of requests) {
+      const quote = request.get('quote');
+      const requestedBy = request.get('requestedBy');
+      const reviewedBy = request.get('reviewedBy');
+
+      // Get client info from quote
+      let clientName = 'N/A';
+      if (quote) {
+        try {
+          const clientObj = quote.get('client');
+          if (clientObj) {
+            await clientObj.fetch({ useMasterKey: true });
+            clientName = clientObj.get('fullName') || clientObj.get('companyName') || 'N/A';
+          }
+        } catch (error) {
+          logger.warn('Could not fetch client for cancellation request', { requestId: request.id, error: error.message });
+        }
+      }
+
+      // Get user names
+      let requestedByName = 'Usuario desconocido';
+      if (requestedBy) {
+        requestedByName = requestedBy.get('fullName') || requestedBy.get('username') || 'Usuario desconocido';
+      }
+
+      let reviewedByName = null;
+      if (reviewedBy) {
+        reviewedByName = reviewedBy.get('fullName') || reviewedBy.get('username') || 'Usuario desconocido';
+      }
+
+      const transformedRequest = {
+        id: request.id,
+        cancellationType: request.get('cancellationType') || 'quote',
+        quoteFolio: quote?.get('folio') || 'N/A',
+        reservationFolio: request.get('reservationFolio') || null,
+        reservationId: request.get('reservationId') || null,
+        clientName,
+        reason: request.get('reason'),
+        status: request.get('status'),
+        priority: request.get('priority') || 'normal',
+        hoursBeforeEvent: request.get('hoursBeforeEvent'),
+        eventDate: request.get('eventDate'),
+        createdAt: request.get('createdAt'),
+        updatedAt: request.get('updatedAt'),
+        requestedBy: request.get('requestedBy'),
+        requestedByName,
+        reviewedBy: request.get('reviewedBy'),
+        reviewedByName,
+        reviewedAt: request.get('reviewedAt'),
+        adminComments: request.get('reviewComments'),
+        refundAmount: request.get('refundAmount'),
+        cancellationFee: request.get('cancellationFee'),
+        active: request.get('active'),
+        exists: request.get('exists'),
+      };
+
+      transformed.push(transformedRequest);
+    }
+
+    return transformed;
+  }
+
+  /**
    * Validate review data.
    * @param {object} reviewData - Review data to validate.
-   * @returns {string|null} - Error message or null if valid.
+   * @returns {object|null} - Object with error message or normalized data.
    * @example
    */
   validateReviewData(reviewData) {
-    if (!reviewData.decision) {
-      return 'Review decision is required';
+    // Support both 'action' (from frontend) and 'decision' (standard) parameters
+    const decision = reviewData.action || reviewData.decision;
+
+    if (!decision) {
+      return { error: 'Review decision is required' };
     }
 
-    const validDecisions = ['approved', 'rejected'];
-    if (!validDecisions.includes(reviewData.decision)) {
-      return `Invalid decision. Must be one of: ${validDecisions.join(', ')}`;
+    const validDecisions = ['approve', 'approved', 'reject', 'rejected'];
+    if (!validDecisions.includes(decision)) {
+      return { error: 'Invalid decision. Must be one of: approve, reject' };
     }
 
-    if (reviewData.decision === 'rejected' && (!reviewData.comments || !reviewData.comments.trim())) {
-      return 'Comments are required when rejecting a cancellation request';
+    // Create normalized review data without mutating the original
+    const normalizedData = { ...reviewData };
+
+    // Normalize decision to standard format
+    if (decision === 'approve') {
+      normalizedData.decision = 'approved';
+    } else if (decision === 'reject') {
+      normalizedData.decision = 'rejected';
+    } else {
+      normalizedData.decision = decision;
     }
 
-    return null;
+    // Comments field could be 'adminComments' or 'comments'
+    const comments = reviewData.adminComments || reviewData.comments;
+    if (normalizedData.decision === 'rejected' && (!comments || !comments.trim())) {
+      return { error: 'Comments are required when rejecting a cancellation request' };
+    }
+
+    // Ensure we have the comments in the expected field
+    if (comments) {
+      normalizedData.comments = comments;
+    }
+
+    return { data: normalizedData };
   }
 
   /**
@@ -534,8 +714,9 @@ class CancellationRequestsController {
    */
   async createCancellationRequestForApproval(quote, currentUser, requestData, hoursBeforeEvent, eventDate) {
     const request = new CancellationRequest();
-    // Set all required fields at once to avoid validate firing before all fields are present
-    request.set({
+
+    // Base request data
+    const requestFields = {
       quote,
       requestedBy: currentUser,
       reason: requestData.reason.trim(),
@@ -545,7 +726,23 @@ class CancellationRequestsController {
       eventDate,
       active: true,
       exists: true,
-    });
+    };
+
+    // Add reservation traceability if this is a reservation cancellation
+    if (requestData.cancellationType === 'reservation') {
+      requestFields.cancellationType = 'reservation';
+      if (requestData.reservationId) {
+        requestFields.reservationId = requestData.reservationId;
+      }
+      if (requestData.reservationFolio) {
+        requestFields.reservationFolio = requestData.reservationFolio;
+      }
+    } else {
+      requestFields.cancellationType = 'quote';
+    }
+
+    // Set all fields at once to avoid validate firing before all fields are present
+    request.set(requestFields);
 
     await request.save(null, { useMasterKey: true });
 

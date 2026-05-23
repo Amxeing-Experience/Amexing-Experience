@@ -21,16 +21,6 @@
                     Administra y gestiona todas las reservaciones del sistema
                 </p>
             </div>
-            <div>
-                <select id="statusFilter" class="form-select form-select-sm" style="width: 180px;">
-                    <option value="">Todos los estados</option>
-                    <option value="pending">Pendiente</option>
-                    <option value="assigned">Asignada</option>
-                    <option value="in_progress">En Progreso</option>
-                    <option value="completed">Completada</option>
-                    <option value="cancelled">Cancelada</option>
-                </select>
-            </div>
         </div>
     </div>
 </div>
@@ -52,13 +42,28 @@
                 </div>
 
                 <div class="card-body">
+                    <!-- Date Filter Pills -->
+                    <div class="mb-3">
+                        <div class="btn-group" role="group" aria-label="Filtro por fecha de reservaciones">
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterFuture" value="future" checked>
+                            <label class="btn btn-outline-primary" for="filterFuture">
+                                <i class="ti ti-calendar-forward me-1"></i>Próximas reservaciones
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterPrevious" value="previous">
+                            <label class="btn btn-outline-secondary" for="filterPrevious">
+                                <i class="ti ti-calendar-time me-1"></i>Reservaciones anteriores
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="table-responsive">
                         <table id="reservations-table" class="table table-hover" style="width:100%">
                             <thead class="table-light">
                                 <tr>
                                     <th>Folio</th>
                                     <th>Cliente</th>
-                                    <th>Tipo de Evento</th>
+                                    <th>Motivo de Viaje</th>
                                     <th class="text-center">Fecha Inicio</th>
                                     <th class="text-center">Personas</th>
                                     <th class="text-end">Total</th>
@@ -77,43 +82,41 @@
     </div>
 </div>
 
-<!-- Cancel Reservation Modal -->
-<div class="modal fade" id="cancelReservationModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content">
-            <div class="modal-header border-0 pb-0">
-                <h6 class="modal-title fw-bold">Cancelar Reservación</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body pt-2">
-                <p>¿Estás seguro de cancelar esta reservación?</p>
-                <p class="text-muted mb-0" style="font-size: 0.85rem;">
-                    <i class="ti ti-alert-triangle me-1"></i>Esta acción cancelará todos los servicios asociados.
-                </p>
-            </div>
-            <div class="modal-footer border-0 pt-0">
-                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
-                <button class="btn btn-sm btn-danger" id="confirmCancelReservationBtn">Cancelar Reservación</button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Sophisticated cancel modal will be dynamically created by shared JavaScript utilities -->
+
+<!-- Shared cancel utilities -->
+<script src="/js/reservation-cancel-utils.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     let pendingCancelId = null;
 
-    function getStatusBadge(status) {
+    function getQuoteStatusBadge(status) {
+        if (!status) return '';
         const map = {
-            pending: { label: 'Pendiente', cls: 'bg-warning text-dark' },
+            scheduled: { label: 'Agendada', cls: 'bg-success text-white' },
+            hold: { label: 'Bloqueada', cls: 'bg-warning text-dark' },
+            requested: { label: 'Solicitada', cls: 'bg-info text-white' },
+            quoted: { label: 'Cotizada', cls: 'bg-primary text-white' },
+            rejected: { label: 'Rechazada', cls: 'bg-danger text-white' },
+        };
+        const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}" title="Estado de cotización origen">${s.label}</span>`;
+    }
+    
+    function getReservationStatusBadge(status) {
+        const map = {
+            pending: { label: 'Asignaciones pendientes', cls: 'bg-warning text-dark' },
             assigned: { label: 'Asignada', cls: 'bg-info text-white' },
             in_progress: { label: 'En Progreso', cls: 'bg-primary text-white' },
             completed: { label: 'Completada', cls: 'bg-success text-white' },
             cancelled: { label: 'Cancelada', cls: 'bg-danger text-white' },
+            confirmed: { label: 'Confirmada', cls: 'bg-success text-white' },
+            hold: { label: 'En Espera', cls: 'bg-warning text-dark' },
         };
         const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
-        return `<span class="badge ${s.cls}">${s.label}</span>`;
+        return `<span class="badge ${s.cls}" title="Estado operacional de reservación">${s.label}</span>`;
     }
 
     function formatDate(dateStr) {
@@ -135,7 +138,11 @@ document.addEventListener('DOMContentLoaded', function() {
             type: 'GET',
             headers: { 'Authorization': `Bearer ${token}` },
             data: function(d) {
-                d.statusFilter = $('#statusFilter').val();
+                // Add date filter
+                const activeFilter = document.querySelector('input[name="dateFilter"]:checked');
+                if (activeFilter) {
+                    d.dateFilter = activeFilter.value;
+                }
                 return d;
             },
             error: function(xhr) {
@@ -170,19 +177,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             },
             {
-                data: 'status',
+                data: null,
                 className: 'text-center',
-                render: function(data) { return getStatusBadge(data); }
+                responsivePriority: 1,  // High priority - always show
+                render: function(data, type, row) {
+                    const quoteBadge = getQuoteStatusBadge(row.quoteStatus);
+                    const reservationBadge = getReservationStatusBadge(row.status);
+                    return `${quoteBadge} ${reservationBadge}`;
+                }
             },
             {
                 data: 'createdAt',
                 className: 'text-center',
+                responsivePriority: 2,  // High priority
                 render: function(data) { return formatDate(data); }
             },
             {
                 data: null,
                 className: 'text-center',
                 orderable: false,
+                responsivePriority: 1,  // High priority for actions
                 render: function(data, type, row) {
                     let actions = `<a href="/dashboard/admin/bookings/${row.id}" class="btn btn-sm btn-outline-primary me-1" title="Ver detalle"><i class="ti ti-eye"></i></a>`;
                     if (row.quoteFolio) {
@@ -211,40 +225,31 @@ document.addEventListener('DOMContentLoaded', function() {
         pageLength: 10,
     });
 
-    // Status filter change
-    $('#statusFilter').on('change', function() {
-        table.ajax.reload();
-    });
-
-    // Cancel reservation
-    $(document).on('click', '.cancel-res-btn', function() {
-        pendingCancelId = $(this).data('id');
-        const modal = new bootstrap.Modal(document.getElementById('cancelReservationModal'));
-        modal.show();
-    });
-
-    document.getElementById('confirmCancelReservationBtn')?.addEventListener('click', async function() {
-        if (!pendingCancelId) return;
-        try {
-            const response = await fetch(`/api/reservations/${pendingCancelId}/cancel`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            });
-            const result = await response.json();
-            if (result.success) {
-                table.ajax.reload();
-                bootstrap.Modal.getInstance(document.getElementById('cancelReservationModal'))?.hide();
-            } else {
-                alert(result.error || 'Error al cancelar reservación');
+    // Date filter change
+    document.querySelectorAll('input[name="dateFilter"]').forEach(button => {
+        button.addEventListener('change', function() {
+            if (this.checked) {
+                // Force DataTable to recalculate columns and reload
+                table.ajax.reload(function() {
+                    // Callback after reload to ensure columns are properly rendered
+                    table.columns.adjust();
+                    // Force responsive to recalculate
+                    if (table.responsive) {
+                        table.responsive.recalc();
+                    }
+                    table.draw();
+                }, false);
             }
-        } catch (err) {
-            console.error('Cancel error:', err);
-            alert('Error al cancelar reservación');
-        }
-        pendingCancelId = null;
+        });
+    });
+
+    // Cancel reservation - using shared utilities
+    $(document).on('click', '.cancel-res-btn', function() {
+        const reservationId = $(this).data('id');
+        // Use shared utility with table reload callback
+        openReservationCancelModal(reservationId, () => {
+            table.ajax.reload();
+        });
     });
 });
 </script>

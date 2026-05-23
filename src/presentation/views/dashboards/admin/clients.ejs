@@ -1841,6 +1841,15 @@ const currentPath = '/dashboard/admin/clients';
             });
         });
 
+        // Initialize accessibility input quick buttons
+        // This is needed because the form is copied with innerHTML which doesn't run scripts
+        const accessibilityInputs = form.querySelectorAll('[id$="AccessibilityRequirements"]');
+        accessibilityInputs.forEach(input => {
+            if (window.initializeAccessibilityInput) {
+                window.initializeAccessibilityInput(input.id);
+            }
+        });
+
         console.log('Form validations initialized for edit modal');
     }
 

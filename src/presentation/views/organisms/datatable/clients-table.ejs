@@ -263,7 +263,9 @@ function initializeClientsDataTable(totalCount) {
             },
             {
                 data: 'email',
+                defaultContent: '',
                 render: function(data, type, row) {
+                    if (!data) return '';
                     return `<a href="mailto:${data}" class="text-decoration-none">${data}</a>`;
                 }
             },

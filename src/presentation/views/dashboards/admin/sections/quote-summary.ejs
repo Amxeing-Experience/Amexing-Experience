@@ -692,6 +692,107 @@
         currency: 'MXN',
         minimumFractionDigits: 2
     });
+    
+    // Segment mappings cache
+    let segmentMappings = {};
+    
+    // Fetch and cache segment mappings from API
+    async function fetchSegmentMappings() {
+        try {
+            // Try multiple sources for access token
+            let accessToken = localStorage.getItem('accessToken') || 
+                            sessionStorage.getItem('accessToken') ||
+                            window.quoteAccessToken ||
+                            getAccessToken();
+            
+            if (!accessToken) {
+                console.warn('No access token available for fetching rate mappings - will use static fallbacks only');
+                return;
+            }
+            
+            console.log('🔍 Fetching rate mappings from /api/rates/active...');
+            const ratesResponse = await fetch('/api/rates/active', {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (ratesResponse.ok) {
+                const result = await ratesResponse.json();
+                if (result.success && result.data) {
+                    console.log(`📊 Processing ${result.data.length} rates for ObjectId mapping...`);
+                    
+                    result.data.forEach(rate => {
+                        // Log the first rate to understand structure
+                        if (!window.rateStructureLogged) {
+                            console.log('📊 Rate structure example:', rate);
+                            window.rateStructureLogged = true;
+                        }
+                        
+                        // The key insight: rate.value contains the Rate ObjectId
+                        // and rate.label contains the Rate display name
+                        const rateId = rate.value;  // This is the ObjectId like "yipmABp1UZ" 
+                        const rateName = rate.label; // This is the name like "First Class"
+                        
+                        if (rateId && rateName) {
+                            segmentMappings[rateId] = rateName;
+                            
+                            // Log specific problematic IDs to confirm mapping
+                            if (['yipmABp1UZ', 'JGEgJ4gr9G', 'ox5gO8c9ok'].includes(rateId)) {
+                                console.log(`✅ Mapped rate ObjectId: ${rateId} -> ${rateName}`);
+                            }
+                        }
+                        
+                        // Also map alternative ID fields just in case
+                        const alternativeIds = [rate.id, rate.objectId].filter(Boolean);
+                        alternativeIds.forEach(altId => {
+                            if (altId && altId !== rateId && rateName) {
+                                segmentMappings[altId] = rateName;
+                            }
+                        });
+                    });
+                    
+                    console.log('✅ Rate ObjectId mappings loaded:', Object.keys(segmentMappings).length);
+                    console.log('📝 Sample mappings:', Object.entries(segmentMappings).slice(0, 5));
+                    
+                    // Verify problematic IDs are now mapped
+                    ['yipmABp1UZ', 'JGEgJ4gr9G', 'ox5gO8c9ok'].forEach(id => {
+                        if (segmentMappings[id]) {
+                            console.log(`✅ ${id} successfully mapped to: ${segmentMappings[id]}`);
+                        } else {
+                            console.log(`❌ ${id} still not found in mappings`);
+                        }
+                    });
+                } else {
+                    console.error('❌ Invalid rates API response structure:', result);
+                }
+            } else {
+                console.error('❌ Failed to fetch rates:', ratesResponse.status, ratesResponse.statusText);
+                // If API fails, ensure we still have some basic static mappings
+                if (Object.keys(segmentMappings).length === 0) {
+                    console.log('🔄 API failed, loading minimal static mappings as fallback...');
+                    segmentMappings = {
+                        'ox5gO8c9ok': 'First Class',
+                        'yipmABp1UZ': 'Premium', 
+                        'JGEgJ4gr9G': 'Green Class'
+                    };
+                }
+            }
+            
+        } catch (error) {
+            console.error('❌ Error fetching rate mappings:', error);
+            // Ensure we have some basic static mappings even if API completely fails
+            if (Object.keys(segmentMappings).length === 0) {
+                console.log('🔄 Network error, loading minimal static mappings as fallback...');
+                segmentMappings = {
+                    'ox5gO8c9ok': 'First Class',
+                    'yipmABp1UZ': 'Premium', 
+                    'JGEgJ4gr9G': 'Green Class'
+                };
+            }
+        }
+    }
 
     // Date formatter for Spanish
     function formatDateSpanish(date) {
@@ -895,6 +996,11 @@
             // Store quote data globally for payment type changes
             window.currentQuoteData = quote;
             
+            // Fetch segment mappings if not already loaded
+            if (Object.keys(segmentMappings).length === 0) {
+                await fetchSegmentMappings();
+            }
+            
             // Render services table
             renderServicesTable(quote.serviceItems, quote.numberOfPeople || 0);
 
@@ -1091,11 +1197,45 @@
                         ? `<img src="${sc.imageUrl}" class="sm-service-img" onerror="this.style.display='none'">`
                         : '';
 
+                    // Check for horario badge (transport only)
+                    let horarioBadgeHtml = '';
+                    if (isTransport(sc.type)) {
+                        // Extract and display horario badge if available - use same fields as renderSummaryTransport
+                        let flightTime = '';
+                        if (sc.time) {
+                            flightTime = sc.time;
+                        } else if (sc.selectedSchedule) {
+                            // Extract time from selectedSchedule (e.g., "13:39" or "13:39 - 14:30")
+                            const timeMatch = sc.selectedSchedule.match(/^(\d{1,2}:\d{2})/);
+                            if (timeMatch) {
+                                flightTime = timeMatch[1];
+                            }
+                        }
+                        
+                        // Round to nearest 15 minutes (matching service list)
+                        if (flightTime) {
+                            const [hours, minutes] = flightTime.split(':').map(Number);
+                            const totalMinutes = hours * 60 + minutes;
+                            const roundedMinutes = Math.round(totalMinutes / 15) * 15;
+                            const roundedHours = Math.floor(roundedMinutes / 60);
+                            const roundedMins = roundedMinutes % 60;
+                            const roundedTime = `${String(roundedHours).padStart(2, '0')}:${String(roundedMins).padStart(2, '0')}`;
+                            
+                            horarioBadgeHtml = `
+                                <div style="margin-bottom: 8px;">
+                                    <span class="sm-badge" style="background: #0dcaf015; color: #0dcaf0; font-weight: 500;">
+                                        <i class="ti ti-clock" style="font-size: 0.9rem; margin-right: 4px;"></i>Horario: ${roundedTime}
+                                    </span>
+                                </div>`;
+                        }
+                    }
+
                     html += `<div class="sm-service" style="border-left-color: ${color};">
                         ${smallThumbHtml}
                         <div class="sm-service-info">
+                            ${horarioBadgeHtml}
                             <div class="sm-service-header">
-                                <span class="sm-badge" style="background: ${color}15; color: ${color};">${label}</span>`;
+                                ${sc.type !== 'concepto' ? `<span class="sm-badge" style="background: ${color}15; color: ${color};">${label}</span>` : ''}`;
 
                     if (isTransport(sc.type)) {
                         // Transport sub-badges (type + direction)
@@ -1116,6 +1256,10 @@
                     } else if (isExperience(sc.type)) {
                         const name = sc.concept || sc.tourName || 'Experiencia';
                         html += `<span class="sm-service-name">${name}</span></div>`;
+                        
+                        // Add passenger quantities for experience services (including establishments)
+                        html += renderPassengerBadges(sc);
+                        
                         if (sc.time || sc.selectedSchedule) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.selectedSchedule || sc.time}</div>`;
                         if (sc.isPackage && sc.includedExperiences) {
                             html += renderIncludedExperiencesCards(sc.includedExperiences);
@@ -1123,6 +1267,10 @@
                     } else if (sc.type === 'tour') {
                         const tourName = sc.destinationPOI || sc.destination || sc.concept || sc.tourName || sc.serviceType || 'Tour';
                         html += `<span class="sm-service-name">${tourName}</span></div>`;
+                        
+                        // Add passenger quantities for tour services
+                        html += renderPassengerBadges(sc);
+                        
                         if (sc.time || sc.selectedSchedule) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.selectedSchedule || sc.time}</div>`;
                         if (sc.vehicleType || sc.vehicleTypeName) {
                             html += `<div class="sm-service-detail"><i class="ti ti-car"></i>${sc.vehicleTypeName || sc.vehicleType}</div>`;
@@ -1131,9 +1279,11 @@
                         if (sc.includeGreeter) html += '<div class="sm-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>';
                         
                         // Add additional vehicle information for tours
-                        if (sc.additionalVehicle || sc.additionalVehicleType || sc.additionalVehicleTypeName) {
+                        if (sc.additionalVehicle || sc.additionalVehicleType || sc.additionalVehicleTypeName || sc.hasAdditionalVehicle) {
                             const additionalVehicleName = sc.additionalVehicleTypeName || sc.additionalVehicleType || 'Vehículo adicional';
-                            html += `<div class="sm-service-detail" style="color: #0d6efd;"><i class="ti ti-plus"></i>Adicional: ${additionalVehicleName}</div>`;
+                            const additionalSegment = sc.additionalVehicleSegmentName || getSegmentDisplayName(sc.additionalVehicleSegment) || '';
+                            const segmentText = additionalSegment ? ` - ${additionalSegment}` : '';
+                            html += `<div class="sm-service-detail" style="color: #0d6efd;"><i class="ti ti-plus"></i>${additionalVehicleName}${segmentText}</div>`;
                         }
                     } else if (sc.type === 'a-disposicion') {
                         const conceptName = sc.concept || sc.tourName || sc.serviceType || 'A Disposición';
@@ -1159,10 +1309,16 @@
                     } else {
                         const conceptName = sc.concept || sc.tourName || sc.serviceType || 'Sin especificar';
                         html += `<span class="sm-service-name">${conceptName}</span></div>`;
+                        
+                        // Add passenger quantities for concepto services (matching services list logic)
+                        if (sc.type === 'concepto') {
+                            html += renderPassengerBadges(sc);
+                        }
+                        
                         if (sc.time) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.time}</div>`;
                     }
 
-                    if (sc.notes) html += `<div class="sm-notes"><i class="ti ti-notes me-1"></i>${sc.notes}</div>`;
+                    if (sc.notes) html += `<div class="sm-notes" style="white-space: pre-wrap;"><i class="ti ti-notes me-1"></i>${sc.notes}</div>`;
 
                     html += `</div>
                         <div class="sm-price">${total}${paymentHtml}</div>
@@ -1255,37 +1411,212 @@
         }
     }
 
+    // Helper function to generate passenger badges (matching services list structure)
+    function renderPassengerBadges(sc) {
+        const adultsQuantity = sc.adultsQuantity || 0;
+        const childrenQuantity = sc.childrenQuantity || 0;
+        const adultsNoAlcoholQuantity = sc.adultsNoAlcoholQuantity || 0;
+        const infantsQuantity = sc.infantsQuantity || 0;
+        
+        if (adultsQuantity > 0 || childrenQuantity > 0 || adultsNoAlcoholQuantity > 0 || infantsQuantity > 0) {
+            let badgesHtml = `<div class="sm-passengers" style="margin-bottom: 8px;">`;
+            
+            if (adultsQuantity > 0) {
+                badgesHtml += `<span class="sm-badge" style="background: #0d6efd15; color: #0d6efd;"><i class="ti ti-user" style="font-size: 0.8rem; margin-right: 4px;"></i>${adultsQuantity} adulto${adultsQuantity > 1 ? 's' : ''}</span>`;
+            }
+            
+            if (childrenQuantity > 0) {
+                badgesHtml += `<span class="sm-badge" style="background: #19875415; color: #198754;"><i class="ti ti-mood-kid" style="font-size: 0.8rem; margin-right: 4px;"></i>${childrenQuantity} niño${childrenQuantity > 1 ? 's' : ''}</span>`;
+            }
+            
+            if (adultsNoAlcoholQuantity > 0) {
+                badgesHtml += `<span class="sm-badge" style="background: #0dcaf015; color: #0dcaf0;"><i class="ti ti-glass-off" style="font-size: 0.8rem; margin-right: 4px;"></i>${adultsNoAlcoholQuantity} sin alcohol</span>`;
+            }
+            
+            if (infantsQuantity > 0) {
+                badgesHtml += `<span class="sm-badge" style="background: #fd7e1415; color: #fd7e14;"><i class="ti ti-baby-carriage" style="font-size: 0.8rem; margin-right: 4px;"></i>${infantsQuantity} infante${infantsQuantity > 1 ? 's' : ''}</span>`;
+            }
+            
+            badgesHtml += `</div>`;
+            return badgesHtml;
+        }
+        return '';
+    }
+
+    function getSegmentDisplayName(segmentId) {
+        if (!segmentId) return 'Segmento';
+        
+        console.log('🔎 Looking for rate ObjectId in summary:', segmentId);
+        console.log('📚 Available rate mappings count:', Object.keys(segmentMappings).length);
+        
+        // Try dynamic mappings from rates API
+        if (segmentMappings[segmentId]) {
+            console.log('✅ Found rate mapping:', segmentId, '->', segmentMappings[segmentId]);
+            return segmentMappings[segmentId];
+        }
+        
+        // Try case-insensitive search for the rate ObjectId
+        const lowerSegmentId = segmentId.toLowerCase();
+        const caseInsensitiveMatch = Object.entries(segmentMappings).find(([key, value]) => 
+            key.toLowerCase() === lowerSegmentId
+        );
+        
+        if (caseInsensitiveMatch) {
+            console.log('✅ Found case-insensitive rate match:', segmentId, '->', caseInsensitiveMatch[1]);
+            return caseInsensitiveMatch[1];
+        }
+        
+        // Fallback to static rate mappings based on actual data
+        const staticRateMap = {
+            // Based on test script evidence and typical rate names
+            'ox5gO8c9ok': 'First Class',
+            'yipmABp1UZ': 'Premium', 
+            'JGEgJ4gr9G': 'Green Class',
+            // Route/geographic segments (different from rates)
+            'sma-leon': 'SMA-León',
+            'sma-gto': 'SMA-Guanajuato',
+            'sma-cdmx': 'SMA-CDMX',
+            'sma-qro': 'SMA-Querétaro',
+            'local-sma': 'Local SMA',
+            'local-gto': 'Local Guanajuato',
+            'local-leon': 'Local León'
+        };
+        
+        // Try static mapping
+        if (staticRateMap[segmentId]) {
+            console.log('✅ Found in static rate mappings:', segmentId, '->', staticRateMap[segmentId]);
+            return staticRateMap[segmentId];
+        }
+        
+        // Log unmapped rate ObjectId with debug info
+        console.warn('❌ Unmapped rate ObjectId in summary:', segmentId);
+        console.log('📊 Available rate mappings sample:', Object.entries(segmentMappings).slice(0, 5));
+        console.log('🔧 Available static rate mappings:', Object.keys(staticRateMap));
+        
+        // Enhanced fallback logic: Instead of generic "Segmento", show more specific information
+        if (segmentId.length === 10 || segmentId.length === 24) {
+            // This looks like an ObjectId - try to fetch it dynamically
+            console.log('📝 Attempting to fetch segment name for unmapped ObjectId:', segmentId);
+            
+            // Return a more descriptive fallback that includes the ID for debugging
+            return `Segmento (${segmentId.substring(0, 8)}...)`;
+        }
+        
+        // If it's not an ObjectId format, it might be a readable name already
+        // Return the ID itself if it looks like a readable name  
+        const cleanedId = segmentId.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        return cleanedId;
+    }
+
     function renderSummaryTransport(sc) {
-        const origin = sc.originName || sc.concept || sc.origin || 'Origen';
-        const destination = sc.destination || 'Destino';
+        // Extract specific location from origin/destination if embedded (matching services list logic)
+        let origin = sc.originName || sc.concept || sc.origin || 'Origen';
+        let destination = sc.destination || 'Destino';
+        let specificLocation = sc.specificLocation || '';
+        
+        // If no explicit specificLocation, try to extract from origin/destination  
+        if (!specificLocation) {
+            // Check if origin has embedded specific location (format: "City, Specific Location")
+            if (origin.includes(',')) {
+                const originParts = origin.split(',');
+                if (originParts.length === 2) {
+                    origin = originParts[0].trim();
+                    specificLocation = originParts[1].trim();
+                }
+            }
+            // Check destination if origin didn't have it
+            else if (destination.includes(',')) {
+                const destParts = destination.split(',');
+                if (destParts.length === 2) {
+                    destination = destParts[0].trim();
+                    specificLocation = destParts[1].trim();
+                }
+            }
+        }
+        
         const vehicleType = sc.vehicleTypeName || sc.vehicleType || '';
         const vehicleMultiplier = sc.vehicleMultiplier || sc.quantity || 1;
-        const multiplierBadge = vehicleMultiplier > 1 ? `<span class="sm-badge" style="background: #0d6efd15; color: #0d6efd;">${vehicleMultiplier}x</span>` : '';
-
-        let html = `</div>
-            <div class="sm-route">
-                <div class="sm-route-dots">
-                    <i class="ti ti-circle-filled text-success" style="font-size: 0.45rem;"></i>
-                    <div class="sm-route-line"></div>
-                    <i class="ti ti-map-pin-filled text-danger" style="font-size: 0.6rem;"></i>
-                </div>
-                <div class="sm-route-names">
-                    <div>${origin}</div>
-                    <div>${destination}</div>
-                </div>
+        
+        // Get passenger quantities
+        const adults = sc.transportAdults || 0;
+        const children = sc.transportChildren || 0;
+        const infants = sc.transportInfants || 0;
+        
+        let html = `</div>`;
+        
+        // Add passenger badges if any
+        if (adults > 0 || children > 0 || infants > 0) {
+            html += `<div class="sm-passengers" style="margin-bottom: 8px;">`;
+            if (adults > 0) html += `<span class="sm-badge" style="background: #0d6efd15; color: #0d6efd;">${adults} adulto${adults > 1 ? 's' : ''}</span>`;
+            if (children > 0) html += `<span class="sm-badge" style="background: #19875415; color: #198754;">${children} niño${children > 1 ? 's' : ''}</span>`;
+            if (infants > 0) html += `<span class="sm-badge" style="background: #fd7e1415; color: #fd7e14;">${infants} infante${infants > 1 ? 's' : ''}</span>`;
+            html += `</div>`;
+        }
+        
+        // Route with Desde/Hacia format
+        html += `
+            <div class="sm-route-text" style="margin-bottom: 8px;">
+                <div style="margin-bottom: 4px;"><i class="ti ti-circle-filled text-success" style="font-size: 0.45rem;"></i> <span style="color: #6c757d;">Desde:</span> ${origin}</div>
+                <div><i class="ti ti-map-pin-filled text-danger" style="font-size: 0.6rem;"></i> <span style="color: #6c757d;">Hacia:</span> ${destination}</div>
             </div>`;
-        if (sc.time || sc.selectedSchedule) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.selectedSchedule || sc.time}</div>`;
-        if (vehicleType) html += `<div class="sm-service-detail"><i class="ti ti-car"></i>${multiplierBadge}${vehicleType}</div>`;
-        if (sc.flightNumber) html += `<div class="sm-service-detail"><i class="ti ti-plane"></i>${sc.flightNumber}${sc.airline ? ' · ' + sc.airline : ''}</div>`;
-        if (sc.includeGuide) html += '<div class="sm-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Guía + Chofer</div>';
+        
+        // Separate airline and flight number for airport transport
+        if (sc.transportType === 'aeropuerto') {
+            if (sc.airline) html += `<div class="sm-service-detail"><i class="ti ti-plane"></i>Aerolínea: ${sc.airline}</div>`;
+            if (sc.flightNumber) html += `<div class="sm-service-detail"><i class="ti ti-ticket"></i>Número de vuelo: ${sc.flightNumber}</div>`;
+        }
+        
+        // Time display with proper labels
+        if (sc.time || sc.selectedSchedule) {
+            const timeLabel = sc.directionType === 'arrival' ? 'Hora de llegada:' : 'Horario de salida:';
+            html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${timeLabel} ${sc.selectedSchedule || sc.time}</div>`;
+        }
+        
+        // Arrival Address (matching services list structure)
+        if (specificLocation) {
+            html += `<div class="sm-service-detail"><i class="ti ti-map-pin"></i>Dirección de llegada: ${specificLocation}</div>`;
+        }
+        
+        // Vehicle(s) section with structured display
+        if (vehicleType || sc.additionalVehicle || sc.additionalVehicleType || sc.additionalVehicleTypeName) {
+            html += `<div class="sm-vehicles" style="margin-top: 8px;">
+                <div class="sm-service-detail" style="margin-bottom: 4px;"><i class="ti ti-car"></i>Vehículo(s):</div>`;
+            
+            if (vehicleType) {
+                const segmentName = sc.categoryName || sc.vehicleSegmentName || getSegmentDisplayName(sc.category || sc.vehicleSegment) || 'Segmento';
+                html += `<div style="margin-left: 20px;"><strong>${vehicleType}</strong>${vehicleMultiplier > 1 ? ` x${vehicleMultiplier}` : ''} - ${segmentName}</div>`;
+            }
+            
+            // Enhanced additional vehicle display - check for multiple possible indicators
+            if (sc.additionalVehicle || sc.additionalVehicleType || sc.additionalVehicleTypeName || sc.hasAdditionalVehicle) {
+                const additionalVehicleName = sc.additionalVehicleTypeName || sc.additionalVehicleType || 'Vehículo adicional';
+                let additionalSegment = '';
+                
+                // Try multiple ways to get the additional vehicle segment name
+                if (sc.additionalVehicleSegmentName) {
+                    additionalSegment = sc.additionalVehicleSegmentName;
+                } else if (sc.additionalVehicleSegment) {
+                    additionalSegment = getSegmentDisplayName(sc.additionalVehicleSegment);
+                } else {
+                    // If no specific additional segment, it might be using the same segment as main vehicle
+                    const mainSegment = sc.categoryName || sc.vehicleSegmentName || getSegmentDisplayName(sc.category || sc.vehicleSegment);
+                    if (mainSegment && mainSegment !== 'Segmento') {
+                        additionalSegment = mainSegment;
+                    }
+                }
+                
+                // Only show segment if we have useful information
+                const segmentDisplay = additionalSegment && additionalSegment !== 'Segmento' ? ` - ${additionalSegment}` : '';
+                
+                html += `<div style="margin-left: 20px; margin-top: 4px;"><strong>${additionalVehicleName}</strong>${segmentDisplay}</div>`;
+            }
+            
+            html += `</div>`;
+        }
+        
+        if (sc.includeGuide) html += '<div class="sm-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Chofer</div>';
         if (sc.includeGreeter) html += '<div class="sm-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>';
         if (sc.waitingTimeHours > 0) html += `<div class="sm-service-detail" style="color: #fd7e14;"><i class="ti ti-clock"></i>Tiempo de espera: ${sc.waitingTimeHours}h</div>`;
-        
-        // Add additional vehicle information for transport
-        if (sc.additionalVehicle || sc.additionalVehicleType || sc.additionalVehicleTypeName) {
-            const additionalVehicleName = sc.additionalVehicleTypeName || sc.additionalVehicleType || 'Vehículo adicional';
-            html += `<div class="sm-service-detail" style="color: #0d6efd;"><i class="ti ti-plus"></i>Adicional: ${additionalVehicleName}</div>`;
-        }
         
         return html;
     }

@@ -629,7 +629,7 @@ class ClientsController {
             name: client.get('name'),
             firstName: client.get('firstName'),
             lastName: client.get('lastName'),
-            email: client.get('email'),
+            email: client.get('email') || '',
             phone: client.get('phone'),
             companyType: client.get('companyType'),
             active: client.get('active'),

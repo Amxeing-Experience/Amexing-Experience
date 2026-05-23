@@ -113,38 +113,8 @@ class QuoteService {
       // BEFORE updating status, handle reservation creation to ensure data integrity
       let reservationData = null;
 
-      // If status is requested (SOLICITADO), ensure reservation exists or create it
-      if (newStatus === 'requested') {
-        // Always check for reservation when status is requested
-        const resQuery = new Parse.Query('Reservation');
-        resQuery.equalTo('quotePtr', quote);
-        resQuery.equalTo('exists', true);
-        const existingReservation = await resQuery.first({ useMasterKey: true });
-
-        if (!existingReservation) {
-          logger.info('Creating reservation for requested quote status', {
-            quoteId: quote.id,
-            quoteFolio: quote.get('folio'),
-            previousStatus,
-            newStatus: 'requested',
-            reason: 'Ensuring reservation exists for requested status',
-          });
-
-          reservationData = await this.createReservationFromQuote(quote, currentUser);
-          if (!reservationData) {
-            throw new Error('Cannot maintain requested status: Failed to create reservation. Please ensure the quote has valid service items.');
-          }
-        } else {
-          logger.info('Reservation already exists for requested quote', {
-            quoteId: quote.id,
-            quoteFolio: quote.get('folio'),
-            reservationId: existingReservation.id,
-          });
-        }
-      }
-
-      // If changing to scheduled, ensure reservation exists or create it
-      if (newStatus === 'scheduled') {
+      // If changing to scheduled or hold, ensure reservation exists or create it
+      if (newStatus === 'scheduled' || newStatus === 'hold') {
         // Always check for reservation when status is scheduled
         const resQuery = new Parse.Query('Reservation');
         resQuery.equalTo('quotePtr', quote);
@@ -152,12 +122,12 @@ class QuoteService {
         const existingReservation = await resQuery.first({ useMasterKey: true });
 
         if (!existingReservation) {
-          logger.info('Creating reservation for transition to scheduled', {
+          logger.info('Creating reservation for transition to scheduled/hold status', {
             quoteId: quote.id,
             quoteFolio: quote.get('folio'),
             previousStatus,
-            newStatus: 'scheduled',
-            reason: 'Ensuring reservation exists before scheduled status',
+            newStatus,
+            reason: `Ensuring reservation exists before ${newStatus} status`,
           });
 
           try {
@@ -167,20 +137,26 @@ class QuoteService {
               throw new Error('Unable to create reservation. Please verify service items are properly configured.');
             }
 
-            // Update reservation status to confirmed for scheduled quotes
+            // Update reservation status based on quote status
             if (reservationData.reservation) {
               const { reservation } = reservationData;
-              reservation.set('status', 'confirmed');
+              if (newStatus === 'scheduled') {
+                reservation.set('status', 'confirmed');
+              } else if (newStatus === 'hold') {
+                reservation.set('status', 'hold');
+              }
               await reservation.save(null, { useMasterKey: true });
 
-              logger.info('Reservation created and confirmed for scheduled quote', {
+              const statusMessage = newStatus === 'scheduled' ? 'confirmed' : 'held';
+              logger.info(`Reservation created and ${statusMessage} for ${newStatus} quote`, {
                 reservationId: reservation.id,
                 quoteId: quote.id,
                 quoteFolio: quote.get('folio'),
+                reservationStatus: newStatus === 'scheduled' ? 'confirmed' : 'hold',
               });
             }
           } catch (error) {
-            logger.error('Failed to create reservation for scheduled quote', {
+            logger.error(`Failed to create reservation for ${newStatus} quote`, {
               error: error.message,
               quoteId: quote.id,
               quoteFolio: quote.get('folio'),
@@ -675,115 +651,10 @@ class QuoteService {
         appliedStatus: appliedUpdates.status,
         currentStatus,
         hasReservationData: !!reservationData,
-        shouldCreateReservation: appliedUpdates.status === 'requested' && currentStatus !== 'requested' && !reservationData,
       });
 
-      // If status changed to requested (SOLICITADO), auto-create Reservation
-      if (appliedUpdates.status === 'requested' && currentStatus !== 'requested' && !reservationData) {
-        logger.info('🚀 Creating reservation for quote status change to REQUESTED', {
-          quoteId: quote.id,
-          quoteFolio: quote.get('folio'),
-          serviceItems: quote.get('serviceItems'),
-          currentStatus,
-          newStatus: appliedUpdates.status,
-          userId: currentUser.id,
-          userEmail: currentUser.get('email'),
-          userRole: currentUser.get('role'),
-        });
-
-        console.log('🔍 DEBUGGING: Department manager requesting services', {
-          quoteId: quote.id,
-          currentStatus,
-          newStatus: appliedUpdates.status,
-          hasReservationData: !!reservationData,
-          userRole: currentUser.get('role'),
-          serviceItemsLength: quote.get('serviceItems')?.days?.length,
-        });
-
-        // Pre-validation: Check if quote has proper pricing before creating reservation
-        const serviceItems = quote.get('serviceItems') || {};
-        const totalAmount = serviceItems.total || 0;
-
-        logger.info('🔍 DEBUGGING: ServiceItems analysis for quote status change', {
-          quoteId: quote.id,
-          quoteFolio: quote.get('folio'),
-          serviceItemsRaw: serviceItems,
-          serviceItemsType: typeof serviceItems,
-          serviceItemsKeys: Object.keys(serviceItems),
-          totalAmount,
-          subtotal: serviceItems.subtotal,
-          currency: serviceItems.currency,
-          hasDays: !!serviceItems.days,
-          daysCount: serviceItems.days ? serviceItems.days.length : 0,
-          daysData: serviceItems.days || 'No days data',
-          userId: currentUser.id,
-          userEmail: currentUser.get('email'),
-          timestamp: new Date().toISOString(),
-        });
-
-        if (totalAmount <= 0) {
-          logger.warn('❌ Cannot create reservation for quote with zero value', {
-            quoteId: quote.id,
-            quoteFolio: quote.get('folio'),
-            totalAmount,
-            serviceItemsTotal: serviceItems.total,
-            subtotal: serviceItems.subtotal,
-            currency: serviceItems.currency,
-            serviceItemsComplete: serviceItems,
-            userId: currentUser.id,
-            contactEmail: quote.get('contactEmail'),
-            timestamp: new Date().toISOString(),
-          });
-
-          throw new Error('No se puede solicitar servicios para una cotización sin precio. Por favor, complete la cotización con servicios y precios válidos antes de solicitar.');
-        }
-
-        logger.info('✅ Quote pricing validation passed', {
-          quoteId: quote.id,
-          totalAmount,
-          currency: serviceItems.currency || 'MXN',
-        });
-
-        try {
-          reservationData = await this.createReservationFromQuote(quote, currentUser);
-
-          logger.info('✅ Reservation created successfully', {
-            quoteId: quote.id,
-            reservationData,
-            reservationId: reservationData?.id,
-            reservationFolio: reservationData?.folio,
-          });
-
-          // Send confirmation email with PDF (non-blocking)
-          this.sendRequestedConfirmationEmail(quote, currentUser, reservationData)
-            .then(() => {
-              logger.info('✅ Confirmation email sent successfully', {
-                quoteId: quote.id,
-                reservationId: reservationData?.id,
-                recipientEmail: quote.get('contactEmail'),
-              });
-            })
-            .catch((err) => {
-              logger.error('❌ Failed to send request confirmation email', {
-                error: err.message,
-                quoteId: quote.id,
-                reservationId: reservationData?.id,
-                stack: err.stack,
-              });
-            });
-        } catch (error) {
-          logger.error('❌ Failed to create reservation from quote', {
-            quoteId: quote.id,
-            quoteFolio: quote.get('folio'),
-            error: error.message,
-            stack: error.stack,
-            serviceItems: quote.get('serviceItems'),
-            userId: currentUser.id,
-          });
-          // Re-throw the error so it reaches the frontend
-          throw error;
-        }
-      }
+      // Removed automatic reservation creation for 'requested' status
+      // Quotes now remain as quotes when status changes to 'requested' (SOLICITADO)
 
       // Audit logging
       logger.info('Quote updated successfully', {
@@ -1649,8 +1520,8 @@ class QuoteService {
         return { id: existing.id, folio: existing.get('folio') };
       }
 
-      // Generate new folio format: [SERVICE_MONTH_PREFIX][YEAR][CREATION_MONTH][CONSECUTIVE]
-      // Example: ABR20260301 = Service in April 2026, created in March, first quote for April
+      // Generate new folio format: [SERVICE_MONTH_PREFIX]-[YEAR_2DIGITS][CREATION_MONTH]-[CONSECUTIVE_3DIGITS]
+      // Example: MAY-2605-001 = Service in May 2026, created in May, first quote for May
       logger.info('🏷️ Generating reservation folio', { quoteId: quote.id });
       const folio = await this.generateReservationFolio(quote);
       logger.info('✅ Folio generated successfully', { quoteId: quote.id, folio });
@@ -2431,15 +2302,32 @@ class QuoteService {
   }
 
   /**
-   * Generate reservation folio based on service date and creation date.
-   * Format: [SERVICE_MONTH_PREFIX][YEAR][CREATION_MONTH][CONSECUTIVE].
-   * Example: ABR20260301 = Service in April 2026, created in March, first quote for April.
+   * Get English 3-letter month abbreviation from date.
+   * @param {Date} date - Date object.
+   * @returns {string} 3-letter English month abbreviation.
+   * @private
+   * @example
+   * const prefix = this.getEnglishMonthPrefix(new Date('2026-05-10'));
+   * console.log(prefix); // 'MAY'
+   */
+  getEnglishMonthPrefix(date) {
+    const monthNames = [
+      'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+    ];
+    return monthNames[date.getMonth()];
+  }
+
+  /**
+   * Generate reservation folio based on service date.
+   * Format: [SERVICE_MONTH_PREFIX]-[YEAR_2DIGITS][CREATION_MONTH]-[CONSECUTIVE_3DIGITS].
+   * Example: MAY-2605-001 = Service in May 2026, created in May, first quote for May.
    * @param {Parse.Object} quote - Quote object with serviceItems.
    * @returns {Promise<string>} Generated folio.
    * @private
    * @example
    * const folio = await this.generateReservationFolio(quote);
-   * console.log(folio); // 'ABR20260301'
+   * console.log(folio); // 'MAY-2605-001'
    */
   async generateReservationFolio(quote) {
     try {
@@ -2466,11 +2354,13 @@ class QuoteService {
 
       const creationDate = new Date();
       const serviceYear = earliestServiceDate.getFullYear();
-      const serviceMonthPrefix = this.getSpanishMonthPrefix(earliestServiceDate);
+      const serviceYear2Digits = String(serviceYear).slice(-2); // Get last 2 digits of year
+      const serviceMonthPrefix = this.getEnglishMonthPrefix(earliestServiceDate); // Use English month
       const creationMonth = String(creationDate.getMonth() + 1).padStart(2, '0');
 
       // Get consecutive number for this service month/year combination
-      const prefix = `${serviceMonthPrefix}${serviceYear}${creationMonth}`;
+      // New format uses hyphens: MAY-2605-XXX
+      const prefix = `${serviceMonthPrefix}-${serviceYear2Digits}${creationMonth}`;
       const countQuery = new Parse.Query('Reservation');
       countQuery.startsWith('folio', prefix);
       countQuery.equalTo('exists', true);
@@ -2483,22 +2373,26 @@ class QuoteService {
       let nextNumber = 1;
       if (lastReservation) {
         const lastFolio = lastReservation.get('folio');
-        // Extract the last 2 digits (consecutive number)
-        const lastNumberStr = lastFolio.slice(-2);
-        const lastNumber = parseInt(lastNumberStr, 10);
-        if (!Number.isNaN(lastNumber)) {
-          nextNumber = lastNumber + 1;
+        // Extract the last 3 digits after the last hyphen (consecutive number)
+        const parts = lastFolio.split('-');
+        if (parts.length === 3) {
+          const lastNumberStr = parts[2];
+          const lastNumber = parseInt(lastNumberStr, 10);
+          if (!Number.isNaN(lastNumber)) {
+            nextNumber = lastNumber + 1;
+          }
         }
       }
 
-      const consecutiveStr = String(nextNumber).padStart(2, '0');
-      const folio = `${prefix}${consecutiveStr}`;
+      const consecutiveStr = String(nextNumber).padStart(3, '0'); // 3 digits instead of 2
+      const folio = `${prefix}-${consecutiveStr}`; // Add hyphen before consecutive
 
       logger.info('Generated reservation folio', {
         quoteId: quote.id,
         serviceDate: earliestServiceDate.toISOString().split('T')[0],
         serviceMonthPrefix,
         serviceYear,
+        serviceYear2Digits,
         creationMonth,
         consecutiveNumber: nextNumber,
         folio,
