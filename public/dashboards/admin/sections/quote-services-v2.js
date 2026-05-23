@@ -3221,6 +3221,31 @@ class ItineraryBuilder {
         }
       }
 
+      // Add guide costs if applicable
+      const includeGuide = document.getElementById('includeGuide')?.checked || false;
+      let guideCostEfectivo = 0;
+      let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
+
+      // When editing, use saved route duration if available
+      if (this.currentServiceId && this.services.has(this.currentServiceId)) {
+        const currentService = this.services.get(this.currentServiceId);
+        if (currentService.routeDuration) {
+          routeDuration = currentService.routeDuration;
+        }
+      }
+
+      if (includeGuide && routeDuration) {
+        guideCostEfectivo = this.calculateGuideTransportCost(routeDuration);
+      }
+
+      // Add greeter costs if applicable
+      const includeGreeter = document.getElementById('includeGreeter')?.checked || false;
+      let greeterCostEfectivo = 0;
+
+      if (includeGreeter && routeDuration) {
+        greeterCostEfectivo = this.calculateGreeterPrice(routeDuration);
+      }
+
       // Add additional vehicle costs if applicable
       let additionalVehicleCostEfectivo = 0;
       const additionalVehicleCheckbox = document.getElementById('additionalVehicleCheckbox');
@@ -3246,7 +3271,7 @@ class ItineraryBuilder {
         }
       }
 
-      const totalEfectivo = vehicleEfectivoTotal + waitingCostEfectivo + additionalVehicleCostEfectivo;
+      const totalEfectivo = vehicleEfectivoTotal + waitingCostEfectivo + guideCostEfectivo + greeterCostEfectivo + additionalVehicleCostEfectivo;
 
       pricesByType = {
         efectivo: totalEfectivo,
@@ -3254,14 +3279,19 @@ class ItineraryBuilder {
         tarjeta: totalEfectivo * (1 + (this.agencyRate / 100)),
       };
 
-      console.log('✅ COLLECT SERVICE DATA - Transport pricesByType fallback (includes additional vehicle):', {
+      console.log('✅ COLLECT SERVICE DATA - Transport pricesByType fallback (includes all costs):', {
         vehicleEfectivoTotal,
         waitingCostEfectivo,
+        guideCostEfectivo,
+        greeterCostEfectivo,
         additionalVehicleCostEfectivo,
         totalEfectivo,
         pricesByType,
-        source: 'transport fallback calculation with additional vehicle',
+        source: 'transport fallback calculation with all costs',
+        includeGuide,
+        includeGreeter,
         hasAdditionalVehicle: additionalVehicleCostEfectivo > 0,
+        routeDuration,
       });
     } else if (type === 'a-disposicion' && this._aDisposicionBreakdownTotals) {
       // Special handling for A Disposición - use breakdown totals that include volume discounts
