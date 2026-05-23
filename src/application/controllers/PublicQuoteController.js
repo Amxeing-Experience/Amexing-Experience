@@ -353,9 +353,21 @@ class PublicQuoteController {
       adultsQuantity: sub.adultsQuantity || 0,
       childrenQuantity: sub.childrenQuantity || 0,
       adultsNoAlcoholQuantity: sub.adultsNoAlcoholQuantity || 0,
+      infantsQuantity: sub.infantsQuantity || 0,
+      // Transport-specific passenger quantities
+      transportAdults: sub.transportAdults || 0,
+      transportChildren: sub.transportChildren || 0,
+      transportInfants: sub.transportInfants || 0,
       customPrice: sub.customPrice || null,
       priceOverride: sub.priceOverride || false,
       customPrices: sub.customPrices || null,
+      // Additional vehicle fields for transport and tour services
+      hasAdditionalVehicle: sub.hasAdditionalVehicle || false,
+      additionalVehicleId: sub.additionalVehicleId || '',
+      additionalVehicleType: sub.additionalVehicleType || '',
+      additionalVehicleTypeName: sub.additionalVehicleTypeName || '',
+      additionalVehicleSegment: sub.additionalVehicleSegment || '',
+      additionalVehicleSegmentName: sub.additionalVehicleSegmentName || '',
     };
   }
 

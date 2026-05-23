@@ -1141,5 +1141,58 @@ router.use((error, req, res, _next) => {
   });
 });
 
+/**
+ * @swagger
+ * /api/clients/{clientId}/employees/assign-manager:
+ *   post:
+ *     tags:
+ *       - Client Employee Management
+ *     summary: Assign agent as new department manager
+ *     description: |
+ *       Swaps personal data between an agent and the department manager account.
+ *       This preserves all organizational relationships while changing who occupies
+ *       the manager role.
+ *
+ *       **Access:** Requires SuperAdmin or Admin only
+ *       **Rate Limited:** 30 requests per 15 minutes
+ *       **Important:** Both users will need to log in again after swap
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Department Manager ID (the client organization ID)
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - agentId
+ *             properties:
+ *               agentId:
+ *                 type: string
+ *                 description: ID of the agent to promote to manager
+ *               preserveOldManager:
+ *                 type: boolean
+ *                 default: true
+ *                 description: Whether to create a new agent account with the old manager's data
+ *     responses:
+ *       200:
+ *         description: Manager role transferred successfully
+ *       400:
+ *         description: Invalid role or relationship
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Agent or Manager not found
+ */
+router.post('/:clientId/employees/assign-manager', validateClientAccess, writeOperationsLimiter, async (req, res) => {
+  await clientEmployeesController.assignAsManager(req, res);
+});
+
 module.exports = router;
 module.exports.validateClientAccess = validateClientAccess; // Export for testing

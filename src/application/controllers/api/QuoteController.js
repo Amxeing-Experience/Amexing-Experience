@@ -517,6 +517,7 @@ class QuoteController {
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'desc';
       const dateFilter = req.query.dateFilter || 'future';
+      const statusFilter = req.query.statusFilter || null;
 
       // Column mapping for sorting (must match frontend columns exactly)
       // Frontend columns depend on user role (admin/superadmin show client column)
@@ -534,50 +535,11 @@ class QuoteController {
 
       const sortField = columns[sortColumnIndex] || 'createdAt';
 
-      // First, get all quotes that have reservations
-      const reservationQuery = new Parse.Query('Reservation');
-      reservationQuery.equalTo('exists', true);
-      reservationQuery.select('quotePtr');
-      const reservations = await reservationQuery.find({ useMasterKey: true });
-      const quotesWithReservations = reservations
-        .filter((r) => r.get('quotePtr'))
-        .map((r) => r.get('quotePtr').id);
+      // Use the same base query logic as the counter for perfect consistency
+      const baseQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
 
-      logger.info('Filtering quotes table - excluding quotes with reservations', {
-        totalReservations: reservations.length,
-        quotesWithReservations: quotesWithReservations.length,
-        excludedQuoteIds: quotesWithReservations,
-      });
-
-      // Build base query for all active, existing records with role-based filtering
-      const baseQuery = new Parse.Query('Quote');
-      baseQuery.equalTo('active', true);
-      baseQuery.equalTo('exists', true);
-
-      // EXCLUDE quotes that have reservations
-      if (quotesWithReservations.length > 0) {
-        baseQuery.notContainedIn('objectId', quotesWithReservations);
-      }
-
-      baseQuery.include('client');
-      baseQuery.include('companyClientPtr');
-      baseQuery.include('rate');
-      baseQuery.include('createdBy');
-
-      // Apply role-based filters
-      await this.applyRoleBasedQuoteFilters(baseQuery, currentUser, req.userRole);
-
-      // Get total records count (without search filter but with role filters)
-      const totalRecordsQuery = new Parse.Query('Quote');
-      totalRecordsQuery.equalTo('active', true);
-      totalRecordsQuery.equalTo('exists', true);
-
-      // EXCLUDE quotes that have reservations from total count
-      if (quotesWithReservations.length > 0) {
-        totalRecordsQuery.notContainedIn('objectId', quotesWithReservations);
-      }
-
-      await this.applyRoleBasedQuoteFilters(totalRecordsQuery, currentUser, req.userRole);
+      // Get total records count using same base query logic
+      const totalRecordsQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
       const recordsTotal = await totalRecordsQuery.count({
         useMasterKey: true,
       });
@@ -585,35 +547,19 @@ class QuoteController {
       // Build filtered query with search
       let filteredQuery = baseQuery;
       if (searchValue) {
-        // Search in folio, client name, or contact person
-        const folioQuery = new Parse.Query('Quote');
-        folioQuery.equalTo('active', true);
-        folioQuery.equalTo('exists', true);
+        // Search in folio, client name, or contact person using same base query logic
+        const folioQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
         folioQuery.matches('folio', searchValue, 'i');
 
-        // EXCLUDE quotes with reservations from search
-        if (quotesWithReservations.length > 0) {
-          folioQuery.notContainedIn('objectId', quotesWithReservations);
-        }
-
-        await this.applyRoleBasedQuoteFilters(folioQuery, currentUser, req.userRole);
-
-        const contactQuery = new Parse.Query('Quote');
-        contactQuery.equalTo('active', true);
-        contactQuery.equalTo('exists', true);
+        const contactQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
         contactQuery.matches('contactPerson', searchValue, 'i');
-
-        // EXCLUDE quotes with reservations from search
-        if (quotesWithReservations.length > 0) {
-          contactQuery.notContainedIn('objectId', quotesWithReservations);
-        }
-
-        await this.applyRoleBasedQuoteFilters(contactQuery, currentUser, req.userRole);
 
         filteredQuery = Parse.Query.or(folioQuery, contactQuery);
         filteredQuery.include('client');
+        filteredQuery.include('companyClientPtr');
         filteredQuery.include('rate');
         filteredQuery.include('createdBy');
+        filteredQuery.include('serviceItems');
       }
 
       // Apply sorting
@@ -853,6 +799,20 @@ class QuoteController {
 
       // Update recordsFiltered count for DataTables based on date filtering
 
+      // Count statuses from the same filtered data that the DataTable will show
+      const statusCounts = {
+        quoted: 0,
+        requested: 0,
+      };
+
+      filteredData.forEach((quote) => {
+        if (quote.status === 'quoted') {
+          statusCounts.quoted++;
+        } else if (quote.status === 'requested') {
+          statusCounts.requested++;
+        }
+      });
+
       // DataTables response format
       const response = {
         success: true,
@@ -860,6 +820,7 @@ class QuoteController {
         recordsTotal,
         recordsFiltered: filteredData.length,
         data: filteredData,
+        statusCounts, // Include status counts for the UI
       };
 
       return res.json(response);
@@ -1116,9 +1077,9 @@ class QuoteController {
         }
       }
 
-      // Admin override check with proper role name
-      if (!canEdit && (roleName === 'admin' || roleName === 'superadmin')) {
-        logger.info('🔓 Controller-level admin override granted', {
+      // Role override check - allow admin, superadmin, department_manager, and client roles
+      if (!canEdit && (roleName === 'admin' || roleName === 'superadmin' || roleName === 'department_manager' || roleName === 'client')) {
+        logger.info('🔓 Controller-level role override granted', {
           userId: currentUser.id,
           roleName,
           rolePointerId: rolePointer?.id,
@@ -1169,15 +1130,31 @@ class QuoteController {
         return this.sendError(res, `Access denied: You don't have permission to edit this quote. Role: ${roleName || req.userRole || 'unknown'}`, 403);
       }
 
-      // Track the edit with versioning service
-      const editRecord = await this.versioningService.recordEdit(
-        quoteId,
-        currentUser.id,
-        updates,
-        {
-          description: updates.reason || 'Quote updated',
-        }
-      );
+      // Check if this is a status-only update to skip versioning
+      const updateKeys = Object.keys(updates);
+      const isStatusOnlyUpdate = updateKeys.length <= 2
+        && updateKeys.includes('status')
+        && updateKeys.every((key) => ['status', 'reason'].includes(key));
+
+      // Track the edit with versioning service (skip for status-only updates)
+      let editRecord = null;
+      if (!isStatusOnlyUpdate) {
+        editRecord = await this.versioningService.recordEdit(
+          quoteId,
+          currentUser.id,
+          updates,
+          {
+            description: updates.reason || 'Quote updated',
+          }
+        );
+      } else {
+        logger.info('🔄 Skipping versioning for status-only update', {
+          userId: currentUser.id,
+          quoteId,
+          updateKeys,
+          status: updates.status,
+        });
+      }
 
       // Handle clientFinalId if it's being updated
       if (updates.clientFinalId !== undefined) {
@@ -1252,10 +1229,17 @@ class QuoteController {
           req.userRole
         );
 
-        // Add edit tracking info to result
-        result.editId = editRecord.id;
-        result.version = editRecord.version;
-        result.requiresApproval = editRecord.approvalStatus === 'pending';
+        // Add edit tracking info to result (handle null editRecord for status-only updates)
+        if (editRecord) {
+          result.editId = editRecord.id;
+          result.version = editRecord.version;
+          result.requiresApproval = editRecord.approvalStatus === 'pending';
+        } else {
+          // Status-only update, no edit record
+          result.editId = null;
+          result.version = null;
+          result.requiresApproval = false;
+        }
 
         return res.json(result);
       }
@@ -3057,7 +3041,7 @@ class QuoteController {
         return; // No additional filters needed
       }
 
-      // Department managers see quotes FOR clients in their department
+      // Department managers see ALL quotes related to their department users (no ownership/collaboration restrictions)
       if (userRole === 'department_manager') {
         const userDepartmentId = currentUser.departmentId || currentUser.get('departmentId');
 
@@ -3113,148 +3097,30 @@ class QuoteController {
           }
         });
 
-        // Query 3: Quotes where department manager has collaboration access OR ownership
-        const currentUserPointer = {
-          __type: 'Pointer',
-          className: 'AmexingUser',
-          objectId: currentUser.id,
-        };
-
-        // Check for collaboration access
-        const accessQuery = new Parse.Query('QuoteAccess');
-        accessQuery.equalTo('agent', currentUserPointer);
-        accessQuery.equalTo('active', true);
-        accessQuery.equalTo('exists', true);
-        const accessRecords = await accessQuery.find({ useMasterKey: true });
-
-        // Check for ownership
-        const ownershipQuery = new Parse.Query('QuoteOwnership');
-        ownershipQuery.equalTo('owner', currentUserPointer);
-        ownershipQuery.equalTo('isCurrent', true);
-        ownershipQuery.equalTo('exists', true);
-        const ownershipRecords = await ownershipQuery.find({ useMasterKey: true });
-
-        // Separate quotes into owned vs unowned for proper access control precedence
-        const allOwnershipQuery = new Parse.Query('QuoteOwnership');
-        allOwnershipQuery.equalTo('isCurrent', true);
-        allOwnershipQuery.equalTo('exists', true);
-        allOwnershipQuery.select('quote');
-        const allOwnedQuotes = await allOwnershipQuery.find({ useMasterKey: true });
-        const ownedQuoteIds = allOwnedQuotes
-          .map((ownership) => ownership.get('quote')?.id)
-          .filter((id) => id);
-
-        console.log('=== DEPARTMENT MANAGER ACCESS CONTROL REBUILD ===');
-        console.log('Total quotes with ownership:', ownedQuoteIds.length);
-        console.log('Current user ID:', currentUser.id);
-        console.log('User owns quotes directly:', ownershipRecords.length);
-        console.log('User has collaboration access:', accessRecords.length);
-
-        // Check specific problematic quote
-        const problemQuoteId = 'pVYlMjqbfa';
-        const isProblemQuoteOwned = ownedQuoteIds.includes(problemQuoteId);
-        const userOwnsProblematicQuote = ownershipRecords.some((r) => r.get('quote')?.id === problemQuoteId);
-        const userCollaboratesOnProblematicQuote = accessRecords.some((r) => r.get('quote')?.id === problemQuoteId);
-
-        console.log('🚨 PROBLEMATIC QUOTE DEBUGGING:');
-        console.log('- Quote ID:', problemQuoteId);
-        console.log('- Is owned (has ownership record):', isProblemQuoteOwned);
-        console.log('- User owns this quote:', userOwnsProblematicQuote);
-        console.log('- User collaborates on this quote:', userCollaboratesOnProblematicQuote);
-        console.log('- Should be excluded from legacy queries:', isProblemQuoteOwned);
-        console.log('- Should only be accessible via ownership/collaboration:', isProblemQuoteOwned);
-
+        // Department managers get unrestricted access to ALL department quotes
+        // No ownership/collaboration filtering - they see everything
         const queries = [];
 
-        // PATH A: Quotes WITH established ownership - only check ownership + collaboration
-        // For owned quotes, ignore client and creator fields completely
+        // Query 1: Quotes where any department user is the client
+        const queryByClient = new Parse.Query('Quote');
+        queryByClient.containedIn('client', allUserPointers);
+        queries.push(queryByClient);
 
-        // PATH B: Quotes WITHOUT established ownership - use legacy access (client + creator)
-        // Only for quotes that have no ownership records at all
-        if (ownedQuoteIds.length > 0) {
-          // Only check unowned quotes for client assignment
-          const queryByClient = new Parse.Query('Quote');
-          queryByClient.containedIn('client', allUserPointers);
-          queryByClient.notContainedIn('objectId', ownedQuoteIds);
-          queries.push(queryByClient);
-
-          // Only check unowned quotes for creator access
-          const queryByCreator = new Parse.Query('Quote');
-          queryByCreator.containedIn('createdBy', allUserPointers);
-          queryByCreator.notContainedIn('objectId', ownedQuoteIds);
-          queries.push(queryByCreator);
-
-          logger.info('Added legacy access filters (excluding owned quotes) for department manager', {
-            userId: currentUser.id,
-            excludedOwnedQuotes: ownedQuoteIds.length,
-          });
-        } else {
-          // No ownership system in use, use standard legacy queries
-          const queryByClient = new Parse.Query('Quote');
-          queryByClient.containedIn('client', allUserPointers);
-          queries.push(queryByClient);
-
-          const queryByCreator = new Parse.Query('Quote');
-          queryByCreator.containedIn('createdBy', allUserPointers);
-          queries.push(queryByCreator);
-
-          logger.info('Added legacy access filters (no ownership system) for department manager', {
-            userId: currentUser.id,
-          });
-        }
-
-        // Add collaboration-based quotes (only for quotes WITH ownership)
-        if (accessRecords.length > 0 && ownedQuoteIds.length > 0) {
-          const collaborativeQuotePointers = accessRecords
-            .map((access) => access.get('quote'))
-            .filter((quote) => quote && quote.id && ownedQuoteIds.includes(quote.id));
-
-          if (collaborativeQuotePointers.length > 0) {
-            const queryByCollaboration = new Parse.Query('Quote');
-            queryByCollaboration.containedIn('objectId', collaborativeQuotePointers.map((q) => q.id));
-            queries.push(queryByCollaboration);
-
-            logger.info('Added collaboration filter for owned quotes (department manager)', {
-              userId: currentUser.id,
-              collaborativeOwnedQuotesCount: collaborativeQuotePointers.length,
-            });
-          }
-        }
-
-        // Add ownership-based quotes (only for quotes the user directly owns)
-        if (ownershipRecords.length > 0) {
-          const ownedQuotePointers = ownershipRecords
-            .map((ownership) => ownership.get('quote'))
-            .filter((quote) => quote && quote.id);
-
-          if (ownedQuotePointers.length > 0) {
-            const queryByOwnership = new Parse.Query('Quote');
-            queryByOwnership.containedIn('objectId', ownedQuotePointers.map((q) => q.id));
-            queries.push(queryByOwnership);
-
-            logger.info('Added ownership filter for department manager', {
-              userId: currentUser.id,
-              ownedQuotesCount: ownedQuotePointers.length,
-            });
-          }
-        }
-
-        // DEBUGGING: Show final queries before execution
-        console.log('=== FINAL QUERY DEBUG FOR DEPT MANAGER ===');
-        console.log('Total OR queries built:', queries.length);
-        console.log('Current user ID:', currentUser.id);
-        queries.forEach((q, i) => {
-          console.log(`Query ${i + 1}:`, q.className, q.toJSON ? q.toJSON() : 'complex query');
-        });
+        // Query 2: Quotes created by any department user
+        const queryByCreator = new Parse.Query('Quote');
+        queryByCreator.containedIn('createdBy', allUserPointers);
+        queries.push(queryByCreator);
 
         // Combine with OR
         // eslint-disable-next-line no-underscore-dangle
         query._orQuery(queries);
 
-        logger.info('Applied department filter to quotes query (client)', {
+        logger.info('Applied unrestricted department filter to quotes query (department_manager)', {
           userId: currentUser.id,
           departmentId: userDepartmentId,
           departmentUsersCount: departmentUsers.length,
+          orgUsersCount: orgUsers.length,
+          totalUsersInScope: allUserPointers.length,
         });
 
         return;
@@ -4276,6 +4142,43 @@ class QuoteController {
       });
       // Don't throw - this shouldn't block the main serviceItems update
     }
+  }
+
+  /**
+   * Build base quote query with all filtering logic (reservations, role-based, etc.)
+   * This ensures consistency between DataTable and counter.
+   * @param {object} currentUser - Current user object.
+   * @param {string} userRole - User role string.
+   * @param {string} statusFilter - Optional status filter.
+   * @returns {Parse.Query} Configured base query.
+   * @example
+   */
+  async buildBaseQuoteQuery(currentUser, userRole, statusFilter = null) {
+    // Build base query for all active, existing records with role-based filtering
+    const baseQuery = new Parse.Query('Quote');
+    baseQuery.equalTo('active', true);
+    baseQuery.equalTo('exists', true);
+
+    // Only show quotes in 'quoted' or 'requested' status
+    // This automatically excludes: scheduled, hold, rejected
+    if (statusFilter) {
+      // If a specific status filter is applied, use it
+      baseQuery.equalTo('status', statusFilter);
+    } else {
+      // Default: only show quoted and requested quotes
+      baseQuery.containedIn('status', ['quoted', 'requested']);
+    }
+
+    baseQuery.include('client');
+    baseQuery.include('companyClientPtr');
+    baseQuery.include('rate');
+    baseQuery.include('createdBy');
+    baseQuery.include('serviceItems');
+
+    // Apply role-based filters (handles visibility per role)
+    await this.applyRoleBasedQuoteFilters(baseQuery, currentUser, userRole);
+
+    return baseQuery;
   }
 
   /**

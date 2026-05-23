@@ -48,7 +48,7 @@
                     <strong id="infoFolio">&mdash;</strong>
                 </div>
                 <div class="col-md-3">
-                    <small class="text-muted d-block">Cotizacion</small>
+                    <small class="text-muted d-block">Cotización</small>
                     <a href="#" id="infoQuoteLink" class="fw-semibold text-decoration-none">&mdash;</a>
                 </div>
                 <div class="col-md-3">
@@ -56,7 +56,7 @@
                     <span id="infoStatus">&mdash;</span>
                 </div>
                 <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Creacion</small>
+                    <small class="text-muted d-block">Fecha Creación</small>
                     <span id="infoCreatedAt">&mdash;</span>
                 </div>
             </div>
@@ -71,7 +71,7 @@
                     <span id="infoContact">&mdash;</span>
                 </div>
                 <div class="col-md-3">
-                    <small class="text-muted d-block">Tipo de Evento</small>
+                    <small class="text-muted d-block">Motivo de viaje</small>
                     <span id="infoEventType">&mdash;</span>
                 </div>
                 <div class="col-md-3">
@@ -259,6 +259,9 @@
 }
 </style>
 
+<!-- Shared cancel utilities -->
+<script src="/js/reservation-cancel-utils.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -314,16 +317,31 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>`;
     }
 
-    function getStatusBadge(status) {
+    function getQuoteStatusBadge(status) {
+        if (!status) return '';
         const map = {
-            pending: { label: 'Pendiente', cls: 'bg-warning text-dark' },
+            scheduled: { label: 'Agendada', cls: 'bg-success text-white' },
+            hold: { label: 'Bloqueada', cls: 'bg-warning text-dark' },
+            requested: { label: 'Solicitada', cls: 'bg-info text-white' },
+            quoted: { label: 'Cotizada', cls: 'bg-primary text-white' },
+            rejected: { label: 'Rechazada', cls: 'bg-danger text-white' },
+        };
+        const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}" title="Estado de cotización origen">${s.label}</span>`;
+    }
+    
+    function getReservationStatusBadge(status) {
+        const map = {
+            pending: { label: 'Asignaciones pendientes', cls: 'bg-warning text-dark' },
             assigned: { label: 'Asignada', cls: 'bg-info text-white' },
             in_progress: { label: 'En Progreso', cls: 'bg-primary text-white' },
             completed: { label: 'Completada', cls: 'bg-success text-white' },
             cancelled: { label: 'Cancelada', cls: 'bg-danger text-white' },
+            confirmed: { label: 'Confirmada', cls: 'bg-success text-white' },
+            hold: { label: 'En Espera', cls: 'bg-warning text-dark' },
         };
         const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
-        return `<span class="badge ${s.cls}">${s.label}</span>`;
+        return `<span class="badge ${s.cls}" title="Estado operacional de reservación">${s.label}</span>`;
     }
 
     function formatDate(dateStr) {
@@ -404,9 +422,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             quoteLink.textContent = d.quoteFolio;
         }
 
-        document.getElementById('infoStatus').innerHTML = getStatusBadge(d.status);
+        const quoteBadge = getQuoteStatusBadge(d.quoteStatus);
+        const reservationBadge = getReservationStatusBadge(d.status);
+        document.getElementById('infoStatus').innerHTML = `${quoteBadge} ${reservationBadge}`;
         document.getElementById('infoCreatedAt').textContent = formatDate(d.createdAt);
-        document.getElementById('infoClient').textContent = d.client?.fullName || d.contactPerson || '—';
+        // Display company name first, then fallback to fullName or contactPerson
+        const clientDisplay = d.client?.companyName || d.client?.fullName || d.contactPerson || '—';
+        document.getElementById('infoClient').textContent = clientDisplay;
         document.getElementById('infoContact').innerHTML = `${d.contactEmail || ''}${d.contactPhone ? `<br>${d.contactPhone}` : ''}`;
         document.getElementById('infoEventType').textContent = d.eventType || '—';
         document.getElementById('infoPeople').textContent = d.numberOfPeople || '—';
@@ -446,7 +468,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         const actions = document.getElementById('headerActions');
         if (canAssign) {
             actions.innerHTML = `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservacion</button>`;
-            document.getElementById('cancelResBtn')?.addEventListener('click', cancelReservation);
+            document.getElementById('cancelResBtn')?.addEventListener('click', () => {
+                // Use shared utility with existing reservation data and loadReservation callback
+                openReservationCancelModalWithData(reservationData, loadReservation);
+            });
         } else {
             actions.innerHTML = '';
         }
@@ -584,7 +609,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        ${getStatusBadge(svc.status)}
+                        ${getReservationStatusBadge(svc.status)}
                         <span class="text-end" style="min-width: 80px;">${formatCurrency(svc.total, reservationData.currency)}</span>
                         ${canAssign && svc.status !== 'cancelled' ? `<button class="btn btn-sm ${svc.status === 'completed' ? 'btn-success' : (svc.status === 'assigned' ? 'btn-outline-success' : 'btn-outline-secondary')} status-toggle-btn" data-service-id="${svc.id}" data-current-status="${svc.status}" title="${svc.status === 'completed' ? 'Revertir a asignada' : (svc.status === 'assigned' ? 'Marcar completada' : 'Marcar asignada')}"><i class="ti ${svc.status === 'completed' ? 'ti-circle-check-filled' : (svc.status === 'assigned' ? 'ti-circle-check' : 'ti-circle')}"></i></button>` : ''}
                         ${canAssign ? `<button class="btn btn-sm btn-outline-primary assign-btn" data-service-id="${svc.id}" data-service-type="${svc.type || ''}" data-service-concept="${svc.concept || ''}" data-service-route="${svc.originName && svc.destinationName ? `${svc.originName} → ${svc.destinationName}` : (svc.originName || svc.destinationName || '')}" data-include-guide="${includeGuide}" data-include-greeter="${includeGreeter}" data-vehicle-qty="${vehicleQty}" data-driver-id="${svc.assignedDriver?.id || ''}" data-guide-id="${svc.assignedGuide?.id || ''}" data-greeter-id="${svc.assignedGreeter?.id || ''}" data-vehicle-id="${svc.assignedVehicle?.id || ''}" data-service-customer-id="${svc.assignedServiceCustomer?.id || ''}" data-vehicle-type-name="${svc.vehicleTypeName || ''}" data-extra='${JSON.stringify(svc.extraAssignments || [])}'><i class="ti ti-user-plus"></i></button>` : ''}
@@ -824,7 +849,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         html += `
         <div class="assign-field-group mb-0" id="serviceCustomerGroup">
             <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="assign-icon bg-primary-subtle text-primary"><i class="ti ti-user-star"></i></span>
+                <span class="assign-icon bg-primary-subtle text-primary"><i class="ti ti-user"></i></span>
                 <label class="form-label mb-0 fw-semibold small">Seguidor de Servicio</label>
             </div>
             <select class="form-select form-select-sm" id="assignServiceCustomer">
@@ -1094,27 +1119,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         btn.disabled = false;
     });
 
-    async function cancelReservation() {
-        if (!confirm('Estas seguro de cancelar esta reservacion? Se cancelaran todos los servicios.')) return;
-        try {
-            const response = await fetch(`/api/reservations/${reservationId}/cancel`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            });
-            const result = await response.json();
-            if (result.success) {
-                await loadReservation();
-            } else {
-                alert(result.error || 'Error al cancelar');
-            }
-        } catch (err) {
-            console.error('Cancel error:', err);
-            alert('Error al cancelar reservacion');
-        }
-    }
+    // Cancel functionality now handled by shared utilities
 
     await loadReservation();
 });

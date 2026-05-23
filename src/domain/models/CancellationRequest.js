@@ -286,6 +286,66 @@ class CancellationRequest extends BaseModel {
     this.set('cancellationFee', cancellationFee);
   }
 
+  /**
+   * Get reservation ID (for reservation cancellations).
+   * @returns {string} Reservation object ID.
+   * @example
+   * const reservationId = request.getReservationId();
+   */
+  getReservationId() {
+    return this.get('reservationId');
+  }
+
+  /**
+   * Set reservation ID (for reservation cancellations).
+   * @param {string} reservationId - Reservation object ID.
+   * @example
+   * request.setReservationId('abc123');
+   */
+  setReservationId(reservationId) {
+    this.set('reservationId', reservationId);
+  }
+
+  /**
+   * Get reservation folio (for reservation cancellations).
+   * @returns {string} Reservation folio.
+   * @example
+   * const reservationFolio = request.getReservationFolio();
+   */
+  getReservationFolio() {
+    return this.get('reservationFolio');
+  }
+
+  /**
+   * Set reservation folio (for reservation cancellations).
+   * @param {string} reservationFolio - Reservation folio.
+   * @example
+   * request.setReservationFolio('RES-2024-001');
+   */
+  setReservationFolio(reservationFolio) {
+    this.set('reservationFolio', reservationFolio);
+  }
+
+  /**
+   * Get cancellation type (quote or reservation).
+   * @returns {string} Cancellation type.
+   * @example
+   * const type = request.getCancellationType();
+   */
+  getCancellationType() {
+    return this.get('cancellationType') || 'quote';
+  }
+
+  /**
+   * Set cancellation type.
+   * @param {string} cancellationType - Type of cancellation (quote or reservation).
+   * @example
+   * request.setCancellationType('reservation');
+   */
+  setCancellationType(cancellationType) {
+    this.set('cancellationType', cancellationType);
+  }
+
   // ================
   // VALIDATION
   // ================
@@ -333,6 +393,13 @@ class CancellationRequest extends BaseModel {
     const priority = attrs.priority || this.get('priority');
     if (priority && !validPriorities.includes(priority)) {
       return new Parse.Error(Parse.Error.VALIDATION_ERROR, `Invalid priority: ${priority}`);
+    }
+
+    // Valid cancellation types
+    const validTypes = ['quote', 'reservation'];
+    const cancellationType = attrs.cancellationType || this.get('cancellationType');
+    if (cancellationType && !validTypes.includes(cancellationType)) {
+      return new Parse.Error(Parse.Error.VALIDATION_ERROR, `Invalid cancellation type: ${cancellationType}`);
     }
 
     return undefined;

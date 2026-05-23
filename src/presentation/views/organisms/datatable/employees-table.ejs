@@ -359,6 +359,20 @@ function initializeEmployeesDataTable() {
                                 </button>`;
                     }
 
+                    /* Assign as Manager button - only for agents (not current user or managers) */
+                    const userRole = '<%= dtUserRole %>';
+                    if (roleName === 'client' && !isCurrentUser && ['superadmin', 'admin'].includes(userRole)) {
+                        actions += `<button type="button"
+                                    class="btn btn-success btn-assign-manager"
+                                    data-agent-id="${row.id}"
+                                    data-agent-name="${employeeName}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Asignar como Manager">
+                                    <i class="ti ti-crown"></i>
+                                </button>`;
+                    }
+
                     /* Toggle status button - hide for current user and department_manager */
                     if (!isCurrentUser && roleName !== 'department_manager') {
                         const statusIcon = row.active ? 'ti-user-off' : 'ti-user-check';
@@ -635,6 +649,163 @@ async function executeToggleEmployeeStatus(employeeId, newStatus) {
 }
 
 /**
+ * Assign agent as department manager
+ * @param {string} agentId - Agent ID to promote
+ * @param {string} agentName - Agent name for confirmation
+ */
+function assignAsManager(agentId, agentName) {
+    // Create confirmation modal
+    const modalHtml = `
+        <div class="modal fade" id="confirmAssignManagerModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="ti ti-crown text-warning me-2"></i>
+                            Asignar Nuevo Manager
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>¿Estás seguro que deseas asignar a <strong>${agentName}</strong> como el nuevo Manager?</p>
+                        
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">¿Qué sucederá?</h6>
+                            <ul class="mb-0">
+                                <li>${agentName} podrá acceder con sus credenciales actuales</li>
+                                <li>Tendrá todos los permisos de Manager</li>
+                                <li>El Manager actual se convertirá en Agente regular</li>
+                                <li>Todos los agentes seguirán vinculados a la empresa</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <small><strong>Nota:</strong> El Manager actual será reemplazado completamente por el nuevo Manager. Esta acción no se puede deshacer.</small>
+                        </div>
+                        
+                        <p class="text-warning mt-3 mb-0">
+                            <i class="ti ti-alert-circle"></i>
+                            Ambos usuarios deberán volver a iniciar sesión.
+                        </p>
+                        
+                        <!-- Loading overlay (hidden by default) -->
+                        <div id="assignManagerLoadingOverlay" class="d-none">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Procesando...</span>
+                                </div>
+                                <p class="mt-2 mb-0">Asignando nuevo Manager...</p>
+                                <small class="text-muted">Por favor espera, esto puede tomar unos segundos</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-success" id="confirmAssignBtn">
+                            <i class="ti ti-crown me-1"></i>
+                            Confirmar Asignación
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('confirmAssignManagerModal');
+    if (existingModal) existingModal.remove();
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('confirmAssignManagerModal'));
+    modal.show();
+
+    // Handle confirmation
+    document.getElementById('confirmAssignBtn').addEventListener('click', async function() {
+        // Show loading state
+        const btn = this;
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Procesando...';
+        
+        // Disable cancel button too
+        const cancelBtn = document.querySelector('#confirmAssignManagerModal .btn-secondary');
+        if (cancelBtn) cancelBtn.disabled = true;
+        
+        // Disable close button
+        const closeBtn = document.querySelector('#confirmAssignManagerModal .btn-close');
+        if (closeBtn) closeBtn.disabled = true;
+        
+        // Execute assignment
+        await executeAssignManager(agentId, agentName);
+        
+        // Close modal after completion
+        modal.hide();
+    });
+}
+
+/**
+ * Execute assign manager API call
+ */
+async function executeAssignManager(agentId, agentName) {
+    try {
+        // Use simplified approach - don't preserve old manager
+        const preserveOldManager = false;
+        
+        // Get access token
+        const getAccessToken = () => {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        };
+        
+        const token = getAccessToken();
+        const headers = {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+        
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(`<%= dtApiEndpoint.replace('/employees', '/employees/assign-manager') %>`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: headers,
+            body: JSON.stringify({ 
+                agentId: agentId,
+                preserveOldManager: preserveOldManager
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Error al asignar el nuevo manager');
+        }
+
+        showSuccessAlert(`${agentName} ha sido asignado como el nuevo Manager exitosamente. Ambos usuarios necesitan volver a iniciar sesión.`);
+        
+        // Reload table data after a short delay
+        setTimeout(() => {
+            window.employeesTable.ajax.reload(null, false);
+        }, 1500);
+
+    } catch (error) {
+        console.error('Error assigning manager:', error);
+        showErrorAlert(error.message || 'Error al asignar el nuevo manager. Por favor, intenta nuevamente.');
+    }
+}
+
+/**
  * Delete (soft delete) employee
  * @param {string} employeeId - Employee ID
  * @param {string} employeeName - Employee name for confirmation
@@ -760,6 +931,14 @@ function setupEventDelegation() {
             const clientId = target.getAttribute('data-client-id');
             const clientData = JSON.parse(decodeURIComponent(target.getAttribute('data-client-data')));
             editClient(clientId, clientData);
+            return;
+        }
+
+        // Assign as Manager button
+        if (target.classList.contains('btn-assign-manager')) {
+            const agentId = target.getAttribute('data-agent-id');
+            const agentName = target.getAttribute('data-agent-name');
+            assignAsManager(agentId, agentName);
             return;
         }
 

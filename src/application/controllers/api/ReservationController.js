@@ -149,6 +149,9 @@ class ReservationController {
       // Status filter
       const statusFilter = req.query.statusFilter || '';
 
+      // Date filter
+      const dateFilter = req.query.dateFilter || 'future'; // Default to future
+
       // Get role-based filter pointers (null = no filter for admins)
       const roleFilterPointers = await ReservationController.getRoleFilterPointers(req);
 
@@ -163,6 +166,17 @@ class ReservationController {
         query.containedIn('clientPtr', roleFilterPointers);
       }
 
+      // Apply date filter based on startDate
+      if (dateFilter === 'future') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Start of today
+        query.greaterThanOrEqualTo('startDate', today);
+      } else if (dateFilter === 'previous') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Start of today
+        query.lessThan('startDate', today);
+      }
+
       // Total count (without search/status filters, but with role filter)
       const totalQuery = new Parse.Query('Reservation');
       totalQuery.equalTo('active', true);
@@ -170,6 +184,18 @@ class ReservationController {
       if (roleFilterPointers) {
         totalQuery.containedIn('clientPtr', roleFilterPointers);
       }
+
+      // Apply date filter to total count
+      if (dateFilter === 'future') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        totalQuery.greaterThanOrEqualTo('startDate', today);
+      } else if (dateFilter === 'previous') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        totalQuery.lessThan('startDate', today);
+      }
+
       const recordsTotal = await totalQuery.count({ useMasterKey: true });
 
       // Apply search filter
@@ -200,6 +226,23 @@ class ReservationController {
           contactQuery.containedIn('clientPtr', roleFilterPointers);
           eventQuery.containedIn('clientPtr', roleFilterPointers);
           emailQuery.containedIn('clientPtr', roleFilterPointers);
+        }
+
+        // Apply date filter to search queries
+        if (dateFilter === 'future') {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          folioQuery.greaterThanOrEqualTo('startDate', today);
+          contactQuery.greaterThanOrEqualTo('startDate', today);
+          eventQuery.greaterThanOrEqualTo('startDate', today);
+          emailQuery.greaterThanOrEqualTo('startDate', today);
+        } else if (dateFilter === 'previous') {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          folioQuery.lessThan('startDate', today);
+          contactQuery.lessThan('startDate', today);
+          eventQuery.lessThan('startDate', today);
+          emailQuery.lessThan('startDate', today);
         }
 
         const compoundQuery = Parse.Query.or(folioQuery, contactQuery, eventQuery, emailQuery);
@@ -250,6 +293,18 @@ class ReservationController {
       if (statusFilter) {
         countQuery.equalTo('status', statusFilter);
       }
+
+      // Apply date filter to count query
+      if (dateFilter === 'future') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        countQuery.greaterThanOrEqualTo('startDate', today);
+      } else if (dateFilter === 'previous') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        countQuery.lessThan('startDate', today);
+      }
+
       const recordsFiltered = await countQuery.count({ useMasterKey: true });
 
       // Sort
@@ -445,6 +500,7 @@ class ReservationController {
           folio: reservation.get('folio'),
           quoteFolio: reservation.get('quotePtr')?.get('folio') || '',
           quoteId: reservation.get('quotePtr')?.id || '',
+          quoteStatus: reservation.get('quotePtr')?.get('status') || '',
           status: reservation.get('status'),
           startDate: reservation.get('startDate'),
           endDate: reservation.get('endDate'),
@@ -462,6 +518,7 @@ class ReservationController {
           client: client ? {
             id: client.id,
             fullName: client.get('fullName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+            companyName: client.get('contextualData')?.companyName || null,
             email: client.get('email'),
             phone: client.get('phone'),
           } : null,
@@ -673,7 +730,7 @@ class ReservationController {
       const { id, serviceId } = req.params;
       const { status } = req.body;
 
-      const validStatuses = ['pending', 'assigned', 'completed', 'cancelled'];
+      const validStatuses = ['pending', 'assigned', 'in_progress', 'completed', 'cancelled', 'confirmed', 'hold'];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ success: false, error: `Estado inválido. Debe ser: ${validStatuses.join(', ')}` });
       }
@@ -1171,15 +1228,33 @@ class ReservationController {
    */
   static formatReservationRow(reservation, serviceCount) {
     const client = reservation.get('clientPtr');
-    const clientName = client
-      ? (client.get('fullName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim())
-      : (reservation.get('contactPerson') || 'N/A');
+
+    // Try to get company name from contextualData first, then fallback to name fields
+    let clientName = 'N/A';
+    if (client) {
+      const contextualData = client.get('contextualData');
+      if (contextualData && contextualData.companyName) {
+        clientName = contextualData.companyName;
+      } else {
+        clientName = client.get('fullName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim();
+      }
+    }
+
+    // Final fallback to contactPerson if no client data
+    if (clientName === 'N/A' || !clientName) {
+      clientName = reservation.get('contactPerson') || 'N/A';
+    }
+
+    const status = reservation.get('status');
+    const quoteStatus = reservation.get('quotePtr')?.get('status') || '';
+    console.log(`🔍 [API] Reservation ${reservation.get('folio')} - Quote status: ${quoteStatus}, Reservation status: ${status}`);
 
     return {
       id: reservation.id,
       folio: reservation.get('folio'),
       quoteId: reservation.get('quotePtr')?.id || '',
       quoteFolio: reservation.get('quotePtr')?.get('folio') || '',
+      quoteStatus,
       clientName,
       eventType: reservation.get('eventType') || '',
       startDate: reservation.get('startDate'),
@@ -1188,7 +1263,7 @@ class ReservationController {
       currency: reservation.get('currency'),
       totalServices: serviceCount.totalCount,
       assignedServices: serviceCount.assignedCount,
-      status: reservation.get('status'),
+      status,
       createdAt: reservation.createdAt,
     };
   }
@@ -1208,24 +1283,27 @@ class ReservationController {
 
     if (services.length === 0) return;
 
+    const currentStatus = reservation.get('status');
     const statuses = services.map((s) => s.get('status'));
     const allCompleted = statuses.every((s) => s === 'completed' || s === 'cancelled');
     const allAssigned = statuses.every((s) => s === 'assigned' || s === 'completed' || s === 'cancelled');
     const someInProgress = statuses.some((s) => s === 'in_progress');
 
-    let newStatus = reservation.get('status');
+    let newStatus = currentStatus;
 
+    // Preserve 'confirmed' and 'hold' statuses unless services are completed
     if (allCompleted) {
       newStatus = 'completed';
     } else if (someInProgress) {
       newStatus = 'in_progress';
-    } else if (allAssigned) {
+    } else if (allAssigned && !['confirmed', 'hold'].includes(currentStatus)) {
       newStatus = 'assigned';
-    } else {
+    } else if (!allAssigned && !['confirmed', 'hold'].includes(currentStatus)) {
       newStatus = 'pending';
     }
+    // For 'confirmed' and 'hold', only change to 'in_progress' or 'completed'
 
-    if (newStatus !== reservation.get('status')) {
+    if (newStatus !== currentStatus) {
       reservation.set('status', newStatus);
       await reservation.save(null, { useMasterKey: true });
     }

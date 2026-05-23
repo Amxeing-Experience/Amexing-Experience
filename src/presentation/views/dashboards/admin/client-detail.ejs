@@ -2650,6 +2650,9 @@ function setupExperienceFilters() {
                 // Trigger validation
                 validateEmployeePasswordRequirements(newPassword);
                 
+                // Trigger form validation to enable/disable submit button
+                validateForm();
+                
                 // Visual feedback
                 const originalIcon = employeeGenerateIcon.className;
                 employeeGenerateIcon.className = 'ti ti-check';

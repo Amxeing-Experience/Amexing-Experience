@@ -89,44 +89,76 @@ const initialValue = typeof value !== 'undefined' ? value : '';
 
 <script>
 (function() {
-    // Enhanced accessibility input with quick selection buttons
-    const accessibilityInput = document.getElementById('<%= inputId %>');
-    const quickButtons = document.querySelectorAll('#<%= inputId %>-quick-buttons .accessibility-quick-btn');
-    
-    if (accessibilityInput) {
-        // Handle quick selection buttons
-        quickButtons.forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                const value = this.getAttribute('data-value');
-                const currentValue = accessibilityInput.value.trim();
-                
-                // Toggle the value in the textarea
-                if (currentValue.includes(value)) {
-                    // Remove the value
-                    const lines = currentValue.split('\n').filter(line => line.trim() !== value);
-                    accessibilityInput.value = lines.join('\n');
-                    this.classList.remove('btn-primary');
-                    this.classList.add('btn-outline-secondary');
+    // Set up global event delegation only once
+    if (!window._accessibilityInputDelegationSetup) {
+        window._accessibilityInputDelegationSetup = true;
+        
+        // Global click handler for all accessibility quick buttons
+        document.addEventListener('click', function(e) {
+            // Check if clicked element or its parent is an accessibility quick button
+            const button = e.target.closest('.accessibility-quick-btn');
+            if (!button) return;
+            
+            e.preventDefault();
+            
+            // Find the associated textarea
+            const container = button.closest('[id$="-quick-buttons"]');
+            if (!container) return;
+            
+            const inputId = container.id.replace('-quick-buttons', '');
+            const accessibilityInput = document.getElementById(inputId);
+            if (!accessibilityInput) return;
+            
+            const value = button.getAttribute('data-value');
+            const currentValue = accessibilityInput.value.trim();
+            
+            // Toggle the value in the textarea
+            if (currentValue.includes(value)) {
+                // Remove the value
+                const lines = currentValue.split('\n').filter(line => line.trim() !== value);
+                accessibilityInput.value = lines.join('\n');
+                button.classList.remove('btn-primary');
+                button.classList.add('btn-outline-secondary');
+            } else {
+                // Add the value
+                if (currentValue) {
+                    accessibilityInput.value = currentValue + '\n' + value;
                 } else {
-                    // Add the value
-                    if (currentValue) {
-                        accessibilityInput.value = currentValue + '\n' + value;
-                    } else {
-                        accessibilityInput.value = value;
-                    }
-                    this.classList.remove('btn-outline-secondary');
-                    this.classList.add('btn-primary');
+                    accessibilityInput.value = value;
                 }
-                
-                // Trigger input event for validation
-                accessibilityInput.dispatchEvent(new Event('input'));
+                button.classList.remove('btn-outline-secondary');
+                button.classList.add('btn-primary');
+            }
+            
+            // Trigger input event for validation
+            accessibilityInput.dispatchEvent(new Event('input'));
+        });
+        
+        // Re-initialize when modals are shown (for dynamic content)
+        document.addEventListener('shown.bs.modal', function(e) {
+            // Find all accessibility inputs in the modal and initialize them
+            const modal = e.target;
+            const accessibilityInputs = modal.querySelectorAll('[id$="AccessibilityRequirements"]');
+            
+            accessibilityInputs.forEach(input => {
+                window.initializeAccessibilityInput(input.id);
             });
         });
+    }
+    
+    // Global function to initialize accessibility input functionality
+    window.initializeAccessibilityInput = function(inputId) {
+        const accessibilityInput = document.getElementById(inputId);
+        if (!accessibilityInput) return;
+        
+        const container = document.getElementById(inputId + '-quick-buttons');
+        if (!container) return;
         
         // Update button states based on textarea content
         function updateButtonStates() {
             const currentValue = accessibilityInput.value;
+            const quickButtons = container.querySelectorAll('.accessibility-quick-btn');
+            
             quickButtons.forEach(button => {
                 const value = button.getAttribute('data-value');
                 if (currentValue.includes(value)) {
@@ -139,40 +171,55 @@ const initialValue = typeof value !== 'undefined' ? value : '';
             });
         }
         
-        // Validation and button state update on input
-        accessibilityInput.addEventListener('input', function() {
-            updateButtonStates();
+        // Set up input event listener
+        if (!accessibilityInput.hasAttribute('data-accessibility-initialized')) {
+            accessibilityInput.setAttribute('data-accessibility-initialized', 'true');
             
-            if (this.value.trim()) {
-                this.classList.remove('is-invalid');
-                this.classList.add('is-valid');
-            } else {
-                this.classList.remove('is-valid');
-                if (<%= isRequired ? 'true' : 'false' %>) {
-                    this.classList.add('is-invalid');
-                } else {
+            // Validation and button state update on input
+            accessibilityInput.addEventListener('input', function() {
+                updateButtonStates();
+                
+                if (this.value.trim()) {
                     this.classList.remove('is-invalid');
+                    this.classList.add('is-valid');
+                } else {
+                    this.classList.remove('is-valid');
+                    if (<%= isRequired ? 'true' : 'false' %>) {
+                        this.classList.add('is-invalid');
+                    } else {
+                        this.classList.remove('is-invalid');
+                    }
                 }
-            }
-        });
-        
-        // Clean up on blur
-        accessibilityInput.addEventListener('blur', function() {
-            // Remove duplicate lines and empty lines
-            const lines = this.value.split('\n')
-                .map(line => line.trim())
-                .filter(line => line.length > 0);
+            });
             
-            // Remove duplicates
-            const unique = [...new Set(lines)];
-            this.value = unique.join('\n');
-            updateButtonStates();
-        });
+            // Clean up on blur
+            accessibilityInput.addEventListener('blur', function() {
+                // Remove duplicate lines and empty lines
+                const lines = this.value.split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0);
+                
+                // Remove duplicates
+                const unique = [...new Set(lines)];
+                this.value = unique.join('\n');
+                updateButtonStates();
+            });
+        }
         
         // Initial button state update
         if (accessibilityInput.value) {
             updateButtonStates();
         }
+    };
+    
+    // Initialize this specific instance when DOM is ready or immediately if already ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            window.initializeAccessibilityInput('<%= inputId %>');
+        });
+    } else {
+        // DOM is already ready
+        window.initializeAccessibilityInput('<%= inputId %>');
     }
 })();
 </script>
