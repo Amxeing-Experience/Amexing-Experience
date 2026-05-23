@@ -18,8 +18,8 @@ class ItineraryBuilder {
     this.days = [];
     this.services = new Map();
 
-    // Development mode detection
-    this.isDevelopmentMode = window.location.hostname === 'localhost' && window.location.port === '1337';
+    // Development mode detection (temporarily including prod-local for debugging)
+    this.isDevelopmentMode = window.location.hostname === 'localhost' && (window.location.port === '1337' || window.location.port === '1338');
     // Debug function for checkbox state
     window.debugTourOverride = () => {
       const checkbox = document.getElementById('tourOverridePrices');
@@ -3184,16 +3184,18 @@ class ItineraryBuilder {
         });
       }
     } else if (type === 'transport' && this._transportBreakdownTotals) {
-      // Use breakdown totals that already include vehicle + waiting time with surcharges
+      // Use breakdown totals that already include vehicle + waiting time + additional vehicle with surcharges
       pricesByType = {
         efectivo: this._transportBreakdownTotals.efectivo,
         transferencia: this._transportBreakdownTotals.transferencia,
         tarjeta: this._transportBreakdownTotals.tarjeta,
       };
 
-      console.log('✅ COLLECT SERVICE DATA - Transport pricesByType from breakdown totals (includes waiting time):', {
+      console.log('✅ COLLECT SERVICE DATA - Transport pricesByType from breakdown totals (includes additional vehicle):', {
         pricesByType,
         source: 'transport breakdown totals',
+        _transportBreakdownTotalsExists: !!this._transportBreakdownTotals,
+        _transportBreakdownTotalsData: this._transportBreakdownTotals,
       });
     } else if (type === 'transport') {
       // Fallback for transport when breakdown totals aren't available (e.g., editing existing service)
@@ -3219,7 +3221,32 @@ class ItineraryBuilder {
         }
       }
 
-      const totalEfectivo = vehicleEfectivoTotal + waitingCostEfectivo;
+      // Add additional vehicle costs if applicable
+      let additionalVehicleCostEfectivo = 0;
+      const additionalVehicleCheckbox = document.getElementById('additionalVehicleCheckbox');
+      const additionalVehicleSelect = document.getElementById('additionalVehicleSelect');
+      
+      if (additionalVehicleCheckbox?.checked && additionalVehicleSelect?.value) {
+        const additionalVehicleId = additionalVehicleSelect.value;
+        const additionalSegmentSelect = document.getElementById('additionalSegmentSelect');
+        const additionalSegmentId = additionalSegmentSelect?.value;
+        const mainSegmentId = document.getElementById('transportCategory')?.value;
+        
+        // Get additional vehicle price based on segment (same logic as dev breakdown)
+        if (additionalSegmentId === mainSegmentId && this.transportPriceData?.vehicles) {
+          const vehicle = this.transportPriceData.vehicles.find((v) => v.vehicleTypeId === additionalVehicleId);
+          if (vehicle) {
+            additionalVehicleCostEfectivo = vehicle.finalPrice || vehicle.basePrice || 0;
+          }
+        } else if (this.additionalTransportPriceData?.vehicles) {
+          const vehicle = this.additionalTransportPriceData.vehicles.find((v) => v.vehicleTypeId === additionalVehicleId);
+          if (vehicle) {
+            additionalVehicleCostEfectivo = vehicle.finalPrice || vehicle.basePrice || 0;
+          }
+        }
+      }
+
+      const totalEfectivo = vehicleEfectivoTotal + waitingCostEfectivo + additionalVehicleCostEfectivo;
 
       pricesByType = {
         efectivo: totalEfectivo,
@@ -3227,12 +3254,14 @@ class ItineraryBuilder {
         tarjeta: totalEfectivo * (1 + (this.agencyRate / 100)),
       };
 
-      console.log('✅ COLLECT SERVICE DATA - Transport pricesByType fallback (includes waiting time):', {
+      console.log('✅ COLLECT SERVICE DATA - Transport pricesByType fallback (includes additional vehicle):', {
         vehicleEfectivoTotal,
         waitingCostEfectivo,
+        additionalVehicleCostEfectivo,
         totalEfectivo,
         pricesByType,
-        source: 'transport fallback calculation',
+        source: 'transport fallback calculation with additional vehicle',
+        hasAdditionalVehicle: additionalVehicleCostEfectivo > 0,
       });
     } else if (type === 'a-disposicion' && this._aDisposicionBreakdownTotals) {
       // Special handling for A Disposición - use breakdown totals that include volume discounts
@@ -6687,8 +6716,8 @@ class ItineraryBuilder {
    * @example
    */
   updateDevPaymentPrices() {
-    // Only run in development mode
-    const isDev = window.location.hostname === 'localhost' && window.location.port === '1337';
+    // Only run in development mode (including prod-local for debugging)
+    const isDev = window.location.hostname === 'localhost' && (window.location.port === '1337' || window.location.port === '1338');
     if (!isDev) {
       console.log('💰 Dev Payment Prices: Not in development mode');
       return;
@@ -6947,8 +6976,8 @@ class ItineraryBuilder {
   updateDevPaymentBreakdown() {
     console.log('📊 updateDevPaymentBreakdown called');
 
-    // Only run in development mode
-    const isDev = window.location.hostname === 'localhost' && window.location.port === '1337';
+    // Only run in development mode (including prod-local for debugging)
+    const isDev = window.location.hostname === 'localhost' && (window.location.port === '1337' || window.location.port === '1338');
     console.log('📊 Development mode check:', { isDev, hostname: window.location.hostname, port: window.location.port });
 
     if (!isDev) {
@@ -8176,10 +8205,37 @@ class ItineraryBuilder {
   getServiceDisplayPrice(service) {
     const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
     
+    // DEBUG: Enhanced logging for transport services to debug price discrepancy
+    if (service.type === 'transport') {
+      console.log(`🚛 TRANSPORT SERVICE DISPLAY PRICE DEBUG:`, {
+        serviceId: service.id,
+        concept: service.concept,
+        paymentType,
+        servicePrice: service.price,
+        baseVehiclePrice: service.baseVehiclePrice,
+        quantity: service.quantity,
+        hasPricesByType: !!(service.pricesByType && typeof service.pricesByType === 'object'),
+        pricesByType: service.pricesByType,
+        pricesByTypeKeys: service.pricesByType ? Object.keys(service.pricesByType) : 'none',
+        requestedPaymentTypePrice: service.pricesByType?.[paymentType],
+      });
+    }
+    
     // Use pricesByType if available (critical for walking tours and all services with payment type pricing)
     if (service.pricesByType && typeof service.pricesByType === 'object') {
       const price = service.pricesByType[paymentType];
       if (price !== undefined) {
+        // Enhanced logging for transport services
+        if (service.type === 'transport') {
+          console.log(`🚛 Transport service using pricesByType (${paymentType}):`, {
+            serviceId: service.id,
+            concept: service.concept,
+            paymentType,
+            price,
+            allPricesByType: service.pricesByType,
+            fallbackPrice: service.price,
+          });
+        }
         // Special logging for walking tours to ensure they work correctly
         if (service.isWalkingTour) {
           console.log(`🚶‍♂️ Walking tour display price using pricesByType (${paymentType}):`, {
@@ -8195,6 +8251,17 @@ class ItineraryBuilder {
     }
     
     // Fallback to service.price (should not happen for walking tours if properly implemented)
+    if (service.type === 'transport') {
+      console.warn(`⚠️ TRANSPORT SERVICE falling back to service.price - pricesByType not available:`, {
+        serviceId: service.id,
+        concept: service.concept,
+        paymentType,
+        servicePrice: service.price,
+        baseVehiclePrice: service.baseVehiclePrice,
+        pricesByType: service.pricesByType,
+        pricesByTypeType: typeof service.pricesByType,
+      });
+    }
     if (service.isWalkingTour) {
       console.warn(`⚠️ Walking tour falling back to service.price - pricesByType not available:`, {
         serviceId: service.id,
