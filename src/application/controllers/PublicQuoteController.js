@@ -257,6 +257,8 @@ class PublicQuoteController {
       subtotal: serviceItems.subtotal || 0,
       iva: serviceItems.iva || 0,
       total: serviceItems.total || 0,
+      paymentType: serviceItems.paymentType || 'efectivo',
+      currency: serviceItems.currency || 'MXN',
     };
   }
 
@@ -271,7 +273,10 @@ class PublicQuoteController {
     const subconcepts = await Promise.all((day.subconcepts || []).map((sub) => this.formatSubconcept(sub)));
 
     return {
+      id: day.id || day['_id'] || '', // eslint-disable-line dot-notation
       dayNumber: day.dayNumber || 0,
+      title: day.title || day.dayTitle || '',
+      dayTitle: day.dayTitle || day.title || '',
       date: day.date || '',
       city: day.city || '',
       description: day.description || '',
@@ -368,6 +373,24 @@ class PublicQuoteController {
       additionalVehicleTypeName: sub.additionalVehicleTypeName || '',
       additionalVehicleSegment: sub.additionalVehicleSegment || '',
       additionalVehicleSegmentName: sub.additionalVehicleSegmentName || '',
+      // Additional missing fields for unified renderer compatibility
+      duration: sub.duration || null,
+      isWalkingTour: sub.isWalkingTour || false,
+      pricesByType: sub.pricesByType || null,
+      includeInTotal: sub.includeInTotal !== false,
+      category: sub.category || '',
+      tripType: sub.tripType || '',
+      specificLocation: sub.specificLocation || '',
+      flightDepartureTimeSuggested: sub.flightDepartureTimeSuggested || '',
+      roundTripDepartureTimeSuggestedIda: sub.roundTripDepartureTimeSuggestedIda || '',
+      roundTripDepartureTimeSuggestedVuelta: sub.roundTripDepartureTimeSuggestedVuelta || '',
+      greeterInVehicle: sub.greeterInVehicle || false,
+      quantity: sub.quantity || 1,
+      // Return flight fields for round-trip services
+      returnOrigin: sub.returnOrigin || '',
+      returnDestination: sub.returnDestination || '',
+      returnAirline: sub.returnAirline || '',
+      returnFlightNumber: sub.returnFlightNumber || '',
     };
   }
 

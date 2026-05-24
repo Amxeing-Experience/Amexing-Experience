@@ -685,6 +685,10 @@
         crossorigin="anonymous" 
         referrerpolicy="no-referrer"></script>
 
+<!-- Services Renderer Scripts -->
+<script src="/js/services-renderer-config.js"></script>
+<script src="/js/services-renderer.js"></script>
+
 <script>
     // Currency formatter
     const currencyFormatter = new Intl.NumberFormat('es-MX', {
@@ -1079,313 +1083,78 @@
             return;
         }
 
-        const typeColors = {
-            traslado: '#0d6efd', transport: '#0d6efd',
-            experiencia: '#6f42c1', experience: '#6f42c1',
-            tour: '#198754',
-            regular: '#6c757d', concepto: '#6c757d',
-            'a-disposicion': '#fd7e14',
-        };
-
-        const typeLabels = {
-            traslado: 'Transporte', transport: 'Transporte',
-            experiencia: 'Experiencia', experience: 'Experiencia',
-            tour: 'Tour',
-            regular: 'Concepto', concepto: 'Concepto',
-            'a-disposicion': 'A Disposición',
-        };
-
-        // Normalize type to check transport/experience regardless of language
-        function isTransport(type) { return type === 'traslado' || type === 'transport'; }
-        function isExperience(type) { return type === 'experiencia' || type === 'experience'; }
-        
-        // Helper function to determine if an experience service is from an establishment provider
-        function getExperienceLabel(serviceItem) {
-            if (!isExperience(serviceItem.type)) return typeLabels[serviceItem.type] || serviceItem.type || 'Servicio';
+        // ONLY use unified renderer - no fallback
+        if (typeof ServicesRenderer !== 'undefined' && typeof ServicesRendererConfig !== 'undefined') {
+            console.log('✅ Summary: Using unified renderer');
+            console.log('📊 Summary: serviceItems structure:', serviceItems);
             
-            console.debug('Checking experience label for:', { 
-                experienceId: serviceItem.experienceId, 
-                providerType: serviceItem.providerType,
-                cachesSizes: {
-                    experiences: experiencesCache.length,
-                    providerExperiences: providerExperiencesCache.length
+            const renderer = new ServicesRenderer({
+                mode: 'summary',
+                container: container,
+                paymentType: savedPayment,
+                formatCurrency: (amount) => currencyFormatter.format(amount),
+                formatDate: (date) => {
+                    if (!date) return '';
+                    const d = new Date(date);
+                    return new Intl.DateTimeFormat('es-MX', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    }).format(d);
+                },
+                segmentMappings: segmentMappings // Pass segment mappings for ObjectId to name conversion
+            });
+
+            // Normalize the data structure
+            const normalizedData = ServicesRendererConfig.normalizeQuoteServices(serviceItems);
+            console.log('📊 Summary: normalized data:', normalizedData);
+            
+            // Render with normalized data
+            renderer.renderNormalized(normalizedData);
+
+            // Calculate and update totals
+            let serviceTotal = 0;
+            serviceItems.days.forEach(day => {
+                if (day.subconcepts && day.subconcepts.length > 0) {
+                    day.subconcepts.forEach(sc => {
+                        let servicePrice = sc.total;
+                        if (sc.pricesByType && typeof sc.pricesByType === 'object' && savedPayment) {
+                            servicePrice = sc.pricesByType[savedPayment] || sc.total;
+                        }
+                        if (servicePrice != null && sc.includeInTotal !== false) serviceTotal += servicePrice;
+                    });
                 }
             });
-            
-            // Tier 1: Check if this service has providerType saved (new services)
-            if (serviceItem.providerType && serviceItem.providerType.toLowerCase() === 'establishment') {
-                console.debug('Found Establishment via Tier 1 (saved providerType)');
-                return 'Establecimiento';
-            }
-            
-            // Tier 2: Fallback to experienceId lookup in cache (existing services)
-            if (serviceItem.experienceId) {
-                // Check provider experiences cache first
-                if (providerExperiencesCache && Array.isArray(providerExperiencesCache)) {
-                    const experience = providerExperiencesCache.find(exp => 
-                        (exp.id === serviceItem.experienceId || exp.objectId === serviceItem.experienceId) &&
-                        exp.provider?.type && exp.provider.type.toLowerCase() === 'establishment'
-                    );
-                    if (experience) {
-                        console.debug('Found Establishment via Tier 2 (provider experiences cache)');
-                        return 'Establecimiento';
-                    }
-                }
-                
-                // Check regular experiences cache
-                if (experiencesCache && Array.isArray(experiencesCache)) {
-                    const experience = experiencesCache.find(exp => 
-                        (exp.id === serviceItem.experienceId || exp.objectId === serviceItem.experienceId) &&
-                        exp.provider?.type && exp.provider.type.toLowerCase() === 'establishment'
-                    );
-                    if (experience) {
-                        console.debug('Found Establishment via Tier 3 (regular experiences cache)');
-                        return 'Establecimiento';
-                    }
-                }
-                
-                console.debug('No establishment provider found for experienceId:', serviceItem.experienceId);
-            }
-            
-            // Tier 3: Default to regular experience label
-            console.debug('Using default Experiencia label');
-            return 'Experiencia';
-        }
 
-        let html = '';
+            const subtotal = serviceTotal;
+            const iva = 0; // IVA already included
+            const total = subtotal;
+            const perPerson = numberOfPeople > 0 ? total / numberOfPeople : 0;
 
-        serviceItems.days.forEach((day) => {
-            let dayTotal = 0;
-            if (day.subconcepts && day.subconcepts.length > 0) {
-                day.subconcepts.forEach(sc => {
-                    // Use pricesByType if available for day total calculation
-                    let servicePrice = sc.total;
-                    if (sc.pricesByType && typeof sc.pricesByType === 'object' && savedPayment) {
-                        servicePrice = sc.pricesByType[savedPayment] || sc.total;
-                    }
-                    if (servicePrice != null) dayTotal += servicePrice;
-                });
-            }
+            document.getElementById('summarySubtotal').textContent = currencyFormatter.format(subtotal);
+            document.getElementById('summaryIVA').textContent = currencyFormatter.format(iva);
+            document.getElementById('summaryTotal').textContent = currencyFormatter.format(total);
+            document.getElementById('summaryPerPerson').textContent = currencyFormatter.format(perPerson);
+            document.getElementById('summaryPersonCount').textContent = `(${numberOfPeople})`;
 
-            const dayDateStr = day.date ? formatDateSpanish(new Date(day.date + 'T12:00:00')) : '';
-            html += `<div class="sm-day-card">
-                <div class="sm-day-header">
-                    <span class="sm-day-badge">${day.dayNumber}</span>
-                    <div class="sm-day-title">Día ${day.dayNumber}${dayDateStr ? ' · ' + dayDateStr : ''}${day.dayTitle ? ' · ' + day.dayTitle : ''}</div>
-                </div>
-                <div class="sm-services">`;
-
-            if (day.subconcepts && day.subconcepts.length > 0) {
-                day.subconcepts.forEach((sc) => {
-                    const color = typeColors[sc.type] || '#6c757d';
-                    const label = getExperienceLabel(sc);
-                    
-                    // Use pricesByType if available, fallback to original total
-                    let servicePrice = sc.total;
-                    if (sc.pricesByType && typeof sc.pricesByType === 'object' && savedPayment) {
-                        servicePrice = sc.pricesByType[savedPayment] || sc.total;
-                    }
-                    const total = servicePrice != null ? currencyFormatter.format(servicePrice) : '-';
-
-                    const paymentHtml = '';
-
-                    const isTourOrExp = sc.type === 'tour' || isExperience(sc.type);
-                    const smallThumbHtml = (!isTourOrExp && sc.imageUrl)
-                        ? `<img src="${sc.imageUrl}" class="rounded" width="48" height="48" style="object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
-                        : '';
-                    const largeImgHtml = (isTourOrExp && sc.imageUrl)
-                        ? `<img src="${sc.imageUrl}" class="sm-service-img" onerror="this.style.display='none'">`
-                        : '';
-
-                    // Check for horario badge (transport only)
-                    let horarioBadgeHtml = '';
-                    if (isTransport(sc.type)) {
-                        // Extract and display horario badge if available - use same fields as renderSummaryTransport
-                        let flightTime = '';
-                        if (sc.time) {
-                            flightTime = sc.time;
-                        } else if (sc.selectedSchedule) {
-                            // Extract time from selectedSchedule (e.g., "13:39" or "13:39 - 14:30")
-                            const timeMatch = sc.selectedSchedule.match(/^(\d{1,2}:\d{2})/);
-                            if (timeMatch) {
-                                flightTime = timeMatch[1];
-                            }
-                        }
-                        
-                        // Round to nearest 15 minutes (matching service list)
-                        if (flightTime) {
-                            const [hours, minutes] = flightTime.split(':').map(Number);
-                            const totalMinutes = hours * 60 + minutes;
-                            const roundedMinutes = Math.round(totalMinutes / 15) * 15;
-                            const roundedHours = Math.floor(roundedMinutes / 60);
-                            const roundedMins = roundedMinutes % 60;
-                            const roundedTime = `${String(roundedHours).padStart(2, '0')}:${String(roundedMins).padStart(2, '0')}`;
-                            
-                            horarioBadgeHtml = `
-                                <div style="margin-bottom: 8px;">
-                                    <span class="sm-badge" style="background: #0dcaf015; color: #0dcaf0; font-weight: 500;">
-                                        <i class="ti ti-clock" style="font-size: 0.9rem; margin-right: 4px;"></i>Horario: ${roundedTime}
-                                    </span>
-                                </div>`;
-                        }
-                    }
-
-                    html += `<div class="sm-service" style="border-left-color: ${color};">
-                        ${smallThumbHtml}
-                        <div class="sm-service-info">
-                            ${horarioBadgeHtml}
-                            <div class="sm-service-header">
-                                ${sc.type !== 'concepto' ? `<span class="sm-badge" style="background: ${color}15; color: ${color};">${label}</span>` : ''}`;
-
-                    if (isTransport(sc.type)) {
-                        // Transport sub-badges (type + direction)
-                        const transportTypes = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
-                        const transportLabel = transportTypes[sc.transportType] || '';
-                        if (transportLabel) {
-                            html += `<span class="sm-badge" style="background: ${color}25; color: ${color};">${transportLabel}</span>`;
-                        }
-                        if (sc.directionType) {
-                            const dirLabels = {
-                                arrival: sc.transportType === 'aeropuerto' ? 'Llegada' : 'Ida',
-                                departure: sc.transportType === 'aeropuerto' ? 'Salida' : 'Vuelta',
-                            };
-                            const dirColor = sc.directionType === 'arrival' ? '#198754' : '#fd7e14';
-                            html += `<span class="sm-badge" style="background: ${dirColor}15; color: ${dirColor};">${dirLabels[sc.directionType] || ''}</span>`;
-                        }
-                        html += renderSummaryTransport(sc);
-                    } else if (isExperience(sc.type)) {
-                        const name = sc.concept || sc.tourName || 'Experiencia';
-                        html += `<span class="sm-service-name">${name}</span></div>`;
-                        
-                        // Add passenger quantities for experience services (including establishments)
-                        html += renderPassengerBadges(sc);
-                        
-                        if (sc.time || sc.selectedSchedule) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.selectedSchedule || sc.time}</div>`;
-                        if (sc.isPackage && sc.includedExperiences) {
-                            html += renderIncludedExperiencesCards(sc.includedExperiences);
-                        }
-                    } else if (sc.type === 'tour') {
-                        const tourName = sc.destinationPOI || sc.destination || sc.concept || sc.tourName || sc.serviceType || 'Tour';
-                        html += `<span class="sm-service-name">${tourName}</span></div>`;
-                        
-                        // Add passenger quantities for tour services
-                        html += renderPassengerBadges(sc);
-                        
-                        if (sc.time || sc.selectedSchedule) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.selectedSchedule || sc.time}</div>`;
-                        if (sc.vehicleType || sc.vehicleTypeName) {
-                            html += `<div class="sm-service-detail"><i class="ti ti-car"></i>${sc.vehicleTypeName || sc.vehicleType}</div>`;
-                        }
-                        if (sc.includeGuide) html += '<div class="sm-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Guía + Chofer</div>';
-                        if (sc.includeGreeter) html += '<div class="sm-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>';
-                        
-                        // Add additional vehicle information for tours
-                        if (sc.additionalVehicle || sc.additionalVehicleType || sc.additionalVehicleTypeName || sc.hasAdditionalVehicle) {
-                            const additionalVehicleName = sc.additionalVehicleTypeName || sc.additionalVehicleType || 'Vehículo adicional';
-                            const additionalSegment = sc.additionalVehicleSegmentName || getSegmentDisplayName(sc.additionalVehicleSegment) || '';
-                            const segmentText = additionalSegment ? ` - ${additionalSegment}` : '';
-                            html += `<div class="sm-service-detail" style="color: #0d6efd;"><i class="ti ti-plus"></i>${additionalVehicleName}${segmentText}</div>`;
-                        }
-                    } else if (sc.type === 'a-disposicion') {
-                        const conceptName = sc.concept || sc.tourName || sc.serviceType || 'A Disposición';
-                        html += `<span class="sm-service-name">${conceptName}</span></div>`;
-                        if (sc.time) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.time}</div>`;
-                        
-                        // Add A Disposición specific details
-                        const hoursText = sc.hours ? `${sc.hours} horas` : '';
-                        const vehicleCountText = sc.vehicleCount && sc.vehicleCount > 1 ? `${sc.vehicleCount} vehículos` : '';
-                        
-                        if (hoursText && vehicleCountText) {
-                            html += `<div class="sm-service-detail"><i class="ti ti-clock-hour-4"></i>${hoursText} • <i class="ti ti-car"></i>${vehicleCountText}</div>`;
-                        } else if (hoursText) {
-                            html += `<div class="sm-service-detail"><i class="ti ti-clock-hour-4"></i>${hoursText}</div>`;
-                        } else if (vehicleCountText) {
-                            html += `<div class="sm-service-detail"><i class="ti ti-car"></i>${vehicleCountText}</div>`;
-                        }
-                        
-                        if (sc.vehicleType || sc.vehicleTypeName) {
-                            html += `<div class="sm-service-detail"><i class="ti ti-car"></i>${sc.vehicleTypeName || sc.vehicleType}</div>`;
-                        }
-                        if (sc.includeGuide) html += '<div class="sm-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Chofer</div>';
-                    } else {
-                        const conceptName = sc.concept || sc.tourName || sc.serviceType || 'Sin especificar';
-                        html += `<span class="sm-service-name">${conceptName}</span></div>`;
-                        
-                        // Add passenger quantities for concepto services (matching services list logic)
-                        if (sc.type === 'concepto') {
-                            html += renderPassengerBadges(sc);
-                        }
-                        
-                        if (sc.time) html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${sc.time}</div>`;
-                    }
-
-                    if (sc.notes) html += `<div class="sm-notes" style="white-space: pre-wrap;"><i class="ti ti-notes me-1"></i>${sc.notes}</div>`;
-
-                    html += `</div>
-                        <div class="sm-price">${total}${paymentHtml}</div>
-                        ${largeImgHtml}
-                    </div>`;
-                });
-            } else {
-                html += '<div class="sm-empty-state" style="padding: 1rem;">Sin servicios</div>';
-            }
-
-            const dayPerPerson = numberOfPeople > 0 ? dayTotal / numberOfPeople : 0;
-
-            html += `</div>
-                <div class="sm-day-footer">
-                    <div>Total del día: ${currencyFormatter.format(dayTotal)}</div>
-                    ${numberOfPeople > 0 ? `<div style="font-size: 0.85rem; font-weight: 500; color: #6c757d;">Por persona: ${currencyFormatter.format(dayPerPerson)}</div>` : ''}
-                </div>
-            </div>`;
-        });
-
-        container.innerHTML = html;
-
-        // Calculate totals using payment-specific prices
-        let serviceTotal = 0;
-        serviceItems.days.forEach(day => {
-            if (day.subconcepts && day.subconcepts.length > 0) {
-                day.subconcepts.forEach(sc => {
-                    // Use pricesByType if available for total calculation
-                    let servicePrice = sc.total;
-                    if (sc.pricesByType && typeof sc.pricesByType === 'object' && savedPayment) {
-                        servicePrice = sc.pricesByType[savedPayment] || sc.total;
-                    }
-                    if (servicePrice != null) serviceTotal += servicePrice;
-                });
-            }
-        });
-
-        // Apply same logic as quote-services-v2.js
-        const ivaRow = document.getElementById('summaryIVARow');
-        
-        let actualSubtotal, actualIVA, actualTotal;
-        
-        if (savedPayment === 'efectivo') {
-            // For cash: no IVA
-            actualSubtotal = serviceTotal;
-            actualIVA = 0;
-            actualTotal = serviceTotal;
-            // Hide IVA row
-            if (ivaRow) ivaRow.style.display = 'none';
         } else {
-            // For transferencia/tarjeta: extract IVA from total
-            // Services already include IVA, so: Base = Total ÷ 1.16
-            actualSubtotal = serviceTotal / 1.16;
-            actualIVA = serviceTotal - actualSubtotal;
-            actualTotal = serviceTotal;
-            // Show IVA row
-            if (ivaRow) ivaRow.style.display = '';
+            // Show clear error if renderer is not available
+            console.error('❌ Summary: ServicesRenderer or ServicesRendererConfig not available!');
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    <strong>Error:</strong> El sistema de renderizado no está disponible. 
+                    Por favor, recarga la página o contacta al soporte técnico.
+                </div>`;
+            document.getElementById('summarySubtotal').textContent = currencyFormatter.format(0);
+            document.getElementById('summaryIVA').textContent = currencyFormatter.format(0);
+            document.getElementById('summaryTotal').textContent = currencyFormatter.format(0);
+            document.getElementById('summaryPerPerson').textContent = currencyFormatter.format(0);
+            document.getElementById('summaryPersonCount').textContent = `(${numberOfPeople})`;
         }
-
-        document.getElementById('summarySubtotal').textContent = currencyFormatter.format(actualSubtotal);
-        document.getElementById('summaryIVA').textContent = currencyFormatter.format(actualIVA);
-        document.getElementById('summaryTotal').textContent = currencyFormatter.format(actualTotal);
-
-        const perPersonTotal = numberOfPeople > 0 ? actualTotal / numberOfPeople : 0;
-        document.getElementById('summaryPerPerson').textContent = currencyFormatter.format(perPersonTotal);
-        document.getElementById('summaryPersonCount').textContent = `(${numberOfPeople})`;
     }
+
 
     // Function to handle payment type changes and recalculate totals
     function handlePaymentTypeChange(newPaymentType) {
@@ -1411,37 +1180,6 @@
         }
     }
 
-    // Helper function to generate passenger badges (matching services list structure)
-    function renderPassengerBadges(sc) {
-        const adultsQuantity = sc.adultsQuantity || 0;
-        const childrenQuantity = sc.childrenQuantity || 0;
-        const adultsNoAlcoholQuantity = sc.adultsNoAlcoholQuantity || 0;
-        const infantsQuantity = sc.infantsQuantity || 0;
-        
-        if (adultsQuantity > 0 || childrenQuantity > 0 || adultsNoAlcoholQuantity > 0 || infantsQuantity > 0) {
-            let badgesHtml = `<div class="sm-passengers" style="margin-bottom: 8px;">`;
-            
-            if (adultsQuantity > 0) {
-                badgesHtml += `<span class="sm-badge" style="background: #0d6efd15; color: #0d6efd;"><i class="ti ti-user" style="font-size: 0.8rem; margin-right: 4px;"></i>${adultsQuantity} adulto${adultsQuantity > 1 ? 's' : ''}</span>`;
-            }
-            
-            if (childrenQuantity > 0) {
-                badgesHtml += `<span class="sm-badge" style="background: #19875415; color: #198754;"><i class="ti ti-mood-kid" style="font-size: 0.8rem; margin-right: 4px;"></i>${childrenQuantity} niño${childrenQuantity > 1 ? 's' : ''}</span>`;
-            }
-            
-            if (adultsNoAlcoholQuantity > 0) {
-                badgesHtml += `<span class="sm-badge" style="background: #0dcaf015; color: #0dcaf0;"><i class="ti ti-glass-off" style="font-size: 0.8rem; margin-right: 4px;"></i>${adultsNoAlcoholQuantity} sin alcohol</span>`;
-            }
-            
-            if (infantsQuantity > 0) {
-                badgesHtml += `<span class="sm-badge" style="background: #fd7e1415; color: #fd7e14;"><i class="ti ti-baby-carriage" style="font-size: 0.8rem; margin-right: 4px;"></i>${infantsQuantity} infante${infantsQuantity > 1 ? 's' : ''}</span>`;
-            }
-            
-            badgesHtml += `</div>`;
-            return badgesHtml;
-        }
-        return '';
-    }
 
     function getSegmentDisplayName(segmentId) {
         if (!segmentId) return 'Segmento';
@@ -1508,141 +1246,7 @@
         return cleanedId;
     }
 
-    function renderSummaryTransport(sc) {
-        // Extract specific location from origin/destination if embedded (matching services list logic)
-        let origin = sc.originName || sc.concept || sc.origin || 'Origen';
-        let destination = sc.destination || 'Destino';
-        let specificLocation = sc.specificLocation || '';
-        
-        // If no explicit specificLocation, try to extract from origin/destination  
-        if (!specificLocation) {
-            // Check if origin has embedded specific location (format: "City, Specific Location")
-            if (origin.includes(',')) {
-                const originParts = origin.split(',');
-                if (originParts.length === 2) {
-                    origin = originParts[0].trim();
-                    specificLocation = originParts[1].trim();
-                }
-            }
-            // Check destination if origin didn't have it
-            else if (destination.includes(',')) {
-                const destParts = destination.split(',');
-                if (destParts.length === 2) {
-                    destination = destParts[0].trim();
-                    specificLocation = destParts[1].trim();
-                }
-            }
-        }
-        
-        const vehicleType = sc.vehicleTypeName || sc.vehicleType || '';
-        const vehicleMultiplier = sc.vehicleMultiplier || sc.quantity || 1;
-        
-        // Get passenger quantities
-        const adults = sc.transportAdults || 0;
-        const children = sc.transportChildren || 0;
-        const infants = sc.transportInfants || 0;
-        
-        let html = `</div>`;
-        
-        // Add passenger badges if any
-        if (adults > 0 || children > 0 || infants > 0) {
-            html += `<div class="sm-passengers" style="margin-bottom: 8px;">`;
-            if (adults > 0) html += `<span class="sm-badge" style="background: #0d6efd15; color: #0d6efd;">${adults} adulto${adults > 1 ? 's' : ''}</span>`;
-            if (children > 0) html += `<span class="sm-badge" style="background: #19875415; color: #198754;">${children} niño${children > 1 ? 's' : ''}</span>`;
-            if (infants > 0) html += `<span class="sm-badge" style="background: #fd7e1415; color: #fd7e14;">${infants} infante${infants > 1 ? 's' : ''}</span>`;
-            html += `</div>`;
-        }
-        
-        // Route with Desde/Hacia format
-        html += `
-            <div class="sm-route-text" style="margin-bottom: 8px;">
-                <div style="margin-bottom: 4px;"><i class="ti ti-circle-filled text-success" style="font-size: 0.45rem;"></i> <span style="color: #6c757d;">Desde:</span> ${origin}</div>
-                <div><i class="ti ti-map-pin-filled text-danger" style="font-size: 0.6rem;"></i> <span style="color: #6c757d;">Hacia:</span> ${destination}</div>
-            </div>`;
-        
-        // Separate airline and flight number for airport transport
-        if (sc.transportType === 'aeropuerto') {
-            if (sc.airline) html += `<div class="sm-service-detail"><i class="ti ti-plane"></i>Aerolínea: ${sc.airline}</div>`;
-            if (sc.flightNumber) html += `<div class="sm-service-detail"><i class="ti ti-ticket"></i>Número de vuelo: ${sc.flightNumber}</div>`;
-        }
-        
-        // Time display with proper labels
-        if (sc.time || sc.selectedSchedule) {
-            const timeLabel = sc.directionType === 'arrival' ? 'Hora de llegada:' : 'Horario de salida:';
-            html += `<div class="sm-service-detail"><i class="ti ti-clock"></i>${timeLabel} ${sc.selectedSchedule || sc.time}</div>`;
-        }
-        
-        // Arrival Address (matching services list structure)
-        if (specificLocation) {
-            html += `<div class="sm-service-detail"><i class="ti ti-map-pin"></i>Dirección de llegada: ${specificLocation}</div>`;
-        }
-        
-        // Vehicle(s) section with structured display
-        if (vehicleType || sc.additionalVehicle || sc.additionalVehicleType || sc.additionalVehicleTypeName) {
-            html += `<div class="sm-vehicles" style="margin-top: 8px;">
-                <div class="sm-service-detail" style="margin-bottom: 4px;"><i class="ti ti-car"></i>Vehículo(s):</div>`;
-            
-            if (vehicleType) {
-                const segmentName = sc.categoryName || sc.vehicleSegmentName || getSegmentDisplayName(sc.category || sc.vehicleSegment) || 'Segmento';
-                html += `<div style="margin-left: 20px;"><strong>${vehicleType}</strong>${vehicleMultiplier > 1 ? ` x${vehicleMultiplier}` : ''} - ${segmentName}</div>`;
-            }
-            
-            // Enhanced additional vehicle display - check for multiple possible indicators
-            if (sc.additionalVehicle || sc.additionalVehicleType || sc.additionalVehicleTypeName || sc.hasAdditionalVehicle) {
-                const additionalVehicleName = sc.additionalVehicleTypeName || sc.additionalVehicleType || 'Vehículo adicional';
-                let additionalSegment = '';
-                
-                // Try multiple ways to get the additional vehicle segment name
-                if (sc.additionalVehicleSegmentName) {
-                    additionalSegment = sc.additionalVehicleSegmentName;
-                } else if (sc.additionalVehicleSegment) {
-                    additionalSegment = getSegmentDisplayName(sc.additionalVehicleSegment);
-                } else {
-                    // If no specific additional segment, it might be using the same segment as main vehicle
-                    const mainSegment = sc.categoryName || sc.vehicleSegmentName || getSegmentDisplayName(sc.category || sc.vehicleSegment);
-                    if (mainSegment && mainSegment !== 'Segmento') {
-                        additionalSegment = mainSegment;
-                    }
-                }
-                
-                // Only show segment if we have useful information
-                const segmentDisplay = additionalSegment && additionalSegment !== 'Segmento' ? ` - ${additionalSegment}` : '';
-                
-                html += `<div style="margin-left: 20px; margin-top: 4px;"><strong>${additionalVehicleName}</strong>${segmentDisplay}</div>`;
-            }
-            
-            html += `</div>`;
-        }
-        
-        if (sc.includeGuide) html += '<div class="sm-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Chofer</div>';
-        if (sc.includeGreeter) html += '<div class="sm-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>';
-        if (sc.waitingTimeHours > 0) html += `<div class="sm-service-detail" style="color: #fd7e14;"><i class="ti ti-clock"></i>Tiempo de espera: ${sc.waitingTimeHours}h</div>`;
-        
-        return html;
-    }
 
-    function renderIncludedExperiencesCards(experiences) {
-        if (!experiences || experiences.length === 0) return '';
-        let html = '<ul class="sm-included-list">';
-        experiences.forEach(exp => {
-            html += `<li>${exp.name}${exp.description ? ': ' + exp.description : ''}</li>`;
-        });
-        html += '</ul>';
-        return html;
-    }
-
-    // Render included experiences for packages
-    function renderIncludedExperiences(experiences) {
-        if (!experiences || experiences.length === 0) return '';
-
-        let html = '<ul class="experience-included-list">';
-        experiences.forEach(exp => {
-            html += `<li>${exp.name}${exp.description ? ': ' + exp.description : ''}</li>`;
-        });
-        html += '</ul>';
-
-        return html;
-    }
 
     // Load summary when section is active
     document.addEventListener('DOMContentLoaded', function() {
@@ -1667,6 +1271,31 @@
             setTimeout(loadQuoteSummary, 100);
         });
     }
+
+    // Listen for service updates from other views for real-time sync
+    document.addEventListener('serviceItemsUpdated', function(event) {
+        console.log('📡 Services updated event received in summary view', event.detail);
+        
+        // Only update if we're on the summary section
+        const urlParams = new URLSearchParams(window.location.search);
+        const section = urlParams.get('section');
+        
+        if (section === 'summary' && event.detail && event.detail.serviceItems) {
+            const serviceItems = event.detail.serviceItems;
+            const numberOfPeople = window.currentQuoteData?.numberOfPeople || 
+                                   parseInt(document.getElementById('summaryNumberOfPeople')?.textContent) || 0;
+            
+            // Re-render the services table with updated data
+            renderServicesTable(serviceItems, numberOfPeople);
+            
+            // Update stored data
+            if (window.currentQuoteData) {
+                window.currentQuoteData.serviceItems = serviceItems;
+            }
+            
+            console.log('✅ Summary view updated with new service data');
+        }
+    });
 
     // Export to PDF function
     function exportToPdf() {

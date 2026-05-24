@@ -5910,6 +5910,12 @@ class ItineraryBuilder {
                                                 ` : ''}
                                             </div>
                                         ` : ''}
+                                        ${service.type === 'tour' && service.duration ? `
+                                            <div class="col-auto">
+                                                <i class="ti ti-clock-hour-${service.duration || 1} me-1"></i>
+                                                Duración: ${service.duration} ${service.duration === 1 ? 'hora' : 'horas'}
+                                            </div>
+                                        ` : ''}
                                     </div>
                                     ${this.renderPeopleQuantities(service)}
                                     ${(service.vehicleId || service.vehicleType || service.vehicleTypeName) ? `
@@ -6043,7 +6049,10 @@ class ItineraryBuilder {
     
     // Extract and round flight time for the header
     let flightTime = '';
-    if (service.startTime) {
+    // For departure transport services, prefer suggested departure time
+    if (service.type === 'transport' && service.directionType === 'departure' && service.flightDepartureTimeSuggested) {
+      flightTime = service.flightDepartureTimeSuggested;
+    } else if (service.startTime) {
       flightTime = service.startTime;
     } else if (service.selectedSchedule) {
       // Extract time from selectedSchedule (e.g., "13:39" or "13:39 - 14:30")
@@ -6109,7 +6118,7 @@ class ItineraryBuilder {
                             ${service.transportType === 'aeropuerto' && service.flightNumber ? `
                                 <div class="d-flex align-items-center text-muted small mb-1">
                                     <i class="ti ti-ticket me-1"></i>
-                                    <span class="text-muted me-1">Número de vuelo:</span>
+                                    <span class="me-1">Número de vuelo:</span>
                                     ${service.flightNumber}
                                 </div>
                             ` : ''}
@@ -6132,7 +6141,7 @@ class ItineraryBuilder {
                             ${service.selectedSchedule || service.startTime ? `
                                 <div class="d-flex align-items-center text-muted small mb-1">
                                     <i class="ti ti-clock me-1"></i>
-                                    <span class="text-muted me-1">${service.directionType === 'arrival' ? 'Hora de llegada:' : 'Horario de salida:'}</span>
+                                    <span class="me-1">Horario de vuelo:</span>
                                     ${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}
                                     ${service.hasOverlap ? `
                                         <span class="text-danger ms-2" title="${this.getOverlapTooltip(service)}">
@@ -6181,7 +6190,7 @@ class ItineraryBuilder {
                               })() ? `
                                 <div class="d-flex align-items-center text-muted small mb-1">
                                     <i class="ti ti-clock me-1"></i>
-                                    <span class="text-muted me-1">Hora Salida Sugerida:</span>
+                                    <span class="me-1">Horario de salida:</span>
                                     ${service.flightDepartureTimeSuggested || service.roundTripDepartureTimeSuggestedIda || service.roundTripDepartureTimeSuggestedVuelta}
                                     ${service.roundTripDepartureTimeSuggestedVuelta && service.roundTripDepartureTimeSuggestedVuelta !== service.roundTripDepartureTimeSuggestedIda ? ` / ${service.roundTripDepartureTimeSuggestedVuelta}` : ''}
                                 </div>
@@ -6271,7 +6280,6 @@ class ItineraryBuilder {
                             ${service.notes ? `
                                 <div class="service-notes mt-1 text-muted small d-flex align-items-start">
                                     <i class="ti ti-notes me-1"></i>
-                                    <span class="text-muted me-1">Notas:</span>
                                     <span style="white-space: pre-wrap;">${service.notes}</span>
                                 </div>
                             ` : ''}
@@ -17646,7 +17654,7 @@ class ItineraryBuilder {
       modalHeader.querySelector('.modal-title').after(toggleBtn);
 
       toggleBtn.addEventListener('click', () => {
-        const preview = content.querySelector('.itinerary-preview');
+        const preview = content.querySelector('.services-renderer-preview');
         if (preview) {
           const hidden = preview.classList.toggle('hide-prices');
           toggleBtn.innerHTML = hidden
@@ -17656,8 +17664,55 @@ class ItineraryBuilder {
       });
     }
 
-    // Color map per service type
-    const typeColors = {
+    // ONLY use unified renderer - no fallback
+    if (typeof ServicesRenderer !== 'undefined' && typeof ServicesRendererConfig !== 'undefined') {
+      console.log('✅ Preview: Using unified renderer');
+      
+      const selectedPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+      const renderer = new ServicesRenderer({
+        mode: 'preview',
+        container: content,
+        paymentType: selectedPaymentType,
+        formatCurrency: (amount) => this.formatCurrency(amount),
+        formatDate: (date) => this.formatDate(date),
+        ratesCache: this.ratesCache // Pass rates cache for segment name mapping
+      });
+
+      // Prepare data for normalization
+      const dataToNormalize = {
+        days: this.days,
+        services: this.services,
+        currency: document.getElementById('currencySelect')?.value || 'MXN',
+        paymentType: selectedPaymentType
+      };
+      console.log('📊 Preview: data to normalize:', dataToNormalize);
+
+      // Normalize and render
+      const normalizedData = ServicesRendererConfig.normalizeQuoteServices(dataToNormalize);
+      console.log('📊 Preview: normalized data:', normalizedData);
+      
+      renderer.renderNormalized(normalizedData);
+      modal.show();
+    } else {
+      // Show clear error if renderer is not available
+      console.error('❌ Preview: ServicesRenderer or ServicesRendererConfig not available!');
+      content.innerHTML = `
+        <div class="alert alert-danger">
+          <i class="ti ti-alert-circle me-2"></i>
+          <strong>Error:</strong> El sistema de renderizado no está disponible. 
+          Por favor, recarga la página o contacta al soporte técnico.
+        </div>`;
+      modal.show();
+    }
+  }
+
+  /* REMOVED: Original preview rendering code - now using unified renderer only
+  renderPreviewService() and all related methods have been commented out
+  to ensure we only use the unified ServicesRenderer */
+
+  /*
+  // Color map per service type  
+  const typeColors = {
       transport: '#0d6efd',
       experience: '#6f42c1',
       tour: '#198754',
@@ -17799,190 +17854,10 @@ class ItineraryBuilder {
     });
 
     modal.show();
-  }
+  } */
 
-  renderPreviewService(service, typeColors, typeLabels) {
-    const color = typeColors[service.type] || '#6c757d';
-    const selectedPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
 
-    // CONSOLIDATED FIX: Use the same getServiceDisplayPrice method as main view and totals
-    const displayPrice = this.getServiceDisplayPrice(service);
-    
-    // Debug logging for consistency tracking
-    console.log(`🎨 Preview Render: Using getServiceDisplayPrice for ${service.type} service:`, {
-      serviceId: service.id,
-      serviceType: service.type,
-      paymentType: selectedPaymentType,
-      displayPrice,
-      hasPricesByType: !!service.pricesByType,
-    });
 
-    const isExcluded = service.includeInTotal === false;
-
-    if (service.type === 'transport') {
-      return this.renderPreviewTransport(service, color, displayPrice, isExcluded);
-    }
-    return this.renderPreviewGenericService(service, color, typeColors, typeLabels, displayPrice, isExcluded);
-  }
-
-  renderPreviewTransport(service, color, displayPrice, isExcluded) {
-    const transportTypes = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
-    const transportLabel = transportTypes[service.transportType] || 'Transporte';
-    
-    // Extract specific location from origin/destination if embedded
-    let origin = service.originName || service.origin || 'Origen';
-    let destination = service.destination || 'Destino';
-    let specificLocation = service.specificLocation || '';
-    
-    // If no explicit specificLocation, try to extract from origin/destination
-    if (!specificLocation) {
-      // Check if origin has embedded specific location (format: "City, Specific Location")
-      if (origin.includes(',')) {
-        const originParts = origin.split(',');
-        if (originParts.length === 2) {
-          origin = originParts[0].trim();
-          specificLocation = originParts[1].trim();
-        }
-      }
-      // Check destination if origin didn't have it
-      else if (destination.includes(',')) {
-        const destParts = destination.split(',');
-        if (destParts.length === 2) {
-          destination = destParts[0].trim();
-          specificLocation = destParts[1].trim();
-        }
-      }
-    }
-    
-    const vehicleName = this.getVehicleDisplayName(service);
-    const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
-    
-    // Get segment name for main vehicle
-    const segmentName = service.category ? this.getCategoryName(service.category) : '';
-    const segmentDisplay = segmentName ? ` · ${segmentName}` : '';
-    
-    const directionLabels = {
-      arrival: service.transportType === 'aeropuerto' ? 'Llegada' : 'Ida',
-      departure: service.transportType === 'aeropuerto' ? 'Salida' : 'Vuelta',
-    };
-
-    // Extract and round flight time for the header (matching main service display)
-    let flightTime = '';
-    if (service.startTime) {
-      flightTime = service.startTime;
-    } else if (service.selectedSchedule) {
-      // Extract time from selectedSchedule (e.g., "13:39" or "13:39 - 14:30")
-      const timeMatch = service.selectedSchedule.match(/^(\d{1,2}:\d{2})/);
-      if (timeMatch) {
-        flightTime = timeMatch[1];
-      }
-    }
-    
-    // Round to nearest 15 minutes
-    const roundedTime = flightTime ? this.roundTimeToNearest15(flightTime) : '';
-    
-    // Get passenger quantities for transport preview
-    const adults = service.transportAdults || 0;
-    const children = service.transportChildren || 0;
-    const infants = service.transportInfants || 0;
-    
-    let passengerBadges = '';
-    if (adults > 0 || children > 0 || infants > 0) {
-      const parts = [];
-      if (adults > 0) parts.push(`<span class="pv-badge" style="background: #0d6efd15; color: #0d6efd;">${adults} adulto${adults > 1 ? 's' : ''}</span>`);
-      if (children > 0) parts.push(`<span class="pv-badge" style="background: #19875415; color: #198754;">${children} niño${children > 1 ? 's' : ''}</span>`);
-      if (infants > 0) parts.push(`<span class="pv-badge" style="background: #fd7e1415; color: #fd7e14;">${infants} infante${infants > 1 ? 's' : ''}</span>`);
-      passengerBadges = `<div class="pv-passengers">${parts.join('')}</div>`;
-    }
-
-    return `
-      <div class="pv-service" style="border-left-color: ${color};">
-        <div class="pv-service-info">
-          ${roundedTime ? `
-          <div class="pv-horario" style="margin-bottom: 8px;">
-            <span class="pv-badge" style="background: #0dcaf015; color: #0dcaf0; font-weight: 500;">
-              <i class="ti ti-clock" style="font-size: 0.9rem; margin-right: 4px;"></i>Horario: ${roundedTime}
-            </span>
-          </div>
-          ` : ''}
-          <div class="pv-service-header">
-            <span class="pv-badge" style="background: ${color}15; color: ${color};">Transporte</span>
-            <span class="pv-badge" style="background: ${color}25; color: ${color};">${transportLabel}</span>
-            ${service.directionType ? `<span class="pv-badge" style="background: ${service.directionType === 'arrival' ? '#19875415' : '#fd7e1415'}; color: ${service.directionType === 'arrival' ? '#198754' : '#fd7e14'};">${directionLabels[service.directionType] || ''}</span>` : ''}
-            ${isExcluded ? '<span class="pv-badge" style="background: #6c757d20; color: #6c757d;">Pago externo</span>' : ''}
-          </div>
-          ${passengerBadges}
-          <div class="pv-route-text">
-            <div class="pv-route-item"><i class="ti ti-circle-filled text-success" style="font-size: 0.45rem;"></i> <span style="color: #6c757d;">Desde:</span> ${origin}</div>
-            <div class="pv-route-item"><i class="ti ti-map-pin-filled text-danger" style="font-size: 0.6rem;"></i> <span style="color: #6c757d;">Hacia:</span> ${destination}</div>
-          </div>
-          ${service.transportType === 'aeropuerto' && service.airline ? `<div class="pv-service-detail"><i class="ti ti-plane"></i>Aerolínea: ${service.airline}</div>` : ''}
-          ${service.transportType === 'aeropuerto' && service.flightNumber ? `<div class="pv-service-detail"><i class="ti ti-ticket"></i>Número de vuelo: ${service.flightNumber}</div>` : ''}
-          ${service.selectedSchedule || service.startTime ? `<div class="pv-service-detail"><i class="ti ti-clock"></i>${service.directionType === 'arrival' ? 'Hora de llegada:' : 'Horario de salida:'} ${service.selectedSchedule || service.startTime}</div>` : ''}
-          ${(service.flightDepartureTimeSuggested || service.roundTripDepartureTimeSuggestedIda || service.roundTripDepartureTimeSuggestedVuelta) && service.directionType !== 'arrival' ? `<div class="pv-service-detail"><i class="ti ti-clock"></i>Hora Salida: ${service.flightDepartureTimeSuggested || service.roundTripDepartureTimeSuggestedIda || service.roundTripDepartureTimeSuggestedVuelta}${service.roundTripDepartureTimeSuggestedVuelta && service.roundTripDepartureTimeSuggestedVuelta !== service.roundTripDepartureTimeSuggestedIda ? ` / ${service.roundTripDepartureTimeSuggestedVuelta}` : ''}</div>` : ''}
-          ${specificLocation ? `<div class="pv-service-detail"><i class="ti ti-map-pin"></i>Dirección: ${specificLocation}</div>` : ''}
-          ${(hasVehicle || (service.hasAdditionalVehicle && service.additionalVehicleId)) ? `
-            <div class="pv-vehicles" style="margin-top: 8px;">
-              <div class="pv-service-detail" style="margin-bottom: 4px;">
-                <i class="ti ti-car"></i>Vehículo(s):
-              </div>
-              ${hasVehicle ? `
-                <div style="margin-left: 20px;">
-                  <strong>${vehicleName}</strong>${service.quantity > 1 ? ` x${service.quantity}` : ''}${segmentDisplay ? ` - ${segmentDisplay.replace(' · ', '')}` : ''}
-                </div>
-              ` : ''}
-              ${(service.hasAdditionalVehicle && service.additionalVehicleId) || service.additionalVehicleTypeName ? `
-                <div style="margin-left: 20px; margin-top: 4px;">
-                  <strong>${this.cleanVehicleName(this.getAdditionalVehicleDisplayName(service))}</strong>
-                  ${service.additionalVehicleSegment ? ` - ${this.getCategoryName(service.additionalVehicleSegment) || 'Segmento'}` : ' - Segmento'}
-                </div>
-              ` : ''}
-            </div>
-          ` : ''}
-          ${service.includeGuide ? '<div class="pv-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Chofer</div>' : ''}
-          ${service.includeGreeter ? '<div class="pv-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>' : ''}
-          ${service.waitingTimeHours > 0 ? `<div class="pv-service-detail" style="color: #fd7e14;"><i class="ti ti-clock"></i>Tiempo de espera: ${service.waitingTimeHours}h</div>` : ''}
-          ${service.notes ? `<div class="pv-notes" style="white-space: pre-wrap;"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
-        </div>
-        <div class="pv-price ${isExcluded ? 'pv-excluded' : ''}">${this.formatCurrency(displayPrice)}</div>
-      </div>`;
-  }
-
-  renderPreviewGenericService(service, color, typeColors, typeLabels, displayPrice, isExcluded) {
-    const label = typeLabels[service.type] || service.type;
-    const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
-    let badgeLabel = null;
-    
-    // Hide "Concepto" badge for concepto services (show service name instead)
-    const shouldShowBadge = service.type !== 'concepto';
-    
-    if (service.type === 'tour' && service.isWalkingTour) {
-      badgeLabel = 'Tour a Pie';
-    } else if (service.type === 'experience' && this.isExperienceFromEstablishment(service.experienceId)) {
-      badgeLabel = 'Establecimiento';
-    }
-    
-    // Hide price section for concepto services with $0 price
-    const shouldShowPrice = !(service.type === 'concepto' && displayPrice === 0);
-
-    return `
-      <div class="pv-service" style="border-left-color: ${color};">
-        <div class="pv-service-info">
-          <div class="pv-service-header">
-            ${shouldShowBadge ? `<span class="pv-badge" style="background: ${color}15; color: ${color};">${badgeLabel || label}</span>` : ''}
-            ${isExcluded ? '<span class="pv-badge" style="background: #6c757d20; color: #6c757d;">Pago externo</span>' : ''}
-            <span class="pv-service-name">${this.getServiceTitle(service)}</span>
-          </div>
-          ${service.selectedSchedule || service.startTime ? `<div class="pv-service-detail"><i class="ti ti-clock"></i>${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}</div>` : ''}
-          ${hasVehicle ? `<div class="pv-service-detail"><i class="ti ti-car"></i>${this.getVehicleDisplayName(service)}${service.quantity > 1 ? ` x${service.quantity}` : ''}</div>` : ''}
-          ${(service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide ? '<div class="pv-service-detail" style="color: #198754;"><i class="ti ti-user"></i>Incluye Chofer</div>' : ''}
-          ${(service.type === 'tour' || service.type === 'transport') && service.includeGreeter ? `<div class="pv-service-detail" style="color: #0dcaf0;"><i class="ti ti-users"></i>Incluye Greeter</div>` : ''}
-          ${service.type === 'tour' && ((service.hasAdditionalVehicle && service.additionalVehicleId) || service.additionalVehicleTypeName) ? `<div class="pv-service-detail" style="color: #0d6efd;"><i class="ti ti-plus"></i>Adicional: ${this.cleanVehicleName(this.getAdditionalVehicleDisplayName(service))}</div>` : ''}
-          ${service.notes ? `<div class="pv-notes" style="white-space: pre-wrap;"><i class="ti ti-notes me-1"></i>${service.notes}</div>` : ''}
-        </div>
-        ${shouldShowPrice ? `<div class="pv-price ${isExcluded ? 'pv-excluded' : ''}">${this.formatCurrency(displayPrice)}</div>` : ''}
-      </div>`;
-  }
 
   async exportPdf() {
     const btn = document.getElementById('exportPdfBtn');

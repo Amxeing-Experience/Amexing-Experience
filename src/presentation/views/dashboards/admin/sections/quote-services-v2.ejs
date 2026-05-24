@@ -543,5 +543,11 @@
 </script>
 <link rel="stylesheet" href="/dashboards/admin/sections/quote-services/quote-catalog-drag.css">
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
+<script src="/js/services-renderer-config.js"></script>
+<script src="/js/services-renderer.js"></script>
+<% if (process.env.NODE_ENV === 'development') { %>
+<!-- Renderer DevTools for development -->
+<script src="/js/renderer-dev-tools.js"></script>
+<% } %>
 <script src="/dashboards/admin/sections/quote-services-v2.js"></script>
 <script src="/dashboards/admin/sections/quote-services/quote-catalog-drag.js"></script>
