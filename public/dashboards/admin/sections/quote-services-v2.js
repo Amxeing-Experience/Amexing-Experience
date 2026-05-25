@@ -236,6 +236,36 @@ class ItineraryBuilder {
     return null;
   }
 
+  /**
+   * Determine the type of tour currently selected.
+   * @returns {string} 'walking', 'vehicle', or 'none'
+   * @example getTourType()
+   */
+  getTourType() {
+    const tourSelect = document.getElementById('tourSelect');
+    const selectedTourId = tourSelect?.value;
+
+    if (!selectedTourId || !this.toursCache.has('all')) {
+      return 'none';
+    }
+
+    const selectedTourData = this.toursCache.get('all').find((t) => t.id === selectedTourId || t.objectId === selectedTourId);
+
+    return selectedTourData?.isWalkingTour ? 'walking' : 'vehicle';
+  }
+
+  /**
+   * Extract the total amount from a breakdown text string.
+   * @param {string} breakdownText - Text containing "Total: $X.XX"
+   * @returns {number} The extracted total amount, or 0 if not found
+   * @example extractTotalFromBreakdown('Total: $1,234.56')
+   */
+  extractTotalFromBreakdown(breakdownText) {
+    if (!breakdownText) return 0;
+    const match = breakdownText.match(/Total:\s*\$([0-9,]+\.?\d*)/);
+    return match ? parseFloat(match[1].replace(/,/g, '')) : 0;
+  }
+
   async init() {
     // Show loading overlay
     const loadingOverlay = document.getElementById('itineraryLoadingOverlay');
@@ -459,7 +489,11 @@ class ItineraryBuilder {
         if (peopleCountField) peopleCountField.value = total || 1;
         // Re-highlight tier based on new total
         if (this.currentTourData) this.highlightWalkingTourTier(this.currentTourData);
-        this.updateServicePriceBreakdown();
+        this.updateDevPaymentBreakdown();
+        // Small delay to ensure dev breakdown is updated before service breakdown reads it
+        setTimeout(() => {
+          this.updateServicePriceBreakdown();
+        }, 50);
       });
     });
 
@@ -468,7 +502,11 @@ class ItineraryBuilder {
     if (walkingManualField) {
       walkingManualField.addEventListener('input', (e) => {
         validatePriceInput(e);
-        this.updateServicePriceBreakdown();
+        this.updateDevPaymentBreakdown();
+        // Small delay to ensure dev breakdown is updated before service breakdown reads it
+        setTimeout(() => {
+          this.updateServicePriceBreakdown();
+        }, 50);
       });
       walkingManualField.addEventListener('keydown', preventInvalidPriceChars);
       walkingManualField.addEventListener('paste', handlePricePaste);
@@ -726,10 +764,11 @@ class ItineraryBuilder {
       this.calculateADisposicionPrice();
 
       // Update breakdown to show guide details
-      this.updateServicePriceBreakdown();
-
-      // Explicitly update dev payment breakdown for guide changes
       this.updateDevPaymentBreakdown();
+      // Small delay to ensure dev breakdown is updated before service breakdown reads it
+      setTimeout(() => {
+        this.updateServicePriceBreakdown();
+      }, 50);
     });
 
     // Price input listener - update conversion preview when user types a price
@@ -771,8 +810,11 @@ class ItineraryBuilder {
 
     experienceFields.forEach(fieldId => {
       document.getElementById(fieldId)?.addEventListener('input', () => {
-        this.updateServicePriceBreakdown();
         this.updateDevPaymentBreakdown();
+        // Small delay to ensure dev breakdown is updated before service breakdown reads it
+        setTimeout(() => {
+          this.updateServicePriceBreakdown();
+        }, 50);
       });
     });
 
@@ -827,7 +869,11 @@ class ItineraryBuilder {
       this.validateTourDuration();
       this.calculateTourEndTime();
       this.recalculateTourPrice();
-      this.updateServicePriceBreakdown();
+      this.updateDevPaymentBreakdown();
+      // Small delay to ensure dev breakdown is updated before service breakdown reads it
+      setTimeout(() => {
+        this.updateServicePriceBreakdown();
+      }, 50);
     });
 
     // Transport flight time listeners - calculate suggested departure time
@@ -875,6 +921,7 @@ class ItineraryBuilder {
         if (selectedTour?.isWalkingTour) {
           this.highlightWalkingTourTier(selectedTour);
           this.updateServicePriceBreakdown();
+          this.updateDevPaymentBreakdown();
         }
       }
     });
@@ -1306,6 +1353,7 @@ class ItineraryBuilder {
         setTimeout(() => {
           this.updateDevPaymentPrices();
           this.updateDevPaymentBreakdown();
+          this.updateServicePriceBreakdown(); // Refresh service breakdown with fresh totals
           console.log('🔄 Updated dev payment displays after populating edit form');
         }, 200);
       }
@@ -3126,28 +3174,45 @@ class ItineraryBuilder {
         agencyRate: this.agencyRate,
       });
     } else if (type === 'tour') {
-      // Check if this is a walking tour
-      const selectedTourData = this.toursCache.has('all')
-        ? this.toursCache.get('all').find((t) => t.id === document.getElementById('tourSelect')?.value || t.objectId === document.getElementById('tourSelect')?.value)
-        : null;
-
-      if (selectedTourData?.isWalkingTour && this._walkingTourBreakdownTotals) {
-        // Use walking tour breakdown totals from dev breakdown
-        pricesByType = {
-          efectivo: this._walkingTourBreakdownTotals.efectivo,
-          transferencia: this._walkingTourBreakdownTotals.transferencia,
-          tarjeta: this._walkingTourBreakdownTotals.tarjeta
-        };
-
-        // Update basePriceEfectivo for consistency
-        basePriceEfectivo = this._walkingTourBreakdownTotals.efectivo;
-
-        console.log('✅ COLLECT SERVICE DATA - Walking tour pricesByType from dev breakdown totals:', {
-          pricesByType,
-          source: 'walking tour dev breakdown totals'
-        });
-
-        // CRITICAL FIX: Also collect dev breakdown text for walking tours
+      // Use clean separation between walking and vehicle tours
+      const tourType = this.getTourType();
+      
+      if (tourType === 'walking') {
+        console.log('📊 COLLECT SERVICE DATA - Processing walking tour');
+        
+        // Get walking tour data
+        const selectedTourData = this.toursCache.get('all').find(t => 
+          t.id === document.getElementById('tourSelect')?.value || 
+          t.objectId === document.getElementById('tourSelect')?.value
+        );
+        
+        // Try to use breakdown totals first, then fallback to calculation
+        if (this._walkingTourBreakdownTotals) {
+          pricesByType = {
+            efectivo: this._walkingTourBreakdownTotals.efectivo,
+            transferencia: this._walkingTourBreakdownTotals.transferencia,
+            tarjeta: this._walkingTourBreakdownTotals.tarjeta
+          };
+          basePriceEfectivo = this._walkingTourBreakdownTotals.efectivo;
+          
+          console.log('✅ Walking tour - using breakdown totals:', pricesByType);
+        } else {
+          // Fallback calculation
+          const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1);
+          const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
+          const baseTotal = this.getWalkingTourPrice(selectedTourData, peopleCount, duration);
+          
+          pricesByType = {
+            efectivo: baseTotal,
+            transferencia: baseTotal * (1 + (this.transferRate / 100)),
+            tarjeta: baseTotal * (1 + (this.agencyRate / 100))
+          };
+          basePriceEfectivo = baseTotal;
+          
+          console.log('✅ Walking tour - calculated prices:', { peopleCount, duration, baseTotal, pricesByType });
+        }
+        
+        // Collect walking tour breakdown text
         const devBreakdownEfectivoField = document.getElementById('devBreakdownEfectivo');
         const devBreakdownTransferenciaField = document.getElementById('devBreakdownTransferencia');
         const devBreakdownTarjetaField = document.getElementById('devBreakdownTarjeta');
@@ -3158,30 +3223,61 @@ class ItineraryBuilder {
             transferencia: devBreakdownTransferenciaField?.value || '',
             tarjeta: devBreakdownTarjetaField?.value || ''
           };
-          console.log('✅ COLLECT SERVICE DATA - Walking tour devBreakdowns saved:', devBreakdowns);
+          console.log('✅ Walking tour devBreakdowns saved');
         }
-      } else if (selectedTourData?.isWalkingTour) {
-        // Fallback: calculate walking tour pricesByType using formula
-        const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1);
-        const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
-        const baseTotal = this.getWalkingTourPrice(selectedTourData, peopleCount, duration);
+        
+      } else if (tourType === 'vehicle') {
+        console.log('📊 COLLECT SERVICE DATA - Processing vehicle tour');
+        
+        // Try to use breakdown totals first, then fallback to form calculation
+        if (this._regularTourBreakdownTotals) {
+          pricesByType = {
+            efectivo: this._regularTourBreakdownTotals.efectivo,
+            transferencia: this._regularTourBreakdownTotals.transferencia,
+            tarjeta: this._regularTourBreakdownTotals.tarjeta
+          };
+          basePriceEfectivo = this._regularTourBreakdownTotals.efectivo;
+          
+          console.log('✅ Vehicle tour - using breakdown totals:', pricesByType);
+        } else {
+          // Fallback: calculate from form values
+          const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+          const currentPrice = parseFloat(document.getElementById('servicePrice')?.value || 0);
+          
+          if (currentPrice > 0) {
+            let baseEfectivo = currentPrice;
+            if (currentPaymentType === 'transferencia') {
+              baseEfectivo = currentPrice / (1 + (this.transferRate / 100));
+            } else if (currentPaymentType === 'tarjeta') {
+              baseEfectivo = currentPrice / (1 + (this.agencyRate / 100));
+            }
+            
+            pricesByType = {
+              efectivo: baseEfectivo,
+              transferencia: baseEfectivo * (1 + (this.transferRate / 100)),
+              tarjeta: baseEfectivo * (1 + (this.agencyRate / 100))
+            };
+            basePriceEfectivo = baseEfectivo;
+            
+            console.log('✅ Vehicle tour - calculated from form:', { currentPrice, currentPaymentType, pricesByType });
+          }
+        }
+        
+        // Collect vehicle tour breakdown text
+        const devBreakdownEfectivoField = document.getElementById('devBreakdownEfectivo');
+        const devBreakdownTransferenciaField = document.getElementById('devBreakdownTransferencia');
+        const devBreakdownTarjetaField = document.getElementById('devBreakdownTarjeta');
 
-        pricesByType = {
-          efectivo: baseTotal,
-          transferencia: baseTotal * (1 + (this.transferRate / 100)),
-          tarjeta: baseTotal * (1 + (this.agencyRate / 100))
-        };
-
-        // Update basePriceEfectivo for consistency
-        basePriceEfectivo = baseTotal;
-
-        console.log('✅ COLLECT SERVICE DATA - Walking tour pricesByType from fallback calculation:', {
-          pricesByType,
-          source: 'walking tour fallback calculation',
-          peopleCount,
-          duration,
-          baseTotal
-        });
+        if (devBreakdownEfectivoField?.value || devBreakdownTransferenciaField?.value || devBreakdownTarjetaField?.value) {
+          devBreakdowns = {
+            efectivo: devBreakdownEfectivoField?.value || '',
+            transferencia: devBreakdownTransferenciaField?.value || '',
+            tarjeta: devBreakdownTarjetaField?.value || ''
+          };
+          console.log('✅ Vehicle tour devBreakdowns saved');
+        }
+      } else {
+        console.warn('⚠️ COLLECT SERVICE DATA - No tour selected or tour type unknown');
       }
     } else if (type === 'transport' && this._transportBreakdownTotals) {
       // Use breakdown totals that already include vehicle + waiting time + additional vehicle with surcharges
@@ -3447,15 +3543,22 @@ class ItineraryBuilder {
       availabilityPending: this.currentServiceAvailabilityPending || false,
     };
 
+    // Helper function to clean vehicle type name (remove segment suffixes)
+    const cleanVehicleTypeName = (name) => {
+      if (!name) return name;
+      // Remove segment suffixes like "· First Class" or "- First Class"
+      return name.split(/[·-]/)[0].trim();
+    };
+
     // For tours and transport, store vehicle type information
     if ((type === 'tour' || type === 'transport') && vehicleSelectValue) {
       data.vehicleType = vehicleSelectValue; // Store the vehicle type ID
       // Get display name from vehicle types map or transport price data
       if (type === 'transport' && this.transportPriceData?.vehicles) {
         const vehicle = this.transportPriceData.vehicles.find((v) => v.vehicleTypeId === vehicleSelectValue);
-        data.vehicleTypeName = vehicle ? vehicle.vehicleType : vehicleSelectValue;
+        data.vehicleTypeName = vehicle ? cleanVehicleTypeName(vehicle.vehicleType) : cleanVehicleTypeName(vehicleSelectValue);
       } else {
-        data.vehicleTypeName = vehicleSelectValue;
+        data.vehicleTypeName = cleanVehicleTypeName(vehicleSelectValue);
       }
     } else if (vehicleSelectValue) {
       // For other services, store as vehicleId
@@ -3979,9 +4082,9 @@ class ItineraryBuilder {
         // Store vehicle name for display
         const adVehicleSelect = document.getElementById('aDisposicionVehicle');
         if (adVehicleSelect?.selectedIndex > 0) {
-          // Remove the capacity info (e.g., "- 4 pax") from the vehicle name
+          // Remove capacity info and segment suffixes from the vehicle name
           const fullText = adVehicleSelect.options[adVehicleSelect.selectedIndex].text;
-          data.vehicleTypeName = fullText.split(' - ')[0].trim();
+          data.vehicleTypeName = cleanVehicleTypeName(fullText);
         }
 
         // Collect schedule
@@ -4845,6 +4948,49 @@ class ItineraryBuilder {
           break;
         }
 
+        // CRITICAL FIX: Restore development breakdown values for regular vehicle tours
+        if (!service.isWalkingTour && service.pricesByType) {
+          console.log('🔄 Regular tour: Restoring development breakdown from pricesByType:', service.pricesByType);
+
+          // Restore dev price fields
+          const devPriceEfectivoField = document.getElementById('devPriceEfectivo');
+          const devPriceTransferenciaField = document.getElementById('devPriceTransferencia');
+          const devPriceTarjetaField = document.getElementById('devPriceTarjeta');
+
+          if (devPriceEfectivoField && service.pricesByType.efectivo !== undefined) {
+            devPriceEfectivoField.value = service.pricesByType.efectivo.toFixed(2);
+          }
+          if (devPriceTransferenciaField && service.pricesByType.transferencia !== undefined) {
+            devPriceTransferenciaField.value = service.pricesByType.transferencia.toFixed(2);
+          }
+          if (devPriceTarjetaField && service.pricesByType.tarjeta !== undefined) {
+            devPriceTarjetaField.value = service.pricesByType.tarjeta.toFixed(2);
+          }
+
+          // Also restore dev breakdown text fields if they exist in service data
+          const devBreakdownEfectivoField = document.getElementById('devBreakdownEfectivo');
+          const devBreakdownTransferenciaField = document.getElementById('devBreakdownTransferencia');
+          const devBreakdownTarjetaField = document.getElementById('devBreakdownTarjeta');
+
+          if (devBreakdownEfectivoField && service.devBreakdowns?.efectivo) {
+            devBreakdownEfectivoField.value = service.devBreakdowns.efectivo;
+          }
+          if (devBreakdownTransferenciaField && service.devBreakdowns?.transferencia) {
+            devBreakdownTransferenciaField.value = service.devBreakdowns.transferencia;
+          }
+          if (devBreakdownTarjetaField && service.devBreakdowns?.tarjeta) {
+            devBreakdownTarjetaField.value = service.devBreakdowns.tarjeta;
+          }
+
+          console.log('✅ Regular tour: Development breakdown restored from saved data');
+        } else if (!service.isWalkingTour && !service.pricesByType) {
+          // If no pricesByType for regular tour, trigger calculation to generate dev breakdown
+          console.log('⚠️ Regular tour: No pricesByType found, will trigger calculation after timeout');
+          setTimeout(() => {
+            this.updateDevPaymentBreakdown();
+          }, 100);
+        }
+
         // Handle transport/vehicle information for tours
         const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
 
@@ -4919,6 +5065,15 @@ class ItineraryBuilder {
           }, 500);
         }
 
+        // Restore tour duration for all tours (both new and edit)
+        setTimeout(() => {
+          const tourDurationField = document.getElementById('tourDuration');
+          if (tourDurationField && service.duration) {
+            tourDurationField.value = service.duration;
+            console.log('🔄 Regular tour: Restored duration to', service.duration);
+          }
+        }, 200);
+
         // Populate tour passenger quantities (similar to experiences)
         const populateTourQuantityFields = (attempt = 1) => {
           const tourAdultsQuantityField = document.getElementById('tourAdultsQuantity');
@@ -4946,11 +5101,6 @@ class ItineraryBuilder {
             if (tourStartTimeField && service.startTime) tourStartTimeField.value = service.startTime;
             if (tourEndTimeField && service.endTime) tourEndTimeField.value = service.endTime;
 
-            // Restore tour duration
-            const tourDurationField = document.getElementById('tourDuration');
-            if (tourDurationField && service.duration) {
-              tourDurationField.value = service.duration;
-            }
 
             // Restore tour individual price fields if price override is enabled
             if (service.priceOverride && !service.isWalkingTour) {
@@ -6008,7 +6158,6 @@ class ItineraryBuilder {
                                                     <div class="d-flex align-items-center gap-2">
                                                         <span>
                                                             <strong>${this.getAdditionalVehicleDisplayName(service)}</strong>
-                                                            ${service.additionalVehicleSegment ? ` - ${this.getCategoryName(service.additionalVehicleSegment) || 'Segmento'}` : ''}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -7676,121 +7825,128 @@ class ItineraryBuilder {
       return; // Exit early, we're done with experience
     }
 
-    // Check if current tour is a walking tour and handle it separately
-    const tourSelect = document.getElementById('tourSelect');
-    const isWalkingTour = tourSelect?.value && this.toursCache.has('all') &&
-      this.toursCache.get('all').find(t =>
-        (t.id === tourSelect.value || t.objectId === tourSelect.value) && t.isWalkingTour
-      );
+    // Use clean separation between walking and vehicle tours
+    if (serviceType === 'tour') {
+      const tourType = this.getTourType();
+      
+      if (tourType === 'walking') {
+        console.log('📊 Processing Walking Tour breakdown');
 
-    if (serviceType === 'tour' && isWalkingTour) {
-      console.log('📊 Processing Walking Tour breakdown');
+        const selectedTourData = this.toursCache.get('all').find(t => 
+          t.id === document.getElementById('tourSelect')?.value || 
+          t.objectId === document.getElementById('tourSelect')?.value
+        );
 
-      const walkingTourData = this.toursCache.get('all').find(t =>
-        (t.id === tourSelect.value || t.objectId === tourSelect.value) && t.isWalkingTour
-      );
+        const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1);
+        const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
 
-      const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1);
-      const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
+        // Calculate base total using walking tour formula
+        const baseTotal = this.getWalkingTourPrice(selectedTourData, peopleCount, duration);
 
-      // Calculate base total using walking tour formula
-      const baseTotal = this.getWalkingTourPrice(walkingTourData, peopleCount, duration);
+        // Calculate totals with surcharges
+        const efectivoTotal = baseTotal;
+        const transferenciaTotal = baseTotal * (1 + (this.transferRate / 100));
+        const tarjetaTotal = baseTotal * (1 + (this.agencyRate / 100));
 
-      // Calculate totals with surcharges
-      const efectivoTotal = baseTotal;
-      const transferenciaTotal = baseTotal * (1 + (this.transferRate / 100));
-      const tarjetaTotal = baseTotal * (1 + (this.agencyRate / 100));
+        // Get dev payment fields
+        const devPriceEfectivoField = document.getElementById('devPriceEfectivo');
+        const devPriceTransferenciaField = document.getElementById('devPriceTransferencia');
+        const devPriceTarjetaField = document.getElementById('devPriceTarjeta');
 
-      // Get dev payment fields
-      const devPriceEfectivoField = document.getElementById('devPriceEfectivo');
-      const devPriceTransferenciaField = document.getElementById('devPriceTransferencia');
-      const devPriceTarjetaField = document.getElementById('devPriceTarjeta');
+        // Get dev breakdown text fields
+        const devBreakdownEfectivoField = document.getElementById('devBreakdownEfectivo');
+        const devBreakdownTransferenciaField = document.getElementById('devBreakdownTransferencia');
+        const devBreakdownTarjetaField = document.getElementById('devBreakdownTarjeta');
 
-      // Get dev breakdown text fields
-      const devBreakdownEfectivoField = document.getElementById('devBreakdownEfectivo');
-      const devBreakdownTransferenciaField = document.getElementById('devBreakdownTransferencia');
-      const devBreakdownTarjetaField = document.getElementById('devBreakdownTarjeta');
+        // Calculate groups for breakdown text
+        const groups = this.calculateWalkingTourGroups(selectedTourData, peopleCount);
+        const priceCurrency = selectedTourData.walkingPriceCurrency || 'MXN';
 
-      // Calculate groups for breakdown text
-      const groups = this.calculateWalkingTourGroups(walkingTourData, peopleCount);
-      const priceCurrency = walkingTourData.walkingPriceCurrency || 'MXN';
+        // Build breakdown text for efectivo
+        let efectivoBreakdown = '';
+        groups.forEach((group, index) => {
+          let groupPrice = group.tier.price;
+          // Convert USD to MXN if needed (same logic as getWalkingTourPrice)
+          if (priceCurrency === 'USD' && this.exchangeRate) {
+            groupPrice = Math.round(groupPrice * this.exchangeRate);
+          }
+          const groupTotal = groupPrice * duration;
 
-      // Build breakdown text for efectivo
-      let efectivoBreakdown = '';
-      groups.forEach((group, index) => {
-        let groupPrice = group.tier.price;
-        // Convert USD to MXN if needed (same logic as getWalkingTourPrice)
-        if (priceCurrency === 'USD' && this.exchangeRate) {
-          groupPrice = Math.round(groupPrice * this.exchangeRate);
-        }
-        const groupTotal = groupPrice * duration;
-
+          if (efectivoBreakdown) efectivoBreakdown += '\n';
+          efectivoBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotal.toFixed(2)}`;
+        });
         if (efectivoBreakdown) efectivoBreakdown += '\n';
-        efectivoBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotal.toFixed(2)}`;
-      });
-      if (efectivoBreakdown) efectivoBreakdown += '\n';
-      efectivoBreakdown += `Total: $${efectivoTotal.toFixed(2)}`;
+        efectivoBreakdown += `Total: $${efectivoTotal.toFixed(2)}`;
 
-      // Build breakdown text for transferencia
-      let transferenciaBreakdown = '';
-      groups.forEach((group, index) => {
-        let groupPrice = group.tier.price;
-        if (priceCurrency === 'USD' && this.exchangeRate) {
-          groupPrice = Math.round(groupPrice * this.exchangeRate);
-        }
-        const groupTotal = groupPrice * duration;
+        // Build breakdown text for transferencia (with surcharge applied to each group)
+        let transferenciaBreakdown = '';
+        groups.forEach((group, index) => {
+          let groupPrice = group.tier.price;
+          if (priceCurrency === 'USD' && this.exchangeRate) {
+            groupPrice = Math.round(groupPrice * this.exchangeRate);
+          }
+          const groupTotal = groupPrice * duration;
+          const groupTotalWithSurcharge = groupTotal * (1 + (this.transferRate / 100));
 
+          if (transferenciaBreakdown) transferenciaBreakdown += '\n';
+          transferenciaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotalWithSurcharge.toFixed(2)}`;
+        });
         if (transferenciaBreakdown) transferenciaBreakdown += '\n';
-        transferenciaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotal.toFixed(2)}`;
-      });
-      // Skip surcharge display for tours - show clean pricing
-      if (transferenciaBreakdown) transferenciaBreakdown += '\n';
-      transferenciaBreakdown += `Total: $${transferenciaTotal.toFixed(2)}`;
+        transferenciaBreakdown += `Total: $${transferenciaTotal.toFixed(2)}`;
 
-      // Build breakdown text for tarjeta
-      let tarjetaBreakdown = '';
-      groups.forEach((group, index) => {
-        let groupPrice = group.tier.price;
-        if (priceCurrency === 'USD' && this.exchangeRate) {
-          groupPrice = Math.round(groupPrice * this.exchangeRate);
-        }
-        const groupTotal = groupPrice * duration;
+        // Build breakdown text for tarjeta (with surcharge applied to each group)
+        let tarjetaBreakdown = '';
+        groups.forEach((group, index) => {
+          let groupPrice = group.tier.price;
+          if (priceCurrency === 'USD' && this.exchangeRate) {
+            groupPrice = Math.round(groupPrice * this.exchangeRate);
+          }
+          const groupTotal = groupPrice * duration;
+          const groupTotalWithSurcharge = groupTotal * (1 + (this.agencyRate / 100));
 
+          if (tarjetaBreakdown) tarjetaBreakdown += '\n';
+          tarjetaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotalWithSurcharge.toFixed(2)}`;
+        });
         if (tarjetaBreakdown) tarjetaBreakdown += '\n';
-        tarjetaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotal.toFixed(2)}`;
-      });
-      // Skip surcharge display for tours - show clean pricing
-      if (tarjetaBreakdown) tarjetaBreakdown += '\n';
-      tarjetaBreakdown += `Total: $${tarjetaTotal.toFixed(2)}`;
+        tarjetaBreakdown += `Total: $${tarjetaTotal.toFixed(2)}`;
 
-      // Update dev payment prices
-      if (devPriceEfectivoField) devPriceEfectivoField.value = efectivoTotal.toFixed(2);
-      if (devPriceTransferenciaField) devPriceTransferenciaField.value = transferenciaTotal.toFixed(2);
-      if (devPriceTarjetaField) devPriceTarjetaField.value = tarjetaTotal.toFixed(2);
+        // Update dev payment prices
+        if (devPriceEfectivoField) devPriceEfectivoField.value = efectivoTotal.toFixed(2);
+        if (devPriceTransferenciaField) devPriceTransferenciaField.value = transferenciaTotal.toFixed(2);
+        if (devPriceTarjetaField) devPriceTarjetaField.value = tarjetaTotal.toFixed(2);
 
-      // Update dev breakdown texts
-      if (devBreakdownEfectivoField) devBreakdownEfectivoField.value = efectivoBreakdown;
-      if (devBreakdownTransferenciaField) devBreakdownTransferenciaField.value = transferenciaBreakdown;
-      if (devBreakdownTarjetaField) devBreakdownTarjetaField.value = tarjetaBreakdown;
+        // Update dev breakdown texts
+        if (devBreakdownEfectivoField) devBreakdownEfectivoField.value = efectivoBreakdown;
+        if (devBreakdownTransferenciaField) devBreakdownTransferenciaField.value = transferenciaBreakdown;
+        if (devBreakdownTarjetaField) devBreakdownTarjetaField.value = tarjetaBreakdown;
 
-      // Store walking tour breakdown totals for use in collectServiceData
-      this._walkingTourBreakdownTotals = {
-        efectivo: efectivoTotal,
-        transferencia: transferenciaTotal,
-        tarjeta: tarjetaTotal
-      };
-
-      console.log('📊 Walking tour breakdown calculated:', {
-        peopleCount,
-        duration,
-        groups: groups.length,
-        totals: {
+        // Store walking tour breakdown totals for use in collectServiceData
+        this._walkingTourBreakdownTotals = {
           efectivo: efectivoTotal,
           transferencia: transferenciaTotal,
           tarjeta: tarjetaTotal
-        }
-      });
-      return; // Exit early, we're done with walking tour
+        };
+
+        console.log('📊 Walking tour breakdown calculated:', {
+          peopleCount,
+          duration,
+          groups: groups.length,
+          totals: {
+            efectivo: efectivoTotal,
+            transferencia: transferenciaTotal,
+            tarjeta: tarjetaTotal
+          }
+        });
+        return; // Exit early, we're done with walking tour
+      
+      } else if (tourType === 'vehicle') {
+        console.log('📊 Processing Vehicle Tour breakdown');
+        // Continue with existing vehicle tour logic...
+      
+      } else {
+        console.warn('⚠️ BREAKDOWN - No tour selected or unknown tour type');
+        return;
+      }
     }
 
     // Calculate breakdown for each payment type (multiply by duration for tours/hours for A Disposición)
@@ -7995,6 +8151,38 @@ class ItineraryBuilder {
         tarjeta: cardTotal,
       };
       console.log('💾 Stored A Disposición breakdown totals for pricesByType:', this._aDisposicionBreakdownTotals);
+    }
+
+    // Store regular vehicle tour breakdown totals for use in collectServiceData
+    if (serviceType === 'tour') {
+      // Check if this is a walking tour by checking if walkingTour fields exist and are visible
+      const walkingTourFieldsExist = document.getElementById('walkingTourAdultsQuantity')?.offsetParent !== null;
+      const isCurrentlyWalkingTour = walkingTourFieldsExist;
+      
+      if (!isCurrentlyWalkingTour) {
+        // Extract totals from dev breakdown text fields (not price fields)
+        const devBreakdownEfectivo = document.getElementById('devBreakdownEfectivo')?.value || '';
+        const devBreakdownTransferencia = document.getElementById('devBreakdownTransferencia')?.value || '';
+        const devBreakdownTarjeta = document.getElementById('devBreakdownTarjeta')?.value || '';
+
+        const efectivoTotal = this.extractTotalFromBreakdown(devBreakdownEfectivo);
+        const transferenciaTotal = this.extractTotalFromBreakdown(devBreakdownTransferencia);
+        const tarjetaTotal = this.extractTotalFromBreakdown(devBreakdownTarjeta);
+
+        if (efectivoTotal > 0 || transferenciaTotal > 0 || tarjetaTotal > 0) {
+          this._regularTourBreakdownTotals = {
+            efectivo: efectivoTotal,
+            transferencia: transferenciaTotal,
+            tarjeta: tarjetaTotal,
+          };
+          console.log('💾 Stored regular tour breakdown totals from breakdown text:', {
+            efectivo: `$${efectivoTotal.toFixed(2)}`,
+            transferencia: `$${transferenciaTotal.toFixed(2)}`,
+            tarjeta: `$${tarjetaTotal.toFixed(2)}`,
+            source: 'extracted from devBreakdown text fields'
+          });
+        }
+      }
     }
 
     // Update the fields
@@ -8545,6 +8733,19 @@ class ItineraryBuilder {
     // Update dev payment prices when payment type changes
     this.updateDevPaymentPrices();
     this.updateDevPaymentBreakdown();
+
+    // Update walking tour displays with new surcharges
+    if (typeof updateWalkingGroupTotalDisplay === 'function') {
+      updateWalkingGroupTotalDisplay();
+    }
+    
+    // Update walking tour tier cards with new surcharges
+    const tourType = this.getTourType();
+    if (tourType === 'walking') {
+      this.updateWalkingTourTierPrices();
+      // Also update the breakdown for walking tours
+      this.updateServicePriceBreakdown();
+    }
 
     // Update price field to reflect new payment surcharge for current service
     const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
@@ -12808,8 +13009,8 @@ class ItineraryBuilder {
     });
 
     // Update breakdowns
-    this.updateServicePriceBreakdown();
     this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
   }
 
   /**
@@ -13316,8 +13517,141 @@ class ItineraryBuilder {
   }
 
   /**
+   * Show an itemized price breakdown for walking tours by reading from dev breakdown.
+   * @example
+   */
+  updateServicePriceBreakdownForWalkingTour() {
+    console.log('🚶 updateServicePriceBreakdownForWalkingTour - using dev breakdown');
+    
+    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    
+    // Get the dev breakdown text for the current payment type
+    let devBreakdownField;
+    let devPriceField;
+    
+    if (paymentType === 'efectivo') {
+      devBreakdownField = document.getElementById('devBreakdownEfectivo');
+      devPriceField = document.getElementById('devPriceEfectivo');
+    } else if (paymentType === 'transferencia') {
+      devBreakdownField = document.getElementById('devBreakdownTransferencia');
+      devPriceField = document.getElementById('devPriceTransferencia');
+    } else if (paymentType === 'tarjeta') {
+      devBreakdownField = document.getElementById('devBreakdownTarjeta');
+      devPriceField = document.getElementById('devPriceTarjeta');
+    }
+    
+    // Find the service breakdown container
+    let container = null;
+    let itemsDiv = null;
+    let totalSpan = null;
+    
+    const serviceModal = document.getElementById('serviceModal');
+    const addServiceModal = document.getElementById('addServiceModal');
+    
+    if (serviceModal && serviceModal.classList.contains('show')) {
+      container = serviceModal.querySelector('#servicePriceBreakdown');
+    } else if (addServiceModal && addServiceModal.classList.contains('show')) {
+      container = addServiceModal.querySelector('#servicePriceBreakdown');
+    } else {
+      container = document.getElementById('servicePriceBreakdown');
+    }
+    
+    if (container) {
+      itemsDiv = container.querySelector('#breakdownItems');
+      totalSpan = container.querySelector('#breakdownTotal');
+    }
+    
+    if (!container || !itemsDiv || !totalSpan) {
+      console.warn('🔍 Service breakdown container not found');
+      return;
+    }
+    
+    // If dev breakdown is not available, hide the service breakdown
+    if (!devBreakdownField?.value || !devPriceField?.value) {
+      console.log('🔍 Dev breakdown not available for walking tour, hiding service breakdown');
+      container.classList.add('d-none');
+      return;
+    }
+
+    // Parse dev breakdown text and convert to HTML
+    const breakdownText = devBreakdownField.value;
+    const totalPrice = parseFloat(devPriceField.value || 0);
+    
+    console.log('📊 WALKING TOUR BREAKDOWN: Using dev breakdown as source', {
+      paymentType,
+      breakdownText: breakdownText.substring(0, 100) + '...',
+      totalPrice
+    });
+    
+    // Parse the breakdown text into items
+    const items = [];
+    const lines = breakdownText.split('\n').filter(line => line.trim());
+    
+    lines.forEach(line => {
+      // Skip the total line
+      if (line.includes('Total:')) {
+        return;
+      }
+      
+      // Extract amount from the line (look for $XXX.XX pattern)
+      const amountMatches = line.match(/\$([0-9,.]+)/g);
+      let lineAmount = 0;
+      
+      if (amountMatches && amountMatches.length > 0) {
+        // Get the last amount in the line (the final total after any calculations)
+        const lastAmount = amountMatches[amountMatches.length - 1];
+        lineAmount = parseFloat(lastAmount.replace('$', '').replace(/,/g, ''));
+      }
+      
+      // Clean the label - remove the = $XXX.XX part if present
+      let cleanLabel = line.trim().replace(/\s*=\s*\$[0-9,.]+$/, '');
+      
+      if (lineAmount > 0) {
+        items.push({
+          label: cleanLabel,
+          amountMXN: lineAmount
+        });
+      }
+    });
+    
+    // Use the total from dev price field
+    const totalMXN = totalPrice;
+    
+    // Hide if no items or total is 0
+    if (items.length === 0 || totalMXN <= 0) {
+      container.classList.add('d-none');
+      return;
+    }
+
+    // Update Desglose title with payment type
+    const desgloseTitle = document.getElementById('desgloseTitle');
+    if (desgloseTitle) {
+      const paymentLabels = {
+        efectivo: 'Efectivo',
+        transferencia: 'Transferencia',
+        tarjeta: 'Tarjeta de Crédito/Débito',
+      };
+      const paymentLabel = paymentLabels[paymentType] || paymentType;
+      desgloseTitle.innerHTML = `<i class="ti ti-list-details me-1"></i>Desglose ${paymentLabel.toLowerCase()}`;
+    }
+
+    // Render all breakdown items
+    const itemsHTML = items.map((item) => {
+      return `<div class="d-flex justify-content-between">
+        <span class="text-muted">${item.label}</span>
+        <span>${this.formatCurrency(item.amountMXN)}</span>
+      </div>`;
+    }).join('');
+
+    // Render the complete breakdown
+    itemsDiv.innerHTML = itemsHTML;
+    totalSpan.textContent = this.formatCurrency(totalMXN);
+    container.classList.remove('d-none');
+  }
+
+  /**
    * Show an itemized price breakdown in the modal based on service type.
-   * Applies Moneda/Pago conversion to all displayed amounts.
+   * For walking tours, uses simplified approach. For others, calculates directly.
    * @example
    */
   updateServicePriceBreakdown() {
@@ -13326,66 +13660,72 @@ class ItineraryBuilder {
     const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
     console.log('🔍 Service type in updateServicePriceBreakdown:', serviceType);
 
-    // Add service type validation and potential retry logic
-    if (!serviceType && this.editMode === 'service' && this.currentServiceId) {
-      console.warn('⚠️ Service type not detected during edit mode, will retry in 50ms');
-      setTimeout(() => {
-        console.log('🔄 Retrying updateServicePriceBreakdown after service type detection delay');
-        this.updateServicePriceBreakdown();
-      }, 50);
+    // Early return if no service type
+    if (!serviceType) {
+      console.log('🔍 No service type selected, hiding breakdown');
+      const container = document.getElementById('servicePriceBreakdown');
+      if (container) container.classList.add('d-none');
       return;
     }
 
-    // Find container in the correct modal (like dev breakdown methods)
+    // CHECK IF IT'S A WALKING TOUR FIRST
+    let isWalkingTour = false;
+    if (serviceType === 'tour') {
+      const tourSelect = document.getElementById('tourSelect');
+      if (tourSelect?.value && this.toursCache.has('all')) {
+        const walkingTourData = this.toursCache.get('all').find(
+          (t) => (t.id === tourSelect.value || t.objectId === tourSelect.value) && t.isWalkingTour
+        );
+        if (walkingTourData) {
+          isWalkingTour = true;
+        }
+      }
+    }
+
+    // ONLY FOR WALKING TOURS: Use simplified approach reading from dev breakdown
+    if (isWalkingTour) {
+      console.log('🚶 Walking tour detected - using simplified dev breakdown approach');
+      this.updateServicePriceBreakdownForWalkingTour();
+      return;
+    }
+
+    // FOR ALL OTHER SERVICES: Continue with original calculation logic
+    console.log('🔍 Non-walking tour service - using original calculation logic');
+    
+    // Find the service breakdown container
     let container = null;
     let itemsDiv = null;
     let totalSpan = null;
-
+    
     const serviceModal = document.getElementById('serviceModal');
     const addServiceModal = document.getElementById('addServiceModal');
-
-    // Check which modal is visible and find the containers
+    
     if (serviceModal && serviceModal.classList.contains('show')) {
       container = serviceModal.querySelector('#servicePriceBreakdown');
-      itemsDiv = container?.querySelector('#breakdownItems');
-      totalSpan = container?.querySelector('#breakdownTotal');
     } else if (addServiceModal && addServiceModal.classList.contains('show')) {
       container = addServiceModal.querySelector('#servicePriceBreakdown');
-      itemsDiv = container?.querySelector('#breakdownItems');
-      totalSpan = container?.querySelector('#breakdownTotal');
-    }
-
-    // Fallback to global search
-    if (!container) {
+    } else {
       container = document.getElementById('servicePriceBreakdown');
-      itemsDiv = document.getElementById('breakdownItems');
-      totalSpan = document.getElementById('breakdownTotal');
     }
-
+    
+    if (container) {
+      itemsDiv = container.querySelector('#breakdownItems');
+      totalSpan = container.querySelector('#breakdownTotal');
+    }
+    
     if (!container || !itemsDiv || !totalSpan) {
-      console.warn('🔍 updateServicePriceBreakdown: Required elements not found', {
-        container: !!container,
-        itemsDiv: !!itemsDiv,
-        totalSpan: !!totalSpan,
-        serviceModalVisible: serviceModal?.classList.contains('show'),
-        addModalVisible: addServiceModal?.classList.contains('show'),
-        serviceType,
-        editMode: this.editMode,
-        currentServiceId: this.currentServiceId,
-        domElementsFound: {
-          serviceModal: !!serviceModal,
-          addServiceModal: !!addServiceModal,
-          globalBreakdown: !!document.getElementById('servicePriceBreakdown'),
-          globalItems: !!document.getElementById('breakdownItems'),
-          globalTotal: !!document.getElementById('breakdownTotal')
-        }
-      });
+      console.warn('🔍 Service breakdown container not found');
       return;
     }
-
-    const items = []; // {label, amountMXN}
+    
+    // Initialize items array and totalMXN for original calculation logic
+    const items = [];
     let totalMXN = 0;
-
+    
+    // Get payment type for the original logic
+    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    
+    // RESTORED: Original calculation logic for non-walking tour services
     if (serviceType === 'transport') {
       const vehicleSelect = document.getElementById('vehicleSelect');
       const selectedVehicleId = vehicleSelect?.value;
@@ -13609,25 +13949,50 @@ class ItineraryBuilder {
 
             // Parse breakdown text to create items (if it has line breaks, split it)
             if (breakdownText) {
+              console.log('📊 SERVICE BREAKDOWN: Parsing dev breakdown text:', {
+                paymentType: currentPaymentType,
+                rawText: breakdownText,
+                textLength: breakdownText.length
+              });
+              
               const breakdownLines = breakdownText.split('\n').filter(line => line.trim() && !line.includes('Total:'));
+              
+              console.log('📊 SERVICE BREAKDOWN: Lines after filtering:', {
+                totalLines: breakdownLines.length,
+                lines: breakdownLines
+              });
+              
               if (breakdownLines.length > 0) {
-                breakdownLines.forEach(line => {
-                  // Extract amount from line if possible, otherwise use proportional amount
-                  const amountMatch = line.match(/\$([0-9,.]+)/);
-                  let lineAmount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
-
-                  // If no amount found in line, distribute total proportionally
-                  if (lineAmount === 0 && breakdownLines.length > 0) {
-                    lineAmount = currentPrice / breakdownLines.length;
+                breakdownLines.forEach((line, idx) => {
+                  // Extract the last amount from line (the total after =)
+                  const amountMatches = line.match(/\$([0-9,.]+)/g);
+                  let lineAmount = 0;
+                  
+                  if (amountMatches && amountMatches.length > 0) {
+                    // Get the last amount in the line (after = sign)
+                    const lastAmount = amountMatches[amountMatches.length - 1];
+                    lineAmount = parseFloat(lastAmount.replace('$', '').replace(/,/g, ''));
                   }
 
+                  // Clean up the label - remove the price part to avoid duplication
+                  let cleanLabel = line.trim();
+                  // Remove the " = $XXX.XX" part at the end
+                  cleanLabel = cleanLabel.replace(/\s*=\s*\$[0-9,.]+$/, '');
+
+                  console.log(`📊 SERVICE BREAKDOWN: Line ${idx + 1} parsed:`, {
+                    originalLine: line,
+                    cleanLabel,
+                    lineAmount
+                  });
+
                   items.push({
-                    label: line.trim(),
+                    label: cleanLabel,
                     amountMXN: lineAmount
                   });
                 });
               } else {
                 // Single line breakdown
+                console.log('📊 SERVICE BREAKDOWN: No lines found, using simple display');
                 items.push({
                   label: `Tour a Pie (${peopleCount} personas) × ${duration}h`,
                   amountMXN: currentPrice
@@ -13635,6 +14000,7 @@ class ItineraryBuilder {
               }
             } else {
               // No breakdown text, use simple display
+              console.log('📊 SERVICE BREAKDOWN: No breakdown text, using simple display');
               items.push({
                 label: `Tour a Pie (${peopleCount} personas) × ${duration}h`,
                 amountMXN: currentPrice
@@ -13644,12 +14010,28 @@ class ItineraryBuilder {
             // FALLBACK: Calculate walking tour price breakdown (original logic)
             console.log('🔄 SERVICE BREAKDOWN: Dev breakdown not available, calculating walking tour breakdown');
             const groups = this.calculateWalkingTourGroups(walkingTourData, peopleCount);
-            const walkingPrice = this.getWalkingTourPrice(walkingTourData, peopleCount, duration);
+            const baseWalkingPrice = this.getWalkingTourPrice(walkingTourData, peopleCount, duration);
+            
+            // Apply payment type surcharge to match devBreakdown
+            let walkingPrice = baseWalkingPrice;
+            if (currentPaymentType === 'transferencia') {
+              walkingPrice = baseWalkingPrice * (1 + (this.transferRate / 100));
+            } else if (currentPaymentType === 'tarjeta') {
+              walkingPrice = baseWalkingPrice * (1 + (this.agencyRate / 100));
+            }
+            
+            console.log('✅ SERVICE BREAKDOWN: Walking tour fallback with surcharges:', {
+              paymentType: currentPaymentType,
+              basePrice: baseWalkingPrice,
+              surchargedPrice: walkingPrice,
+              transferRate: this.transferRate,
+              agencyRate: this.agencyRate
+            });
 
             if (groups.length > 1) {
               // Multiple groups - show detailed breakdown with hours
               groups.forEach((group, index) => {
-                // Calculate actual price for this group - let getDisplayPrice handle currency conversion
+                // Calculate actual price for this group
                 let groupPrice = group.tier.price || 0;
                 const priceCurrency = walkingTourData.walkingPriceCurrency || 'MXN';
 
@@ -13658,8 +14040,15 @@ class ItineraryBuilder {
                   groupPrice = Math.round(groupPrice * this.exchangeRate);
                 }
 
-                // Multiply by duration for final price
-                const totalGroupPrice = groupPrice * duration;
+                // Multiply by duration for base price
+                let totalGroupPrice = groupPrice * duration;
+                
+                // Apply payment type surcharge to match devBreakdown
+                if (currentPaymentType === 'transferencia') {
+                  totalGroupPrice = totalGroupPrice * (1 + (this.transferRate / 100));
+                } else if (currentPaymentType === 'tarjeta') {
+                  totalGroupPrice = totalGroupPrice * (1 + (this.agencyRate / 100));
+                }
 
                 items.push({
                   label: `Grupo ${index + 1} (${group.tier.label}) - ${group.count} personas × ${duration}h`,
@@ -13667,7 +14056,7 @@ class ItineraryBuilder {
                 });
               });
             } else {
-              // Single group - show simple breakdown with hours
+              // Single group - show simple breakdown with hours (with surcharge applied)
               items.push({ label: `Tour a Pie (${peopleCount} personas) × ${duration}h`, amountMXN: walkingPrice });
             }
           }
@@ -13716,56 +14105,77 @@ class ItineraryBuilder {
           items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precios personalizados</span>', amountMXN: 0 });
         }
 
-        // Vehicle cost breakdown - use same logic as saveToBackend to avoid double surcharge
+        // Vehicle cost breakdown - use dev breakdown totals for accuracy
         const vehicleSelect = document.getElementById('vehicleSelect');
         const vehicleQty = parseInt(document.getElementById('serviceQuantity')?.value || 1);
         const isGuideIncluded = document.getElementById('includeGuide')?.checked;
+        const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
 
         if (vehicleSelect?.value) {
-          // Get the price directly from the field (already processed with surcharges)
-          const priceFieldValue = parseFloat(document.getElementById('servicePrice')?.value || 0);
+          // Get corresponding devBreakdown text field for current payment type
+          let devBreakdownField;
+          if (currentPaymentType === 'transferencia') {
+            devBreakdownField = document.getElementById('devBreakdownTransferencia');
+          } else if (currentPaymentType === 'tarjeta') {
+            devBreakdownField = document.getElementById('devBreakdownTarjeta');
+          } else {
+            devBreakdownField = document.getElementById('devBreakdownEfectivo');
+          }
 
-          console.log('💰 Breakdown calculation DEBUG (SIMPLIFIED):', {
-            paymentType: document.getElementById('priceTypeSelect')?.value || 'efectivo',
-            priceFieldValue,
-            vehicleQty,
-            tourDuration,
-            includesGuide: isGuideIncluded,
+          // Extract exact total from breakdown text
+          const exactTotal = this.extractTotalFromBreakdown(devBreakdownField?.value || '');
+          
+          console.log('✅ SERVICE BREAKDOWN: Using exact devBreakdown total for perfect consistency:', {
+            paymentType: currentPaymentType,
+            devBreakdownText: devBreakdownField?.value || '',
+            extractedTotal: exactTotal,
+            source: 'extracted from devBreakdown text field'
           });
 
-          // Only show breakdown if we have a valid price
-          if (priceFieldValue > 0) {
-            // Calculate what the rendering needs to show the correct final amount
-            const unitPriceForDisplay = priceFieldValue; // For formula display ($1,232)
-            const totalFinalCost = priceFieldValue * vehicleQty * tourDuration; // Final amount ($3,696)
-
-            // Show final surcharged amount directly (consistent with additional vehicle display)
-            const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-
-            console.log('💰 Main vehicle breakdown calculation:', {
-              priceFieldValue, // $1,232 (with surcharge)
-              totalFinalCost, // $3,696 desired final amount to show
-              paymentType,
-              agencyRate: this.agencyRate,
-              transferRate: this.transferRate,
-              note: 'Showing final surcharged amount directly',
-            });
-
+          if (exactTotal > 0) {
             if (isGuideIncluded && this.driverTourRateCache) {
-              // When guide is included, show combined (Vehicle + Guide) in one line
+              // When guide is included, show combined (Vehicle + Guide)
               items.push({
-                label: `(Vehículo + Guía) - Precio base (${vehicleQty} × ${this.formatCurrency(unitPriceForDisplay)} × ${tourDuration}h)`,
-                amountMXN: totalFinalCost, // Show final surcharged amount directly
+                label: `(Vehículo + Guía) - Total: $${exactTotal.toFixed(2)}`,
+                amountMXN: exactTotal,
               });
             } else {
               // When guide is NOT included, show vehicle only
               items.push({
-                label: `Vehículo - Precio base (${vehicleQty} × ${this.formatCurrency(unitPriceForDisplay)} × ${tourDuration}h)`,
-                amountMXN: totalFinalCost, // Show final surcharged amount directly
+                label: `Vehículo - Total: $${exactTotal.toFixed(2)}`,
+                amountMXN: exactTotal,
               });
             }
           } else {
-            console.warn('⚠️ No valid price in field, skipping breakdown display');
+            // Fallback: Use simplified calculation if dev breakdown totals not available
+            const priceFieldValue = parseFloat(document.getElementById('servicePrice')?.value || 0);
+
+            console.log('⚠️ SERVICE BREAKDOWN: Using fallback calculation (dev totals not available):', {
+              paymentType: currentPaymentType,
+              priceFieldValue,
+              vehicleQty,
+              tourDuration,
+              includesGuide: isGuideIncluded,
+            });
+
+            if (priceFieldValue > 0) {
+              const unitPriceForDisplay = priceFieldValue;
+              const totalFinalCost = priceFieldValue * vehicleQty * tourDuration;
+
+              if (isGuideIncluded && this.driverTourRateCache) {
+                items.push({
+                  label: `(Vehículo + Guía) - Precio base (${vehicleQty} × ${this.formatCurrency(unitPriceForDisplay)} × ${tourDuration}h)`,
+                  amountMXN: totalFinalCost,
+                });
+              } else {
+                items.push({
+                  label: `Vehículo - Precio base (${vehicleQty} × ${this.formatCurrency(unitPriceForDisplay)} × ${tourDuration}h)`,
+                  amountMXN: totalFinalCost,
+                });
+              }
+            } else {
+              console.warn('⚠️ No valid price in field, skipping breakdown display');
+            }
           }
         }
       } // end if (!isWalkingTourBreakdown)
@@ -14100,7 +14510,7 @@ class ItineraryBuilder {
           alreadySurcharged: true, // Prevent additional surcharging
         });
       }
-    }
+    } // END OF SERVICE TYPE CHECKS
 
     // Calculate total with proper handling of mixed surcharge states
     let alreadySurchargedTotal = 0;
@@ -14132,8 +14542,7 @@ class ItineraryBuilder {
       return;
     }
 
-    // Get payment type
-    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    // Payment type already declared at the top of the function
 
     // Update Desglose title with payment type
     const desgloseTitle = document.getElementById('desgloseTitle');
@@ -15713,10 +16122,14 @@ class ItineraryBuilder {
     document.getElementById('walkingRangeLargeLabel').textContent = tour.walkingRangeLarge || '—';
 
     const currency = tour.walkingPriceCurrency || 'MXN';
-    document.getElementById('walkingPriceSmallLabel').textContent = `$${parseFloat(tour.walkingPriceSmall || 0).toLocaleString()} ${currency}`;
-    document.getElementById('walkingPriceMediumLabel').textContent = `$${parseFloat(tour.walkingPriceMedium || 0).toLocaleString()} ${currency}`;
-    document.getElementById('walkingPriceLargeLabel').textContent = `$${parseFloat(tour.walkingPriceLarge || 0).toLocaleString()} ${currency}`;
     document.getElementById('walkingTourCurrency').value = currency;
+    
+    // Update tier prices with payment type surcharges
+    this.updateWalkingTourTierPrices(tour);
+    
+    // Update the label with current payment type
+    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    this.updateWalkingTourGroupLabel(paymentType);
 
     // Store tour data for tier re-highlight on quantity change
     this.currentTourData = tour;
@@ -15770,9 +16183,9 @@ class ItineraryBuilder {
       });
     }
 
-    // Set default duration from tour.time (minutes to hours)
+    // Set default duration from tour.time (minutes to hours) - only for new services, not when editing
     const durationField = document.getElementById('tourDuration');
-    if (durationField && tour.time) {
+    if (durationField && tour.time && !this.currentServiceId) {
       const defaultHours = Math.ceil(tour.time / 60); // Round up to nearest hour
       durationField.value = defaultHours;
     }
@@ -15796,6 +16209,7 @@ class ItineraryBuilder {
     });
     this.handleTourSchedule(tour);
     this.updateServicePriceBreakdown();
+    this.updateDevPaymentBreakdown();
   }
 
   /**
@@ -15926,6 +16340,128 @@ class ItineraryBuilder {
     this.currentWalkingTourPrice = total;
 
     return total;
+  }
+
+  /**
+   * Update walking tour tier card prices based on current payment type.
+   * @param {Object} tour - The tour data containing tier prices
+   */
+  updateWalkingTourTierPrices(tour) {
+    if (!tour) {
+      // Try to get current tour data
+      const tourSelect = document.getElementById('tourSelect');
+      const selectedTourId = tourSelect?.value;
+      if (!selectedTourId || !this.toursCache.has('all')) return;
+      
+      tour = this.toursCache.get('all').find(t => 
+        t.id === selectedTourId || t.objectId === selectedTourId
+      );
+      if (!tour || !tour.isWalkingTour) return;
+    }
+
+    // Get current payment type
+    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    
+    // Update the label to include payment type
+    this.updateWalkingTourGroupLabel(paymentType);
+    
+    // Get surcharge rates
+    const transferRate = this.transferRate || 0;
+    const agencyRate = this.agencyRate || 0;
+    
+    // Calculate surcharge multiplier
+    let surchargeMultiplier = 1;
+    if (paymentType === 'transferencia') {
+      surchargeMultiplier = 1 + (transferRate / 100);
+    } else if (paymentType === 'tarjeta') {
+      surchargeMultiplier = 1 + (agencyRate / 100);
+    }
+    
+    // Get base prices (convert from USD if needed)
+    const currency = tour.walkingPriceCurrency || 'MXN';
+    let smallPrice = parseFloat(tour.walkingPriceSmall || 0);
+    let mediumPrice = parseFloat(tour.walkingPriceMedium || 0);
+    let largePrice = parseFloat(tour.walkingPriceLarge || 0);
+    
+    // Convert USD to MXN if needed
+    if (currency === 'USD' && this.exchangeRate) {
+      smallPrice = Math.round(smallPrice * this.exchangeRate);
+      mediumPrice = Math.round(mediumPrice * this.exchangeRate);
+      largePrice = Math.round(largePrice * this.exchangeRate);
+    }
+    
+    // Apply surcharges
+    const smallPriceWithSurcharge = smallPrice * surchargeMultiplier;
+    const mediumPriceWithSurcharge = mediumPrice * surchargeMultiplier;
+    const largePriceWithSurcharge = largePrice * surchargeMultiplier;
+    
+    // Update the tier card displays
+    const smallLabel = document.getElementById('walkingPriceSmallLabel');
+    const mediumLabel = document.getElementById('walkingPriceMediumLabel');
+    const largeLabel = document.getElementById('walkingPriceLargeLabel');
+    
+    if (smallLabel) {
+      if (paymentType === 'efectivo') {
+        smallLabel.textContent = `$${smallPrice.toLocaleString()} MXN`;
+      } else {
+        smallLabel.textContent = `$${smallPriceWithSurcharge.toLocaleString('es-MX', {minimumFractionDigits: 0, maximumFractionDigits: 2})} MXN`;
+      }
+    }
+    
+    if (mediumLabel) {
+      if (paymentType === 'efectivo') {
+        mediumLabel.textContent = `$${mediumPrice.toLocaleString()} MXN`;
+      } else {
+        mediumLabel.textContent = `$${mediumPriceWithSurcharge.toLocaleString('es-MX', {minimumFractionDigits: 0, maximumFractionDigits: 2})} MXN`;
+      }
+    }
+    
+    if (largeLabel) {
+      if (paymentType === 'efectivo') {
+        largeLabel.textContent = `$${largePrice.toLocaleString()} MXN`;
+      } else {
+        largeLabel.textContent = `$${largePriceWithSurcharge.toLocaleString('es-MX', {minimumFractionDigits: 0, maximumFractionDigits: 2})} MXN`;
+      }
+    }
+    
+    // Also update tier card styling based on payment type
+    const tierCards = document.querySelectorAll('.walking-tier-card');
+    tierCards.forEach(card => {
+      if (paymentType !== 'efectivo') {
+        card.classList.add('border-warning');
+      } else {
+        card.classList.remove('border-warning');
+      }
+    });
+  }
+
+  /**
+   * Update the walking tour group label to include payment type.
+   * @param {string} paymentType - The current payment type
+   */
+  updateWalkingTourGroupLabel(paymentType) {
+    // Find all labels that say "Precios por Grupo"
+    const labels = document.querySelectorAll('label.form-label');
+    
+    // Map payment types to display names
+    const paymentTypeDisplay = {
+      'efectivo': 'Efectivo',
+      'transferencia': 'Transferencia',
+      'tarjeta': 'Tarjeta'
+    };
+    
+    const displayType = paymentTypeDisplay[paymentType] || 'Efectivo';
+    
+    labels.forEach(label => {
+      // Check if this is a "Precios por Grupo" label
+      if (label.textContent.includes('Precios por Grupo')) {
+        // Remove any existing payment type in parentheses
+        const baseText = label.textContent.replace(/\s*\([^)]*\)\s*$/, '');
+        if (baseText === 'Precios por Grupo') {
+          label.textContent = `Precios por Grupo (${displayType})`;
+        }
+      }
+    });
   }
 
   // Update walking tour pricing (recalculate tier prices)
@@ -16276,9 +16812,9 @@ class ItineraryBuilder {
           serviceDescriptionField.value = selectedTour.description;
         }
 
-        // Set default duration from tour.time (minutes to hours)
+        // Set default duration from tour.time (minutes to hours) - only for new services, not when editing
         const durationField = document.getElementById('tourDuration');
-        if (durationField && selectedTour.time) {
+        if (durationField && selectedTour.time && !this.currentServiceId) {
           const defaultHours = Math.ceil(selectedTour.time / 60); // Round up to nearest hour
           durationField.value = defaultHours;
         }
@@ -18821,9 +19357,24 @@ class ItineraryBuilder {
       // Add total calculation display
       html += `
         <div class="border-top pt-2 mt-3">
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-bold">Total:</span>
-            <span class="fw-bold text-primary" id="walkingGroupTotalDisplay">$0.00 MXN</span>
+          <div class="d-flex justify-content-between align-items-start">
+            <span class="fw-bold">Totales:</span>
+            <div class="fw-bold text-end" id="walkingGroupTotalDisplay">
+              <div class="d-flex flex-column gap-1">
+                <div class="d-flex justify-content-between">
+                  <span>Efectivo:</span>
+                  <span>$0.00 MXN</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <span>Transferencia:</span>
+                  <span>$0.00 MXN</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <span>Tarjeta:</span>
+                  <span>$0.00 MXN</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       `;
@@ -18861,6 +19412,7 @@ class ItineraryBuilder {
           updateWalkingGroupTotalDisplay();
           // Update breakdown
           this.updateServicePriceBreakdown();
+          this.updateDevPaymentBreakdown();
         });
 
         // Add keydown handler to prevent invalid characters
@@ -19842,20 +20394,50 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   function updateWalkingGroupTotalDisplay() {
     const groupInputs = document.querySelectorAll('.walking-group-price');
-    let total = 0;
+    let baseTotal = 0;
 
     groupInputs.forEach((input) => {
       const value = parseFloat(input.value) || 0;
-      total += value;
+      baseTotal += value;
     });
+
+    // Calculate totals with surcharges
+    const efectivoTotal = baseTotal;
+    const transferRate = window.quoteServicesManager?.transferRate || 0;
+    const agencyRate = window.quoteServicesManager?.agencyRate || 0;
+    const transferenciaTotal = baseTotal * (1 + (transferRate / 100));
+    const tarjetaTotal = baseTotal * (1 + (agencyRate / 100));
+
+    // Get current payment type to highlight
+    const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
 
     const totalDisplay = document.getElementById('walkingGroupTotalDisplay');
     if (totalDisplay) {
-      totalDisplay.textContent = `$${total.toFixed(2)} MXN`;
+      totalDisplay.innerHTML = `
+        <div class="d-flex flex-column gap-1">
+          <div class="d-flex justify-content-between ${currentPaymentType === 'efectivo' ? 'text-primary fw-bold' : ''}">
+            <span>Efectivo:</span>
+            <span>$${efectivoTotal.toFixed(2)} MXN</span>
+          </div>
+          <div class="d-flex justify-content-between ${currentPaymentType === 'transferencia' ? 'text-primary fw-bold' : ''}">
+            <span>Transferencia:</span>
+            <span>$${transferenciaTotal.toFixed(2)} MXN ${transferRate > 0 ? `(+${transferRate.toFixed(2)}%)` : ''}</span>
+          </div>
+          <div class="d-flex justify-content-between ${currentPaymentType === 'tarjeta' ? 'text-primary fw-bold' : ''}">
+            <span>Tarjeta:</span>
+            <span>$${tarjetaTotal.toFixed(2)} MXN ${agencyRate > 0 ? `(+${agencyRate.toFixed(2)}%)` : ''}</span>
+          </div>
+        </div>
+      `;
     }
 
-    // Store the total for use in data collection
-    window.walkingGroupTotal = total;
+    // Store the total for use in data collection (use current payment type total)
+    const totals = {
+      efectivo: efectivoTotal,
+      transferencia: transferenciaTotal,
+      tarjeta: tarjetaTotal
+    };
+    window.walkingGroupTotal = totals[currentPaymentType] || efectivoTotal;
   }
 
 
