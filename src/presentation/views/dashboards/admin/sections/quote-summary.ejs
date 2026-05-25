@@ -20,13 +20,22 @@
         justify-content: space-between;
         align-items: center;
         padding: 2rem;
-        border-bottom: 3px solid #0d6efd;
         margin-bottom: 2rem;
     }
 
     .summary-banner-logo img {
         max-width: 250px;
         height: auto;
+    }
+
+    .summary-banner-folio {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #0d6efd;
+        text-align: center;
+        letter-spacing: 1px;
+        margin: 0;
+        line-height: 1.2;
     }
 
     .summary-banner-address {
@@ -37,6 +46,37 @@
 
     .summary-banner-address div {
         margin-bottom: 0.25rem;
+    }
+
+    /* Public Header Styles (matching public quote view) */
+    .public-header {
+        text-align: center;
+        padding-bottom: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .header-logo {
+        margin-bottom: 1.5rem;
+    }
+
+    .header-folio {
+        margin-top: 1rem;
+    }
+
+    .public-header h1 {
+        background: #969b81;
+        color: white;
+        font-size: 1.2rem;
+        font-weight: 400;
+        letter-spacing: 0.3rem;
+        text-transform: uppercase;
+        padding: 0.75rem;
+        margin: 0;
+        display: block;
+        border-radius: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        width: 100%;
+        text-align: center;
     }
 
     .summary-section {
@@ -91,9 +131,7 @@
 
     /* Unified quote info card */
     .sm-quote-info {
-        border: 1px solid #e9ecef;
         border-radius: 0.5rem;
-        padding: 1.25rem 1.5rem;
         margin-bottom: 2rem;
         background: #fff;
     }
@@ -185,10 +223,9 @@
     .summary-footer {
         text-align: center;
         padding: 2rem;
-        font-style: italic;
         color: #6c757d;
-        border-top: 2px solid #dee2e6;
         margin-top: 2rem;
+        letter-spacing: 0.3rem;
     }
 
     .experience-included-list {
@@ -243,18 +280,16 @@
     }
     .sm-section-title {
         font-size: 1.1rem;
+        letter-spacing: 0.3rem;
         font-weight: 600;
         color: #212529;
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
-        border-bottom: 2px solid #e9ecef;
     }
 
     /* Totals card */
     .sm-totals-card {
-        border: 1px solid #e9ecef;
         border-radius: 0.5rem;
-        padding: 1.25rem 1.5rem;
         background: #fff;
         margin-bottom: 2rem;
     }
@@ -282,16 +317,39 @@
         font-size: 1rem;
         color: #495057;
     }
+    .sm-totals-subtotal {
+        font-size: 1.1rem;
+        color: #212529;
+        padding: 0.75rem;
+        border: 2px solid #ffffff;
+        border-radius: 0.375rem;
+        margin-top: 0.5rem;
+    }
+    .sm-totals-iva {
+        font-size: 1.1rem;
+        color: #212529;
+        padding: 0.75rem;
+        border: 2px solid #ffffff;
+        border-radius: 0.375rem;
+        margin-top: 0.5rem;
+    }
     .sm-totals-grand {
-        font-weight: 700;
-        font-size: 1.35rem;
-        color: #0d6efd;
-        padding-top: 0.5rem;
+        /* font-weight: 700; */
+        font-size: 1.1rem;
+        color: #212529;
+        padding: 0.75rem;
+        border: 2px solid #969b81;
+        border-radius: 0.375rem;
+        margin-top: 0.5rem;
     }
     .sm-totals-per-person {
         font-weight: 600;
         font-size: 1rem;
         color: #495057;
+        padding: 0.75rem;
+        border: 2px solid #ffffff;
+        border-radius: 0.375rem;
+        margin-top: 0.5rem;
     }
 
     /* Print Styles */
@@ -545,7 +603,7 @@
     .pdf-export-mode .sm-price { font-size: 0.8rem; }
 </style>
 
-<div class="card border-0 shadow-sm">
+<div class="card border-0">
     <% if (!locals.isPublicView) { %>
     <div class="card-header bg-white border-bottom d-print-none">
         <div class="d-flex justify-content-between align-items-center">
@@ -582,15 +640,31 @@
         <!-- Summary Content -->
         <div id="summaryContent" class="quote-summary-container" style="display: none;">
             <!-- Banner -->
+            <!-- Original summary-banner (commented for future reference)
             <div class="summary-banner">
                 <div class="summary-banner-logo">
-                    <img src="/img/amexing_logo_horizontal.avif" alt="Amexing Experience">
+                    <% if (locals.isPublicView) { %>
+                        <h1 class="summary-banner-folio"><%= quote.folio || quote.id || 'N/A' %></h1>
+                    <% } else { %>
+                        <img src="/images/logos/light_amexing.png" alt="Amexing Experience">
+                    <% } %>
                 </div>
                 <div class="summary-banner-address">
                     <div>Vicente Suarez 5, Colonia Independencia</div>
                     <div>San Miguel de Allende, Guanajuato 37732</div>
                     <div>+52 (415) 167 39 90</div>
                     <div>contact@amexingexperience.com</div>
+                </div>
+            </div>
+            -->
+
+            <!-- Public Header Design (matching public quote view) -->
+            <div class="public-header">
+                <div class="header-logo">
+                    <img src="/images/logos/light_amexing.png" alt="Amexing Experience" style="max-width: 200px; height: auto;">
+                </div>
+                <div class="header-folio">
+                    <h1 id="summaryFolioHeader">-</h1>
                 </div>
             </div>
 
@@ -634,7 +708,7 @@
             <!-- Services & Itinerary -->
             <div class="sm-services-section">
                 <div class="sm-section-title">
-                    <i class="ti ti-calendar-event me-2"></i>Servicios
+                    <i class="me-2"></i>SERVICIOS
                 </div>
                 <div id="summaryServicesCards">
                     <div class="sm-empty-state">No hay servicios agregados</div>
@@ -652,11 +726,11 @@
                     </div>
                 </div>
                 <div class="sm-totals-divider"></div>
-                <div class="sm-totals-row">
+                <div class="sm-totals-row sm-totals-subtotal">
                     <span>Subtotal</span>
                     <span id="summarySubtotal">$0.00</span>
                 </div>
-                <div class="sm-totals-row" id="summaryIVARow">
+                <div class="sm-totals-row sm-totals-iva" id="summaryIVARow">
                     <span>IVA (16%)</span>
                     <span id="summaryIVA">$0.00</span>
                 </div>
@@ -664,7 +738,6 @@
                     <span>Total</span>
                     <span id="summaryTotal">$0.00</span>
                 </div>
-                <div class="sm-totals-divider"></div>
                 <div class="sm-totals-row sm-totals-per-person">
                     <span>Por Persona <span id="summaryPersonCount">(0)</span></span>
                     <span id="summaryPerPerson">$0.00</span>
@@ -673,7 +746,7 @@
 
             <!-- Footer Message -->
             <div class="summary-footer">
-                Agradecemos su preferencia y quedamos a sus órdenes para cualquier duda o comentario
+                THANK YOU FOR YOUR PREFERENCE!
             </div>
         </div>
     </div>
@@ -959,6 +1032,7 @@
 
             // Populate summary information
             document.getElementById('summaryFolio').textContent = quote.folio || quote.id || 'N/A';
+            document.getElementById('summaryFolioHeader').textContent = quote.folio || quote.id || 'N/A';
             document.getElementById('summaryGenerationDate').textContent = formatDateSpanish(quote.createdAt);
             document.getElementById('summaryLastUpdated').textContent = formatDateSpanish(quote.updatedAt);
             // Atención a
@@ -1127,9 +1201,31 @@
                 }
             });
 
-            const subtotal = serviceTotal;
-            const iva = 0; // IVA already included
-            const total = subtotal;
+            // Calculate IVA breakdown based on payment type (matching main services logic)
+            let subtotal;
+            let iva;
+            const total = serviceTotal;
+
+            if (savedPayment === 'efectivo') {
+                // Efectivo: no IVA breakdown
+                subtotal = total;
+                iva = 0;
+                // Hide IVA row
+                const ivaRow = document.getElementById('summaryIVARow');
+                if (ivaRow) {
+                    ivaRow.classList.add('d-none');
+                }
+            } else {
+                // Transferencia/Tarjeta: calculate backwards from total (which already includes IVA)
+                subtotal = total / 1.16;
+                iva = total - subtotal;
+                // Show IVA row
+                const ivaRow = document.getElementById('summaryIVARow');
+                if (ivaRow) {
+                    ivaRow.classList.remove('d-none');
+                }
+            }
+            
             const perPerson = numberOfPeople > 0 ? total / numberOfPeople : 0;
 
             document.getElementById('summarySubtotal').textContent = currencyFormatter.format(subtotal);

@@ -6,7 +6,7 @@
 
 /* global ServicesRendererConfig */
 
-(function(window) {
+(function (window) {
     'use strict';
 
     class ServicesRenderer {
@@ -23,14 +23,14 @@
             this.formatCurrency = options.formatCurrency || this.config.formatters.currency;
             this.formatDate = options.formatDate || this.config.formatters.date;
             this.truncateText = options.truncateText || this.config.formatters.truncateText;
-            
+
             // Payment type for pricing
             this.paymentType = options.paymentType || 'efectivo';
-            
+
             // Segment mappings for converting ObjectIds to human-readable names
             this.segmentMappings = options.segmentMappings || {};
             this.ratesCache = options.ratesCache || [];
-            
+
             // Initialize styles
             this.initializeStyles();
         }
@@ -45,11 +45,32 @@
                     .service-badge {
                         display: inline-block;
                         padding: 0.25em 0.6em;
-                        border-radius: 0.25rem;
+                        border-radius: 0.375rem;
                         font-size: 0.75rem;
                         font-weight: 600;
                         margin-right: 0.5rem;
                         margin-bottom: 0.25rem;
+                    }
+
+                    .service-item {
+                        border-bottom: 2px solid #969b81 !important;
+                        margin-bottom: 0;
+                        padding: 1rem 0;
+                    }
+
+                    .service-item:last-child {
+                        border-bottom: none !important;
+                    }
+
+                    /* Remove any box shadows from containers */
+                    .services-renderer-preview,
+                    .services-renderer-summary,
+                    .services-renderer-list,
+                    .day-card,
+                    .service-item {
+                        box-shadow: none !important;
+                        -webkit-box-shadow: none !important;
+                        -moz-box-shadow: none !important;
                     }
 
                     .service-card {
@@ -120,9 +141,9 @@
                     }
 
                     .service-price {
-                        font-weight: 600;
+                        font-weight: normal;
                         font-size: 0.95rem;
-                        color: #0d6efd;
+                        color: #000000;
                         white-space: nowrap;
                         margin-left: 1rem;
                     }
@@ -145,16 +166,12 @@
                     }
 
                     .day-card {
-                        border: 1px solid #e9ecef;
-                        border-radius: 0.5rem;
                         margin-bottom: 1.5rem;
-                        overflow: hidden;
                     }
 
                     .day-header {
                         background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%);
                         padding: 1rem 1.25rem;
-                        border-bottom: 1px solid #e9ecef;
                     }
 
                     .day-number-badge {
@@ -164,7 +181,7 @@
                         width: 35px;
                         height: 35px;
                         border-radius: 50%;
-                        background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%);
+                        background: #969b81;
                         color: white;
                         font-weight: 700;
                         font-size: 1rem;
@@ -179,12 +196,10 @@
                     .day-footer {
                         padding: 0.75rem 1.25rem;
                         background: #f8f9fa;
-                        border-top: 1px solid #e9ecef;
                         text-align: right;
                     }
 
                     .day-total {
-                        font-weight: 700;
                         font-size: 1rem;
                         color: #212529;
                     }
@@ -200,8 +215,7 @@
 
                     /* Hide prices in preview mode if requested */
                     .services-renderer-preview.hide-prices .service-price,
-                    .services-renderer-preview.hide-prices .day-footer,
-                    .services-renderer-preview.hide-prices .grand-total {
+                    .services-renderer-preview.hide-prices .day-footer {
                         display: none !important;
                     }
                 </style>
@@ -215,12 +229,12 @@
             // All modes now use consistent Bootstrap badge classes
             return 'badge bg-light text-dark';
         }
-        
+
         // Get passenger badge class - consistent across all modes
         getPassengerBadgeClass(type) {
             const colorMap = {
                 adults: 'bg-primary-subtle text-primary',
-                children: 'bg-success-subtle text-success', 
+                children: 'bg-success-subtle text-success',
                 infants: 'bg-warning-subtle text-warning',
                 adultsNoAlcohol: 'bg-info-subtle text-info'
             };
@@ -235,7 +249,7 @@
                 this.renderNormalized(normalized);
                 return;
             }
-            
+
             // Legacy support for direct days/services
             const days = data;
             const services = servicesMap || {};
@@ -245,7 +259,7 @@
             }
 
             const html = this.renderDays(days, services);
-            
+
             if (typeof this.container === 'string') {
                 const element = document.querySelector(this.container);
                 if (element) {
@@ -279,9 +293,6 @@
                 html += this.renderNormalizedDay(day, dayTotal);
             });
 
-            if (this.mode === 'preview' || this.mode === 'summary') {
-                html += this.renderGrandTotal(grandTotal);
-            }
 
             html += '</div>';
 
@@ -330,16 +341,13 @@
                 const services = day.services
                     .map(sid => servicesMap.get ? servicesMap.get(sid) : servicesMap[sid])
                     .filter(Boolean);
-                
+
                 const dayTotal = this.calculateDayTotal(services);
                 grandTotal += dayTotal;
 
                 html += this.renderDay(day, services, dayTotal);
             });
 
-            if (this.mode === 'preview' || this.mode === 'summary') {
-                html += this.renderGrandTotal(grandTotal);
-            }
 
             html += '</div>';
             return html;
@@ -375,11 +383,10 @@
             if (this.config.helpers.isTransport(service.type)) {
                 return this.renderTransportService(service);
             }
-            
-            const serviceClass = `service-card ${service.type}`;
+
             const isExcluded = service.includeInTotal === false;
             const price = this.getServicePrice(service);
-            
+
             // Check for special badge labels
             let badgeLabel = this.config.helpers.getServiceBadgeLabel(service);
             if (service.type === 'tour' && service.isWalkingTour) {
@@ -387,106 +394,35 @@
             } else if (service.type === 'experience' && this.isExperienceFromEstablishment(service)) {
                 badgeLabel = 'Establecimiento';
             }
-            
-            const typeColor = this.config.typeColors[service.type] || '#6c757d';
 
-            let html = `<div class="${serviceClass}">`;
-            html += '<div class="service-header">';
-            html += '<div class="service-info">';
-            
-            // Service badges and title on same line (matching main services view)
+            // Clean service item with minimal styling
+            let html = `<div class="service-item">`;
+
+            // Service header row with title and price
+            html += '<div class="d-flex justify-content-between align-items-start">';
+
+            // Left side: Service info (keeping original structure)
+            html += '<div class="service-info flex-grow-1">';
+
+            // Service badges and title on same line (keeping original layout)
             html += '<div class="d-flex align-items-center mb-2">';
             if (this.config.displayRules.shouldShowServiceBadge(service)) {
-                // All service badges use light gray to match main services view
+                // Minimal badge styling - match main services view
                 const badgeClass = 'bg-light text-dark';
                 html += `<span class="badge ${badgeClass} me-2">${badgeLabel}</span>`;
             }
             if (isExcluded) {
-                html += `<span class="badge bg-secondary-subtle text-secondary me-2">Pago externo</span>`;
+                html += `<span class="badge bg-light text-muted small me-2">Pago externo</span>`;
             }
-            // Service title on same line
+            // Service title (keeping original structure)
             html += `<h6 class="mb-0 service-title">${this.getServiceTitle(service)}</h6>`;
             html += '</div>';
-            
-            // Service details
-            html += '<div class="service-details">';
-            
-            // Schedule
-            if (service.selectedSchedule || service.startTime) {
-                html += `<div class="service-detail-item">
-                    <i class="ti ti-clock me-1"></i>
-                    ${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}
-                </div>`;
-            }
-            
-            // People quantities
-            html += this.renderPeopleQuantities(service);
-            
-            // Vehicle info
-            if (service.vehicleId || service.vehicleType || service.vehicleTypeName) {
-                html += `<div class="service-detail-item mt-1">
-                    <i class="ti ti-car me-1"></i>
-                    ${this.getVehicleDisplayName(service)}
-                    ${service.quantity > 1 ? ` x${service.quantity}` : ''}
-                </div>`;
-            }
-            
-            // Additional vehicle (tours)
-            if (service.type === 'tour' && (service.additionalVehicleId || service.additionalVehicleTypeName)) {
-                html += `<div class="service-detail-item text-info mt-1">
-                    <i class="ti ti-car-crane me-1"></i>
-                    <span>Vehículo adicional: ${this.getAdditionalVehicleDisplayName(service)}</span>
-                </div>`;
-            }
-            
-            // Duration (for tours)
-            if (service.type === 'tour' && service.duration) {
-                html += `<div class="service-detail-item mt-1">
-                    <i class="ti ti-clock-hour-${service.duration || 1} me-1"></i>
-                    <span>Duración: ${service.duration} ${service.duration === 1 ? 'hora' : 'horas'}</span>
-                </div>`;
-            }
-            
-            // Guide
-            if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
-                html += `<div class="service-detail-item text-success mt-1">
-                    <i class="ti ti-user me-1"></i>
-                    <strong>Incluye Chofer</strong>
-                </div>`;
-            }
-            
-            // Greeter
-            if ((service.type === 'tour' || service.type === 'transport') && service.includeGreeter) {
-                const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
-                html += `<div class="service-detail-item text-info mt-1">
-                    <i class="ti ti-users me-1"></i>
-                    <strong>Incluye Greeter${greeterLocation}</strong>
-                </div>`;
-            }
-            
-            // Availability warning
-            if (service.availabilityPending) {
-                html += `<div class="mt-2">
-                    <span class="badge bg-warning text-dark">
-                        <i class="ti ti-alert-triangle me-1"></i>Verificar disponibilidad
-                    </span>
-                </div>`;
-            }
-            
-            // Notes
-            if (service.notes) {
-                html += `<div class="service-detail-item mt-2 text-muted small">
-                    <i class="ti ti-notes me-1"></i>
-                    <span style="white-space: pre-wrap;">${service.notes}</span>
-                </div>`;
-            }
-            
-            html += '</div>'; // service-details
+
             html += '</div>'; // service-info
-            
-            // Price - use display rules to check if should show
+
+            // Price - use display rules to check if should show (restore original logic)
             if (this.config.displayRules.shouldShowPrice(service)) {
-                html += '<div>';
+                html += '<div class="service-price text-end">';
                 if (isExcluded) {
                     html += '<span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span><br>';
                     html += `<div class="service-price excluded">${this.formatCurrency(price)}</div>`;
@@ -495,33 +431,132 @@
                 }
                 html += '</div>';
             }
+
+            html += '</div>'; // Close header row
+
+            // Service details container - moved inside service-item for proper border positioning
+            html += '<div class="service-details">';
+
+            // Schedule
+            if (service.selectedSchedule || service.startTime) {
+                html += `<div class="service-detail-item">
+                    <i class="ti ti-clock me-1"></i>
+                    ${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}
+                </div>`;
+            }
+
+            // People quantities
+            html += this.renderPeopleQuantities(service);
+
+            // Duration (for tours)
+            if (service.type === 'tour' && service.duration) {
+                html += `<div class="service-detail-item mt-1">
+                    <i class="ti ti-clock-hour-${service.duration || 1} me-1"></i>
+                    <span>Duración: ${service.duration} ${service.duration === 1 ? 'hora' : 'horas'}</span>
+                </div>`;
+            }
             
+            // Duration (for a-disposición)
+            if (service.type === 'a-disposicion' && service.hours) {
+                html += `<div class="service-detail-item mt-1">
+                    <i class="ti ti-clock me-1"></i>
+                    <span>Duración: ${service.hours} ${service.hours == 1 ? 'hora' : 'horas'}</span>
+                </div>`;
+            }
+
+            // Vehicle info - standardized format like transport services
+            if (service.vehicleId || service.vehicleType || service.vehicleTypeName || 
+                (service.type === 'tour' && ((service.hasAdditionalVehicle && service.additionalVehicleId) || service.additionalVehicleTypeName))) {
+                html += `<div class="mt-1">
+                    <div class="mb-1">
+                        <i class="ti ti-car me-1"></i><span class="text-muted">Vehículo(s):</span>
+                    </div>
+                    ${(service.vehicleId || service.vehicleType || service.vehicleTypeName) ? `
+                        <div class="ms-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span>
+                                    <strong>${this.getVehicleDisplayName(service)}</strong>
+                                    ${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` : 
+                                      service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}
+                                    ${service.rateId ? ` - ${this.getCategoryName(service.rateId)}` : 
+                                      service.category ? ` - ${this.getCategoryName(service.category)}` : ''}
+                                </span>
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${service.type === 'tour' && ((service.hasAdditionalVehicle && service.additionalVehicleId) || service.additionalVehicleTypeName) ? `
+                        <div class="ms-3 mt-1">
+                            <div class="d-flex align-items-center gap-2">
+                                <span>
+                                    <strong>${this.getAdditionalVehicleDisplayName(service)}</strong>
+                                    ${service.additionalVehicleSegment ? ` - ${this.getCategoryName(service.additionalVehicleSegment)}` : ''}
+                                </span>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>`;
+            }
+
+            // Guide
+            if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
+                html += `<div class="service-detail-item text-success mt-1">
+                    <i class="ti ti-user me-1"></i>
+                    <strong>Incluye Chofer</strong>
+                </div>`;
+            }
+
+            // Greeter
+            if ((service.type === 'tour' || service.type === 'transport') && service.includeGreeter) {
+                const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
+                html += `<div class="service-detail-item text-info mt-1">
+                    <i class="ti ti-users me-1"></i>
+                    <strong>Incluye Greeter${greeterLocation}</strong>
+                </div>`;
+            }
+
+            // Availability warning
+            if (service.availabilityPending) {
+                html += `<div class="mt-2">
+                    <span class="badge bg-warning text-dark">
+                        <i class="ti ti-alert-triangle me-1"></i>Verificar disponibilidad
+                    </span>
+                </div>`;
+            }
+
+            // Notes
+            if (service.notes) {
+                html += `<div class="service-detail-item mt-2 text-muted small">
+                    <i class="ti ti-notes me-1"></i>
+                    <span style="white-space: pre-wrap;">${service.notes}</span>
+                </div>`;
+            }
+
+            html += '</div>'; // service-details
+
             // Actions (only in list mode)
             if (this.mode === 'list' && this.container) {
                 html += this.renderServiceActions(service);
             }
-            
-            html += '</div>'; // service-header
-            html += '</div>'; // service-card
-            
+
+            html += '</div>'; // service-item
+
             return html;
         }
 
         // Render transport service with special layout
         renderTransportService(service) {
-            const serviceClass = `service-card transport`;
             const isExcluded = service.includeInTotal === false;
             const price = this.getServicePrice(service);
             const typeColor = this.config.typeColors.transport;
-            
+
             // Get transport specific info
-            const transportTypes = { 
-                aeropuerto: 'Aeropuerto', 
-                'punto-a-punto': 'Punto a Punto', 
-                local: 'Local' 
+            const transportTypes = {
+                aeropuerto: 'Aeropuerto',
+                'punto-a-punto': 'Punto a Punto',
+                local: 'Local'
             };
             const transportLabel = transportTypes[service.transportType] || 'Transporte';
-            
+
             // Extract and round flight time
             let flightTime = '';
             // For departure transport services, prefer suggested departure time
@@ -539,12 +574,12 @@
                 flightTime = service.time;
             }
             const roundedTime = flightTime ? this.roundTimeToNearest15(flightTime) : '';
-            
+
             // Get origin and destination
             let origin = service.originName || service.origin || 'Origen';
             let destination = service.destination || 'Destino';
             let specificLocation = service.specificLocation || '';
-            
+
             // Extract specific location from embedded format
             if (!specificLocation) {
                 if (origin.includes(',')) {
@@ -557,17 +592,22 @@
                     specificLocation = parts[1].trim();
                 }
             }
-            
+
             // Direction labels
             const directionLabels = {
                 arrival: service.transportType === 'aeropuerto' ? 'Llegada' : 'Ida',
                 departure: service.transportType === 'aeropuerto' ? 'Salida' : 'Vuelta',
             };
 
-            let html = `<div class="${serviceClass}">`;
-            html += '<div class="service-header">';
-            html += '<div class="service-info">';
-            
+            // Clean transport service item with minimal styling
+            let html = `<div class="service-item">`;
+
+            // Service header row with title and price
+            html += '<div class="d-flex justify-content-between align-items-start">';
+
+            // Left side: Service info
+            html += '<div class="service-info flex-grow-1">';
+
             // Rounded time badge at top if exists (matching main services view styling)
             if (roundedTime) {
                 html += `<div class="mb-2">
@@ -576,37 +616,37 @@
                     </span>
                 </div>`;
             }
-            
+
             // Service badges
             html += '<div class="mb-2">';
             html += `<span class="badge bg-light text-dark me-2">Transporte</span>`;
             html += `<span class="badge bg-primary-subtle text-primary me-2">${transportLabel}</span>`;
-            
+
             if (service.directionType) {
                 const dirLabel = directionLabels[service.directionType];
                 const badgeClass = service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning';
                 html += `<span class="badge ${badgeClass} me-2">${dirLabel}</span>`;
             }
-            
+
             if (service.tripType === 'round-trip') {
                 html += `<span class="badge bg-info-subtle text-info me-2"><i class="ti ti-arrows-left-right me-1"></i>Ida y Vuelta</span>`;
             }
-            
+
             if (service.returnOrigin || service.returnDestination) {
                 html += `<span class="badge bg-secondary-subtle text-secondary me-2"><i class="ti ti-link me-1"></i>Conexión</span>`;
             }
-            
+
             if (isExcluded) {
                 html += `<span class="badge bg-secondary-subtle text-secondary me-2">Pago externo</span>`;
             }
             html += '</div>';
-            
+
             // Passenger quantities
             html += this.renderPeopleQuantities(service);
-            
+
             // Service details
             html += '<div class="service-details mt-2">';
-            
+
             // Origin and destination
             html += `<div class="service-detail-item">
                 <i class="ti ti-circle-filled text-success me-1" style="font-size: 0.5rem;"></i>
@@ -618,7 +658,7 @@
                 <span class="text-muted me-1">Hacia:</span>
                 ${destination}
             </div>`;
-            
+
             // Airline info
             if (service.transportType === 'aeropuerto') {
                 if (service.airline) {
@@ -636,7 +676,7 @@
                     </div>`;
                 }
             }
-            
+
             // Schedule time
             if (service.selectedSchedule || service.startTime || service.time) {
                 const timeLabel = this.config.displayRules.getScheduleLabel(service);
@@ -646,7 +686,7 @@
                     ${timeLabel} ${timeValue}
                 </div>`;
             }
-            
+
             // Departure time suggestions - only show for departure services (not arrivals)
             if (this.config.displayRules.shouldShowDepartureTime(service)) {
                 if (service.transportType === 'aeropuerto' && service.flightDepartureTimeSuggested) {
@@ -657,7 +697,7 @@
                     </div>`;
                 }
             }
-            
+
             // Round trip departure times - only show for departure services
             if (this.config.displayRules.shouldShowRoundTripFields(service)) {
                 if (service.roundTripDepartureTimeSuggestedIda) {
@@ -672,7 +712,7 @@
                         <span class="text-muted">Salida vuelta:</span> ${service.roundTripDepartureTimeSuggestedVuelta}
                     </div>`;
                 }
-                
+
                 // Round trip dates
                 if (service.startDate || service.endDate) {
                     html += `<div class="service-detail-item">
@@ -680,7 +720,7 @@
                         <span class="text-muted">Fechas:</span> ${service.startDate || ''} - ${service.endDate || ''}
                     </div>`;
                 }
-                
+
                 // Return flight info
                 if (service.returnAirline || service.returnFlightNumber) {
                     html += `<div class="service-detail-item">
@@ -689,9 +729,9 @@
                     </div>`;
                 }
             }
-            
+
             // Route duration is kept in data for pricing calculations but not displayed in UI
-            
+
             // Specific location
             if (specificLocation) {
                 html += `<div class="service-detail-item">
@@ -700,28 +740,30 @@
                     ${specificLocation}
                 </div>`;
             }
-            
+
             // Vehicles
             const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
             const hasAdditional = service.additionalVehicleId || service.additionalVehicleTypeName;
-            
+
             if (hasVehicle || hasAdditional) {
                 html += '<div class="mt-2">';
                 html += '<div class="service-detail-item mb-1">';
                 html += '<i class="ti ti-car me-1"></i>Vehículo(s):';
                 html += '</div>';
-                
+
                 if (hasVehicle) {
                     const vehicleName = this.getVehicleDisplayName(service);
-                    const segmentName = service.category ? ` - ${this.getCategoryName(service.category)}` : '';
+                    const segmentName = service.category ? ` - ${this.getCategoryName(service.category)}` : 
+                                       service.rateId ? ` - ${this.getCategoryName(service.rateId)}` : '';
                     html += `<div style="margin-left: 20px;">
-                        <strong>${vehicleName}</strong>${service.quantity > 1 ? ` x${service.quantity}` : ''}${segmentName}
+                        <strong>${vehicleName}</strong>${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` : 
+                            service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}${segmentName}
                     </div>`;
                 }
-                
+
                 if (hasAdditional) {
                     const additionalName = this.cleanVehicleName(this.getAdditionalVehicleDisplayName(service));
-                    const additionalSegment = service.additionalVehicleSegment ? 
+                    const additionalSegment = service.additionalVehicleSegment ?
                         ` - ${this.getCategoryName(service.additionalVehicleSegment)}` : ' - Segmento';
                     html += `<div style="margin-left: 20px; margin-top: 4px;">
                         <strong>${additionalName}</strong>${additionalSegment}
@@ -729,7 +771,7 @@
                 }
                 html += '</div>';
             }
-            
+
             // Guide
             if (service.includeGuide) {
                 html += `<div class="service-detail-item text-success mt-1">
@@ -737,7 +779,7 @@
                     <strong>Incluye Chofer</strong>
                 </div>`;
             }
-            
+
             // Greeter
             if (service.includeGreeter) {
                 const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
@@ -746,7 +788,7 @@
                     <strong>Incluye Greeter${greeterLocation}</strong>
                 </div>`;
             }
-            
+
             // Waiting time
             if (service.waitingTimeHours > 0) {
                 html += `<div class="service-detail-item text-warning mt-1">
@@ -754,7 +796,7 @@
                     <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
                 </div>`;
             }
-            
+
             // Notes
             if (service.notes) {
                 html += `<div class="service-detail-item mt-2 text-muted small">
@@ -762,13 +804,13 @@
                     <span style="white-space: pre-wrap;">${service.notes}</span>
                 </div>`;
             }
-            
+
             html += '</div>'; // service-details
             html += '</div>'; // service-info
-            
-            // Price - transport services always show price
+
+            // Price - transport services always show price (restore original logic)
             if (this.config.displayRules.shouldShowPrice(service)) {
-                html += '<div>';
+                html += '<div class="service-price text-end">';
                 if (isExcluded) {
                     html += '<span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span><br>';
                     html += `<div class="service-price excluded">${this.formatCurrency(price)}</div>`;
@@ -777,15 +819,16 @@
                 }
                 html += '</div>';
             }
-            
+
+            html += '</div>'; // Close header row
+
             // Actions (only in list mode)
             if (this.mode === 'list' && this.container) {
                 html += this.renderServiceActions(service);
             }
-            
-            html += '</div>'; // service-header
-            html += '</div>'; // service-card
-            
+
+            html += '</div>'; // service-item
+
             return html;
         }
 
@@ -801,20 +844,48 @@
                 </div>`;
             }
 
-            // Vehicle info
-            if (service.vehicleId || service.vehicleType || service.vehicleTypeName) {
+            // Duration (for tours)
+            if (service.type === 'tour' && service.duration) {
                 html += `<div class="service-detail-item">
-                    <i class="ti ti-car me-1"></i>
-                    ${this.getVehicleDisplayName(service)}
-                    ${service.quantity > 1 ? ` x${service.quantity}` : ''}
+                    <i class="ti ti-clock-hour-${service.duration || 1} me-1"></i>
+                    <span>Duración: ${service.duration} ${service.duration === 1 ? 'hora' : 'horas'}</span>
+                </div>`;
+            }
+            
+            // Duration (for a-disposición)
+            if (service.type === 'a-disposicion' && service.hours) {
+                html += `<div class="service-detail-item">
+                    <i class="ti ti-clock me-1"></i>
+                    <span>Duración: ${service.hours} ${service.hours == 1 ? 'hora' : 'horas'}</span>
                 </div>`;
             }
 
-            // Additional vehicle (tours)
-            if (service.type === 'tour' && service.additionalVehicleId) {
-                html += `<div class="service-detail-item text-info">
-                    <i class="ti ti-car-crane me-1"></i>
-                    <span>Vehículo adicional: ${this.getAdditionalVehicleDisplayName(service)}</span>
+            // Vehicle info - standardized format like transport services
+            if (service.vehicleId || service.vehicleType || service.vehicleTypeName || 
+                (service.type === 'tour' && service.additionalVehicleId)) {
+                html += `<div>
+                    <div class="mb-1">
+                        <i class="ti ti-car me-1"></i><span class="text-muted">Vehículo(s):</span>
+                    </div>
+                    ${(service.vehicleId || service.vehicleType || service.vehicleTypeName) ? `
+                        <div class="ms-3">
+                            <span>
+                                <strong>${this.getVehicleDisplayName(service)}</strong>
+                                ${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` : 
+                                  service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}
+                                ${service.rateId ? ` - ${this.getCategoryName(service.rateId)}` : 
+                                  service.category ? ` - ${this.getCategoryName(service.category)}` : ''}
+                            </span>
+                        </div>
+                    ` : ''}
+                    ${service.type === 'tour' && service.additionalVehicleId ? `
+                        <div class="ms-3 mt-1">
+                            <span>
+                                <strong>${this.getAdditionalVehicleDisplayName(service)}</strong>
+                                ${service.additionalVehicleSegment ? ` - ${this.getCategoryName(service.additionalVehicleSegment)}` : ''}
+                            </span>
+                        </div>
+                    ` : ''}
                 </div>`;
             }
 
@@ -862,11 +933,11 @@
         // Render transport-specific details
         renderTransportDetails(service) {
             let html = '';
-            
+
             // Origin and destination
             const origin = this.getTransportLocation(service, 'origin');
             const destination = this.getTransportLocation(service, 'destination');
-            
+
             if (origin) {
                 html += `<div class="service-detail-item">
                     <i class="ti ti-circle-filled text-success me-1" style="font-size: 0.5rem;"></i>
@@ -874,7 +945,7 @@
                     ${origin}
                 </div>`;
             }
-            
+
             if (destination) {
                 html += `<div class="service-detail-item">
                     <i class="ti ti-map-pin-filled text-danger me-1" style="font-size: 0.7rem;"></i>
@@ -910,13 +981,13 @@
             const children = service.childrenQuantity || service.transportChildren || 0;
             const infants = service.infantsQuantity || service.transportInfants || 0;
             const noAlcohol = service.adultsNoAlcoholQuantity || 0;
-            
+
             if (adults === 0 && children === 0 && infants === 0 && noAlcohol === 0) {
                 return '';
             }
 
             let html = '<div class="passenger-badges d-flex align-items-center text-muted small mb-1">';
-            
+
             if (adults > 0) {
                 const config = this.config.passengerTypes.adults;
                 html += `<span class="${this.getPassengerBadgeClass('adults')}">
@@ -924,7 +995,7 @@
                     <span>${adults} ${adults > 1 ? config.pluralLabel : config.label}</span>
                 </span>`;
             }
-            
+
             if (children > 0) {
                 const config = this.config.passengerTypes.children;
                 html += `<span class="${this.getPassengerBadgeClass('children')}">
@@ -932,7 +1003,7 @@
                     <span>${children} ${children > 1 ? config.pluralLabel : config.label}</span>
                 </span>`;
             }
-            
+
             if (infants > 0) {
                 const config = this.config.passengerTypes.infants;
                 html += `<span class="${this.getPassengerBadgeClass('infants')}">
@@ -940,7 +1011,7 @@
                     <span>${infants} ${infants > 1 ? config.pluralLabel : config.label}</span>
                 </span>`;
             }
-            
+
             if (noAlcohol > 0) {
                 const config = this.config.passengerTypes.adultsNoAlcohol;
                 html += `<span class="${this.getPassengerBadgeClass('adultsNoAlcohol')}">
@@ -948,15 +1019,35 @@
                     <span>${noAlcohol} ${config.label}</span>
                 </span>`;
             }
-            
+
             html += '</div>';
             return html;
+        }
+
+        // Render people quantities simplified for minimal layout
+        renderPeopleQuantitiesSimple(service) {
+            const adults = service.adultsQuantity || service.transportAdults || 0;
+            const children = service.childrenQuantity || service.transportChildren || 0;
+            const infants = service.infantsQuantity || service.transportInfants || 0;
+            const noAlcohol = service.adultsNoAlcoholQuantity || 0;
+
+            if (adults === 0 && children === 0 && infants === 0 && noAlcohol === 0) {
+                return '';
+            }
+
+            const parts = [];
+            if (adults > 0) parts.push(`${adults} adulto${adults > 1 ? 's' : ''}`);
+            if (children > 0) parts.push(`${children} niño${children > 1 ? 's' : ''}`);
+            if (infants > 0) parts.push(`${infants} infante${infants > 1 ? 's' : ''}`);
+            if (noAlcohol > 0) parts.push(`${noAlcohol} sin alcohol`);
+
+            return `<i class="ti ti-users me-1"></i>${parts.join(' • ')}`;
         }
 
         // Render passenger badges
         renderPassengerBadges(passengers) {
             let html = '<div class="passenger-badges">';
-            
+
             if (passengers.adults > 0) {
                 const config = this.config.passengerTypes.adults;
                 html += `<span class="service-badge" style="background: ${config.color}15; color: ${config.color};">
@@ -964,7 +1055,7 @@
                     ${passengers.adults} ${passengers.adults > 1 ? config.pluralLabel : config.label}
                 </span>`;
             }
-            
+
             if (passengers.children > 0) {
                 const config = this.config.passengerTypes.children;
                 html += `<span class="service-badge" style="background: ${config.color}15; color: ${config.color};">
@@ -972,7 +1063,7 @@
                     ${passengers.children} ${passengers.children > 1 ? config.pluralLabel : config.label}
                 </span>`;
             }
-            
+
             if (passengers.infants > 0) {
                 const config = this.config.passengerTypes.infants;
                 html += `<span class="service-badge" style="background: ${config.color}15; color: ${config.color};">
@@ -980,7 +1071,7 @@
                     ${passengers.infants} ${passengers.infants > 1 ? config.pluralLabel : config.label}
                 </span>`;
             }
-            
+
             if (passengers.noAlcohol > 0) {
                 const config = this.config.passengerTypes.adultsNoAlcohol;
                 html += `<span class="service-badge" style="background: ${config.color}15; color: ${config.color};">
@@ -988,7 +1079,7 @@
                     ${passengers.noAlcohol} ${config.label}
                 </span>`;
             }
-            
+
             html += '</div>';
             return html;
         }
@@ -1013,17 +1104,6 @@
             `;
         }
 
-        // Render grand total
-        renderGrandTotal(total) {
-            return `
-                <div class="grand-total mt-3 p-3 bg-dark text-white rounded">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Total General</h5>
-                        <h4 class="mb-0">${this.formatCurrency(total)}</h4>
-                    </div>
-                </div>
-            `;
-        }
 
         // Helper: Round time to nearest 15 minutes
         roundTimeToNearest15(timeStr) {
@@ -1038,11 +1118,14 @@
 
         // Helper: Get service title
         getServiceTitle(service) {
+            // For a-disposición, return empty to avoid redundancy (vehicle shown below)
+            if (service.type === 'a-disposicion') return '';
+            
             if (service.concept) return service.concept;
             if (service.experienceName) return service.experienceName;
             if (service.tourName) return service.tourName;
             if (service.name) return service.name;
-            
+
             // For transport, build title from route
             if (this.config.helpers.isTransport(service.type)) {
                 const origin = this.getTransportLocation(service, 'origin', true);
@@ -1051,32 +1134,37 @@
                     return `${origin} → ${destination}`;
                 }
             }
-            
+
             return this.config.typeLabels[service.type] || 'Servicio';
         }
 
         // Helper: Get transport location
         getTransportLocation(service, type, short = false) {
             let location = '';
-            
+
             if (type === 'origin') {
                 location = service.origin || service.transportOrigin || '';
             } else {
                 location = service.destination || service.transportDestination || '';
             }
-            
+
             // Extract location from embedded format
             if (location.includes(' - ')) {
                 const parts = location.split(' - ');
                 location = short ? parts[0] : location;
             }
-            
+
             return location;
         }
 
         // Helper: Get vehicle display name
         getVehicleDisplayName(service) {
-            return service.vehicleTypeName || service.vehicleType || 'Vehículo seleccionado';
+            let name = service.vehicleTypeName || service.vehicleType || 'Vehículo seleccionado';
+            // Clean vehicle name - remove capacity info like "- 4 pax"
+            if (name && typeof name === 'string') {
+                name = name.split(' - ')[0].trim();
+            }
+            return name;
         }
 
         // Helper: Get additional vehicle display name
@@ -1094,29 +1182,29 @@
         // Helper: Get category name
         getCategoryName(categoryId) {
             if (!categoryId) return 'Segmento';
-            
+
             // Try segment mappings from summary view
             if (this.segmentMappings && this.segmentMappings[categoryId]) {
                 return this.segmentMappings[categoryId];
             }
-            
+
             // Try rates cache from services view
             if (this.ratesCache && this.ratesCache.length > 0) {
-                const rate = this.ratesCache.find(r => 
-                    r.value === categoryId || 
-                    r.objectId === categoryId || 
+                const rate = this.ratesCache.find(r =>
+                    r.value === categoryId ||
+                    r.objectId === categoryId ||
                     r.id === categoryId
                 );
-                
+
                 if (rate) {
                     return rate.label || rate.name || 'Segmento';
                 }
             }
-            
+
             // Static fallback mappings for common ObjectIds
             const staticMappings = {
                 'ox5gO8c9ok': 'First Class',
-                'yipmABp1UZ': 'Premium', 
+                'yipmABp1UZ': 'Premium',
                 'JGEgJ4gr9G': 'Green Class',
                 // Route/geographic segments 
                 'sma-leon': 'SMA-León',
@@ -1127,11 +1215,11 @@
                 'local-gto': 'Local Guanajuato',
                 'local-leon': 'Local León'
             };
-            
+
             if (staticMappings[categoryId]) {
                 return staticMappings[categoryId];
             }
-            
+
             // Last resort: return the ID itself
             console.warn('Unmapped segment ID in unified renderer:', categoryId);
             return categoryId;
@@ -1149,7 +1237,7 @@
                 const price = service.pricesByType[this.paymentType];
                 if (price !== undefined) return price;
             }
-            
+
             // Fallback to base price
             return service.price || service.total || 0;
         }
