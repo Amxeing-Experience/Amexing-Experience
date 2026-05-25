@@ -406,6 +406,14 @@ yarn lint:fix       # Auto-fix errores
 yarn format         # Format con Prettier
 ```
 
+**Quote Services Renderer Sync**:
+Si modificas la vista de servicios de cotizaciones (`quote-services-v2.js`):
+```bash
+npm run check-sync    # Verificar sincronización de renderers
+npm run sync-renderer # Sincronizar cambios entre vistas
+```
+Ver [Renderer Sync Guide](./docs/RENDERER_SYNC_GUIDE.md) para más detalles.
+
 **Coverage Requirements**:
 - Mínimo 80% para nuevos features
 - Crítico: 100% para security/authentication

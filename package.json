@@ -5,6 +5,9 @@
   "main": "src/index.js",
   "scripts": {
     "scripts:help": "node scripts/global/help.js",
+    "check-sync": "node scripts/renderer-sync-check.js",
+    "sync-renderer": "node scripts/renderer-sync-wizard.js",
+    "sync-report": "node scripts/renderer-sync-check.js --json > renderer-sync-report.json",
     "start": "NODE_ENV=production node --experimental-vm-modules src/index.js",
     "dev": "NODE_ENV=development node --watch --experimental-vm-modules src/index.js",
     "dev:staging": "NODE_ENV=staging node --watch --experimental-vm-modules src/index.js",

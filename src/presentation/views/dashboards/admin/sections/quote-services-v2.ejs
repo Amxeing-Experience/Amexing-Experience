@@ -305,8 +305,8 @@
     }
 
     .service-item:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        /* transform: translateY(-2px); */
+        /* box-shadow: 0 4px 12px rgba(0,0,0,0.1); */
     }
 
     .hover-shadow {
@@ -543,5 +543,11 @@
 </script>
 <link rel="stylesheet" href="/dashboards/admin/sections/quote-services/quote-catalog-drag.css">
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
+<script src="/js/services-renderer-config.js"></script>
+<script src="/js/services-renderer.js"></script>
+<% if (process.env.NODE_ENV === 'development') { %>
+<!-- Renderer DevTools for development -->
+<script src="/js/renderer-dev-tools.js"></script>
+<% } %>
 <script src="/dashboards/admin/sections/quote-services-v2.js"></script>
 <script src="/dashboards/admin/sections/quote-services/quote-catalog-drag.js"></script>

@@ -194,7 +194,7 @@ class PublicQuoteController {
       contactPerson: quote.getContactPerson() || '',
       contactEmail: quote.getContactEmail() || '',
       contactPhone: quote.getContactPhone() || '',
-      numberOfPeople: quote.getNumberOfPeople() || 1,
+      numberOfPeople: quote.getNumberOfPeople() || 0,
       eventType: quote.getEventType() || '',
       rate: this.formatRateData(rate),
       serviceItems: await this.formatServiceItems(serviceItems),
@@ -257,6 +257,8 @@ class PublicQuoteController {
       subtotal: serviceItems.subtotal || 0,
       iva: serviceItems.iva || 0,
       total: serviceItems.total || 0,
+      paymentType: serviceItems.paymentType || 'efectivo',
+      currency: serviceItems.currency || 'MXN',
     };
   }
 
@@ -271,7 +273,10 @@ class PublicQuoteController {
     const subconcepts = await Promise.all((day.subconcepts || []).map((sub) => this.formatSubconcept(sub)));
 
     return {
+      id: day.id || day['_id'] || '', // eslint-disable-line dot-notation
       dayNumber: day.dayNumber || 0,
+      title: day.title || day.dayTitle || '',
+      dayTitle: day.dayTitle || day.title || '',
       date: day.date || '',
       city: day.city || '',
       description: day.description || '',
@@ -321,6 +326,7 @@ class PublicQuoteController {
       vehicleTypeId: sub.vehicleTypeId || '',
       vehicleCapacity: sub.vehicleCapacity || null,
       vehicleMultiplier: sub.vehicleMultiplier || 1,
+      quantity: sub.quantity || 1,
       startTime: sub.startTime || '',
       endTime: sub.endTime || '',
       time: sub.time || '',
@@ -328,7 +334,7 @@ class PublicQuoteController {
       hours: sub.hours || 0,
       unitPrice: sub.unitPrice || 0,
       isPerPerson: sub.isPerPerson || false,
-      numberOfPeople: sub.numberOfPeople || 1,
+      numberOfPeople: sub.numberOfPeople || 0,
       total: sub.total || 0,
       destinationPOI: sub.destinationPOI || '',
       destination: sub.destination || '',
@@ -368,6 +374,28 @@ class PublicQuoteController {
       additionalVehicleTypeName: sub.additionalVehicleTypeName || '',
       additionalVehicleSegment: sub.additionalVehicleSegment || '',
       additionalVehicleSegmentName: sub.additionalVehicleSegmentName || '',
+      // Additional missing fields for unified renderer compatibility
+      duration: sub.duration || null,
+      isWalkingTour: sub.isWalkingTour || false,
+      pricesByType: sub.pricesByType || null,
+      includeInTotal: sub.includeInTotal !== false,
+      category: sub.category || '',
+      tripType: sub.tripType || '',
+      specificLocation: sub.specificLocation || '',
+      // A-disposición specific fields
+      vehicleCount: sub.vehicleCount || null,
+      hourlyPrice: sub.hourlyPrice || null,
+      discountPercent: sub.discountPercent || null,
+      rateId: sub.rateId || '',
+      flightDepartureTimeSuggested: sub.flightDepartureTimeSuggested || '',
+      roundTripDepartureTimeSuggestedIda: sub.roundTripDepartureTimeSuggestedIda || '',
+      roundTripDepartureTimeSuggestedVuelta: sub.roundTripDepartureTimeSuggestedVuelta || '',
+      greeterInVehicle: sub.greeterInVehicle || false,
+      // Return flight fields for round-trip services
+      returnOrigin: sub.returnOrigin || '',
+      returnDestination: sub.returnDestination || '',
+      returnAirline: sub.returnAirline || '',
+      returnFlightNumber: sub.returnFlightNumber || '',
     };
   }
 

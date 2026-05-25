@@ -470,6 +470,20 @@ const quotes = await quotesQuery.find({ useMasterKey: true });
 
 ## 🎨 Frontend Development
 
+### **Development Tools**
+
+**Quote Services Renderer Sync:**
+When working on quote services views, use the renderer sync tools to maintain consistency:
+```bash
+npm run check-sync    # Check renderer synchronization
+npm run sync-renderer # Interactive sync wizard
+```
+In browser console (development mode):
+```javascript
+DevTools.checkRendererSync()  // Quick sync check
+```
+See [Renderer Sync Guide](./RENDERER_SYNC_GUIDE.md) for details.
+
 ### **Atomic Design Structure**
 
 **Component Hierarchy:**
