@@ -474,9 +474,17 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <label for="flightTime" class="form-label">Hora Vuelo</label>
                                             <input type="text" class="form-control time-input" id="flightTime" placeholder="__:__" maxlength="5">
                                         </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label for="flightDepartureTimeSuggested" class="form-label">Hora de salida sugerida</label>
-                                            <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" placeholder="__:__" maxlength="5">
+                                        <div class="col-md-6 mb-3" id="flightDepartureTimeSuggestedContainer">
+                                            <label for="flightDepartureTimeSuggested" class="form-label" id="flightDepartureTimeSuggestedLabel">Hora de salida sugerida</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" placeholder="__:__" maxlength="5" readonly>
+                                                <button type="button" class="btn btn-outline-secondary" id="flightDepartureTimeEditBtn" title="Editar">
+                                                    <i class="ti ti-pencil"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-outline-success d-none" id="flightDepartureTimeConfirmBtn" title="Confirmar">
+                                                    <i class="ti ti-check"></i>
+                                                </button>
+                                            </div>
                                             <small class="text-muted">Se calculará automáticamente al seleccionar un segmento</small>
                                         </div>
                                         <!-- Removed Número de Personas field as requested
@@ -485,6 +493,17 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="number" class="form-control" id="transportPersons" min="1" max="50" value="1" required>
                                         </div>
                                         -->
+                                    </div>
+                                    <!-- Additional flights — for when several passengers arrive on different flights -->
+                                    <div class="row">
+                                        <div class="col-12 mb-3">
+                                            <label class="form-label">Vuelos adicionales</label>
+                                            <small class="form-text text-muted d-block mb-2">Si distintos pasajeros llegan en vuelos distintos, agrégalos aquí.</small>
+                                            <div id="additionalFlightsList"></div>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" id="addAdditionalFlightBtn">
+                                                <i class="ti ti-plus me-1"></i>Agregar vuelo
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 </div>
@@ -725,24 +744,22 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <input type="text" class="form-control" id="conceptoConcept" placeholder="Describe el servicio...">
                             </div>
                             
-                            <!-- Client Price and Surcharge Control -->
+                            <!-- Client Price -->
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label for="conceptoClientPrice" class="form-label">Precio Unitario</label>
+                                    <label for="conceptoClientPrice" class="form-label">Precio Unitario (efectivo)</label>
                                     <input type="number" class="form-control" id="conceptoClientPrice" placeholder="0.00" step="0.01" min="0">
                                     <small class="text-muted">Precio unitario del concepto</small>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <div class="form-check mt-4">
-                                        <input class="form-check-input" type="checkbox" id="conceptoApplySurcharges" checked>
-                                        <label class="form-check-label" for="conceptoApplySurcharges">
-                                            <i class="ti ti-percentage me-1"></i>Aplicar recargos por tipo de pago
-                                        </label>
-                                    </div>
-                                    <small class="text-muted d-block mt-2">
-                                        Si está activo, se aplicarán recargos automáticos según el tipo de pago
-                                    </small>
+                                    <label for="conceptoPricePerPerson" class="form-label">Precio por Persona (efectivo)</label>
+                                    <input type="number" class="form-control" id="conceptoPricePerPerson" placeholder="0.00" step="0.01" min="0">
+                                    <small class="text-muted">Precio por persona del concepto</small>
                                 </div>
+                            </div>
+                            <!-- Surcharges checkbox kept in DOM (hidden) so existing JS handlers still work -->
+                            <div class="d-none">
+                                <input class="form-check-input" type="checkbox" id="conceptoApplySurcharges" checked>
                             </div>
                             
                             <!-- Schedule Toggle -->
@@ -975,6 +992,21 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <option value="">Primero selecciona un segmento</option>
                             </select>
                         </div>
+                        <!-- Extra additional vehicles (beyond the first one) — wired by JS.
+                             Each row gets its own segment + vehicle dropdowns. Hidden until the
+                             "Vehículo adicional" checkbox is checked. Phase 1: data model + UI;
+                             pricing impact lands in Phase 2. -->
+                        <div class="col-12 d-none mt-2 p-3 border rounded bg-light" id="extraAdditionalVehiclesContainer">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong class="text-secondary" style="font-size: 0.9rem;">
+                                    <i class="ti ti-car-suv me-1"></i>Vehículos adicionales (extra)
+                                </strong>
+                                <button type="button" class="btn btn-sm btn-primary" id="addExtraAdditionalVehicleBtn">
+                                    <i class="ti ti-plus me-1"></i>Agregar otro vehículo
+                                </button>
+                            </div>
+                            <div id="extraAdditionalVehiclesList"></div>
+                        </div>
                     </div>
                     <!-- Experience pricing with adult/child/no-alcohol options -->
                     <div id="experiencePricingSection" class="d-none">
@@ -1113,6 +1145,16 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             Incluir en el total de la cotización
                         </label>
                         <small class="form-text text-muted d-block">Desmarcar si el cliente paga este servicio por separado</small>
+                    </div>
+
+                    <!-- Asistentes (participantes / pasajeros) -->
+                    <div class="mb-3" id="serviceAttendeesSection">
+                        <label class="form-label">Asistentes</label>
+                        <small class="form-text text-muted d-block mb-2">Nombre completo de cada persona que toma este servicio</small>
+                        <div id="serviceAttendeesList"></div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" id="addAttendeeBtn">
+                            <i class="ti ti-plus me-1"></i>Agregar asistente
+                        </button>
                     </div>
 
                     <div class="mb-3">

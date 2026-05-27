@@ -374,16 +374,6 @@ class ExperienceImageController {
             }
           }
 
-          // Debug log
-          console.log(
-            'Processing experience image:',
-            img.get('fileName'),
-            's3Key:',
-            s3Key,
-            'optimizationMetadata:',
-            img.get('optimizationMetadata')
-          );
-
           // Generate optimized URLs if optimization is enabled
           let imageData = null;
 

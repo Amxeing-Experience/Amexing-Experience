@@ -51,12 +51,6 @@ class QuoteOwnershipController {
     }
 
     try {
-      logger.info('Initializing quote ownership', {
-        quoteId,
-        userId,
-        ip: req.ip,
-      });
-
       const ownership = await this.ownershipService.initializeOwnership(
         quoteId,
         userId

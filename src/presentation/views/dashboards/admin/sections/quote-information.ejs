@@ -183,6 +183,20 @@
                     </div>
                 </div>
 
+                <!-- Lead Guest Fields -->
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="leadGuestFirstName" class="form-label">Lead Guest - Nombre</label>
+                        <input type="text" class="form-control" id="leadGuestFirstName" name="leadGuestFirstName" placeholder="Nombre">
+                        <div class="form-text">Nombre del huésped principal</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="leadGuestLastName" class="form-label">Lead Guest - Apellido</label>
+                        <input type="text" class="form-control" id="leadGuestLastName" name="leadGuestLastName" placeholder="Apellido">
+                        <div class="form-text">Apellido del huésped principal</div>
+                    </div>
+                </div>
+
                 <!-- Contact Name Fields -->
                 <div class="row">
                     <div class="col-md-6 mb-3">
@@ -1146,13 +1160,16 @@
                         raw: client,
                         label: client.label,
                         value: client.value,
-                        contactPerson: client.contactPerson
+                        contactPerson: client.contactPerson,
+                        companyName: client.companyName
                     });
-                    
-                    // Smart display logic:
-                    // 1. If label has company name in parentheses, prioritize company name
-                    // 2. If no parentheses but label looks like "FirstName LastName", keep as is
-                    // 3. Otherwise use the full label
+
+                    // Display logic:
+                    // - Agencies → ALWAYS show the company name (admins want to see the
+                    //   agency / enterprise, never the department manager's personal name).
+                    //   Falls back to the legacy "Name (Company)" parse if companyName
+                    //   isn't on the payload (e.g. older API responses).
+                    // - Direct clients → keep current parse (company-in-parens preferred).
                     let displayText = client.label;
                     const parenthesesMatch = client.label.match(/^(.+?)\s*\(([^)]+)\)$/);
 
@@ -1184,25 +1201,26 @@
                         console.log('✅ Agency: using companyName:', displayText);
                     } else if (parenthesesMatch && parenthesesMatch[2]) {
                         displayText = parenthesesMatch[2];
-                        console.log('✅ Using company name from parentheses:', displayText);
+                        console.log('✅ Direct: using company name from parentheses:', displayText);
                     } else if (!client.label.includes('(')) {
-                        // No parentheses - likely just the company or person name, use as is
                         displayText = client.label;
-                        console.log('ℹ️ No parentheses found, using label as-is:', displayText);
+                        console.log('ℹ️ Direct: no parentheses, using label as-is:', displayText);
                     }
-                    
+
                     console.log('📋 Final display text for client:', {
                         clientId: client.value,
                         displayText: displayText,
-                        originalLabel: client.label
+                        originalLabel: client.label,
+                        typeToLoad
                     });
-                    
+
                     clientTS.addOption({
                         value: client.value,
                         text: displayText,
                         email: client.email,
                         contactPerson: client.contactPerson,
-                        phone: client.phone
+                        phone: client.phone,
+                        companyName: client.companyName
                     });
                 });
 
@@ -2360,6 +2378,12 @@
                     }
                 }
 
+                // Lead Guest fields (huésped principal)
+                const leadGuestFirstNameEl = document.getElementById('leadGuestFirstName');
+                const leadGuestLastNameEl = document.getElementById('leadGuestLastName');
+                if (leadGuestFirstNameEl) leadGuestFirstNameEl.value = quote.leadGuestFirstName || '';
+                if (leadGuestLastNameEl) leadGuestLastNameEl.value = quote.leadGuestLastName || '';
+
                 if (quote.contactEmail) {
                     document.getElementById('contactEmail').value = quote.contactEmail;
                 }
@@ -2468,6 +2492,8 @@
             contactLastName: lastName || undefined,
             contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
             contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
+            leadGuestFirstName: document.getElementById('leadGuestFirstName')?.value.trim() || undefined,
+            leadGuestLastName: document.getElementById('leadGuestLastName')?.value.trim() || undefined,
             notes: document.getElementById('notes').value.trim() || undefined
         };
 
@@ -2475,7 +2501,7 @@
         if (clientFinalId) {
             formData.clientFinalId = clientFinalId;
         }
-        
+
         // Include clientType for admin users updating direct client quotes
         if (userRole === 'admin' || userRole === 'superadmin') {
             const directRadio = document.getElementById('clientTypeDirect');
@@ -2613,6 +2639,8 @@
             contactLastName: lastName || undefined,
             contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
             contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
+            leadGuestFirstName: document.getElementById('leadGuestFirstName')?.value.trim() || undefined,
+            leadGuestLastName: document.getElementById('leadGuestLastName')?.value.trim() || undefined,
             notes: document.getElementById('notes').value.trim() || undefined
         };
 

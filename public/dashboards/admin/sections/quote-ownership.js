@@ -20,11 +20,11 @@ class QuoteOwnershipManager {
         this.savedQuoteData = null; // Store quote data for clientType checking
         this.dataLoaded = false; // Track when initial data loading is complete
         this.dataLoadingPromise = null; // Store the loading promise to await if needed
-        
+
         // Store user role for filtering
         this.currentUserRole = window.currentUser?.role || window.userRole || '';
         console.log('[QuoteOwnershipManager] Initialized with user role:', this.currentUserRole);
-        
+
         this.init();
     }
 
@@ -38,34 +38,34 @@ class QuoteOwnershipManager {
             console.log('✅ Direct client mode detected from saved quote data:', this.savedQuoteData.clientType);
             return true;
         }
-        
+
         // IMPORTANT: Also check if quote has companyClientPtr but no client (indicates direct client)
         if (this.savedQuoteData && this.savedQuoteData.companyClientPtr && !this.savedQuoteData.client) {
             console.log('✅ Direct client mode detected from data structure (has companyClientPtr, no client)');
             return true;
         }
-        
+
         // Check if the direct client radio button is checked
         const directRadio = document.getElementById('clientTypeDirect');
         if (directRadio && directRadio.checked) {
             console.log('✅ Direct client mode detected from radio button');
             return true;
         }
-        
+
         // Check if the direct client row is visible
         const directClientRow = document.getElementById('directClientRow');
         if (directClientRow && directClientRow.style.display !== 'none') {
             console.log('✅ Direct client mode detected from directClientRow visibility');
             return true;
         }
-        
+
         // Check if the agency client row is hidden (indicates direct mode)
         const agencyClientRow = document.getElementById('agencyClientRow');
         if (agencyClientRow && agencyClientRow.style.display === 'none') {
             console.log('✅ Direct client mode detected from agencyClientRow hidden');
             return true;
         }
-        
+
         console.log('❌ Not in direct client mode - all checks failed:', {
             savedQuoteData: this.savedQuoteData,
             clientType: this.savedQuoteData?.clientType,
@@ -75,7 +75,7 @@ class QuoteOwnershipManager {
             directClientRowDisplay: directClientRow?.style.display,
             agencyClientRowDisplay: agencyClientRow?.style.display
         });
-        
+
         return false;
     }
 
@@ -83,7 +83,7 @@ class QuoteOwnershipManager {
         try {
             // Skip API calls for new quotes
             const isNewQuote = !this.quoteId || this.quoteId === 'new';
-            
+
             if (isNewQuote) {
                 console.log('New quote detected, skipping ownership/collaborator loading');
                 // Setup event listeners even for new quotes
@@ -91,17 +91,17 @@ class QuoteOwnershipManager {
                 this.dataLoaded = true; // Mark as loaded for new quotes
                 return;
             }
-            
+
             // Restore persisted client change state from sessionStorage
             const savedTimestamp = sessionStorage.getItem(`clientChangeTimestamp_${this.quoteId}`);
             const savedDeletedIds = sessionStorage.getItem(`deletedCollaborators_${this.quoteId}`);
             const wasChanged = sessionStorage.getItem(`clientChanged_${this.quoteId}`);
-            
+
             if (savedTimestamp) {
                 this.clientChangeTimestamp = parseInt(savedTimestamp);
                 const timeSince = Date.now() - this.clientChangeTimestamp;
                 console.log(`🔄 Restored client change state: ${timeSince}ms ago`);
-                
+
                 // If it's been more than 60 seconds, clear the persisted state
                 if (timeSince > 60000) {
                     console.log('⏱️ Grace period expired, clearing persisted state');
@@ -116,12 +116,12 @@ class QuoteOwnershipManager {
                         this.deletedCollaboratorIds = new Set(JSON.parse(savedDeletedIds));
                         console.log(`📋 Restored ${this.deletedCollaboratorIds.size} deleted collaborator IDs`);
                     }
-                    
+
                     // Set flag if client was just changed (useful for other logic)
                     this.clientWasJustChanged = wasChanged === 'true';
                 }
             }
-            
+
             // Load initial data
             this.dataLoadingPromise = Promise.all([
                 this.loadOwnership(),
@@ -129,17 +129,17 @@ class QuoteOwnershipManager {
                 this.loadUserAccess(),
                 this.loadAgents()
             ]);
-            
+
             await this.dataLoadingPromise;
             this.dataLoaded = true;
             console.log('Initial data loading complete, dataLoaded:', this.dataLoaded);
-            
+
             // Capture the originally saved client ID when page loads
             this.captureOriginalClient();
-            
+
             // Setup event listeners
             this.setupEventListeners();
-            
+
             // Check for pending edits if owner
             if (this.userAccess && this.userAccess.role === 'owner') {
                 await this.loadPendingEdits();
@@ -158,8 +158,8 @@ class QuoteOwnershipManager {
                     'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
-            
-            
+
+
             if (response.ok) {
                 const data = await response.json();
                 console.log('Received ownership data:', data.data);
@@ -182,11 +182,11 @@ class QuoteOwnershipManager {
                     'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
                 this.savedQuoteData = data.data;
-                console.log('📊 Quote data loaded successfully:', { 
+                console.log('📊 Quote data loaded successfully:', {
                     clientType: this.savedQuoteData?.clientType,
                     hasClient: !!this.savedQuoteData?.client,
                     hasCompanyClientPtr: !!this.savedQuoteData?.companyClientPtr,
@@ -209,7 +209,7 @@ class QuoteOwnershipManager {
                     'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
                 this.userAccess = data.data;
@@ -226,41 +226,41 @@ class QuoteOwnershipManager {
             const CLIENT_CHANGE_GRACE_PERIOD = 60000; // 60 seconds
             const timeSinceClientChange = this.clientChangeTimestamp ? (Date.now() - this.clientChangeTimestamp) : null;
             const isInGracePeriod = this.clientWasJustChanged || (timeSinceClientChange !== null && timeSinceClientChange < CLIENT_CHANGE_GRACE_PERIOD);
-            
+
             if (isInGracePeriod) {
                 console.log(`⏰ loadAgents - Within grace period (${timeSinceClientChange}ms since client change)`);
             }
-            
+
             // Add client context to ensure we get collaborators for the correct client
             let currentClientId = this.originalClientId;
             const clientSelect = document.getElementById('clientId');
             if (clientSelect && clientSelect.value) {
                 currentClientId = clientSelect.value;
             }
-            
+
             // Build query parameters for client context
             const params = new URLSearchParams();
             if (currentClientId) {
                 params.set('clientId', currentClientId);
             }
-            
+
             const queryString = params.toString() ? `?${params.toString()}` : '';
             const endpoint = `/api/quotes/${this.quoteId}/collaborators${queryString}`;
-            
+
             console.log('loadAgents - endpoint:', endpoint);
             console.log('loadAgents - currentClientId:', currentClientId);
-            
+
             const response = await fetch(endpoint, {
                 headers: {
                     'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
                 console.log('loadAgents - received data:', data);
                 let collaborators = data.data || [];
-                
+
                 // SMART FILTERING: During grace period, filter out deleted collaborators but keep new ones
                 if (isInGracePeriod && this.deletedCollaboratorIds && this.deletedCollaboratorIds.size > 0) {
                     const beforeCount = collaborators.length;
@@ -273,7 +273,7 @@ class QuoteOwnershipManager {
                     });
                     console.log(`🔍 Filtered ${beforeCount - collaborators.length} deleted collaborators, keeping ${collaborators.length} valid ones`);
                 }
-                
+
                 this.agents = collaborators;
                 console.log('loadAgents - final agents count:', this.agents.length);
                 this.displayAgents();
@@ -290,7 +290,7 @@ class QuoteOwnershipManager {
                     'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
                 this.pendingEdits = data.data;
@@ -303,8 +303,8 @@ class QuoteOwnershipManager {
 
     displayOwner() {
         if (!this.owner) return;
-        
-        
+
+
         // Safely get owner elements (they may not exist in reorganized UI)
         const ownerNameEl = document.getElementById('ownerName');
         const ownerEmailEl = document.getElementById('ownerEmail');
@@ -337,46 +337,46 @@ class QuoteOwnershipManager {
             if (ownerEmailEl) ownerEmailEl.textContent = this.owner.email;
             if (ownerSinceEl) ownerSinceEl.textContent = 'Desde: ' + new Date(this.owner.ownershipStartDate).toLocaleDateString('es-MX');
         }
-        
+
         // Store transfer capability for use in consolidated modal
         const userRole = window.currentUser?.role || '';
         const currentUserId = window.currentUser?.id || window.currentUserData?.id || '';
-        
+
         // Check if current user is the creator (when isDefaultOwner is true)
         const isCreator = this.owner && this.owner.isDefaultOwner && this.owner.id === currentUserId;
-        
+
         this.canTransfer = (
             (this.userAccess && this.userAccess.role === 'owner' && !this.owner.isPlaceholder) ||
             (userRole === 'admin' || userRole === 'superadmin' || userRole === 'department_manager' || userRole === 'client') ||
             (this.owner && this.owner.needsAssignment) ||
             isCreator // Allow creator to transfer ownership when no formal ownership exists
         );
-        
+
         if (isCreator) {
             console.log('User is the creator of the quote, enabling transfer capability');
         }
-        
+
         // Add user access info next to owner if applicable
         this.displayUserAccessWithOwner();
-        
+
         // Update compact owner display in quote information form
         this.updateCompactOwnerDisplay();
     }
-    
+
     updateCompactOwnerDisplay() {
         const compactNameEl = document.getElementById('compactOwnerName');
         const compactEmailEl = document.getElementById('compactOwnerEmail');
         const ownerLoader = document.getElementById('ownerLoader');
         const ownerEmailLoader = document.getElementById('ownerEmailLoader');
-        
+
         if (!compactNameEl || !compactEmailEl) {
             return; // Elements don't exist on this page
         }
-        
+
         // Hide skeleton loaders
         if (ownerLoader) ownerLoader.style.display = 'none';
         if (ownerEmailLoader) ownerEmailLoader.style.display = 'none';
-        
+
         if (this.owner.isPlaceholder) {
             if (this.owner.ownershipType === 'error' || this.owner.ownershipType === 'not-found') {
                 compactNameEl.innerHTML = '<span class="text-muted">Sin asignar</span>';
@@ -393,12 +393,12 @@ class QuoteOwnershipManager {
             compactNameEl.textContent = this.owner.firstName + ' ' + this.owner.lastName;
             compactEmailEl.textContent = this.owner.email;
         }
-        
+
         // Show the content (in case it was hidden)
         compactNameEl.style.display = 'block';
         compactEmailEl.style.display = 'block';
     }
-    
+
     displayUserAccessWithOwner() {
         // Only show if user is not the owner
         if (!this.userAccess || this.userAccess.role === 'owner') {
@@ -412,24 +412,24 @@ class QuoteOwnershipManager {
             }
             return;
         }
-        
+
         // Create or update the user access info (safely)
         const ownerSinceEl = document.getElementById('ownerSince');
         if (!ownerSinceEl || !ownerSinceEl.parentElement) {
             console.log('Owner since element or parent not found - skipping user access display');
             return;
         }
-        
+
         let accessDiv = ownerSinceEl.parentElement.querySelector('.user-access-info');
         if (!accessDiv) {
             accessDiv = document.createElement('div');
             accessDiv.className = 'user-access-info mt-1';
             ownerSinceEl.parentElement.appendChild(accessDiv);
         }
-        
+
         const roleText = this.userAccess.role === 'editor' ? 'Editor' : 'Visualizador';
         const roleClass = this.userAccess.role === 'editor' ? 'bg-primary' : 'bg-success';
-        
+
         accessDiv.innerHTML = `
             <small class="text-muted">Tu acceso: </small>
             <span class="badge ${roleClass} ms-1">
@@ -440,27 +440,27 @@ class QuoteOwnershipManager {
 
     displayUserAccess() {
         if (!this.userAccess) return;
-        
+
         // Hide the old access banner - we're now showing this with the owner info
         const accessDiv = document.getElementById('currentUserAccess');
         if (accessDiv) {
             accessDiv.classList.add('d-none');
         }
-        
+
         // Show/hide owner-only features with admin override
         const userRole = window.currentUser?.role || '';
         const isOwner = this.userAccess.role === 'owner';
         const isAdmin = userRole === 'admin' || userRole === 'superadmin';
-        
+
         // Manage agents - available for all users
         const manageBtn = document.getElementById('btnManageCollaborators');
         if (manageBtn) {
             // Always show the button - remove any d-none class that might have been added
             manageBtn.classList.remove('d-none');
         }
-        
+
         // Transfer capability is now handled in the consolidated modal
-        
+
         // Pending edits - only for owners
         const alertElem = document.getElementById('pendingEditsAlert');
         if (alertElem) {
@@ -474,13 +474,13 @@ class QuoteOwnershipManager {
 
     displayAgents() {
         const listDiv = document.getElementById('collaboratorsList');
-        
+
         // Check if the agents list container exists (may not exist after UI reorganization)
         if (!listDiv) {
             console.log('Collaborators list element not found - skipping agents display');
             return;
         }
-        
+
         // Filter out current owner from collaborators (defensive filtering)
         // Ownership supersedes collaboration
         const filteredAgents = this.agents.filter(collab => {
@@ -495,7 +495,7 @@ class QuoteOwnershipManager {
             }
             return true;
         });
-        
+
         if (filteredAgents.length === 0) {
             listDiv.innerHTML = `
                 <div class="text-center py-3 text-muted">
@@ -505,15 +505,15 @@ class QuoteOwnershipManager {
             `;
             return;
         }
-        
+
         let html = '<div class="row g-1">';
-        
+
         filteredAgents.forEach(collab => {
             const agent = collab.agent;
             const roleClass = collab.role === 'editor' ? 'bg-primary' : 'bg-success';
             const roleIcon = collab.role === 'editor' ? 'ti-pencil' : 'ti-eye';
             const roleText = collab.role === 'editor' ? 'Editor' : 'Visualizador';
-            
+
             html += `
                 <div class="col-12 col-md-6 col-xl-4 mb-1">
                     <div class="card collaborator-card" data-agent-id="${agent.id}" style="min-height: 90px;">
@@ -534,9 +534,9 @@ class QuoteOwnershipManager {
                             <!-- Last activity - always render for consistent height -->
                             <div class="small ${collab.lastActivity ? 'text-muted' : 'invisible'} mb-0" style="font-size: 0.7rem;">
                                 <i class="ti ti-clock me-1"></i>
-                                ${collab.lastActivity ? 
-                                    `Última actividad: ${new Date(collab.lastActivity.date).toLocaleDateString('es-MX')}` : 
-                                    'Placeholder'}
+                                ${collab.lastActivity ?
+                    `Última actividad: ${new Date(collab.lastActivity.date).toLocaleDateString('es-MX')}` :
+                    'Placeholder'}
                             </div>
                             
                             <!-- Remove button for owner only - no space when not owner -->
@@ -556,10 +556,10 @@ class QuoteOwnershipManager {
                 </div>
             `;
         });
-        
+
         html += '</div>';
         listDiv.innerHTML = html;
-        
+
         // Add custom styles to minimize spacing
         if (!document.getElementById('agent-spacing-styles')) {
             const style = document.createElement('style');
@@ -586,7 +586,7 @@ class QuoteOwnershipManager {
         if (this.pendingEdits.length > 0) {
             const alertDiv = document.getElementById('pendingEditsAlert');
             const countSpan = document.getElementById('pendingCount');
-            
+
             alertDiv.classList.remove('d-none');
             countSpan.textContent = this.pendingEdits.length;
         }
@@ -598,53 +598,53 @@ class QuoteOwnershipManager {
         if (manageBtn) {
             manageBtn.addEventListener('click', () => this.showCollaboratorsModal());
         }
-        
+
         // View history button
         const historyBtn = document.getElementById('btnViewHistory');
         if (historyBtn) {
             historyBtn.addEventListener('click', () => this.showEditHistory());
         }
-        
+
         // Review edits button
         const reviewBtn = document.getElementById('btnReviewEdits');
         if (reviewBtn) {
             reviewBtn.addEventListener('click', () => this.showPendingEdits());
         }
-        
+
         // Confirm transfer button (in consolidated modal)
         const confirmTransferBtn = document.getElementById('btnConfirmTransferMain');
         if (confirmTransferBtn) {
             confirmTransferBtn.addEventListener('click', () => this.transferOwnership());
         }
-        
+
         // Add agent button (legacy)
         const addCollabBtn = document.getElementById('btnAddCollaborator');
         if (addCollabBtn) {
             addCollabBtn.addEventListener('click', () => this.addAgent());
         }
-        
+
         // Add people input with dropdown functionality
         const addPeopleInput = document.getElementById('addPeopleInput');
         if (addPeopleInput) {
             addPeopleInput.addEventListener('input', (e) => {
                 this.filterUserDropdown(e.target.value);
             });
-            
+
             addPeopleInput.addEventListener('focus', () => {
                 this.showUserDropdown();
             });
-            
+
             addPeopleInput.addEventListener('keydown', (e) => {
                 this.handleDropdownNavigation(e);
             });
         }
-        
+
         // Save and close button
         const saveCloseBtn = document.getElementById('btnSaveAndClose');
         if (saveCloseBtn) {
             saveCloseBtn.addEventListener('click', () => this.saveAndCloseModal());
         }
-        
+
         // Click outside to close dropdown
         document.addEventListener('click', (e) => {
             const dropdown = document.getElementById('userDropdown');
@@ -653,47 +653,47 @@ class QuoteOwnershipManager {
                 this.hideUserDropdown();
             }
         });
-        
+
         // Remove agent buttons (delegated)
         document.addEventListener('click', (e) => {
             if (e.target.closest('.btn-remove-agent')) {
                 const btn = e.target.closest('.btn-remove-agent');
                 this.removeAgent(btn.dataset.agentId, btn.dataset.agentName, btn);
             }
-            
+
             // Handle expandable row clicks
             if (e.target.closest('.expandable-row')) {
                 // Don't expand if clicking on action buttons
                 if (e.target.closest('.btn-approve-edit, .btn-reject-edit')) {
                     return;
                 }
-                
+
                 const row = e.target.closest('.expandable-row');
                 const editId = row.dataset.editId;
                 this.toggleEditDetails(editId);
             }
-            
+
             // Handle approve edit button
             if (e.target.closest('.btn-approve-edit')) {
                 e.stopPropagation(); // Prevent row expansion
                 const btn = e.target.closest('.btn-approve-edit');
                 this.approveEdit(btn.dataset.editId);
             }
-            
+
             // Handle reject edit button
             if (e.target.closest('.btn-reject-edit')) {
                 e.stopPropagation(); // Prevent row expansion
                 const btn = e.target.closest('.btn-reject-edit');
                 this.rejectEdit(btn.dataset.editId);
             }
-            
+
             // Handle remove agent from modal
             if (e.target.closest('.btn-remove-agent-modal')) {
                 const btn = e.target.closest('.btn-remove-agent-modal');
                 this.removeAgentFromModal(btn.dataset.agentId, btn);
             }
         });
-        
+
         // Handle role changes (delegated)
         document.addEventListener('change', (e) => {
             if (e.target.classList.contains('role-select')) {
@@ -705,42 +705,29 @@ class QuoteOwnershipManager {
 
     async showCollaboratorsModal() {
         console.log('showCollaboratorsModal called');
-        
+
         // Wait for initial data to load if still loading
         if (!this.dataLoaded && this.dataLoadingPromise) {
             console.log('Waiting for initial data to load before opening modal...');
             await this.dataLoadingPromise;
             console.log('Data loaded, proceeding with modal');
         }
-        
+
         // Check if quote has a client selected first
         const clientField = document.getElementById('clientId');
         const userRole = window.currentUser?.role || '';
-        
+
         // For department_manager and client roles, the client field is hidden but still has value
         // Skip validation for these roles or if field is hidden
         const isHiddenRole = userRole === 'department_manager' || userRole === 'client';
-        
+
         // Check if this is a direct client quote by looking at the UI state
         const isDirectClientMode = this.isDirectClientMode();
-        
-        // Debug logging
-        console.log('🔍 showCollaboratorsModal validation check:', {
-            isDirectClientMode,
-            savedQuoteData: this.savedQuoteData,
-            clientType: this.savedQuoteData?.clientType,
-            dataLoaded: this.dataLoaded,
-            clientFieldExists: !!clientField,
-            isHiddenRole,
-            userRole,
-            directRadioChecked: document.getElementById('clientTypeDirect')?.checked,
-            directClientRowVisible: document.getElementById('directClientRow')?.style.display
-        });
-        
+
         if (clientField && !isHiddenRole && !isDirectClientMode) {
             const clientValue = clientField.value || clientField.tomselect?.getValue() || clientField.customSelect?.getValue();
             console.log('Client value check:', { clientValue, fieldValue: clientField.value });
-            
+
             if (!clientValue) {
                 this.showToast('Por favor selecciona un cliente antes de gestionar la propiedad', 'warning');
                 clientField.classList.add('is-invalid');
@@ -755,7 +742,7 @@ class QuoteOwnershipManager {
             if (directClientField) {
                 const directClientValue = directClientField.value || directClientField.tomselect?.getValue() || directClientField.customSelect?.getValue();
                 console.log('Direct client value check:', { directClientValue, isDirectClientMode });
-                
+
                 if (!directClientValue) {
                     this.showToast('Por favor selecciona un cliente directo antes de gestionar la propiedad', 'warning');
                     directClientField.classList.add('is-invalid');
@@ -769,16 +756,16 @@ class QuoteOwnershipManager {
             const clientValue = clientField.value || clientField.tomselect?.getValue() || clientField.customSelect?.getValue();
             console.log('Hidden role client value:', { clientValue, userRole });
         }
-        
+
         // Check if quote is saved - if not, auto-save it first
         const quoteIdInput = document.getElementById('quoteId');
         const quoteId = quoteIdInput ? quoteIdInput.value : '';
         const isNewQuote = !quoteId || quoteId === '' || quoteId === 'new';
-        
+
         if (isNewQuote) {
             this.showToast('Guardando cotización...', 'info');
             this.setButtonLoading('btnManageCollaborators', true, 'Guardando...');
-            
+
             try {
                 const savedQuote = await this.saveQuoteInBackground();
                 if (!savedQuote || !savedQuote.id) {
@@ -786,25 +773,25 @@ class QuoteOwnershipManager {
                     this.setButtonLoading('btnManageCollaborators', false);
                     return;
                 }
-                
+
                 // Update the page state to reflect the saved quote
                 if (quoteIdInput) {
                     quoteIdInput.value = savedQuote.id;
                 }
-                
+
                 // Update this instance's quoteId for API calls
                 this.quoteId = savedQuote.id;
-                
+
                 // Update UI to edit mode with folio information
                 this.updatePageToEditMode(savedQuote.id, savedQuote.folio);
-                
+
                 // Reload ownership data now that we have a real quote
                 await this.loadOwnership();
                 await this.loadUserAccess();
-                
+
                 // Capture the client ID as original since we just saved
                 this.captureOriginalClient();
-                
+
                 // Show success message with folio
                 const folioText = savedQuote.folio ? ` ${savedQuote.folio}` : '';
                 this.showToast(`📄 Cotización${folioText} creada - gestiona colaboradores`, 'success');
@@ -818,48 +805,48 @@ class QuoteOwnershipManager {
             // For existing quotes, check if client has changed
             if (this.hasClientChanged()) {
                 const currentClientId = this.getCurrentClientId();
-                
+
                 // Show prominent update message with longer duration
                 this.showToast('🔄 Actualizando cliente de la cotización...', 'info', 3000);
                 this.setButtonLoading('btnManageCollaborators', true, 'Actualizando cliente...');
-                
+
                 console.log('Client changed detected:', {
                     original: this.originalClientId,
                     current: currentClientId
                 });
-                
+
                 try {
                     // Update quote with new client
                     await this.updateQuoteClient(this.quoteId, currentClientId);
-                    
+
                     // Set flag and timestamp that client was just changed
                     this.clientWasJustChanged = true;
                     this.clientChangeTimestamp = Date.now();
                     console.log('📌 Client change marked at:', new Date(this.clientChangeTimestamp).toISOString());
-                    
+
                     // Persist client change state to sessionStorage
                     sessionStorage.setItem(`clientChangeTimestamp_${this.quoteId}`, this.clientChangeTimestamp.toString());
                     sessionStorage.setItem(`clientChanged_${this.quoteId}`, 'true');
-                    
+
                     // Clear any cached collaborators from the previous client
                     this.clearCollaboratorsCache();
-                    
+
                     // Remove all existing collaborators from the quote since client changed
                     await this.clearAllCollaborators();
-                    
+
                     // Clear and refresh all user dropdowns for new client context
                     this.clearUserDropdowns();
-                    
+
                     // Don't reload agents immediately - let the modal handle the empty state
                     // The DELETE operations may still be processing on the server
-                    
+
                     this.showToast('✅ Cliente actualizado - Colaboradores anteriores removidos', 'success', 2500);
                 } catch (error) {
                     console.error('Error updating client:', error);
-                    
+
                     // Reset the client change flag since update failed
                     this.clientWasJustChanged = false;
-                    
+
                     // Show specific error message
                     let errorMessage = '❌ Error al actualizar cliente';
                     if (error.message.includes('Client not found')) {
@@ -869,34 +856,34 @@ class QuoteOwnershipManager {
                     } else if (error.message) {
                         errorMessage = `❌ Error: ${error.message}`;
                     }
-                    
+
                     this.showToast(errorMessage, 'error', 5000);
                     this.setButtonLoading('btnManageCollaborators', false);
                     return;
                 }
             }
         }
-        
+
         // Don't proceed to open modal until any client updates are complete
         // (The client update section above will handle the button loading state)
-        
+
         // Show final loading state on button if not already loading from client update
         if (!document.getElementById('btnManageCollaborators').disabled) {
             this.setButtonLoading('btnManageCollaborators', true, 'Cargando modal...');
         }
-        
+
         try {
             const modalElement = document.getElementById('manageCollaboratorsModal');
             console.log('Modal element:', modalElement);
-            
+
             if (!modalElement) {
                 console.error('Modal element not found: manageCollaboratorsModal');
                 this.showToast('Error: Modal no encontrado', 'error');
                 return;
             }
-            
+
             const modal = new bootstrap.Modal(modalElement);
-            
+
             // Always clear collaborators UI first to prevent showing stale data
             const collaboratorsList = document.getElementById('collaboratorsManagementList');
             if (collaboratorsList) {
@@ -910,7 +897,7 @@ class QuoteOwnershipManager {
                     </div>
                 `;
             }
-            
+
             // If client was just changed, show specific message
             if (this.clientWasJustChanged) {
                 console.log('Modal opening after client change - ensuring fresh collaborator state');
@@ -927,63 +914,63 @@ class QuoteOwnershipManager {
                     `;
                 }
             }
-            
+
             // Update ownership section in modal
             this.displayOwnershipInModal();
-        
-        // Show/hide ownership transfer section based on permissions  
-        const ownershipSection = document.getElementById('ownershipTransferSection');
-        const userRole = window.currentUser?.role || '';
-        const isAdmin = userRole === 'admin' || userRole === 'superadmin';
-        const canManage = isAdmin || userRole === 'department_manager' || userRole === 'client';
-        
-        if (this.canTransfer && canManage) {
-            if (ownershipSection) {
-                ownershipSection.style.display = 'block';
-            }
-            
-            // Note: transferForm no longer exists in Google-style layout
-            // The transfer functionality is now in a details/summary section
-            
-            // Update button text if it exists
-            const confirmBtn = document.getElementById('btnConfirmTransferMain');
-            if (confirmBtn) {
-                if (this.owner && this.owner.needsAssignment) {
-                    confirmBtn.innerHTML = '<i class="ti ti-user-plus me-1"></i>Asignar Propietario';
-                    confirmBtn.className = 'btn btn-sm btn-outline-primary w-100';
-                } else {
-                    confirmBtn.innerHTML = '<i class="ti ti-transfer me-1"></i>Transferir';
-                    confirmBtn.className = 'btn btn-sm btn-outline-warning w-100';
+
+            // Show/hide ownership transfer section based on permissions  
+            const ownershipSection = document.getElementById('ownershipTransferSection');
+            const userRole = window.currentUser?.role || '';
+            const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+            const canManage = isAdmin || userRole === 'department_manager' || userRole === 'client';
+
+            if (this.canTransfer && canManage) {
+                if (ownershipSection) {
+                    ownershipSection.style.display = 'block';
+                }
+
+                // Note: transferForm no longer exists in Google-style layout
+                // The transfer functionality is now in a details/summary section
+
+                // Update button text if it exists
+                const confirmBtn = document.getElementById('btnConfirmTransferMain');
+                if (confirmBtn) {
+                    if (this.owner && this.owner.needsAssignment) {
+                        confirmBtn.innerHTML = '<i class="ti ti-user-plus me-1"></i>Asignar Propietario';
+                        confirmBtn.className = 'btn btn-sm btn-outline-primary w-100';
+                    } else {
+                        confirmBtn.innerHTML = '<i class="ti ti-transfer me-1"></i>Transferir';
+                        confirmBtn.className = 'btn btn-sm btn-outline-warning w-100';
+                    }
+                }
+            } else {
+                if (ownershipSection) {
+                    ownershipSection.style.display = 'none';
                 }
             }
-        } else {
-            if (ownershipSection) {
-                ownershipSection.style.display = 'none';
+
+            // Load available users for ownership transfer and dropdown
+            // Force reload if client was just changed to get new client's users
+            console.log('Loading users for dropdowns...', { clientWasJustChanged: this.clientWasJustChanged });
+
+            if (this.clientWasJustChanged) {
+                // Give a moment for the server to process the client update
+                await new Promise(resolve => setTimeout(resolve, 500));
+                console.log('Client was just changed - forcing fresh user data load');
             }
-        }
-        
-        // Load available users for ownership transfer and dropdown
-        // Force reload if client was just changed to get new client's users
-        console.log('Loading users for dropdowns...', { clientWasJustChanged: this.clientWasJustChanged });
-        
-        if (this.clientWasJustChanged) {
-            // Give a moment for the server to process the client update
-            await new Promise(resolve => setTimeout(resolve, 500));
-            console.log('Client was just changed - forcing fresh user data load');
-        }
-        
-        await this.loadAvailableUsers('newOwnerSelectMain');
-        await this.loadUsersForDropdown();
-        
-        // Reset placeholder text after loading new users
-        if (this.clientWasJustChanged) {
-            const addPeopleInput = document.getElementById('addPeopleInput');
-            if (addPeopleInput) {
-                addPeopleInput.placeholder = 'Añadir Personas';
+
+            await this.loadAvailableUsers('newOwnerSelectMain');
+            await this.loadUsersForDropdown();
+
+            // Reset placeholder text after loading new users
+            if (this.clientWasJustChanged) {
+                const addPeopleInput = document.getElementById('addPeopleInput');
+                if (addPeopleInput) {
+                    addPeopleInput.placeholder = 'Añadir Personas';
+                }
+                console.log('Dropdowns reloaded with fresh client context');
             }
-            console.log('Dropdowns reloaded with fresh client context');
-        }
-        
+
             // Display current agents in management view with loading state
             // If client was just changed, force reload agents for new client context
             if (this.clientWasJustChanged) {
@@ -999,23 +986,23 @@ class QuoteOwnershipManager {
                 console.log('Loading agents for modal display...');
                 await this.displayAgentsManagement();
             }
-            
+
             // Show the modal
             modal.show();
-            
+
             // Update button text to indicate modal is ready
             const btn = document.getElementById('btnManageCollaborators');
             if (btn && !btn.disabled) {
                 btn.innerHTML = '<i class="ti ti-user-plus me-1"></i>Compartir';
             }
-            
+
         } catch (error) {
             console.error('Error loading modal data:', error);
             this.showToast('❌ Error al cargar datos de colaboración', 'error');
         } finally {
             // Hide loading state on button
             this.setButtonLoading('btnManageCollaborators', false);
-            
+
             // Reset the client change flag now that modal loading is complete
             // But keep the timestamp for grace period checking
             if (this.clientWasJustChanged) {
@@ -1025,7 +1012,7 @@ class QuoteOwnershipManager {
                 sessionStorage.setItem(`clientChanged_${this.quoteId}`, 'false');
                 // Don't reset timestamp - it's used for grace period checking
             }
-            
+
             // Check if grace period has expired and clear persisted state if so
             if (this.clientChangeTimestamp) {
                 const timeSince = Date.now() - this.clientChangeTimestamp;
@@ -1038,7 +1025,7 @@ class QuoteOwnershipManager {
                     this.deletedCollaboratorIds = new Set();
                 }
             }
-            
+
             console.log('Modal loading complete, button state restored');
         }
     }
@@ -1049,7 +1036,7 @@ class QuoteOwnershipManager {
         if (!form) {
             throw new Error('Quote form not found');
         }
-        
+
         // Validate form first
         if (!form.checkValidity()) {
             form.classList.add('was-validated');
@@ -1061,12 +1048,12 @@ class QuoteOwnershipManager {
             }
             return null;
         }
-        
+
         // Get client ID - handle both agency and direct client modes
         let clientId = null;
         const userRole = window.currentUser?.role || window.userRole;
         const isDirectClientMode = this.isDirectClientMode();
-        
+
         if (isDirectClientMode) {
             // For direct client mode, get the directClientId
             const directClientField = document.getElementById('directClientId');
@@ -1094,7 +1081,7 @@ class QuoteOwnershipManager {
                     clientId = clientField.value;
                 }
             }
-            
+
             // Fallback to currentUserData for restricted roles
             if (!clientId && window.currentUserData) {
                 if (userRole === 'client' && window.currentUserData.clientId) {
@@ -1107,7 +1094,7 @@ class QuoteOwnershipManager {
             }
             console.log('Agency mode - using clientId:', clientId);
         }
-        
+
         if (!clientId) {
             console.error('Cliente requerido - no clientId found', {
                 isDirectClientMode,
@@ -1117,12 +1104,12 @@ class QuoteOwnershipManager {
             });
             throw new Error('Cliente requerido');
         }
-        
+
         // Get form data using the same structure as createQuote
         const formData = {
             clientId: clientId,
             eventType: document.getElementById('eventType')?.value?.trim() || undefined,
-            numberOfPeople: document.getElementById('numberOfPeople')?.value ? 
+            numberOfPeople: document.getElementById('numberOfPeople')?.value ?
                 parseInt(document.getElementById('numberOfPeople').value, 10) : undefined,
             numberOfAdults: parseInt(document.getElementById('numberOfAdults')?.value || 0),
             numberOfChildren: parseInt(document.getElementById('numberOfChildren')?.value || 0),
@@ -1133,16 +1120,16 @@ class QuoteOwnershipManager {
             contactPhone: document.getElementById('contactPhone')?.value?.trim() || undefined,
             notes: document.getElementById('notes')?.value?.trim() || undefined
         };
-        
+
         // Include clientType for direct client quotes
         if (isDirectClientMode && (userRole === 'admin' || userRole === 'superadmin')) {
             formData.clientType = 'direct';
             console.log('Added clientType: direct to formData');
         }
-        
+
         // Get access token
         const accessToken = this.getAccessToken();
-        
+
         const response = await fetch('/api/quotes', {
             method: 'POST',
             headers: {
@@ -1151,16 +1138,16 @@ class QuoteOwnershipManager {
             },
             body: JSON.stringify(formData)
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success && result.data) {
             return result.data; // Return full quote data including folio
         } else {
             throw new Error(result.error || 'Error al guardar la cotización');
         }
     }
-    
+
     // Update page UI to edit mode after saving
     updatePageToEditMode(quoteId, folio = null) {
         // Update the submit button text
@@ -1168,27 +1155,27 @@ class QuoteOwnershipManager {
         if (submitBtn) {
             submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Actualizar Cotización';
         }
-        
+
         // Update page URL without redirect (for better UX)
         if (window.history && window.history.replaceState) {
             const currentUrl = window.location.href;
             const newUrl = currentUrl.replace(/\/new$/, `/${quoteId}`);
             window.history.replaceState({}, '', newUrl);
         }
-        
+
         // Update page title and header to show folio if available
         if (folio) {
             console.log('Updating page title with folio:', folio);
-            
+
             // Update document title
             document.title = `${folio} - Cotización | Amexing Quotes`;
-            
+
             // Update page header if it exists
             const pageTitle = document.querySelector('h1, .page-title, .card-title');
             if (pageTitle && pageTitle.textContent.includes('Nueva Cotización')) {
                 pageTitle.textContent = `Cotización ${folio}`;
             }
-            
+
             // Update breadcrumb if it exists
             const breadcrumbActive = document.querySelector('.breadcrumb-item.active');
             if (breadcrumbActive && breadcrumbActive.textContent.includes('Nueva Cotización')) {
@@ -1196,7 +1183,7 @@ class QuoteOwnershipManager {
             }
         }
     }
-    
+
     // Get JWT token from cookies (copied from quote-information.ejs)
     getAccessToken() {
         const cookies = document.cookie.split(';');
@@ -1208,19 +1195,19 @@ class QuoteOwnershipManager {
         }
         return null;
     }
-    
+
     // Capture the originally saved client ID when page loads
     captureOriginalClient() {
         console.log('Starting captureOriginalClient...');
-        
+
         // Try multiple times with increasing delays to ensure dropdown is ready
         const attemptCapture = (attempt = 1, maxAttempts = 5) => {
             const clientField = document.getElementById('clientId');
             console.log(`Capture attempt ${attempt}/${maxAttempts} - clientField:`, !!clientField);
-            
+
             if (clientField) {
                 let clientId = null;
-                
+
                 // Try multiple methods to get the client ID
                 if (clientField.customSelect && clientField.customSelect.getValue) {
                     clientId = clientField.customSelect.getValue();
@@ -1236,14 +1223,14 @@ class QuoteOwnershipManager {
                     clientId = clientField.dataset.value || clientField.getAttribute('data-value');
                     console.log('Found clientId via data attributes:', clientId);
                 }
-                
+
                 if (clientId && clientId !== '' && clientId !== 'undefined') {
                     this.originalClientId = clientId;
                     console.log('✅ Successfully captured original client ID:', this.originalClientId);
                     return true;
                 }
             }
-            
+
             // If we failed and have more attempts, try again with longer delay
             if (attempt < maxAttempts) {
                 const delay = attempt * 500; // Increasing delay: 500ms, 1s, 1.5s, 2s
@@ -1252,19 +1239,19 @@ class QuoteOwnershipManager {
             } else {
                 console.warn('❌ Failed to capture original client ID after all attempts');
             }
-            
+
             return false;
         };
-        
+
         // Start first attempt immediately, then with delays if needed
         attemptCapture();
     }
-    
+
     // Get current client ID from dropdown
     getCurrentClientId() {
         const clientField = document.getElementById('clientId');
         let currentClientId = null;
-        
+
         if (clientField) {
             if (clientField.customSelect) {
                 currentClientId = clientField.customSelect.getValue();
@@ -1279,30 +1266,30 @@ class QuoteOwnershipManager {
         } else {
             console.warn('getCurrentClientId - clientField not found');
         }
-        
+
         console.log('getCurrentClientId final result:', {
             clientId: currentClientId,
             type: typeof currentClientId,
             length: currentClientId ? currentClientId.length : 0
         });
-        
+
         return currentClientId;
     }
-    
+
     // Check if client has changed from original
     hasClientChanged() {
         const currentClientId = this.getCurrentClientId();
         const hasChanged = currentClientId && this.originalClientId && currentClientId !== this.originalClientId;
-        
+
         console.log('Client change detection:', {
             current: currentClientId,
             original: this.originalClientId,
             hasChanged: hasChanged
         });
-        
+
         return hasChanged;
     }
-    
+
     // Update quote with new client
     async updateQuoteClient(quoteId, newClientId) {
         console.log('🔄 Starting client update request:', {
@@ -1311,11 +1298,11 @@ class QuoteOwnershipManager {
             newClientIdType: typeof newClientId,
             newClientIdLength: newClientId ? newClientId.length : 0
         });
-        
+
         const formData = {
             clientId: newClientId
         };
-        
+
         const response = await fetch(`/api/quotes/${quoteId}`, {
             method: 'PUT',
             headers: {
@@ -1324,16 +1311,16 @@ class QuoteOwnershipManager {
             },
             body: JSON.stringify(formData)
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
             // Update the original client ID to the new one
             this.originalClientId = newClientId;
-            console.log('✅ Client update successful:', { 
-                quoteId, 
-                newClientId, 
-                response: result 
+            console.log('✅ Client update successful:', {
+                quoteId,
+                newClientId,
+                response: result
             });
             return true;
         } else {
@@ -1347,21 +1334,21 @@ class QuoteOwnershipManager {
             throw new Error(errorMessage);
         }
     }
-    
+
     // Clear collaborators cache when client changes
     clearCollaboratorsCache() {
         console.log('Clearing collaborators cache for client change...');
-        
+
         // Clear the agents array
         this.agents = [];
-        
+
         // Clear all modal elements that show collaborators
         const modalElements = [
             'manageAgentsList',
-            'collaboratorsManagementList', 
+            'collaboratorsManagementList',
             'collaboratorsList'
         ];
-        
+
         modalElements.forEach(elementId => {
             const element = document.getElementById(elementId);
             if (element) {
@@ -1374,7 +1361,7 @@ class QuoteOwnershipManager {
                 console.log(`Cleared collaborators from ${elementId}`);
             }
         });
-        
+
         // Also clear any existing collaborator items to prevent stale data
         const collaboratorItems = document.querySelectorAll('.collaborator-item, .person-item');
         collaboratorItems.forEach(item => {
@@ -1382,63 +1369,63 @@ class QuoteOwnershipManager {
                 item.parentNode.removeChild(item);
             }
         });
-        
+
         console.log('Collaborators cache cleared successfully');
     }
-    
+
     // Check and update page permissions after ownership transfer
     async checkAndUpdatePagePermissions() {
         try {
             console.log('Checking if page permissions need updating...');
-            
+
             // Check if current user's access level changed
             const currentAccess = this.userAccess;
             const isOwner = this.owner && this.owner.id === window.currentUser?.id;
-            
+
             console.log('Permission check:', {
                 currentUserId: window.currentUser?.id,
                 ownerId: this.owner?.id,
                 isOwner,
                 currentAccess: currentAccess?.level
             });
-            
+
             // Update UI elements based on new permissions
             this.updatePageElementsForPermissions(isOwner, currentAccess);
-            
+
             // If user lost owner privileges, show notification
             if (!isOwner && currentAccess?.level !== 'owner') {
                 this.showToast('Permisos actualizados después de transferencia', 'info', 3000);
             }
-            
+
         } catch (error) {
             console.error('Error updating page permissions:', error);
         }
     }
-    
+
     // Update page elements based on current permissions
     updatePageElementsForPermissions(isOwner, userAccess) {
         // Update any permission-dependent UI elements here
         // This could include disabling certain buttons, hiding sections, etc.
-        
+
         const transferSection = document.getElementById('ownershipTransferSection');
         if (transferSection) {
             // Show/hide transfer section based on permissions
             const canTransfer = isOwner || (userAccess && ['admin', 'superadmin', 'department_manager', 'client'].includes(window.currentUser?.role));
             transferSection.style.display = canTransfer ? 'block' : 'none';
         }
-        
+
         console.log('Page permissions updated:', { isOwner, accessLevel: userAccess?.level });
     }
-    
+
     // Clear user dropdowns when client changes
     clearUserDropdowns() {
         console.log('Clearing user dropdowns for client change...');
-        
+
         // Clear the "Añadir Personas" dropdown cache
         this.availableUsers = [];
         this.filteredUsers = [];
         this.selectedUserIndex = -1;
-        
+
         // Clear the actual dropdown display
         const userDropdown = document.getElementById('userDropdown');
         if (userDropdown) {
@@ -1453,7 +1440,7 @@ class QuoteOwnershipManager {
             `;
             userDropdown.classList.remove('show');
         }
-        
+
         // Clear the "Transferir propiedad" dropdown
         const ownershipSelect = document.getElementById('newOwnerSelectMain');
         if (ownershipSelect) {
@@ -1461,42 +1448,42 @@ class QuoteOwnershipManager {
                 <option value="">Cargando usuarios del nuevo cliente...</option>
             `;
         }
-        
+
         // Clear the input field
         const addPeopleInput = document.getElementById('addPeopleInput');
         if (addPeopleInput) {
             addPeopleInput.value = '';
             addPeopleInput.placeholder = 'Usuarios se cargarán para el nuevo cliente...';
         }
-        
+
         console.log('User dropdowns cleared successfully');
     }
-    
+
     // Force clear local agents cache and UI
     forceClearAgentsCache() {
         console.log('🧹 Force clearing agents cache and UI');
         this.agents = [];
-        
+
         // Clear all UI elements
         const elements = [
             'collaboratorsManagementList',
             'agentsList'
         ];
-        
+
         elements.forEach(id => {
             const element = document.getElementById(id);
             if (element) {
                 element.innerHTML = '';
             }
         });
-        
+
         console.log('✅ Agents cache and UI force cleared');
     }
-    
+
     // Clear all collaborators from the quote when client changes
     async clearAllCollaborators() {
         console.log('🧹 Clearing all collaborators due to client change...');
-        
+
         try {
             // CRITICAL FIX: Always fetch collaborators from database first
             // Don't rely on this.agents which might be empty
@@ -1506,7 +1493,7 @@ class QuoteOwnershipManager {
                     'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
-            
+
             let collaboratorsToDelete = [];
             if (fetchResponse.ok) {
                 const data = await fetchResponse.json();
@@ -1517,20 +1504,20 @@ class QuoteOwnershipManager {
                 // Fall back to local cache if database fetch fails
                 collaboratorsToDelete = this.agents || [];
             }
-            
+
             if (collaboratorsToDelete.length === 0) {
                 console.log('✅ No collaborators to clear');
                 return;
             }
-            
+
             const originalCount = collaboratorsToDelete.length;
             console.log(`🔄 Starting removal of ${originalCount} collaborators from database...`);
-            
+
             // Remove each collaborator sequentially to ensure proper processing
             let removedCount = 0;
             const failedRemovals = [];
             const deletedCollaboratorIds = new Set(); // Track successfully deleted IDs
-            
+
             for (const collab of collaboratorsToDelete) {
                 try {
                     console.log(`Removing collaborator: ${collab.agent.firstName} ${collab.agent.lastName} (ID: ${collab.agent.id})`);
@@ -1544,7 +1531,7 @@ class QuoteOwnershipManager {
                             reason: 'Client changed - removing previous client collaborators'
                         })
                     });
-                    
+
                     if (response.ok) {
                         console.log(`✅ Successfully removed collaborator: ${collab.agent.firstName} ${collab.agent.lastName}`);
                         removedCount++;
@@ -1568,52 +1555,52 @@ class QuoteOwnershipManager {
                         error: error.message
                     });
                 }
-                
+
                 // Small delay between requests to avoid overwhelming server
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
-            
+
             console.log(`Removed ${removedCount} out of ${originalCount} collaborators`);
-            
+
             // Database verification with exponential backoff retry logic
             console.log('🔍 Performing database verification with exponential backoff...');
-            
+
             let verificationAttempts = 0;
             const maxAttempts = 5;
             const maxWaitTime = 30000; // 30 seconds total timeout
             let allCollaboratorsRemoved = false;
             const startTime = Date.now();
-            
+
             while (verificationAttempts < maxAttempts && !allCollaboratorsRemoved && (Date.now() - startTime) < maxWaitTime) {
                 verificationAttempts++;
                 console.log(`🔄 Database verification attempt ${verificationAttempts}/${maxAttempts}`);
-                
+
                 try {
                     // Check timeout
                     if ((Date.now() - startTime) >= maxWaitTime) {
                         console.warn(`⏰ Verification timeout reached (${maxWaitTime}ms)`);
                         break;
                     }
-                    
+
                     // Exponential backoff: 0.5s, 1s, 2s, 4s, 8s
                     if (verificationAttempts > 1) {
                         const backoffTime = Math.min(500 * Math.pow(2, verificationAttempts - 2), 8000);
                         console.log(`⏳ Waiting ${backoffTime}ms before verification attempt ${verificationAttempts}...`);
                         await new Promise(resolve => setTimeout(resolve, backoffTime));
                     }
-                    
+
                     const verificationResponse = await fetch(`/api/quotes/${this.quoteId}/collaborators`, {
                         headers: {
                             'Authorization': `Bearer ${this.getAccessToken()}`
                         }
                     });
-                    
+
                     if (verificationResponse.ok) {
                         const verificationData = await verificationResponse.json();
                         const remainingCollaborators = verificationData.data || [];
-                        
+
                         console.log(`Attempt ${verificationAttempts}: Found ${remainingCollaborators.length} remaining collaborators`);
-                        
+
                         if (remainingCollaborators.length === 0) {
                             const elapsedTime = Date.now() - startTime;
                             console.log(`✅ Database verification successful: All collaborators removed (${elapsedTime}ms)`);
@@ -1624,7 +1611,7 @@ class QuoteOwnershipManager {
                             remainingCollaborators.forEach(remaining => {
                                 console.warn(`  - ${remaining.agent?.firstName} ${remaining.agent?.lastName} (${remaining.agent?.id})`);
                             });
-                            
+
                             // If this is the last attempt or timeout reached, don't throw error - proceed anyway
                             if (verificationAttempts === maxAttempts || (Date.now() - startTime) >= maxWaitTime) {
                                 console.warn(`⚠️ Database cleanup incomplete after ${verificationAttempts} attempts (${Date.now() - startTime}ms). Proceeding anyway.`);
@@ -1646,10 +1633,10 @@ class QuoteOwnershipManager {
                     }
                 }
             }
-            
+
             // Clear the local cache regardless of database state
             this.agents = [];
-            
+
             // Report summary
             if (failedRemovals.length > 0) {
                 console.warn(`❌ ${failedRemovals.length} collaborator removals failed:`, failedRemovals);
@@ -1658,14 +1645,14 @@ class QuoteOwnershipManager {
             } else {
                 console.log('✅ All collaborator removal requests completed successfully');
             }
-            
+
             // Save the deleted collaborator IDs for filtering during grace period
             this.deletedCollaboratorIds = deletedCollaboratorIds;
             console.log(`📝 Tracking ${deletedCollaboratorIds.size} deleted collaborator IDs for grace period filtering`);
-            
+
             // Persist deleted IDs to sessionStorage
             sessionStorage.setItem(`deletedCollaborators_${this.quoteId}`, JSON.stringify([...deletedCollaboratorIds]));
-            
+
             // Final verification result
             const totalTime = Date.now() - startTime;
             if (allCollaboratorsRemoved) {
@@ -1681,15 +1668,15 @@ class QuoteOwnershipManager {
 
     async showEditHistory() {
         const modal = new bootstrap.Modal(document.getElementById('editHistoryModal'));
-        
+
         // Enhance modal header
         this.enhanceModalHeader();
-        
+
         // Add legend after header
         this.addLegend();
-        
+
         modal.show();
-        
+
         // Load edit history
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/edits`, {
@@ -1697,7 +1684,7 @@ class QuoteOwnershipManager {
                     'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
                 this.displayEditHistory(data.data);
@@ -1707,7 +1694,7 @@ class QuoteOwnershipManager {
             console.error('Error loading edit history:', error);
         }
     }
-    
+
     enhanceModalHeader() {
         const modalHeader = document.querySelector('#editHistoryModal .modal-header');
         if (modalHeader) {
@@ -1727,12 +1714,12 @@ class QuoteOwnershipManager {
                     </div>
                 </div>
             `;
-            
+
             // Add styles for the enhanced header
             modalHeader.style.background = '#f8f9fa';
             modalHeader.style.color = '#212529';
             modalHeader.style.borderBottom = '2px solid #dee2e6';
-            
+
             // Add icon gradient background
             const style = document.createElement('style');
             style.textContent = `
@@ -1919,32 +1906,32 @@ class QuoteOwnershipManager {
                     font-size: 0.85rem;
                 }
             `;
-            
+
             if (!document.getElementById('editHistoryStyles')) {
                 style.id = 'editHistoryStyles';
                 document.head.appendChild(style);
             }
         }
     }
-    
+
     updateModalHeaderCount(count) {
         const subtitle = document.getElementById('editCountSubtitle');
         if (subtitle) {
-            subtitle.textContent = count === 0 
-                ? 'No hay cambios registrados' 
+            subtitle.textContent = count === 0
+                ? 'No hay cambios registrados'
                 : `${count} ${count === 1 ? 'cambio registrado' : 'cambios registrados'}`;
         }
     }
-    
+
     addLegend() {
         const modal = document.getElementById('editHistoryModal');
         const modalBody = modal.querySelector('.modal-body');
-        
+
         // Check if legend already exists
         if (modal.querySelector('.version-legend')) {
             return;
         }
-        
+
         // Create legend element
         const legend = document.createElement('div');
         legend.className = 'version-legend';
@@ -1965,7 +1952,7 @@ class QuoteOwnershipManager {
                 </div>
             </div>
         `;
-        
+
         // Insert legend before modal body content
         modalBody.parentNode.insertBefore(legend, modalBody);
     }
@@ -1973,7 +1960,7 @@ class QuoteOwnershipManager {
     async showPendingEdits() {
         const modal = new bootstrap.Modal(document.getElementById('reviewEditsModal'));
         modal.show();
-        
+
         // Load and display pending edits
         await this.loadPendingEdits();
         this.displayPendingEditsForReview();
@@ -1982,9 +1969,9 @@ class QuoteOwnershipManager {
     displayEditHistory(edits) {
         // Store edits for later use in expansion
         this.currentEdits = edits;
-        
+
         const tbody = document.querySelector('#editHistoryTable tbody');
-        
+
         if (edits.length === 0) {
             tbody.innerHTML = `
                 <tr>
@@ -1999,22 +1986,22 @@ class QuoteOwnershipManager {
             `;
             return;
         }
-        
+
         let html = '';
         edits.forEach((edit, index) => {
             const statusBadge = this.getStatusBadge(edit.approvalStatus);
-            
+
             // Get relevant changes (filter ownership transfers)
             const relevantChanges = this.getRelevantChanges(edit);
             const relevantFields = Object.keys(relevantChanges);
             const changedFieldsList = relevantFields.map(field => this.getFieldDisplayName(field)).join(', ');
-            
+
             // Calculate if edit is recent (last 24 hours)
             const editDate = new Date(edit.editedAt);
             const now = new Date();
             const hoursAgo = (now - editDate) / (1000 * 60 * 60);
             const isRecent = hoursAgo <= 24;
-            
+
             html += `
                 <tr class="${isRecent ? 'table-active' : ''} expandable-row" data-edit-id="${edit.id}">
                     <td>
@@ -2090,9 +2077,9 @@ class QuoteOwnershipManager {
                             <div class="mb-2">
                                 <strong class="text-dark">Campos:</strong>
                                 <span class="ms-2">
-                                    ${edit.changedFields.map(field => 
-                                        `<span class="badge bg-info text-dark me-1">${this.getFieldDisplayName(field)}</span>`
-                                    ).join('')}
+                                    ${edit.changedFields.map(field =>
+                `<span class="badge bg-info text-dark me-1">${this.getFieldDisplayName(field)}</span>`
+            ).join('')}
                                 </span>
                             </div>
                             
@@ -2104,13 +2091,13 @@ class QuoteOwnershipManager {
                 </tr>
             `;
         });
-        
+
         tbody.innerHTML = html;
     }
 
     displayPendingEditsForReview() {
         const listDiv = document.getElementById('pendingEditsList');
-        
+
         if (this.pendingEdits.length === 0) {
             listDiv.innerHTML = `
                 <div class="text-center py-3 text-muted">
@@ -2120,7 +2107,7 @@ class QuoteOwnershipManager {
             `;
             return;
         }
-        
+
         let html = '';
         this.pendingEdits.forEach(edit => {
             html += `
@@ -2149,17 +2136,17 @@ class QuoteOwnershipManager {
                 </div>
             `;
         });
-        
+
         listDiv.innerHTML = html;
     }
 
     formatChanges(changes, previousValues, newValues) {
         let html = '<div class="small">';
-        
+
         Object.keys(changes).forEach(field => {
             const oldVal = previousValues[field];
             const newVal = newValues[field];
-            
+
             html += `
                 <div class="mb-1">
                     <strong class="change-field">${field}:</strong>
@@ -2169,7 +2156,7 @@ class QuoteOwnershipManager {
                 </div>
             `;
         });
-        
+
         html += '</div>';
         return html;
     }
@@ -2187,28 +2174,21 @@ class QuoteOwnershipManager {
             'rejected': '<span class="badge bg-danger">Rechazado</span>',
             'auto_approved': '<span class="badge bg-info">Auto-aprobado</span>'
         };
-        
+
         return badges[status] || '<span class="badge bg-secondary">Desconocido</span>';
     }
 
     async loadAvailableUsers(selectId) {
         try {
             // Note: Removed loadAvailableUsers loading log for console cleanup
-            
+
             // Get current user role to determine filtering
-            // Debug: Check all possible sources for user role
-            console.log('[DEBUG] Checking user role sources:', {
-                'window.currentUser': window.currentUser,
-                'window.currentUser?.role': window.currentUser?.role,
-                'window.userRole': window.userRole,
-                'document.body.dataset.userRole': document.body.dataset.userRole
-            });
-            
+
             const userRole = this.currentUserRole || window.currentUser?.role || window.userRole || document.body.dataset.userRole || '';
             const isDirectClientQuote = this.isDirectClientMode();
             const shouldFilterAdmins = !isDirectClientQuote && (userRole === 'client' || userRole === 'department_manager');
             console.log('User role for filtering:', userRole, 'Direct client quote:', isDirectClientQuote, 'Should filter admins:', shouldFilterAdmins, 'Stored role:', this.currentUserRole);
-            
+
             // Use department-filtered endpoint for both ownership transfers and agent additions
             // Get current client ID for context
             let currentClientId = this.originalClientId;
@@ -2216,7 +2196,7 @@ class QuoteOwnershipManager {
             if (clientSelect && clientSelect.value) {
                 currentClientId = clientSelect.value;
             }
-            
+
             // Build query parameters
             const params = new URLSearchParams();
             if (this.clientWasJustChanged) {
@@ -2225,26 +2205,26 @@ class QuoteOwnershipManager {
             if (currentClientId) {
                 params.set('clientId', currentClientId);
             }
-            
+
             const queryString = params.toString() ? `?${params.toString()}` : '';
             const endpoint = `/api/quotes/${this.quoteId}/available-owners${queryString}`;
-            
+
             console.log('loadAvailableUsers - endpoint:', endpoint);
             console.log('loadAvailableUsers - currentClientId:', currentClientId);
-            
+
             const response = await fetch(endpoint, {
                 headers: {
                     'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
-            
+
             // Note: Removed response status log for console cleanup
-            
+
             // Handle missing client error
             if (!response.ok && response.status === 400) {
                 const errorData = await response.json();
                 console.log('loadAvailableUsers - 400 error:', errorData);
-                
+
                 if (errorData.requiresClient) {
                     this.showError('Por favor selecciona un cliente antes de gestionar la propiedad');
                     // Optionally highlight the client field
@@ -2259,32 +2239,32 @@ class QuoteOwnershipManager {
                 this.showError(errorData.error || 'Error al cargar usuarios disponibles');
                 return;
             }
-            
+
             if (response.ok) {
                 const responseData = await response.json();
                 const select = document.getElementById(selectId);
-                
+
                 // Note: Removed verbose received data log for console cleanup
-                
+
                 if (!select) {
                     console.error(`loadAvailableUsers - Select element not found: ${selectId}`);
                     return;
                 }
-                
+
                 select.innerHTML = '<option value="">Seleccionar usuario...</option>';
-                
+
                 // Available owners endpoint returns array directly in data
                 const users = responseData.data || [];
-                
+
                 // Group users by type for better UX
                 const departmentManagers = [];
                 const clients = [];
                 const admins = [];
                 const others = [];
-                
+
                 console.log('🔍 loadAvailableUsers - Processing users for', selectId);
                 console.log('Raw users received:', users.map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, email: u.email, role: u.role })));
-                
+
                 users.forEach(user => {
                     // For ownership transfer: don't show current owner (unless placeholder)
                     // For collaboration: don't show current owner or existing agents
@@ -2296,7 +2276,7 @@ class QuoteOwnershipManager {
                         if (this.owner && user.id === this.owner.id) return;
                         if (this.agents.some(c => c.agent.id === user.id)) return;
                     }
-                    
+
                     // Categorize users for both dropdowns
                     if (user.isDepartmentManager) {
                         departmentManagers.push(user);
@@ -2308,7 +2288,7 @@ class QuoteOwnershipManager {
                         others.push(user);
                     }
                 });
-                
+
                 // Add grouped options for both ownership transfer and agent addition
                 // Add Department Managers
                 if (departmentManagers.length > 0) {
@@ -2323,7 +2303,7 @@ class QuoteOwnershipManager {
                     });
                     select.appendChild(optgroup);
                 }
-                
+
                 // Add Agents (client role users)
                 if (clients.length > 0) {
                     const optgroup = document.createElement('optgroup');
@@ -2337,7 +2317,7 @@ class QuoteOwnershipManager {
                     });
                     select.appendChild(optgroup);
                 }
-                
+
                 // Add Admins (merge with Others under Administradores label)
                 // Only show admin group for admin/superadmin users
                 const administratorsGroup = [...admins, ...others];
@@ -2364,7 +2344,7 @@ class QuoteOwnershipManager {
 
     async displayAgentsManagement() {
         const listDiv = document.getElementById('collaboratorsManagementList');
-        
+
         if (this.agents.length === 0) {
             listDiv.innerHTML = `
                 <p class="text-muted text-center py-3">
@@ -2373,14 +2353,14 @@ class QuoteOwnershipManager {
             `;
             return;
         }
-        
+
         let html = '';
-        
+
         this.agents.forEach(collab => {
             const agent = collab.agent;
             const initials = `${agent.firstName.charAt(0)}${agent.lastName.charAt(0)}`.toUpperCase();
             const avatarColor = this.getAvatarColor(agent.email);
-            
+
             html += `
                 <div class="person-item d-flex align-items-center mb-2 p-2" style="min-height: 60px;">
                     <div class="person-avatar bg-${avatarColor} text-white d-flex align-items-center justify-content-center me-3" 
@@ -2412,9 +2392,9 @@ class QuoteOwnershipManager {
                 </div>
             `;
         });
-        
+
         listDiv.innerHTML = html;
-        
+
         // Add event listeners for role changes
         listDiv.querySelectorAll('.role-selector').forEach(select => {
             select.addEventListener('change', (e) => {
@@ -2422,7 +2402,7 @@ class QuoteOwnershipManager {
             });
         });
     }
-    
+
     getAvatarColor(email) {
         const colors = ['primary', 'success', 'warning', 'info', 'secondary'];
         const hash = email.split('').reduce((a, b) => {
@@ -2431,7 +2411,7 @@ class QuoteOwnershipManager {
         }, 0);
         return colors[Math.abs(hash) % colors.length];
     }
-    
+
     async updateAgentRole(agentId, newRole) {
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/collaborators/${agentId}/role`, {
@@ -2442,7 +2422,7 @@ class QuoteOwnershipManager {
                 },
                 body: JSON.stringify({ role: newRole })
             });
-            
+
             if (response.ok) {
                 // Update local data
                 const collab = this.agents.find(c => c.agent.id === agentId);
@@ -2459,22 +2439,22 @@ class QuoteOwnershipManager {
             this.showError('Error al actualizar el rol del agente');
         }
     }
-    
-    
+
+
     async addCollaboratorByUser(userId, role) {
         // Show loading state
         this.setModalLoading(true, 'Agregando...');
-        
+
         try {
             console.log('Adding collaborator:', { userId, role, quoteId: this.quoteId });
-            
+
             // Protection against race conditions: If client was recently changed,
             // wait a bit more to ensure all clear operations are complete
             if (this.clientWasJustChanged) {
                 console.log('Client was recently changed - waiting for clearAllCollaborators to complete...');
                 await new Promise(resolve => setTimeout(resolve, 2000));
             }
-            
+
             const response = await fetch(`/api/quotes/${this.quoteId}/collaborators`, {
                 method: 'POST',
                 headers: {
@@ -2487,32 +2467,32 @@ class QuoteOwnershipManager {
                     role: role
                 })
             });
-            
+
             if (response.ok) {
                 this.showSuccess('Colaborador agregado exitosamente');
-                
+
                 // Protection: If client was recently changed, add extra delay before loading agents
                 // to ensure we don't load stale data
                 if (this.clientWasJustChanged) {
                     console.log('Waiting extra time before loading agents due to recent client change...');
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                
+
                 // Reload agents list but maintain client context awareness
                 // Check if we're within grace period after client change
                 const timeSinceClientChange = this.clientChangeTimestamp ? (Date.now() - this.clientChangeTimestamp) : null;
                 const CLIENT_CHANGE_GRACE_PERIOD = 60000; // 60 seconds
-                
+
                 if (timeSinceClientChange !== null && timeSinceClientChange < CLIENT_CHANGE_GRACE_PERIOD) {
                     console.log(`⚠️ Within client change grace period (${timeSinceClientChange}ms) - only showing new collaborator`);
                     // During grace period, only add the new collaborator to empty list
                     this.forceClearAgentsCache();
-                    
+
                     // Manually add just the new collaborator we just created
                     // We'll need to fetch just this one collaborator's details
                     // For now, just keep the list empty and let UI update show the new state
                 }
-                
+
                 await this.loadAgents();
                 await this.displayAgentsManagement();
                 console.log('Collaborator added successfully');
@@ -2523,7 +2503,7 @@ class QuoteOwnershipManager {
                     statusText: response.statusText,
                     errorData
                 });
-                
+
                 // Check if error is about trying to add current owner as collaborator
                 if (errorData.error && errorData.error.includes('already the owner')) {
                     this.showToast('Esta persona ya es el propietario de la cotización', 'warning');
@@ -2539,7 +2519,7 @@ class QuoteOwnershipManager {
             this.setModalLoading(false);
         }
     }
-    
+
     getCurrentClientId() {
         const clientIdInput = document.getElementById('clientId');
         if (clientIdInput) {
@@ -2547,35 +2527,27 @@ class QuoteOwnershipManager {
         }
         return null;
     }
-    
+
     // User Dropdown Functionality
     availableUsers = [];
     filteredUsers = [];
     selectedUserIndex = -1;
-    
+
     async loadUsersForDropdown() {
         try {
             // Get current user role to determine filtering
-            // Debug: Check all possible sources for user role
-            console.log('[Dropdown DEBUG] Checking user role sources:', {
-                'window.currentUser': window.currentUser,
-                'window.currentUser?.role': window.currentUser?.role,
-                'window.userRole': window.userRole,
-                'document.body.dataset.userRole': document.body.dataset.userRole
-            });
-            
             const userRole = this.currentUserRole || window.currentUser?.role || window.userRole || document.body.dataset.userRole || '';
             const isDirectClientQuote = this.isDirectClientMode();
             const shouldFilterAdmins = !isDirectClientQuote && (userRole === 'client' || userRole === 'department_manager');
             console.log('[Dropdown] User role for filtering:', userRole, 'Direct client quote:', isDirectClientQuote, 'Should filter admins:', shouldFilterAdmins, 'Stored role:', this.currentUserRole);
-            
+
             // Use the same API endpoint as loadAvailableUsers with proper client context
             let currentClientId = this.originalClientId;
             const clientSelect = document.getElementById('clientId');
             if (clientSelect && clientSelect.value) {
                 currentClientId = clientSelect.value;
             }
-            
+
             // Build query parameters  
             const params = new URLSearchParams();
             if (this.clientWasJustChanged) {
@@ -2584,15 +2556,15 @@ class QuoteOwnershipManager {
             if (currentClientId) {
                 params.set('clientId', currentClientId);
             }
-            
+
             const queryString = params.toString() ? `?${params.toString()}` : '';
             const endpoint = `/api/quotes/${this.quoteId}/available-owners${queryString}`;
-            
+
             console.log('loadUsersForDropdown - endpoint:', endpoint);
             console.log('loadUsersForDropdown - currentClientId:', currentClientId);
-            
+
             const token = this.getAccessToken();
-            
+
             console.log('🔐 AUTH DEBUG - loadUsersForDropdown request (FIXED):', {
                 endpoint,
                 hasToken: !!token,
@@ -2603,20 +2575,13 @@ class QuoteOwnershipManager {
                 currentClientId,
                 tokenSource: 'cookies_via_getAccessToken'
             });
-            
+
             const response = await fetch(endpoint, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
-            
-            console.log('🔐 AUTH DEBUG - loadUsersForDropdown response:', {
-                ok: response.ok,
-                status: response.status,
-                statusText: response.statusText,
-                url: response.url
-            });
-            
+
             if (!response.ok) {
                 if (response.status === 400) {
                     const errorData = await response.json();
@@ -2629,10 +2594,10 @@ class QuoteOwnershipManager {
                 }
                 throw new Error(`HTTP ${response.status}`);
             }
-            
+
             const responseData = await response.json();
             const users = responseData.data || [];
-            
+
             // Convert API response to dropdown format
             // Filter out admins for non-admin users
             this.availableUsers = users
@@ -2647,16 +2612,16 @@ class QuoteOwnershipManager {
                         username: user.username,
                         email: user.email
                     });
-                    
+
                     // Filter out admins for client/department_manager users
                     // Check multiple ways to identify admin users
-                    const isAdminUser = 
-                        user.role === 'admin' || 
-                        user.role === 'superadmin' || 
+                    const isAdminUser =
+                        user.role === 'admin' ||
+                        user.role === 'superadmin' ||
                         user.isAdmin === true ||
                         (user.email && (user.email.includes('admin@') || user.email.includes('superadmin@'))) ||
                         (user.username && (user.username.includes('admin@') || user.username.includes('superadmin@')));
-                    
+
                     if (shouldFilterAdmins && isAdminUser) {
                         console.log('✅ FILTERING OUT admin user from dropdown:', user.firstName, user.lastName, 'role:', user.role, 'isAdmin:', user.isAdmin, 'email:', user.email);
                         return false;
@@ -2674,16 +2639,16 @@ class QuoteOwnershipManager {
                         role: user.role // Keep role for potential future use
                     };
                 });
-            
+
             this.filteredUsers = [...this.availableUsers];
-            
+
         } catch (error) {
             console.error('Error loading users for dropdown:', error);
             this.availableUsers = [];
             this.filteredUsers = [];
         }
     }
-    
+
     showUserDropdown() {
         const dropdown = document.getElementById('userDropdown');
         if (dropdown) {
@@ -2691,7 +2656,7 @@ class QuoteOwnershipManager {
             dropdown.classList.add('show');
         }
     }
-    
+
     hideUserDropdown() {
         const dropdown = document.getElementById('userDropdown');
         if (dropdown) {
@@ -2699,13 +2664,13 @@ class QuoteOwnershipManager {
         }
         this.selectedUserIndex = -1;
     }
-    
+
     filterUserDropdown(query) {
         if (!query.trim()) {
             this.filteredUsers = [...this.availableUsers];
         } else {
             const lowerQuery = query.toLowerCase();
-            this.filteredUsers = this.availableUsers.filter(user => 
+            this.filteredUsers = this.availableUsers.filter(user =>
                 user.firstName.toLowerCase().includes(lowerQuery) ||
                 user.lastName.toLowerCase().includes(lowerQuery) ||
                 user.email.toLowerCase().includes(lowerQuery)
@@ -2714,11 +2679,11 @@ class QuoteOwnershipManager {
         this.selectedUserIndex = -1;
         this.renderUserDropdown();
     }
-    
+
     renderUserDropdown() {
         const dropdown = document.getElementById('userDropdown');
         if (!dropdown) return;
-        
+
         if (this.filteredUsers.length === 0) {
             dropdown.innerHTML = `
                 <div class="p-2 text-center text-muted">
@@ -2727,13 +2692,13 @@ class QuoteOwnershipManager {
             `;
             return;
         }
-        
+
         let html = '';
         this.filteredUsers.forEach((user, index) => {
             const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
             const avatarColor = this.getAvatarColor(user.email);
             const isActive = index === this.selectedUserIndex ? 'active' : '';
-            
+
             html += `
                 <div class="dropdown-user-item ${isActive}" data-user-index="${index}">
                     <div class="dropdown-user-avatar bg-${avatarColor} text-white">
@@ -2746,9 +2711,9 @@ class QuoteOwnershipManager {
                 </div>
             `;
         });
-        
+
         dropdown.innerHTML = html;
-        
+
         // Add click handlers
         dropdown.querySelectorAll('.dropdown-user-item').forEach((item, index) => {
             item.addEventListener('click', () => {
@@ -2756,11 +2721,11 @@ class QuoteOwnershipManager {
             });
         });
     }
-    
+
     handleDropdownNavigation(e) {
         const dropdown = document.getElementById('userDropdown');
         if (!dropdown.classList.contains('show')) return;
-        
+
         switch (e.key) {
             case 'ArrowDown':
                 e.preventDefault();
@@ -2783,71 +2748,71 @@ class QuoteOwnershipManager {
                 break;
         }
     }
-    
+
     updateDropdownSelection() {
         const dropdown = document.getElementById('userDropdown');
         if (!dropdown) return;
-        
+
         dropdown.querySelectorAll('.dropdown-user-item').forEach((item, index) => {
             item.classList.toggle('active', index === this.selectedUserIndex);
         });
     }
-    
+
     async selectUser(index) {
         if (index < 0 || index >= this.filteredUsers.length) return;
-        
+
         const user = this.filteredUsers[index];
-        
+
         console.log('Selected user:', user);
         console.log('User ID:', user.id, 'Type:', typeof user.id);
-        
+
         // Check if user ID is valid
         if (!user.id) {
             this.showError('ID de usuario inválido');
             return;
         }
-        
+
         // Add user as collaborator
         await this.addCollaboratorByUser(user.id, 'viewer');
-        
+
         // Clear input and hide dropdown
         const input = document.getElementById('addPeopleInput');
         if (input) input.value = '';
         this.hideUserDropdown();
     }
-    
+
     saveAndCloseModal() {
         // Close the modal
         const modal = bootstrap.Modal.getInstance(document.getElementById('manageCollaboratorsModal'));
         if (modal) {
             modal.hide();
         }
-        
+
         // Refresh the main display
         this.displayOwner();
         this.displayAgents();
     }
-    
+
     // Toast Notification System
     showToast(message, type = 'info', duration = 4000) {
         const container = document.querySelector('.toast-container');
         if (!container) return;
-        
+
         const toastId = `toast-${Date.now()}`;
         const iconClass = {
             success: 'ti-check-circle text-success',
-            error: 'ti-x-circle text-danger', 
+            error: 'ti-x-circle text-danger',
             warning: 'ti-alert-triangle text-warning',
             info: 'ti-info-circle text-info'
         };
-        
+
         const bgClass = {
             success: 'bg-success-subtle border-success',
             error: 'bg-danger-subtle border-danger',
-            warning: 'bg-warning-subtle border-warning', 
+            warning: 'bg-warning-subtle border-warning',
             info: 'bg-info-subtle border-info'
         };
-        
+
         const toastHtml = `
             <div class="toast ${bgClass[type]} border" id="${toastId}" role="alert">
                 <div class="toast-body d-flex align-items-center">
@@ -2857,24 +2822,24 @@ class QuoteOwnershipManager {
                 </div>
             </div>
         `;
-        
+
         container.insertAdjacentHTML('beforeend', toastHtml);
-        
+
         const toastElement = document.getElementById(toastId);
         const toast = new bootstrap.Toast(toastElement, { delay: duration });
         toast.show();
-        
+
         // Auto-remove from DOM after hiding
         toastElement.addEventListener('hidden.bs.toast', () => {
             toastElement.remove();
         });
     }
-    
+
     // Loading State Helpers
     setButtonLoading(buttonId, loading, text = 'Cargando...') {
         const button = document.getElementById(buttonId);
         if (!button) return;
-        
+
         if (loading) {
             button.disabled = true;
             button.dataset.originalText = button.innerHTML;
@@ -2890,7 +2855,7 @@ class QuoteOwnershipManager {
             delete button.dataset.originalText;
         }
     }
-    
+
     addSpinnerStyles() {
         if (!document.getElementById('spinner-styles')) {
             const style = document.createElement('style');
@@ -2907,7 +2872,7 @@ class QuoteOwnershipManager {
             document.head.appendChild(style);
         }
     }
-    
+
     setModalLoading(loading, message = 'Cargando...') {
         // Disable Hecho button
         const hechoBtn = document.getElementById('btnSaveAndClose');
@@ -2923,7 +2888,7 @@ class QuoteOwnershipManager {
                 delete hechoBtn.dataset.originalText;
             }
         }
-        
+
         // Also disable the add people input
         const addInput = document.getElementById('addPeopleInput');
         if (addInput) {
@@ -2939,7 +2904,7 @@ class QuoteOwnershipManager {
     showInlineRoleLoader(agentId, show) {
         const select = document.querySelector(`[data-agent-id="${agentId}"].role-selector`);
         if (!select) return;
-        
+
         let loader = select.parentElement.querySelector('.role-loader');
         if (!loader) {
             loader = document.createElement('span');
@@ -2947,7 +2912,7 @@ class QuoteOwnershipManager {
             loader.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
             select.parentElement.appendChild(loader);
         }
-        
+
         select.disabled = show;
         loader.style.display = show ? 'inline-block' : 'none';
     }
@@ -2955,7 +2920,7 @@ class QuoteOwnershipManager {
     showInputLoading(inputId, show) {
         const input = document.getElementById(inputId);
         if (!input) return;
-        
+
         input.disabled = show;
         if (show) {
             input.style.opacity = '0.6';
@@ -2969,10 +2934,10 @@ class QuoteOwnershipManager {
     setModalDismissible(dismissible) {
         const modal = document.getElementById('manageCollaboratorsModal');
         if (!modal) return;
-        
+
         modal.setAttribute('data-bs-backdrop', dismissible ? 'true' : 'static');
         modal.setAttribute('data-bs-keyboard', dismissible ? 'true' : 'false');
-        
+
         const closeBtn = modal.querySelector('.btn-close');
         if (closeBtn) {
             closeBtn.disabled = !dismissible;
@@ -2983,22 +2948,22 @@ class QuoteOwnershipManager {
     displayOwnershipInModal() {
         console.log('=== DISPLAYING OWNERSHIP IN MODAL ===');
         console.log('this.owner:', this.owner);
-        
+
         if (!this.owner) {
             console.log('No owner data available for modal display');
             return;
         }
-        
+
         const modalOwnerName = document.getElementById('modalOwnerName');
         const modalOwnerEmail = document.getElementById('modalOwnerEmail');
         const ownerInitials = document.getElementById('ownerInitials');
-        
+
         console.log('Modal elements found:', {
             modalOwnerName: !!modalOwnerName,
             modalOwnerEmail: !!modalOwnerEmail,
             ownerInitials: !!ownerInitials
         });
-        
+
         if (this.owner.isPlaceholder) {
             if (this.owner.ownershipType === 'error' || this.owner.ownershipType === 'not-found') {
                 if (modalOwnerName) modalOwnerName.innerHTML = '<span class="text-muted">Sin asignar</span>';
@@ -3028,18 +2993,18 @@ class QuoteOwnershipManager {
             if (ownerInitials) ownerInitials.textContent = `${this.owner.firstName.charAt(0)}${this.owner.lastName.charAt(0)}`.toUpperCase();
             console.log('Displaying formal owner:', this.owner.firstName, this.owner.lastName, this.owner.email);
         }
-        
+
         console.log('=== END MODAL OWNERSHIP DISPLAY ===');
     }
 
     async transferOwnership() {
         const newOwnerId = document.getElementById('newOwnerSelectMain').value;
         const reason = document.getElementById('transferReasonMain').value;
-        
+
         // Enhanced debugging for user selection issue
         console.log('=== OWNERSHIP TRANSFER DEBUGGING ===');
         console.log('Selected newOwnerId:', newOwnerId);
-        
+
         const selectElement = document.getElementById('newOwnerSelectMain');
         const selectedOption = selectElement.options[selectElement.selectedIndex];
         console.log('Selected option text:', selectedOption?.text);
@@ -3051,12 +3016,12 @@ class QuoteOwnershipManager {
         console.log('Current client context (originalClientId):', this.originalClientId);
         console.log('Client was just changed?', this.clientWasJustChanged);
         console.log('=== END TRANSFER DEBUGGING ===');
-        
+
         if (!newOwnerId) {
             this.showError('Por favor selecciona un nuevo propietario');
             return;
         }
-        
+
         // Additional validation: verify selected user is intended
         if (selectedOption) {
             const confirmMessage = `¿Confirmar transferencia de propiedad a:\n\n${selectedOption.text}\n\nRazón: ${reason || 'Sin razón especificada'}`;
@@ -3065,11 +3030,11 @@ class QuoteOwnershipManager {
                 return;
             }
         }
-        
+
         // Show loading state on transfer button and disable modal
         this.setButtonLoading('btnConfirmTransferMain', true, 'Transfiriendo...');
         this.setModalLoading(true, 'Transfiriendo propiedad...');
-        
+
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/ownership/transfer`, {
                 method: 'POST',
@@ -3082,42 +3047,42 @@ class QuoteOwnershipManager {
                     reason
                 })
             });
-            
+
             if (response.ok) {
                 // Show appropriate success message
-                const successMessage = (this.owner && this.owner.needsAssignment) 
+                const successMessage = (this.owner && this.owner.needsAssignment)
                     ? 'Propietario asignado exitosamente'
                     : 'Propiedad transferida exitosamente';
-                    
+
                 this.showSuccess(successMessage);
-                
+
                 // Clear form
                 document.getElementById('newOwnerSelectMain').value = '';
                 document.getElementById('transferReasonMain').value = '';
-                
+
                 // Reload ownership data and wait for completion
                 console.log('=== STARTING OWNERSHIP DATA RELOAD AFTER TRANSFER ===');
                 console.log('Current owner before reload:', this.owner);
-                
+
                 await this.loadOwnership();
                 console.log('Owner after loadOwnership:', this.owner);
-                
+
                 await this.loadUserAccess();
                 console.log('User access after reload:', this.userAccess);
-                
+
                 console.log('=== OWNERSHIP DATA RELOAD COMPLETED ===');
-                
+
                 // Update both modal and main page display with fresh data
                 this.displayOwnershipInModal();
                 this.displayOwner(); // Update main page ownership display
-                
+
                 // Refresh collaborators to show updated list after ownership transfer
                 await this.loadAgents();
                 this.displayAgents();
-                
+
                 // Update page permissions if current user changed
                 await this.checkAndUpdatePagePermissions();
-                
+
                 console.log('✅ Transfer completed - UI updated with new ownership');
             } else {
                 const error = await response.json();
@@ -3136,25 +3101,16 @@ class QuoteOwnershipManager {
     async addAgent() {
         const collaboratorSelect = document.getElementById('collaboratorSelect');
         const roleSelect = document.getElementById('collaboratorRole');
-        
-        // Debug logging
-        console.log('addAgent - Element states:', {
-            collaboratorSelect: !!collaboratorSelect,
-            roleSelect: !!roleSelect,
-            collaboratorSelectValue: collaboratorSelect?.value,
-            roleSelectValue: roleSelect?.value,
-            collaboratorSelectOptions: collaboratorSelect?.options?.length || 0
-        });
-        
+
         const agentId = collaboratorSelect?.value;
         const role = roleSelect?.value || 'viewer';
-        
+
         // Enhanced validation
         if (!collaboratorSelect) {
             this.showError('Error: elemento de selección de colaborador no encontrado');
             return;
         }
-        
+
         if (!agentId) {
             // Check if dropdown has options
             if (collaboratorSelect.options.length <= 1) {
@@ -3164,18 +3120,18 @@ class QuoteOwnershipManager {
             this.showError('Por favor selecciona un usuario');
             return;
         }
-        
+
         console.log('addAgent - Sending request:', {
             quoteId: this.quoteId,
             agentId,
             role,
             requestBody: { agentId, role }
         });
-        
+
         // Show loading state on add button and disable Hecho button
         this.setButtonLoading('btnAddCollaborator', true, 'Agregando...');
         this.setModalLoading(true, 'Agregando...');
-        
+
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/collaborators`, {
                 method: 'POST',
@@ -3188,16 +3144,16 @@ class QuoteOwnershipManager {
                     role
                 })
             });
-            
+
             console.log('addAgent - Response status:', response.status);
-            
+
             if (response.ok) {
                 this.showSuccess('Agente agregado exitosamente');
-                
+
                 // Reset form
                 document.getElementById('collaboratorSelect').value = '';
                 document.getElementById('collaboratorRole').value = 'viewer';
-                
+
                 // Reload agents (add small delay to ensure database transaction is committed)
                 setTimeout(async () => {
                     await this.loadAgents();
@@ -3213,7 +3169,7 @@ class QuoteOwnershipManager {
                     errorData,
                     requestData: { agentId, role }
                 });
-                
+
                 // More specific error messages
                 let errorMessage = 'Error al agregar agente';
                 if (errorData.error) {
@@ -3227,7 +3183,7 @@ class QuoteOwnershipManager {
                         errorMessage = errorData.error;
                     }
                 }
-                
+
                 this.showError(errorMessage);
                 // Hide loading state on error
                 this.setButtonLoading('btnAddCollaborator', false);
@@ -3246,7 +3202,7 @@ class QuoteOwnershipManager {
         if (!confirm(`¿Estás seguro de quitar a ${agentName} como agente?`)) {
             return;
         }
-        
+
         // Show loading state on the specific button if provided
         if (buttonElement) {
             buttonElement.disabled = true;
@@ -3256,10 +3212,10 @@ class QuoteOwnershipManager {
             // Add spinner animation styles
             this.addSpinnerStyles();
         }
-        
+
         // Also disable Hecho button
         this.setModalLoading(true, 'Removiendo...');
-        
+
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/collaborators/${agentId}`, {
                 method: 'DELETE',
@@ -3271,7 +3227,7 @@ class QuoteOwnershipManager {
                     reason: 'Removed by owner/admin'
                 })
             });
-            
+
             if (response.ok) {
                 this.showSuccess('Agente eliminado exitosamente');
                 await this.loadAgents();
@@ -3310,7 +3266,7 @@ class QuoteOwnershipManager {
             selectElement.style.opacity = '0.6';
         }
         this.setModalLoading(true, 'Guardando...');
-        
+
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/collaborators/${agentId}/role`, {
                 method: 'PUT',
@@ -3320,7 +3276,7 @@ class QuoteOwnershipManager {
                 },
                 body: JSON.stringify({ role: newRole })
             });
-            
+
             if (response.ok) {
                 this.showSuccess('Rol actualizado exitosamente');
                 await this.loadAgents();
@@ -3344,7 +3300,7 @@ class QuoteOwnershipManager {
 
     async approveEdit(editId) {
         if (!confirm('¿Aprobar esta edición?')) return;
-        
+
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/edits/${editId}/approve`, {
                 method: 'POST',
@@ -3354,12 +3310,12 @@ class QuoteOwnershipManager {
                 },
                 body: JSON.stringify({ comment: '' })
             });
-            
+
             if (response.ok) {
                 this.showSuccess('Edición aprobada');
                 await this.loadPendingEdits();
                 this.displayPendingEditsForReview();
-                
+
                 // Reload quote data if on quote page
                 if (window.loadQuoteData) {
                     window.loadQuoteData();
@@ -3377,7 +3333,7 @@ class QuoteOwnershipManager {
     async rejectEdit(editId) {
         const reason = prompt('Razón del rechazo (opcional):');
         if (reason === null) return; // User cancelled
-        
+
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/edits/${editId}/reject`, {
                 method: 'POST',
@@ -3387,7 +3343,7 @@ class QuoteOwnershipManager {
                 },
                 body: JSON.stringify({ reason })
             });
-            
+
             if (response.ok) {
                 this.showSuccess('Edición rechazada');
                 await this.loadPendingEdits();
@@ -3405,18 +3361,18 @@ class QuoteOwnershipManager {
     async toggleEditDetails(editId) {
         const detailRow = document.getElementById(`detail-${editId}`);
         const expandableRow = document.querySelector(`[data-edit-id="${editId}"]`);
-        
+
         if (detailRow.style.display === 'none' || detailRow.style.display === '') {
             // Show details
             detailRow.style.display = 'table-row';
             expandableRow.classList.add('expanded');
-            
+
             // Load changes details if not already loaded
             const changesContainer = detailRow.querySelector(`[data-edit-id="${editId}"]`);
             if (changesContainer && changesContainer.innerHTML.trim() === '<!-- Changes will be loaded dynamically -->') {
                 // Find the edit data from the current edits array (we need to pass it somehow)
                 changesContainer.innerHTML = '<div class="text-center py-2"><i class="ti ti-loader animate-spin"></i> Cargando detalles...</div>';
-                
+
                 try {
                     // For now, we'll need to fetch the edit data or pass it differently
                     // This is a placeholder for the async change loading
@@ -3432,14 +3388,14 @@ class QuoteOwnershipManager {
                     changesContainer.innerHTML = '<div class="alert alert-danger">Error al cargar detalles del cambio.</div>';
                 }
             }
-            
+
             // Hide other open detail rows
             document.querySelectorAll('.detail-row').forEach(row => {
                 if (row.id !== `detail-${editId}`) {
                     row.style.display = 'none';
                 }
             });
-            
+
             // Reset other expanded rows
             document.querySelectorAll('.expandable-row').forEach(row => {
                 if (row.dataset.editId !== editId) {
@@ -3452,65 +3408,65 @@ class QuoteOwnershipManager {
             expandableRow.classList.remove('expanded');
         }
     }
-    
+
     findEditData(editId) {
         // Helper method to find edit data from the last loaded edits
         // This would need to be enhanced to properly store and retrieve edit data
         return this.currentEdits?.find(edit => edit.id === editId) || null;
     }
-    
+
     getActionType(edit) {
         const changes = edit.changes || {};
         const fields = Object.keys(changes);
         const description = edit.description || '';
-        
+
         // Ownership transfer
-        if (fields.includes('owner') && 
+        if (fields.includes('owner') &&
             (description.includes('Ownership transferred') || description.includes('transferred'))) {
             return 'ownership_transfer';
         }
-        
+
         // Collaborator added
         if (fields.includes('collaboratorAdded') && fields.includes('role')) {
             return 'collaborator_added';
         }
-        
+
         // Collaborator removed
         if (fields.includes('collaboratorRemoved')) {
             return 'collaborator_removed';
         }
-        
+
         // Role changed
-        if (fields.includes('roleChanged') || 
+        if (fields.includes('roleChanged') ||
             (description.includes('role') && (description.includes('changed') || description.includes('updated')))) {
             return 'role_changed';
         }
-        
+
         // Status change
         if (fields.includes('status') && fields.length === 1) {
             return 'status_change';
         }
-        
+
         // Client assignment
         if (fields.includes('clientId')) {
             return 'client_assignment';
         }
-        
+
         // General edit (multiple fields or other changes)
         return 'general_edit';
     }
-    
+
     isOwnershipTransfer(edit) {
         return this.getActionType(edit) === 'ownership_transfer';
     }
-    
+
     async getActionHeader(edit, actionType) {
         const changes = edit.changes || {};
-        
+
         switch (actionType) {
             case 'ownership_transfer':
                 return '<i class="ti ti-user-check me-1"></i>Transferencia de Propiedad';
-                
+
             case 'collaborator_added':
                 // Get user info for the added collaborator
                 const addedUserId = changes.collaboratorAdded;
@@ -3519,88 +3475,88 @@ class QuoteOwnershipManager {
                 const userName = userInfo ? `${userInfo.firstName} ${userInfo.lastName}` : 'Usuario';
                 const roleText = role === 'editor' ? 'Editor' : 'Visualizador';
                 return `<i class="ti ti-user-plus me-1"></i>Colaborador Agregado: ${userName} (${roleText})`;
-                
+
             case 'collaborator_removed':
                 // Get user info for the removed collaborator
                 const removedUserId = changes.collaboratorRemoved;
                 const removedUserInfo = await this.getUserInfo(removedUserId);
                 const removedUserName = removedUserInfo ? `${removedUserInfo.firstName} ${removedUserInfo.lastName}` : 'Usuario';
                 return `<i class="ti ti-user-minus me-1"></i>Colaborador Removido: ${removedUserName}`;
-                
+
             case 'role_changed':
                 return '<i class="ti ti-shield-check me-1"></i>Cambio de Rol';
-                
+
             case 'status_change':
                 return '<i class="ti ti-flag me-1"></i>Cambio de Estado';
-                
+
             case 'client_assignment':
                 return '<i class="ti ti-building me-1"></i>Asignación de Cliente';
-                
+
             case 'general_edit':
             default:
                 return '<i class="ti ti-clipboard-list me-1"></i>¿Qué cambió?';
         }
     }
-    
+
     getRelevantChanges(edit) {
         const changes = edit.changes || {};
         const relevantChanges = { ...changes };
         const actionType = this.getActionType(edit);
-        
+
         switch (actionType) {
             case 'ownership_transfer':
                 // Remove previousOwner as it's redundant with owner change
                 delete relevantChanges.previousOwner;
                 break;
-                
+
             case 'collaborator_added':
                 // Hide technical fields, they'll be shown in the action header
                 delete relevantChanges.collaboratorAdded;
                 delete relevantChanges.role;
                 break;
-                
+
             case 'collaborator_removed':
                 // Hide technical field, show in action header
                 delete relevantChanges.collaboratorRemoved;
                 break;
-                
+
             case 'role_changed':
                 // Keep roleChanged field but format it nicely
                 break;
-                
+
             case 'status_change':
                 // Keep status field as primary focus
                 break;
-                
+
             case 'client_assignment':
                 // Keep clientId as primary focus
                 break;
-                
+
             case 'general_edit':
                 // Show all fields for general edits
                 break;
         }
-        
+
         return relevantChanges;
     }
-    
+
     async formatEditDetailsForExpansion(edit) {
         if (!edit.changes && !edit.previousValues && !edit.newValues) {
             return '<div class="alert alert-info border-0 bg-white"><i class="ti ti-info-circle me-2"></i>No hay detalles de cambios disponibles.</div>';
         }
-        
+
         const changes = edit.changes || {};
         const previousValues = edit.previousValues || {};
         const newValues = edit.newValues || {};
-        
+
         if (Object.keys(changes).length === 0) {
             return '<div class="alert alert-info border-0 bg-white"><i class="ti ti-info-circle me-2"></i>No se registraron cambios específicos.</div>';
         }
-        
+
         // Get only relevant changes (filtered for ownership transfers)
         const relevantChanges = this.getRelevantChanges(edit);
         const actionType = this.getActionType(edit);
-        
+
         // If relevantChanges is empty due to collaboration filtering, show collaboration details
         if (Object.keys(relevantChanges).length === 0) {
             if (actionType === 'collaborator_added' || actionType === 'collaborator_removed') {
@@ -3608,23 +3564,23 @@ class QuoteOwnershipManager {
             }
             return '<div class="alert alert-info border-0 bg-white"><i class="ti ti-info-circle me-2"></i>No hay cambios relevantes para mostrar.</div>';
         }
-        
+
         let html = '<div class="changes-summary mt-2">';
-        
+
         // Get action header (actionType already declared above)
         const actionHeader = await this.getActionHeader(edit, actionType);
-        
+
         html += `<strong class="text-dark mb-2 d-block">${actionHeader}</strong>`;
-        
+
         // Create user-friendly change cards
         html += '<div class="changes-grid row g-2">';
-        
+
         for (const field of Object.keys(relevantChanges)) {
             const fieldName = this.getFieldDisplayName(field);
             const icon = this.getChangeIcon(field);
             const oldVal = await this.formatUserFriendlyValue(field, previousValues[field], edit);
             const newVal = await this.formatUserFriendlyValue(field, newValues[field], edit);
-            
+
             html += `
                 <div class="col-12">
                     <div class="change-card p-2 bg-white border rounded">
@@ -3649,40 +3605,29 @@ class QuoteOwnershipManager {
                 </div>
             `;
         }
-        
+
         html += '</div></div>';
         return html;
     }
-    
+
     async formatCollaborationDetails(edit, actionType) {
         const changes = edit.changes || {};
         let html = '<div class="changes-summary mt-2">';
-        
-        // Debug logging to check what we have in the edit object
-        console.log('formatCollaborationDetails - Edit object:', {
-            editId: edit.id,
-            hasEditor: !!edit.editor,
-            editorId: edit.editor?.id,
-            editorFirstName: edit.editor?.firstName,
-            editorLastName: edit.editor?.lastName,
-            actionType,
-            changes
-        });
-        
+
         // Get action header
         const actionHeader = await this.getActionHeader(edit, actionType);
         html += `<strong class="text-dark mb-3 d-block">${actionHeader}</strong>`;
-        
+
         // Create details cards
         html += '<div class="collaboration-details">';
-        
+
         if (actionType === 'collaborator_added') {
             const userId = changes.collaboratorAdded;
             const role = changes.role;
             const userInfo = await this.getUserInfo(userId);
             const userName = userInfo ? `${userInfo.firstName} ${userInfo.lastName}`.trim() : 'Usuario desconocido';
             const roleText = role === 'editor' ? 'Editor' : 'Visualizador';
-            
+
             // Get who performed the action - use edit.editor which is the actual field
             let editorName = 'Usuario desconocido';
             if (edit.editor && edit.editor.firstName && edit.editor.lastName) {
@@ -3692,7 +3637,7 @@ class QuoteOwnershipManager {
                 const editorInfo = await this.getUserInfo(edit.editor.id);
                 editorName = editorInfo ? `${editorInfo.firstName} ${editorInfo.lastName}`.trim() : 'Usuario desconocido';
             }
-            
+
             html += `
                 <div class="row g-2">
                     <div class="col-md-4">
@@ -3729,7 +3674,7 @@ class QuoteOwnershipManager {
             const reason = changes.reason || edit.description;
             const userInfo = await this.getUserInfo(userId);
             const userName = userInfo ? `${userInfo.firstName} ${userInfo.lastName}`.trim() : 'Usuario desconocido';
-            
+
             // Get who performed the action - use edit.editor which is the actual field
             let editorName = 'Usuario desconocido';
             if (edit.editor && edit.editor.firstName && edit.editor.lastName) {
@@ -3739,13 +3684,13 @@ class QuoteOwnershipManager {
                 const editorInfo = await this.getUserInfo(edit.editor.id);
                 editorName = editorInfo ? `${editorInfo.firstName} ${editorInfo.lastName}`.trim() : 'Usuario desconocido';
             }
-            
+
             // Clean reason text
             let cleanReason = 'No especificada';
             if (reason && !reason.includes('collaboratorRemoved') && reason.trim() !== '') {
                 cleanReason = reason;
             }
-            
+
             html += `
                 <div class="row g-2">
                     <div class="col-md-4">
@@ -3778,18 +3723,18 @@ class QuoteOwnershipManager {
                 </div>
             `;
         }
-        
+
         // Note: "Acción realizada por" is now integrated into the 3-column layout above
-        
+
         html += '</div></div>';
         return html;
     }
-    
+
     formatEditDetailsForDisplay(edit) {
         // Keep this method for backward compatibility if needed elsewhere
         return this.formatEditDetailsForExpansion(edit);
     }
-    
+
     formatDisplayValue(value) {
         if (value === null || value === undefined) {
             return '<em class="text-muted">vacío</em>';
@@ -3802,11 +3747,11 @@ class QuoteOwnershipManager {
         }
         return String(value);
     }
-    
+
     getFieldDisplayName(field) {
         const fieldMap = {
             'owner': 'Propietario',
-            'previousOwner': 'Propietario Anterior', 
+            'previousOwner': 'Propietario Anterior',
             'status': 'Estado',
             'clientId': 'Cliente',
             'agentId': 'Agente',
@@ -3830,11 +3775,11 @@ class QuoteOwnershipManager {
         };
         return fieldMap[field] || field;
     }
-    
+
     getChangeIcon(field) {
         const iconMap = {
             'owner': 'ti-user-check',
-            'previousOwner': 'ti-user-x', 
+            'previousOwner': 'ti-user-x',
             'status': 'ti-flag',
             'clientId': 'ti-building',
             'agentId': 'ti-user-circle',
@@ -3856,22 +3801,22 @@ class QuoteOwnershipManager {
         };
         return iconMap[field] || 'ti-edit';
     }
-    
+
     async getUserInfo(userId) {
         if (!userId || userId === null || userId === undefined || userId === 'undefined') {
-            return { 
-                name: 'Usuario desconocido', 
-                firstName: 'Usuario', 
+            return {
+                name: 'Usuario desconocido',
+                firstName: 'Usuario',
                 lastName: 'desconocido',
-                email: '' 
+                email: ''
             };
         }
-        
+
         // Check cache first
         if (this.userCache.has(userId)) {
             return this.userCache.get(userId);
         }
-        
+
         try {
             // Try to get user info from available users endpoint (which we know exists)
             const response = await fetch(`/api/quotes/${this.quoteId}/available-owners`, {
@@ -3879,11 +3824,11 @@ class QuoteOwnershipManager {
                     'Authorization': `Bearer ${this.getAccessToken()}`
                 }
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
                 const users = data.data || [];
-                
+
                 // Find the user by ID
                 const user = users.find(u => u.id === userId);
                 if (user) {
@@ -3897,7 +3842,7 @@ class QuoteOwnershipManager {
                     return userInfo;
                 }
             }
-            
+
             // If not found in available users, try to get from current edit data
             if (this.owner && this.owner.id === userId) {
                 const userInfo = {
@@ -3909,7 +3854,7 @@ class QuoteOwnershipManager {
                 this.userCache.set(userId, userInfo);
                 return userInfo;
             }
-            
+
             // Check agents
             const agent = this.agents?.find(a => a.agent.id === userId);
             if (agent) {
@@ -3922,44 +3867,44 @@ class QuoteOwnershipManager {
                 this.userCache.set(userId, userInfo);
                 return userInfo;
             }
-            
+
             // Fallback: return ID with indication it's not resolved
-            const fallback = { 
-                name: `Usuario ${userId.substring(0, 8)}...`, 
-                firstName: 'Usuario', 
+            const fallback = {
+                name: `Usuario ${userId.substring(0, 8)}...`,
+                firstName: 'Usuario',
                 lastName: 'desconocido',
-                email: '' 
+                email: ''
             };
             this.userCache.set(userId, fallback);
             return fallback;
-            
+
         } catch (error) {
             console.warn('Error fetching user info for:', userId, error);
-            const fallback = { 
-                name: 'Usuario desconocido', 
-                firstName: 'Usuario', 
+            const fallback = {
+                name: 'Usuario desconocido',
+                firstName: 'Usuario',
                 lastName: 'desconocido',
-                email: '' 
+                email: ''
             };
             this.userCache.set(userId, fallback);
             return fallback;
         }
     }
-    
+
     async formatUserFriendlyValue(field, value, edit) {
         // Handle null/undefined values first
         if (value === null || value === undefined) {
             return 'Sin especificar';
         }
-        
+
         // Format specific field types for business users
-        switch(field) {
+        switch (field) {
             case 'collaboratorAdded':
             case 'collaboratorRemoved':
                 // These are user IDs - get user name
                 const userInfo = await this.getUserInfo(value);
                 return userInfo ? `${userInfo.firstName} ${userInfo.lastName}` : 'Usuario desconocido';
-                
+
             case 'role':
                 const roleMap = {
                     'editor': 'Editor',
@@ -3968,7 +3913,7 @@ class QuoteOwnershipManager {
                     'admin': 'Administrador'
                 };
                 return roleMap[value] || value;
-                
+
             case 'roleChanged':
                 // This might be an object with from/to values
                 if (typeof value === 'object' && value.from && value.to) {
@@ -3977,18 +3922,18 @@ class QuoteOwnershipManager {
                     return `${fromRole} → ${toRole}`;
                 }
                 return String(value);
-                
+
             case 'status':
                 const statusMap = {
                     'draft': 'Borrador',
-                    'pending': 'Pendiente', 
+                    'pending': 'Pendiente',
                     'approved': 'Aprobado',
                     'rejected': 'Rechazado',
                     'active': 'Activo',
                     'inactive': 'Inactivo'
                 };
                 return statusMap[value] || value;
-                
+
             case 'priority':
                 const priorityMap = {
                     'low': 'Baja',
@@ -3997,16 +3942,16 @@ class QuoteOwnershipManager {
                     'urgent': 'Urgente'
                 };
                 return priorityMap[value] || value;
-                
+
             default:
                 // If it looks like a user ID, try to get user name
                 if (typeof value === 'string' && (field.includes('owner') || field.includes('agent') || field.includes('By'))) {
                     if (!value) return 'Sin asignar';
-                    
+
                     const userInfo = await this.getUserInfo(value);
                     return userInfo ? userInfo.name : 'Usuario desconocido';
                 }
-                
+
                 return String(value);
         }
     }
@@ -4014,7 +3959,7 @@ class QuoteOwnershipManager {
     showSuccess(message) {
         this.showToast(message, 'success');
     }
-    
+
     showError(message) {
         this.showToast(message, 'error');
     }
@@ -4023,13 +3968,13 @@ class QuoteOwnershipManager {
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     // Get quote ID from page - could be from window, data attribute, or hidden input
-    const quoteId = window.quoteId || 
-                   document.querySelector('[data-quote-id]')?.dataset.quoteId || 
-                   document.getElementById('quoteId')?.value || 
-                   'new';
-    
+    const quoteId = window.quoteId ||
+        document.querySelector('[data-quote-id]')?.dataset.quoteId ||
+        document.getElementById('quoteId')?.value ||
+        'new';
+
     console.log('Initializing QuoteOwnershipManager with quoteId:', quoteId);
-    
+
     // Always initialize the manager, even for new quotes
     // The manager handles both new and existing quotes
     window.quoteOwnership = new QuoteOwnershipManager(quoteId);
