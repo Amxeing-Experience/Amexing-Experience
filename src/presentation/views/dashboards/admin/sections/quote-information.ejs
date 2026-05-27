@@ -1149,6 +1149,12 @@
                 });
                 
                 // Add client options
+                // Agency mode dedupe: the API returns one row per department-manager USER,
+                // so multiple managers of the same agency produce duplicates. Keep the first
+                // user with a given companyName as the agency's representative. Also skip
+                // managers without a companyName entirely — those are personal/test accounts
+                // that shouldn't pollute the agency dropdown.
+                const seenCompanyNames = new Set();
                 clients.forEach(client => {
                     console.log('🔍 Processing client for dropdown:', {
                         raw: client,
@@ -1168,17 +1174,31 @@
                     const parenthesesMatch = client.label.match(/^(.+?)\s*\(([^)]+)\)$/);
 
                     if (typeToLoad === 'agency') {
+                        // Resolve a companyName from any of the sources we have.
+                        let resolvedCompany = '';
                         if (client.companyName && client.companyName.trim()) {
-                            displayText = client.companyName.trim();
-                            console.log('✅ Agency: using companyName field:', displayText);
+                            resolvedCompany = client.companyName.trim();
                         } else if (parenthesesMatch && parenthesesMatch[2]) {
-                            displayText = parenthesesMatch[2];
-                            console.log('✅ Agency: extracted company from parentheses:', displayText);
-                        } else {
-                            // No companyName at all — fall back to label so the row isn't blank.
-                            displayText = client.label;
-                            console.warn('⚠️ Agency without companyName — falling back to label:', displayText);
+                            resolvedCompany = parenthesesMatch[2].trim();
                         }
+
+                        if (!resolvedCompany) {
+                            // Skip agency rows that have no company — they're department
+                            // managers without an assigned agency.
+                            console.warn('⚠️ Agency without companyName — skipping option:', client.label);
+                            return;
+                        }
+
+                        // Dedupe: case-insensitive comparison so "Acme" and "ACME" collapse.
+                        const key = resolvedCompany.toLowerCase();
+                        if (seenCompanyNames.has(key)) {
+                            console.log('🧹 Agency dedupe: skipping duplicate of', resolvedCompany);
+                            return;
+                        }
+                        seenCompanyNames.add(key);
+
+                        displayText = resolvedCompany;
+                        console.log('✅ Agency: using companyName:', displayText);
                     } else if (parenthesesMatch && parenthesesMatch[2]) {
                         displayText = parenthesesMatch[2];
                         console.log('✅ Direct: using company name from parentheses:', displayText);
