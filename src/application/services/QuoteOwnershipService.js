@@ -87,13 +87,6 @@ class QuoteOwnershipService {
           ownershipId: ownership.id,
         },
       });
-
-      logger.info('Initialized quote ownership', {
-        quoteId,
-        ownerId,
-        ownershipId: ownership.id,
-      });
-
       return this.formatOwnershipResponse(ownership);
     } catch (error) {
       logger.error('Failed to initialize ownership', {
@@ -289,14 +282,6 @@ class QuoteOwnershipService {
           reason,
           ownershipId: newOwnership.id,
         },
-      });
-
-      logger.info('Transferred quote ownership', {
-        quoteId,
-        fromOwnerId: currentOwner.id,
-        toOwnerId: newOwnerId,
-        transferredById,
-        reason,
       });
 
       return this.formatOwnershipResponse(newOwnership);

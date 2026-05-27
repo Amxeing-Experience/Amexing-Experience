@@ -185,6 +185,7 @@ class PublicQuoteController {
     const rate = quote.getRate();
     const client = quote.getClient();
     const serviceItems = quote.getServiceItems() || {};
+    const segmentNames = await this.loadSegmentNamesMap();
 
     return {
       id: quote.id,
@@ -192,15 +193,45 @@ class PublicQuoteController {
       status: quote.getStatus(),
       client: this.formatClientData(client),
       contactPerson: quote.getContactPerson() || '',
+      contactFirstName: quote.get('contactFirstName') || '',
+      contactLastName: quote.get('contactLastName') || '',
       contactEmail: quote.getContactEmail() || '',
       contactPhone: quote.getContactPhone() || '',
       numberOfPeople: quote.getNumberOfPeople() || 0,
       eventType: quote.getEventType() || '',
+      notes: quote.getNotes() || '',
+      leadGuestFirstName: quote.get('leadGuestFirstName') || '',
+      leadGuestLastName: quote.get('leadGuestLastName') || '',
       rate: this.formatRateData(rate),
-      serviceItems: await this.formatServiceItems(serviceItems),
+      serviceItems: await this.formatServiceItems(serviceItems, segmentNames),
       createdAt: quote.get('createdAt') || null,
       updatedAt: quote.get('updatedAt') || null,
     };
+  }
+
+  /**
+   * Load a map of Rate objectId -> { name, color } for resolving segment names
+   * and colors on legacy subconcepts that don't carry categoryName / categoryColor /
+   * additionalVehicleSegmentName / additionalVehicleSegmentColor.
+   * @returns {Promise<Map<string, {name: string, color: string}>>}
+   * @example
+   */
+  async loadSegmentNamesMap() {
+    try {
+      const query = new Parse.Query('Rate');
+      query.equalTo('exists', true);
+      query.limit(1000);
+      const rates = await query.find({ useMasterKey: true });
+      const map = new Map();
+      rates.forEach((r) => map.set(r.id, {
+        name: r.get('name') || '',
+        color: r.get('color') || '',
+      }));
+      return map;
+    } catch (error) {
+      logger.warn('PublicQuoteController: failed to load segment names map', { error: error.message });
+      return new Map();
+    }
   }
 
   /**
@@ -245,12 +276,13 @@ class PublicQuoteController {
   /**
    * Format service items for public view.
    * @param {object} serviceItems - Service items object.
+   * @param segmentNames
    * @returns {Promise<object>} Formatted service items.
    * @example
    * const formattedItems = await this.formatServiceItems(serviceItems);
    */
-  async formatServiceItems(serviceItems) {
-    const days = await Promise.all((serviceItems.days || []).map((day) => this.formatDayData(day)));
+  async formatServiceItems(serviceItems, segmentNames = new Map()) {
+    const days = await Promise.all((serviceItems.days || []).map((day) => this.formatDayData(day, segmentNames)));
 
     return {
       days,
@@ -265,12 +297,15 @@ class PublicQuoteController {
   /**
    * Format day data for public view.
    * @param {object} day - Day object.
+   * @param segmentNames
    * @returns {Promise<object>} Formatted day data.
    * @example
    * const dayData = await this.formatDayData(day);
    */
-  async formatDayData(day) {
-    const subconcepts = await Promise.all((day.subconcepts || []).map((sub) => this.formatSubconcept(sub)));
+  async formatDayData(day, segmentNames = new Map()) {
+    const subconcepts = await Promise.all(
+      (day.subconcepts || []).map((sub) => this.formatSubconcept(sub, segmentNames))
+    );
 
     return {
       id: day.id || day['_id'] || '', // eslint-disable-line dot-notation
@@ -287,16 +322,33 @@ class PublicQuoteController {
   /**
    * Format subconcept data for public view.
    * @param {object} sub - Subconcept object.
+   * @param segmentNames
    * @returns {Promise<object>} Formatted subconcept data.
    * @example
    * const subData = await this.formatSubconcept(subconcept);
    */
-  async formatSubconcept(sub) {
+  async formatSubconcept(sub, segmentNames = new Map()) {
     // For tours, prioritize destination name over empty concept
     let concept = sub.concept || '';
     if (sub.type === 'tour' && (!concept || concept.trim() === '')) {
       concept = sub.destinationPOI || sub.destination || 'Tour';
     }
+
+    // Resolve main segment name + color (prefer saved values, fall back to live lookup)
+    const mainSegmentId = sub.category || sub.rateId || '';
+    const mainSegmentRate = mainSegmentId ? segmentNames.get(mainSegmentId) : null;
+    const categoryName = sub.categoryName || mainSegmentRate?.name || '';
+    const categoryColor = sub.categoryColor || mainSegmentRate?.color || '';
+
+    // Resolve additional vehicle segment name + color
+    const additionalSegmentId = sub.additionalVehicleSegment || '';
+    const additionalSegmentRate = additionalSegmentId ? segmentNames.get(additionalSegmentId) : null;
+    const additionalVehicleSegmentName = sub.additionalVehicleSegmentName
+      || additionalSegmentRate?.name
+      || '';
+    const additionalVehicleSegmentColor = sub.additionalVehicleSegmentColor
+      || additionalSegmentRate?.color
+      || '';
 
     // For transfers, ensure we have proper service type
     let serviceType = sub.serviceType || '';
@@ -373,13 +425,19 @@ class PublicQuoteController {
       additionalVehicleType: sub.additionalVehicleType || '',
       additionalVehicleTypeName: sub.additionalVehicleTypeName || '',
       additionalVehicleSegment: sub.additionalVehicleSegment || '',
-      additionalVehicleSegmentName: sub.additionalVehicleSegmentName || '',
+      additionalVehicleSegmentName,
+      additionalVehicleSegmentColor,
       // Additional missing fields for unified renderer compatibility
       duration: sub.duration || null,
       isWalkingTour: sub.isWalkingTour || false,
       pricesByType: sub.pricesByType || null,
       includeInTotal: sub.includeInTotal !== false,
       category: sub.category || '',
+      categoryName,
+      categoryColor,
+      attendees: Array.isArray(sub.attendees) ? sub.attendees : [],
+      additionalFlights: Array.isArray(sub.additionalFlights) ? sub.additionalFlights : [],
+      extraAdditionalVehicles: Array.isArray(sub.extraAdditionalVehicles) ? sub.extraAdditionalVehicles : [],
       tripType: sub.tripType || '',
       specificLocation: sub.specificLocation || '',
       // A-disposición specific fields

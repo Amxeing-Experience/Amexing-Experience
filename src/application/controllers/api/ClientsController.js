@@ -850,6 +850,10 @@ class ClientsController {
         return {
           value: user.id,
           label,
+          // Expose companyName separately so the frontend can render it as the primary
+          // identifier for agency selection (admins want to see the company, not the
+          // department manager's personal name).
+          companyName: companyName || '',
           email: user.email,
           contactPerson: fullName,
           phone: user.phone || '',
@@ -1115,65 +1119,26 @@ class ClientsController {
       const ownerPointer = new AmexingUser();
       ownerPointer.id = clientId;
 
-      // DEBUG: Log the pointer being created
-      logger.info('DEBUG: getSubClients - Query 1 setup', {
-        clientId,
-        ownerPointerId: ownerPointer.id,
-        ownerPointerClassName: ownerPointer.className,
-        requestedBy: currentUser.id,
-        userRole: currentUser.get ? currentUser.get('role') : 'unknown',
-      });
-
       directOwnerQuery.equalTo('ownedBy', ownerPointer);
       directOwnerQuery.equalTo('active', true);
       directOwnerQuery.equalTo('exists', true);
 
       // DEBUG: Execute Query 1 separately to see results
       const directResults = await directOwnerQuery.find({ useMasterKey: true });
-      console.log('=== QUERY 1 (DIRECT OWNER) RESULTS ===', {
-        count: directResults.length,
-        clientId,
-        foundClients: directResults.map((c) => ({
-          id: c.id,
-          name: c.get('name'),
-          ownedById: c.get('ownedBy')?.id,
-        })),
-      });
       logger.info('DEBUG: Query 1 (direct owner) results', {
-        count: directResults.length,
         clientId,
-        foundClients: directResults.map((c) => ({
-          id: c.id,
-          name: c.get('name'),
-          ownedById: c.get('ownedBy')?.id,
-        })),
+        count: directResults.length,
+        clientIds: directResults.map((c) => c.id),
       });
 
       // DEBUG: Also check without active/exists filters to see if data exists at all
       const debugQuery = new Parse.Query(Client);
       debugQuery.equalTo('ownedBy', ownerPointer);
       const allOwnedClients = await debugQuery.find({ useMasterKey: true });
-      console.log('=== ALL CLIENTS OWNED (NO FILTERS) ===', {
+      logger.info('DEBUG: All ownedBy clients (no active/exists filter)', {
         clientId,
-        totalCount: allOwnedClients.length,
-        clients: allOwnedClients.map((c) => ({
-          id: c.id,
-          name: c.get('name'),
-          active: c.get('active'),
-          exists: c.get('exists'),
-          ownedById: c.get('ownedBy')?.id,
-        })),
-      });
-      logger.info('DEBUG: ALL Clients owned by this user (no filters)', {
-        clientId,
-        totalCount: allOwnedClients.length,
-        clients: allOwnedClients.map((c) => ({
-          id: c.id,
-          name: c.get('name'),
-          active: c.get('active'),
-          exists: c.get('exists'),
-          ownedById: c.get('ownedBy')?.id,
-        })),
+        count: allOwnedClients.length,
+        clientIds: allOwnedClients.map((c) => c.id),
       });
 
       // Query 2: Match users where their clientId field = clientId
@@ -1207,22 +1172,6 @@ class ClientsController {
           name: c.get('name'),
           ownedById: c.get('ownedBy')?.id,
         })),
-      });
-
-      // DEBUG: Query summary before combination
-      console.log('=== QUERY SUMMARY BEFORE COMBINATION ===', {
-        directResultsCount: directResults.length,
-        indirectResultsCount: indirectResults.length,
-        isDepartmentManager,
-        requestingClientSubClients,
-        totalResultsBeforeCombination: directResults.length + indirectResults.length,
-      });
-      logger.info('DEBUG: Query summary before combination', {
-        directResultsCount: directResults.length,
-        indirectResultsCount: indirectResults.length,
-        isDepartmentManager,
-        requestingClientSubClients,
-        totalResultsBeforeCombination: directResults.length + indirectResults.length,
       });
 
       // Combine both queries with OR

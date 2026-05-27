@@ -150,6 +150,7 @@ class QuoteController {
       const {
         client, clientId, clientType, clientFinalId, contactPerson, contactEmail, contactPhone,
         contactFirstName, contactLastName, notes, eventType,
+        leadGuestFirstName, leadGuestLastName,
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
       } = req.body;
 
@@ -377,6 +378,8 @@ class QuoteController {
       quote.set('contactLastName', finalContactData.contactLastName);
       quote.set('contactEmail', finalContactData.contactEmail);
       quote.set('contactPhone', finalContactData.contactPhone);
+      quote.set('leadGuestFirstName', leadGuestFirstName || '');
+      quote.set('leadGuestLastName', leadGuestLastName || '');
       quote.set('notes', notes || '');
       quote.set('eventType', eventType || '');
 
@@ -722,6 +725,8 @@ class QuoteController {
             contactLastName: quote.get('contactLastName') || '',
             contactEmail: quote.get('contactEmail') || '',
             contactPhone: quote.get('contactPhone') || '',
+            leadGuestFirstName: quote.get('leadGuestFirstName') || '',
+            leadGuestLastName: quote.get('leadGuestLastName') || '',
             notes: quote.get('notes') || '',
             clientFinalId: quote.get('clientFinalId') || null,
             validUntil: quote.get('validUntil'),
@@ -951,6 +956,8 @@ class QuoteController {
         contactLastName: quote.get('contactLastName') || '',
         contactEmail: quote.get('contactEmail') || '',
         contactPhone: quote.get('contactPhone') || '',
+        leadGuestFirstName: quote.get('leadGuestFirstName') || '',
+        leadGuestLastName: quote.get('leadGuestLastName') || '',
         notes: quote.get('notes') || '',
         clientFinalId: quote.get('clientFinalId') || null,
         status: quote.get('status') || 'quoted',

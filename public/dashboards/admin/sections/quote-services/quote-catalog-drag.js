@@ -21,7 +21,6 @@ class DragCatalogManager {
     this.tourSearchQuery = ''; // Track current search query
 
     if (!this.offcanvasEl) {
-      console.warn('[DragCatalog] Offcanvas element not found');
       return;
     }
 
@@ -311,7 +310,6 @@ class DragCatalogManager {
         }
       }
     } catch (error) {
-      console.error('[DragCatalog] Error loading transport services:', error);
       const container = document.getElementById('catalogTransportList');
       if (container) {
         container.innerHTML = '<div class="catalog-empty-state">Error al cargar transportes</div>';
@@ -423,7 +421,6 @@ class DragCatalogManager {
       const item = e.target.closest('.catalog-drag-item');
       if (!item) return;
 
-      console.log('[DragCatalog] dragstart:', item.dataset.catalogId, item.dataset.catalogType);
       item.classList.add('dragging');
       document.body.classList.add('catalog-dragging');
 
@@ -514,7 +511,7 @@ class DragCatalogManager {
 
       try {
         const data = JSON.parse(catalogData);
-        console.log('[DragCatalog] drop:', data.type, data.id, '→ day', dayId);
+        
         if (data.id && data.type) {
           this.handleDrop(dayId, data.id, data.type);
         }
@@ -721,9 +718,7 @@ class DragCatalogManager {
 
 // Initialize when itinerary caches are ready
 document.addEventListener('itinerary-caches-ready', () => {
-  console.log('[DragCatalog] itinerary-caches-ready fired, builder:', !!window.itineraryBuilder);
   if (window.itineraryBuilder) {
     window.catalogManager = new DragCatalogManager(window.itineraryBuilder);
-    console.log('[DragCatalog] Manager initialized');
   }
 });

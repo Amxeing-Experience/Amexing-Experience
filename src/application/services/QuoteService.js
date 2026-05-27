@@ -321,6 +321,8 @@ class QuoteService {
         'contactLastName',
         'contactEmail',
         'contactPhone',
+        'leadGuestFirstName',
+        'leadGuestLastName',
         'notes',
         'validUntil',
         'eventType',
@@ -1717,6 +1719,10 @@ class QuoteService {
                 resSvc.set('additionalVehicleSegment', sub.additionalVehicleSegment);
                 logger.debug('📋 Stored additional vehicle segment:', sub.additionalVehicleSegment);
               }
+              if (sub.additionalVehicleSegmentName) {
+                resSvc.set('additionalVehicleSegmentName', sub.additionalVehicleSegmentName);
+                logger.debug('📋 Stored additional vehicle segment name:', sub.additionalVehicleSegmentName);
+              }
             }
 
             // Map suggested departure times for transport services
@@ -1771,6 +1777,10 @@ class QuoteService {
                 if (sub.additionalVehicleSegment) {
                   resSvc.set('additionalVehicleSegment', sub.additionalVehicleSegment);
                   logger.debug('📋 Stored additional vehicle segment for tour:', sub.additionalVehicleSegment);
+                }
+                if (sub.additionalVehicleSegmentName) {
+                  resSvc.set('additionalVehicleSegmentName', sub.additionalVehicleSegmentName);
+                  logger.debug('📋 Stored additional vehicle segment name for tour:', sub.additionalVehicleSegmentName);
                 }
               }
             }

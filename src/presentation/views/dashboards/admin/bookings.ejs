@@ -42,18 +42,70 @@
                 </div>
 
                 <div class="card-body">
-                    <!-- Date Filter Pills -->
+                    <!-- Date Filter Pills and Date Selectors -->
                     <div class="mb-3">
-                        <div class="btn-group" role="group" aria-label="Filtro por fecha de reservaciones">
-                            <input type="radio" class="btn-check" name="dateFilter" id="filterFuture" value="future" checked>
-                            <label class="btn btn-outline-primary" for="filterFuture">
-                                <i class="ti ti-calendar-forward me-1"></i>Próximas reservaciones
-                            </label>
+                        <div class="row align-items-center">
+                            <div class="col-md-auto mb-2 mb-md-0">
+                                <div class="btn-group" role="group" aria-label="Filtro por fecha de reservaciones">
+                                    <input type="radio" class="btn-check" name="dateFilter" id="filterUpcoming" value="upcoming" checked>
+                                    <label class="btn btn-outline-primary" for="filterUpcoming">
+                                        <i class="ti ti-calendar-forward me-1"></i>PRÓXIMAS
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="dateFilter" id="filterOngoing" value="ongoing">
+                                    <label class="btn btn-outline-info" for="filterOngoing">
+                                        <i class="ti ti-calendar-event me-1"></i>EN CURSO
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="dateFilter" id="filterPast" value="past">
+                                    <label class="btn btn-outline-secondary" for="filterPast">
+                                        <i class="ti ti-calendar-time me-1"></i>PASADAS
+                                    </label>
+                                </div>
+                            </div>
                             
-                            <input type="radio" class="btn-check" name="dateFilter" id="filterPrevious" value="previous">
-                            <label class="btn btn-outline-secondary" for="filterPrevious">
-                                <i class="ti ti-calendar-time me-1"></i>Reservaciones anteriores
-                            </label>
+                            <div class="col-md-auto">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted">|</span>
+                                    
+                                    <!-- Year Filter -->
+                                    <div class="d-flex align-items-center">
+                                        <label for="yearFilter" class="form-label mb-0 me-2 text-muted">Año:</label>
+                                        <select class="form-select form-select-sm" id="yearFilter" style="width: 100px;">
+                                            <!-- Options will be populated by JavaScript -->
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Month Filter -->
+                                    <div class="d-flex align-items-center">
+                                        <label for="monthFilter" class="form-label mb-0 me-2 text-muted">Mes:</label>
+                                        <select class="form-select form-select-sm" id="monthFilter" style="width: 130px;">
+                                            <option value="">Todos</option>
+                                            <option value="1">Enero</option>
+                                            <option value="2">Febrero</option>
+                                            <option value="3">Marzo</option>
+                                            <option value="4">Abril</option>
+                                            <option value="5">Mayo</option>
+                                            <option value="6">Junio</option>
+                                            <option value="7">Julio</option>
+                                            <option value="8">Agosto</option>
+                                            <option value="9">Septiembre</option>
+                                            <option value="10">Octubre</option>
+                                            <option value="11">Noviembre</option>
+                                            <option value="12">Diciembre</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Day Filter -->
+                                    <div class="d-flex align-items-center">
+                                        <label for="dayFilter" class="form-label mb-0 me-2 text-muted">Día:</label>
+                                        <select class="form-select form-select-sm" id="dayFilter" style="width: 85px;">
+                                            <option value="">Todos</option>
+                                            <!-- Days 1-31 will be populated by JavaScript -->
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -91,6 +143,39 @@
 document.addEventListener('DOMContentLoaded', function() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     let pendingCancelId = null;
+    
+    // Populate year dropdown
+    function populateYearDropdown() {
+        const yearSelect = document.getElementById('yearFilter');
+        const currentYear = new Date().getFullYear();
+        
+        // Add years from current year -2 to current year +2
+        for (let year = currentYear - 2; year <= currentYear + 2; year++) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            if (year === currentYear) {
+                option.selected = true;
+            }
+            yearSelect.appendChild(option);
+        }
+    }
+    
+    // Populate day dropdown
+    function populateDayDropdown() {
+        const daySelect = document.getElementById('dayFilter');
+        
+        for (let day = 1; day <= 31; day++) {
+            const option = document.createElement('option');
+            option.value = day;
+            option.textContent = day;
+            daySelect.appendChild(option);
+        }
+    }
+    
+    // Initialize dropdowns
+    populateYearDropdown();
+    populateDayDropdown();
 
     function getQuoteStatusBadge(status) {
         if (!status) return '';
@@ -143,6 +228,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (activeFilter) {
                     d.dateFilter = activeFilter.value;
                 }
+                
+                // Add year, month, day filters
+                const yearFilter = document.getElementById('yearFilter').value;
+                const monthFilter = document.getElementById('monthFilter').value;
+                const dayFilter = document.getElementById('dayFilter').value;
+                
+                if (yearFilter) d.yearFilter = yearFilter;
+                if (monthFilter) d.monthFilter = monthFilter;
+                if (dayFilter) d.dayFilter = dayFilter;
+                
                 return d;
             },
             error: function(xhr) {
@@ -240,6 +335,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     table.draw();
                 }, false);
             }
+        });
+    });
+    
+    // Year, Month, Day filter change
+    ['yearFilter', 'monthFilter', 'dayFilter'].forEach(filterId => {
+        document.getElementById(filterId).addEventListener('change', function() {
+            table.ajax.reload(null, false);
         });
     });
 

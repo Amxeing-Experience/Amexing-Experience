@@ -694,7 +694,11 @@
                         <span class="sm-quote-info-label">Atención a</span>
                         <span class="sm-quote-info-value" id="summaryContactPerson">-</span>
                     </div>
-                    <div class="sm-quote-info-item">
+                    <div class="sm-quote-info-item d-none" id="summaryLeadGuestRow">
+                        <span class="sm-quote-info-label">Lead Guest</span>
+                        <span class="sm-quote-info-value" id="summaryLeadGuest">-</span>
+                    </div>
+                    <div class="sm-quote-info-item" id="summaryEventTypeRow">
                         <span class="sm-quote-info-label">Motivo de viaje</span>
                         <span class="sm-quote-info-value" id="summaryEventType">-</span>
                     </div>
@@ -703,6 +707,15 @@
                         <span class="sm-quote-info-value" id="summaryNumberOfPeople">-</span>
                     </div>
                 </div>
+            </div>
+
+            <!-- Quote-level notes (shown only when set) -->
+            <div id="summaryQuoteNotesBlock" class="mt-3 mb-3 p-3 rounded d-none" style="background: #f8f9fa; border-left: 3px solid #adb5bd;">
+                <div class="d-flex align-items-center mb-1">
+                    <i class="ti ti-notes me-1 text-secondary"></i>
+                    <strong class="text-secondary" style="font-size: 0.9rem;">Notas de la cotización</strong>
+                </div>
+                <div id="summaryQuoteNotes" class="text-dark" style="white-space: pre-wrap; font-size: 0.95rem;"></div>
             </div>
 
             <!-- Services & Itinerary -->
@@ -772,18 +785,18 @@
     
     // Segment mappings cache
     let segmentMappings = {};
+    // Full rates cache (array of {value, label, color}) — used by the unified renderer
+    // to resolve segment colors for the colored chip display.
+    let ratesCache = [];
     
     // Fetch and cache segment mappings from API
     async function fetchSegmentMappings() {
         try {
-            // Try multiple sources for access token
-            let accessToken = localStorage.getItem('accessToken') || 
-                            sessionStorage.getItem('accessToken') ||
-                            window.quoteAccessToken ||
-                            getAccessToken();
+            // Get access token using comprehensive method (same as ServicesRenderer)
+            let accessToken = getAccessTokenComprehensive();
             
             if (!accessToken) {
-                console.warn('No access token available for fetching rate mappings - will use static fallbacks only');
+                console.warn('❌ Quote Summary: No access token available for fetching rate mappings - will use static fallbacks only');
                 return;
             }
             
@@ -799,6 +812,8 @@
                 const result = await ratesResponse.json();
                 if (result.success && result.data) {
                     console.log(`📊 Processing ${result.data.length} rates for ObjectId mapping...`);
+                    // Keep the raw rates so the renderer can resolve segment colors
+                    ratesCache = result.data;
                     
                     result.data.forEach(rate => {
                         // Log the first rate to understand structure
@@ -877,7 +892,126 @@
         return new Date(date).toLocaleDateString('es-MX', options);
     }
 
-    // Get access token with retry logic
+    // Robust cookie getter function
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) {
+            const cookieValue = parts.pop().split(';').shift();
+            if (cookieValue) {
+                console.log(`✅ Quote Summary: Found cookie ${name} with value length:`, cookieValue.length);
+                return cookieValue;
+            }
+        }
+        return null;
+    }
+
+    // Get access token with comprehensive fallback logic and enhanced debugging
+    function getAccessTokenComprehensive() {
+        // Enhanced debugging - show all available cookies
+        console.log('🔍 Quote Summary: Starting token lookup...');
+        console.log('🔍 Quote Summary: Raw document.cookie:', document.cookie);
+        console.log('🔍 Quote Summary: Cookie breakdown:', 
+            document.cookie.split(';').map((c, i) => {
+                const trimmed = c.trim();
+                const [name, value] = trimmed.split('=');
+                return { 
+                    index: i, 
+                    name: name || '(empty)', 
+                    hasValue: !!value, 
+                    valueLength: value?.length || 0,
+                    rawContent: trimmed.substring(0, 50) + (trimmed.length > 50 ? '...' : '')
+                };
+            })
+        );
+
+        // First try to get from window variable (passed from server)
+        if (typeof window !== 'undefined' && window.quoteAccessToken) {
+            // Set the cookie for future requests since middleware expects it
+            document.cookie = `accessToken=${window.quoteAccessToken}; path=/; SameSite=Lax`;
+            console.log('✅ Quote Summary: Using token from window.quoteAccessToken');
+            return window.quoteAccessToken;
+        }
+
+        // Try robust cookie parsing for common token cookie names
+        const tokenCookieNames = ['accessToken', 'clientAccessToken', 'client_access_token', 'authToken'];
+        for (const cookieName of tokenCookieNames) {
+            const tokenValue = getCookie(cookieName);
+            if (tokenValue) {
+                console.log(`✅ Quote Summary: Using token from ${cookieName} cookie`);
+                return tokenValue;
+            } else {
+                console.log(`❌ Quote Summary: No value found for ${cookieName} cookie`);
+            }
+        }
+
+        // Fallback to old parsing method (in case of parsing differences)
+        console.log('🔍 Quote Summary: Trying fallback cookie parsing...');
+        const cookies = document.cookie.split(';');
+        for (const cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            console.log(`🔍 Quote Summary: Checking cookie - name: '${name}', hasValue: ${!!value}, valueLength: ${value?.length || 0}`);
+            if (name === 'accessToken' && value) {
+                console.log('✅ Quote Summary: Using token from accessToken cookie (fallback method)');
+                return value;
+            }
+            if (name === 'clientAccessToken' && value) {
+                console.log('✅ Quote Summary: Using token from clientAccessToken cookie (fallback method)');
+                return value;
+            }
+        }
+
+        // Try localStorage/sessionStorage with various keys (with enhanced logging)
+        console.log('🔍 Quote Summary: Checking localStorage/sessionStorage...');
+        const tokenSources = [
+            { source: 'localStorage.accessToken', getter: () => localStorage.getItem('accessToken') },
+            { source: 'sessionStorage.accessToken', getter: () => sessionStorage.getItem('accessToken') },
+            { source: 'localStorage.token', getter: () => localStorage.getItem('token') },
+            { source: 'sessionStorage.token', getter: () => sessionStorage.getItem('token') },
+            { source: 'localStorage.clientAccessToken', getter: () => localStorage.getItem('clientAccessToken') },
+            { source: 'sessionStorage.clientAccessToken', getter: () => sessionStorage.getItem('clientAccessToken') }
+        ];
+
+        for (const tokenSource of tokenSources) {
+            try {
+                const token = tokenSource.getter();
+                console.log(`🔍 Quote Summary: Checking ${tokenSource.source} - hasValue: ${!!token}, length: ${token?.length || 0}`);
+                if (token) {
+                    console.log(`✅ Quote Summary: Using token from ${tokenSource.source}`);
+                    return token;
+                }
+            } catch (error) {
+                console.warn(`⚠️ Quote Summary: Error accessing ${tokenSource.source}:`, error.message);
+            }
+        }
+
+        // Try original getAccessToken function as fallback
+        try {
+            const token = getAccessToken();
+            if (token) {
+                console.log('✅ Quote Summary: Using token from legacy getAccessToken()');
+                return token;
+            }
+        } catch (error) {
+            console.warn('⚠️ Quote Summary: Error calling getAccessToken():', error.message);
+        }
+
+        console.warn('❌ Quote Summary: No authentication token found in any source:', {
+            windowQuoteAccessToken: !!(window.quoteAccessToken),
+            rawCookieString: document.cookie,
+            cookieCount: document.cookie.split(';').length,
+            checkedSources: tokenSources.map(s => s.source),
+            checkedCookieNames: ['accessToken', 'clientAccessToken', 'client_access_token', 'authToken'],
+            browserInfo: {
+                userAgent: navigator.userAgent,
+                url: window.location.href,
+                domain: window.location.hostname
+            }
+        });
+        return null;
+    }
+
+    // Get access token with retry logic (legacy function - kept for compatibility)
     function getAccessToken() {
         return document.cookie
             .split('; ')
@@ -1046,9 +1180,51 @@
                 }
             }
 
-            // Quote details
-            document.getElementById('summaryEventType').textContent = quote.eventType || 'No especificado';
+            // Quote details — omit the "Motivo de viaje" row entirely when no event type was provided
+            const summaryEventTypeRow = document.getElementById('summaryEventTypeRow');
+            const summaryEventTypeEl = document.getElementById('summaryEventType');
+            if (quote.eventType && String(quote.eventType).trim()) {
+                summaryEventTypeEl.textContent = quote.eventType;
+                summaryEventTypeRow?.classList.remove('d-none');
+            } else {
+                summaryEventTypeEl.textContent = '';
+                summaryEventTypeRow?.classList.add('d-none');
+            }
             document.getElementById('summaryNumberOfPeople').textContent = quote.numberOfPeople || '0';
+
+            // Quote-level notes — show the callout above SERVICIOS only when set
+            const quoteNotesBlock = document.getElementById('summaryQuoteNotesBlock');
+            const quoteNotesEl = document.getElementById('summaryQuoteNotes');
+            if (quote.notes && String(quote.notes).trim()) {
+                quoteNotesEl.textContent = quote.notes;
+                quoteNotesBlock?.classList.remove('d-none');
+            } else {
+                quoteNotesEl.textContent = '';
+                quoteNotesBlock?.classList.add('d-none');
+            }
+
+            // Lead Guest row — prefer explicit leadGuestFirst/LastName, otherwise fall back to
+            // the contact name (contactFirstName/contactLastName, or the legacy contactPerson).
+            const buildName = (first, last) => [first, last]
+                .map(part => (part || '').trim())
+                .filter(Boolean)
+                .join(' ');
+            let leadGuestName = buildName(quote.leadGuestFirstName, quote.leadGuestLastName);
+            if (!leadGuestName) {
+                leadGuestName = buildName(quote.contactFirstName, quote.contactLastName)
+                    || (quote.contactPerson || '').trim();
+            }
+            const leadGuestRow = document.getElementById('summaryLeadGuestRow');
+            const leadGuestEl = document.getElementById('summaryLeadGuest');
+            if (leadGuestEl && leadGuestRow) {
+                if (leadGuestName) {
+                    leadGuestEl.textContent = leadGuestName;
+                    leadGuestRow.classList.remove('d-none');
+                } else {
+                    leadGuestEl.textContent = '';
+                    leadGuestRow.classList.add('d-none');
+                }
+            }
 
             // Client name
             let clientName = 'No especificado';
@@ -1169,7 +1345,16 @@
                 formatCurrency: (amount) => currencyFormatter.format(amount),
                 formatDate: (date) => {
                     if (!date) return '';
-                    const d = new Date(date);
+                    // YYYY-MM-DD strings must be parsed as LOCAL dates — `new Date('2026-08-11')`
+                    // is UTC midnight, which shifts to the previous day in any negative-offset
+                    // timezone (e.g. Mexico City UTC-6) when formatted.
+                    let d;
+                    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+                        const [y, m, day] = date.split('-').map(Number);
+                        d = new Date(y, m - 1, day);
+                    } else {
+                        d = new Date(date);
+                    }
                     return new Intl.DateTimeFormat('es-MX', {
                         weekday: 'long',
                         year: 'numeric',
@@ -1177,7 +1362,8 @@
                         day: 'numeric'
                     }).format(d);
                 },
-                segmentMappings: segmentMappings // Pass segment mappings for ObjectId to name conversion
+                segmentMappings: segmentMappings, // Pass segment mappings for ObjectId to name conversion
+                ratesCache: ratesCache // Full rates so the renderer can resolve segment colors (rate.color)
             });
 
             // Normalize the data structure
@@ -1544,16 +1730,18 @@
             
             // Get quote details
             const contactPerson = document.getElementById('summaryContactPerson')?.textContent || 'No especificado';
-            const eventType = document.getElementById('summaryEventType')?.textContent || 'No especificado';
+            const eventType = (document.getElementById('summaryEventType')?.textContent || '').trim();
             const numberOfPeople = document.getElementById('summaryNumberOfPeople')?.textContent || '0';
             const clientName = document.getElementById('summaryClientName')?.textContent || 'No especificado';
-            
+
             doc.text(`ATENCIÓN A: ${contactPerson}`, margin, yPosition);
             yPosition += 5;
             doc.text(`CLIENTE: ${clientName}`, margin, yPosition);
             yPosition += 5;
-            doc.text(`EVENTO: ${eventType}`, margin, yPosition);
-            yPosition += 5;
+            if (eventType) {
+                doc.text(`EVENTO: ${eventType}`, margin, yPosition);
+                yPosition += 5;
+            }
             doc.text(`PERSONAS: ${numberOfPeople}`, margin, yPosition);
             yPosition += 10;
 
