@@ -1135,6 +1135,12 @@
                 });
                 
                 // Add client options
+                // Agency mode dedupe: the API returns one row per department-manager USER,
+                // so multiple managers of the same agency produce duplicates. Keep the first
+                // user with a given companyName as the agency's representative. Also skip
+                // managers without a companyName entirely — those are personal/test accounts
+                // that shouldn't pollute the agency dropdown.
+                const seenCompanyNames = new Set();
                 clients.forEach(client => {
                     console.log('🔍 Processing client for dropdown:', {
                         raw: client,
@@ -1149,9 +1155,34 @@
                     // 3. Otherwise use the full label
                     let displayText = client.label;
                     const parenthesesMatch = client.label.match(/^(.+?)\s*\(([^)]+)\)$/);
-                    
-                    if (parenthesesMatch && parenthesesMatch[2]) {
-                        // Has format "Name (Company)" - use company name
+
+                    if (typeToLoad === 'agency') {
+                        // Resolve a companyName from any of the sources we have.
+                        let resolvedCompany = '';
+                        if (client.companyName && client.companyName.trim()) {
+                            resolvedCompany = client.companyName.trim();
+                        } else if (parenthesesMatch && parenthesesMatch[2]) {
+                            resolvedCompany = parenthesesMatch[2].trim();
+                        }
+
+                        if (!resolvedCompany) {
+                            // Skip agency rows that have no company — they're department
+                            // managers without an assigned agency.
+                            console.warn('⚠️ Agency without companyName — skipping option:', client.label);
+                            return;
+                        }
+
+                        // Dedupe: case-insensitive comparison so "Acme" and "ACME" collapse.
+                        const key = resolvedCompany.toLowerCase();
+                        if (seenCompanyNames.has(key)) {
+                            console.log('🧹 Agency dedupe: skipping duplicate of', resolvedCompany);
+                            return;
+                        }
+                        seenCompanyNames.add(key);
+
+                        displayText = resolvedCompany;
+                        console.log('✅ Agency: using companyName:', displayText);
+                    } else if (parenthesesMatch && parenthesesMatch[2]) {
                         displayText = parenthesesMatch[2];
                         console.log('✅ Using company name from parentheses:', displayText);
                     } else if (!client.label.includes('(')) {
