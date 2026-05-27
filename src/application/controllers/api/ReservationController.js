@@ -150,7 +150,12 @@ class ReservationController {
       const statusFilter = req.query.statusFilter || '';
 
       // Date filter
-      const dateFilter = req.query.dateFilter || 'future'; // Default to future
+      const dateFilter = req.query.dateFilter || 'upcoming'; // Default to upcoming
+
+      // Year, Month, Day filters
+      const yearFilter = req.query.yearFilter ? parseInt(req.query.yearFilter, 10) : null;
+      const monthFilter = req.query.monthFilter ? parseInt(req.query.monthFilter, 10) : null;
+      const dayFilter = req.query.dayFilter ? parseInt(req.query.dayFilter, 10) : null;
 
       // Get role-based filter pointers (null = no filter for admins)
       const roleFilterPointers = await ReservationController.getRoleFilterPointers(req);
@@ -166,16 +171,57 @@ class ReservationController {
         query.containedIn('clientPtr', roleFilterPointers);
       }
 
-      // Apply date filter based on startDate
-      if (dateFilter === 'future') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Start of today
-        query.greaterThanOrEqualTo('startDate', today);
-      } else if (dateFilter === 'previous') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Start of today
-        query.lessThan('startDate', today);
+      // Helper function to apply year/month/day filters
+      const applySpecificDateFilters = (q, yearVal, monthVal, dayVal) => {
+        if (yearVal !== null) {
+          // Create date range for the year
+          const yearStart = new Date(yearVal, 0, 1); // January 1st
+          const yearEnd = new Date(yearVal + 1, 0, 1); // January 1st of next year
+
+          if (monthVal !== null) {
+            // Specific month in year
+            const monthStart = new Date(yearVal, monthVal - 1, 1); // First day of month (monthVal is 1-based)
+            const monthEnd = new Date(yearVal, monthVal, 1); // First day of next month
+
+            if (dayVal !== null) {
+              // Specific day
+              const dayStart = new Date(yearVal, monthVal - 1, dayVal);
+              const dayEnd = new Date(yearVal, monthVal - 1, dayVal + 1);
+
+              // Reservation overlaps with this specific day
+              q.lessThan('startDate', dayEnd);
+              q.greaterThanOrEqualTo('endDate', dayStart);
+            } else {
+              // Month filter only - reservation overlaps with this month
+              q.lessThan('startDate', monthEnd);
+              q.greaterThanOrEqualTo('endDate', monthStart);
+            }
+          } else {
+            // Year filter only - reservation overlaps with this year
+            q.lessThan('startDate', yearEnd);
+            q.greaterThanOrEqualTo('endDate', yearStart);
+          }
+        }
+      };
+
+      // Apply date filter based on startDate and endDate
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of today
+
+      if (dateFilter === 'upcoming') {
+        // Reservations that haven't started yet
+        query.greaterThan('startDate', today);
+      } else if (dateFilter === 'ongoing') {
+        // Reservations currently in progress
+        query.lessThanOrEqualTo('startDate', today);
+        query.greaterThanOrEqualTo('endDate', today);
+      } else if (dateFilter === 'past') {
+        // Reservations that have ended
+        query.lessThan('endDate', today);
       }
+
+      // Apply additional year/month/day filters
+      applySpecificDateFilters(query, yearFilter, monthFilter, dayFilter);
 
       // Total count (without search/status filters, but with role filter)
       const totalQuery = new Parse.Query('Reservation');
@@ -186,15 +232,17 @@ class ReservationController {
       }
 
       // Apply date filter to total count
-      if (dateFilter === 'future') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        totalQuery.greaterThanOrEqualTo('startDate', today);
-      } else if (dateFilter === 'previous') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        totalQuery.lessThan('startDate', today);
+      if (dateFilter === 'upcoming') {
+        totalQuery.greaterThan('startDate', today);
+      } else if (dateFilter === 'ongoing') {
+        totalQuery.lessThanOrEqualTo('startDate', today);
+        totalQuery.greaterThanOrEqualTo('endDate', today);
+      } else if (dateFilter === 'past') {
+        totalQuery.lessThan('endDate', today);
       }
+
+      // Apply additional year/month/day filters to total count
+      applySpecificDateFilters(totalQuery, yearFilter, monthFilter, dayFilter);
 
       const recordsTotal = await totalQuery.count({ useMasterKey: true });
 
@@ -229,21 +277,32 @@ class ReservationController {
         }
 
         // Apply date filter to search queries
-        if (dateFilter === 'future') {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          folioQuery.greaterThanOrEqualTo('startDate', today);
-          contactQuery.greaterThanOrEqualTo('startDate', today);
-          eventQuery.greaterThanOrEqualTo('startDate', today);
-          emailQuery.greaterThanOrEqualTo('startDate', today);
-        } else if (dateFilter === 'previous') {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          folioQuery.lessThan('startDate', today);
-          contactQuery.lessThan('startDate', today);
-          eventQuery.lessThan('startDate', today);
-          emailQuery.lessThan('startDate', today);
+        if (dateFilter === 'upcoming') {
+          folioQuery.greaterThan('startDate', today);
+          contactQuery.greaterThan('startDate', today);
+          eventQuery.greaterThan('startDate', today);
+          emailQuery.greaterThan('startDate', today);
+        } else if (dateFilter === 'ongoing') {
+          folioQuery.lessThanOrEqualTo('startDate', today);
+          folioQuery.greaterThanOrEqualTo('endDate', today);
+          contactQuery.lessThanOrEqualTo('startDate', today);
+          contactQuery.greaterThanOrEqualTo('endDate', today);
+          eventQuery.lessThanOrEqualTo('startDate', today);
+          eventQuery.greaterThanOrEqualTo('endDate', today);
+          emailQuery.lessThanOrEqualTo('startDate', today);
+          emailQuery.greaterThanOrEqualTo('endDate', today);
+        } else if (dateFilter === 'past') {
+          folioQuery.lessThan('endDate', today);
+          contactQuery.lessThan('endDate', today);
+          eventQuery.lessThan('endDate', today);
+          emailQuery.lessThan('endDate', today);
         }
+
+        // Apply additional year/month/day filters to search queries
+        applySpecificDateFilters(folioQuery, yearFilter, monthFilter, dayFilter);
+        applySpecificDateFilters(contactQuery, yearFilter, monthFilter, dayFilter);
+        applySpecificDateFilters(eventQuery, yearFilter, monthFilter, dayFilter);
+        applySpecificDateFilters(emailQuery, yearFilter, monthFilter, dayFilter);
 
         const compoundQuery = Parse.Query.or(folioQuery, contactQuery, eventQuery, emailQuery);
         compoundQuery.include('quotePtr');
@@ -295,15 +354,17 @@ class ReservationController {
       }
 
       // Apply date filter to count query
-      if (dateFilter === 'future') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        countQuery.greaterThanOrEqualTo('startDate', today);
-      } else if (dateFilter === 'previous') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        countQuery.lessThan('startDate', today);
+      if (dateFilter === 'upcoming') {
+        countQuery.greaterThan('startDate', today);
+      } else if (dateFilter === 'ongoing') {
+        countQuery.lessThanOrEqualTo('startDate', today);
+        countQuery.greaterThanOrEqualTo('endDate', today);
+      } else if (dateFilter === 'past') {
+        countQuery.lessThan('endDate', today);
       }
+
+      // Apply additional year/month/day filters to count query
+      applySpecificDateFilters(countQuery, yearFilter, monthFilter, dayFilter);
 
       const recordsFiltered = await countQuery.count({ useMasterKey: true });
 

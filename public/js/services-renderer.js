@@ -13,7 +13,7 @@
         constructor(options = {}) {
             // Check if config is loaded
             if (typeof ServicesRendererConfig === 'undefined') {
-                console.error('ServicesRendererConfig not loaded. Please include services-renderer-config.js first.');
+                console.error('❌ ServicesRenderer: ServicesRendererConfig not loaded. Please include services-renderer-config.js first.');
                 return;
             }
 
@@ -31,8 +31,51 @@
             this.segmentMappings = options.segmentMappings || {};
             this.ratesCache = options.ratesCache || [];
 
+            // Rate fetching state
+            this.ratesFetchPromise = null;
+            this.lastRatesFetch = null;
+
             // Initialize styles
             this.initializeStyles();
+
+            // Log initialization details
+            this.logInitialization(options);
+        }
+
+        // Helper: Log initialization details for debugging
+        logInitialization(options) {
+            const cacheInfo = {
+                provided: !!options.ratesCache,
+                isArray: Array.isArray(this.ratesCache),
+                length: this.ratesCache?.length || 0,
+                validStructure: this.ratesCache?.length > 0 ? this.validateRatesCache() : false
+            };
+
+            console.log('🔧 ServicesRenderer: Initialized', {
+                mode: this.mode,
+                paymentType: this.paymentType,
+                hasContainer: !!this.container,
+                containerType: this.container ? (typeof this.container === 'string' ? 'selector' : 'element') : 'none',
+                ratesCache: cacheInfo,
+                config: {
+                    loaded: !!this.config,
+                    hasFormatters: !!this.config?.formatters,
+                    hasHelpers: !!this.config?.helpers
+                }
+            });
+
+            // Warn about potential issues
+            if (!this.container) {
+                console.warn('⚠️ ServicesRenderer: No container specified - render() will fail');
+            }
+
+            if (cacheInfo.provided && cacheInfo.length === 0) {
+                console.warn('⚠️ ServicesRenderer: Empty ratesCache provided - segment names may display as IDs');
+            }
+
+            if (cacheInfo.provided && !cacheInfo.validStructure) {
+                console.warn('⚠️ ServicesRenderer: Invalid ratesCache structure - segment resolution may fail');
+            }
         }
 
         initializeStyles() {
@@ -46,10 +89,55 @@
                         display: inline-block;
                         padding: 0.25em 0.6em;
                         border-radius: 0.375rem;
-                        font-size: 0.75rem;
+                        font-size: 0.875rem;
                         font-weight: 600;
                         margin-right: 0.5rem;
                         margin-bottom: 0.25rem;
+                        background: #969b81;
+                        color: white;
+                        border: none;
+                    }
+                    
+                    .service-badge.secondary {
+                        background: rgba(150, 155, 129, 0.2);
+                        color: #969b81;
+                    }
+                    
+                    .service-badge.warning {
+                        background: #c4a747;
+                        color: white;
+                    }
+                    
+                    .service-badge.error {
+                        background: #a67c7c;
+                        color: white;
+                    }
+                    
+                    .service-badge.info {
+                        background: #8a9aa8;
+                        color: white;
+                    }
+                    
+                    .service-badge.external {
+                        background: rgba(150, 155, 129, 0.15);
+                        color: #969b81;
+                        border: 1px solid rgba(150, 155, 129, 0.3);
+                    }
+                    
+                    /* Passenger-specific badge colors */
+                    .service-badge.children {
+                        background: #b5ba9e;
+                        color: white;
+                    }
+                    
+                    .service-badge.infants {
+                        background: rgba(150, 155, 129, 0.3);
+                        color: #969b81;
+                    }
+                    
+                    .service-badge.no-alcohol {
+                        background: #7a7f6b;
+                        color: white;
                     }
 
                     .service-item {
@@ -123,13 +211,13 @@
 
                     .service-title {
                         font-weight: 600;
-                        font-size: 0.95rem;
+                        font-size: 1.075rem;
                         color: #212529;
                         margin-bottom: 0.25rem;
                     }
 
                     .service-details {
-                        font-size: 0.85rem;
+                        font-size: 0.975rem;
                         color: #6c757d;
                     }
 
@@ -142,7 +230,7 @@
 
                     .service-price {
                         font-weight: normal;
-                        font-size: 0.95rem;
+                        font-size: 1.075rem;
                         color: #000000;
                         white-space: nowrap;
                         margin-left: 1rem;
@@ -200,7 +288,7 @@
                     }
 
                     .day-total {
-                        font-size: 1rem;
+                        font-size: 1.125rem;
                         color: #212529;
                     }
 
@@ -224,21 +312,21 @@
             document.head.insertAdjacentHTML('beforeend', styles);
         }
 
-        // Get badge class based on mode - using consistent Bootstrap classes
+        // Get badge class based on mode - using sage color scheme
         getBadgeClass() {
-            // All modes now use consistent Bootstrap badge classes
-            return 'badge bg-light text-dark';
+            // All modes now use consistent sage color scheme
+            return 'service-badge';
         }
 
-        // Get passenger badge class - consistent across all modes
+        // Get passenger badge class - consistent across all modes with sage color scheme
         getPassengerBadgeClass(type) {
             const colorMap = {
-                adults: 'bg-primary-subtle text-primary',
-                children: 'bg-success-subtle text-success',
-                infants: 'bg-warning-subtle text-warning',
-                adultsNoAlcohol: 'bg-info-subtle text-info'
+                adults: 'service-badge',
+                children: 'service-badge children',
+                infants: 'service-badge infants',
+                adultsNoAlcohol: 'service-badge no-alcohol'
             };
-            return `badge ${colorMap[type] || 'bg-light text-dark'} d-inline-flex align-items-center gap-1 me-1 mb-1`;
+            return `${colorMap[type] || 'service-badge secondary'} d-inline-flex align-items-center gap-1 me-1 mb-1`;
         }
 
         // Main render method
@@ -407,12 +495,11 @@
             // Service badges and title on same line (keeping original layout)
             html += '<div class="d-flex align-items-center mb-2">';
             if (this.config.displayRules.shouldShowServiceBadge(service)) {
-                // Minimal badge styling - match main services view
-                const badgeClass = 'bg-light text-dark';
-                html += `<span class="badge ${badgeClass} me-2">${badgeLabel}</span>`;
+                // Use sage color scheme for service badges
+                html += `<span class="service-badge me-2">${badgeLabel}</span>`;
             }
             if (isExcluded) {
-                html += `<span class="badge bg-light text-muted small me-2">Pago externo</span>`;
+                html += `<span class="service-badge external small me-2">Pago externo</span>`;
             }
             // Service title (keeping original structure)
             html += `<h6 class="mb-0 service-title">${this.getServiceTitle(service)}</h6>`;
@@ -424,7 +511,7 @@
             if (this.config.displayRules.shouldShowPrice(service)) {
                 html += '<div class="service-price text-end">';
                 if (isExcluded) {
-                    html += '<span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span><br>';
+                    html += '<span class="service-badge external mb-1">Pago externo</span><br>';
                     html += `<div class="service-price excluded">${this.formatCurrency(price)}</div>`;
                 } else {
                     html += `<div class="service-price">${this.formatCurrency(price)}</div>`;
@@ -455,7 +542,7 @@
                     <span>Duración: ${service.duration} ${service.duration === 1 ? 'hora' : 'horas'}</span>
                 </div>`;
             }
-            
+
             // Duration (for a-disposición)
             if (service.type === 'a-disposicion' && service.hours) {
                 html += `<div class="service-detail-item mt-1">
@@ -465,8 +552,10 @@
             }
 
             // Vehicle info - standardized format like transport services
-            if (service.vehicleId || service.vehicleType || service.vehicleTypeName || 
-                (service.type === 'tour' && ((service.hasAdditionalVehicle && service.additionalVehicleId) || service.additionalVehicleTypeName))) {
+            const hasExtraVehicles = Array.isArray(service.extraAdditionalVehicles) && service.extraAdditionalVehicles.length > 0;
+            if (service.vehicleId || service.vehicleType || service.vehicleTypeName ||
+                (service.type === 'tour' && ((service.hasAdditionalVehicle && service.additionalVehicleId) || service.additionalVehicleTypeName)) ||
+                hasExtraVehicles) {
                 html += `<div class="mt-1">
                     <div class="mb-1">
                         <i class="ti ti-car me-1"></i><span class="text-muted">Vehículo(s):</span>
@@ -476,10 +565,9 @@
                             <div class="d-flex align-items-center justify-content-between">
                                 <span>
                                     <strong>${this.getVehicleDisplayName(service)}</strong>
-                                    ${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` : 
-                                      service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}
-                                    ${service.rateId ? ` - ${this.getCategoryName(service.rateId)}` : 
-                                      service.category ? ` - ${this.getCategoryName(service.category)}` : ''}
+                                    ${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` :
+                            service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}
+                                    ${this.getMainSegmentSuffix(service)}
                                 </span>
                             </div>
                         </div>
@@ -488,12 +576,12 @@
                         <div class="ms-3 mt-1">
                             <div class="d-flex align-items-center gap-2">
                                 <span>
-                                    <strong>${this.getAdditionalVehicleDisplayName(service)}</strong>
-                                    ${service.additionalVehicleSegment ? ` - ${this.getCategoryName(service.additionalVehicleSegment)}` : ''}
+                                    <strong>${this.getAdditionalVehicleDisplayName(service)}</strong>${(() => { const n = this.getAdditionalSegmentName(service); return n ? ` - ${this.renderSegmentChip(n, this.getAdditionalSegmentColor(service))}` : ''; })()}
                                 </span>
                             </div>
                         </div>
                     ` : ''}
+                    ${this.renderExtraAdditionalVehicleRows(service)}
                 </div>`;
             }
 
@@ -514,20 +602,30 @@
                 </div>`;
             }
 
-            // Availability warning
-            if (service.availabilityPending) {
-                html += `<div class="mt-2">
-                    <span class="badge bg-warning text-dark">
-                        <i class="ti ti-alert-triangle me-1"></i>Verificar disponibilidad
-                    </span>
+            // Note: "Verificar disponibilidad" warning is intentionally NOT rendered here.
+            // It belongs only to the internal cotización (services edit) view; the summary /
+            // public quote should never expose it to clients.
+
+            // Notes (callout style — full-width gray background, text inside flows naturally).
+            if (service.notes) {
+                html += `<div class="mt-2 p-2 rounded" style="background: #f8f9fa; border-left: 3px solid #adb5bd; width: 100%;">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="ti ti-notes me-1 text-secondary"></i>
+                        <strong class="text-secondary" style="font-size: 0.85rem;">Notas</strong>
+                    </div>
+                    <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;">${service.notes}</div>
                 </div>`;
             }
 
-            // Notes
-            if (service.notes) {
-                html += `<div class="service-detail-item mt-2 text-muted small">
-                    <i class="ti ti-notes me-1"></i>
-                    <span style="white-space: pre-wrap;">${service.notes}</span>
+            // Asistentes — same vehicle-style block (header + indented names per row).
+            if (Array.isArray(service.attendees) && service.attendees.filter((n) => String(n).trim()).length > 0) {
+                html += `<div class="mt-1 text-muted small">
+                    <div class="mb-1">
+                        <i class="ti ti-users me-1"></i><span class="text-muted">Asistentes:</span>
+                    </div>
+                    ${service.attendees.map((n) => String(n).trim()).filter(Boolean).map((name) => `
+                        <div class="ms-3"><strong>${name}</strong></div>
+                    `).join('')}
                 </div>`;
             }
 
@@ -596,7 +694,7 @@
             // Direction labels
             const directionLabels = {
                 arrival: service.transportType === 'aeropuerto' ? 'Llegada' : 'Ida',
-                departure: service.transportType === 'aeropuerto' ? 'Salida' : 'Vuelta',
+                departure: service.transportType === 'aeropuerto' ? 'Salida' : 'Regreso',
             };
 
             // Clean transport service item with minimal styling
@@ -611,33 +709,33 @@
             // Rounded time badge at top if exists (matching main services view styling)
             if (roundedTime) {
                 html += `<div class="mb-2">
-                    <span class="badge bg-info text-white">
-                        <i class="ti ti-clock me-1"></i>Horario: ${roundedTime}
+                    <span class="service-badge info">
+                        <i class="ti ti-clock me-1"></i>Hora: ${roundedTime}
                     </span>
                 </div>`;
             }
 
             // Service badges
             html += '<div class="mb-2">';
-            html += `<span class="badge bg-light text-dark me-2">Transporte</span>`;
-            html += `<span class="badge bg-primary-subtle text-primary me-2">${transportLabel}</span>`;
+            html += `<span class="service-badge me-2">Transporte</span>`;
+            html += `<span class="service-badge secondary me-2">${transportLabel}</span>`;
 
             if (service.directionType) {
                 const dirLabel = directionLabels[service.directionType];
-                const badgeClass = service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning';
-                html += `<span class="badge ${badgeClass} me-2">${dirLabel}</span>`;
+                const badgeClass = service.directionType === 'arrival' ? 'service-badge info' : 'service-badge warning';
+                html += `<span class="${badgeClass} me-2">${dirLabel}</span>`;
             }
 
             if (service.tripType === 'round-trip') {
-                html += `<span class="badge bg-info-subtle text-info me-2"><i class="ti ti-arrows-left-right me-1"></i>Ida y Vuelta</span>`;
+                html += `<span class="service-badge info me-2"><i class="ti ti-arrows-left-right me-1"></i>Ida y Vuelta</span>`;
             }
 
             if (service.returnOrigin || service.returnDestination) {
-                html += `<span class="badge bg-secondary-subtle text-secondary me-2"><i class="ti ti-link me-1"></i>Conexión</span>`;
+                html += `<span class="service-badge secondary me-2"><i class="ti ti-link me-1"></i>Conexión</span>`;
             }
 
             if (isExcluded) {
-                html += `<span class="badge bg-secondary-subtle text-secondary me-2">Pago externo</span>`;
+                html += `<span class="service-badge external me-2">Pago externo</span>`;
             }
             html += '</div>';
 
@@ -673,6 +771,21 @@
                         <i class="ti ti-ticket me-1"></i>
                         <span class="me-1">Número de vuelo:</span>
                         ${service.flightNumber}
+                    </div>`;
+                }
+                // Additional flights — same vehicle-style block (header + indented rows)
+                if (Array.isArray(service.additionalFlights) && service.additionalFlights.length > 0) {
+                    html += `<div class="mt-1 text-muted small">
+                        <div class="mb-1">
+                            <i class="ti ti-plane me-1"></i><span class="text-muted">Vuelos adicionales:</span>
+                        </div>
+                        ${service.additionalFlights.map((f) => {
+                            const airline = (f.airline || '').trim();
+                            const number = (f.flightNumber || '').trim();
+                            const time = (f.flightTime || '').trim();
+                            const label = [airline, number].filter(Boolean).join(' ') || 'Vuelo';
+                            return `<div class="ms-3"><strong>${label}</strong>${time ? ` <span class="text-muted">— ${time}</span>` : ''}</div>`;
+                        }).join('')}
                     </div>`;
                 }
             }
@@ -744,8 +857,9 @@
             // Vehicles
             const hasVehicle = service.vehicleId || service.vehicleType || service.vehicleTypeName;
             const hasAdditional = service.additionalVehicleId || service.additionalVehicleTypeName;
+            const hasExtraVehicles = Array.isArray(service.extraAdditionalVehicles) && service.extraAdditionalVehicles.length > 0;
 
-            if (hasVehicle || hasAdditional) {
+            if (hasVehicle || hasAdditional || hasExtraVehicles) {
                 html += '<div class="mt-2">';
                 html += '<div class="service-detail-item mb-1">';
                 html += '<i class="ti ti-car me-1"></i>Vehículo(s):';
@@ -753,21 +867,35 @@
 
                 if (hasVehicle) {
                     const vehicleName = this.getVehicleDisplayName(service);
-                    const segmentName = service.category ? ` - ${this.getCategoryName(service.category)}` : 
-                                       service.rateId ? ` - ${this.getCategoryName(service.rateId)}` : '';
+                    const segmentName = this.getMainSegmentSuffix(service);
                     html += `<div style="margin-left: 20px;">
-                        <strong>${vehicleName}</strong>${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` : 
+                        <strong>${vehicleName}</strong>${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` :
                             service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}${segmentName}
                     </div>`;
                 }
 
                 if (hasAdditional) {
                     const additionalName = this.cleanVehicleName(this.getAdditionalVehicleDisplayName(service));
-                    const additionalSegment = service.additionalVehicleSegment ?
-                        ` - ${this.getCategoryName(service.additionalVehicleSegment)}` : ' - Segmento';
+                    const additionalSegmentName = this.getAdditionalSegmentName(service);
+                    const additionalSegment = additionalSegmentName
+                        ? ` - ${this.renderSegmentChip(additionalSegmentName, this.getAdditionalSegmentColor(service))}`
+                        : '';
                     html += `<div style="margin-left: 20px; margin-top: 4px;">
                         <strong>${additionalName}</strong>${additionalSegment}
                     </div>`;
+                }
+                // Extra additional vehicles (Phase 3 multi-vehicle support)
+                if (Array.isArray(service.extraAdditionalVehicles) && service.extraAdditionalVehicles.length > 0) {
+                    service.extraAdditionalVehicles.forEach((v) => {
+                        const name = (v && (v.vehicleTypeName || '')).trim() || 'Vehículo adicional';
+                        const segName = (v && v.segmentName) || (v && v.segment ? this.getCategoryNameFromCache(v.segment) : '');
+                        const cleanSegName = segName && segName !== v.segment ? segName : '';
+                        const segColor = (v && v.segmentColor) || (v && v.segment ? this.getCategoryColorFromCache(v.segment) : '');
+                        const chip = cleanSegName ? ` - ${this.renderSegmentChip(cleanSegName, segColor)}` : '';
+                        html += `<div style="margin-left: 20px; margin-top: 4px;">
+                            <strong>${name}</strong>${chip}
+                        </div>`;
+                    });
                 }
                 html += '</div>';
             }
@@ -797,14 +925,6 @@
                 </div>`;
             }
 
-            // Notes
-            if (service.notes) {
-                html += `<div class="service-detail-item mt-2 text-muted small">
-                    <i class="ti ti-notes me-1"></i>
-                    <span style="white-space: pre-wrap;">${service.notes}</span>
-                </div>`;
-            }
-
             html += '</div>'; // service-details
             html += '</div>'; // service-info
 
@@ -812,7 +932,7 @@
             if (this.config.displayRules.shouldShowPrice(service)) {
                 html += '<div class="service-price text-end">';
                 if (isExcluded) {
-                    html += '<span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span><br>';
+                    html += '<span class="service-badge external mb-1">Pago externo</span><br>';
                     html += `<div class="service-price excluded">${this.formatCurrency(price)}</div>`;
                 } else {
                     html += `<div class="service-price">${this.formatCurrency(price)}</div>`;
@@ -821,6 +941,30 @@
             }
 
             html += '</div>'; // Close header row
+
+            // Notes (callout) — placed outside the info/price flex row so the gray
+            // background spans the full service-item width.
+            if (service.notes) {
+                html += `<div class="mt-2 p-2 rounded" style="background: #f8f9fa; border-left: 3px solid #adb5bd;">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="ti ti-notes me-1 text-secondary"></i>
+                        <strong class="text-secondary" style="font-size: 0.85rem;">Notas</strong>
+                    </div>
+                    <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;">${service.notes}</div>
+                </div>`;
+            }
+
+            // Asistentes — same vehicle-style block (header + indented names per row).
+            if (Array.isArray(service.attendees) && service.attendees.filter((n) => String(n).trim()).length > 0) {
+                html += `<div class="mt-2 text-muted small">
+                    <div class="mb-1">
+                        <i class="ti ti-users me-1"></i><span class="text-muted">Asistentes:</span>
+                    </div>
+                    ${service.attendees.map((n) => String(n).trim()).filter(Boolean).map((name) => `
+                        <div class="ms-3"><strong>${name}</strong></div>
+                    `).join('')}
+                </div>`;
+            }
 
             // Actions (only in list mode)
             if (this.mode === 'list' && this.container) {
@@ -851,7 +995,7 @@
                     <span>Duración: ${service.duration} ${service.duration === 1 ? 'hora' : 'horas'}</span>
                 </div>`;
             }
-            
+
             // Duration (for a-disposición)
             if (service.type === 'a-disposicion' && service.hours) {
                 html += `<div class="service-detail-item">
@@ -861,7 +1005,7 @@
             }
 
             // Vehicle info - standardized format like transport services
-            if (service.vehicleId || service.vehicleType || service.vehicleTypeName || 
+            if (service.vehicleId || service.vehicleType || service.vehicleTypeName ||
                 (service.type === 'tour' && service.additionalVehicleId)) {
                 html += `<div>
                     <div class="mb-1">
@@ -871,21 +1015,20 @@
                         <div class="ms-3">
                             <span>
                                 <strong>${this.getVehicleDisplayName(service)}</strong>
-                                ${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` : 
-                                  service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}
-                                ${service.rateId ? ` - ${this.getCategoryName(service.rateId)}` : 
-                                  service.category ? ` - ${this.getCategoryName(service.category)}` : ''}
+                                ${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` :
+                            service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}
+                                ${this.getMainSegmentSuffix(service)}
                             </span>
                         </div>
                     ` : ''}
                     ${service.type === 'tour' && service.additionalVehicleId ? `
                         <div class="ms-3 mt-1">
                             <span>
-                                <strong>${this.getAdditionalVehicleDisplayName(service)}</strong>
-                                ${service.additionalVehicleSegment ? ` - ${this.getCategoryName(service.additionalVehicleSegment)}` : ''}
+                                <strong>${this.getAdditionalVehicleDisplayName(service)}</strong>${(() => { const n = this.getAdditionalSegmentName(service); return n ? ` - ${this.renderSegmentChip(n, this.getAdditionalSegmentColor(service))}` : ''; })()}
                             </span>
                         </div>
                     ` : ''}
+                    ${this.renderExtraAdditionalVehicleRows(service)}
                 </div>`;
             }
 
@@ -918,14 +1061,9 @@
                 html += this.renderTransportDetails(service);
             }
 
-            // Availability warning
-            if (service.availabilityPending) {
-                html += `<div class="mt-2">
-                    <span class="badge bg-warning text-dark">
-                        <i class="ti ti-alert-triangle me-1"></i>Verificar disponibilidad
-                    </span>
-                </div>`;
-            }
+            // Note: "Verificar disponibilidad" warning is intentionally NOT rendered here.
+            // It belongs only to the internal cotización (services edit) view; the summary /
+            // public quote should never expose it to clients.
 
             return html;
         }
@@ -1105,14 +1243,15 @@
         }
 
 
-        // Helper: Round time to nearest 15 minutes
+        // Helper: Round time DOWN to previous 15-minute interval (matches admin services view)
         roundTimeToNearest15(timeStr) {
-            if (!timeStr) return '';
+            if (!timeStr || !timeStr.includes(':')) return timeStr || '';
             const [hours, minutes] = timeStr.split(':').map(Number);
-            const totalMinutes = hours * 60 + minutes;
-            const rounded = Math.round(totalMinutes / 15) * 15;
-            const roundedHours = Math.floor(rounded / 60);
-            const roundedMinutes = rounded % 60;
+            if (isNaN(hours) || isNaN(minutes)) return timeStr;
+            let totalMinutes = hours * 60 + minutes;
+            totalMinutes = Math.floor(totalMinutes / 15) * 15;
+            const roundedHours = Math.floor(totalMinutes / 60) % 24;
+            const roundedMinutes = totalMinutes % 60;
             return `${String(roundedHours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
         }
 
@@ -1120,7 +1259,7 @@
         getServiceTitle(service) {
             // For a-disposición, return empty to avoid redundancy (vehicle shown below)
             if (service.type === 'a-disposicion') return '';
-            
+
             if (service.concept) return service.concept;
             if (service.experienceName) return service.experienceName;
             if (service.tourName) return service.tourName;
@@ -1179,11 +1318,130 @@
             return name.replace(/^Vehículo:\s*/i, '').trim();
         }
 
-        // Helper: Get category name
-        getCategoryName(categoryId) {
+        // Helper: Get category name with auto-refetch capability
+        async getCategoryName(categoryId) {
             if (!categoryId) return 'Segmento';
 
-            // Try segment mappings from summary view
+            // First try cached rates
+            const cachedResult = this.getCategoryNameFromCache(categoryId);
+            if (cachedResult !== categoryId) {
+                return cachedResult; // Found in cache
+            }
+
+            // If not found and cache is empty/null, try to fetch rates
+            if (!this.ratesCache || this.ratesCache.length === 0) {
+                console.log('🔄 ServicesRenderer: No rates cache, attempting to fetch rates...');
+                await this.fetchRatesIfMissing();
+
+                // Try again with fresh cache
+                const retryResult = this.getCategoryNameFromCache(categoryId);
+                if (retryResult !== categoryId) {
+                    return retryResult;
+                }
+            }
+
+            // If still not found, check if we should refresh cache
+            if (this.shouldRefreshRatesCache()) {
+                console.log('🔄 ServicesRenderer: Refreshing rates cache for missing segment:', categoryId);
+                await this.refreshRatesCache();
+
+                // Final attempt
+                const finalResult = this.getCategoryNameFromCache(categoryId);
+                if (finalResult !== categoryId) {
+                    return finalResult;
+                }
+            }
+
+            // Last resort: return the ID itself with comprehensive logging
+            console.warn('❌ ServicesRenderer: Unmapped segment ID after all attempts:', {
+                categoryId,
+                cacheSize: this.ratesCache?.length || 0,
+                cacheKeys: this.ratesCache?.map(r => r.value || r.objectId || r.id) || []
+            });
+            return categoryId;
+        }
+
+        // Helper: Get category name from cache only (synchronous)
+        // Helper: Resolve the additional-vehicle segment name with cache fallback.
+        // Prefer the saved name, then look up the ID via segmentMappings / ratesCache.
+        getAdditionalSegmentName(service) {
+            if (service && service.additionalVehicleSegmentName) {
+                return service.additionalVehicleSegmentName;
+            }
+            const segmentId = service && service.additionalVehicleSegment;
+            if (!segmentId) return '';
+            const resolved = this.getCategoryNameFromCache(segmentId);
+            // getCategoryNameFromCache returns the ID itself when unmapped; treat that as empty.
+            return resolved && resolved !== segmentId ? resolved : '';
+        }
+
+        // Helper: Resolve a segment's rate color (hex) by ID using the same caches.
+        // Returns '' if not found.
+        getCategoryColorFromCache(categoryId) {
+            if (!categoryId) return '';
+            if (this.ratesCache && this.ratesCache.length > 0) {
+                const rate = this.ratesCache.find(r =>
+                    r.value === categoryId || r.objectId === categoryId || r.id === categoryId);
+                if (rate && rate.color) return rate.color;
+            }
+            return '';
+        }
+
+        // Helper: Render the extra additional vehicles (Phase 3 multi-vehicle support).
+        // Each row uses the same indented + chip pattern as the primary additional vehicle.
+        renderExtraAdditionalVehicleRows(service) {
+            const list = (service && Array.isArray(service.extraAdditionalVehicles))
+                ? service.extraAdditionalVehicles : [];
+            if (list.length === 0) return '';
+            return list.map((v) => {
+                const name = (v && (v.vehicleTypeName || '')).trim() || 'Vehículo adicional';
+                const segmentName = (v && v.segmentName) || (v && v.segment ? this.getCategoryNameFromCache(v.segment) : '');
+                const cleanSegment = segmentName && segmentName !== v.segment ? segmentName : '';
+                const segmentColor = (v && v.segmentColor) || (v && v.segment ? this.getCategoryColorFromCache(v.segment) : '');
+                const chip = cleanSegment ? ` - ${this.renderSegmentChip(cleanSegment, segmentColor)}` : '';
+                return `<div class="ms-3 mt-1">
+                    <div class="d-flex align-items-center gap-2">
+                        <span><strong>${name}</strong>${chip}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Helper: Resolve the additional-vehicle segment color with cache fallback.
+        getAdditionalSegmentColor(service) {
+            if (service && service.additionalVehicleSegmentColor) {
+                return service.additionalVehicleSegmentColor;
+            }
+            const segmentId = service && service.additionalVehicleSegment;
+            return segmentId ? this.getCategoryColorFromCache(segmentId) : '';
+        }
+
+        // Helper: Render a segment name as a small colored chip.
+        renderSegmentChip(name, color) {
+            if (!name) return '';
+            const bg = color || '#6366F1';
+            return `<span class="badge ms-1" style="background-color: ${bg}; color: #fff; font-weight: 500;">${name}</span>`;
+        }
+
+        // Helper: Resolve main segment name + color and return the formatted " - <chip>" suffix.
+        getMainSegmentSuffix(service) {
+            const id = (service && (service.rateId || service.category)) || '';
+            const name = service && service.categoryName
+                ? service.categoryName
+                : (id ? this.getCategoryNameFromCache(id) : '');
+            // getCategoryNameFromCache returns the ID itself when unmapped — treat that as empty.
+            const displayName = name && name !== id ? name : '';
+            if (!displayName) return '';
+            const color = service && service.categoryColor
+                ? service.categoryColor
+                : this.getCategoryColorFromCache(id);
+            return ` - ${this.renderSegmentChip(displayName, color)}`;
+        }
+
+        getCategoryNameFromCache(categoryId) {
+            if (!categoryId) return 'Segmento';
+
+            // Try segmentMappings (used by quote-summary view: { id: name })
             if (this.segmentMappings && this.segmentMappings[categoryId]) {
                 return this.segmentMappings[categoryId];
             }
@@ -1197,32 +1455,171 @@
                 );
 
                 if (rate) {
+                    console.log('✅ ServicesRenderer: Found segment in cache:', categoryId, '->', rate.label || rate.name);
                     return rate.label || rate.name || 'Segmento';
                 }
             }
 
-            // Static fallback mappings for common ObjectIds
-            const staticMappings = {
-                'ox5gO8c9ok': 'First Class',
-                'yipmABp1UZ': 'Premium',
-                'JGEgJ4gr9G': 'Green Class',
-                // Route/geographic segments 
-                'sma-leon': 'SMA-León',
-                'sma-gto': 'SMA-Guanajuato',
-                'sma-cdmx': 'SMA-CDMX',
-                'sma-qro': 'SMA-Querétaro',
-                'local-sma': 'Local SMA',
-                'local-gto': 'Local Guanajuato',
-                'local-leon': 'Local León'
-            };
+            return categoryId; // Not found, return as-is
+        }
 
-            if (staticMappings[categoryId]) {
-                return staticMappings[categoryId];
+        // Helper: Fetch rates if missing or cache is empty
+        async fetchRatesIfMissing() {
+            if (this.ratesFetchPromise) {
+                // Avoid duplicate requests
+                console.log('🔄 ServicesRenderer: Rate fetch already in progress, waiting...');
+                return await this.ratesFetchPromise;
             }
 
-            // Last resort: return the ID itself
-            console.warn('Unmapped segment ID in unified renderer:', categoryId);
-            return categoryId;
+            this.ratesFetchPromise = this.performRatesFetch();
+            try {
+                await this.ratesFetchPromise;
+            } finally {
+                this.ratesFetchPromise = null;
+            }
+        }
+
+        // Helper: Get access token using the same pattern as quote-services-v2.js
+        getAccessToken() {
+            // First try to get from window variable (passed from server)
+            if (typeof window !== 'undefined' && window.quoteAccessToken) {
+                // Set the cookie for future requests since middleware expects it
+                document.cookie = `accessToken=${window.quoteAccessToken}; path=/; SameSite=Lax`;
+                console.log('✅ ServicesRenderer: Using token from window.quoteAccessToken');
+                return window.quoteAccessToken;
+            }
+
+            // Then try to get from cookies (most common in this app)
+            const cookies = document.cookie.split(';');
+            for (const cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    console.log('✅ ServicesRenderer: Using token from accessToken cookie');
+                    return value;
+                }
+            }
+
+            // Try localStorage/sessionStorage with various keys
+            const tokenSources = [
+                { source: 'localStorage.accessToken', getter: () => localStorage.getItem('accessToken') },
+                { source: 'sessionStorage.accessToken', getter: () => sessionStorage.getItem('accessToken') },
+                { source: 'localStorage.token', getter: () => localStorage.getItem('token') },
+                { source: 'sessionStorage.token', getter: () => sessionStorage.getItem('token') }
+            ];
+
+            for (const tokenSource of tokenSources) {
+                try {
+                    const token = tokenSource.getter();
+                    if (token) {
+                        console.log(`✅ ServicesRenderer: Using token from ${tokenSource.source}`);
+                        return token;
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ ServicesRenderer: Error accessing ${tokenSource.source}:`, error.message);
+                }
+            }
+
+            // Try window.getAccessToken function if available
+            if (typeof window !== 'undefined' && typeof window.getAccessToken === 'function') {
+                try {
+                    const token = window.getAccessToken();
+                    if (token) {
+                        console.log('✅ ServicesRenderer: Using token from window.getAccessToken()');
+                        return token;
+                    }
+                } catch (error) {
+                    console.warn('⚠️ ServicesRenderer: Error calling window.getAccessToken():', error.message);
+                }
+            }
+
+            console.warn('❌ ServicesRenderer: No authentication token found in any source:', {
+                windowQuoteAccessToken: !!(window.quoteAccessToken),
+                cookieCount: document.cookie.split(';').length,
+                hasWindowGetAccessToken: typeof window.getAccessToken === 'function',
+                checkedSources: tokenSources.map(s => s.source)
+            });
+            return null;
+        }
+
+        // Helper: Perform the actual rates fetch
+        async performRatesFetch() {
+            try {
+                console.log('🔄 ServicesRenderer: Fetching rates from /api/rates/active...');
+
+                // Get token using comprehensive method
+                const token = this.getAccessToken();
+                if (!token) {
+                    console.warn('⚠️ ServicesRenderer: No authentication token found - cannot fetch rates');
+                    return;
+                }
+
+                const response = await fetch('/api/rates/active', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+
+                if (result.success && result.data) {
+                    this.ratesCache = result.data;
+                    console.log('✅ ServicesRenderer: Successfully fetched rates:', this.ratesCache.length);
+                    this.lastRatesFetch = Date.now();
+                } else {
+                    console.warn('⚠️ ServicesRenderer: API returned unsuccessful response:', result);
+                }
+            } catch (error) {
+                console.error('❌ ServicesRenderer: Failed to fetch rates:', error.message);
+                // Don't throw to avoid breaking the UI
+            }
+        }
+
+        // Helper: Check if rates cache should be refreshed
+        shouldRefreshRatesCache() {
+            // Only refresh if:
+            // 1. We have a cache but it's been more than 5 minutes since last fetch
+            // 2. Or we've never fetched before
+            const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+            return !this.lastRatesFetch || this.lastRatesFetch < fiveMinutesAgo;
+        }
+
+        // Helper: Refresh the rates cache
+        async refreshRatesCache() {
+            this.lastRatesFetch = 0; // Force refresh
+            await this.fetchRatesIfMissing();
+        }
+
+        // Helper: Validate rates cache structure
+        validateRatesCache() {
+            if (!this.ratesCache || !Array.isArray(this.ratesCache)) {
+                console.warn('⚠️ ServicesRenderer: Invalid ratesCache structure - not an array');
+                return false;
+            }
+
+            if (this.ratesCache.length === 0) {
+                console.warn('⚠️ ServicesRenderer: ratesCache is empty');
+                return false;
+            }
+
+            // Check if rates have expected structure
+            const hasValidStructure = this.ratesCache.every(rate =>
+                rate &&
+                (rate.value || rate.objectId || rate.id) &&
+                (rate.label || rate.name)
+            );
+
+            if (!hasValidStructure) {
+                console.warn('⚠️ ServicesRenderer: Some rates missing required fields (value/id and label/name)');
+                return false;
+            }
+
+            console.log('✅ ServicesRenderer: ratesCache validation passed:', this.ratesCache.length, 'rates');
+            return true;
         }
 
         // Helper: Check if experience is from establishment

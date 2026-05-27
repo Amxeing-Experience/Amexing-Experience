@@ -4,7 +4,7 @@
  * Created by Denisse Maldonado
  */
 
-(function(window) {
+(function (window) {
     'use strict';
 
     const ServicesRendererConfig = {
@@ -72,7 +72,7 @@
                 const color = ServicesRendererConfig.typeColors[type] || '#6c757d';
                 return `background: ${color}15; color: ${color};`;
             },
-            
+
             // Secondary badges (transport subtypes, etc)
             secondary: (color) => {
                 return `background: ${color}25; color: ${color};`;
@@ -80,13 +80,13 @@
 
             // Info badges (schedule, passengers, etc)
             info: 'background: #0dcaf015; color: #0dcaf0;',
-            
+
             // Warning badges
             warning: 'background: #ffc10715; color: #ffc107;',
-            
+
             // Success badges
             success: 'background: #19875415; color: #198754;',
-            
+
             // Muted badges
             muted: 'background: #6c757d15; color: #6c757d;'
         },
@@ -145,7 +145,16 @@
 
             date: (dateString) => {
                 if (!dateString) return '';
-                const date = new Date(dateString);
+                // YYYY-MM-DD strings must be parsed as LOCAL dates — `new Date('2026-08-11')`
+                // is UTC midnight, which shifts to the previous day in any negative-offset
+                // timezone (e.g. Mexico City UTC-6) when formatted.
+                let date;
+                if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+                    const [y, m, d] = dateString.split('-').map(Number);
+                    date = new Date(y, m - 1, d);
+                } else {
+                    date = new Date(dateString);
+                }
                 return new Intl.DateTimeFormat('es-MX', {
                     weekday: 'long',
                     year: 'numeric',
@@ -224,27 +233,27 @@
     };
 
     // Data normalization functions
-    ServicesRendererConfig.normalizeService = function(service) {
+    ServicesRendererConfig.normalizeService = function (service) {
         if (!service) return null;
-        
+
         return {
             // Core identification
             id: service.id || service._id || service.objectId,
             type: service.type,
             dayId: service.dayId,
-            
+
             // Names and concepts
             concept: service.concept || service.name || service.title,
             experienceName: service.experienceName || service.concept,
             tourName: service.tourName || service.concept,
             name: service.name || service.concept,
-            
+
             // Schedule and timing
             selectedSchedule: service.selectedSchedule || service.time || service.schedule,
             startTime: service.startTime || service.start || service.time || service.selectedSchedule,
             endTime: service.endTime || service.end,
             duration: service.duration || 1,
-            
+
             // Passenger quantities (normalize all variations)
             transportAdults: service.transportAdults || service.adults || service.adultsQuantity || 0,
             transportChildren: service.transportChildren || service.children || service.childrenQuantity || 0,
@@ -254,7 +263,7 @@
             infantsQuantity: service.infantsQuantity || service.infants || service.transportInfants || 0,
             adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity || service.noAlcoholAdults || 0,
             persons: service.persons || 0,
-            
+
             // Transport specific - core fields
             transportType: service.transportType,
             directionType: service.directionType,
@@ -266,12 +275,12 @@
             flightNumber: service.flightNumber,
             specificLocation: service.specificLocation,
             category: service.category,
-            
+
             // Transport specific - departure times
             flightDepartureTimeSuggested: service.flightDepartureTimeSuggested,
             roundTripDepartureTimeSuggestedIda: service.roundTripDepartureTimeSuggestedIda,
             roundTripDepartureTimeSuggestedVuelta: service.roundTripDepartureTimeSuggestedVuelta,
-            
+
             // Transport specific - round trip fields
             startDate: service.startDate,
             endDate: service.endDate,
@@ -279,44 +288,44 @@
             returnDestination: service.returnDestination,
             returnAirline: service.returnAirline,
             returnFlightNumber: service.returnFlightNumber,
-            
+
             // Transport specific - route and pricing
             routeDuration: service.routeDuration,
             baseVehiclePrice: service.baseVehiclePrice,
             waitingTimeHours: service.waitingTimeHours || 0,
             waitingTimePricePerHour: service.waitingTimePricePerHour || 0,
-            
+
             // Vehicle information
             vehicleId: service.vehicleId,
             vehicleType: service.vehicleType,
             vehicleTypeName: service.vehicleTypeName,
             quantity: service.quantity || 1,
-            
+
             // Additional vehicle (tours)
             hasAdditionalVehicle: service.hasAdditionalVehicle || false,
             additionalVehicleId: service.additionalVehicleId,
             additionalVehicleTypeName: service.additionalVehicleTypeName,
-            additionalVehicleSegment: service.additionalVehicleSegment,
-            
+            additionalVehicleSegmentName: service.additionalVehicleSegmentName,
+
             // Guide and Greeter features
             includeGuide: service.includeGuide || false,
             includeGreeter: service.includeGreeter || false,
             greeterInVehicle: service.greeterInVehicle || false,
-            
+
             // Tour specific
             isWalkingTour: service.isWalkingTour || false,
             tourId: service.tourId,
             rateId: service.rateId,
-            
+
             // Experience specific
             experienceId: service.experienceId,
             providerType: service.providerType,
-            
+
             // Hotel specific
             hotelName: service.hotelName,
             checkIn: service.checkIn,
             checkOut: service.checkOut,
-            
+
             // Pricing - all variations
             price: service.price || service.total || 0,
             total: service.total || service.price || 0,
@@ -331,21 +340,21 @@
             vehicleRatePerHour: service.vehicleRatePerHour,
             guideRatePerHour: service.guideRatePerHour,
             includeInTotal: service.includeInTotal !== false, // Default to true
-            
+
             // Status and metadata
             availabilityPending: service.availabilityPending || false,
             hasOverlap: service.hasOverlap || false,
             imageUrl: service.imageUrl,
-            
+
             // Notes
             notes: service.notes || service.teamNotes || '',
-            
+
             // Keep any other fields that might exist
             ...service
         };
     };
-    
-    ServicesRendererConfig.normalizeQuoteServices = function(data) {
+
+    ServicesRendererConfig.normalizeQuoteServices = function (data) {
         // If it comes from backend (quote-summary format)
         if (data && data.days && data.days[0] && data.days[0].subconcepts) {
             return {
@@ -362,7 +371,7 @@
                 total: data.total || 0
             };
         }
-        
+
         // If it comes from frontend (quote-services format with Map)
         if (data && data.days && data.services) {
             const servicesMap = data.services;
@@ -382,7 +391,7 @@
                 paymentType: data.paymentType || 'efectivo'
             };
         }
-        
+
         // Return as-is if we can't normalize
         return data;
     };
@@ -390,30 +399,30 @@
     // Display rules for conditional rendering
     ServicesRendererConfig.displayRules = {
         // Should show suggested departure time for transport services
-        shouldShowDepartureTime: function(service) {
+        shouldShowDepartureTime: function (service) {
             // Only show departure time for departure services (not arrival)
             if (!service || service.type !== 'transport') return false;
             if (service.directionType === 'arrival') return false;
-            
+
             // Check for actual time values (not null, not empty string)
-            const hasFlightTime = service.flightDepartureTimeSuggested && 
-                                service.flightDepartureTimeSuggested.toString().trim();
-            const hasIdaTime = service.roundTripDepartureTimeSuggestedIda && 
-                             service.roundTripDepartureTimeSuggestedIda.toString().trim();
-            const hasVueltaTime = service.roundTripDepartureTimeSuggestedVuelta && 
-                                service.roundTripDepartureTimeSuggestedVuelta.toString().trim();
-            
+            const hasFlightTime = service.flightDepartureTimeSuggested &&
+                service.flightDepartureTimeSuggested.toString().trim();
+            const hasIdaTime = service.roundTripDepartureTimeSuggestedIda &&
+                service.roundTripDepartureTimeSuggestedIda.toString().trim();
+            const hasVueltaTime = service.roundTripDepartureTimeSuggestedVuelta &&
+                service.roundTripDepartureTimeSuggestedVuelta.toString().trim();
+
             return hasFlightTime || hasIdaTime || hasVueltaTime;
         },
-        
+
         // Should show service type badge
-        shouldShowServiceBadge: function(service) {
+        shouldShowServiceBadge: function (service) {
             // Hide "Concepto" badge for concepto services
             return service && service.type !== 'concepto';
         },
-        
+
         // Should show price section
-        shouldShowPrice: function(service) {
+        shouldShowPrice: function (service) {
             // Hide price section for concepto services with $0 price
             if (!service) return true;
             if (service.type === 'concepto') {
@@ -422,17 +431,17 @@
             }
             return true;
         },
-        
+
         // Get schedule label based on direction
-        getScheduleLabel: function(service) {
+        getScheduleLabel: function (service) {
             if (!service || service.type !== 'transport') {
                 return 'Horario:';
             }
             return 'Horario de vuelo:';
         },
-        
+
         // Should show round trip fields
-        shouldShowRoundTripFields: function(service) {
+        shouldShowRoundTripFields: function (service) {
             if (!service || service.type !== 'transport') return false;
             if (service.directionType === 'arrival') return false;
             return service.tripType === 'round-trip';

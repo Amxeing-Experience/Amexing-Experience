@@ -19,14 +19,14 @@ Parse.serverURL = 'http://localhost:1337/parse';
 async function updateFirstClassRatePricesFromServices() {
   try {
     console.log('🚀 Starting First Class RatePrices price update from Service table...');
-    
+
     // Step 1: Get First Class rate
     console.log('📋 Loading First Class rate...');
     const rateQuery = new Parse.Query('Rate');
     rateQuery.equalTo('name', 'First Class');
     rateQuery.equalTo('exists', true);
     const firstClassRate = await rateQuery.first({ useMasterKey: true });
-    
+
     if (!firstClassRate) {
       throw new Error('First Class rate not found');
     }
@@ -39,7 +39,7 @@ async function updateFirstClassRatePricesFromServices() {
     ratePricesQuery.equalTo('exists', true);
     ratePricesQuery.include(['vehicleType', 'destinationPOI', 'originPOI']);
     ratePricesQuery.limit(1000);
-    
+
     const ratePricesRecords = await ratePricesQuery.find({ useMasterKey: true });
     console.log(`✅ Found ${ratePricesRecords.length} First Class RatePrices records to update`);
 
@@ -50,40 +50,31 @@ async function updateFirstClassRatePricesFromServices() {
     serviceQuery.equalTo('exists', true);
     serviceQuery.include(['vehicleType', 'destinationPOI', 'originPOI']);
     serviceQuery.limit(1000);
-    
+
     const serviceRecords = await serviceQuery.find({ useMasterKey: true });
     console.log(`✅ Found ${serviceRecords.length} Service records with First Class rate`);
 
     // Step 4: Create lookup map for faster matching
     console.log('🔍 Creating Service price lookup map...');
     const servicePriceMap = new Map();
-    
+
     serviceRecords.forEach(service => {
       const vehicleType = service.get('vehicleType');
       const destinationPOI = service.get('destinationPOI');
       const originPOI = service.get('originPOI');
       const price = service.get('price');
-      
+
       if (vehicleType && destinationPOI && price) {
         const vehicleCode = vehicleType.get('code');
         const destinationId = destinationPOI.id;
         const originId = originPOI ? originPOI.id : 'NULL';
-        
+
         // Create unique key for matching
         const lookupKey = `${originId}-${destinationId}-${vehicleCode}`;
         servicePriceMap.set(lookupKey, price);
-        
-        // Debug: Show some mappings
-        if (servicePriceMap.size <= 5) {
-          console.log(`   Map: ${lookupKey} = $${price} (${vehicleCode})`);
-        }
       }
     });
-    
-    console.log(`✅ Created lookup map with ${servicePriceMap.size} price entries`);
 
-    // Step 5: Update RatePrices records
-    console.log('🔄 Updating First Class RatePrices records with correct prices...');
     let updated = 0;
     let notFound = 0;
     let ratePricesToUpdate = [];
@@ -94,18 +85,18 @@ async function updateFirstClassRatePricesFromServices() {
         const vehicleType = ratePrice.get('vehicleType');
         const destinationPOI = ratePrice.get('destinationPOI');
         const originPOI = ratePrice.get('originPOI');
-        
+
         if (vehicleType && destinationPOI) {
           const vehicleCode = vehicleType.get('code');
           const destinationId = destinationPOI.id;
           const originId = originPOI ? originPOI.id : 'NULL';
-          
+
           // Create lookup key
           const lookupKey = `${originId}-${destinationId}-${vehicleCode}`;
-          
+
           // Find matching price in Service table
           const correctPrice = servicePriceMap.get(lookupKey);
-          
+
           if (correctPrice !== undefined) {
             // Update price if different
             const currentPrice = ratePrice.get('price');
@@ -143,7 +134,7 @@ async function updateFirstClassRatePricesFromServices() {
     console.log(`   ⚠️  Not found in Service table: ${notFound}`);
     console.log(`   📦 Total RatePrices processed: ${ratePricesRecords.length}`);
     console.log(`   🔍 Service records available: ${serviceRecords.length}`);
-    
+
   } catch (error) {
     console.error('❌ Error updating First Class RatePrices:', error.message);
     throw error;
