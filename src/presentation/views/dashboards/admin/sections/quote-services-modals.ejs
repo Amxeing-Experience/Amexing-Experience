@@ -427,6 +427,18 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     </div>
                                 </div>
                                 
+                                <!-- Pickup / Drop-off address (Punto a Punto only) -->
+                                <div class="row d-none" id="papAddressesRow">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label" for="transportPickupAddress">Dirección de pick-up</label>
+                                        <input type="text" class="form-control" id="transportPickupAddress" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label" for="transportDropoffAddress">Dirección de drop-off</label>
+                                        <input type="text" class="form-control" id="transportDropoffAddress" placeholder="Ej: Aeropuerto BJX, Casa particular...">
+                                    </div>
+                                </div>
+
                                 <!-- Specific Location field (shown only for certain destinations) -->
                                 <div class="row d-none" id="specificLocationRow">
                                     <div class="col-md-12 mb-3">
@@ -584,6 +596,18 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             </div>
                                         </div>
                                     </div>
+
+                                    <!-- Pickup / Drop-off addresses for Ida (Punto a Punto + Local) -->
+                                    <div class="row d-none" id="papAddressesRowIda">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label" for="roundTripPickupAddressIda">Dirección de pick-up</label>
+                                            <input type="text" class="form-control" id="roundTripPickupAddressIda" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label" for="roundTripDropoffAddressIda">Dirección de drop-off</label>
+                                            <input type="text" class="form-control" id="roundTripDropoffAddressIda" placeholder="Ej: Aeropuerto BJX, Casa particular...">
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Vuelta (Departure leg) -->
@@ -657,6 +681,18 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                                 <label for="roundTripFlightNumberVuelta" class="form-label">Número de Vuelo</label>
                                                 <input type="text" class="form-control" id="roundTripFlightNumberVuelta" placeholder="Ej: AA5678">
                                             </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Pickup / Drop-off addresses for Vuelta (Punto a Punto + Local) -->
+                                    <div class="row d-none" id="papAddressesRowVuelta">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label" for="roundTripPickupAddressVuelta">Dirección de pick-up</label>
+                                            <input type="text" class="form-control" id="roundTripPickupAddressVuelta" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label" for="roundTripDropoffAddressVuelta">Dirección de drop-off</label>
+                                            <input type="text" class="form-control" id="roundTripDropoffAddressVuelta" placeholder="Ej: Aeropuerto BJX, Casa particular...">
                                         </div>
                                     </div>
                                 </div>

@@ -171,7 +171,17 @@ class ReservationController {
         query.containedIn('clientPtr', roleFilterPointers);
       }
 
-      // Helper function to apply year/month/day filters
+      /**
+       * Apply year/month/day filters to a Parse query against the `startDate` field.
+       * Each filter narrows the date range further; nulls are ignored.
+       * @param {Parse.Query} q - The Parse query to constrain.
+       * @param {number|null} yearVal - Year filter (e.g. 2026) or null.
+       * @param {number|null} monthVal - Month filter (1-12) or null.
+       * @param {number|null} dayVal - Day-of-month filter (1-31) or null.
+       * @returns {void}
+       * @example
+       *   applySpecificDateFilters(query, 2026, 5, null); // all of May 2026
+       */
       const applySpecificDateFilters = (q, yearVal, monthVal, dayVal) => {
         if (yearVal !== null) {
           // Create date range for the year
@@ -447,6 +457,65 @@ class ReservationController {
 
       const serviceCustomerObj = reservation.get('serviceCustomer');
 
+      // Build a Rate id → { name, color } map so older subconcepts that were saved before
+      // we started persisting categoryName / categoryColor / segmentName / segmentColor can
+      // still surface a proper segment label in the booking dashboard.
+      const rateMap = new Map();
+      try {
+        const rateQuery = new Parse.Query('Rate');
+        rateQuery.equalTo('exists', true);
+        rateQuery.limit(1000);
+        const rates = await rateQuery.find({ useMasterKey: true });
+        rates.forEach((r) => rateMap.set(r.id, {
+          name: r.get('name') || '',
+          color: r.get('color') || '',
+        }));
+      } catch (rateErr) {
+        logger.warn('ReservationController.getReservationById: failed to load rate map', { error: rateErr.message });
+      }
+      // Mutates the given subconcept in place to fill any missing segment names / colors
+      // using the rateMap. Returns the same object for fluent use.
+      // Intentional in-place mutation: this helper enriches the subconcept blob with
+      // segment names / colors when they are missing, so callers receive a fully populated
+      // object without having to remap. The no-param-reassign rule is disabled accordingly.
+      /* eslint-disable no-param-reassign */
+      /**
+       * Enrich a subconcept blob with segment names / colors when missing, using rateMap.
+       * Mutates the passed object in place and returns it for fluent chaining.
+       * @param {object} sub - Subconcept blob from a ReservationService.
+       * @returns {object} The same subconcept, with categoryName/categoryColor/etc filled in.
+       * @example
+       *   enrichSubconceptSegments(service.get('subconcept'));
+       */
+      const enrichSubconceptSegments = (sub) => {
+        if (!sub || typeof sub !== 'object') return sub;
+        const mainSegmentId = sub.category || sub.rateId;
+        if (mainSegmentId && rateMap.has(mainSegmentId)) {
+          const r = rateMap.get(mainSegmentId);
+          if (!sub.categoryName) sub.categoryName = r.name;
+          if (!sub.categoryColor) sub.categoryColor = r.color;
+        }
+        if (sub.additionalVehicleSegment && rateMap.has(sub.additionalVehicleSegment)) {
+          const r = rateMap.get(sub.additionalVehicleSegment);
+          if (!sub.additionalVehicleSegmentName) sub.additionalVehicleSegmentName = r.name;
+          if (!sub.additionalVehicleSegmentColor) sub.additionalVehicleSegmentColor = r.color;
+        }
+        if (Array.isArray(sub.extraAdditionalVehicles)) {
+          sub.extraAdditionalVehicles = sub.extraAdditionalVehicles.map((v) => {
+            if (!v || !v.segment) return v;
+            const r = rateMap.get(v.segment);
+            if (!r) return v;
+            return {
+              ...v,
+              segmentName: v.segmentName || r.name,
+              segmentColor: v.segmentColor || r.color,
+            };
+          });
+        }
+        return sub;
+      };
+      /* eslint-enable no-param-reassign */
+
       // Batch fetch primary images for assigned vehicles (including extra assignments)
       const vehicleIds = services
         .map((svc) => svc.get('assignedVehicle')?.id)
@@ -575,6 +644,10 @@ class ReservationController {
           contactPerson: reservation.get('contactPerson'),
           contactEmail: reservation.get('contactEmail'),
           contactPhone: reservation.get('contactPhone'),
+          // Lead guest names and quote-level notes propagated from the quote at
+          // conversion time (see QuoteService.createReservationFromQuote).
+          leadGuestFirstName: reservation.get('leadGuestFirstName') || '',
+          leadGuestLastName: reservation.get('leadGuestLastName') || '',
           notes: reservation.get('notes'),
           client: client ? {
             id: client.id,
@@ -595,7 +668,7 @@ class ReservationController {
             // Use stored subconcept, or fallback to snapshot match
             const storedSub = svc.get('subconcept');
             const fallbackKey = `${svc.get('dayNumber') || 1}_${svc.get('concept') || ''}_${svc.get('time') || ''}`;
-            const subconcept = storedSub || snapshotLookup[fallbackKey] || null;
+            const subconcept = enrichSubconceptSegments(storedSub || snapshotLookup[fallbackKey] || null);
 
             return {
               id: svc.id,
@@ -646,10 +719,22 @@ class ReservationController {
                 phone: svc.get('assignedServiceCustomer').get('phone') || '',
                 profilePhotoUrl: svc.get('assignedServiceCustomer').get('profilePhotoUrl') || '',
               } : null,
-              extraAssignments: (svc.get('extraAssignments') || []).map((ea) => ({
-                ...ea,
-                vehicleImageUrl: ea.vehicleId ? (vehicleImageMap[ea.vehicleId] || '') : '',
-              })),
+              extraAssignments: (svc.get('extraAssignments') || []).map((ea) => {
+                // Backfill segmentName / segmentColor from rateMap when missing (legacy data).
+                let segName = ea.segmentName || '';
+                let segColor = ea.segmentColor || '';
+                if (ea.segmentId && rateMap.has(ea.segmentId)) {
+                  const r = rateMap.get(ea.segmentId);
+                  if (!segName) segName = r.name;
+                  if (!segColor) segColor = r.color;
+                }
+                return {
+                  ...ea,
+                  segmentName: segName,
+                  segmentColor: segColor,
+                  vehicleImageUrl: ea.vehicleId ? (vehicleImageMap[ea.vehicleId] || '') : '',
+                };
+              }),
             };
           }),
         },

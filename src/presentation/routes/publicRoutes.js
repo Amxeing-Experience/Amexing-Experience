@@ -15,6 +15,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const PublicQuoteController = require('../../application/controllers/PublicQuoteController');
+const PublicReservationController = require('../../application/controllers/PublicReservationController');
 const logger = require('../../infrastructure/logger');
 
 const router = express.Router();
@@ -53,5 +54,24 @@ router.use(publicRateLimiter);
  * GET /quotes/QTE-2025-0004
  */
 router.get('/quotes/:folio', PublicQuoteController.viewPublicQuote);
+
+/**
+ * Public quote PDF download (server-side, puppeteer-rendered).
+ * GET /quotes/:folio/pdf.
+ */
+router.get('/quotes/:folio/pdf', PublicQuoteController.downloadQuotePdf);
+
+/**
+ * Public reservation view by folio.
+ * GET /reservations/:folio.
+ * Folio format: MMM-YYMM-NNN (e.g. MAY-2605-001).
+ */
+router.get('/reservations/:folio', PublicReservationController.viewPublicReservation);
+
+/**
+ * Public reservation PDF download (server-side, puppeteer-rendered).
+ * GET /reservations/:folio/pdf.
+ */
+router.get('/reservations/:folio/pdf', PublicReservationController.downloadReservationPdf);
 
 module.exports = router;

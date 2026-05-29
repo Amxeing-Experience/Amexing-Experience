@@ -16,6 +16,7 @@ const Parse = require('parse/node');
 const Quote = require('../../domain/models/Quote');
 const logger = require('../../infrastructure/logger');
 const FileStorageService = require('../services/FileStorageService');
+const { renderUrlToPdf } = require('../services/PdfRenderService');
 
 const fileStorageService = new FileStorageService({
   baseFolder: 'general',
@@ -31,6 +32,7 @@ class PublicQuoteController {
   constructor() {
     // Bind methods to maintain 'this' context
     this.viewPublicQuote = this.viewPublicQuote.bind(this);
+    this.downloadQuotePdf = this.downloadQuotePdf.bind(this);
     this.preparePublicQuoteData = this.preparePublicQuoteData.bind(this);
 
     // Initialize experience caches for provider detection
@@ -72,6 +74,41 @@ class PublicQuoteController {
       });
     } catch (error) {
       return this.handlePublicQuoteError(error, folio, req, res);
+    }
+  }
+
+  /**
+   * Download quote as PDF via headless Chrome (puppeteer).
+   * GET /quotes/:folio/pdf.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   *   GET /quotes/QTE-2025-0004/pdf
+   */
+  async downloadQuotePdf(req, res) {
+    const { folio } = req.params;
+    try {
+      const folioError = this.validateFolio(folio, req, res);
+      if (folioError) return folioError;
+
+      const quote = await this.fetchQuoteByFolio(folio, req, res);
+      if (!quote) return;
+
+      const proto = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.get('host');
+      const url = `${proto}://${host}/quotes/${encodeURIComponent(folio)}?pdf=1`;
+
+      const pdfBuffer = await renderUrlToPdf(url);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="Cotizacion_${folio}.pdf"`);
+      return res.end(pdfBuffer);
+    } catch (error) {
+      logger.error('Failed to render quote PDF', {
+        folio, error: error.message, stack: error.stack,
+      });
+      return res.status(500).json({ success: false, error: 'Error al generar el PDF' });
     }
   }
 
@@ -365,7 +402,7 @@ class PublicQuoteController {
 
     // Update serviceType based on providerType for experiences
     if (sub.type === 'experiencia' && providerType === 'Establishment') {
-      serviceType = 'Establecimiento';
+      serviceType = 'Experiencia';
     }
 
     return {
@@ -405,6 +442,7 @@ class PublicQuoteController {
       tourId: sub.tourId || '',
       experienceId: sub.experienceId || '',
       providerType,
+      providerName: sub.providerName || '',
       imageUrl: sub.imageUrl || '',
       // Include all missing service data fields for complete parity with admin views
       notes: sub.notes || '',
@@ -440,6 +478,13 @@ class PublicQuoteController {
       extraAdditionalVehicles: Array.isArray(sub.extraAdditionalVehicles) ? sub.extraAdditionalVehicles : [],
       tripType: sub.tripType || '',
       specificLocation: sub.specificLocation || '',
+      // Pickup / drop-off addresses (Punto a Punto + Local; one-way + per-leg round-trip)
+      pickupAddress: sub.pickupAddress || '',
+      dropoffAddress: sub.dropoffAddress || '',
+      pickupAddressIda: sub.pickupAddressIda || '',
+      dropoffAddressIda: sub.dropoffAddressIda || '',
+      pickupAddressVuelta: sub.pickupAddressVuelta || '',
+      dropoffAddressVuelta: sub.dropoffAddressVuelta || '',
       // A-disposición specific fields
       vehicleCount: sub.vehicleCount || null,
       hourlyPrice: sub.hourlyPrice || null,
