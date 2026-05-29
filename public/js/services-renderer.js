@@ -480,7 +480,7 @@
             if (service.type === 'tour' && service.isWalkingTour) {
                 badgeLabel = 'Tour a Pie';
             } else if (service.type === 'experience' && this.isExperienceFromEstablishment(service)) {
-                badgeLabel = 'Establecimiento';
+                badgeLabel = 'Experiencia';
             }
 
             // Clean service item with minimal styling
@@ -585,11 +585,12 @@
                 </div>`;
             }
 
-            // Guide
+            // Guide (label differs: a-disposicion uses a Chofer, tours/experiences use a Guía)
             if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
+                const guideLabel = service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía';
                 html += `<div class="service-detail-item text-success mt-1">
                     <i class="ti ti-user me-1"></i>
-                    <strong>Incluye Chofer</strong>
+                    <strong>${guideLabel}</strong>
                 </div>`;
             }
 
@@ -608,7 +609,7 @@
 
             // Notes (callout style — full-width gray background, text inside flows naturally).
             if (service.notes) {
-                html += `<div class="mt-2 p-2 rounded" style="background: #f8f9fa; border-left: 3px solid #adb5bd; width: 100%;">
+                html += `<div class="mt-2 p-2" style="border-left: 3px solid #adb5bd; width: 100%;">
                     <div class="d-flex align-items-center mb-1">
                         <i class="ti ti-notes me-1 text-secondary"></i>
                         <strong class="text-secondary" style="font-size: 0.85rem;">Notas</strong>
@@ -635,6 +636,8 @@
             if (this.mode === 'list' && this.container) {
                 html += this.renderServiceActions(service);
             }
+
+            html += this.renderAssignmentsBlock(service);
 
             html += '</div>'; // service-item
 
@@ -692,10 +695,14 @@
             }
 
             // Direction labels
-            const directionLabels = {
-                arrival: service.transportType === 'aeropuerto' ? 'Llegada' : 'Ida',
-                departure: service.transportType === 'aeropuerto' ? 'Salida' : 'Regreso',
-            };
+            // Match the modal labels in quote-services-v2.js
+            const directionLabels = (() => {
+                if (service.transportType === 'local') {
+                    return { arrival: 'Llevar', departure: 'Recoger' };
+                }
+                // aeropuerto + punto-a-punto both use Llegada/Salida
+                return { arrival: 'Llegada', departure: 'Salida' };
+            })();
 
             // Clean transport service item with minimal styling
             let html = `<div class="service-item">`;
@@ -756,6 +763,56 @@
                 <span class="text-muted me-1">Hacia:</span>
                 ${destination}
             </div>`;
+
+            // Pickup / drop-off addresses (Punto a Punto + Local)
+            const isPapOrLocal = service.transportType === 'punto-a-punto' || service.transportType === 'local';
+            if (isPapOrLocal) {
+                if (service.tripType === 'round-trip') {
+                    // Per-leg addresses
+                    if (service.pickupAddressIda || service.dropoffAddressIda) {
+                        if (service.pickupAddressIda) {
+                            html += `<div class="service-detail-item">
+                                <i class="ti ti-map-pin-up me-1 text-success"></i>
+                                <span class="text-muted me-1">Pick-up (ida):</span>${service.pickupAddressIda}
+                            </div>`;
+                        }
+                        if (service.dropoffAddressIda) {
+                            html += `<div class="service-detail-item">
+                                <i class="ti ti-map-pin-down me-1 text-danger"></i>
+                                <span class="text-muted me-1">Drop-off (ida):</span>${service.dropoffAddressIda}
+                            </div>`;
+                        }
+                    }
+                    if (service.pickupAddressVuelta || service.dropoffAddressVuelta) {
+                        if (service.pickupAddressVuelta) {
+                            html += `<div class="service-detail-item">
+                                <i class="ti ti-map-pin-up me-1 text-success"></i>
+                                <span class="text-muted me-1">Pick-up (regreso):</span>${service.pickupAddressVuelta}
+                            </div>`;
+                        }
+                        if (service.dropoffAddressVuelta) {
+                            html += `<div class="service-detail-item">
+                                <i class="ti ti-map-pin-down me-1 text-danger"></i>
+                                <span class="text-muted me-1">Drop-off (regreso):</span>${service.dropoffAddressVuelta}
+                            </div>`;
+                        }
+                    }
+                } else {
+                    // One-way addresses
+                    if (service.pickupAddress) {
+                        html += `<div class="service-detail-item">
+                            <i class="ti ti-map-pin-up me-1 text-success"></i>
+                            <span class="text-muted me-1">Pick-up:</span>${service.pickupAddress}
+                        </div>`;
+                    }
+                    if (service.dropoffAddress) {
+                        html += `<div class="service-detail-item">
+                            <i class="ti ti-map-pin-down me-1 text-danger"></i>
+                            <span class="text-muted me-1">Drop-off:</span>${service.dropoffAddress}
+                        </div>`;
+                    }
+                }
+            }
 
             // Airline info
             if (service.transportType === 'aeropuerto') {
@@ -900,11 +957,12 @@
                 html += '</div>';
             }
 
-            // Guide
+            // Guide (label differs: a-disposicion → Chofer, tours/experiences → Guía)
             if (service.includeGuide) {
+                const guideLabel = service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía';
                 html += `<div class="service-detail-item text-success mt-1">
                     <i class="ti ti-user me-1"></i>
-                    <strong>Incluye Chofer</strong>
+                    <strong>${guideLabel}</strong>
                 </div>`;
             }
 
@@ -945,7 +1003,7 @@
             // Notes (callout) — placed outside the info/price flex row so the gray
             // background spans the full service-item width.
             if (service.notes) {
-                html += `<div class="mt-2 p-2 rounded" style="background: #f8f9fa; border-left: 3px solid #adb5bd;">
+                html += `<div class="mt-2 p-2" style="border-left: 3px solid #adb5bd;">
                     <div class="d-flex align-items-center mb-1">
                         <i class="ti ti-notes me-1 text-secondary"></i>
                         <strong class="text-secondary" style="font-size: 0.85rem;">Notas</strong>
@@ -970,6 +1028,8 @@
             if (this.mode === 'list' && this.container) {
                 html += this.renderServiceActions(service);
             }
+
+            html += this.renderAssignmentsBlock(service);
 
             html += '</div>'; // service-item
 
@@ -1032,11 +1092,12 @@
                 </div>`;
             }
 
-            // Guide
+            // Guide (label differs: a-disposicion → Chofer, tours/experiences → Guía)
             if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
+                const guideLabel = service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía';
                 html += `<div class="service-detail-item text-success">
                     <i class="ti ti-user me-1"></i>
-                    <strong>Incluye Chofer</strong>
+                    <strong>${guideLabel}</strong>
                 </div>`;
             }
 
@@ -1222,6 +1283,198 @@
             return html;
         }
 
+        // Render assignments block (reservation-only: chofer, vehículo, guía, greeter, extras, seguidor).
+        // Returns empty string when service.assignments is not present (e.g. quotes).
+        renderAssignmentsBlock(service) {
+            const a = service && service.assignments;
+            if (!a) return '';
+            const hasAny = a.driver || a.vehicle || a.guide || a.greeter || a.serviceCustomer
+                || (Array.isArray(a.extras) && a.extras.some((e) => e.driver || e.vehicle));
+            if (!hasAny) return '';
+
+            // Build initials from a name (e.g. "Test 1 Driver" → "TD")
+            const initials = (name) => {
+                if (!name) return '?';
+                const parts = String(name).trim().split(/\s+/);
+                if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+            };
+            // Deterministic background color from a string (gives each user a stable hue)
+            const colorFromName = (name) => {
+                let h = 0;
+                const s = String(name || '');
+                for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffffffff;
+                const palette = ['#7c8473', '#a39160', '#71909a', '#a67c52', '#8b6f8b', '#6b8b6b'];
+                return palette[Math.abs(h) % palette.length];
+            };
+
+            // Avatar with photo fallback to colored initials
+            const avatar = (person, size = 40) => {
+                if (person && person.profilePhotoUrl) {
+                    return `<img src="${person.profilePhotoUrl}"
+                        alt="${person.fullName || ''}"
+                        onerror="this.outerHTML='${this._escapeAttr(this.initialsAvatarHTML(person.fullName, size))}'"
+                        style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;border:1px solid #e9ecef;flex-shrink:0;">`;
+                }
+                return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${colorFromName(person?.fullName)};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:${Math.round(size * 0.4)}px;flex-shrink:0;letter-spacing:0.02em;">${initials(person?.fullName)}</div>`;
+            };
+
+            // Vehicle thumb: image or clean car icon
+            const vehicleThumb = (vehicle, w = 56, h = 42) => {
+                if (vehicle && vehicle.imageUrl) {
+                    return `<img src="${vehicle.imageUrl}" alt="${vehicle.name || ''}"
+                        onerror="this.outerHTML='${this._escapeAttr(this.vehiclePlaceholderHTML(w, h))}'"
+                        style="width:${w}px;height:${h}px;object-fit:cover;border-radius:4px;border:1px solid #e9ecef;flex-shrink:0;">`;
+                }
+                return this.vehiclePlaceholderHTML(w, h);
+            };
+
+            const contactLine = (person) => {
+                if (!person) return '';
+                const bits = [];
+                if (person.phone) bits.push(`<span><i class="ti ti-phone" style="font-size:0.78rem;opacity:0.7;"></i> ${person.phone}</span>`);
+                if (person.email) bits.push(`<span><i class="ti ti-mail" style="font-size:0.78rem;opacity:0.7;"></i> ${person.email}</span>`);
+                if (bits.length === 0) return '';
+                return `<div class="text-muted d-flex flex-wrap" style="font-size:0.72rem;gap:0.5rem;margin-top:2px;">${bits.join('')}</div>`;
+            };
+
+            // Half-card: person (driver). Sin label — el ícono y el avatar lo identifican.
+            const halfPerson = (person) => {
+                if (!person) {
+                    return `
+                        <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width:0;">
+                            <div style="width:40px;height:40px;border-radius:50%;background:#eef0f2;display:flex;align-items:center;justify-content:center;color:#adb5bd;flex-shrink:0;">
+                                <i class="ti ti-user"></i>
+                            </div>
+                            <div style="font-size:0.85rem;line-height:1.25;min-width:0;color:#adb5bd;font-style:italic;">Sin chofer</div>
+                        </div>`;
+                }
+                return `
+                    <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width:0;">
+                        ${avatar(person, 40)}
+                        <div style="font-size:0.85rem;line-height:1.25;min-width:0;">
+                            <div class="fw-semibold text-truncate" style="color:#212529;">${person.fullName || '—'}</div>
+                            ${contactLine(person)}
+                        </div>
+                    </div>`;
+            };
+
+            // Half-card: vehicle.
+            const halfVehicle = (vehicle) => {
+                if (!vehicle) {
+                    return `
+                        <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width:0;">
+                            ${this.vehiclePlaceholderHTML(56, 42)}
+                            <div style="font-size:0.85rem;line-height:1.25;min-width:0;color:#adb5bd;font-style:italic;">Sin vehículo</div>
+                        </div>`;
+                }
+                const meta = [vehicle.plate, vehicle.color, vehicle.year].filter(Boolean).join(' · ');
+                return `
+                    <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width:0;">
+                        ${vehicleThumb(vehicle)}
+                        <div style="font-size:0.85rem;line-height:1.25;min-width:0;">
+                            <div class="fw-semibold text-truncate" style="color:#212529;">${vehicle.name || '—'}</div>
+                            ${meta ? `<div class="text-muted text-truncate" style="font-size:0.72rem;margin-top:2px;">${meta}</div>` : ''}
+                        </div>
+                    </div>`;
+            };
+
+            // Pair card with optional segment chip in the corner
+            const pairCard = (slotIndex, driver, vehicle, segmentName, segmentColor) => {
+                const safeColor = segmentColor && /^#?[0-9a-f]{3,8}$/i.test(segmentColor)
+                    ? (segmentColor.startsWith('#') ? segmentColor : `#${segmentColor}`)
+                    : '#969b81';
+                const segChip = segmentName
+                    ? `<span class="badge" style="background:${safeColor};color:#fff;font-size:0.65rem;font-weight:500;padding:2px 8px;letter-spacing:0.03em;">${segmentName}</span>`
+                    : '';
+                const slotChip = `<span class="text-muted" style="font-size:0.7rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;">${slotIndex === 1 ? 'Vehículo principal' : `Vehículo adicional ${slotIndex - 1}`}</span>`;
+                return `
+                    <div class="border rounded bg-white assignment-card" style="overflow:hidden;">
+                        <div class="d-flex justify-content-between align-items-center px-2 py-1" style="background:#fafbfc;border-bottom:1px solid #eef0f2;">
+                            ${slotChip}
+                            ${segChip}
+                        </div>
+                        <div class="d-flex align-items-stretch p-2" style="gap:0.75rem;">
+                            ${halfPerson(driver)}
+                            <div style="width:1px;background:#eef0f2;"></div>
+                            ${halfVehicle(vehicle)}
+                        </div>
+                    </div>`;
+            };
+
+            // Standalone card for guide / greeter / service customer
+            const standaloneCard = (label, icon, person) => {
+                if (!person) return '';
+                return `
+                    <div class="border rounded bg-white p-2 d-flex align-items-center gap-2 assignment-card">
+                        ${avatar(person, 40)}
+                        <div style="font-size:0.85rem;line-height:1.25;min-width:0;flex-grow:1;">
+                            <div class="text-muted" style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;"><i class="ti ${icon} me-1"></i>${label}</div>
+                            <div class="fw-semibold text-truncate" style="color:#212529;">${person.fullName || '—'}</div>
+                            ${contactLine(person)}
+                        </div>
+                    </div>`;
+            };
+
+            const pairCards = [];
+            // Main slot (driver + vehicle) — always slot 1 if either exists
+            if (a.driver || a.vehicle) {
+                pairCards.push(pairCard(1, a.driver, a.vehicle, null, null));
+            }
+            // Extras
+            if (Array.isArray(a.extras)) {
+                a.extras.forEach((extra, idx) => {
+                    if (!extra.driver && !extra.vehicle) return;
+                    pairCards.push(pairCard(idx + 2, extra.driver, extra.vehicle, extra.segmentName, extra.segmentColor));
+                });
+            }
+
+            const standaloneCards = [];
+            if (a.guide) standaloneCards.push(standaloneCard('Guía', 'ti-id-badge-2', a.guide));
+            if (a.greeter) standaloneCards.push(standaloneCard('Greeter', 'ti-hand-stop', a.greeter));
+            if (a.serviceCustomer) standaloneCards.push(standaloneCard('Seguidor de servicio', 'ti-eye', a.serviceCustomer));
+
+            const pairGridHtml = pairCards.length
+                ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:0.5rem;">${pairCards.join('')}</div>`
+                : '';
+            const standaloneGridHtml = standaloneCards.length
+                ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.5rem;margin-top:${pairCards.length ? '0.5rem' : '0'};">${standaloneCards.join('')}</div>`
+                : '';
+
+            return `
+                <div class="mt-2 p-2 assignments-block" style="background:#f8f9fa;border-left:3px solid #969b81;border-radius:0 4px 4px 0;">
+                    <div class="d-flex align-items-center mb-2 assignments-header" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;color:#6c757d;font-weight:600;">
+                        <i class="ti ti-user-check me-1"></i>Asignaciones
+                    </div>
+                    ${pairGridHtml}
+                    ${standaloneGridHtml}
+                </div>
+            `;
+        }
+
+        // Small HTML helpers for the assignments block (kept on the prototype so the inline
+        // onerror handlers above can reach them through `this.*`).
+        initialsAvatarHTML(name, size = 40) {
+            const palette = ['#7c8473', '#a39160', '#71909a', '#a67c52', '#8b6f8b', '#6b8b6b'];
+            let h = 0;
+            const s = String(name || '');
+            for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffffffff;
+            const bg = palette[Math.abs(h) % palette.length];
+            const parts = s.trim().split(/\s+/).filter(Boolean);
+            let init = '?';
+            if (parts.length === 1) init = parts[0].slice(0, 2).toUpperCase();
+            else if (parts.length > 1) init = (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+            return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:${Math.round(size * 0.4)}px;flex-shrink:0;">${init}</div>`;
+        }
+
+        vehiclePlaceholderHTML(w = 56, h = 42) {
+            return `<div style="width:${w}px;height:${h}px;border-radius:4px;background:#eef0f2;display:flex;align-items:center;justify-content:center;color:#adb5bd;flex-shrink:0;"><i class="ti ti-car" style="font-size:1.1rem;"></i></div>`;
+        }
+
+        _escapeAttr(s) {
+            return String(s).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+        }
+
         // Render service actions (edit, duplicate, delete buttons)
         renderServiceActions(service) {
             return `
@@ -1260,10 +1513,18 @@
             // For a-disposición, return empty to avoid redundancy (vehicle shown below)
             if (service.type === 'a-disposicion') return '';
 
-            if (service.concept) return service.concept;
-            if (service.experienceName) return service.experienceName;
-            if (service.tourName) return service.tourName;
-            if (service.name) return service.name;
+            // Establishment experiences: append "- ProviderName" to match the dropdown format
+            const isEstablishmentExp = service.type === 'experience'
+                && (service.providerType || '').toLowerCase() === 'establishment'
+                && service.providerName;
+
+            let base = service.concept || service.experienceName || service.tourName || service.name;
+            if (base) {
+                if (isEstablishmentExp && !base.includes(` - ${service.providerName}`)) {
+                    base = `${base} - ${service.providerName}`;
+                }
+                return base;
+            }
 
             // For transport, build title from route
             if (this.config.helpers.isTransport(service.type)) {

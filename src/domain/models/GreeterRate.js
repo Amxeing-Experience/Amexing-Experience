@@ -558,6 +558,13 @@ class GreeterRate extends Parse.Object {
     const basePrice = this.get('basePrice') || 760;
     const hourlyRate = this.get('hourlyRate') || 640;
 
+    /**
+     * Format a number as MXN currency.
+     * @param {number} value - Numeric value to format.
+     * @returns {string} Currency-formatted string.
+     * @example
+     *   formatCurrency(760); // '$760.00'
+     */
     const formatCurrency = (value) => new Intl.NumberFormat('es-MX', {
       style: 'currency',
       currency: 'MXN',

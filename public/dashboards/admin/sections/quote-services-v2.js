@@ -2453,9 +2453,14 @@ class ItineraryBuilder {
     const departureLabel = document.querySelector('label[for="typeDeparture"] span');
     const arrivalIcon = document.querySelector('label[for="typeArrival"] i');
     const departureIcon = document.querySelector('label[for="typeDeparture"] i');
-    if (transportType === 'punto-a-punto' || transportType === 'local') {
-      if (arrivalLabel) arrivalLabel.textContent = 'Ida';
-      if (departureLabel) departureLabel.textContent = 'Regreso';
+    if (transportType === 'punto-a-punto') {
+      if (arrivalLabel) arrivalLabel.textContent = 'Llegada';
+      if (departureLabel) departureLabel.textContent = 'Salida';
+      if (arrivalIcon) { arrivalIcon.className = 'ti ti-car me-1'; arrivalIcon.style.fontSize = '1.1rem'; }
+      if (departureIcon) { departureIcon.className = 'ti ti-car me-1'; departureIcon.style.fontSize = '1.1rem'; }
+    } else if (transportType === 'local') {
+      if (arrivalLabel) arrivalLabel.textContent = 'Llevar';
+      if (departureLabel) departureLabel.textContent = 'Recoger';
       if (arrivalIcon) { arrivalIcon.className = 'ti ti-car me-1'; arrivalIcon.style.fontSize = '1.1rem'; }
       if (departureIcon) { departureIcon.className = 'ti ti-car me-1'; departureIcon.style.fontSize = '1.1rem'; }
     } else {
@@ -2486,6 +2491,15 @@ class ItineraryBuilder {
       roundTripFlightDetailsVuelta?.classList.add('d-none');
       transportScheduleSection?.classList.remove('d-none');
     }
+
+    // Pickup / drop-off address fields are shown for Punto a Punto and Local (one-way + round-trip)
+    const usesPickupDropoff = transportType === 'punto-a-punto' || transportType === 'local';
+    ['papAddressesRow', 'papAddressesRowIda', 'papAddressesRowVuelta'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (usesPickupDropoff) el.classList.remove('d-none');
+      else el.classList.add('d-none');
+    });
 
     // Re-evaluate direction fields (local has different field types than aeropuerto/punto-a-punto)
     const tripType2 = document.querySelector('input[name="tripType"]:checked')?.value;
@@ -3864,14 +3878,15 @@ class ItineraryBuilder {
         data.childrenQuantity = parseInt(document.getElementById('childrenQuantity')?.value || 0);
         data.adultsNoAlcoholQuantity = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
 
-        // Always capture provider type from selected dropdown option
+        // Always capture provider type + name from selected dropdown option
         const selectedOption = document.getElementById('experienceSelect')?.selectedOptions[0];
         if (selectedOption?.dataset.providerType) {
           data.providerType = selectedOption.dataset.providerType;
+          data.providerName = selectedOption.dataset.providerName || '';
           console.debug('💾 Saving experience with provider type:', {
             experienceId: data.experienceId,
             providerType: data.providerType,
-            providerName: selectedOption.dataset.providerName,
+            providerName: data.providerName,
           });
         }
 
@@ -4210,6 +4225,32 @@ class ItineraryBuilder {
             } else {
               data.destination = `${data.destination}, ${specificLocation.trim()}`;
             }
+          }
+
+          // Pickup / drop-off addresses (Punto a Punto + Local)
+          const usesPickupDropoff = data.transportType === 'punto-a-punto' || data.transportType === 'local';
+          if (usesPickupDropoff) {
+            // One-way fields
+            const pickup = document.getElementById('transportPickupAddress')?.value || '';
+            const dropoff = document.getElementById('transportDropoffAddress')?.value || '';
+            data.pickupAddress = pickup.trim();
+            data.dropoffAddress = dropoff.trim();
+            // Round-trip fields (per leg)
+            const pickupIda = document.getElementById('roundTripPickupAddressIda')?.value || '';
+            const dropoffIda = document.getElementById('roundTripDropoffAddressIda')?.value || '';
+            const pickupVuelta = document.getElementById('roundTripPickupAddressVuelta')?.value || '';
+            const dropoffVuelta = document.getElementById('roundTripDropoffAddressVuelta')?.value || '';
+            data.pickupAddressIda = pickupIda.trim();
+            data.dropoffAddressIda = dropoffIda.trim();
+            data.pickupAddressVuelta = pickupVuelta.trim();
+            data.dropoffAddressVuelta = dropoffVuelta.trim();
+          } else {
+            data.pickupAddress = '';
+            data.dropoffAddress = '';
+            data.pickupAddressIda = '';
+            data.dropoffAddressIda = '';
+            data.pickupAddressVuelta = '';
+            data.dropoffAddressVuelta = '';
           }
 
           // Flight details (if airport transport)
@@ -5387,6 +5428,21 @@ class ItineraryBuilder {
             const specificLocationRow = document.getElementById('specificLocationRow');
             if (specificLocationRow) specificLocationRow.classList.remove('d-none');
           }
+
+          // Restore pickup / drop-off addresses (Punto a Punto + Local)
+          const pickupField = document.getElementById('transportPickupAddress');
+          const dropoffField = document.getElementById('transportDropoffAddress');
+          if (pickupField) pickupField.value = service.pickupAddress || '';
+          if (dropoffField) dropoffField.value = service.dropoffAddress || '';
+          // Round-trip per-leg addresses
+          const pickupIdaField = document.getElementById('roundTripPickupAddressIda');
+          const dropoffIdaField = document.getElementById('roundTripDropoffAddressIda');
+          const pickupVueltaField = document.getElementById('roundTripPickupAddressVuelta');
+          const dropoffVueltaField = document.getElementById('roundTripDropoffAddressVuelta');
+          if (pickupIdaField) pickupIdaField.value = service.pickupAddressIda || '';
+          if (dropoffIdaField) dropoffIdaField.value = service.dropoffAddressIda || '';
+          if (pickupVueltaField) pickupVueltaField.value = service.pickupAddressVuelta || '';
+          if (dropoffVueltaField) dropoffVueltaField.value = service.dropoffAddressVuelta || '';
 
           // Flight details (airport)
           if (service.transportType === 'aeropuerto') {
@@ -7173,9 +7229,8 @@ class ItineraryBuilder {
     let badgeLabel = null;
     if (service.type === 'tour' && service.isWalkingTour) {
       badgeLabel = 'Tour a Pie';
-    } else if (service.type === 'experience' && this.isExperienceFromEstablishment(service.experienceId)) {
-      badgeLabel = 'Establecimiento';
     }
+    // Establishment experiences keep the standard "Experiencia" badge (no longer "Establecimiento")
 
     const typeLabels = {
       experience: 'Experiencia',
@@ -7286,7 +7341,7 @@ class ItineraryBuilder {
                                         <div class="row g-2 text-success small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-user me-1"></i>
-                                                <strong>Incluye Chofer</strong>
+                                                <strong>${service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía'}</strong>
                                             </div>
                                         </div>
                                     ` : ''}
@@ -7439,7 +7494,7 @@ class ItineraryBuilder {
                             <div class="d-flex align-items-center mb-2 flex-wrap gap-1">
                                 <span class="badge bg-light text-dark me-2">Transporte</span>
                                 <span class="badge bg-primary-subtle text-primary">${transportLabel}</span>
-                                ${service.directionType ? `<span class="badge ${service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">${(service.transportType === 'punto-a-punto' || service.transportType === 'local') ? (service.directionType === 'arrival' ? 'Ida' : 'Regreso') : (service.directionType === 'arrival' ? 'Llegada' : 'Salida')}</span>` : ''}
+                                ${service.directionType ? `<span class="badge ${service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">${service.transportType === 'local' ? (service.directionType === 'arrival' ? 'Llevar' : 'Recoger') : (service.directionType === 'arrival' ? 'Llegada' : 'Salida')}</span>` : ''}
                                 ${service.tripType === 'round-trip' ? '<span class="badge bg-info-subtle text-info"><i class="ti ti-arrows-left-right me-1"></i>Ida y Vuelta</span>' : ''}
                                 ${service.returnOrigin || service.returnDestination ? '<span class="badge bg-secondary-subtle text-secondary"><i class="ti ti-link me-1"></i>Conexión</span>' : ''}
                             </div>
@@ -7464,6 +7519,27 @@ class ItineraryBuilder {
                                 <span class="text-muted me-1">Hacia:</span>
                                 ${destination}
                             </div>
+                            <!-- Pickup / Drop-off (Punto a Punto + Local) -->
+                            ${(() => {
+                                const isPapOrLocal = service.transportType === 'punto-a-punto' || service.transportType === 'local';
+                                if (!isPapOrLocal) return '';
+                                const lines = [];
+                                const row = (icon, color, label, value) => `
+                                    <div class="d-flex align-items-center text-muted small mb-1">
+                                        <i class="ti ${icon} me-1 ${color}"></i>
+                                        <span class="text-muted me-1">${label}:</span>${value}
+                                    </div>`;
+                                if (service.tripType === 'round-trip') {
+                                    if (service.pickupAddressIda) lines.push(row('ti-map-pin-up', 'text-success', 'Pick-up (ida)', service.pickupAddressIda));
+                                    if (service.dropoffAddressIda) lines.push(row('ti-map-pin-down', 'text-danger', 'Drop-off (ida)', service.dropoffAddressIda));
+                                    if (service.pickupAddressVuelta) lines.push(row('ti-map-pin-up', 'text-success', 'Pick-up (regreso)', service.pickupAddressVuelta));
+                                    if (service.dropoffAddressVuelta) lines.push(row('ti-map-pin-down', 'text-danger', 'Drop-off (regreso)', service.dropoffAddressVuelta));
+                                } else {
+                                    if (service.pickupAddress) lines.push(row('ti-map-pin-up', 'text-success', 'Pick-up', service.pickupAddress));
+                                    if (service.dropoffAddress) lines.push(row('ti-map-pin-down', 'text-danger', 'Drop-off', service.dropoffAddress));
+                                }
+                                return lines.join('');
+                            })()}
                             <!-- Airline -->
                             ${service.transportType === 'aeropuerto' && service.airline ? `
                                 <div class="d-flex align-items-center text-muted small mb-1">
@@ -7609,7 +7685,7 @@ class ItineraryBuilder {
                             ${service.includeGuide ? `
                                 <div class="d-flex align-items-center text-success small mt-1">
                                     <i class="ti ti-user me-1"></i>
-                                    <strong>Incluye Chofer</strong>
+                                    <strong>${service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía'}</strong>
                                 </div>
                             ` : ''}
                             ${service.includeGreeter ? `
@@ -11110,8 +11186,15 @@ class ItineraryBuilder {
 
   getServiceTitle(service) {
     switch (service.type) {
-      case 'experience':
-        return this.getExperienceName(service.experienceId) || 'Experiencia';
+      case 'experience': {
+        const base = this.getExperienceName(service.experienceId) || 'Experiencia';
+        // Establishment experiences include the provider name in the title (matches dropdown format)
+        const isEstablishment = (service.providerType || '').toLowerCase() === 'establishment';
+        if (isEstablishment && service.providerName && !base.includes(` - ${service.providerName}`)) {
+          return `${base} - ${service.providerName}`;
+        }
+        return base;
+      }
       case 'tour':
         return this.getTourName(service.tourId) || 'Tour';
       case 'transport':
@@ -11682,8 +11765,13 @@ class ItineraryBuilder {
             price: this.getCorrectPriceForPaymentType(subconcept, serviceItemsData.paymentType),
             quantity: subconcept.quantity || 1,
             notes: subconcept.notes || '',
+            clientNotes: subconcept.clientNotes || '',
+            providerNotes: subconcept.providerNotes || '',
+            teamNotes: subconcept.teamNotes || '',
+            internalNotes: subconcept.internalNotes || '',
             experienceId: subconcept.experienceId,
             providerType: subconcept.providerType,
+            providerName: subconcept.providerName || '',
             tourId: subconcept.tourId,
             rateId: subconcept.rateId,
             hotelName: subconcept.hotelName,
@@ -11721,6 +11809,12 @@ class ItineraryBuilder {
             destination: subconcept.destination || null,
             destinationPOI: subconcept.destinationPOI || null,
             specificLocation: subconcept.specificLocation || null,
+            pickupAddress: subconcept.pickupAddress || '',
+            dropoffAddress: subconcept.dropoffAddress || '',
+            pickupAddressIda: subconcept.pickupAddressIda || '',
+            dropoffAddressIda: subconcept.dropoffAddressIda || '',
+            pickupAddressVuelta: subconcept.pickupAddressVuelta || '',
+            dropoffAddressVuelta: subconcept.dropoffAddressVuelta || '',
             category: subconcept.category || null,
             transportAdults: subconcept.transportAdults || 0,
             transportChildren: subconcept.transportChildren || 0,
@@ -19570,12 +19664,19 @@ class ItineraryBuilder {
             unitPrice: servicePrice,
             quantity: service.quantity || 1,
             notes: service.notes || '',
+            // Additional note channels — informational notes for different audiences.
+            // Persisted on the subconcept blob so they flow into the reservation.
+            clientNotes: service.clientNotes || '',
+            providerNotes: service.providerNotes || '',
+            teamNotes: service.teamNotes || '',
+            internalNotes: service.internalNotes || '',
             availabilityPending: service.availabilityPending || false,
             hours: service.hours || null,
             total: serviceTotal,
             // Type-specific fields
             experienceId: service.experienceId || null,
             providerType: service.providerType || null,
+            providerName: service.providerName || '',
             tourId: service.tourId || null,
             rateId: service.rateId || null, // Store rate for vehicle pricing
             hotelName: service.hotelName || null,
@@ -19668,6 +19769,14 @@ class ItineraryBuilder {
             // Devbreakdown text snapshots (used in production where the dev panel is hidden
             // but the totals still need to round-trip with the saved data)
             devBreakdowns: service.devBreakdowns || null,
+            // Pickup / drop-off addresses (free-text) for Punto a Punto + Local.
+            // One-way uses pickupAddress/dropoffAddress; round-trip uses the per-leg pairs below.
+            pickupAddress: service.pickupAddress || '',
+            dropoffAddress: service.dropoffAddress || '',
+            pickupAddressIda: service.pickupAddressIda || '',
+            dropoffAddressIda: service.dropoffAddressIda || '',
+            pickupAddressVuelta: service.pickupAddressVuelta || '',
+            dropoffAddressVuelta: service.dropoffAddressVuelta || '',
           };
 
           // Debug logging for price override and pricesByType

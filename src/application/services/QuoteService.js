@@ -1554,6 +1554,10 @@ class QuoteService {
       reservation.set('contactPerson', quote.get('contactPerson') || '');
       reservation.set('contactEmail', quote.get('contactEmail') || '');
       reservation.set('contactPhone', quote.get('contactPhone') || '');
+      // Lead guest names — propagated so the booking dashboard can surface the actual
+      // traveler separately from the contact person.
+      reservation.set('leadGuestFirstName', quote.get('leadGuestFirstName') || '');
+      reservation.set('leadGuestLastName', quote.get('leadGuestLastName') || '');
       reservation.set('notes', quote.get('notes') || '');
       reservation.set('serviceItemsSnapshot', serviceItems);
       reservation.set('active', true);
@@ -1701,12 +1705,18 @@ class QuoteService {
             }
 
             // Track additional vehicle requirement - update quantity for assignment slots
-            if (hasAdditionalVehicle) {
-              // Update subconcept quantity to reflect total vehicles (main + additional)
-              sub.quantity = 2; // Main vehicle + 1 additional = 2 total assignment slots
-              logger.debug('🚗 Transport service with additional vehicle: updated quantity to 2 for booking dashboard');
+            const extrasTransport = Array.isArray(sub.extraAdditionalVehicles) ? sub.extraAdditionalVehicles : [];
+            if (hasAdditionalVehicle || extrasTransport.length > 0) {
+              // Quantity reflects total vehicles the booking dashboard must assign:
+              // 1 main + 1 primary additional (when checkbox is on) + N extras.
+              sub.quantity = 1 + primaryCount + extrasTransport.length;
+              logger.debug('🚗 Transport service vehicle slots', {
+                primaryCount,
+                extrasCount: extrasTransport.length,
+                finalQuantity: sub.quantity,
+              });
 
-              // Store additional vehicle type information for assignment
+              // Store primary additional vehicle type information for assignment
               if (sub.additionalVehicleId) {
                 resSvc.set('additionalVehicleId', sub.additionalVehicleId);
                 logger.debug('📋 Stored additional vehicle ID:', sub.additionalVehicleId);
@@ -1722,6 +1732,24 @@ class QuoteService {
               if (sub.additionalVehicleSegmentName) {
                 resSvc.set('additionalVehicleSegmentName', sub.additionalVehicleSegmentName);
                 logger.debug('📋 Stored additional vehicle segment name:', sub.additionalVehicleSegmentName);
+              }
+
+              // Seed extraAssignments — one empty slot per extra vehicle so the booking
+              // dashboard can render assign UI per row. Driver/vehicle pointers stay null
+              // until an operator assigns them.
+              if (extrasTransport.length > 0) {
+                resSvc.set('extraAssignments', extrasTransport.map((v) => ({
+                  vehicleTypeId: v.vehicleId || '',
+                  vehicleName: v.vehicleTypeName || '',
+                  segmentId: v.segment || '',
+                  segmentName: v.segmentName || '',
+                  segmentColor: v.segmentColor || '',
+                  driverId: null,
+                  driverName: '',
+                  vehicleId: null,
+                  vehicleImageUrl: '',
+                })));
+                logger.debug('📋 Stored extraAssignments for transport', { count: extrasTransport.length });
               }
             }
 
@@ -1760,12 +1788,18 @@ class QuoteService {
               logger.debug('🚗 Tour service includes transport, needs driver assignment');
 
               // Track additional vehicle requirement for tours
-              if (hasAdditionalVehicle) {
-                // Update subconcept quantity to reflect total vehicles (main + additional)
-                sub.quantity = 2; // Main vehicle + 1 additional = 2 total assignment slots
-                logger.debug('🚗 Tour service with additional vehicle: updated quantity to 2 for booking dashboard');
+              const extrasTour = Array.isArray(sub.extraAdditionalVehicles) ? sub.extraAdditionalVehicles : [];
+              if (hasAdditionalVehicle || extrasTour.length > 0) {
+                // Quantity reflects total vehicles to assign: 1 main + 1 primary additional + N extras.
+                const primaryCount = hasAdditionalVehicle ? 1 : 0;
+                sub.quantity = 1 + primaryCount + extrasTour.length;
+                logger.debug('🚗 Tour service vehicle slots', {
+                  primaryCount,
+                  extrasCount: extrasTour.length,
+                  finalQuantity: sub.quantity,
+                });
 
-                // Store additional vehicle type information for assignment
+                // Store primary additional vehicle type information for assignment
                 if (sub.additionalVehicleId) {
                   resSvc.set('additionalVehicleId', sub.additionalVehicleId);
                   logger.debug('📋 Stored additional vehicle ID for tour:', sub.additionalVehicleId);
@@ -1781,6 +1815,23 @@ class QuoteService {
                 if (sub.additionalVehicleSegmentName) {
                   resSvc.set('additionalVehicleSegmentName', sub.additionalVehicleSegmentName);
                   logger.debug('📋 Stored additional vehicle segment name for tour:', sub.additionalVehicleSegmentName);
+                }
+
+                // Seed extraAssignments for tour — one slot per extra vehicle, awaiting
+                // driver/vehicle assignment by an operator.
+                if (extrasTour.length > 0) {
+                  resSvc.set('extraAssignments', extrasTour.map((v) => ({
+                    vehicleTypeId: v.vehicleId || '',
+                    vehicleName: v.vehicleTypeName || '',
+                    segmentId: v.segment || '',
+                    segmentName: v.segmentName || '',
+                    segmentColor: v.segmentColor || '',
+                    driverId: null,
+                    driverName: '',
+                    vehicleId: null,
+                    vehicleImageUrl: '',
+                  })));
+                  logger.debug('📋 Stored extraAssignments for tour', { count: extrasTour.length });
                 }
               }
             }

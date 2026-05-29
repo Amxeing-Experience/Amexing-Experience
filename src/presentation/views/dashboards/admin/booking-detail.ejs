@@ -114,6 +114,26 @@
                     </div>
                 </div>
             </div>
+            <!-- Lead guest + quote-level notes (only shown when present) -->
+            <div class="d-none" id="infoLeadGuestRow">
+                <hr>
+                <div class="row g-3">
+                    <div class="col-md-12">
+                        <small class="text-muted d-block"><i class="ti ti-user me-1"></i>Lead Guest</small>
+                        <span id="infoLeadGuest" class="fw-semibold">&mdash;</span>
+                    </div>
+                </div>
+            </div>
+            <div class="d-none" id="infoQuoteNotesRow">
+                <hr>
+                <div class="p-2 rounded" style="background: #f8f9fa; border-left: 3px solid #adb5bd;">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="ti ti-notes me-1 text-secondary"></i>
+                        <strong class="text-secondary" style="font-size: 0.85rem;">Notas de la cotización</strong>
+                    </div>
+                    <div id="infoQuoteNotes" class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -266,6 +286,9 @@
 document.addEventListener('DOMContentLoaded', async function() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     const reservationId = '<%= reservationId %>';
+    // Role from server-side renderRoleView (admin / superadmin / department_manager / client / etc.)
+    // Used to gate visibility of internal note channels.
+    const userRole = '<%= typeof userRole !== "undefined" ? userRole : "" %>';
     let reservationData = null;
     let employeesCache = null;
     let vehiclesCache = null;
@@ -273,6 +296,25 @@ document.addEventListener('DOMContentLoaded', async function() {
     function getInitials(name) {
         if (!name) return '?';
         return name.split(' ').map(w => w[0]).filter(Boolean).join('').substring(0, 2).toUpperCase();
+    }
+
+    // Returns the per-service price respecting the reservation's payment type. The
+    // quote stored pricesByType per service ({ efectivo, transferencia, tarjeta }) — at
+    // conversion only the snapshot for the quote's payment type made it into
+    // svc.total. Using pricesByType when available makes the booking totals match the
+    // quote regardless of which payment type the reservation is currently on.
+    function getServicePriceByType(svc, paymentType) {
+        const pbt = svc?.subconcept?.pricesByType;
+        if (pbt && typeof pbt === 'object' && pbt[paymentType] != null) {
+            const v = Number(pbt[paymentType]);
+            if (!Number.isNaN(v)) return v;
+        }
+        return Number(svc?.total) || 0;
+    }
+
+    // Sum of per-service prices using the reservation's payment type.
+    function computeServicesSubtotalByType(services, paymentType) {
+        return (services || []).reduce((sum, svc) => sum + getServicePriceByType(svc, paymentType), 0);
     }
 
     function buildPersonCard(person, roleLabel, roleIcon, colorClass) {
@@ -317,17 +359,123 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>`;
     }
 
+    // Group a driver and a vehicle into one visual unit so it's obvious which conductor
+    // is paired with which vehicle. The label sits on top (e.g. "Vehículo principal").
+    // If only one side is assigned, the other is shown as a muted "Pendiente" placeholder
+    // so the operator still sees the slot exists.
+    function buildPairCard(label, driver, vehicle, expectedVehicleName) {
+        const hasDriver = !!(driver && driver.fullName);
+        const hasVehicle = !!(vehicle && vehicle.name);
+        if (!hasDriver && !hasVehicle) return '';
+
+        const driverHtml = hasDriver
+            ? buildPersonCard(driver, 'Conductor', 'ti-steering-wheel', 'info')
+            : `<div class="d-flex align-items-center gap-2 mb-2 text-muted" style="opacity:0.6">
+                    <span class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;font-size:0.9rem"><i class="ti ti-steering-wheel"></i></span>
+                    <div>
+                        <div class="small fst-italic">Conductor pendiente</div>
+                    </div>
+               </div>`;
+
+        const vehicleHtml = hasVehicle
+            ? buildVehicleCard(vehicle)
+            : `<div class="d-flex align-items-center gap-2 mb-2 text-muted" style="opacity:0.6">
+                    <span class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;font-size:0.9rem"><i class="ti ti-car"></i></span>
+                    <div>
+                        <div class="small fst-italic">${expectedVehicleName ? expectedVehicleName + ' pendiente' : 'Vehículo pendiente'}</div>
+                    </div>
+               </div>`;
+
+        return `
+            <div class="p-2 rounded" style="background: #f8f9fa; min-width: 230px; flex: 0 0 auto;">
+                ${label ? `<div class="small fw-semibold text-secondary mb-1">${label}</div>` : ''}
+                ${driverHtml}
+                ${vehicleHtml}
+            </div>`;
+    }
+
+    // Quote statuses — kept as an ORDERED array (lifecycle: cotizada → solicitada →
+    // bloqueada → agendada → rechazada) so the dropdown matches the segmented control on
+    // the quote detail page.
+    const QUOTE_STATUS_ORDER = [
+        { key: 'quoted', label: 'Cotizada', cls: 'bg-primary text-white' },
+        { key: 'requested', label: 'Solicitada', cls: 'bg-info text-white' },
+        { key: 'hold', label: 'Bloqueada', cls: 'bg-warning text-dark' },
+        { key: 'scheduled', label: 'Agendada', cls: 'bg-success text-white' },
+        { key: 'rejected', label: 'Rechazada', cls: 'bg-danger text-white' },
+    ];
+    const QUOTE_STATUS_MAP = Object.fromEntries(QUOTE_STATUS_ORDER.map((s) => [s.key, s]));
+
     function getQuoteStatusBadge(status) {
         if (!status) return '';
-        const map = {
-            scheduled: { label: 'Agendada', cls: 'bg-success text-white' },
-            hold: { label: 'Bloqueada', cls: 'bg-warning text-dark' },
-            requested: { label: 'Solicitada', cls: 'bg-info text-white' },
-            quoted: { label: 'Cotizada', cls: 'bg-primary text-white' },
-            rejected: { label: 'Rechazada', cls: 'bg-danger text-white' },
-        };
-        const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
-        return `<span class="badge ${s.cls}" title="Estado de cotización origen">${s.label}</span>`;
+        const s = QUOTE_STATUS_MAP[status] || { label: status, cls: 'bg-secondary text-white' };
+        const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+        // Admin gets a dropdown to change the quote status inline. Other roles see a
+        // plain badge.
+        if (!isAdmin) {
+            return `<span class="badge ${s.cls}" title="Estado de cotización origen">${s.label}</span>`;
+        }
+        // Same lifecycle lock as the quote detail page: once a quote is scheduled, the
+        // admin can't change it away from this dashboard (must go through the quote
+        // detail flow to handle cancellation properly).
+        const isLocked = status === 'scheduled';
+        if (isLocked) {
+            return `<span class="badge ${s.cls}" title="Cotización agendada — bloqueada">${s.label}</span>`;
+        }
+        const options = QUOTE_STATUS_ORDER
+            .map((opt) => `<li><button type="button" class="dropdown-item d-flex justify-content-between align-items-center quote-status-option" data-status="${opt.key}">
+                    <span>${opt.label}</span>
+                    ${opt.key === status ? '<i class="ti ti-check text-success ms-2"></i>' : ''}
+                </button></li>`)
+            .join('');
+        return `<span class="dropdown d-inline-block">
+                    <button type="button" class="badge ${s.cls} border-0 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Cambiar estado de cotización">
+                        ${s.label}
+                    </button>
+                    <ul class="dropdown-menu shadow-sm">
+                        <li><h6 class="dropdown-header">Cambiar estado de cotización</h6></li>
+                        ${options}
+                    </ul>
+                </span>`;
+    }
+
+    // Wires the quote-status dropdown options to the PUT /api/quotes/:id endpoint.
+    // Called after the badge is (re)rendered.
+    function wireQuoteStatusDropdown() {
+        document.querySelectorAll('.quote-status-option').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const newStatus = btn.dataset.status;
+                const currentStatus = reservationData?.quoteStatus;
+                if (!newStatus || newStatus === currentStatus) return;
+                const quoteId = reservationData?.quoteId;
+                if (!quoteId) {
+                    alert('Cotización no disponible');
+                    return;
+                }
+                const label = QUOTE_STATUS_MAP[newStatus]?.label || newStatus;
+                if (!confirm(`¿Cambiar el estado de la cotización a "${label}"?`)) return;
+                try {
+                    const res = await fetch(`/api/quotes/${quoteId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ status: newStatus, reason: 'Updated from booking detail' }),
+                    });
+                    const json = await res.json();
+                    if (!res.ok || json?.success === false) {
+                        throw new Error(json?.error || `HTTP ${res.status}`);
+                    }
+                    // Refresh local data and re-render the status row.
+                    reservationData.quoteStatus = newStatus;
+                    const quoteBadge = getQuoteStatusBadge(reservationData.quoteStatus);
+                    const reservationBadge = getReservationStatusBadge(reservationData.status);
+                    document.getElementById('infoStatus').innerHTML = `${quoteBadge} ${reservationBadge}`;
+                    wireQuoteStatusDropdown();
+                } catch (err) {
+                    console.error('Failed to update quote status', err);
+                    alert(`Error al actualizar estado: ${err.message}`);
+                }
+            });
+        });
     }
     
     function getReservationStatusBadge(status) {
@@ -371,9 +519,18 @@ document.addEventListener('DOMContentLoaded', async function() {
             tour: 'Tour',
             experience: 'Experiencia',
             concepto: 'Concepto',
-            'a-disposicion': 'A Disposicion',
+            'a-disposicion': 'A Disposición',
         };
         return labels[type] || type || '';
+    }
+
+    // Returns a human-readable concept for a service. A-disposición services often have
+    // an empty concept field — fall back to the literal type label instead of a dash.
+    function getDisplayConcept(svc) {
+        const raw = (svc?.concept || '').trim();
+        if (raw) return raw;
+        if (svc?.type === 'a-disposicion') return 'A Disposición';
+        return '—';
     }
 
     function getRoleBadge(role, displayRole) {
@@ -425,6 +582,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const quoteBadge = getQuoteStatusBadge(d.quoteStatus);
         const reservationBadge = getReservationStatusBadge(d.status);
         document.getElementById('infoStatus').innerHTML = `${quoteBadge} ${reservationBadge}`;
+        wireQuoteStatusDropdown();
         document.getElementById('infoCreatedAt').textContent = formatDate(d.createdAt);
         // Display company name first, then fallback to fullName or contactPerson
         const clientDisplay = d.client?.companyName || d.client?.fullName || d.contactPerson || '—';
@@ -432,10 +590,41 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('infoContact').innerHTML = `${d.contactEmail || ''}${d.contactPhone ? `<br>${d.contactPhone}` : ''}`;
         document.getElementById('infoEventType').textContent = d.eventType || '—';
         document.getElementById('infoPeople').textContent = d.numberOfPeople || '—';
+
+        // Lead guest — only render row when at least one name is present. Falls back to
+        // contactFirstName/contactPerson so a reservation that has the actual traveler in
+        // the contact fields still surfaces it as the lead guest.
+        const leadGuestParts = [d.leadGuestFirstName, d.leadGuestLastName]
+            .map((p) => (p || '').trim())
+            .filter(Boolean);
+        const leadGuestName = leadGuestParts.length > 0
+            ? leadGuestParts.join(' ')
+            : (d.contactPerson || '').trim();
+        const leadGuestRow = document.getElementById('infoLeadGuestRow');
+        const leadGuestEl = document.getElementById('infoLeadGuest');
+        if (leadGuestName && leadGuestEl && leadGuestRow) {
+            leadGuestEl.textContent = leadGuestName;
+            leadGuestRow.classList.remove('d-none');
+        }
+
+        // Quote-level notes — same callout style as service notes.
+        const quoteNotesRow = document.getElementById('infoQuoteNotesRow');
+        const quoteNotesEl = document.getElementById('infoQuoteNotes');
+        const quoteNotesText = (d.notes || '').trim();
+        if (quoteNotesText && quoteNotesEl && quoteNotesRow) {
+            quoteNotesEl.textContent = quoteNotesText;
+            quoteNotesRow.classList.remove('d-none');
+        }
         document.getElementById('infoStartDate').textContent = formatDate(d.startDate);
         document.getElementById('infoEndDate').textContent = formatDate(d.endDate);
         document.getElementById('infoPaymentType').textContent = d.paymentType || '—';
-        document.getElementById('infoTotal').textContent = formatCurrency(d.totalAmount, d.currency);
+        // Total recomputed from each service's pricesByType[paymentType] when available so
+        // the reservation reflects the quote's per-service breakdown for the current
+        // payment type. Falls back to the stored d.totalAmount only if no service has
+        // pricesByType (very old data).
+        const headerServicesSubtotal = computeServicesSubtotalByType(d.services, d.paymentType);
+        const headerTotal = headerServicesSubtotal > 0 ? headerServicesSubtotal : (d.totalAmount || 0);
+        document.getElementById('infoTotal').textContent = formatCurrency(headerTotal, d.currency);
 
         // Assignment counter
         const totalSvc = (d.services || []).length;
@@ -466,14 +655,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         const actions = document.getElementById('headerActions');
+        const folio = encodeURIComponent(d.folio || '');
+        const exportBtnHtml = folio
+            ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir vista pública (incluye Exportar a PDF)"><i class="ti ti-file-export me-1"></i>Exportar</a>`
+            : '';
+        const cancelBtnHtml = canAssign ? `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservacion</button>` : '';
+        actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
         if (canAssign) {
-            actions.innerHTML = `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservacion</button>`;
             document.getElementById('cancelResBtn')?.addEventListener('click', () => {
                 // Use shared utility with existing reservation data and loadReservation callback
                 openReservationCancelModalWithData(reservationData, loadReservation);
             });
-        } else {
-            actions.innerHTML = '';
         }
 
         renderServices(d.services);
@@ -483,66 +675,211 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('reservationContent').style.display = '';
     }
 
+    // Round a HH:MM string DOWN to the previous 15-minute mark — same strategy used
+    // in the quote services list so timestamps stay consistent across views.
+    function roundTimeToNearest15(timeStr) {
+        if (!timeStr || !timeStr.includes(':')) return timeStr || '';
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        if (Number.isNaN(hours) || Number.isNaN(minutes)) return timeStr;
+        let totalMinutes = hours * 60 + minutes;
+        totalMinutes = Math.floor(totalMinutes / 15) * 15;
+        const h = Math.floor(totalMinutes / 60) % 24;
+        const m = totalMinutes % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    // Build a single detail line: small icon + label (optional) + value.
+    function detailLine(icon, value, label) {
+        if (value == null || value === '') return '';
+        const labelHtml = label ? `<span class="text-muted me-1">${label}:</span>` : '';
+        return `<div class="d-flex align-items-center gap-1 small text-dark">
+                    <i class="ti ti-${icon} text-secondary" style="font-size: 0.9rem;"></i>
+                    ${labelHtml}<span>${value}</span>
+                </div>`;
+    }
+
+    // Build a section: small header + flex-wrap of items.
+    function detailSection(icon, title, items) {
+        const filtered = items.filter(Boolean);
+        if (filtered.length === 0) return '';
+        return `<div class="mt-2">
+                    <div class="d-flex align-items-center gap-1 text-secondary mb-1" style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">
+                        <i class="ti ti-${icon}"></i>${title}
+                    </div>
+                    <div class="d-flex flex-wrap" style="row-gap: 0.15rem; column-gap: 1.25rem;">
+                        ${filtered.join('')}
+                    </div>
+                </div>`;
+    }
+
     function getSubconceptDetails(svc) {
         const sub = svc.subconcept;
         if (!sub) return '';
+        // Legacy tags array kept for non-categorized stuff; new sections below replace
+        // most of the old badge rows.
         const tags = [];
         const tag = (icon, text, color) => `<span class="badge detail-tag bg-${color}-subtle text-${color}"><i class="ti ti-${icon} me-1"></i>${text}</span>`;
 
-        if (sub.quantity && sub.quantity > 1) tags.push(tag('car', `${sub.quantity} vehiculos`, 'primary'));
+        // ===== Sections (replaces the legacy badge row) =====
+        // Build categorized detail lines so the operator can scan the info quickly.
 
+        // SERVICIO — trip type / direction, vehicle count, included roles, hotel, etc.
+        const servicioItems = [];
+        if (svc.type === 'transport' && sub.tripType) {
+            const tripLabel = sub.tripType === 'round-trip' ? 'Redondo' : 'Sencillo';
+            const dirLabel = sub.directionType === 'arrival' ? 'Llegada' : 'Salida';
+            servicioItems.push(detailLine('arrows-exchange', `${tripLabel} — ${dirLabel}`));
+        }
+        if (svc.type === 'a-disposicion' && sub.vehicleCount && sub.vehicleCount > 0) {
+            servicioItems.push(detailLine('car', `${sub.vehicleCount} vehículo${sub.vehicleCount > 1 ? 's' : ''}`));
+        }
+        if (svc.type !== 'a-disposicion' && sub.quantity && sub.quantity > 1) {
+            servicioItems.push(detailLine('car', `${sub.quantity} vehículos`));
+        }
+        const guideLabel = svc.type === 'a-disposicion' ? 'Chofer' : 'Guía';
         if (sub.includeGuide === true) {
-            tags.push(tag('map-pin', 'Guia: Si', 'success'));
-        } else if (sub.includeGuide === false && (svc.type === 'transport' || svc.type === 'tour')) {
-            tags.push(tag('map-pin', 'Guia: No', 'secondary'));
+            servicioItems.push(detailLine('map-pin', `${guideLabel} incluido`));
         }
         if (sub.includeGreeter === true) {
-            const inVehicle = sub.greeterInVehicle ? ' (en vehiculo)' : ' (en punto)';
-            tags.push(tag('hand-stop', `Greeter: Si${inVehicle}`, 'warning'));
-        } else if (sub.includeGreeter === false && (svc.type === 'transport' || svc.type === 'tour')) {
-            tags.push(tag('hand-stop', 'Greeter: No', 'secondary'));
+            const inVehicle = sub.greeterInVehicle ? ' (en vehículo)' : ' (en punto)';
+            servicioItems.push(detailLine('hand-stop', `Greeter incluido${inVehicle}`));
+        }
+        if (svc.type === 'tour' && sub.hotelName) {
+            servicioItems.push(detailLine('building', sub.hotelName, 'Hotel'));
         }
 
-        if (svc.type === 'transport') {
-            if (sub.tripType) {
-                const tripLabel = sub.tripType === 'round-trip' ? 'Redondo' : 'Sencillo';
-                const dirLabel = sub.directionType === 'arrival' ? 'Llegada' : 'Salida';
-                tags.push(tag('arrows-exchange', `${tripLabel} — ${dirLabel}`, 'info'));
+        // HORARIO — schedule / duration / suggested times.
+        const horarioItems = [];
+        if (svc.type === 'transport' && sub.transportType === 'aeropuerto') {
+            const isDeparture = sub.directionType === 'departure';
+            const isArrival = sub.directionType === 'arrival';
+            let rawTime = '';
+            let timeLabel = '';
+            if (isDeparture && (svc.flightDepartureTimeSuggested || sub.flightDepartureTimeSuggested)) {
+                rawTime = svc.flightDepartureTimeSuggested || sub.flightDepartureTimeSuggested;
+                timeLabel = 'Hora de salida sugerida';
+            } else if (isArrival) {
+                rawTime = sub.startTime || sub.time || svc.time || '';
+                if (!rawTime && sub.selectedSchedule) {
+                    const m = String(sub.selectedSchedule).match(/^(\d{1,2}:\d{2})/);
+                    if (m) rawTime = m[1];
+                }
+                timeLabel = 'Hora de llegada';
             }
-            const pax = [];
-            if (sub.transportAdults) pax.push(`${sub.transportAdults} adulto${sub.transportAdults > 1 ? 's' : ''}`);
-            if (sub.transportChildren) pax.push(`${sub.transportChildren} nino${sub.transportChildren > 1 ? 's' : ''}`);
-            if (sub.transportInfants) pax.push(`${sub.transportInfants} infante${sub.transportInfants > 1 ? 's' : ''}`);
-            if (sub.persons && !pax.length) pax.push(`${sub.persons} persona${sub.persons > 1 ? 's' : ''}`);
-            if (pax.length) tags.push(tag('users', pax.join(', '), 'primary'));
-            if (sub.airline || sub.flightNumber) tags.push(tag('plane', `${sub.airline || ''} ${sub.flightNumber || ''}`.trim(), 'info'));
-            if (sub.waitingTimeHours) tags.push(tag('clock-pause', `Espera: ${sub.waitingTimeHours}h`, 'warning'));
-            if (sub.routeDuration) tags.push(tag('route', `Duracion: ${sub.routeDuration} min`, 'secondary'));
+            const rounded = rawTime ? roundTimeToNearest15(rawTime) : '';
+            if (rounded) horarioItems.push(detailLine('clock', rounded, timeLabel));
+        }
+        if (sub.selectedSchedule && (svc.type === 'experience' || svc.type === 'a-disposicion')) {
+            horarioItems.push(detailLine('clock', sub.selectedSchedule, 'Horario'));
+        }
+        if (sub.hours && sub.hours > 0 && svc.type === 'a-disposicion') {
+            horarioItems.push(detailLine('clock-hour-4', `${sub.hours} h`, 'Duración'));
+        }
+        if (sub.waitingTimeHours) {
+            horarioItems.push(detailLine('clock-pause', `${sub.waitingTimeHours}h`, 'Espera'));
+        }
+        if (sub.routeDuration) {
+            horarioItems.push(detailLine('route', `${sub.routeDuration} min`, 'Duración ruta'));
         }
 
-        if (svc.type === 'tour') {
-            if (sub.hotelName) tags.push(tag('building', sub.hotelName, 'secondary'));
-            if (sub.isWalkingTour) tags.push(tag('walk', `Walking tour (${sub.walkingTourPeopleCount || 0} pax)`, 'info'));
-            if (sub.persons) tags.push(tag('users', `${sub.persons} persona${sub.persons > 1 ? 's' : ''}`, 'primary'));
-        }
-
-        if (svc.type === 'experience') {
+        // PERSONAS — passenger / ticket counts.
+        const personasItems = [];
+        if (svc.type === 'transport') {
+            const parts = [];
+            if (sub.transportAdults) parts.push(`${sub.transportAdults} adulto${sub.transportAdults > 1 ? 's' : ''}`);
+            if (sub.transportChildren) parts.push(`${sub.transportChildren} niño${sub.transportChildren > 1 ? 's' : ''}`);
+            if (sub.transportInfants) parts.push(`${sub.transportInfants} infante${sub.transportInfants > 1 ? 's' : ''}`);
+            if (parts.length === 0 && sub.persons) parts.push(`${sub.persons} persona${sub.persons > 1 ? 's' : ''}`);
+            if (parts.length) personasItems.push(detailLine('users', parts.join(', ')));
+        } else if (svc.type === 'experience') {
             const tickets = [];
             if (sub.adultsQuantity) tickets.push(`${sub.adultsQuantity} adulto${sub.adultsQuantity > 1 ? 's' : ''}`);
-            if (sub.childrenQuantity) tickets.push(`${sub.childrenQuantity} nino${sub.childrenQuantity > 1 ? 's' : ''}`);
+            if (sub.childrenQuantity) tickets.push(`${sub.childrenQuantity} niño${sub.childrenQuantity > 1 ? 's' : ''}`);
             if (sub.adultsNoAlcoholQuantity) tickets.push(`${sub.adultsNoAlcoholQuantity} sin alcohol`);
-            if (tickets.length) tags.push(tag('ticket', tickets.join(', '), 'primary'));
-            if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
+            if (tickets.length) personasItems.push(detailLine('ticket', tickets.join(', ')));
+        } else if (svc.type === 'tour') {
+            if (sub.isWalkingTour) {
+                const adults = Number(sub.adultsQuantity) || 0;
+                const children = Number(sub.childrenQuantity) || 0;
+                const infants = Number(sub.infantsQuantity) || 0;
+                const parts = [];
+                if (adults) parts.push(`${adults} adulto${adults > 1 ? 's' : ''}`);
+                if (children) parts.push(`${children} niño${children > 1 ? 's' : ''}`);
+                if (infants) parts.push(`${infants} infante${infants > 1 ? 's' : ''}`);
+                const totalPeople = adults + children + infants || sub.walkingTourPeopleCount || 0;
+                personasItems.push(detailLine('walk', `${totalPeople} pax${parts.length ? ` (${parts.join(', ')})` : ''}`, 'Walking tour'));
+            } else if (sub.persons) {
+                personasItems.push(detailLine('users', `${sub.persons} persona${sub.persons > 1 ? 's' : ''}`));
+            }
+        }
+        // Asistentes (named list) — applies to all types.
+        if (Array.isArray(sub.attendees)) {
+            const names = sub.attendees.map((n) => String(n || '').trim()).filter(Boolean);
+            if (names.length > 0) {
+                personasItems.push(detailLine('user-check', `${names.join(', ')}`, `Asistentes (${names.length})`));
+            }
         }
 
-        if (svc.type === 'a-disposicion') {
-            if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
-            if (sub.discountPercent) tags.push(tag('discount-2', `${sub.discountPercent}% desc.`, 'success'));
+        // VUELOS — airline + flight number + additional flights.
+        const vuelosItems = [];
+        if (svc.type === 'transport') {
+            if (sub.airline || sub.flightNumber) {
+                vuelosItems.push(detailLine('plane', `${sub.airline || ''} ${sub.flightNumber || ''}`.trim()));
+            }
+            if (Array.isArray(sub.additionalFlights) && sub.additionalFlights.length > 0) {
+                sub.additionalFlights.forEach((f) => {
+                    const parts = [(f.airline || '').trim(), (f.flightNumber || '').trim()].filter(Boolean).join(' ');
+                    const time = (f.flightTime || '').trim();
+                    const label = parts || 'Vuelo';
+                    const text = time ? `${label} @ ${time}` : label;
+                    vuelosItems.push(detailLine('plane', text));
+                });
+            }
         }
 
-        if (sub.notes) tags.push(tag('note', sub.notes, 'secondary'));
+        // OTROS — discounts, etc.
+        const otrosItems = [];
+        if (svc.type === 'a-disposicion' && sub.discountPercent) {
+            otrosItems.push(detailLine('discount-2', `${sub.discountPercent}% descuento`));
+        }
 
-        return tags.length ? `<div class="mt-1 d-flex flex-wrap gap-1">${tags.join('')}</div>` : '';
+        const sectionsHtml = [
+            detailSection('info-circle', 'Servicio', servicioItems),
+            detailSection('clock', 'Horario', horarioItems),
+            detailSection('users', 'Personas', personasItems),
+            detailSection('plane', 'Vuelos', vuelosItems),
+            detailSection('award', 'Otros', otrosItems),
+        ].filter(Boolean).join('');
+
+        // Notes — render each note channel as its own callout so the operator can quickly
+        // tell who the note is for. Prefer the subconcept snapshot, with sensible fallbacks.
+        // Visibility by role:
+        //   notes (general)  → all roles
+        //   clientNotes      → client + department_manager + admin/superadmin
+        //   providerNotes    → admin/superadmin only
+        //   teamNotes        → admin/superadmin only
+        //   internalNotes    → admin/superadmin only
+        const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+        const isClientFacing = isAdmin || userRole === 'department_manager' || userRole === 'client';
+        const noteChannels = [
+            { label: 'Notas', icon: 'notes', color: '#adb5bd', text: (sub.notes || svc.notes || '').trim(), visible: true },
+            { label: 'Notas del cliente', icon: 'user', color: '#0d6efd', text: (sub.clientNotes || '').trim(), visible: isClientFacing },
+            { label: 'Notas del proveedor', icon: 'building', color: '#198754', text: (sub.providerNotes || '').trim(), visible: isAdmin },
+            { label: 'Notas del equipo', icon: 'users', color: '#fd7e14', text: (sub.teamNotes || '').trim(), visible: isAdmin },
+            { label: 'Notas internas', icon: 'lock', color: '#6f42c1', text: (sub.internalNotes || '').trim(), visible: isAdmin },
+        ].filter((n) => n.visible && n.text);
+
+        const notesHtml = noteChannels.map((n) => `
+            <div class="mt-2 p-2 rounded" style="background: #f8f9fa; border-left: 3px solid ${n.color};">
+                <div class="d-flex align-items-center mb-1">
+                    <i class="ti ti-${n.icon} me-1" style="color: ${n.color};"></i>
+                    <strong style="font-size: 0.8rem; color: ${n.color};">${n.label}</strong>
+                </div>
+                <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.85rem;">${n.text}</div>
+            </div>
+        `).join('');
+
+        return sectionsHtml + notesHtml;
     }
 
     function renderServices(services) {
@@ -553,6 +890,28 @@ document.addEventListener('DOMContentLoaded', async function() {
             const key = svc.dayNumber || 1;
             if (!days[key]) days[key] = { title: svc.dayTitle || `Dia ${key}`, date: svc.serviceDate, services: [] };
             days[key].services.push(svc);
+        });
+
+        // Order services within each day chronologically — same strategy used by the
+        // quote services list (sortSubconceptsByTime). Empty times go to the end.
+        const parseTimeToMinutes = (timeStr) => {
+            if (!timeStr) return null;
+            // Range format "HH:MM - HH:MM" → use the start of the range
+            const rangeMatch = String(timeStr).match(/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+            if (rangeMatch) return parseInt(rangeMatch[1], 10) * 60 + parseInt(rangeMatch[2], 10);
+            const singleMatch = String(timeStr).match(/^(\d{1,2}):(\d{2})/);
+            if (singleMatch) return parseInt(singleMatch[1], 10) * 60 + parseInt(singleMatch[2], 10);
+            return null;
+        };
+        Object.values(days).forEach((d) => {
+            d.services.sort((a, b) => {
+                const ma = parseTimeToMinutes(a.time);
+                const mb = parseTimeToMinutes(b.time);
+                if (ma === null && mb === null) return 0;
+                if (ma === null) return 1;
+                if (mb === null) return -1;
+                return ma - mb;
+            });
         });
 
         if (Object.keys(days).length === 0) {
@@ -570,24 +929,41 @@ document.addEventListener('DOMContentLoaded', async function() {
             day.services.forEach(svc => {
                 const icon = getServiceTypeIcon(svc.type);
                 // Build person cards for assigned employees
-                let peopleHtml = '';
-                let vehiclesHtml = '';
-                peopleHtml += buildPersonCard(svc.assignedDriver, 'Conductor', 'ti-steering-wheel', 'info');
-                peopleHtml += buildPersonCard(svc.assignedGuide, 'Guía', 'ti-map-pin', 'success');
-                peopleHtml += buildPersonCard(svc.assignedGreeter, 'Greeter', 'ti-hand-stop', 'warning');
-                peopleHtml += buildPersonCard(svc.assignedServiceCustomer, 'Seguidor', 'ti-user-star', 'primary');
+                // Build paired cards (conductor + vehículo per slot) so it's obvious who's
+                // driving which vehicle. Non-vehicle roles (guía/chofer, greeter, seguidor)
+                // are rendered separately at the end.
+                let pairsHtml = '';
+                let rolesHtml = '';
 
-                // Vehicle card
-                if (svc.assignedVehicle) vehiclesHtml += buildVehicleCard(svc.assignedVehicle);
-
-                // Extra assignments (additional vehicles/drivers)
+                // Driver+vehicle pair for the main slot.
+                const showMainPair = !!(svc.assignedDriver || svc.assignedVehicle);
                 const extras = svc.extraAssignments || [];
-                extras.forEach((ea) => {
-                    if (ea.driverName) peopleHtml += buildPersonCard({ fullName: ea.driverName, phone: '', profilePhotoUrl: '' }, 'Conductor', 'ti-steering-wheel', 'info');
-                    if (ea.vehicleName) vehiclesHtml += buildVehicleCard({ name: ea.vehicleName, imageUrl: ea.vehicleImageUrl || '' });
+                const hasAnyExtraSlot = extras.some((ea) => ea.driverId || ea.vehicleId);
+                const useSlotLabels = hasAnyExtraSlot; // only label when there's more than one slot
+                if (showMainPair) {
+                    pairsHtml += buildPairCard(
+                        useSlotLabels ? 'Vehículo principal' : '',
+                        svc.assignedDriver,
+                        svc.assignedVehicle,
+                        svc.vehicleTypeName || ''
+                    );
+                }
+
+                // Extras (additional vehicles + their drivers).
+                extras.forEach((ea, idx) => {
+                    if (!ea.driverId && !ea.vehicleId) return;
+                    const driver = ea.driverId ? { fullName: ea.driverName, phone: '', profilePhotoUrl: '' } : null;
+                    const vehicle = ea.vehicleId ? { name: ea.vehicleName, imageUrl: ea.vehicleImageUrl || '' } : null;
+                    const label = useSlotLabels ? `Vehículo extra ${idx + 1}` : '';
+                    pairsHtml += buildPairCard(label, driver, vehicle, ea.vehicleName || '');
                 });
 
-                const hasAssignments = peopleHtml || vehiclesHtml;
+                // Non-vehicle roles
+                rolesHtml += buildPersonCard(svc.assignedGuide, svc.type === 'a-disposicion' ? 'Chofer' : 'Guía', 'ti-map-pin', 'success');
+                rolesHtml += buildPersonCard(svc.assignedGreeter, 'Greeter', 'ti-hand-stop', 'warning');
+                rolesHtml += buildPersonCard(svc.assignedServiceCustomer, 'Seguidor', 'ti-user-star', 'primary');
+
+                const hasAssignments = pairsHtml || rolesHtml;
 
                 const route = svc.originName || svc.destinationName
                     ? `<small class="text-muted">${svc.originName || ''}${svc.originName && svc.destinationName ? ' &rarr; ' : ''}${svc.destinationName || ''}</small>`
@@ -595,24 +971,73 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                 const includeGuide = svc.subconcept?.includeGuide;
                 const includeGreeter = svc.subconcept?.includeGreeter;
-                const vehicleQty = svc.subconcept?.quantity || 1;
+                // Decide whether this service actually needs vehicle assignment slots.
+                // Experiences, conceptos and walking tours never need a vehicle even if
+                // their subconcept.quantity is > 0 (that's people count for them).
+                const isWalkingTour = !!svc.subconcept?.isWalkingTour;
+                const hasVehicleData = !!(svc.subconcept?.vehicleType || svc.subconcept?.vehicleTypeName
+                    || svc.subconcept?.requiresTransport
+                    || svc.subconcept?.additionalVehicleId
+                    || (Array.isArray(svc.subconcept?.extraAdditionalVehicles) && svc.subconcept.extraAdditionalVehicles.length > 0));
+                const needsVehicle = (svc.type === 'transport'
+                    || svc.type === 'a-disposicion'
+                    || (svc.type === 'tour' && !isWalkingTour && hasVehicleData));
+                // For a-disposición the "quantity" field on the subconcept is the count of
+                // the service entry; the actual vehicle count lives in `vehicleCount`.
+                let vehicleQty = 0;
+                if (needsVehicle) {
+                    if (svc.type === 'a-disposicion') {
+                        vehicleQty = Number(svc.subconcept?.vehicleCount) || 1;
+                    } else {
+                        vehicleQty = Number(svc.subconcept?.quantity) || 1;
+                    }
+                }
 
                 html += `
                 <div class="service-row d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center flex-grow-1">
                         <div>
-                            <div class="fw-semibold">${svc.concept || '—'}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
+                            <div class="fw-semibold">${getDisplayConcept(svc)}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
                             ${route}
-                            ${svc.vehicleTypeName ? `<small class="text-muted d-block">${svc.vehicleTypeName}</small>` : ''}
+                            ${(svc.vehicleTypeName && needsVehicle && vehicleQty === 1) ? `<small class="text-muted d-block">${svc.vehicleTypeName}</small>` : ''}
                             ${getSubconceptDetails(svc)}
-                            ${hasAssignments ? `<div class="row mt-2"><div class="col-md-7">${peopleHtml}</div><div class="col-md-5">${vehiclesHtml}</div></div>` : '<div class="mt-2"><small class="text-muted">Sin asignar</small></div>'}
+                            ${hasAssignments ? `
+                                <div class="mt-2">
+                                    ${pairsHtml ? `<div class="d-flex flex-wrap gap-2">${pairsHtml}</div>` : ''}
+                                    ${rolesHtml ? `<div class="d-flex flex-wrap gap-3 mt-2">${rolesHtml}</div>` : ''}
+                                </div>
+                            ` : '<div class="mt-2"><small class="text-muted">Sin asignar</small></div>'}
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         ${getReservationStatusBadge(svc.status)}
-                        <span class="text-end" style="min-width: 80px;">${formatCurrency(svc.total, reservationData.currency)}</span>
+                        <span class="text-end" style="min-width: 80px;">${formatCurrency(getServicePriceByType(svc, reservationData.paymentType), reservationData.currency)}</span>
                         ${canAssign && svc.status !== 'cancelled' ? `<button class="btn btn-sm ${svc.status === 'completed' ? 'btn-success' : (svc.status === 'assigned' ? 'btn-outline-success' : 'btn-outline-secondary')} status-toggle-btn" data-service-id="${svc.id}" data-current-status="${svc.status}" title="${svc.status === 'completed' ? 'Revertir a asignada' : (svc.status === 'assigned' ? 'Marcar completada' : 'Marcar asignada')}"><i class="ti ${svc.status === 'completed' ? 'ti-circle-check-filled' : (svc.status === 'assigned' ? 'ti-circle-check' : 'ti-circle')}"></i></button>` : ''}
-                        ${canAssign ? `<button class="btn btn-sm btn-outline-primary assign-btn" data-service-id="${svc.id}" data-service-type="${svc.type || ''}" data-service-concept="${svc.concept || ''}" data-service-route="${svc.originName && svc.destinationName ? `${svc.originName} → ${svc.destinationName}` : (svc.originName || svc.destinationName || '')}" data-include-guide="${includeGuide}" data-include-greeter="${includeGreeter}" data-vehicle-qty="${vehicleQty}" data-driver-id="${svc.assignedDriver?.id || ''}" data-guide-id="${svc.assignedGuide?.id || ''}" data-greeter-id="${svc.assignedGreeter?.id || ''}" data-vehicle-id="${svc.assignedVehicle?.id || ''}" data-service-customer-id="${svc.assignedServiceCustomer?.id || ''}" data-vehicle-type-name="${svc.vehicleTypeName || ''}" data-extra='${JSON.stringify(svc.extraAssignments || [])}'><i class="ti ti-user-plus"></i></button>` : ''}
+                        ${canAssign ? (() => {
+            // Build the extras payload merging the REQUESTED list (from subconcept blob — never
+            // overwritten by assignments) with any current assignment info already on the record.
+            // svc.extraAssignments was seeded at conversion from sub.extraAdditionalVehicles, but
+            // if a future flow only updates assignment fields we still want the requested type/
+            // segment to come from the snapshot.
+            const requestedExtras = Array.isArray(svc.subconcept?.extraAdditionalVehicles) ? svc.subconcept.extraAdditionalVehicles : [];
+            const existing = Array.isArray(svc.extraAssignments) ? svc.extraAssignments : [];
+            const mergedExtras = requestedExtras.length > 0
+                ? requestedExtras.map((v) => {
+                    const match = existing.find((ea) => ea.vehicleTypeId === (v.vehicleId || ''));
+                    return {
+                        vehicleTypeId: v.vehicleId || '',
+                        vehicleName: v.vehicleTypeName || '',
+                        segmentId: v.segment || '',
+                        segmentName: v.segmentName || '',
+                        segmentColor: v.segmentColor || '',
+                        driverId: match?.driverId || null,
+                        vehicleId: match?.vehicleId || null,
+                        vehicleImageUrl: match?.vehicleImageUrl || '',
+                    };
+                })
+                : existing;
+            return `<button class="btn btn-sm btn-outline-primary assign-btn" data-service-id="${svc.id}" data-service-type="${svc.type || ''}" data-service-concept="${getDisplayConcept(svc)}" data-service-route="${svc.originName && svc.destinationName ? `${svc.originName} → ${svc.destinationName}` : (svc.originName || svc.destinationName || '')}" data-include-guide="${includeGuide}" data-include-greeter="${includeGreeter}" data-vehicle-qty="${vehicleQty}" data-driver-id="${svc.assignedDriver?.id || ''}" data-guide-id="${svc.assignedGuide?.id || ''}" data-greeter-id="${svc.assignedGreeter?.id || ''}" data-vehicle-id="${svc.assignedVehicle?.id || ''}" data-service-customer-id="${svc.assignedServiceCustomer?.id || ''}" data-vehicle-type-name="${svc.subconcept?.vehicleTypeName || svc.subconcept?.vehicleType || svc.vehicleTypeName || ''}" data-segment-name="${svc.subconcept?.categoryName || ''}" data-segment-color="${svc.subconcept?.categoryColor || ''}" data-additional-vehicle-type-name="${svc.subconcept?.additionalVehicleTypeName || svc.additionalVehicleTypeName || ''}" data-additional-segment-name="${svc.subconcept?.additionalVehicleSegmentName || svc.additionalVehicleSegmentName || ''}" data-additional-segment-color="${svc.subconcept?.additionalVehicleSegmentColor || ''}" data-extra='${JSON.stringify(mergedExtras)}'><i class="ti ti-user-plus"></i></button>`;
+        })() : ''}
                     </div>
                 </div>`;
             });
@@ -740,15 +1165,40 @@ document.addEventListener('DOMContentLoaded', async function() {
         const serviceRoute = btn.dataset.serviceRoute;
         const includeGuide = btn.dataset.includeGuide;
         const includeGreeter = btn.dataset.includeGreeter;
-        const vehicleQty = parseInt(btn.dataset.vehicleQty) || 1;
+        // Important: parse without the `|| 1` fallback because `parseInt('0') || 1` would
+        // coerce a legitimate 0 (service doesn't need vehicles) to 1.
+        const parsedQty = parseInt(btn.dataset.vehicleQty, 10);
+        const vehicleQty = Number.isNaN(parsedQty) ? 1 : parsedQty;
         const driverId = btn.dataset.driverId;
         const guideId = btn.dataset.guideId;
         const greeterId = btn.dataset.greeterId;
         const vehicleId = btn.dataset.vehicleId;
         const serviceCustomerId = btn.dataset.serviceCustomerId;
         const vehicleTypeName = btn.dataset.vehicleTypeName || '';
+        const segmentName = btn.dataset.segmentName || '';
+        const segmentColor = btn.dataset.segmentColor || '';
+        const additionalVehicleTypeName = btn.dataset.additionalVehicleTypeName || '';
+        const additionalSegmentName = btn.dataset.additionalSegmentName || '';
+        const additionalSegmentColor = btn.dataset.additionalSegmentColor || '';
         let extraAssignments = [];
         try { extraAssignments = JSON.parse(btn.dataset.extra || '[]'); } catch { extraAssignments = []; }
+
+        // Build per-slot expected vehicle type + segment so each pair label tells the operator
+        // exactly which type of vehicle and segment goes in that slot (Sprinter / Green Class):
+        //   slot 0 → main vehicle type + segment
+        //   slot 1 → primary additional vehicle type + segment (if checkbox was on)
+        //   slot 2+ → extras in order
+        const slotSpecs = [{ type: vehicleTypeName, segment: segmentName, color: segmentColor }];
+        if (additionalVehicleTypeName) {
+            slotSpecs.push({ type: additionalVehicleTypeName, segment: additionalSegmentName, color: additionalSegmentColor });
+        }
+        extraAssignments.forEach((ea) => {
+            slotSpecs.push({
+                type: ea?.vehicleName || '',
+                segment: ea?.segmentName || '',
+                color: ea?.segmentColor || '',
+            });
+        });
 
         document.getElementById('assignServiceId').value = serviceId;
 
@@ -773,21 +1223,45 @@ document.addEventListener('DOMContentLoaded', async function() {
         let html = '<input type="hidden" id="assignServiceId" value="' + serviceId + '">';
 
         // Vehicle/Driver pairs section
-        const vehicleHint = vehicleTypeName ? `<span class="badge bg-secondary-subtle text-secondary ms-2"><i class="ti ti-car me-1"></i>${vehicleTypeName}</span>` : '';
         if (vehicleQty > 1) {
-            html += `<div class="mb-2"><small class="text-muted fw-semibold"><i class="ti ti-car me-1"></i>${vehicleQty} vehiculos requeridos</small>${vehicleHint}</div>`;
-        } else if (vehicleTypeName) {
-            html += `<div class="mb-2"><small class="text-muted fw-semibold">Vehiculo solicitado:</small>${vehicleHint}</div>`;
+            html += `<div class="mb-2"><small class="text-muted fw-semibold"><i class="ti ti-car me-1"></i>${vehicleQty} vehículos requeridos</small></div>`;
+        } else if (vehicleTypeName || segmentName) {
+            const inlineTypeBadge = vehicleTypeName
+                ? `<span class="badge bg-secondary-subtle text-secondary ms-2"><i class="ti ti-car me-1"></i>${vehicleTypeName}</span>`
+                : '';
+            const inlineSegmentBadge = segmentName
+                ? `<span class="badge ms-1" style="background-color: ${segmentColor || '#6c757d'}; color: #fff;">${segmentName}</span>`
+                : '';
+            html += `<div class="mb-2"><small class="text-muted fw-semibold">Vehículo solicitado:</small>${inlineTypeBadge}${inlineSegmentBadge}</div>`;
         }
 
+        // Primary additional vehicle had its own dedicated checkbox in the quote modal
+        // (separate from the "extras" list). To keep the slot order consistent (main → primary
+        // additional → extras), the primary-additional sits at slot index 1 when present.
+        const hasPrimaryAdditional = !!additionalVehicleTypeName;
+
         for (let i = 0; i < vehicleQty; i++) {
-            const pairDriverId = i === 0 ? driverId : (extraAssignments[i - 1]?.driverId || '');
-            const pairVehicleId = i === 0 ? vehicleId : (extraAssignments[i - 1]?.vehicleId || '');
-            const pairLabel = vehicleQty > 1 ? `Vehiculo ${i + 1}` : '';
+            // Slot mapping for assigned IDs:
+            //  - i === 0           → main driver/vehicle (driverId / vehicleId top-level)
+            //  - i === 1 && primary additional → no top-level legacy field; falls through to extras[0] if any
+            //  - i > 0             → extraAssignments at offset (i - 1 - primaryOffset)
+            const primaryOffset = hasPrimaryAdditional && i >= 1 ? 1 : 0;
+            const pairDriverId = i === 0 ? driverId : (extraAssignments[i - 1 - primaryOffset]?.driverId || '');
+            const pairVehicleId = i === 0 ? vehicleId : (extraAssignments[i - 1 - primaryOffset]?.vehicleId || '');
+            const spec = slotSpecs[i] || { type: '', segment: '', color: '' };
+            const slotLabelText = vehicleQty > 1
+                ? (i === 0 ? 'Vehículo principal' : (i === 1 && hasPrimaryAdditional ? 'Vehículo adicional' : `Vehículo extra ${i - (hasPrimaryAdditional ? 1 : 0)}`))
+                : '';
+            const slotTypeBadge = spec.type
+                ? `<span class="badge bg-secondary-subtle text-secondary ms-2"><i class="ti ti-car me-1"></i>${spec.type}</span>`
+                : '';
+            const slotSegmentBadge = spec.segment
+                ? `<span class="badge ms-1" style="background-color: ${spec.color || '#6c757d'}; color: #fff;">${spec.segment}</span>`
+                : '';
 
             html += `<div class="${vehicleQty > 1 ? 'vehicle-pair-group' : ''}">`;
-            if (pairLabel) {
-                html += `<div class="pair-label">${pairLabel}</div>`;
+            if (slotLabelText || slotTypeBadge || slotSegmentBadge) {
+                html += `<div class="pair-label d-flex align-items-center flex-wrap">${slotLabelText}${slotTypeBadge}${slotSegmentBadge}</div>`;
             }
             html += `
                 <div class="row g-2">
@@ -817,13 +1291,15 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>`;
         }
 
-        // Guide (conditionally shown)
+        // Guide (conditionally shown) — labeled "Chofer" for a-disposición services,
+        // "Guia" otherwise. Same underlying assignment field, just a clearer label.
         if (includeGuide !== 'false') {
+            const guideFieldLabel = serviceType === 'a-disposicion' ? 'Chofer' : 'Guia';
             html += `
             <div class="assign-field-group" id="guideGroup">
                 <div class="d-flex align-items-center gap-2 mb-1">
                     <span class="assign-icon bg-success-subtle text-success"><i class="ti ti-map-pin"></i></span>
-                    <label class="form-label mb-0 fw-semibold small">Guia</label>
+                    <label class="form-label mb-0 fw-semibold small">${guideFieldLabel}</label>
                 </div>
                 <select class="form-select form-select-sm" id="assignGuide">
                     ${buildOptionHtml(guides, guideId, 'fullName', true)}
@@ -959,7 +1435,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         const body = document.getElementById('financialSummaryBody');
         const addBtn = document.getElementById('addAdjustmentBtn');
         const adjustments = d.adjustments || [];
-        const servicesSubtotal = d.servicesSubtotal || d.totalAmount || 0;
+        // Subtotal recomputed from per-service pricesByType[paymentType] so the booking
+        // matches the quote's totals when both use the same payment type, and updates
+        // correctly if payment type changes on the reservation. Falls back to the
+        // stored values for very old data without pricesByType.
+        const computedSubtotal = computeServicesSubtotalByType(d.services, d.paymentType);
+        const servicesSubtotal = computedSubtotal > 0
+            ? computedSubtotal
+            : (d.servicesSubtotal || d.totalAmount || 0);
         const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
 
         card.style.display = '';
@@ -970,7 +1453,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         const discounts = adjustments.filter(a => a.type === 'discount');
         const chargesTotal = charges.reduce((s, a) => s + (a.amount || 0), 0);
         const discountsTotal = discounts.reduce((s, a) => s + (a.amount || 0), 0);
-        const finalTotal = d.totalAmount || 0;
+        // Final total = subtotal + charges - discounts (computed instead of using
+        // the stored d.totalAmount so payment-type changes recompute correctly).
+        const finalTotal = servicesSubtotal + chargesTotal - discountsTotal;
         const curr = d.currency || 'MXN';
 
         let html = '';

@@ -39,17 +39,17 @@
             local: 'Local'
         },
 
-        // Direction labels for transport
+        // Direction labels for transport — must match the modal labels in quote-services-v2.js
         directionLabels: {
             arrival: {
                 aeropuerto: 'Llegada',
-                'punto-a-punto': 'Ida',
-                local: 'Ida'
+                'punto-a-punto': 'Llegada',
+                local: 'Llevar'
             },
             departure: {
                 aeropuerto: 'Salida',
-                'punto-a-punto': 'Vuelta',
-                local: 'Vuelta'
+                'punto-a-punto': 'Salida',
+                local: 'Recoger'
             }
         },
 
@@ -200,11 +200,8 @@
             },
 
             getServiceBadgeLabel: (service) => {
-                // Special handling for experiences from establishments
+                // Both regular and establishment experiences show as "Experiencia"
                 if (ServicesRendererConfig.helpers.isExperience(service.type)) {
-                    if (service.providerType && service.providerType.toLowerCase() === 'establishment') {
-                        return 'Establecimiento';
-                    }
                     return 'Experiencia';
                 }
                 return ServicesRendererConfig.typeLabels[service.type] || service.type || 'Servicio';

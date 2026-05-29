@@ -601,15 +601,43 @@
     .pdf-export-mode .sm-day-title { font-size: 0.95rem; }
     .pdf-export-mode .sm-badge { font-size: 0.6rem; }
     .pdf-export-mode .sm-price { font-size: 0.8rem; }
+    /* Prevent splitting of services + assignment cards across pages */
+    .pdf-export-mode .service-item,
+    .pdf-export-mode .assignments-block,
+    .pdf-export-mode .assignment-card,
+    .pdf-export-mode .sm-totals-card,
+    .pdf-export-mode .summary-banner,
+    .pdf-export-mode tr {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    /* Keep section / day headers attached to the content that follows them */
+    .pdf-export-mode .sm-day-title,
+    .pdf-export-mode .summary-section-title,
+    .pdf-export-mode .assignments-header {
+        page-break-after: avoid;
+        break-after: avoid;
+    }
+    /* Hide hero images in PDF mode — Chrome embeds full source bytes regardless of CSS sizing,
+       so a single 2 MB hero JPG bloats the PDF dramatically. Logo, avatars and vehicle thumbs
+       stay because they are tiny in source as well. */
+    .pdf-export-mode .service-item .sm-service-image,
+    .pdf-export-mode .service-item .service-hero-image,
+    .pdf-export-mode .service-item > img,
+    .pdf-export-mode .service-item .ratio img { display: none; }
+    .pdf-export-mode .summary-banner-logo img { max-width: 180px; }
 </style>
 
 <div class="card border-0">
-    <% if (!locals.isPublicView) { %>
     <div class="card-header bg-white border-bottom d-print-none">
         <div class="d-flex justify-content-between align-items-center">
+            <% if (!locals.isPublicView) { %>
             <h5 class="card-title mb-0">
                 <i class="ti ti-file-description me-2"></i>Resumen de la Cotización
             </h5>
+            <% } else { %>
+            <span></span>
+            <% } %>
             <div class="d-flex gap-2">
                 <button id="shareLinkBtn" class="btn btn-success" style="display: none;">
                     <i class="ti ti-share me-2"></i>Compartir
@@ -626,7 +654,6 @@
             </div>
         </div>
     </div>
-    <% } %>
 
     <div class="card-body">
         <!-- Loading State -->
@@ -698,6 +725,10 @@
                         <span class="sm-quote-info-label">Lead Guest</span>
                         <span class="sm-quote-info-value" id="summaryLeadGuest">-</span>
                     </div>
+                    <div class="sm-quote-info-item d-none" id="summaryServiceCustomerRow">
+                        <span class="sm-quote-info-label">Seguidor de servicio</span>
+                        <span class="sm-quote-info-value" id="summaryServiceCustomer">-</span>
+                    </div>
                     <div class="sm-quote-info-item" id="summaryEventTypeRow">
                         <span class="sm-quote-info-label">Motivo de viaje</span>
                         <span class="sm-quote-info-value" id="summaryEventType">-</span>
@@ -710,10 +741,10 @@
             </div>
 
             <!-- Quote-level notes (shown only when set) -->
-            <div id="summaryQuoteNotesBlock" class="mt-3 mb-3 p-3 rounded d-none" style="background: #f8f9fa; border-left: 3px solid #adb5bd;">
+            <div id="summaryQuoteNotesBlock" class="mt-3 mb-3 p-3 d-none" style="border-left: 3px solid #adb5bd;">
                 <div class="d-flex align-items-center mb-1">
                     <i class="ti ti-notes me-1 text-secondary"></i>
-                    <strong class="text-secondary" style="font-size: 0.9rem;">Notas de la cotización</strong>
+                    <strong class="text-secondary" style="font-size: 0.9rem;">NOTAS IMPORTANTES</strong>
                 </div>
                 <div id="summaryQuoteNotes" class="text-dark" style="white-space: pre-wrap; font-size: 0.95rem;"></div>
             </div>
@@ -1226,6 +1257,24 @@
                 }
             }
 
+            // Seguidor de servicio (reservation-level service customer, only for reservations)
+            const scRow = document.getElementById('summaryServiceCustomerRow');
+            const scEl = document.getElementById('summaryServiceCustomer');
+            const sc = quote.reservationServiceCustomer;
+            if (scRow && scEl) {
+                if (sc && (sc.fullName || sc.email || sc.phone)) {
+                    const contact = [sc.phone, sc.email].filter(Boolean).join(' · ');
+                    const photo = sc.profilePhotoUrl
+                        ? `<img src="${sc.profilePhotoUrl}" alt="" onerror="this.style.display='none'" style="width:22px;height:22px;border-radius:50%;object-fit:cover;border:1px solid #e9ecef;vertical-align:middle;margin-right:6px;">`
+                        : '';
+                    scEl.innerHTML = `${photo}<span class="fw-semibold">${sc.fullName || '—'}</span>${contact ? `<span class="text-muted ms-2" style="font-size:0.85rem;">${contact}</span>` : ''}`;
+                    scRow.classList.remove('d-none');
+                } else {
+                    scEl.textContent = '';
+                    scRow.classList.add('d-none');
+                }
+            }
+
             // Client name
             let clientName = 'No especificado';
             if (quote.client) {
@@ -1262,16 +1311,15 @@
             document.getElementById('summaryLoading').style.display = 'none';
             document.getElementById('summaryContent').style.display = 'block';
 
-            // Show and attach buttons (only if not in public view)
-            <% if (!locals.isPublicView) { %>
+            // Show and attach Export PDF button (visible in both admin and public views)
             const exportBtn = document.getElementById('exportPdfBtn');
             exportBtn.style.display = 'inline-block';
-
-            // Attach export event listener (remove previous if exists)
             const newExportBtn = exportBtn.cloneNode(true);
             exportBtn.parentNode.replaceChild(newExportBtn, exportBtn);
             newExportBtn.addEventListener('click', exportToPdf);
 
+            // Share / Email / Cancel buttons are admin-only
+            <% if (!locals.isPublicView) { %>
             // Show and attach share button
             const shareBtn = document.getElementById('shareLinkBtn');
             shareBtn.style.display = 'inline-block';
@@ -1533,6 +1581,16 @@
     // Load summary when section is active
     document.addEventListener('DOMContentLoaded', function() {
         <% if (locals.isPublicView) { %>
+        // When opened via ?pdf=1 (server-side puppeteer render), enable PDF styles
+        // and hide the export controls — the PDF should contain the document, not the UI chrome.
+        try {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('pdf') === '1') {
+                document.body.classList.add('pdf-export-mode');
+                const cardHeader = document.querySelector('.card-header.d-print-none');
+                if (cardHeader) cardHeader.style.display = 'none';
+            }
+        } catch (e) { /* noop */ }
         // Public view: load immediately
         loadQuoteSummary();
         <% } else { %>
@@ -1579,10 +1637,53 @@
         }
     });
 
-    // Export to PDF function
-    function exportToPdf() {
-        // Use html2pdf directly
-        exportWithHtml2Pdf();
+    // Export to PDF via server-side puppeteer (vector text, native page breaks).
+    // Falls back to client-side html2pdf if the server endpoint fails.
+    async function exportToPdf() {
+        const folio = (document.getElementById('summaryFolio')?.textContent || '').trim();
+        if (!folio) {
+            alert('No se pudo determinar el folio para exportar.');
+            return;
+        }
+        const isQuote = /^QTE-/i.test(folio);
+        const endpoint = isQuote
+            ? `/quotes/${encodeURIComponent(folio)}/pdf`
+            : `/reservations/${encodeURIComponent(folio)}/pdf`;
+        const docKind = isQuote ? 'Cotizacion' : 'Reservacion';
+        const filename = `${docKind}_${folio.replace(/\s+/g, '_')}.pdf`;
+
+        const btn = document.getElementById('exportPdfBtn');
+        const originalText = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando PDF...';
+            btn.disabled = true;
+        }
+
+        try {
+            const res = await fetch(endpoint, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(`Server returned ${res.status}`);
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (err) {
+            console.error('Server PDF export failed, falling back to client-side html2pdf:', err);
+            if (typeof html2pdf !== 'undefined') {
+                exportWithHtml2Pdf();
+            } else {
+                alert('No se pudo generar el PDF en el servidor. Intente nuevamente.');
+            }
+        } finally {
+            if (btn) {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
     }
 
     // Simple html2pdf export - restored to working state
@@ -1594,7 +1695,8 @@
 
         const element = document.getElementById('summaryContent');
         const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
-        const filename = `Cotizacion_${folio.replace(/\s+/g, '_')}.pdf`;
+        const docKind = /^QTE-/i.test(folio) ? 'Cotizacion' : 'Reservacion';
+        const filename = `${docKind}_${folio.replace(/\s+/g, '_')}.pdf`;
 
         // Check if element exists
         if (!element) {
@@ -1668,7 +1770,16 @@
             },
             pagebreak: {
                 mode: ['css', 'legacy'],
-                avoid: ['.sm-day-card', '.sm-totals-card', '.summary-banner', 'tr']
+                // Keep these elements intact across page breaks
+                avoid: [
+                    '.sm-day-card',
+                    '.sm-totals-card',
+                    '.summary-banner',
+                    'tr',
+                    '.service-item',        // each rendered service (incl. its assignments)
+                    '.assignments-block',   // the assignments wrapper
+                    '.assignment-card'      // each individual pair / standalone card
+                ]
             }
         };
 
@@ -1722,7 +1833,7 @@
             // Quote Info
             doc.setFontSize(14);
             doc.setTextColor(13, 110, 253);
-            doc.text(`COTIZACIÓN: ${folio}`, margin, yPosition);
+            doc.text(`${/^QTE-/i.test(folio) ? 'COTIZACIÓN' : 'RESERVACIÓN'}: ${folio}`, margin, yPosition);
             
             yPosition += 8;
             doc.setFontSize(10);
@@ -1873,12 +1984,14 @@
             const footerLines = doc.splitTextToSize(footerText, contentWidth);
             doc.text(footerLines, margin, yPosition, { align: 'center' });
 
-            // Add metadata
+            // Add metadata (Cotización vs Reservación based on folio prefix)
+            const isReservacion = !/^QTE-/i.test(folio);
+            const docLabel = isReservacion ? 'Reservación' : 'Cotización';
             doc.setProperties({
-                title: `Cotización ${folio}`,
-                subject: 'Cotización Amexing Experience',
+                title: `${docLabel} ${folio}`,
+                subject: `${docLabel} Amexing Experience`,
                 author: 'Amexing Experience',
-                keywords: 'cotización, transporte, servicios',
+                keywords: `${docLabel.toLowerCase()}, transporte, servicios`,
                 creator: 'AmexingWeb Platform'
             });
 
@@ -1908,7 +2021,8 @@
         const element = document.getElementById('summaryContent');
         const loadingElement = document.getElementById('summaryLoading');
         const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
-        const filename = `Cotizacion_${folio.replace(/\s+/g, '_')}.pdf`;
+        const docKind = /^QTE-/i.test(folio) ? 'Cotizacion' : 'Reservacion';
+        const filename = `${docKind}_${folio.replace(/\s+/g, '_')}.pdf`;
 
         // Check if element exists
         if (!element) {
