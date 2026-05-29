@@ -1709,6 +1709,7 @@ class QuoteService {
             if (hasAdditionalVehicle || extrasTransport.length > 0) {
               // Quantity reflects total vehicles the booking dashboard must assign:
               // 1 main + 1 primary additional (when checkbox is on) + N extras.
+              const primaryCount = hasAdditionalVehicle ? 1 : 0;
               sub.quantity = 1 + primaryCount + extrasTransport.length;
               logger.debug('🚗 Transport service vehicle slots', {
                 primaryCount,
