@@ -172,66 +172,90 @@ class ReservationController {
       }
 
       /**
-       * Apply year/month/day filters to a Parse query against the `startDate` field.
-       * Each filter narrows the date range further; nulls are ignored.
+       * Apply the upcoming/ongoing/past filter together with the optional
+       * year/month/day period filter, computing combined date bounds so the
+       * two filters never overwrite each other's constraints.
+       *
+       * Both filters constrain `startDate`/`endDate`. The Parse SDK stores only
+       * ONE value per comparator per field, so calling e.g.
+       * `greaterThanOrEqualTo('endDate', x)` twice silently overwrites the
+       * first. That caused an ended reservation (endDate < today) to also show
+       * up in EN CURSO, because the year filter's `endDate >= yearStart`
+       * clobbered ongoing's `endDate >= today`. We therefore merge the bounds
+       * (max for lower bounds, min for upper bounds) and apply each comparator
+       * at most once per field.
        * @param {Parse.Query} q - The Parse query to constrain.
+       * @param {string} filter - 'upcoming' | 'ongoing' | 'past'.
+       * @param {Date} today - Start of today (00:00).
        * @param {number|null} yearVal - Year filter (e.g. 2026) or null.
        * @param {number|null} monthVal - Month filter (1-12) or null.
        * @param {number|null} dayVal - Day-of-month filter (1-31) or null.
        * @returns {void}
        * @example
-       *   applySpecificDateFilters(query, 2026, 5, null); // all of May 2026
+       *   applyDateConstraints(query, 'ongoing', today, 2026, 5, null);
        */
-      const applySpecificDateFilters = (q, yearVal, monthVal, dayVal) => {
+      const applyDateConstraints = (q, filter, today, yearVal, monthVal, dayVal) => {
+        const maxDate = (a, b) => {
+          if (!a) return b;
+          if (!b) return a;
+          return a > b ? a : b;
+        };
+        const minDate = (a, b) => {
+          if (!a) return b;
+          if (!b) return a;
+          return a < b ? a : b;
+        };
+
+        // Period [pStart, pEnd) from the year/month/day selectors (null if no year).
+        let pStart = null;
+        let pEnd = null;
         if (yearVal !== null) {
-          // Create date range for the year
-          const yearStart = new Date(yearVal, 0, 1); // January 1st
-          const yearEnd = new Date(yearVal + 1, 0, 1); // January 1st of next year
-
-          if (monthVal !== null) {
-            // Specific month in year
-            const monthStart = new Date(yearVal, monthVal - 1, 1); // First day of month (monthVal is 1-based)
-            const monthEnd = new Date(yearVal, monthVal, 1); // First day of next month
-
-            if (dayVal !== null) {
-              // Specific day
-              const dayStart = new Date(yearVal, monthVal - 1, dayVal);
-              const dayEnd = new Date(yearVal, monthVal - 1, dayVal + 1);
-
-              // Reservation overlaps with this specific day
-              q.lessThan('startDate', dayEnd);
-              q.greaterThanOrEqualTo('endDate', dayStart);
-            } else {
-              // Month filter only - reservation overlaps with this month
-              q.lessThan('startDate', monthEnd);
-              q.greaterThanOrEqualTo('endDate', monthStart);
-            }
+          if (monthVal !== null && dayVal !== null) {
+            pStart = new Date(yearVal, monthVal - 1, dayVal);
+            pEnd = new Date(yearVal, monthVal - 1, dayVal + 1);
+          } else if (monthVal !== null) {
+            pStart = new Date(yearVal, monthVal - 1, 1);
+            pEnd = new Date(yearVal, monthVal, 1);
           } else {
-            // Year filter only - reservation overlaps with this year
-            q.lessThan('startDate', yearEnd);
-            q.greaterThanOrEqualTo('endDate', yearStart);
+            pStart = new Date(yearVal, 0, 1);
+            pEnd = new Date(yearVal + 1, 0, 1);
           }
         }
+
+        // Combined bounds (null = unbounded).
+        let startGt = null; // startDate >  (exclusive lower)
+        let startLte = null; // startDate <= (inclusive upper)
+        let startLt = null; // startDate <  (exclusive upper)
+        let endGte = null; // endDate   >= (inclusive lower)
+        let endLt = null; // endDate   <  (exclusive upper)
+
+        if (filter === 'upcoming') {
+          startGt = today; // hasn't started yet
+        } else if (filter === 'ongoing') {
+          startLte = today; // already started
+          endGte = today; // hasn't ended
+        } else if (filter === 'past') {
+          endLt = today; // already ended
+        }
+
+        // Fold in the period (overlap: startDate < pEnd AND endDate >= pStart).
+        // Merging avoids a second $gte/$lt on the same field overwriting the above.
+        if (pEnd) startLt = minDate(startLt, pEnd);
+        if (pStart) endGte = maxDate(endGte, pStart);
+
+        if (startGt) q.greaterThan('startDate', startGt);
+        if (startLte) q.lessThanOrEqualTo('startDate', startLte);
+        if (startLt) q.lessThan('startDate', startLt);
+        if (endGte) q.greaterThanOrEqualTo('endDate', endGte);
+        if (endLt) q.lessThan('endDate', endLt);
       };
 
       // Apply date filter based on startDate and endDate
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Start of today
 
-      if (dateFilter === 'upcoming') {
-        // Reservations that haven't started yet
-        query.greaterThan('startDate', today);
-      } else if (dateFilter === 'ongoing') {
-        // Reservations currently in progress
-        query.lessThanOrEqualTo('startDate', today);
-        query.greaterThanOrEqualTo('endDate', today);
-      } else if (dateFilter === 'past') {
-        // Reservations that have ended
-        query.lessThan('endDate', today);
-      }
-
-      // Apply additional year/month/day filters
-      applySpecificDateFilters(query, yearFilter, monthFilter, dayFilter);
+      // Apply combined date constraints (upcoming/ongoing/past + year/month/day)
+      applyDateConstraints(query, dateFilter, today, yearFilter, monthFilter, dayFilter);
 
       // Total count (without search/status filters, but with role filter)
       const totalQuery = new Parse.Query('Reservation');
@@ -241,18 +265,8 @@ class ReservationController {
         totalQuery.containedIn('clientPtr', roleFilterPointers);
       }
 
-      // Apply date filter to total count
-      if (dateFilter === 'upcoming') {
-        totalQuery.greaterThan('startDate', today);
-      } else if (dateFilter === 'ongoing') {
-        totalQuery.lessThanOrEqualTo('startDate', today);
-        totalQuery.greaterThanOrEqualTo('endDate', today);
-      } else if (dateFilter === 'past') {
-        totalQuery.lessThan('endDate', today);
-      }
-
-      // Apply additional year/month/day filters to total count
-      applySpecificDateFilters(totalQuery, yearFilter, monthFilter, dayFilter);
+      // Apply the same combined date constraints to the total count
+      applyDateConstraints(totalQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
 
       const recordsTotal = await totalQuery.count({ useMasterKey: true });
 
@@ -286,33 +300,11 @@ class ReservationController {
           emailQuery.containedIn('clientPtr', roleFilterPointers);
         }
 
-        // Apply date filter to search queries
-        if (dateFilter === 'upcoming') {
-          folioQuery.greaterThan('startDate', today);
-          contactQuery.greaterThan('startDate', today);
-          eventQuery.greaterThan('startDate', today);
-          emailQuery.greaterThan('startDate', today);
-        } else if (dateFilter === 'ongoing') {
-          folioQuery.lessThanOrEqualTo('startDate', today);
-          folioQuery.greaterThanOrEqualTo('endDate', today);
-          contactQuery.lessThanOrEqualTo('startDate', today);
-          contactQuery.greaterThanOrEqualTo('endDate', today);
-          eventQuery.lessThanOrEqualTo('startDate', today);
-          eventQuery.greaterThanOrEqualTo('endDate', today);
-          emailQuery.lessThanOrEqualTo('startDate', today);
-          emailQuery.greaterThanOrEqualTo('endDate', today);
-        } else if (dateFilter === 'past') {
-          folioQuery.lessThan('endDate', today);
-          contactQuery.lessThan('endDate', today);
-          eventQuery.lessThan('endDate', today);
-          emailQuery.lessThan('endDate', today);
-        }
-
-        // Apply additional year/month/day filters to search queries
-        applySpecificDateFilters(folioQuery, yearFilter, monthFilter, dayFilter);
-        applySpecificDateFilters(contactQuery, yearFilter, monthFilter, dayFilter);
-        applySpecificDateFilters(eventQuery, yearFilter, monthFilter, dayFilter);
-        applySpecificDateFilters(emailQuery, yearFilter, monthFilter, dayFilter);
+        // Apply the same combined date constraints to each search sub-query
+        applyDateConstraints(folioQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
+        applyDateConstraints(contactQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
+        applyDateConstraints(eventQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
+        applyDateConstraints(emailQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
 
         const compoundQuery = Parse.Query.or(folioQuery, contactQuery, eventQuery, emailQuery);
         compoundQuery.include('quotePtr');
@@ -363,18 +355,8 @@ class ReservationController {
         countQuery.equalTo('status', statusFilter);
       }
 
-      // Apply date filter to count query
-      if (dateFilter === 'upcoming') {
-        countQuery.greaterThan('startDate', today);
-      } else if (dateFilter === 'ongoing') {
-        countQuery.lessThanOrEqualTo('startDate', today);
-        countQuery.greaterThanOrEqualTo('endDate', today);
-      } else if (dateFilter === 'past') {
-        countQuery.lessThan('endDate', today);
-      }
-
-      // Apply additional year/month/day filters to count query
-      applySpecificDateFilters(countQuery, yearFilter, monthFilter, dayFilter);
+      // Apply the same combined date constraints to the count query
+      applyDateConstraints(countQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
 
       const recordsFiltered = await countQuery.count({ useMasterKey: true });
 
@@ -1404,6 +1386,10 @@ class ReservationController {
       clientName,
       eventType: reservation.get('eventType') || '',
       startDate: reservation.get('startDate'),
+      // endDate is exposed so the UI can explain (in local/dev) why a reservation
+      // falls into the upcoming/ongoing/past filter. The date-filter queries use
+      // both startDate and endDate, so showing endDate reveals data anomalies.
+      endDate: reservation.get('endDate') || null,
       numberOfPeople: reservation.get('numberOfPeople'),
       totalAmount: reservation.get('totalAmount'),
       currency: reservation.get('currency'),
