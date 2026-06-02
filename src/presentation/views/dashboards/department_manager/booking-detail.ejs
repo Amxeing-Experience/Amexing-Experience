@@ -361,10 +361,20 @@ document.addEventListener('DOMContentLoaded', async function() {
             scEl.innerHTML = '<span class="text-muted">Sin asignar</span>';
         }
 
-        // Header actions
+        // Header actions — "Exportar" opens the public reservation view in a new tab,
+        // which has the PDF export + print-friendly layout. "Cancelar" only shows when
+        // the reservation can still be cancelled.
         const actions = document.getElementById('headerActions');
-        if (d.status !== 'cancelled' && d.status !== 'completed') {
-            actions.innerHTML = `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservación</button>`;
+        const folio = encodeURIComponent(d.folio || '');
+        const canCancel = d.status !== 'cancelled' && d.status !== 'completed';
+        const exportBtnHtml = folio
+            ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir vista pública (incluye Exportar a PDF)"><i class="ti ti-file-export me-1"></i>Exportar</a>`
+            : '';
+        const cancelBtnHtml = canCancel
+            ? `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservación</button>`
+            : '';
+        actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
+        if (canCancel) {
             document.getElementById('cancelResBtn')?.addEventListener('click', cancelReservation);
         }
 

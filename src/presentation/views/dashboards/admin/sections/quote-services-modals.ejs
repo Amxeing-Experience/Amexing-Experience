@@ -300,41 +300,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 
                                 <!-- Manual Price Field for Walking Tours (Hidden by default) -->
                                 <div id="walkingTourManualPriceContainer" class="d-none">
-                                    <!-- Toggle between total and per-group pricing -->
-                                    <div class="d-flex align-items-center justify-content-between mb-3">
-                                        <label class="form-label mb-0">Modo de edición de precios</label>
-                                        <div class="btn-group btn-group-sm" role="group">
-                                            <input type="radio" class="btn-check" name="walkingPriceMode" id="walkingPriceModeTotal" value="total" checked>
-                                            <label class="btn btn-outline-primary" for="walkingPriceModeTotal">
-                                                <i class="ti ti-calculator"></i> Precio Total
-                                            </label>
-                                            <input type="radio" class="btn-check" name="walkingPriceMode" id="walkingPriceModeGroup" value="group">
-                                            <label class="btn btn-outline-primary" for="walkingPriceModeGroup">
-                                                <i class="ti ti-users"></i> Por Grupo
-                                            </label>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Total price input (default) -->
-                                    <div id="walkingTourTotalPriceSection">
-                                        <label for="walkingTourManualPrice" class="form-label">Precio Total <span class="text-danger">*</span></label>
-                                        <div class="input-group mb-2">
-                                            <span class="input-group-text">$</span>
-                                            <input type="number" class="form-control" id="walkingTourManualPrice" placeholder="0.00" step="0.01" min="0" readonly>
-                                            <span class="input-group-text currency-symbol">MXN</span>
-                                        </div>
-                                        <small class="text-muted">Precio manual para el tour a pie (reemplaza el cálculo por niveles)</small>
-                                    </div>
-                                    
-                                    <!-- Per-group price inputs (hidden by default) -->
-                                    <div id="walkingTourGroupPricesSection" class="d-none">
+                                    <!-- Mode is always "group" (per-tier). The hidden radio keeps the
+                                         existing JS query (input[name="walkingPriceMode"]:checked) happy. -->
+                                    <input type="radio" name="walkingPriceMode" id="walkingPriceModeGroup" value="group" checked hidden>
+
+                                    <!-- Per-group price inputs -->
+                                    <div id="walkingTourGroupPricesSection">
                                         <label class="form-label mb-2">Precios por Grupo</label>
                                         <div id="walkingTourGroupPricesContainer">
                                             <!-- Dynamic group price inputs will be inserted here -->
-                                        </div>
-                                        <div class="mt-2">
-                                            <small class="text-muted">Total: </small>
-                                            <strong id="walkingTourGroupPricesTotal">$0.00</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -454,15 +428,16 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     </div>
                                 </div>
                                 
-                                <!-- Transport Schedule (shown for Punto a Punto and Local) -->
+                                <!-- Transport Schedule (shown for Punto a Punto and Local — no flight
+                                     involved, so "Hora de salida" reads naturally). -->
                                 <div id="transportScheduleSection" class="d-none">
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label for="transportStartTime" class="form-label">Horario Inicio</label>
+                                            <label for="transportStartTime" class="form-label">Hora de salida</label>
                                             <input type="text" class="form-control time-input" id="transportStartTime" placeholder="__:__" maxlength="5">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="transportEndTime" class="form-label">Horario Fin</label>
+                                            <label for="transportEndTime" class="form-label">Hora de fin</label>
                                             <input type="text" class="form-control time-input" id="transportEndTime" placeholder="__:__" maxlength="5">
                                         </div>
                                     </div>
@@ -553,6 +528,18 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             </select>
                                         </div>
                                     </div>
+                                    <!-- Pickup / Drop-off addresses for Ida (Punto a Punto + Local) — sits right
+                                         below Origen/Destino so the route detail fields stay together. -->
+                                    <div class="row d-none" id="papAddressesRowIda">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label" for="roundTripPickupAddressIda">Dirección de pick-up</label>
+                                            <input type="text" class="form-control" id="roundTripPickupAddressIda" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label" for="roundTripDropoffAddressIda">Dirección de drop-off</label>
+                                            <input type="text" class="form-control" id="roundTripDropoffAddressIda" placeholder="Ej: Aeropuerto BJX, Casa particular...">
+                                        </div>
+                                    </div>
                                     <!-- Specific Location for Ida (shown for certain destinations like San Miguel) -->
                                     <div class="row d-none" id="roundTripSpecificLocationIdaRow">
                                         <div class="col-md-12 mb-3">
@@ -597,17 +584,6 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         </div>
                                     </div>
 
-                                    <!-- Pickup / Drop-off addresses for Ida (Punto a Punto + Local) -->
-                                    <div class="row d-none" id="papAddressesRowIda">
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label" for="roundTripPickupAddressIda">Dirección de pick-up</label>
-                                            <input type="text" class="form-control" id="roundTripPickupAddressIda" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label" for="roundTripDropoffAddressIda">Dirección de drop-off</label>
-                                            <input type="text" class="form-control" id="roundTripDropoffAddressIda" placeholder="Ej: Aeropuerto BJX, Casa particular...">
-                                        </div>
-                                    </div>
                                 </div>
 
                                 <!-- Vuelta (Departure leg) -->
@@ -638,6 +614,18 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             </select>
                                             <!-- TEXT destination (Local Vuelta) -->
                                             <input type="text" class="form-control d-none" id="roundTripDestinationVueltaText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
+                                        </div>
+                                    </div>
+                                    <!-- Pickup / Drop-off addresses for Vuelta (Punto a Punto + Local) — sits right
+                                         below Origen/Destino so the route detail fields stay together. -->
+                                    <div class="row d-none" id="papAddressesRowVuelta">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label" for="roundTripPickupAddressVuelta">Dirección de pick-up</label>
+                                            <input type="text" class="form-control" id="roundTripPickupAddressVuelta" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label" for="roundTripDropoffAddressVuelta">Dirección de drop-off</label>
+                                            <input type="text" class="form-control" id="roundTripDropoffAddressVuelta" placeholder="Ej: Aeropuerto BJX, Casa particular...">
                                         </div>
                                     </div>
                                     <!-- Specific Location for Vuelta (shown for certain origins like San Miguel) -->
@@ -684,17 +672,6 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         </div>
                                     </div>
 
-                                    <!-- Pickup / Drop-off addresses for Vuelta (Punto a Punto + Local) -->
-                                    <div class="row d-none" id="papAddressesRowVuelta">
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label" for="roundTripPickupAddressVuelta">Dirección de pick-up</label>
-                                            <input type="text" class="form-control" id="roundTripPickupAddressVuelta" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label" for="roundTripDropoffAddressVuelta">Dirección de drop-off</label>
-                                            <input type="text" class="form-control" id="roundTripDropoffAddressVuelta" placeholder="Ej: Aeropuerto BJX, Casa particular...">
-                                        </div>
-                                    </div>
                                 </div>
 
                                 <!-- Number of Persons - Removed as requested

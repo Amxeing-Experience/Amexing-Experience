@@ -429,10 +429,16 @@
             return true;
         },
 
-        // Get schedule label based on direction
+        // Get schedule label based on transport type. Aeropuerto transfers always
+        // include a flight, so "Horario de vuelo" is accurate. Punto-a-punto and
+        // local transfers don't involve a flight — they're just a scheduled
+        // departure, so "Horario de salida" reads correctly.
         getScheduleLabel: function (service) {
             if (!service || service.type !== 'transport') {
                 return 'Horario:';
+            }
+            if (service.transportType === 'punto-a-punto' || service.transportType === 'local') {
+                return 'Horario de salida:';
             }
             return 'Horario de vuelo:';
         },

@@ -560,6 +560,11 @@ class ItineraryBuilder {
       radio.addEventListener('change', () => this.handleTransportTypeChange());
     });
 
+    // Local transfers don't need the "Hotel/Airbnb/Particular" address row —
+    // the route is local and the pickup/drop-off fields below already capture
+    // any specific spots. Skip the row whenever the active transport type is local.
+    const isLocalTransport = () => document.querySelector('input[name="transportType"]:checked')?.value === 'local';
+
     // Show specific location when destination is selected (arrival only — destination is city/hotel)
     document.getElementById('transportDestinationSelect')?.addEventListener('change', (e) => {
       const arrivalRadio = document.getElementById('typeArrival');
@@ -567,7 +572,7 @@ class ItineraryBuilder {
       const specificLocationRow = document.getElementById('specificLocationRow');
       const selectedNames = document.querySelectorAll('.selectedDestinationName');
       if (specificLocationRow) {
-        if (e.target.value) {
+        if (e.target.value && !isLocalTransport()) {
           selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
           specificLocationRow.classList.remove('d-none');
         } else {
@@ -583,7 +588,7 @@ class ItineraryBuilder {
       const specificLocationRow = document.getElementById('specificLocationRow');
       const selectedNames = document.querySelectorAll('.selectedDestinationName');
       if (specificLocationRow) {
-        if (e.target.value) {
+        if (e.target.value && !isLocalTransport()) {
           selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
           specificLocationRow.classList.remove('d-none');
         } else {
@@ -597,7 +602,7 @@ class ItineraryBuilder {
       const row = document.getElementById('roundTripSpecificLocationIdaRow');
       const selectedNames = document.querySelectorAll('.selectedDestinationName');
       if (row) {
-        if (e.target.value) {
+        if (e.target.value && !isLocalTransport()) {
           selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
           row.classList.remove('d-none');
         } else {
@@ -611,7 +616,7 @@ class ItineraryBuilder {
       const row = document.getElementById('roundTripSpecificLocationVueltaRow');
       const selectedNames = document.querySelectorAll('.selectedDestinationName');
       if (row) {
-        if (e.target.value) {
+        if (e.target.value && !isLocalTransport()) {
           selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
           row.classList.remove('d-none');
         } else {
@@ -748,6 +753,8 @@ class ItineraryBuilder {
             }
           }
         }
+        // Dev breakdown FIRST so service breakdown reads fresh override values.
+        this.updateDevPaymentBreakdown();
         this.updateServicePriceBreakdown();
       });
 
@@ -858,6 +865,9 @@ class ItineraryBuilder {
           }
         }
         validatePriceInput(e);
+        // Dev breakdown FIRST — it populates the devBreakdown* fields that
+        // updateServicePriceBreakdown reads from.
+        this.updateDevPaymentBreakdown();
         this.updateServicePriceBreakdown();
       });
       servicePriceField.addEventListener('keydown', preventInvalidPriceChars);
@@ -2075,7 +2085,9 @@ class ItineraryBuilder {
   handlePriceOverrideToggle(serviceType, isOverride) {
     console.log(`🔄 Price override toggle for ${serviceType}: ${isOverride}`);
 
-    // Special handling for walking tours
+    // Special handling for walking tours: show/hide the manual price section.
+    // Walking tour prices are PER-GROUP, so the group mode is the natural default
+    // (each tier of group size gets its own price input).
     if (serviceType === 'tour') {
       const tourSelect = document.getElementById('tourSelect');
       const selectedTourId = tourSelect?.value;
@@ -2084,30 +2096,35 @@ class ItineraryBuilder {
         const tours = this.toursCache.get('all');
         const selectedTour = tours.find((tour) => tour.id === selectedTourId || tour.objectId === selectedTourId);
 
-        // Handle walking tours differently - DISABLED FOR NOW
         if (selectedTour?.isWalkingTour) {
-          // Walking tour price override is temporarily disabled
-          // Always hide price override UI for walking tours
           const walkingTourManualPriceContainer = document.getElementById('walkingTourManualPriceContainer');
           const walkingTourManualPrice = document.getElementById('walkingTourManualPrice');
-          const walkingTierCards = document.querySelectorAll('.walking-tier-card');
 
-          // Always hide manual price field and disable it for walking tours
-          walkingTourManualPriceContainer?.classList.add('d-none');
-          if (walkingTourManualPrice) {
-            walkingTourManualPrice.classList.remove('price-override-active');
-            walkingTourManualPrice.value = '';
+          if (isOverride) {
+            // Reveal the manual override section and make the total input editable.
+            walkingTourManualPriceContainer?.classList.remove('d-none');
+            if (walkingTourManualPrice) {
+              walkingTourManualPrice.readOnly = false;
+              walkingTourManualPrice.removeAttribute('readonly');
+              walkingTourManualPrice.classList.add('price-override-active');
+            }
+            // Populate per-group inputs from the current tier/people count.
+            const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10) || 1;
+            this.generateWalkingTourGroupInputs(selectedTour, peopleCount);
+          } else {
+            // Hide override UI and re-run automatic tier pricing.
+            walkingTourManualPriceContainer?.classList.add('d-none');
+            if (walkingTourManualPrice) {
+              walkingTourManualPrice.readOnly = true;
+              walkingTourManualPrice.setAttribute('readonly', 'readonly');
+              walkingTourManualPrice.classList.remove('price-override-active');
+              walkingTourManualPrice.value = '';
+            }
+            this.updateWalkingTourPricing();
           }
 
-          // Restore tier pricing cards visibility
-          walkingTierCards.forEach((card) => card.style.opacity = '1');
-
-          // Re-calculate tier pricing
-          this.updateWalkingTourPricing();
-
-          // Update the breakdown
           this.updateServicePriceBreakdown();
-          return; // Exit early for walking tours
+          return; // Walking tour handled — skip the generic field-toggle logic.
         }
       }
     }
@@ -2501,6 +2518,15 @@ class ItineraryBuilder {
       else el.classList.add('d-none');
     });
 
+    // Local transfers never need the "Hotel/Airbnb/Particular" address row —
+    // hide it explicitly when switching to local so a row left visible from a
+    // previous Punto a Punto / Aeropuerto selection doesn't linger.
+    if (transportType === 'local') {
+      ['specificLocationRow', 'roundTripSpecificLocationIdaRow', 'roundTripSpecificLocationVueltaRow'].forEach((id) => {
+        document.getElementById(id)?.classList.add('d-none');
+      });
+    }
+
     // Re-evaluate direction fields (local has different field types than aeropuerto/punto-a-punto)
     const tripType2 = document.querySelector('input[name="tripType"]:checked')?.value;
     if (tripType2 === 'one-way') {
@@ -2791,13 +2817,23 @@ class ItineraryBuilder {
       if (timeIdaLabel) timeIdaLabel.textContent = 'Hora de Llegada';
       if (dateVueltaLabel) dateVueltaLabel.textContent = 'Fecha de Salida';
       if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Salida';
+    } else if (transportType === 'punto-a-punto') {
+      // Punto a Punto: the first leg is the arrival at the destination,
+      // the second leg is the return trip from it.
+      if (idaHeader) idaHeader.innerHTML = '<i class="ti ti-car me-2"></i>Llegada';
+      if (vueltaHeader) vueltaHeader.innerHTML = '<i class="ti ti-car me-2"></i>Salida';
+      if (dateIdaLabel) dateIdaLabel.textContent = 'Fecha de Llegada';
+      if (timeIdaLabel) timeIdaLabel.textContent = 'Hora de Llegada';
+      if (dateVueltaLabel) dateVueltaLabel.textContent = 'Fecha de Salida';
+      if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Salida';
     } else {
-      if (idaHeader) idaHeader.innerHTML = '<i class="ti ti-car me-2"></i>Ida';
-      if (vueltaHeader) vueltaHeader.innerHTML = '<i class="ti ti-car me-2"></i>Vuelta';
-      if (dateIdaLabel) dateIdaLabel.textContent = 'Fecha de Ida';
-      if (timeIdaLabel) timeIdaLabel.textContent = 'Hora de Ida';
-      if (dateVueltaLabel) dateVueltaLabel.textContent = 'Fecha de Vuelta';
-      if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Vuelta';
+      // Local: the first leg drops the guest off (llevar), the second leg picks them up (recoger).
+      if (idaHeader) idaHeader.innerHTML = '<i class="ti ti-car me-2"></i>Llevar';
+      if (vueltaHeader) vueltaHeader.innerHTML = '<i class="ti ti-car me-2"></i>Recoger';
+      if (dateIdaLabel) dateIdaLabel.textContent = 'Fecha de Llevar';
+      if (timeIdaLabel) timeIdaLabel.textContent = 'Hora de Llevar';
+      if (dateVueltaLabel) dateVueltaLabel.textContent = 'Fecha de Recoger';
+      if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Recoger';
     }
 
     // Populate dropdowns for both directions
@@ -2917,6 +2953,11 @@ class ItineraryBuilder {
         const day = this.days.find((d) => d.id === updatedService.dayId);
         if (day) {
           this.recalculateOverlapsForDay(day);
+          // Re-sort services by time when schedule was edited so the list
+          // reflects chronological order without needing a page reload.
+          if (scheduleChanged) {
+            day.services = this.sortAndDeduplicateServices(day.services);
+          }
         }
       } else {
         // Add new service
@@ -4038,9 +4079,15 @@ class ItineraryBuilder {
         // Collect tour duration
         data.duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
 
-        // Store tour price override flag
+        // Store tour price override flag. Vehicle tours use the dedicated
+        // `tourVehicleOverridePrices` checkbox (single price override for the
+        // calculated vehicle cost). Walking tours never set this — they have
+        // their own override mechanism handled below.
         const tourOverrideCheckbox = document.getElementById('tourOverridePrices');
-        let priceOverride = tourOverrideCheckbox?.checked || false;
+        const vehicleOverrideCheckbox = document.getElementById('tourVehicleOverridePrices');
+        let priceOverride = data.isWalkingTour
+          ? (tourOverrideCheckbox?.checked || false)
+          : (vehicleOverrideCheckbox?.checked || false);
 
         // WORKAROUND: If the price has been manually edited (different from calculated), treat as override
         const servicePriceField = document.getElementById('servicePrice');
@@ -4050,10 +4097,9 @@ class ItineraryBuilder {
           if (!isNaN(currentPrice) && !isNaN(calculatedPrice) && Math.abs(currentPrice - calculatedPrice) > 0.01) {
             console.log('🔄 Price was manually edited, enabling override automatically');
             priceOverride = true;
-            // Try to check the checkbox
-            if (tourOverrideCheckbox) {
-              tourOverrideCheckbox.checked = true;
-            }
+            // Reflect the auto-detected override on whichever checkbox applies.
+            const activeCheckbox = data.isWalkingTour ? tourOverrideCheckbox : vehicleOverrideCheckbox;
+            if (activeCheckbox) activeCheckbox.checked = true;
           }
         }
 
@@ -5245,6 +5291,54 @@ class ItineraryBuilder {
             });
           }
 
+          // Restore manual price override if it was saved with the service.
+          // Defer until handleTourSelection has finished rendering the walking
+          // tour pricing section and the override UI is mounted.
+          if (service.walkingTourPriceOverride) {
+            setTimeout(() => {
+              const overrideCheckbox = document.getElementById('tourOverridePrices');
+              if (!overrideCheckbox) {
+                console.warn('⚠️ Override restore: checkbox not found in DOM');
+                return;
+              }
+              overrideCheckbox.checked = true;
+              overrideCheckbox.setAttribute('checked', 'checked');
+              // Fire change event so any UI/listener picks up the new state.
+              overrideCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+              // Toggle handler also called explicitly in case the listener isn't attached yet.
+              this.handlePriceOverrideToggle('tour', true);
+              console.log('✅ Walking tour override checkbox restored', { mode: service.walkingTourPriceMode });
+
+              if (service.walkingTourPriceMode === 'group') {
+                const groupRadio = document.getElementById('walkingPriceModeGroup');
+                if (groupRadio) {
+                  groupRadio.checked = true;
+                  this.handleWalkingPriceModeChange('group');
+                }
+                // After the inputs are regenerated, fill them with saved per-group prices.
+                setTimeout(() => {
+                  const inputs = document.querySelectorAll('.walking-group-price');
+                  const saved = Array.isArray(service.walkingTourGroupPrices) ? service.walkingTourGroupPrices : [];
+                  inputs.forEach((inp, i) => {
+                    if (saved[i] !== undefined) inp.value = parseFloat(saved[i]).toFixed(2);
+                  });
+                  // Dev breakdown FIRST so service breakdown reads fresh values.
+                  this.updateDevPaymentBreakdown();
+                  this.updateServicePriceBreakdown();
+                }, 50);
+              } else if (service.walkingTourPriceMode === 'total') {
+                const totalRadio = document.getElementById('walkingPriceModeTotal');
+                if (totalRadio) totalRadio.checked = true;
+                const manualPrice = document.getElementById('walkingTourManualPrice');
+                if (manualPrice && service.walkingTourPrice !== undefined && service.walkingTourPrice !== null) {
+                  manualPrice.value = parseFloat(service.walkingTourPrice).toFixed(2);
+                }
+                this.updateDevPaymentBreakdown();
+                this.updateServicePriceBreakdown();
+              }
+            }, 150);
+          }
+
           // Clear the restoration flag after everything completes
           setTimeout(() => {
             this._restoringWalkingTourData = false;
@@ -6286,10 +6380,19 @@ class ItineraryBuilder {
       endTimeField.value = service.endTime;
     }
 
-    // Step 7: Restore price override checkbox
-    const priceOverrideCheckbox = document.getElementById('tourOverridePrices');
-    if (priceOverrideCheckbox && service.priceOverride !== undefined) {
-      priceOverrideCheckbox.checked = service.priceOverride;
+    // Step 7: Restore vehicle tour override checkbox so the breakdown reads
+    // the saved custom price (we live in the vehicle tour form, so the
+    // applicable checkbox is `tourVehicleOverridePrices`).
+    const vehicleOverrideCheckbox = document.getElementById('tourVehicleOverridePrices');
+    if (vehicleOverrideCheckbox && service.priceOverride !== undefined) {
+      vehicleOverrideCheckbox.checked = service.priceOverride;
+      if (service.priceOverride) {
+        const servicePriceField = document.getElementById('servicePrice');
+        if (servicePriceField) {
+          servicePriceField.readOnly = false;
+          servicePriceField.classList.add('price-override-active');
+        }
+      }
     }
 
     // Step 8: Restore prices (dev and service)
@@ -6551,8 +6654,18 @@ class ItineraryBuilder {
       driverTourRateCache: this.driverTourRateCache,
     });
 
-    // Get main vehicle cost
-    const mainVehicleCost = this.getMainVehicleCost();
+    // Get main vehicle cost — when the user has activated the manual override
+    // (tourVehicleOverridePrices) for vehicle tours, replace the calculated
+    // rate with what's typed into servicePrice so the breakdown reflects it.
+    let mainVehicleCost = this.getMainVehicleCost();
+    const vehicleOverrideCheckbox = document.getElementById('tourVehicleOverridePrices');
+    if (vehicleOverrideCheckbox?.checked) {
+      const overriddenPrice = parseFloat(document.getElementById('servicePrice')?.value || 0);
+      if (overriddenPrice >= 0) {
+        console.log('🚗 Vehicle tour override active — using servicePrice as main vehicle cost:', overriddenPrice, '(was:', mainVehicleCost, ')');
+        mainVehicleCost = overriddenPrice;
+      }
+    }
     console.log('🚗 Main vehicle cost result:', mainVehicleCost);
 
     // Get additional vehicle cost if applicable
@@ -7240,10 +7353,29 @@ class ItineraryBuilder {
       concepto: 'Concepto',
     };
 
+    // Mirror the transport header: pick a start time from startTime or the
+    // beginning of selectedSchedule, round to the nearest 15 minutes and
+    // render a grey-blue "Hora: HH:MM" badge above the type label.
+    let startTime = '';
+    if (service.startTime) {
+      startTime = service.startTime;
+    } else if (service.selectedSchedule) {
+      const timeMatch = String(service.selectedSchedule).match(/^(\d{1,2}:\d{2})/);
+      if (timeMatch) startTime = timeMatch[1];
+    }
+    const roundedTime = startTime ? this.roundTimeToNearest15(startTime) : '';
+
     return `
             <div class="service-item mb-3 p-3 border rounded ${service.hasOverlap && !service.overlapAccepted ? 'has-overlap' : ''}" data-service-id="${service.id}">
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
+                        ${roundedTime ? `
+                        <div class="mb-2">
+                            <span class="badge bg-info text-white">
+                                <i class="ti ti-clock me-1"></i>Hora: ${roundedTime}
+                            </span>
+                        </div>
+                        ` : ''}
                         <div class="d-flex align-items-start mb-2">
                             <div class="flex-grow-1">
                                 <div class="d-flex align-items-center mb-1">
@@ -7269,10 +7401,10 @@ class ItineraryBuilder {
                                                         <i class="ti ti-clock me-1"></i>
                                                         ${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}
                                                         ${service.hasOverlap && !service.overlapAccepted ? `
-                                                            <span class="text-danger ms-2" title="${this.getOverlapTooltip(service)}">
+                                                            <span class="overlap-warning-badge ms-2" title="${this.getOverlapTooltip(service)}">
                                                                 <i class="ti ti-alert-triangle"></i>
-                                                                <small>Conflicto de horario</small>
-                                                                <button type="button" class="btn btn-sm btn-link p-0 ms-1 text-decoration-underline text-danger" style="font-size: 0.75rem;" onclick="event.stopPropagation(); window.itineraryBuilder.acceptOverlap('${service.id}')" title="Aceptar este conflicto y ocultar el aviso">
+                                                                <span>Conflicto de horario</span>
+                                                                <button type="button" class="accept-overlap-btn" data-service-id="${service.id}" title="Aceptar este conflicto y ocultar el aviso">
                                                                     Aceptar
                                                                 </button>
                                                             </span>
@@ -7280,6 +7412,7 @@ class ItineraryBuilder {
                                                     </div>
                                                 ` : ''}
                                                 ${hasTourDuration ? `
+                                                    <div class="w-100"></div>
                                                     <div class="col-auto">
                                                         <i class="ti ti-clock-hour-${service.duration || 1} me-1"></i>
                                                         Duración: ${service.duration} ${service.duration === 1 ? 'hora' : 'horas'}
@@ -7288,6 +7421,7 @@ class ItineraryBuilder {
                                                 ${(() => {
             if (hasDisposicionHours) {
               return `
+                                                            <div class="w-100"></div>
                                                             <div class="col-auto">
                                                                 <i class="ti ti-clock me-1"></i>
                                                                 Duración: ${service.hours} ${service.hours == 1 ? 'hora' : 'horas'}
@@ -7586,17 +7720,18 @@ class ItineraryBuilder {
                                     ${service.returnFlightNumber}
                                 </div>
                             ` : ''}
-                            <!-- Arrival/Departure Time -->
+                            <!-- Arrival/Departure Time — aeropuerto involves a flight,
+                                 punto-a-punto and local are just scheduled departures. -->
                             ${service.selectedSchedule || service.startTime ? `
                                 <div class="d-flex align-items-center text-muted small mb-1">
                                     <i class="ti ti-clock me-1"></i>
-                                    <span class="me-1">Horario de vuelo:</span>
+                                    <span class="me-1">${(service.transportType === 'punto-a-punto' || service.transportType === 'local') ? 'Horario de salida:' : 'Horario de vuelo:'}</span>
                                     ${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}
                                     ${service.hasOverlap && !service.overlapAccepted ? `
-                                        <span class="text-danger ms-2" title="${this.getOverlapTooltip(service)}">
+                                        <span class="overlap-warning-badge ms-2" title="${this.getOverlapTooltip(service)}">
                                             <i class="ti ti-alert-triangle"></i>
-                                            <small>Conflicto de horario</small>
-                                            <button type="button" class="btn btn-sm btn-link p-0 ms-1 text-decoration-underline text-danger" style="font-size: 0.75rem;" onclick="event.stopPropagation(); window.itineraryBuilder.acceptOverlap('${service.id}')" title="Aceptar este conflicto y ocultar el aviso">
+                                            <span>Conflicto de horario</span>
+                                            <button type="button" class="accept-overlap-btn" data-service-id="${service.id}" title="Aceptar este conflicto y ocultar el aviso">
                                                 Aceptar
                                             </button>
                                         </span>
@@ -9223,8 +9358,38 @@ class ItineraryBuilder {
         const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1);
         const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
 
-        // Calculate base total using walking tour formula
-        const baseTotal = this.getWalkingTourPrice(selectedTourData, peopleCount, duration);
+        const priceCurrency = selectedTourData.walkingPriceCurrency || 'MXN';
+
+        // If user activated override + group mode, read edited per-tier prices.
+        const overrideCheckbox = document.getElementById('tourOverridePrices');
+        const walkingMode = document.querySelector('input[name="walkingPriceMode"]:checked')?.value;
+        const isPerGroupOverride = !!(overrideCheckbox?.checked && walkingMode === 'group');
+        const overridePrices = {};
+        if (isPerGroupOverride) {
+          document.querySelectorAll('.walking-group-price').forEach((inp) => {
+            const tn = inp.dataset.tierName;
+            if (tn) overridePrices[tn] = parseFloat(inp.value) || 0;
+          });
+        }
+
+        // Resolve effective price per tier: override wins, otherwise tour's tier price
+        // (with USD→MXN conversion applied to default values when needed).
+        const resolveTierPrice = (tier) => {
+          if (isPerGroupOverride && overridePrices[tier.name] !== undefined) {
+            return overridePrices[tier.name];
+          }
+          let p = tier.price;
+          if (priceCurrency === 'USD' && this.exchangeRate) {
+            p = Math.round(p * this.exchangeRate);
+          }
+          return p;
+        };
+
+        // Calculate groups for breakdown text
+        const groups = this.calculateWalkingTourGroups(selectedTourData, peopleCount);
+
+        // Base total using effective (possibly overridden) tier prices.
+        const baseTotal = groups.reduce((sum, g) => sum + resolveTierPrice(g.tier) * duration, 0);
 
         // Calculate totals with surcharges
         const efectivoTotal = baseTotal;
@@ -9241,20 +9406,10 @@ class ItineraryBuilder {
         const devBreakdownTransferenciaField = document.getElementById('devBreakdownTransferencia');
         const devBreakdownTarjetaField = document.getElementById('devBreakdownTarjeta');
 
-        // Calculate groups for breakdown text
-        const groups = this.calculateWalkingTourGroups(selectedTourData, peopleCount);
-        const priceCurrency = selectedTourData.walkingPriceCurrency || 'MXN';
-
         // Build breakdown text for efectivo
         let efectivoBreakdown = '';
         groups.forEach((group, index) => {
-          let groupPrice = group.tier.price;
-          // Convert USD to MXN if needed (same logic as getWalkingTourPrice)
-          if (priceCurrency === 'USD' && this.exchangeRate) {
-            groupPrice = Math.round(groupPrice * this.exchangeRate);
-          }
-          const groupTotal = groupPrice * duration;
-
+          const groupTotal = resolveTierPrice(group.tier) * duration;
           if (efectivoBreakdown) efectivoBreakdown += '\n';
           efectivoBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotal.toFixed(2)}`;
         });
@@ -9264,13 +9419,8 @@ class ItineraryBuilder {
         // Build breakdown text for transferencia (with surcharge applied to each group)
         let transferenciaBreakdown = '';
         groups.forEach((group, index) => {
-          let groupPrice = group.tier.price;
-          if (priceCurrency === 'USD' && this.exchangeRate) {
-            groupPrice = Math.round(groupPrice * this.exchangeRate);
-          }
-          const groupTotal = groupPrice * duration;
+          const groupTotal = resolveTierPrice(group.tier) * duration;
           const groupTotalWithSurcharge = groupTotal * (1 + (this.transferRate / 100));
-
           if (transferenciaBreakdown) transferenciaBreakdown += '\n';
           transferenciaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotalWithSurcharge.toFixed(2)}`;
         });
@@ -9280,13 +9430,8 @@ class ItineraryBuilder {
         // Build breakdown text for tarjeta (with surcharge applied to each group)
         let tarjetaBreakdown = '';
         groups.forEach((group, index) => {
-          let groupPrice = group.tier.price;
-          if (priceCurrency === 'USD' && this.exchangeRate) {
-            groupPrice = Math.round(groupPrice * this.exchangeRate);
-          }
-          const groupTotal = groupPrice * duration;
+          const groupTotal = resolveTierPrice(group.tier) * duration;
           const groupTotalWithSurcharge = groupTotal * (1 + (this.agencyRate / 100));
-
           if (tarjetaBreakdown) tarjetaBreakdown += '\n';
           tarjetaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotalWithSurcharge.toFixed(2)}`;
         });
@@ -12606,15 +12751,21 @@ class ItineraryBuilder {
 
   // Mark an overlap warning as accepted by the user. Hides the warning + red border
   // until the service's schedule is edited again (see resetOverlapAcceptanceIfScheduleChanged).
-  acceptOverlap(serviceId) {
+  async acceptOverlap(serviceId) {
     const service = this.services.get(serviceId);
     if (!service) return;
     service.overlapAccepted = true;
-    this.hasUnsavedChanges = true;
-    if (typeof this.scheduleAutoSave === 'function') {
-      this.scheduleAutoSave();
-    }
     this.renderDaysContent();
+    // Persist immediately — the 2s autoSave debounce loses the change if the
+    // user reloads before it fires, causing the warning to reappear.
+    try {
+      await this.saveToBackend();
+    } catch (error) {
+      console.error('Failed to persist overlap acceptance:', error);
+      service.overlapAccepted = false;
+      this.renderDaysContent();
+      this.showAlert('No se pudo guardar la aceptación del conflicto', 'danger');
+    }
   }
 
   getOverlapTooltip(service) {
@@ -13937,9 +14088,11 @@ class ItineraryBuilder {
         document.getElementById('additionalVehicleCheckbox').checked = false;
       }
 
-      // Show pricing fields
+      // Show pricing fields — clear any inline display:none left over from
+      // a previous walking-tour edit (which force-hides the section).
       if (standardPricingSection) {
         standardPricingSection.classList.remove('d-none');
+        standardPricingSection.style.display = '';
       }
 
       // Show the tour vehicle override toggle for admin users
@@ -14259,21 +14412,13 @@ class ItineraryBuilder {
     const serviceQuantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
 
     if (vehicleSelect && vehicleSelect.value && tourSelect && tourSelect.value) {
-      // Create a temporary service object to calculate vehicle cost
-      const tempService = {
-        type: 'tour',
-        tourId: tourSelect.value,
-        rateId: rateSelect ? rateSelect.value : null,
-        vehicleId: vehicleSelect.value,
-        vehicleType: vehicleSelect.value, // Use the actual value, not text content
-        quantity: serviceQuantity,
-      };
-
-      const vehicleCost = this.getVehicleCost(tempService);
+      // Use the shared helper so we resolve the vehicle TYPE NAME from the
+      // selected option text (e.g. "SPRINTER - 16 pax" → "SPRINTER") — the
+      // same lookup key the tour-prices cache uses. Matching by ObjectId
+      // alone misses the cache and returns 0.
+      const vehicleCost = this.getMainVehicleCost();
       const vehicleTotal = vehicleCost * serviceQuantity;
       totalPrice += vehicleTotal;
-      // console.log('🚛 Recalculation - Tour:', tourSelect.value, 'Rate:', rateSelect?.value, 'Vehicle:', vehicleSelect.value);
-      // console.log('🚛 Adding vehicle cost in recalculation:', vehicleCost, '× quantity:', serviceQuantity, '= Total vehicle cost:', vehicleTotal);
     }
 
     // Add driver tour rate if includeGuide is checked (Guía + Chofer)
@@ -14284,26 +14429,24 @@ class ItineraryBuilder {
       // console.log('🚗 Adding driver tour rate in recalculation:', driverTourRate, 'New total:', totalPrice);
     }
 
-    // Update the price field - ONLY if price override is not active
-    // Check both DOM and service object for override state to handle timing issues
+    // Update the price field — ONLY if price override is not active. Vehicle
+    // tours use `tourVehicleOverridePrices`; walking tours use `tourOverridePrices`.
+    // Trust the live checkbox state (not stored data) so that unchecking the
+    // box allows the field to start auto-updating again.
     const tourOverrideCheckbox = document.getElementById('tourOverridePrices');
-    const isOverrideChecked = tourOverrideCheckbox?.checked || false;
+    const vehicleOverrideCheckbox = document.getElementById('tourVehicleOverridePrices');
+    const isOverrideChecked = (tourOverrideCheckbox?.checked || false) || (vehicleOverrideCheckbox?.checked || false);
+    const tourOverride = isOverrideChecked;
+    // Still pull the stored service so the override branch can restore the
+    // saved custom price; not used to decide whether override is active.
     const storedService = this.getServiceForEditing();
-    const hasStoredOverride = storedService?.priceOverride || false;
-    const tourOverride = isOverrideChecked || hasStoredOverride;
 
     const servicePriceField = document.getElementById('servicePrice');
 
     console.log('🔒 Price protection check in recalculateTourPrice:', {
       tourOverride,
       isOverrideChecked,
-      hasStoredOverride,
       currentServiceId: this.currentServiceId,
-      storedService: storedService ? {
-        priceOverride: storedService.priceOverride,
-        customPrice: storedService.customPrice,
-        price: storedService.price,
-      } : null,
       currentFieldValue: servicePriceField?.value,
     });
 
@@ -14311,16 +14454,10 @@ class ItineraryBuilder {
       // Only update price field when override is NOT checked
       // Only show the vehicle cost in the price field
       if (vehicleSelect && vehicleSelect.value && tourSelect && tourSelect.value) {
-        // We already calculated vehicleCost above, let's extract just that
-        const tempService2 = {
-          type: 'tour',
-          tourId: tourSelect.value,
-          rateId: rateSelect ? rateSelect.value : null,
-          vehicleId: vehicleSelect.value,
-          vehicleType: vehicleSelect.value,
-          quantity: serviceQuantity,
-        };
-        const vehicleOnlyCost = this.getVehicleCost(tempService2);
+        // Resolve vehicle TYPE NAME via the shared helper (same lookup the
+        // cache is keyed on). Building a tempService inline with vehicleType =
+        // ObjectId misses the cache and returns 0.
+        const vehicleOnlyCost = this.getMainVehicleCost();
         const baseVehicleCost = this.getBasePriceOnly(vehicleOnlyCost);
 
         // Start with base vehicle cost
@@ -15900,10 +16037,12 @@ class ItineraryBuilder {
         console.log('❌ BREAKDOWN: Additional vehicle not selected or checkbox not checked');
       }
     } else if (serviceType === 'experience') {
-      // Use quote data instead of modal fields to match dev breakdown (correct data source)
-      const adultsQty = this.quoteData?.numberOfAdults || 0;
-      const childrenQty = this.quoteData?.numberOfChildren || 0;
-      const noAlcoholQty = this.quoteData?.numberOfInfants || 0;
+      // Read quantities straight from the modal — what the user actually typed.
+      // Quote-level numberOfAdults/Children/Infants prefill these on open but
+      // can diverge per-service, so the modal is the source of truth.
+      const adultsQty = parseInt(document.getElementById('adultsQuantity')?.value || 0, 10) || 0;
+      const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value || 0, 10) || 0;
+      const noAlcoholQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0, 10) || 0;
       const adultPrice = parseFloat(document.getElementById('adultPrice')?.value || 0);
       const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0);
       const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0);
@@ -15919,10 +16058,7 @@ class ItineraryBuilder {
       // Calculate base total (efectivo)
       const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal;
 
-      // Get current payment type
-      const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-
-      // Calculate surcharged total based on payment type
+      // Calculate surcharged total based on the active payment type.
       let finalTotal = baseTotal;
       if (paymentType === 'transferencia' && this.transferRate > 0) {
         finalTotal = baseTotal * (1 + (this.transferRate / 100));
@@ -15930,17 +16066,20 @@ class ItineraryBuilder {
         finalTotal = baseTotal * (1 + (this.agencyRate / 100));
       }
 
-      // Show detailed breakdown with final surcharged totals (without showing surcharge details)
+      // Distribute the surcharge proportionally across categories. Guarded so we
+      // don't divide by 0 when baseTotal is empty.
+      const splitShare = baseTotal > 0 ? (finalTotal / baseTotal) : 0;
+
       if (adultsQty > 0 && adultPrice > 0) {
-        const finalAdultTotal = (adultsTotal / baseTotal) * finalTotal;
+        const finalAdultTotal = adultsTotal * splitShare;
         items.push({ label: `Adultos: ${adultsQty} × $${adultPrice.toFixed(2)} = $${finalAdultTotal.toFixed(2)}`, amountMXN: finalAdultTotal });
       }
       if (childrenQty > 0 && childPrice > 0) {
-        const finalChildTotal = (childrenTotal / baseTotal) * finalTotal;
+        const finalChildTotal = childrenTotal * splitShare;
         items.push({ label: `Niños: ${childrenQty} × $${childPrice.toFixed(2)} = $${finalChildTotal.toFixed(2)}`, amountMXN: finalChildTotal });
       }
       if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
-        const finalNoAlcoholTotal = (noAlcoholTotal / baseTotal) * finalTotal;
+        const finalNoAlcoholTotal = noAlcoholTotal * splitShare;
         items.push({ label: `Sin alcohol: ${noAlcoholQty} × $${noAlcoholPrice.toFixed(2)} = $${finalNoAlcoholTotal.toFixed(2)}`, amountMXN: finalNoAlcoholTotal });
       }
 
@@ -15949,9 +16088,13 @@ class ItineraryBuilder {
         items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precios personalizados</span>', amountMXN: 0 });
       }
 
+      // Set the final total so the visibility guard at the end of the function
+      // doesn't hide the breakdown.
+      totalMXN = finalTotal;
+
       console.log('📊 Experience service breakdown calculated:', {
         quantities: { adultsQty, childrenQty, noAlcoholQty },
-        quantitySource: 'quote data (matches dev breakdown)',
+        quantitySource: 'modal fields',
         prices: { adultPrice, childPrice, noAlcoholPrice },
         baseTotal,
         paymentType,
@@ -18440,9 +18583,15 @@ class ItineraryBuilder {
           if (vehiclePricingSection) vehiclePricingSection.classList.add('d-none');
           if (walkingPricingSection) walkingPricingSection.classList.remove('d-none');
 
-          // Hide the tour person prices override toggle for walking tours (DISABLED FOR NOW)
+          // Show the override checkbox for walking tours (per-group price editing).
           if (this.canEditPrices) {
-            document.getElementById('tourOverridePricesContainer')?.classList.add('d-none');
+            const overrideContainer = document.getElementById('tourOverridePricesContainer');
+            overrideContainer?.classList.remove('d-none');
+            // Default to unchecked + hidden manual section when selecting a fresh tour.
+            const overrideCheckbox = document.getElementById('tourOverridePrices');
+            if (overrideCheckbox && !overrideCheckbox.checked) {
+              document.getElementById('walkingTourManualPriceContainer')?.classList.add('d-none');
+            }
           }
 
           // Hide transport checkbox for walking tours (they don't require transport)
@@ -18471,10 +18620,13 @@ class ItineraryBuilder {
           document.getElementById('tourOverridePricesContainer')?.classList.add('d-none');
         }
 
-        // Show standard pricing section (Precio base and Cantidad fields) for vehicle tours
+        // Show standard pricing section (Precio base and Cantidad fields) for vehicle tours.
+        // Clear inline display:none too — a previous walking-tour edit force-hides it
+        // with an inline style that classList.remove alone cannot undo.
         const standardPricingSection = document.getElementById('standardPricingSection');
         if (standardPricingSection) {
           standardPricingSection.classList.remove('d-none');
+          standardPricingSection.style.display = '';
         }
 
         // Auto-enable transport for vehicle tours
@@ -19631,6 +19783,23 @@ class ItineraryBuilder {
     // Totals will be calculated from display prices (with surcharge + currency)
     let grandSubtotal = 0;
 
+    // Backend requires strict HH:MM (00:00 - 23:59). Coerce loose inputs
+    // ("9:00", "9:00 AM", " ") to valid HH:MM or null so legacy/typo'd
+    // subconcepts don't block the entire save.
+    const normalizeTimeHHMM = (val) => {
+      if (val === null || val === undefined || val === '') return null;
+      const m = String(val).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?$/);
+      if (!m) return null;
+      let h = parseInt(m[1], 10);
+      const min = parseInt(m[2], 10);
+      if (min > 59) return null;
+      const ampm = m[3] && m[3].toUpperCase();
+      if (ampm === 'PM' && h < 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      if (h > 23) return null;
+      return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+    };
+
     // Transform our data structure to match the expected format
     const serviceItemsData = {
       days: this.days.map((day, index) => {
@@ -19656,8 +19825,8 @@ class ItineraryBuilder {
           const subconcept = {
             type: service.type || 'regular',
             concept: this.getServiceTitle(service),
-            time: service.startTime || null, // Backend expects 'time' not 'startTime'
-            endTime: service.endTime || null,
+            time: normalizeTimeHHMM(service.startTime), // Backend expects 'time' not 'startTime'
+            endTime: normalizeTimeHHMM(service.endTime),
             vehicleId: service.vehicleId || null,
             vehicleType: service.vehicleType || null, // Store vehicle type for tours
             vehicleTypeName: service.vehicleTypeName || null, // Store display name
@@ -19680,11 +19849,12 @@ class ItineraryBuilder {
             tourId: service.tourId || null,
             rateId: service.rateId || null, // Store rate for vehicle pricing
             hotelName: service.hotelName || null,
-            // People quantities
-            adultsQuantity: service.adultsQuantity || null,
-            childrenQuantity: service.childrenQuantity || null,
-            adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity || null,
-            infantsQuantity: service.infantsQuantity || null,
+            // People quantities — nullish coalescing so a real 0 stays 0
+            // (||null would silently drop legitimate zero counts).
+            adultsQuantity: service.adultsQuantity ?? null,
+            childrenQuantity: service.childrenQuantity ?? null,
+            adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity ?? null,
+            infantsQuantity: service.infantsQuantity ?? null,
             // Schedule for experiences
             selectedSchedule: service.selectedSchedule || null,
             // Individual prices for experiences
@@ -19745,6 +19915,11 @@ class ItineraryBuilder {
             walkingTourPeopleCount: service.walkingTourPeopleCount || null,
             walkingTourPrice: service.walkingTourPrice || null,
             walkingTourCurrency: service.walkingTourCurrency || null,
+            // Walking tour manual override metadata so the modal can restore
+            // the checkbox + per-tier inputs on next edit.
+            walkingTourPriceOverride: service.walkingTourPriceOverride || false,
+            walkingTourPriceMode: service.walkingTourPriceMode || null,
+            walkingTourGroupPrices: Array.isArray(service.walkingTourGroupPrices) ? service.walkingTourGroupPrices : null,
             // Price override fields
             priceOverride: service.priceOverride || false,
             customPrice: service.customPrice || null,
@@ -20910,6 +21085,14 @@ class ItineraryBuilder {
       });
     });
 
+    container.querySelectorAll('.accept-overlap-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const { serviceId } = btn.dataset;
+        this.acceptOverlap(serviceId);
+      });
+    });
+
     // Toggle include in total buttons
     container.querySelectorAll('.toggle-include-total-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -20994,8 +21177,8 @@ class ItineraryBuilder {
   // Generate dynamic input fields for each walking tour group
   generateWalkingTourGroupInputs(tour, peopleCount) {
     const priceMode = document.querySelector('input[name="walkingPriceMode"]:checked')?.value || 'total';
-    const groupPricesContainer = document.getElementById('walkingTourGroupPrices');
-    const totalPriceContainer = document.getElementById('walkingTourTotalPriceContainer');
+    const groupPricesContainer = document.getElementById('walkingTourGroupPricesContainer');
+    const totalPriceContainer = document.getElementById('walkingTourTotalPriceSection');
     const groupPricesSection = document.getElementById('walkingTourGroupPricesSection');
 
     if (priceMode === 'total') {
@@ -21009,34 +21192,35 @@ class ItineraryBuilder {
 
       if (!groupPricesContainer) return;
 
-      // Calculate groups
-      const groups = this.calculateWalkingTourGroups(tour, peopleCount);
+      // Render one input per configured tier (Small/Medium/Large) so the user
+      // can override each tier's price independently. Tiers are fixed per tour
+      // — not dynamic — so no add/remove buttons.
       const priceCurrency = tour.walkingPriceCurrency || 'MXN';
+      const tiers = [
+        { name: 'Small', label: tour.walkingRangeSmall, price: parseFloat(tour.walkingPriceSmall || 0) },
+        { name: 'Medium', label: tour.walkingRangeMedium, price: parseFloat(tour.walkingPriceMedium || 0) },
+        { name: 'Large', label: tour.walkingRangeLarge, price: parseFloat(tour.walkingPriceLarge || 0) },
+      ].filter((t) => t.label);
 
-      // Generate input fields for each group
-      let html = '';
-      groups.forEach((group, index) => {
-        let defaultPrice = group.tier.price;
-        // If source price is in USD, convert to MXN for internal storage
+      let html = '<div class="row g-3">';
+      tiers.forEach((tier, index) => {
+        let defaultPrice = tier.price;
         if (priceCurrency === 'USD' && this.exchangeRate) {
           defaultPrice = Math.round(defaultPrice * this.exchangeRate);
         }
 
         html += `
-          <div class="mb-3">
-            <label class="form-label d-flex justify-content-between align-items-center">
-              <span>
-                <i class="ti ti-users me-1"></i>
-                Grupo ${index + 1} (${group.tier.label})
-              </span>
-              <span class="text-muted small">${group.count} personas</span>
+          <div class="col-md-4 walking-group-row" data-tier-name="${tier.name}" data-tier-label="${tier.label}">
+            <label class="form-label d-flex align-items-center mb-1">
+              <i class="ti ti-users me-1"></i>
+              <span class="walking-group-title">Grupo ${index + 1} (${tier.label})</span>
             </label>
             <div class="input-group">
               <span class="input-group-text">$</span>
-              <input type="text" 
-                     class="form-control walking-group-price" 
-                     id="walkingGroupPrice_${index}" 
+              <input type="text"
+                     class="form-control walking-group-price"
                      data-group-index="${index}"
+                     data-tier-name="${tier.name}"
                      value="${defaultPrice.toFixed(2)}"
                      placeholder="Precio del grupo">
               <span class="input-group-text">MXN</span>
@@ -21044,37 +21228,12 @@ class ItineraryBuilder {
           </div>
         `;
       });
-
-      // Add total calculation display
-      html += `
-        <div class="border-top pt-2 mt-3">
-          <div class="d-flex justify-content-between align-items-start">
-            <span class="fw-bold">Totales:</span>
-            <div class="fw-bold text-end" id="walkingGroupTotalDisplay">
-              <div class="d-flex flex-column gap-1">
-                <div class="d-flex justify-content-between">
-                  <span>Efectivo:</span>
-                  <span>$0.00 MXN</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                  <span>Transferencia:</span>
-                  <span>$0.00 MXN</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                  <span>Tarjeta:</span>
-                  <span>$0.00 MXN</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
+      html += '</div>';
 
       groupPricesContainer.innerHTML = html;
 
-      // Add event listeners to group price inputs
-      const groupInputs = groupPricesContainer.querySelectorAll('.walking-group-price');
-      groupInputs.forEach((input) => {
+      // Wire validation + breakdown listeners on a single price input.
+      const wireInput = (input) => {
         input.addEventListener('input', (e) => {
           // Apply price validation
           const inp = e.target;
@@ -21099,11 +21258,14 @@ class ItineraryBuilder {
             inp.value = value;
           }
 
-          // Update total display
-          updateWalkingGroupTotalDisplay();
-          // Update breakdown
-          this.updateServicePriceBreakdown();
+          // Update total display (function lives in DOMContentLoaded scope; guard for class-method access).
+          if (typeof updateWalkingGroupTotalDisplay === 'function') {
+            updateWalkingGroupTotalDisplay();
+          }
+          // Dev breakdown must run FIRST — it populates the devBreakdown* fields
+          // that updateServicePriceBreakdown reads from.
           this.updateDevPaymentBreakdown();
+          this.updateServicePriceBreakdown();
         });
 
         // Add keydown handler to prevent invalid characters
@@ -21150,10 +21312,15 @@ class ItineraryBuilder {
           // Trigger input event to apply full validation
           inp.dispatchEvent(new Event('input', { bubbles: true }));
         });
-      });
+      };
 
-      // Calculate initial total
-      updateWalkingGroupTotalDisplay();
+      // Wire validation listeners on each tier input.
+      groupPricesContainer.querySelectorAll('.walking-group-price').forEach(wireInput);
+
+      // Calculate initial total (function lives in DOMContentLoaded scope; guard for class-method access).
+      if (typeof updateWalkingGroupTotalDisplay === 'function') {
+        updateWalkingGroupTotalDisplay();
+      }
     }
   }
 

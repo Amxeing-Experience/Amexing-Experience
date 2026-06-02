@@ -3294,9 +3294,9 @@ class ExperienceServicesBuilder {
 
     const overlapClass = service.hasOverlap ? ' has-overlap' : '';
     const overlapBadge = service.hasOverlap ? `
-              <span class="text-danger ms-2" title="${this.getOverlapTooltip(service)}">
+              <span class="overlap-warning-badge ms-2" title="${this.getOverlapTooltip(service)}">
                 <i class="ti ti-alert-triangle"></i>
-                <small>Conflicto de horario</small>
+                <span>Conflicto de horario</span>
               </span>` : '';
 
     // Transport-specific rendering
