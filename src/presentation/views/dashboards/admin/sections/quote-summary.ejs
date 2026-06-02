@@ -1197,18 +1197,41 @@
 
             // Populate summary information
             document.getElementById('summaryFolio').textContent = quote.folio || quote.id || 'N/A';
-            document.getElementById('summaryFolioHeader').textContent = quote.folio || quote.id || 'N/A';
+            // Reservation view prefixes the banner folio with "Reservación" so the
+            // public/PDF heading reads "Reservación MAY-2605-002" instead of just the folio.
+            const __folioLabel = quote.folio || quote.id || 'N/A';
+            const __isReservationView = <%- typeof isReservationView !== 'undefined' && isReservationView ? 'true' : 'false' %>;
+            document.getElementById('summaryFolioHeader').textContent = __isReservationView
+                ? `Reservación ${__folioLabel}`
+                : __folioLabel;
             document.getElementById('summaryGenerationDate').textContent = formatDateSpanish(quote.createdAt);
             document.getElementById('summaryLastUpdated').textContent = formatDateSpanish(quote.updatedAt);
-            // Atención a
-            const contactPerson = quote.contactPerson || '';
+            // Atención a — defaults to the quote owner's full name. When the
+            // owner is an admin/superadmin the owner identity isn't meaningful
+            // to the client, so fall back to the contact person instead.
             const summaryContactPersonElement = document.getElementById('summaryContactPerson');
             if (summaryContactPersonElement) {
-                if (contactPerson && contactPerson.toLowerCase() !== 'no especificado' && contactPerson.trim() !== '') {
-                    summaryContactPersonElement.textContent = contactPerson;
+                const owner = quote.owner || {};
+                const ownerRole = String(owner.role || '').toLowerCase();
+                const ownerIsAdmin = ownerRole === 'admin' || ownerRole === 'superadmin';
+                const ownerFullName = [owner.firstName, owner.lastName]
+                    .map((s) => String(s || '').trim())
+                    .filter(Boolean)
+                    .join(' ')
+                    .trim();
+                const contactPerson = (quote.contactPerson || '').trim();
+                const contactValue = contactPerson && contactPerson.toLowerCase() !== 'no especificado'
+                    ? contactPerson
+                    : '';
+                let atencionA = '';
+                if (ownerIsAdmin) {
+                    atencionA = contactValue;
+                } else if (ownerFullName) {
+                    atencionA = ownerFullName;
                 } else {
-                    summaryContactPersonElement.textContent = '-';
+                    atencionA = contactValue;
                 }
+                summaryContactPersonElement.textContent = atencionA || '-';
             }
 
             // Quote details — omit the "Motivo de viaje" row entirely when no event type was provided
@@ -1234,17 +1257,13 @@
                 quoteNotesBlock?.classList.add('d-none');
             }
 
-            // Lead Guest row — prefer explicit leadGuestFirst/LastName, otherwise fall back to
-            // the contact name (contactFirstName/contactLastName, or the legacy contactPerson).
+            // Lead Guest row — use ONLY the explicit leadGuestFirstName/leadGuestLastName
+            // fields. No fallback to the contact name; when not set the row stays hidden.
             const buildName = (first, last) => [first, last]
                 .map(part => (part || '').trim())
                 .filter(Boolean)
                 .join(' ');
-            let leadGuestName = buildName(quote.leadGuestFirstName, quote.leadGuestLastName);
-            if (!leadGuestName) {
-                leadGuestName = buildName(quote.contactFirstName, quote.contactLastName)
-                    || (quote.contactPerson || '').trim();
-            }
+            const leadGuestName = buildName(quote.leadGuestFirstName, quote.leadGuestLastName);
             const leadGuestRow = document.getElementById('summaryLeadGuestRow');
             const leadGuestEl = document.getElementById('summaryLeadGuest');
             if (leadGuestEl && leadGuestRow) {
