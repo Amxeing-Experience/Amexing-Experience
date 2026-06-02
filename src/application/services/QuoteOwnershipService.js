@@ -455,12 +455,31 @@ class QuoteOwnershipService {
         };
       }
 
+      // Resolve the owner role so the public summary can swap "Atención a" for
+      // the contact when the owner is an admin/superadmin. Prefer the direct
+      // role field, fall back to displayRole, then the Role pointer name.
+      let ownerRole = (owner.get('role') || owner.get('displayRole') || '').toString().toLowerCase();
+      if (!ownerRole) {
+        const rolePtr = owner.get('roleId');
+        if (rolePtr && typeof rolePtr === 'object') {
+          try {
+            if (typeof rolePtr.fetch === 'function' && !rolePtr.get('name')) {
+              await rolePtr.fetch({ useMasterKey: true });
+            }
+            ownerRole = (rolePtr.get && (rolePtr.get('name') || '')).toString().toLowerCase();
+          } catch (e) {
+            // role lookup is best-effort
+          }
+        }
+      }
+
       return {
         id: owner.id,
         username: owner.get('username') || 'Sin nombre de usuario',
         email: owner.get('email') || 'Sin correo',
         firstName: owner.get('firstName') || 'Sin nombre',
         lastName: owner.get('lastName') || '',
+        role: ownerRole,
         ownershipStartDate: ownership.getOwnershipStartDate() || new Date(),
         ownershipType: ownership.getOwnershipType() || 'initial',
       };

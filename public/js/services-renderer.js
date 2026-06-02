@@ -227,6 +227,13 @@
                         gap: 0.25rem;
                         margin-top: 0.25rem;
                     }
+                    /* Keep label and value in the same darker tone for a
+                       consistent look. The label keeps its text-muted class
+                       so other contexts still get the lighter tone — this
+                       only equalizes the in-row pairing. */
+                    .service-detail-item .text-muted {
+                        color: inherit !important;
+                    }
 
                     .service-price {
                         font-weight: normal;
@@ -483,6 +490,20 @@
                 badgeLabel = 'Experiencia';
             }
 
+            // Pick a start time (startTime → first time in selectedSchedule) and round to
+            // the nearest 15-min mark so we can show the same grey-blue "Hora: HH:MM"
+            // badge transports already display above the type label.
+            let startTime = '';
+            if (service.startTime) {
+                startTime = service.startTime;
+            } else if (service.selectedSchedule) {
+                const timeMatch = String(service.selectedSchedule).match(/^(\d{1,2}:\d{2})/);
+                if (timeMatch) startTime = timeMatch[1];
+            } else if (service.time) {
+                startTime = service.time;
+            }
+            const roundedTime = startTime ? this.roundTimeToNearest15(startTime) : '';
+
             // Clean service item with minimal styling
             let html = `<div class="service-item">`;
 
@@ -491,6 +512,15 @@
 
             // Left side: Service info (keeping original structure)
             html += '<div class="service-info flex-grow-1">';
+
+            // Rounded time badge at top (mirrors the transport renderer styling).
+            if (roundedTime) {
+                html += `<div class="mb-2">
+                    <span class="service-badge info">
+                        <i class="ti ti-clock me-1"></i>Hora: ${roundedTime}
+                    </span>
+                </div>`;
+            }
 
             // Service badges and title on same line (keeping original layout)
             html += '<div class="d-flex align-items-center mb-2">';
@@ -558,7 +588,7 @@
                 hasExtraVehicles) {
                 html += `<div class="mt-1">
                     <div class="mb-1">
-                        <i class="ti ti-car me-1"></i><span class="text-muted">Vehículo(s):</span>
+                        <i class="ti ti-car me-1"></i>Vehículo(s):
                     </div>
                     ${(service.vehicleId || service.vehicleType || service.vehicleTypeName) ? `
                         <div class="ms-3">
@@ -1069,7 +1099,7 @@
                 (service.type === 'tour' && service.additionalVehicleId)) {
                 html += `<div>
                     <div class="mb-1">
-                        <i class="ti ti-car me-1"></i><span class="text-muted">Vehículo(s):</span>
+                        <i class="ti ti-car me-1"></i>Vehículo(s):
                     </div>
                     ${(service.vehicleId || service.vehicleType || service.vehicleTypeName) ? `
                         <div class="ms-3">
