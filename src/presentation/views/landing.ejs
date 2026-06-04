@@ -126,8 +126,8 @@ Created by Denisse Maldonado
         .loader-spinner {
             width: 50px;
             height: 50px;
-            border: 3px solid rgba(184, 134, 11, 0.3);
-            border-top: 3px solid #B8860B;
+            border: 3px solid rgba(150, 155, 129, 0.3);
+            border-top: 3px solid #969B81;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -152,7 +152,7 @@ Created by Denisse Maldonado
             background: linear-gradient(135deg, #B8860B, #DAA520);
             color: white;
             border: none;
-            border-radius: 50%;
+            border-radius: 0;
             cursor: pointer;
             opacity: 0;
             visibility: hidden;
@@ -265,12 +265,18 @@ Created by Denisse Maldonado
         }
         
         .reconocimientos-section__title {
-            font-family: var(--font-myriad);
+            font-family: var(--font-newsreader);
+            font-optical-sizing: auto;
             font-weight: 400;
             font-size: clamp(1.2rem, 2.5vw, 1.8rem);
-            color: #969b81;
+            color: #969B81;
             letter-spacing: 0.3em;
             text-transform: uppercase;
+            /* Equal VISUAL space above and below the word (between the two <hr>).
+               Caps sit high in the line box, leaving ~6px more below, so the top
+               margin is a bit larger than the bottom to compensate (total kept). */
+            line-height: 1;
+            margin: 1.7rem 0 1.3rem;
         }
         
         .reconocimientos-section__award {
@@ -281,13 +287,14 @@ Created by Denisse Maldonado
         
         .reconocimientos-section__image {
             margin-top: 3rem;
-            max-width: 150px;
+            max-width: 270px;
             height: auto;
             border-radius: 50%;
         }
 
         .reconocimientos-section__hr {
             color: #969b81;
+            margin: 0;
         }
 
         /* Testimonios Section Styles */
@@ -304,9 +311,10 @@ Created by Denisse Maldonado
         }
         
         .testimonios-section__title {
-            font-family: var(--font-myriad);
+            font-family: var(--font-newsreader);
+            font-optical-sizing: auto;
             font-weight: 400;
-            font-size: clamp(1.8rem, 3vw, 2.5rem);
+            font-size: clamp(2rem, 3vw, 2.7rem);
             color: white;
             background: rgba(150, 155, 129, 1.0);
             padding: 1rem 3rem;

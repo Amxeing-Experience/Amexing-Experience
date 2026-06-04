@@ -50,7 +50,7 @@ Created by Denisse Maldonado
 
         /* Page Hero Banner Section - Green banner with content */
         .page-hero-banner {
-            background: #869B81;
+            background: #969b81;
             color: white;
             padding: 2rem 0;
         }
@@ -135,6 +135,50 @@ Created by Denisse Maldonado
             width: 24px;
             height: 24px;
             object-fit: contain;
+        }
+
+        /* TripAdvisor is not in Font Awesome 6 Free (it only exists in FA4), so
+           we self-host the FA4 icon font under an isolated family name to avoid
+           clashing with the FA6 the site already loads. */
+        @font-face {
+            font-family: "TripAdvisor Icon";
+            src: url("/fonts/icons/fa4-tripadvisor.woff2") format("woff2");
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        /* TripAdvisor uses an icon-font glyph, so the circle (which the other
+           icons carry inside their PNG) is drawn here to match Facebook. */
+        .page-hero-banner__social-link--tripadvisor {
+            width: 24px;
+            height: 24px;
+            /* Ring drawn with an inset box-shadow (not border) so the stroke can
+               be sub-pixel/soft and match the thin Facebook PNG ring (~0.7px). */
+            box-shadow: inset 0 0 0 0.75px #fff;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 12px;
+            line-height: 1;
+            box-sizing: border-box;
+        }
+
+        .page-hero-banner__social-link--tripadvisor:hover {
+            /* Keep the glyph visible (shared hover paints a white bg) and keep
+               the ring (shared hover overrides box-shadow). */
+            background: transparent;
+            box-shadow: inset 0 0 0 0.75px #fff, 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Force the TripAdvisor glyph: multiple Font Awesome versions are loaded
+           on the page and clobber the default .fa-tripadvisor content rule, so we
+           pin the FA6 Brands font and its unicode (\f262) directly. */
+        .page-hero-banner__social-link--tripadvisor i::before {
+            font-family: "TripAdvisor Icon";
+            font-weight: normal;
+            /* <i> is italic by default; without this the glyph gets faux-italic. */
+            font-style: normal;
+            content: "\f262";
         }
 
         @media (max-width: 768px) {
@@ -231,16 +275,23 @@ Created by Denisse Maldonado
                 <div class="page-hero-banner__right">
                     <p class="page-hero-banner__follow-text">FOLLOW US ON</p>
                     <div class="page-hero-banner__social-icons">
-                        <a href="https://facebook.com/amexingexperience" 
-                           target="_blank" 
-                           rel="noopener noreferrer" 
+                        <a href="https://www.tripadvisor.com.mx/Attraction_Review-g151932-d19425238-Reviews-Amexing_Experience_by_Angelica_Tours-San_Miguel_de_Allende_Central_Mexico_and_Gu.html"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="page-hero-banner__social-link page-hero-banner__social-link--tripadvisor"
+                           aria-label="TripAdvisor">
+                            <i aria-hidden="true"></i>
+                        </a>
+                        <a href="https://www.facebook.com/amexingexperience"
+                           target="_blank"
+                           rel="noopener noreferrer"
                            class="page-hero-banner__social-link"
                            aria-label="Facebook">
                             <img src="/images/facebook_blanco.png" alt="Facebook" class="page-hero-banner__social-icon">
                         </a>
-                        <a href="https://instagram.com/amexingexperience" 
-                           target="_blank" 
-                           rel="noopener noreferrer" 
+                        <a href="https://www.instagram.com/amexingexperience/"
+                           target="_blank"
+                           rel="noopener noreferrer"
                            class="page-hero-banner__social-link"
                            aria-label="Instagram">
                             <img src="/images/instagram_blanco.png" alt="Instagram" class="page-hero-banner__social-icon">
