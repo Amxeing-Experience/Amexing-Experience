@@ -631,9 +631,12 @@ class Quote extends BaseModel {
     query.equalTo('exists', true);
     query.equalTo('active', true);
 
-    // Include related objects for public view
+    // Include related objects for public view (mirror the authenticated
+    // /api/quotes/:id includes so the public/PDF summary has the same fields).
     query.include('rate');
     query.include('client');
+    query.include('companyClientPtr');
+    query.include('createdBy');
 
     try {
       const result = await query.first({ useMasterKey: true });

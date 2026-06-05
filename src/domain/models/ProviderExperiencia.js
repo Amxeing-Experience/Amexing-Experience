@@ -292,14 +292,11 @@ class ProviderExperiencia extends BaseModel {
 
     // Only validate field constraints, not required field presence
     const name = this.get('name');
-    if (name && name.length > 200) {
-      errors.push('Name must be 200 characters or less');
+    if (name && name.length > 280) {
+      errors.push('Name must be 280 characters or less');
     }
 
-    const description = this.get('description');
-    if (description && description.length > 1000) {
-      errors.push('Description must be 1000 characters or less');
-    }
+    // No maximum length for description (effectively unlimited).
 
     const price = this.getPrice();
     if (price !== undefined && price !== null && price < 0) {
@@ -368,17 +365,14 @@ class ProviderExperiencia extends BaseModel {
       errors.push('Name is required');
     }
 
-    if (this.getName().length > 200) {
-      errors.push('Name must be 200 characters or less');
+    if (this.getName() && this.getName().length > 280) {
+      errors.push('Name must be 280 characters or less');
     }
 
     if (!this.getDescription()) {
       errors.push('Description is required');
     }
-
-    if (this.getDescription().length > 1000) {
-      errors.push('Description must be 1000 characters or less');
-    }
+    // No maximum length for description (effectively unlimited).
 
     const price = this.getPrice();
     if (price < 0) {

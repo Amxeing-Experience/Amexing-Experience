@@ -71,10 +71,20 @@
     font-display: swap;
 }
 
+/* Newsreader Font Family (variable: weight 200–800, optical sizing) */
+@font-face {
+    font-family: 'Newsreader';
+    src: url('../fonts/Newsreader-VariableFont_opsz,wght.ttf') format('truetype');
+    font-weight: 200 800;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* CSS Custom Properties for Easy Usage */
 :root {
     --font-arpona: 'Arpona', 'Helvetica Neue', Arial, sans-serif;
     --font-myriad: 'Myriad Pro', 'Helvetica Neue', Arial, sans-serif;
+    --font-newsreader: 'Newsreader', Georgia, 'Times New Roman', serif;
     --font-fallback: 'Helvetica Neue', Arial, sans-serif;
 }
 
@@ -95,6 +105,11 @@
 
 .font-myriad {
     font-family: var(--font-myriad);
+}
+
+.font-newsreader {
+    font-family: var(--font-newsreader);
+    font-optical-sizing: auto;
 }
 
 .font-myriad-light {

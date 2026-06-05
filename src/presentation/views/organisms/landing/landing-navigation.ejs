@@ -118,7 +118,10 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
     left: 0;
     right: 0;
     z-index: 1000;
-    padding: 1.5rem 0;
+    /* Asymmetric vertical padding to match the Illustrator design: a bit more
+       space above the items than below (~30px top / ~18px bottom, ratio ~1.7:1).
+       Total stays ~48px so the navbar height is unchanged. */
+    padding: 1.875rem 0 1.125rem;
     transition: all 0.3s ease;
     background: #2e2e2d;
     width: 100%;
@@ -215,7 +218,7 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
     left: 0;
     width: 0;
     height: 1px;
-    background: #B8860B;
+    background: #969B81;
     transition: width 0.3s ease;
 }
 
@@ -225,7 +228,7 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
 }
 
 .landing-nav__link:hover {
-    color: #B8860B;
+    color: #969B81;
 }
 
 .landing-nav__item--actions {
@@ -245,15 +248,26 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.1rem 1.5rem;
+    /* Proportion mapped from Illustrator (button 248x68 within a 188px-tall
+       navbar). Real navbar is 83px tall → scale 83/188 ≈ 0.4415, so the button
+       maps to ~109.4 x 30. aspect-ratio keeps the exact 248:68 ratio; height
+       drives width (auto-computed to ~109.4px). */
+    height: 30px;
+    aspect-ratio: 248 / 68;
+    /* Optical centering: Myriad Pro all-caps sit high in the line box (the caps
+       don't fill the descender area), leaving ~2px more space below than above.
+       A small padding-top nudges the text down ~2px so it reads as centered. */
+    padding: 4px 0 0;
+    box-sizing: border-box;
+    white-space: nowrap;
     background: #969b81;
     border: 1px solid rgba(255, 255, 255, 0.9);
     color: rgba(255, 255, 255, 0.9);
     text-decoration: none;
     font-family: var(--font-myriad);
     font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
     transition: all 0.3s ease;
     cursor: pointer;
@@ -269,14 +283,16 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    /* Profile icon 44x44 in Illustrator, mapped by the navbar scale
+       (83/188 ≈ 0.4415) → ~19.4px, consistent with the book button mapping. */
+    width: 19.4px;
+    height: 19.4px;
     transition: all 0.3s ease;
 }
 
 .landing-nav__user-icon-img {
-    width: 24px;
-    height: 24px;
+    width: 19.4px;
+    height: 19.4px;
     transition: all 0.3s ease;
     opacity: 0.9;
 }
@@ -294,8 +310,10 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 25px;
-    height: 25px;
+    /* Language icon 44x44 in Illustrator, mapped by the navbar scale
+       (83/188 ≈ 0.4415) → ~19.4px, consistent with the profile icon. */
+    width: 19.4px;
+    height: 19.4px;
     background: transparent;
     border: none;
     cursor: pointer;
@@ -308,8 +326,8 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
 }
 
 .landing-nav__language-icon {
-    width: 25px;
-    height: 25px;
+    width: 19.4px;
+    height: 19.4px;
     transition: all 0.3s ease;
     opacity: 0.9;
 }
@@ -441,9 +459,8 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
     }
     
     .landing-nav__book-btn {
-        padding: 0.6rem 1.25rem;
+        /* padding: 0.6rem 1.25rem; */
         font-size: 0.85rem;
-        letter-spacing: 1.2px;
         min-height: 44px;
         display: inline-flex;
         align-items: center;
@@ -558,7 +575,7 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
     }
     
     .landing-nav__book-btn {
-        padding: 0.75rem 2rem;
+        /* padding: 0.75rem 2rem; */
         font-size: 1rem;
     }
     

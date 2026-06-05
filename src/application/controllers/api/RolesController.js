@@ -324,7 +324,7 @@ class RolesController {
         trimmedDisplayName = displayName.trim();
 
         // Validate displayName length
-        if (trimmedDisplayName.length > 100) {
+        if (trimmedDisplayName.length > 280) {
           return this.sendError(res, 'Display name cannot exceed 100 characters', 400);
         }
       }
@@ -337,10 +337,7 @@ class RolesController {
         }
         trimmedDescription = description.trim();
 
-        // Validate description length (allow empty, but limit max length)
-        if (trimmedDescription.length > 500) {
-          return this.sendError(res, 'Description cannot exceed 500 characters', 400);
-        }
+        // No maximum length for description (effectively unlimited).
       }
 
       // Get current role

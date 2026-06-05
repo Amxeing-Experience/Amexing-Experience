@@ -255,8 +255,8 @@ class ServiceTypeController {
         return this.sendError(res, 'El nombre es requerido', 400);
       }
 
-      if (name.length > 100) {
-        return this.sendError(res, 'El nombre debe tener 100 caracteres o menos', 400);
+      if (name.length > 280) {
+        return this.sendError(res, 'El nombre debe tener 280 caracteres o menos', 400);
       }
 
       // Check name uniqueness manually

@@ -140,6 +140,11 @@ class SecurityMiddleware {
             'allow-downloads',
             'allow-modals',
             'allow-popups', // Required for modals
+            // Lets target="_blank" tabs open WITHOUT inheriting this page's
+            // sandbox. Without it, popups inherit an opaque origin and the
+            // browser blocks navigation to sites that send
+            // Cross-Origin-Opener-Policy: same-origin (e.g. Facebook, Instagram).
+            'allow-popups-to-escape-sandbox',
           ],
           reportUri: '/api/csp-report',
           upgradeInsecureRequests: this.isProduction ? [] : null,

@@ -428,6 +428,14 @@ class ClientsController {
         return this.sendError(res, 'Access denied. Only SuperAdmin or Admin can delete clients.', 403);
       }
 
+      // The auth middleware exposes the role on req.userRole, not always on
+      // req.user. Ensure it's present so the service's role-hierarchy check
+      // (canModifyUser) can authorize the deactivation instead of treating the
+      // admin as role level 0 ("Insufficient permissions").
+      if (currentUser && !currentUser.role) {
+        currentUser.role = currentUserRole;
+      }
+
       // Deactivate client using service
       const result = await this.userService.deactivateUser(clientId, currentUser);
 

@@ -60,26 +60,16 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 <div class="btn-group" role="group" aria-label="Filtro por estado de servicios">
                     <input type="radio" class="btn-check" name="dateFilter" id="filterFuture" value="future" checked>
                     <label class="btn btn-outline-primary" for="filterFuture">
-                        <i class="ti ti-calendar-forward me-1"></i>Próximas cotizaciones
+                        <i class="ti ti-calendar-event me-1"></i>Actuales
                     </label>
                     
                     <input type="radio" class="btn-check" name="dateFilter" id="filterPrevious" value="previous">
                     <label class="btn btn-outline-secondary" for="filterPrevious">
-                        <i class="ti ti-calendar-time me-1"></i>Cotizaciones anteriores
-                    </label>
-                    
-                    <input type="radio" class="btn-check" name="dateFilter" id="filterNoServices" value="no-services">
-                    <label class="btn btn-outline-warning" for="filterNoServices">
-                        <i class="ti ti-alert-triangle me-1"></i>Sin servicios
+                        <i class="ti ti-calendar-time me-1"></i>Anteriores
                     </label>
                 </div>
 
                 <div class="d-inline-flex gap-2">
-                    <button type="button" class="btn btn-outline-info position-relative" id="filterCotizadas">
-                        <i class="ti ti-file-text me-1"></i>Cotizadas
-                        <span class="badge bg-info text-white position-absolute top-0 start-100 translate-middle" id="cotizadasCount">0</span>
-                    </button>
-                    
                     <button type="button" class="btn btn-outline-primary position-relative" id="filterSolicitadas">
                         <i class="ti ti-check me-1"></i>Solicitadas
                         <span class="badge bg-primary text-white position-absolute top-0 start-100 translate-middle" id="solicitadasCount">0</span>
@@ -97,15 +87,14 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 <thead class="table-light">
                     <tr>
                         <th>Folio</th>
-                        <% if (dtUserRole !== 'admin') { %><th class="text-center">Mi Rol</th><% } %>
                         <% if (showClientColumn) { %><th>Cliente</th><% } %>
-                        <% if (dtUserRole !== 'admin') { %><th>Tipo de Evento</th><% } %>
+                        <th>Propietario de la cotización</th>
+                        <th>Cliente Final</th>
                         <th class="text-center">No. Personas</th>
-                        <th>Creado Por</th>
-                        <th class="text-center">Estatus</th>
-                        <th class="text-center">Fecha Creación</th>
-                        <th class="text-center">Última Modificación</th>
                         <th class="text-center">Fecha inicio de servicios</th>
+                        <th class="text-center">Fecha Creación</th>
+                        <th class="text-center">Estatus</th>
+                        <th class="text-center">Última Modificación</th>
                         <% if (dtShowActions) { %>
                             <th class="text-center">Acciones</th>
                         <% } %>
@@ -553,49 +542,6 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         return `<span class="fw-semibold text-primary">${data || 'N/A'}</span>`;
                     }
                 },
-                <% if (dtUserRole !== 'admin') { %>
-                {
-                    data: 'userQuoteRoleSpanish',
-                    className: 'text-center',
-                    orderable: false,
-                    render: function(data, type, row) {
-                        const role = row.userQuoteRole || 'visualizador';
-                        const roleText = data || 'Visualizador';
-                        
-                        // Define badge styles and icons for each role
-                        let badgeClass = '';
-                        let icon = '';
-                        let tooltipText = '';
-                        
-                        switch(role) {
-                            case 'propietario':
-                                badgeClass = 'bg-gradient-purple text-white';
-                                icon = '<i class="ti ti-crown me-1"></i>';
-                                tooltipText = 'Eres el propietario de esta cotización';
-                                break;
-                            case 'editor':
-                                badgeClass = 'bg-gradient-primary text-white';
-                                icon = '<i class="ti ti-edit me-1"></i>';
-                                tooltipText = 'Tienes permisos de edición en esta cotización';
-                                break;
-                            case 'visualizador':
-                            default:
-                                badgeClass = 'bg-light text-dark';
-                                icon = '<i class="ti ti-eye me-1"></i>';
-                                tooltipText = 'Tienes permisos de visualización en esta cotización';
-                                break;
-                        }
-                        
-                        return `<span class="badge ${badgeClass} px-2 py-1" 
-                                      style="font-size: 0.75rem; font-weight: 500;"
-                                      data-bs-toggle="tooltip" 
-                                      data-bs-placement="top" 
-                                      title="${tooltipText}">
-                                    ${icon}${roleText}
-                                </span>`;
-                    }
-                },
-                <% } %>
                 <% if (showClientColumn) { %>
                 {
                     data: 'client',
@@ -619,17 +565,26 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     }
                 },
                 <% } %>
-                <% if (dtUserRole !== 'admin') { %>
                 {
-                    data: 'eventType',
+                    data: 'owner',
                     render: function(data) {
-                        if (!data || data.trim() === '') {
-                            return '<em class="text-muted">Sin especificar</em>';
+                        if (!data) return '<em class="text-muted">Sin información</em>';
+                        // If the current user owns the quote, show a "ME" tag instead of their name.
+                        if (data.isMe) {
+                            return '<span class="badge bg-primary px-2 py-1" style="font-size: 0.75rem;">ME</span>';
                         }
-                        return `<span class="text-truncate" style="max-width: 200px; display: inline-block;" title="${data}">${data}</span>`;
+                        return `<span>${data.fullName || data.email || 'N/A'}</span>`;
                     }
                 },
-                <% } %>
+                {
+                    data: 'contactPerson',
+                    render: function(data, type, row) {
+                        const name = (data && data.trim())
+                            || `${row.contactFirstName || ''} ${row.contactLastName || ''}`.trim();
+                        if (!name) return '<em class="text-muted">—</em>';
+                        return `<span>${name}</span>`;
+                    }
+                },
                 {
                     data: null,
                     className: 'text-center',
@@ -639,16 +594,66 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         const children = row.numberOfChildren || 0;
                         const infants = row.numberOfInfants || 0;
                         const total = adults + children + infants;
-                        
+
                         // Always use calculated total (no fallback)
                         return `<span class="fw-semibold">${total}</span>`;
                     }
                 },
                 {
-                    data: 'createdBy',
+                    data: null,
+                    className: 'text-center',
+                    orderable: true,
+                    render: function(data, type, row) {
+                        const serviceItems = row.serviceItems || {};
+                        const days = serviceItems.days || [];
+                        
+                        if (days.length === 0) {
+                            return '<em class="text-muted">Sin servicios</em>';
+                        }
+                        
+                        let startDate = null;
+                        for (const day of days) {
+                            if (day.date) {
+                                const d = new Date(`${day.date}T12:00:00`);
+                                if (!startDate || d < startDate) {
+                                    startDate = d;
+                                }
+                            }
+                        }
+                        
+                        if (!startDate) {
+                            return '<em class="text-muted">Sin fecha</em>';
+                        }
+                        
+                        const dateStr = startDate.toLocaleDateString('es-MX', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        });
+                        
+                        return `<div class="fw-semibold text-info">${dateStr}</div>`;
+                    }
+                },
+                {
+                    data: 'createdAt',
+                    className: 'text-center',
+                    visible: false, // Hidden per request (still used for default ordering)
                     render: function(data) {
-                        if (!data) return '<em class="text-muted">Sin información</em>';
-                        return `<span>${data.fullName || data.email || 'N/A'}</span>`;
+                        if (!data) return '<em class="text-muted">N/A</em>';
+                        const date = new Date(data);
+                        const dateStr = date.toLocaleDateString('es-MX', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        });
+                        const timeStr = date.toLocaleTimeString('es-MX', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        return `<div style="white-space: nowrap;">
+                                    <div class="fw-semibold">${dateStr}</div>
+                                    <small class="text-muted">${timeStr}</small>
+                                </div>`;
                     }
                 },
                 {
@@ -719,29 +724,9 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     }
                 },
                 {
-                    data: 'createdAt',
-                    className: 'text-center',
-                    render: function(data) {
-                        if (!data) return '<em class="text-muted">N/A</em>';
-                        const date = new Date(data);
-                        const dateStr = date.toLocaleDateString('es-MX', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit'
-                        });
-                        const timeStr = date.toLocaleTimeString('es-MX', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
-                        return `<div style="white-space: nowrap;">
-                                    <div class="fw-semibold">${dateStr}</div>
-                                    <small class="text-muted">${timeStr}</small>
-                                </div>`;
-                    }
-                },
-                {
                     data: 'updatedAt',
                     className: 'text-center',
+                    visible: <%= showClientColumn ? 'false' : 'true' %>, // Hidden for admin/superadmin; shown for department_manager/client
                     render: function(data) {
                         if (!data) return '<em class="text-muted">N/A</em>';
                         const date = new Date(data);
@@ -758,41 +743,6 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                                     <div class="fw-semibold">${dateStr}</div>
                                     <small class="text-muted">${timeStr}</small>
                                 </div>`;
-                    }
-                },
-                {
-                    data: null,
-                    className: 'text-center',
-                    orderable: true,
-                    render: function(data, type, row) {
-                        const serviceItems = row.serviceItems || {};
-                        const days = serviceItems.days || [];
-                        
-                        if (days.length === 0) {
-                            return '<em class="text-muted">Sin servicios</em>';
-                        }
-                        
-                        let startDate = null;
-                        for (const day of days) {
-                            if (day.date) {
-                                const d = new Date(`${day.date}T12:00:00`);
-                                if (!startDate || d < startDate) {
-                                    startDate = d;
-                                }
-                            }
-                        }
-                        
-                        if (!startDate) {
-                            return '<em class="text-muted">Sin fecha</em>';
-                        }
-                        
-                        const dateStr = startDate.toLocaleDateString('es-MX', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit'
-                        });
-                        
-                        return `<div class="fw-semibold text-info">${dateStr}</div>`;
                     }
                 },
                 ...(showActions ? [{
@@ -870,21 +820,6 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         // Normal actions for non-scheduled quotes
                         let actions = '<div class="btn-group btn-group-sm" role="group">';
 
-                        // Convert to Reservation button (only for quoted or requested status and admin roles)
-                        if ((data.status === 'quoted' || data.status === 'requested') && canConvertToReservation) {
-                            actions += `<button type="button"
-                                            class="btn btn-success convert-reservation-btn"
-                                            data-id="${data.objectId || data.id}"
-                                            data-folio="${data.folio}"
-                                            data-email="${data.contactEmail || (data.createdBy && data.createdBy.email) || ''}"
-                                            data-status="${data.status}"
-                                            data-bs-toggle="tooltip"
-                                            data-bs-placement="top"
-                                            title="Convertir a Reservación">
-                                            <i class="ti ti-calendar-plus"></i>
-                                        </button>`;
-                        }
-
                         if (canEdit) {
                             // Edit button (goes to detail page)
                             actions += `<a href="<%= baseDashboardPath %>/quotes/${data.objectId || data.id}"
@@ -929,7 +864,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando Cotizaciones...'
             },
-            order: [[<%= dtUserRole === 'admin' ? (showClientColumn ? 6 : 5) : (showClientColumn ? 8 : 7) %>, 'desc']], // Sort by updatedAt column by default (most recent first) - adjusted for admin role (no Mi Rol/Tipo de Evento columns)
+            order: [[<%= showClientColumn ? 8 : 7 %>, 'desc']], // Sort by updatedAt by default (most recent first). Index: with Cliente column (admin/superadmin) updatedAt is 8, otherwise 7
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +

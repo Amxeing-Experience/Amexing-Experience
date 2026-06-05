@@ -6,12 +6,16 @@
  */
 
 const activeSection = typeof currentSection !== 'undefined' ? currentSection : 'information';
-const quoteTitle = isNewQuote ? 'Nueva Cotización' : `Cotización`;
+const isReservationView = typeof isReservation !== 'undefined' && isReservation;
+const entityLabel = isReservationView ? 'Reservación' : 'Cotización';
+const quoteTitle = isNewQuote ? 'Nueva Cotización' : entityLabel;
 
+// Preserve the reservation context across the stepper's section navigation.
+const ctx = isReservationView ? 'context=reservation' : '';
 const steps = [
-    { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/admin/quotes/${quoteId}`, number: 1 },
-    { label: 'Servicios', icon: 'list', section: 'services', href: `/dashboard/admin/quotes/${quoteId}?section=services`, number: 2 },
-    { label: 'Resumen', icon: 'calculator', section: 'summary', href: `/dashboard/admin/quotes/${quoteId}?section=summary`, number: 3 }
+    { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/admin/quotes/${quoteId}${ctx ? `?${ctx}` : ''}`, number: 1 },
+    { label: 'Servicios', icon: 'list', section: 'services', href: `/dashboard/admin/quotes/${quoteId}?section=services${ctx ? `&${ctx}` : ''}`, number: 2 },
+    { label: 'Resumen', icon: 'calculator', section: 'summary', href: `/dashboard/admin/quotes/${quoteId}?section=summary${ctx ? `&${ctx}` : ''}`, number: 3 }
 ];
 %>
 
@@ -21,6 +25,12 @@ window.currentUser = {
     role: '<%= typeof userRole !== "undefined" ? userRole : "admin" %>',
     id: '<%= typeof userId !== "undefined" ? userId : "" %>'
 };
+// Exact quote id, used to resolve the right record on share/PDF (folios aren't unique).
+window.__quoteId = '<%= typeof quoteId !== "undefined" ? quoteId : "" %>';
+// Whether this quote is already a reservation (relabels UI client-side too).
+window.__isReservation = <%= isReservationView ? 'true' : 'false' %>;
+// When it's a reservation, show the reservation folio instead of the quote folio.
+window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reservationFolio : "" %>';
 </script>
 
 <!-- Page Header -->
@@ -43,7 +53,11 @@ window.currentUser = {
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item"><a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a></li>
+                        <% if (isReservationView) { %>
+                        <li class="breadcrumb-item"><a href="/dashboard/admin/bookings"><i class="ti ti-clipboard-list me-1"></i>Reservaciones</a></li>
+                        <% } else { %>
                         <li class="breadcrumb-item"><a href="/dashboard/admin/quotes"><i class="ti ti-file-invoice me-1"></i>Cotizaciones</a></li>
+                        <% } %>
                         <li class="breadcrumb-item active" id="breadcrumbQuoteTitle"><%= quoteTitle %></li>
                     </ol>
                 </nav>
@@ -51,7 +65,7 @@ window.currentUser = {
             <% if (!isNewQuote) { %>
             <div class="quote-status-control" id="quoteStatusControl">
                 <div class="quote-status-header">
-                    <span class="quote-status-title">Estado de la Cotización</span>
+                    <span class="quote-status-title">Estado de la <%= entityLabel %></span>
                     <span class="quote-status-hint">Selecciona el estado actual</span>
                 </div>
                 <div class="quote-status-segments">
@@ -127,12 +141,12 @@ window.currentUser = {
 <div class="row">
     <div class="col-12">
         <% if (activeSection === 'information') { %>
-            <%- include('./sections/quote-information', { quoteId: quoteId, userRole: userRole }) %>
+            <%- include('./sections/quote-information', { quoteId: quoteId, userRole: userRole, isReservation: isReservationView }) %>
         <% } else if (activeSection === 'services') { %>
             <%- include('./sections/quote-services-v2', { quoteId: quoteId, userRole: userRole }) %>
-            <%- include('./sections/quote-services-modals') %>
+            <%- include('./sections/quote-services-modals', { isReservation: isReservationView }) %>
         <% } else if (activeSection === 'summary') { %>
-            <%- include('./sections/quote-summary') %>
+            <%- include('./sections/quote-summary', { isReservation: isReservationView }) %>
         <% } else { %>
             <div class="alert alert-warning">
                 <strong>DEBUG:</strong> Unknown section '<%= activeSection %>'. Available: information, services, summary
@@ -464,8 +478,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
 
             if (result.success && result.data) {
-                const folio = result.data.folio || quoteId;
-                const quoteTitleWithFolio = `Cotización ${folio}`;
+                // Authoritative: only treat it as a reservation if an active
+                // reservation actually exists (server flag). A scheduled status
+                // alone does NOT relabel it — quotes keep "Cotización".
+                const isRes = window.__isReservation;
+                // When it's a reservation, prefer the reservation folio over the quote folio.
+                const folio = (isRes && window.__reservationFolio) ? window.__reservationFolio : (result.data.folio || quoteId);
+                const entityLabel = isRes ? 'Reservación' : 'Cotización';
+                const quoteTitleWithFolio = `${entityLabel} ${folio}`;
 
                 const quoteFolioSpan = document.getElementById('quoteFolioSpan');
                 if (quoteFolioSpan) {
