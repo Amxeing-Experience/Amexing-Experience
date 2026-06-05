@@ -655,14 +655,11 @@ class Department extends BaseModel {
     }
 
     // Name length validation
-    if (departmentData.name && departmentData.name.length > 100) {
-      errors.push('Department name must be 100 characters or less');
+    if (departmentData.name && departmentData.name.length > 280) {
+      errors.push('Department name must be 280 characters or less');
     }
 
-    // Description length validation
-    if (departmentData.description && departmentData.description.length > 500) {
-      errors.push('Description must be 500 characters or less');
-    }
+    // No maximum length for description (effectively unlimited).
 
     return errors;
   }

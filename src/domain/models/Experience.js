@@ -500,8 +500,8 @@ class Experience extends BaseModel {
       errors.push('Name is required');
     }
 
-    if (this.getName().length > 200) {
-      errors.push('Name must be 200 characters or less');
+    if (this.getName().length > 280) {
+      errors.push('Name must be 280 characters or less');
     }
 
     if (!this.getDescription()) {

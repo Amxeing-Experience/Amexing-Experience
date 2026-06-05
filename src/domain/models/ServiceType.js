@@ -85,8 +85,8 @@ class ServiceType extends BaseModel {
       errors.push('Name is required');
     }
 
-    if (this.getName() && this.getName().length > 100) {
-      errors.push('Name must be 100 characters or less');
+    if (this.getName() && this.getName().length > 280) {
+      errors.push('Name must be 280 characters or less');
     }
 
     return {

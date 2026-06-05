@@ -3,6 +3,9 @@
  * Quote Summary Section
  * Complete read-only summary of the quote for client viewing and PDF export
  */
+const __isRes = typeof isReservation !== 'undefined' && isReservation;
+const E = __isRes ? 'Reservación' : 'Cotización';
+const e = __isRes ? 'reservación' : 'cotización';
 %>
 
 <style>
@@ -633,7 +636,7 @@
         <div class="d-flex justify-content-between align-items-center">
             <% if (!locals.isPublicView) { %>
             <h5 class="card-title mb-0">
-                <i class="ti ti-file-description me-2"></i>Resumen de la Cotización
+                <i class="ti ti-file-description me-2"></i>Resumen de la <%= E %>
             </h5>
             <% } else { %>
             <span></span>
@@ -661,7 +664,7 @@
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Cargando resumen...</span>
             </div>
-            <p class="mt-3 text-muted">Cargando información de la cotización...</p>
+            <p class="mt-3 text-muted">Cargando información de la <%= e %>...</p>
         </div>
 
         <!-- Summary Content -->
@@ -807,6 +810,9 @@
 <script src="/js/services-renderer.js"></script>
 
 <script>
+    // Entity label (client-side): "Reservación" once the quote is scheduled.
+    const QE = window.__isReservation ? 'Reservación' : 'Cotización';
+    const Qe = window.__isReservation ? 'reservación' : 'cotización';
     // Currency formatter
     const currencyFormatter = new Intl.NumberFormat('es-MX', {
         style: 'currency',
@@ -1188,7 +1194,7 @@
             const result = await response.json();
 
             if (!result.success || !result.data) {
-                throw new Error(result.error || 'Error al cargar la cotización');
+                throw new Error(result.error || `Error al cargar la ${Qe}`);
             }
 
             quote = result.data;
@@ -1196,11 +1202,12 @@
             <% } %>
 
             // Populate summary information
-            document.getElementById('summaryFolio').textContent = quote.folio || quote.id || 'N/A';
-            // Reservation view prefixes the banner folio with "Reservación" so the
-            // public/PDF heading reads "Reservación MAY-2605-002" instead of just the folio.
-            const __folioLabel = quote.folio || quote.id || 'N/A';
-            const __isReservationView = <%- typeof isReservationView !== 'undefined' && isReservationView ? 'true' : 'false' %>;
+            // Once scheduled, show the reservation folio instead of the quote folio.
+            const __isReservationView = window.__isReservation;
+            const __folioLabel = (__isReservationView && window.__reservationFolio)
+                ? window.__reservationFolio
+                : (quote.folio || quote.id || 'N/A');
+            document.getElementById('summaryFolio').textContent = __folioLabel;
             document.getElementById('summaryFolioHeader').textContent = __isReservationView
                 ? `Reservación ${__folioLabel}`
                 : __folioLabel;
@@ -1372,7 +1379,7 @@
             document.getElementById('summaryLoading').innerHTML = `
                 <div class="alert alert-danger">
                     <i class="ti ti-alert-circle me-2"></i>
-                    Error al cargar el resumen de la cotización: ${error.message}
+                    Error al cargar el resumen de la ${Qe}: ${error.message}
                 </div>
             `;
         }
@@ -1391,7 +1398,7 @@
         document.getElementById('summaryPaymentType').textContent = paymentLabels[savedPayment] || savedPayment;
 
         if (!serviceItems || !serviceItems.days || serviceItems.days.length === 0) {
-            container.innerHTML = '<div class="sm-empty-state">No hay servicios agregados a esta cotización</div>';
+            container.innerHTML = `<div class="sm-empty-state">No hay servicios agregados a esta ${Qe}</div>`;
             document.getElementById('summarySubtotal').textContent = currencyFormatter.format(0);
             document.getElementById('summaryIVA').textContent = currencyFormatter.format(0);
             document.getElementById('summaryTotal').textContent = currencyFormatter.format(0);
@@ -1665,8 +1672,11 @@
             return;
         }
         const isQuote = /^QTE-/i.test(folio);
+        // Pass the exact quote id (?q=) so the PDF resolves the same record even
+        // when folios are duplicated. Reservations are unaffected.
+        const qParam = (isQuote && window.__quoteId) ? `?q=${encodeURIComponent(window.__quoteId)}` : '';
         const endpoint = isQuote
-            ? `/quotes/${encodeURIComponent(folio)}/pdf`
+            ? `/quotes/${encodeURIComponent(folio)}/pdf${qParam}`
             : `/reservations/${encodeURIComponent(folio)}/pdf`;
         const docKind = isQuote ? 'Cotizacion' : 'Reservacion';
         const filename = `${docKind}_${folio.replace(/\s+/g, '_')}.pdf`;
@@ -2168,7 +2178,7 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title"><i class="ti ti-mail me-2"></i>Enviar cotización por correo</h5>
+                        <h5 class="modal-title"><i class="ti ti-mail me-2"></i>Enviar <%= e %> por correo</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -2376,7 +2386,7 @@
                         <div class="modal-body">
                             <p class="text-muted mb-3">
                                 <i class="ti ti-info-circle me-2"></i>
-                                Comparta este enlace con su cliente para que pueda ver la cotización sin necesidad de iniciar sesión.
+                                Comparta este enlace con su cliente para que pueda ver la <%= e %> sin necesidad de iniciar sesión.
                             </p>
 
                             <div class="mb-3">
@@ -2517,7 +2527,7 @@
 
                             <div class="row mb-3">
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold">Folio de Cotización</label>
+                                    <label class="form-label fw-semibold">Folio de <%= E %></label>
                                     <div class="form-control-plaintext">${quote.folio || quote.id}</div>
                                 </div>
                                 <div class="col-md-6">

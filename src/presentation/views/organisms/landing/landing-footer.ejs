@@ -57,9 +57,9 @@ const contactoLinks = [
 ];
 
 const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
-    facebook: 'https://facebook.com/amexingexperience',
-    instagram: 'https://instagram.com/amexingexperience',
-    tripadvisor: 'https://tripadvisor.com/amexing',
+    facebook: 'https://www.facebook.com/amexingexperience',
+    instagram: 'https://www.instagram.com/amexingexperience/',
+    tripadvisor: 'https://www.tripadvisor.com.mx/Attraction_Review-g151932-d19425238-Reviews-Amexing_Experience_by_Angelica_Tours-San_Miguel_de_Allende_Central_Mexico_and_Gu.html',
     google: 'https://g.page/amexing',
     whatsapp: 'https://wa.me/524151527890'
 };
@@ -137,7 +137,14 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
         <%# Social Media Section %>
         <div class="landing-footer__social-section">
             <div class="landing-footer__social-links">
-                <a href="<%= socialLinks.facebook %>" 
+                <a href="<%= socialLinks.tripadvisor %>"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="landing-footer__social-link landing-footer__social-link--tripadvisor"
+                   aria-label="TripAdvisor">
+                    <i aria-hidden="true"></i>
+                </a>
+                <a href="<%= socialLinks.facebook %>"
                    target="_blank" 
                    rel="noopener noreferrer" 
                    class="landing-footer__social-link"
@@ -256,6 +263,43 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
     display: flex;
     justify-content: center;
     gap: 1rem;
+}
+
+/* TripAdvisor is not in Font Awesome 6 Free, so the FA4 icon font is self-hosted
+   here (the footer renders on many pages) to draw the glyph. */
+@font-face {
+    font-family: "TripAdvisor Icon";
+    src: url("/fonts/icons/fa4-tripadvisor.woff2") format("woff2");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* TripAdvisor: glyph + circle drawn to match the dark facebook.png ring
+   (~0.8px, #2e2e2d) inside the 40px link, with the same hover invert. */
+.landing-footer__social-link--tripadvisor i {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 0 0 0.8px #2e2e2d;
+    color: #2e2e2d;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.landing-footer__social-link--tripadvisor i::before {
+    font-family: "TripAdvisor Icon";
+    font-weight: normal;
+    font-style: normal;
+    content: "\f262";
+}
+
+.landing-footer__social-link--tripadvisor:hover i {
+    color: #fff;
+    box-shadow: inset 0 0 0 0.8px #fff;
 }
 
 .landing-footer__social-link {

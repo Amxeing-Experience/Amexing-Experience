@@ -345,11 +345,12 @@ class QuoteOwnershipManager {
         // Check if current user is the creator (when isDefaultOwner is true)
         const isCreator = this.owner && this.owner.isDefaultOwner && this.owner.id === currentUserId;
 
+        // Only superadmin, admin, or the quote's owner (incl. its creator when no
+        // formal owner exists yet) may transfer ownership.
         this.canTransfer = (
+            userRole === 'admin' || userRole === 'superadmin' ||
             (this.userAccess && this.userAccess.role === 'owner' && !this.owner.isPlaceholder) ||
-            (userRole === 'admin' || userRole === 'superadmin' || userRole === 'department_manager' || userRole === 'client') ||
-            (this.owner && this.owner.needsAssignment) ||
-            isCreator // Allow creator to transfer ownership when no formal ownership exists
+            isCreator
         );
 
         if (isCreator) {
@@ -918,13 +919,11 @@ class QuoteOwnershipManager {
             // Update ownership section in modal
             this.displayOwnershipInModal();
 
-            // Show/hide ownership transfer section based on permissions  
+            // Show/hide ownership transfer section based on permissions
+            // (superadmin, admin, or the owner — encoded in this.canTransfer).
             const ownershipSection = document.getElementById('ownershipTransferSection');
-            const userRole = window.currentUser?.role || '';
-            const isAdmin = userRole === 'admin' || userRole === 'superadmin';
-            const canManage = isAdmin || userRole === 'department_manager' || userRole === 'client';
 
-            if (this.canTransfer && canManage) {
+            if (this.canTransfer) {
                 if (ownershipSection) {
                     ownershipSection.style.display = 'block';
                 }
@@ -1409,8 +1408,8 @@ class QuoteOwnershipManager {
 
         const transferSection = document.getElementById('ownershipTransferSection');
         if (transferSection) {
-            // Show/hide transfer section based on permissions
-            const canTransfer = isOwner || (userAccess && ['admin', 'superadmin', 'department_manager', 'client'].includes(window.currentUser?.role));
+            // Show/hide transfer section: only superadmin, admin, or the owner.
+            const canTransfer = isOwner || ['admin', 'superadmin'].includes(window.currentUser?.role);
             transferSection.style.display = canTransfer ? 'block' : 'none';
         }
 

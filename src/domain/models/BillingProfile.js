@@ -641,8 +641,8 @@ class BillingProfile extends BaseModel {
     const errors = [];
 
     const label = this.get('label');
-    if (label && label.length > 200) {
-      errors.push('Label must be 200 characters or less');
+    if (label && label.length > 280) {
+      errors.push('Label must be 280 characters or less');
     }
 
     const rfc = this.get('rfc');
@@ -697,8 +697,8 @@ class BillingProfile extends BaseModel {
     }
 
     const label = this.get('label');
-    if (label && label.length > 200) {
-      errors.push('Label must be 200 characters or less');
+    if (label && label.length > 280) {
+      errors.push('Label must be 280 characters or less');
     }
 
     // Mexico-specific validations

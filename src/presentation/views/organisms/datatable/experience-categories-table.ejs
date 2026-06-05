@@ -89,7 +89,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="name" class="form-label">Nombre <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="name" name="name" required maxlength="100" placeholder="Ej: Aventura">
+                                <input type="text" class="form-control" id="name" name="name" required maxlength="280" placeholder="Ej: Aventura">
                                 <div class="form-text">Nombre mostrado al usuario</div>
                             </div>
                             <div class="col-md-6 mb-3">
@@ -101,7 +101,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
                         <div class="mb-3">
                             <label for="description" class="form-label">Descripción</label>
-                            <textarea class="form-control" id="description" name="description" rows="3" maxlength="500" placeholder="Descripción de la categoría"></textarea>
+                            <textarea class="form-control" id="description" name="description" rows="3" placeholder="Descripción de la categoría"></textarea>
                             <div class="form-text">Descripción opcional de la categoría</div>
                         </div>
                     </div>

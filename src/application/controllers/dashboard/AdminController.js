@@ -761,11 +761,36 @@ class AdminController extends RoleBasedController {
 
       const isNewQuote = quoteId === 'new';
 
+      // The relabel to "Reservación" is driven by the CONTEXT it was opened in,
+      // not by whether a reservation exists: opened from the bookings list
+      // (?context=reservation) it reads as a reservation; opened from the quotes
+      // list it stays "Cotización" even if a reservation already exists.
+      const isReservation = req.query.context === 'reservation';
+      let reservationFolio = '';
+      if (isReservation && !isNewQuote) {
+        try {
+          const Parse = require('parse/node');
+          const resQuery = new Parse.Query('Reservation');
+          resQuery.equalTo('quotePtr', { __type: 'Pointer', className: 'Quote', objectId: quoteId });
+          resQuery.equalTo('active', true);
+          resQuery.equalTo('exists', true);
+          const reservation = await resQuery.first({ useMasterKey: true });
+          if (reservation) {
+            reservationFolio = reservation.get('folio') || '';
+          }
+        } catch (e) {
+          reservationFolio = '';
+        }
+      }
+      const entityLabel = isReservation ? 'Reservación' : 'Cotización';
+
       await this.renderRoleView(req, res, 'quote-detail', {
-        title: isNewQuote ? 'Nueva Cotización' : `Cotización ${quoteId}`,
+        title: isNewQuote ? 'Nueva Cotización' : `${entityLabel} ${quoteId}`,
         breadcrumb: null,
         quoteId,
         isNewQuote,
+        isReservation,
+        reservationFolio,
         currentSection: section,
         pageStyles: ['https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css'],
         footerScripts: `

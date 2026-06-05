@@ -256,8 +256,8 @@ class RateController {
         return this.sendError(res, 'El nombre es requerido', 400);
       }
 
-      if (name.length > 200) {
-        return this.sendError(res, 'El nombre debe tener 200 caracteres o menos', 400);
+      if (name.length > 280) {
+        return this.sendError(res, 'El nombre debe tener 280 caracteres o menos', 400);
       }
 
       // Validate color format if provided
@@ -360,8 +360,8 @@ class RateController {
 
       // Update name if provided
       if (name && name.trim().length > 0) {
-        if (name.length > 200) {
-          return this.sendError(res, 'El nombre debe tener 200 caracteres o menos', 400);
+        if (name.length > 280) {
+          return this.sendError(res, 'El nombre debe tener 280 caracteres o menos', 400);
         }
 
         // Check name uniqueness if changing

@@ -109,8 +109,8 @@ class POI extends BaseModel {
       errors.push('Name cannot be empty');
     }
 
-    if (this.getName() && this.getName().length > 200) {
-      errors.push('Name must be 200 characters or less');
+    if (this.getName() && this.getName().length > 280) {
+      errors.push('Name must be 280 characters or less');
     }
 
     if (!this.getServiceType()) {

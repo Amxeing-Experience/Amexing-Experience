@@ -4,6 +4,10 @@
  * Created by Denisse Maldonado
  */
 
+// Entity label: this view is reused for quotes and, once scheduled, reservations.
+const __isRes = typeof isReservation !== 'undefined' && isReservation;
+const e = __isRes ? 'reservación' : 'cotización';
+
 // Define role-based permissions at the top of the file
 const currentUserRole = typeof userRole !== 'undefined' ? userRole : '';
 const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
@@ -1155,7 +1159,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                     <div class="form-check mb-3" id="includeInTotalContainer" style="display: none;">
                         <input class="form-check-input" type="checkbox" id="includeInTotal" checked>
                         <label class="form-check-label" for="includeInTotal">
-                            Incluir en el total de la cotización
+                            Incluir en el total de la <%= e %>
                         </label>
                         <small class="form-text text-muted d-block">Desmarcar si el cliente paga este servicio por separado</small>
                     </div>
