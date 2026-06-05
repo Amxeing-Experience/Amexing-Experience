@@ -394,8 +394,8 @@ class ExperienceController {
       }
     }
 
-    if (name.length > 200) {
-      return { error: 'Name must be 200 characters or less', status: 400 };
+    if (name.length > 280) {
+      return { error: 'Name must be 280 characters or less', status: 400 };
     }
 
     return null;
@@ -906,8 +906,8 @@ class ExperienceController {
       if (!name) {
         return { error: 'Name cannot be empty', status: 400 };
       }
-      if (name.length > 200) {
-        return { error: 'Name must be 200 characters or less', status: 400 };
+      if (name.length > 280) {
+        return { error: 'Name must be 280 characters or less', status: 400 };
       }
       experienceObj.set('name', name);
     }

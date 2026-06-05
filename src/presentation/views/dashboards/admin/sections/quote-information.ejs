@@ -3,19 +3,23 @@
  * Quote Information Section
  * Basic information form for quote creation/editing
  */
+// Entity label: this view is reused for quotes and, once scheduled, reservations.
+const __isRes = typeof isReservation !== 'undefined' && isReservation;
+const E = __isRes ? 'Reservación' : 'Cotización';
+const e = __isRes ? 'reservación' : 'cotización';
 %>
 
 <div class="card border-0 shadow-sm" id="quoteInformationCard">
     <!-- Page Loader -->
     <%- include('../../../atoms/common/page-loader', {
-        text: 'Cargando información de la cotización...',
+        text: `Cargando información de la ${e}...`,
         spinnerColor: 'primary',
         containerId: 'quoteInformationCard'
     }) %>
 
     <div class="card-header bg-white border-bottom">
         <h5 class="card-title mb-0">
-            <i class="ti ti-info-circle me-2"></i>Información de la Cotización
+            <i class="ti ti-info-circle me-2"></i>Información de la <%= (typeof isReservation !== 'undefined' && isReservation) ? 'Reservación' : 'Cotización' %>
         </h5>
     </div>
 
@@ -156,7 +160,7 @@
                 <div class="alert alert-info d-flex align-items-start" role="alert">
                     <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                     <div>
-                        <small>Esta información se autocompletará al seleccionar un cliente, pero puedes editarla para esta cotización específica.</small>
+                        <small>Esta información se autocompletará al seleccionar un cliente, pero puedes editarla para esta <%= e %> específica.</small>
                     </div>
                 </div>
 
@@ -221,7 +225,7 @@
                             label: 'Email de Contacto',
                             required: false,
                             placeholder: 'email@ejemplo.com',
-                            helpText: 'Email para enviar la cotización',
+                            helpText: `Email para enviar la ${e}`,
                             containerClass: 'mb-3'
                         }) %>
                     </div>
@@ -293,7 +297,7 @@
 
                 <div class="mb-3">
                     <label for="notes" class="form-label">Notas</label>
-                    <textarea class="form-control" id="notes" name="notes" rows="3" maxlength="500" placeholder="Notas adicionales sobre la cotización..."></textarea>
+                    <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Notas adicionales sobre la <%= e %>..."></textarea>
                     <div class="form-text">Máximo 500 caracteres (opcional)</div>
                 </div>
             </div>
@@ -304,7 +308,7 @@
             <div class="alert alert-success d-flex align-items-start" role="alert">
                 <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                 <div>
-                    <strong>Cotización:</strong>
+                    <strong><%= E %>:</strong>
                     <p class="mb-0 mt-1">Define la información básica del cliente. Una vez creada, podrás agregar servicios y seleccionar tarifas específicas para cada traslado en la siguiente sección.</p>
                 </div>
             </div>
@@ -714,6 +718,9 @@
 </div>
 
 <script>
+// Entity label (client-side): "Reservación" once the quote is scheduled.
+const QE = window.__isReservation ? 'Reservación' : 'Cotización';
+const Qe = window.__isReservation ? 'reservación' : 'cotización';
 (function() {
     'use strict';
 
@@ -2408,13 +2415,13 @@
 
                 // Change button text to "Actualizar"
                 const submitBtn = document.getElementById('createQuoteBtn');
-                submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Actualizar Cotización';
+                submitBtn.innerHTML = 'Siguiente <i class="ti ti-arrow-right ms-1"></i>';
             } else {
-                showAlert('quoteInformationAlerts', 'Error al cargar la cotización', 'danger');
+                showAlert('quoteInformationAlerts', `Error al cargar la ${Qe}`, 'danger');
             }
         } catch (error) {
             console.error('Error loading quote data:', error);
-            showAlert('quoteInformationAlerts', 'Error al cargar los datos de la cotización', 'danger');
+            showAlert('quoteInformationAlerts', `Error al cargar los datos de la ${Qe}`, 'danger');
         }
     }
 
@@ -2535,7 +2542,7 @@
             const result = await response.json();
 
             if (result.success) {
-                showAlert('quoteInformationAlerts', 'Cotización actualizada exitosamente', 'success');
+                showAlert('quoteInformationAlerts', `${QE} actualizada exitosamente`, 'success');
 
                 // Redirect to quote detail page with services section (use appropriate dashboard path)
                 const dashboardPathMap = { department_manager: '/dashboard/department_manager', client: '/dashboard/client' };
@@ -2544,13 +2551,13 @@
                     window.location.href = `${dashboardPath}/quotes/${quoteId}?section=services`;
                 }, 1500);
             } else {
-                showAlert('quoteInformationAlerts', result.error || 'Error al actualizar la cotización', 'danger');
+                showAlert('quoteInformationAlerts', result.error || `Error al actualizar la ${Qe}`, 'danger');
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
             }
         } catch (error) {
             console.error('Error updating quote:', error);
-            showAlert('quoteInformationAlerts', 'Error de conexión al actualizar la cotización', 'danger');
+            showAlert('quoteInformationAlerts', `Error de conexión al actualizar la ${Qe}`, 'danger');
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalText;
         }
@@ -2729,7 +2736,7 @@
                 if (!helpText) {
                     helpText = document.createElement('small');
                     helpText.className = 'text-muted d-block mt-1 client-type-disabled-help';
-                    helpText.innerHTML = '<i class="ti ti-info-circle me-1"></i>El tipo de cliente no se puede cambiar después de crear la cotización';
+                    helpText.innerHTML = `<i class="ti ti-info-circle me-1"></i>El tipo de cliente no se puede cambiar después de crear la ${Qe}`;
                     selectorGroup.parentElement.appendChild(helpText);
                 }
             }

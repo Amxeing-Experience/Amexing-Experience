@@ -97,7 +97,9 @@ class PublicQuoteController {
 
       const proto = req.headers['x-forwarded-proto'] || req.protocol;
       const host = req.get('host');
-      const url = `${proto}://${host}/quotes/${encodeURIComponent(folio)}?pdf=1`;
+      // Preserve the exact-quote id (?q=) so puppeteer renders the same record.
+      const qParam = req.query.q ? `&q=${encodeURIComponent(req.query.q)}` : '';
+      const url = `${proto}://${host}/quotes/${encodeURIComponent(folio)}?pdf=1${qParam}`;
 
       const pdfBuffer = await renderUrlToPdf(url);
 
@@ -150,7 +152,24 @@ class PublicQuoteController {
    * const quote = await this.fetchQuoteByFolio('QTE-2024-0001', req, res);
    */
   async fetchQuoteByFolio(folio, req, res) {
-    const quote = await Quote.findByFolioPublic(folio);
+    // Folios are not guaranteed unique. When a quote id is provided (?q=), resolve
+    // the EXACT record by id so the shared/PDF view matches the quote the user
+    // shared, instead of an arbitrary duplicate-folio match.
+    const exactId = req && req.query && req.query.q;
+    let quote;
+    if (exactId) {
+      const idQuery = new Parse.Query('Quote');
+      idQuery.equalTo('objectId', exactId);
+      idQuery.equalTo('exists', true);
+      idQuery.equalTo('active', true);
+      idQuery.include('rate');
+      idQuery.include('client');
+      idQuery.include('companyClientPtr');
+      idQuery.include('createdBy');
+      quote = await idQuery.first({ useMasterKey: true });
+    } else {
+      quote = await Quote.findByFolioPublic(folio);
+    }
 
     if (!quote) {
       logger.warn('Quote not found for public access', {
@@ -221,26 +240,69 @@ class PublicQuoteController {
   async preparePublicQuoteData(quote) {
     const rate = quote.getRate();
     const client = quote.getClient();
+    const companyClientPtr = quote.get('companyClientPtr');
+    const createdBy = quote.get('createdBy');
+    // Owner drives the "Atención a" field in the summary; resolve it the same way
+    // the authenticated API does (denormalized owner, falling back to the creator)
+    // so the public/PDF view shows the same value.
+    const ownerObj = quote.get('owner') || createdBy;
     const serviceItems = quote.getServiceItems() || {};
-    const segmentNames = await this.loadSegmentNamesMap();
 
     return {
       id: quote.id,
       folio: quote.getFolio(),
       status: quote.getStatus(),
+      clientType: quote.get('clientType') || null,
       client: this.formatClientData(client),
+      companyClientPtr: companyClientPtr
+        ? {
+          id: companyClientPtr.id,
+          name: companyClientPtr.get('name') || '',
+          email: companyClientPtr.get('email') || '',
+          phone: companyClientPtr.get('phone') || '',
+          contactPerson: companyClientPtr.get('contactPerson') || null,
+          fullName: companyClientPtr.get('name') || '',
+        }
+        : null,
       contactPerson: quote.getContactPerson() || '',
       contactFirstName: quote.get('contactFirstName') || '',
       contactLastName: quote.get('contactLastName') || '',
       contactEmail: quote.getContactEmail() || '',
       contactPhone: quote.getContactPhone() || '',
       numberOfPeople: quote.getNumberOfPeople() || 0,
+      numberOfAdults: quote.get('numberOfAdults') || 0,
+      numberOfChildren: quote.get('numberOfChildren') || 0,
+      numberOfInfants: quote.get('numberOfInfants') || 0,
+      preferredLanguage: quote.get('preferredLanguage') || 'es',
       eventType: quote.getEventType() || '',
       notes: quote.getNotes() || '',
       leadGuestFirstName: quote.get('leadGuestFirstName') || '',
       leadGuestLastName: quote.get('leadGuestLastName') || '',
+      clientFinalId: quote.get('clientFinalId') || null,
+      validUntil: quote.get('validUntil') || null,
       rate: this.formatRateData(rate),
-      serviceItems: await this.formatServiceItems(serviceItems, segmentNames),
+      // Pass raw serviceItems (same as /api/quotes/:id) so the unified renderer
+      // normalizes them exactly like the summary. The previous formatServiceItems
+      // whitelisted fields and dropped services/fields.
+      serviceItems,
+      createdBy: createdBy
+        ? {
+          id: createdBy.id,
+          firstName: createdBy.get('firstName') || '',
+          lastName: createdBy.get('lastName') || '',
+          email: createdBy.get('email') || '',
+          fullName: `${createdBy.get('firstName') || ''} ${createdBy.get('lastName') || ''}`.trim(),
+        }
+        : null,
+      owner: ownerObj
+        ? {
+          id: ownerObj.id,
+          firstName: ownerObj.get('firstName') || '',
+          lastName: ownerObj.get('lastName') || '',
+          email: ownerObj.get('email') || '',
+          fullName: `${ownerObj.get('firstName') || ''} ${ownerObj.get('lastName') || ''}`.trim(),
+        }
+        : null,
       createdAt: quote.get('createdAt') || null,
       updatedAt: quote.get('updatedAt') || null,
     };

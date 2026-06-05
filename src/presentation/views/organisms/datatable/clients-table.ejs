@@ -355,6 +355,7 @@ function initializeClientsDataTable(totalCount) {
                     actions += `<button type="button"
                                 class="btn btn-danger btn-delete-client"
                                 data-client-id="${row.id}"
+                                data-client-type="${row.type}"
                                 data-client-name="${row.firstName} ${row.lastName}"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="top"
@@ -572,7 +573,7 @@ async function executeToggleStatus(clientId, newStatus) {
  * @param {string} clientId - Client ID
  * @param {string} clientName - Client name for confirmation
  */
-function deleteClient(clientId, clientName) {
+function deleteClient(clientId, clientName, clientType) {
     // Create confirmation modal
     const modalHtml = `
         <div class="modal fade" id="confirmDeleteModal" tabindex="-1">
@@ -609,28 +610,45 @@ function deleteClient(clientId, clientName) {
     // Handle confirmation
     document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
         modal.hide();
-        await executeDeleteClient(clientId, clientName);
+        await executeDeleteClient(clientId, clientName, clientType);
     });
 }
 
 /**
  * Execute delete client API call
  */
-async function executeDeleteClient(clientId, clientName) {
+async function executeDeleteClient(clientId, clientName, clientType) {
     try {
-        const response = await fetch(`<%= dtApiEndpoint %>/${clientId}`, {
+        // The list endpoint (dtApiEndpoint) is "/api/clients/mixed"; item operations
+        // must target the resource route, which differs by type (mirrors the edit
+        // modal): agencies → /api/clients/:id, direct clients → /api/owned-clients/:id.
+        const deleteEndpoint = clientType === 'agency'
+            ? `/api/clients/${encodeURIComponent(clientId)}`
+            : `/api/owned-clients/${encodeURIComponent(clientId)}`;
+
+        const response = await fetch(deleteEndpoint, {
             method: 'DELETE',
             credentials: 'include',
             headers: {
-                'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',
             }
         });
 
-        const result = await response.json();
+        // Parse defensively: a non-JSON body (HTML error page, empty, redirect)
+        // would otherwise throw the cryptic "The string did not match the
+        // expected pattern." in Safari. Surface the real status/body instead.
+        const raw = await response.text();
+        let result = {};
+        if (raw) {
+            try {
+                result = JSON.parse(raw);
+            } catch (parseErr) {
+                throw new Error(`Respuesta no válida del servidor (HTTP ${response.status}): ${raw.slice(0, 200)}`);
+            }
+        }
 
         if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Error al eliminar el cliente');
+            throw new Error(result.error || `Error al eliminar el cliente (HTTP ${response.status})`);
         }
 
         showSuccessAlert(`Cliente "${clientName}" eliminado exitosamente`);
@@ -681,7 +699,8 @@ function setupEventDelegation() {
         if (target.classList.contains('btn-delete-client')) {
             const clientId = target.getAttribute('data-client-id');
             const clientName = target.getAttribute('data-client-name');
-            deleteClient(clientId, clientName);
+            const clientType = target.getAttribute('data-client-type');
+            deleteClient(clientId, clientName, clientType);
             return;
         }
     });

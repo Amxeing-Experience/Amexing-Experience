@@ -254,10 +254,7 @@ class Service extends BaseModel {
       errors.push('Price must be greater than 0');
     }
 
-    const note = this.getNote();
-    if (note && note.length > 500) {
-      errors.push('Note must be 500 characters or less');
-    }
+    // No maximum length for note (effectively unlimited).
 
     return {
       valid: errors.length === 0,

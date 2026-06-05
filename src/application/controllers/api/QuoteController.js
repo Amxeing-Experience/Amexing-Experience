@@ -562,6 +562,7 @@ class QuoteController {
         filteredQuery.include('companyClientPtr');
         filteredQuery.include('rate');
         filteredQuery.include('createdBy');
+        filteredQuery.include('owner');
         filteredQuery.include('serviceItems');
       }
 
@@ -603,6 +604,13 @@ class QuoteController {
           const companyClientPtr = quote.get('companyClientPtr');
           const rate = quote.get('rate');
           const createdBy = quote.get('createdBy');
+          // Current owner: denormalized 'owner' pointer (updated on transfers),
+          // falling back to the creator (default owner) when there is no owner
+          // or it didn't resolve to a usable name (e.g. deleted user).
+          const ownerPtr = quote.get('owner');
+          const owner = (ownerPtr && (ownerPtr.get('firstName') || ownerPtr.get('lastName') || ownerPtr.get('email')))
+            ? ownerPtr
+            : createdBy;
 
           // Check if quote has pending invoice request
           let hasPendingInvoiceRequest = false;
@@ -717,6 +725,16 @@ class QuoteController {
                 lastName: createdBy.get('lastName') || '',
                 email: createdBy.get('email') || '',
                 fullName: `${createdBy.get('firstName') || ''} ${createdBy.get('lastName') || ''}`.trim(),
+              }
+              : null,
+            owner: owner
+              ? {
+                id: owner.id,
+                firstName: owner.get('firstName') || '',
+                lastName: owner.get('lastName') || '',
+                email: owner.get('email') || '',
+                fullName: `${owner.get('firstName') || ''} ${owner.get('lastName') || ''}`.trim(),
+                isMe: !!(currentUser && owner.id === currentUser.id),
               }
               : null,
             status: quote.get('status') || 'quoted',
@@ -2903,10 +2921,11 @@ class QuoteController {
         return this.sendError(res, 'La cotización no tiene folio asignado', 500);
       }
 
-      // 6. Generate share URL using folio
+      // 6. Generate share URL using folio, plus the quote id (?q=) so the public
+      // view resolves the exact record even if the folio is duplicated.
       const { protocol } = req; // http or https
       const host = req.get('host'); // localhost:1337 or domain
-      const shareUrl = `${protocol}://${host}/quotes/${folio}`;
+      const shareUrl = `${protocol}://${host}/quotes/${folio}?q=${quote.id}`;
 
       // 7. Log share link generation for audit trail
       logger.info('Share link generated for quote', {
@@ -4180,6 +4199,7 @@ class QuoteController {
     baseQuery.include('companyClientPtr');
     baseQuery.include('rate');
     baseQuery.include('createdBy');
+    baseQuery.include('owner');
     baseQuery.include('serviceItems');
 
     // Apply role-based filters (handles visibility per role)

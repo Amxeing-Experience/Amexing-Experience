@@ -91,7 +91,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <div class="row">
                             <div class="col-md-12 mb-3">
                                 <label for="name" class="form-label">Nombre <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="name" name="name" required maxlength="100" placeholder="Ej: Sedan">
+                                <input type="text" class="form-control" id="name" name="name" required maxlength="280" placeholder="Ej: Sedan">
                                 <div class="form-text">Nombre mostrado al usuario</div>
                             </div>
                             <!-- Hidden code field - auto-generated from name -->
@@ -100,7 +100,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
                         <div class="mb-3">
                             <label for="description" class="form-label">Descripción</label>
-                            <textarea class="form-control" id="description" name="description" rows="3" maxlength="500" placeholder="Descripción del tipo de vehículo"></textarea>
+                            <textarea class="form-control" id="description" name="description" rows="3" placeholder="Descripción del tipo de vehículo"></textarea>
                             <div class="form-text">Descripción opcional del tipo</div>
                         </div>
                     </div>

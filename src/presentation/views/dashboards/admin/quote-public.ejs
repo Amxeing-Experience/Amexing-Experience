@@ -119,6 +119,10 @@
     </style>
 </head>
 <body>
+    <script>
+        // Exact quote id so "Exportar a PDF" resolves the right record (folios aren't unique).
+        window.__quoteId = '<%= quote && quote.id ? quote.id : "" %>';
+    </script>
     <div class="public-quote-container">
         <!-- Include quote-summary section (reuse existing template) -->
         <%- include('./sections/quote-summary', {

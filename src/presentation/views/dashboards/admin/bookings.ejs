@@ -351,7 +351,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 render: function(data, type, row) {
                     let actions = `<a href="/dashboard/admin/bookings/${row.id}" class="btn btn-sm btn-outline-primary me-1" title="Ver detalle"><i class="ti ti-eye"></i></a>`;
                     if (row.quoteFolio) {
-                        actions += `<a href="/dashboard/admin/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-invoice"></i></a>`;
+                        actions += `<a href="/dashboard/admin/quotes/${row.quoteId}?context=reservation" class="btn btn-sm btn-outline-secondary me-1" title="Editar reservación"><i class="ti ti-edit"></i></a>`;
                     }
                     if (row.status !== 'cancelled' && row.status !== 'completed') {
                         actions += `<button class="btn btn-sm btn-outline-danger cancel-res-btn" data-id="${row.id}" title="Cancelar"><i class="ti ti-x"></i></button>`;
