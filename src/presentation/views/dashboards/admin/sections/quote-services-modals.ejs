@@ -1009,6 +1009,18 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <option value="">Primero selecciona un segmento</option>
                             </select>
                         </div>
+                        <!-- Per-vehicle custom price for the primary additional vehicle.
+                             Defaults to the list (catalog) price, editable, with the list
+                             price shown below for reference. -->
+                        <div class="col-md-6 mb-3 d-none" id="additionalVehiclePriceContainer">
+                            <label for="additionalVehiclePrice" class="form-label">Precio vehículo adicional</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" min="0" step="0.01" class="form-control" id="additionalVehiclePrice" placeholder="0.00">
+                                <span class="input-group-text">MXN</span>
+                            </div>
+                            <small class="text-muted d-block" id="additionalVehicleListPrice"></small>
+                        </div>
                         <!-- Extra additional vehicles (beyond the first one) — wired by JS.
                              Each row gets its own segment + vehicle dropdowns. Hidden until the
                              "Vehículo adicional" checkbox is checked. Phase 1: data model + UI;

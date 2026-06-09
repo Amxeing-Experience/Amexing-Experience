@@ -77,7 +77,7 @@ const e = __isRes ? 'reservación' : 'cotización';
         margin: 0;
         display: block;
         border-radius: 0;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-family: var(--font-myriad, 'Myriad Pro'), 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         width: 100%;
         text-align: center;
     }
@@ -539,15 +539,22 @@ const e = __isRes ? 'reservación' : 'cotización';
         page-break-inside: avoid;
     }
 
-    .pdf-export-mode .summary-info-grid {
-        display: block !important;
+    /* Keep the quote-info fields on a single row in the PDF (the narrow render
+       width would otherwise trigger the 2-column responsive breakpoint). */
+    .pdf-export-mode .sm-quote-info-row {
+        display: grid !important;
+        grid-template-columns: none !important;
+        grid-auto-flow: column !important;
+        grid-auto-columns: minmax(0, 1fr) !important;
+        gap: 12px !important;
     }
 
-    .pdf-export-mode .summary-info-item {
-        display: inline-block !important;
-        width: 48% !important;
-        margin-bottom: 8px !important;
-        margin-right: 2% !important;
+    /* :not(.d-none) so empty fields hidden via Bootstrap's d-none stay hidden
+       (Lead Guest, Seguidor de servicio, Motivo de viaje when not set). */
+    .pdf-export-mode .sm-quote-info-item:not(.d-none) {
+        display: block !important;
+        width: auto !important;
+        margin: 0 !important;
         vertical-align: top !important;
     }
 

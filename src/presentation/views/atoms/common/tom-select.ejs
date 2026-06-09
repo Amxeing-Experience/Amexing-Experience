@@ -276,11 +276,14 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
     // Handle option click
     function handleOptionClick(e) {
         e.preventDefault();
-        
-        if (e.target.classList.contains('dropdown-option')) {
-            const value = e.target.dataset.value;
-            const text = e.target.dataset.text;
-            
+
+        // Use closest() so clicks landing on inner elements (e.g. the small type
+        // suffix) still resolve to the option anchor.
+        const optionEl = e.target.closest('.dropdown-option');
+        if (optionEl) {
+            const value = optionEl.dataset.value;
+            const text = optionEl.dataset.text;
+
             setValue(value);
             closeDropdown();
         }
@@ -364,7 +367,16 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
         optionEl.dataset.value = option.value;
         optionEl.dataset.text = option.text;
         optionEl.textContent = option.text;
-        
+        // Optional small muted suffix (e.g. POI type) shown only in the dropdown list.
+        // Kept out of dataset.text so the selected display and search use the plain name.
+        if (option.type) {
+            optionEl.dataset.type = option.type;
+            const typeEl = document.createElement('small');
+            typeEl.className = 'text-muted ms-1';
+            typeEl.textContent = '(' + option.type + ')';
+            optionEl.appendChild(typeEl);
+        }
+
         optionsContainer.appendChild(optionEl);
         // Store all option data, not just value and text
         allOptions.push({

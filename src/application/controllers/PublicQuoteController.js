@@ -14,6 +14,7 @@
 
 const Parse = require('parse/node');
 const Quote = require('../../domain/models/Quote');
+const QuoteOwnershipService = require('../services/QuoteOwnershipService');
 const logger = require('../../infrastructure/logger');
 const FileStorageService = require('../services/FileStorageService');
 const { renderUrlToPdf } = require('../services/PdfRenderService');
@@ -34,6 +35,9 @@ class PublicQuoteController {
     this.viewPublicQuote = this.viewPublicQuote.bind(this);
     this.downloadQuotePdf = this.downloadQuotePdf.bind(this);
     this.preparePublicQuoteData = this.preparePublicQuoteData.bind(this);
+    // Resolve the owner the same way the authenticated API does (formal
+    // QuoteOwnership → Quote.owner → createdBy) so "Atención a" matches.
+    this.ownershipService = new QuoteOwnershipService();
 
     // Initialize experience caches for provider detection
     this.experiencesCache = null;
@@ -242,10 +246,10 @@ class PublicQuoteController {
     const client = quote.getClient();
     const companyClientPtr = quote.get('companyClientPtr');
     const createdBy = quote.get('createdBy');
-    // Owner drives the "Atención a" field in the summary; resolve it the same way
-    // the authenticated API does (denormalized owner, falling back to the creator)
-    // so the public/PDF view shows the same value.
-    const ownerObj = quote.get('owner') || createdBy;
+    // Owner drives the "Atención a" field in the summary. Use the SAME resolver
+    // as the authenticated API (formal QuoteOwnership → Quote.owner → createdBy)
+    // so the public/PDF value matches exactly.
+    const owner = await this.ownershipService.getCurrentOwner(quote.id);
     const serviceItems = quote.getServiceItems() || {};
 
     return {
@@ -294,15 +298,7 @@ class PublicQuoteController {
           fullName: `${createdBy.get('firstName') || ''} ${createdBy.get('lastName') || ''}`.trim(),
         }
         : null,
-      owner: ownerObj
-        ? {
-          id: ownerObj.id,
-          firstName: ownerObj.get('firstName') || '',
-          lastName: ownerObj.get('lastName') || '',
-          email: ownerObj.get('email') || '',
-          fullName: `${ownerObj.get('firstName') || ''} ${ownerObj.get('lastName') || ''}`.trim(),
-        }
-        : null,
+      owner,
       createdAt: quote.get('createdAt') || null,
       updatedAt: quote.get('updatedAt') || null,
     };

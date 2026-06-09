@@ -3059,11 +3059,12 @@ table.dataTable thead th:nth-child(2) select {
                             destTS.clearOptions();
                             console.log('🔧 POI Loading: Cleared existing options');
 
-                            // Add options to both Tom Select instances
+                            // Add options to both Tom Select instances.
+                            // Both show the POI's serviceType in small parentheses.
                             response.data.forEach(poi => {
-                                const option = { value: poi.value, text: poi.label };
-                                originTS.addOption(option);
-                                destTS.addOption(option);
+                                const type = poi.serviceType && poi.serviceType.name ? poi.serviceType.name : null;
+                                originTS.addOption({ value: poi.value, text: poi.label, type });
+                                destTS.addOption({ value: poi.value, text: poi.label, type });
                             });
                             console.log('🔧 POI Loading: Added', response.data.length, 'options to both dropdowns');
 
@@ -3266,7 +3267,9 @@ table.dataTable thead th:nth-child(2) select {
                 params.push(`_cb=${new Date().getTime()}`);
                 
                 if (params.length > 0) {
-                    apiUrl += `?${params.join('&')}`;
+                    // apiEndpoint may already carry a query string (e.g. ?includeInactive=true),
+                    // so use '&' as the separator in that case to avoid a malformed double '?'.
+                    apiUrl += `${apiUrl.includes('?') ? '&' : '?'}${params.join('&')}`;
                 }
                 
                 
@@ -3361,7 +3364,7 @@ table.dataTable thead th:nth-child(2) select {
             await openServiceModal(true);
 
             $.ajax({
-                url: `${apiEndpoint}/${serviceId}`,
+                url: `${apiEndpoint.split('?')[0]}/${serviceId}`,
                 type: 'GET',
                 success: async function(response) {
                     if (response.success && response.data) {
@@ -3889,7 +3892,10 @@ table.dataTable thead th:nth-child(2) select {
                         pricingData: pricingData  // Include individual pricing data
                     };
                     
-                    url = `${apiEndpoint}/bulk-create`;
+                    // Strip any query string (e.g. ?includeInactive=true) before appending
+                    // the path, otherwise the URL is malformed and Express routes it to
+                    // POST /api/services (single create) instead of /bulk-create.
+                    url = `${apiEndpoint.split('?')[0]}/bulk-create`;
                     method = 'POST';
                 } else {
                     // For editing, use existing single service data
@@ -3900,7 +3906,7 @@ table.dataTable thead th:nth-child(2) select {
                         routeDuration: $('#routeDuration').val() ? parseInt($('#routeDuration').val()) : null,
                     };
                     
-                    url = `${apiEndpoint}/${serviceId}`;
+                    url = `${apiEndpoint.split('?')[0]}/${serviceId}`;
                     method = 'PUT';
                 }
 
@@ -4107,7 +4113,7 @@ table.dataTable thead th:nth-child(2) select {
             // Handle confirmation
             $('#confirmToggleServiceBtn').on('click', function() {
                 $.ajax({
-                    url: `${apiEndpoint}/${serviceId}/toggle-status`,
+                    url: `${apiEndpoint.split('?')[0]}/${serviceId}/toggle-status`,
                     type: 'PATCH',
                     contentType: 'application/json',
                     data: JSON.stringify({ active: newStatus }),
@@ -4167,7 +4173,7 @@ table.dataTable thead th:nth-child(2) select {
             // Handle confirmation
             $('#confirmDeleteServiceBtn').on('click', function() {
                 $.ajax({
-                    url: `${apiEndpoint}/${serviceId}`,
+                    url: `${apiEndpoint.split('?')[0]}/${serviceId}`,
                     type: 'DELETE',
                     success: function(response) {
                         if (response.success) {
