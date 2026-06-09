@@ -3207,6 +3207,8 @@ class ItineraryBuilder {
         concept: `${typeLabel}: ${serviceData.origin} - ${serviceData.destination} (Ida)`,
         startTime: serviceData.startTime,
         endTime: '',
+        // Per-leg schedule so the list reflects (and clears) the Ida time correctly.
+        selectedSchedule: serviceData.startTime || '',
         startDate: serviceData.startDate,
         endDate: '',
         returnOrigin: '',
@@ -3232,6 +3234,8 @@ class ItineraryBuilder {
         destination: serviceData.returnDestination,
         startTime: serviceData.endTime,
         endTime: '',
+        // Per-leg schedule so the list reflects (and clears) the Vuelta time correctly.
+        selectedSchedule: serviceData.endTime || '',
         startDate: serviceData.endDate,
         endDate: '',
         airline: serviceData.returnAirline || '',
@@ -4445,19 +4449,23 @@ class ItineraryBuilder {
           // Flight details (if airport transport)
           if (data.transportType === 'aeropuerto') {
             data.flightNumber = document.getElementById('flightNumber')?.value;
-            data.flightTime = document.getElementById('flightTime')?.value;
-            data.flightDepartureTimeSuggested = document.getElementById('flightDepartureTimeSuggested')?.value;
+            data.flightTime = document.getElementById('flightTime')?.value || '';
+            data.flightDepartureTimeSuggested = document.getElementById('flightDepartureTimeSuggested')?.value || '';
             data.startTime = data.flightTime; // Use flight time for sorting
             data.airline = document.getElementById('airline')?.value;
+            // Keep selectedSchedule in sync so removing the time also clears the list display.
+            data.selectedSchedule = data.flightTime || '';
           } else {
             // Punto a Punto / Local: collect schedule fields
             const transportStartTime = document.getElementById('transportStartTime')?.value;
             const transportEndTime = document.getElementById('transportEndTime')?.value;
             data.startTime = transportStartTime || '';
             data.endTime = transportEndTime || '';
-            if (transportStartTime) {
-              data.selectedSchedule = transportEndTime ? `${transportStartTime} - ${transportEndTime}` : transportStartTime;
-            }
+            // Always (re)build selectedSchedule — when the time is removed this clears it
+            // so the service list ("Horario de salida") doesn't keep the old value.
+            data.selectedSchedule = transportStartTime
+              ? (transportEndTime ? `${transportStartTime} - ${transportEndTime}` : transportStartTime)
+              : '';
           }
 
           // Resolve origin display name from the active field
