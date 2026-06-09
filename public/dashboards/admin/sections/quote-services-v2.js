@@ -13926,15 +13926,17 @@ class ItineraryBuilder {
       document.getElementById('servicePrice').value = '0.00';
       this.clearExperienceDetails();
       this.currentServiceAvailabilityPending = false;
+      this._loadedExperienceId = '';
       return;
     }
 
-    // When switching to a different experience, reset the manual price override so the
+    // When switching to a DIFFERENT experience, reset the manual price override so the
     // new experience's prices load instead of stale manual prices from the previous one.
-    // Done inline (not via handlePriceOverrideToggle, which would re-call this method).
-    // Skip during edit population/restore so a saved custom price isn't wiped (this is
-    // also called programmatically while restoring a service for edit).
-    if (!this._populatingForm && !this._restoringExperienceData) {
+    // Only on a genuine change of experience: edit-restore and the modal-shown re-dispatch
+    // (Event('change')) call this with the SAME id and must NOT wipe the saved custom
+    // prices. Also skipped during edit population/restore.
+    const isExperienceChange = experienceId !== this._loadedExperienceId;
+    if (isExperienceChange && !this._populatingForm && !this._restoringExperienceData) {
       const overrideCheckbox = document.getElementById('experienceOverridePrices');
       if (overrideCheckbox?.checked) {
         overrideCheckbox.checked = false;
@@ -13951,6 +13953,8 @@ class ItineraryBuilder {
         });
       }
     }
+    // Remember the loaded experience so re-entrant calls with the same id don't reset.
+    this._loadedExperienceId = experienceId;
 
     // Check if selected option is marked as unavailable
     const expSelect = document.getElementById('experienceSelect');
