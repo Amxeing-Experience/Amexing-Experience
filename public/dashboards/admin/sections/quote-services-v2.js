@@ -531,9 +531,10 @@ class ItineraryBuilder {
       }
 
       this.serviceModified = true; // Mark as modified when user changes additional vehicle
-      this.updateServicePriceBreakdown();
+      // Dev breakdown FIRST — the service breakdown reads its line items from it.
       this.updateDevPaymentPrices(); // Update dev prices
       this.updateDevPaymentBreakdown(); // Update dev breakdown to include/exclude additional vehicle
+      this.updateServicePriceBreakdown();
       
       // Adjust modal height when showing/hiding additional fields
       setTimeout(() => {
@@ -1120,7 +1121,9 @@ class ItineraryBuilder {
     // Waiting time hours listener (Transport)
     document.getElementById('waitingTimeHours')?.addEventListener('input', () => {
       // Don't recalculate price for transport (keep vehicle price only)
-      // Just update the breakdown to show the waiting time cost
+      // Just update the breakdown to show the waiting time cost.
+      // Dev breakdown FIRST — the service breakdown reads its line items from it.
+      this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
     });
 
@@ -1725,6 +1728,7 @@ class ItineraryBuilder {
     // Also hide individual additional vehicle containers and clear their state
     document.getElementById('additionalSegmentContainer')?.classList.add('d-none');
     document.getElementById('additionalVehicleSelectContainer')?.classList.add('d-none');
+    document.getElementById('additionalVehiclePriceContainer')?.classList.add('d-none');
     // Clear selections to prevent orphaned state
     const additionalSegmentSelect = document.getElementById('additionalSegmentSelect');
     const additionalVehicleSelect = document.getElementById('additionalVehicleSelect');
@@ -1734,6 +1738,11 @@ class ItineraryBuilder {
       additionalVehicleSelect.disabled = true;
       additionalVehicleSelect.innerHTML = '<option value="">Primero selecciona un segmento</option>';
     }
+    // Clear the primary additional vehicle price + list price so it doesn't carry over.
+    const handleServiceTypeAddPrice = document.getElementById('additionalVehiclePrice');
+    if (handleServiceTypeAddPrice) handleServiceTypeAddPrice.value = '';
+    const handleServiceTypeAddListPrice = document.getElementById('additionalVehicleListPrice');
+    if (handleServiceTypeAddListPrice) handleServiceTypeAddListPrice.textContent = '';
     // Fully reset the additional-vehicle toggle + its extra rows so activating it in one
     // service (transport / vehicle tour) doesn't carry the section over to other service
     // types. Skip during edit population so a saved service's additional vehicles aren't wiped.
@@ -1993,6 +2002,7 @@ class ItineraryBuilder {
         // Ensure additional vehicle containers are hidden by default (until checkbox is checked)
         document.getElementById('additionalSegmentContainer')?.classList.add('d-none');
         document.getElementById('additionalVehicleSelectContainer')?.classList.add('d-none');
+        document.getElementById('additionalVehiclePriceContainer')?.classList.add('d-none');
 
         // Show pricing fields
         if (standardPricingSection) {
@@ -2074,6 +2084,7 @@ class ItineraryBuilder {
       // Ensure additional vehicle containers are hidden by default (until checkbox is checked)
       document.getElementById('additionalSegmentContainer')?.classList.add('d-none');
       document.getElementById('additionalVehicleSelectContainer')?.classList.add('d-none');
+      document.getElementById('additionalVehiclePriceContainer')?.classList.add('d-none');
 
       // Reset title and checkbox label for Transport
       if (serviciosLabel) {
@@ -6013,13 +6024,21 @@ class ItineraryBuilder {
                         console.log('✅ Additional vehicle restored successfully:', service.additionalVehicleId);
 
                         // Restore the per-vehicle custom price, show its container + list price.
-                        const addPriceContainer = document.getElementById('additionalVehiclePriceContainer');
-                        if (addPriceContainer) addPriceContainer.classList.remove('d-none');
-                        const addPriceInput = document.getElementById('additionalVehiclePrice');
-                        if (addPriceInput && service.additionalVehiclePrice !== undefined && service.additionalVehiclePrice !== null) {
-                          addPriceInput.value = parseFloat(service.additionalVehiclePrice).toFixed(2);
-                        }
-                        this.syncPrimaryAdditionalVehiclePrice(false);
+                        // Re-applied a couple of times because the vehicle 'change' event (and
+                        // the async round-trip load) can fire syncPrimaryAdditionalVehiclePrice(true)
+                        // afterwards and reset the input to the list price.
+                        const restoreAddVehiclePrice = () => {
+                          const addPriceContainer = document.getElementById('additionalVehiclePriceContainer');
+                          if (addPriceContainer) addPriceContainer.classList.remove('d-none');
+                          const addPriceInput = document.getElementById('additionalVehiclePrice');
+                          if (addPriceInput && service.additionalVehiclePrice !== undefined && service.additionalVehiclePrice !== null) {
+                            addPriceInput.value = parseFloat(service.additionalVehiclePrice).toFixed(2);
+                          }
+                          this.syncPrimaryAdditionalVehiclePrice(false);
+                        };
+                        restoreAddVehiclePrice();
+                        setTimeout(restoreAddVehiclePrice, 150);
+                        setTimeout(restoreAddVehiclePrice, 400);
 
                         // Trigger price recalculation now that additional vehicle is set
                         this.updateServicePriceBreakdown();
@@ -15769,6 +15788,33 @@ class ItineraryBuilder {
 
     // RESTORED: Original calculation logic for non-walking tour services
     if (serviceType === 'transport') {
+      // Mirror the dev breakdown for the selected payment type (the single source of
+      // truth computed by updateDevPaymentBreakdown). Parse its line items instead of
+      // recomputing here — the recompute double-applied the round-trip leg multiplier
+      // (serviceQuantity already encodes the 2 legs), so the service total didn't match.
+      const txPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+      let txDevField = document.getElementById('devBreakdownEfectivo');
+      if (txPaymentType === 'transferencia') {
+        txDevField = document.getElementById('devBreakdownTransferencia') || txDevField;
+      } else if (txPaymentType === 'tarjeta') {
+        txDevField = document.getElementById('devBreakdownTarjeta') || txDevField;
+      }
+      (txDevField?.value || '').split('\n').forEach((rawLine) => {
+        const lineText = rawLine.trim();
+        // Skip summary lines and the recargo line (component lines are already surcharged).
+        if (!lineText || /^(Subtotal|Total|Recargo)/i.test(lineText)) return;
+        const lineAmounts = lineText.match(/-?\$[0-9,.]+/g);
+        const amountMXN = lineAmounts && lineAmounts.length
+          ? parseFloat(lineAmounts[lineAmounts.length - 1].replace('$', '').replace(/,/g, ''))
+          : 0;
+        if (amountMXN === 0) return;
+        const label = lineText.replace(/\s*=\s*-?\$[0-9,.]+\s*$/, '');
+        items.push({ label, amountMXN, alreadySurcharged: true });
+      });
+
+      // Legacy recomputation kept below but DISABLED — the dev breakdown parsed above is
+      // now the single source of truth for the transport desglose.
+      if (false) {
       const vehicleSelect = document.getElementById('vehicleSelect');
       const selectedVehicleId = vehicleSelect?.value;
       const quantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
@@ -15972,6 +16018,7 @@ class ItineraryBuilder {
           items.push({ label: `Tiempo de espera (${brkWaitingHours}h × ${this.formatCurrency(displayHourly)})${legSuffix}`, amountMXN: wtCost });
         }
       }
+      } // end disabled legacy transport recompute
     } else if (serviceType === 'tour') {
       // Check if it's a walking tour
       let isWalkingTourBreakdown = false;
@@ -16860,9 +16907,13 @@ class ItineraryBuilder {
       }
     }
 
-    // Use fallbacks from service data if form fields are empty (edit race condition)
-    if (!originName && fallbackOrigin) originName = fallbackOrigin;
-    if (!destinationName && fallbackDestination) destinationName = fallbackDestination;
+    // Prefer the explicit fallbacks when provided. The edit-restore flow passes the saved
+    // service's origin/destination here — that's the authoritative route for THIS leg.
+    // For round-trip the form resolution above always reads the IDA fields, which sends the
+    // wrong route for the VUELTA/salida (departure) leg and returns 0 vehicles. Live user
+    // selection passes no fallbacks, so the form fields are still used there.
+    if (fallbackOrigin) originName = fallbackOrigin;
+    if (fallbackDestination) destinationName = fallbackDestination;
 
     if (!originName || !destinationName) {
       this.clearVehicleDropdown();
@@ -17289,7 +17340,9 @@ class ItineraryBuilder {
 
     this.updatePriceField(displayPrice);
 
-    // Update breakdown after transport price recalculation
+    // The service breakdown now reads from the dev breakdown, so recompute the dev
+    // breakdown FIRST, then render the service breakdown from it.
+    this.updateDevPaymentBreakdown();
     this.updateServicePriceBreakdown();
   }
 
@@ -17376,9 +17429,13 @@ class ItineraryBuilder {
 
     // Check if the selected segment matches the main segment
     const mainSegmentId = document.getElementById('transportCategory')?.value;
-    console.log('🔍 Checking segments:', { segmentId, mainSegmentId, hasCachedData: !!this.transportPriceData?.vehicles });
+    const cachedVehicleCount = this.transportPriceData?.vehicles?.length || 0;
+    console.log('🔍 Checking segments:', { segmentId, mainSegmentId, hasCachedData: cachedVehicleCount > 0 });
 
-    if (segmentId === mainSegmentId && this.transportPriceData?.vehicles) {
+    // Require a NON-EMPTY cache. On round-trip the active transportPriceData can belong to
+    // the other leg (empty vehicles for this one), so an empty array must fall through to
+    // the API fetch below instead of failing with "No vehicles provided".
+    if (segmentId === mainSegmentId && cachedVehicleCount > 0) {
       // Same segment - use cached data, no API call needed!
       console.log('🚀 Using cached vehicle data for additional segment');
 
@@ -17542,7 +17599,10 @@ class ItineraryBuilder {
           hasData: !!result.data,
         });
 
-        if (result.success && result.data?.vehicles) {
+        // Require a NON-EMPTY vehicles array — an empty array is truthy and would call
+        // populateAdditionalVehicleDropdown(0) which fails. Route it to the graceful
+        // "no vehicles" branch instead of throwing an unhandled rejection.
+        if (result.success && result.data?.vehicles?.length > 0) {
           // Store the additional transport price data for use in breakdown
           this.additionalTransportPriceData = result.data;
           const populationResult = await this.populateAdditionalVehicleDropdown(result.data.vehicles);
