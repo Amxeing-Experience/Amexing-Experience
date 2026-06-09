@@ -4573,8 +4573,15 @@ class ItineraryBuilder {
             data.endTime = adEndTime;
             data.selectedSchedule = `${adStartTime} - ${adEndTime}`;
           } else {
+            data.endTime = '';
             data.selectedSchedule = adStartTime;
           }
+        } else {
+          // Schedule removed by the user — clear it explicitly so the edit merge
+          // ({...existingService, ...data}) drops the previous values instead of keeping them.
+          data.startTime = '';
+          data.endTime = '';
+          data.selectedSchedule = '';
         }
 
         // Store a disposición price override flag.
@@ -4621,23 +4628,25 @@ class ItineraryBuilder {
 
         // Collect schedule data if checkbox is checked
         const hasSchedule = document.getElementById('conceptoHasSchedule')?.checked;
-        if (hasSchedule) {
-          const startTimeEl = document.getElementById('conceptoStartTime');
-          const endTimeEl = document.getElementById('conceptoEndTime');
-
-          const startTime = startTimeEl?.value;
-          const endTime = endTimeEl?.value;
-
-          if (startTime) {
-            data.startTime = startTime;
-            // Create a schedule string for display
-            if (endTime) {
-              data.endTime = endTime;
-              data.selectedSchedule = `${startTime} - ${endTime}`;
-            } else {
-              data.selectedSchedule = startTime;
-            }
+        const conceptoStartTime = document.getElementById('conceptoStartTime')?.value;
+        const conceptoEndTime = document.getElementById('conceptoEndTime')?.value;
+        if (hasSchedule && conceptoStartTime) {
+          data.startTime = conceptoStartTime;
+          // Create a schedule string for display
+          if (conceptoEndTime) {
+            data.endTime = conceptoEndTime;
+            data.selectedSchedule = `${conceptoStartTime} - ${conceptoEndTime}`;
+          } else {
+            data.endTime = '';
+            data.selectedSchedule = conceptoStartTime;
           }
+        } else {
+          // Schedule removed (checkbox off or time cleared) — clear it explicitly so the
+          // edit merge ({...existingService, ...data}) drops the previous values instead
+          // of keeping the old schedule.
+          data.startTime = '';
+          data.endTime = '';
+          data.selectedSchedule = '';
         }
         break;
       }
