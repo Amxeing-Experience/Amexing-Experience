@@ -55,7 +55,7 @@ async function getBrowser() {
 async function renderUrlToPdf(url, options = {}) {
   const {
     format = 'Letter',
-    margin = '10mm',
+    margin = '8mm',
     cookies = null,
   } = options;
 
