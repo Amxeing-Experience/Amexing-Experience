@@ -500,25 +500,21 @@ class ItineraryBuilder {
 
     // Additional vehicle checkbox for transport - shows additional vehicle selection fields
     document.getElementById('additionalVehicleCheckbox')?.addEventListener('change', (e) => {
-      const segmentContainer = document.getElementById('additionalSegmentContainer');
-      const vehicleContainer = document.getElementById('additionalVehicleSelectContainer');
-      const priceContainer = document.getElementById('additionalVehiclePriceContainer');
-      const extraContainer = document.getElementById('extraAdditionalVehiclesContainer');
+      // Visibilidad derivada del registro de opciones (data-driven, costura #2).
+      // Fallback a los ids reales por seguridad si el registro no cargó.
+      const ADDITIONAL_VEHICLE_FALLBACK = [
+        'additionalSegmentContainer',
+        'additionalVehicleSelectContainer',
+        'additionalVehiclePriceContainer',
+        'extraAdditionalVehiclesContainer',
+      ];
+      this.setOptionContainersVisible('additionalVehicle', e.target.checked, ADDITIONAL_VEHICLE_FALLBACK);
 
       if (e.target.checked) {
-        // Show additional vehicle fields
-        segmentContainer?.classList.remove('d-none');
-        vehicleContainer?.classList.remove('d-none');
-        priceContainer?.classList.remove('d-none');
-        extraContainer?.classList.remove('d-none');
         // Populate segment dropdown with same options as main segment
         this.populateAdditionalSegmentDropdown();
       } else {
-        // Hide additional vehicle fields and clear selections
-        segmentContainer?.classList.add('d-none');
-        vehicleContainer?.classList.add('d-none');
-        priceContainer?.classList.add('d-none');
-        extraContainer?.classList.add('d-none');
+        // Clear selections when hiding
         document.getElementById('additionalSegmentSelect').value = '';
         document.getElementById('additionalVehicleSelect').value = '';
         document.getElementById('additionalVehicleSelect').disabled = true;
@@ -11984,6 +11980,27 @@ class ItineraryBuilder {
       concepto: {},
       transport: {},
     };
+  }
+
+  /**
+   * Muestra u oculta los contenedores que revela una opción, según el registro
+   * data-driven (window.QuoteOptionRegistry). Reemplaza los classList dispersos.
+   * Cae a fallbackIds si el registro no está cargado (insurance — no rompe la UI).
+   * @param {string} optionKey - key de la opción en el registro.
+   * @param {boolean} isVisible - mostrar (true) u ocultar (false).
+   * @param {string[]} [fallbackIds] - ids a usar si el registro no está disponible.
+   * @example
+   */
+  setOptionContainersVisible(optionKey, isVisible, fallbackIds = []) {
+    const registry = (typeof window !== 'undefined') ? window.QuoteOptionRegistry : null;
+    const opt = registry ? registry.byKey(optionKey) : null;
+    const ids = (opt && Array.isArray(opt.showsWhenChecked) && opt.showsWhenChecked.length)
+      ? opt.showsWhenChecked
+      : fallbackIds;
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('d-none', !isVisible);
+    });
   }
 
   closeModal(modalId) {

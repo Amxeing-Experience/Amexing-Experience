@@ -36,11 +36,15 @@
       appliesTo: ['transport'],
       inputType: 'toggle',
       label: 'Vehículo adicional',
+      // Contenedores que revela el checkbox (verificado contra el handler real en
+      // quote-services-v2.js: additionalVehicleCheckbox change). NO incluye
+      // additionalVehicleContainer (wrapper del propio checkbox, manejado por el
+      // cambio de tipo de servicio, no por esta opción).
       showsWhenChecked: [
-        'additionalVehicleContainer',
         'additionalSegmentContainer',
         'additionalVehicleSelectContainer',
         'additionalVehiclePriceContainer',
+        'extraAdditionalVehiclesContainer',
       ],
       priceEffect: 'addAdditionalVehicle',
     },

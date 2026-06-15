@@ -68,13 +68,13 @@ describe('OptionRegistry — helpers puros', () => {
 });
 
 describe('OptionRegistry — visibilidad data-driven', () => {
-  it('additionalVehicle declara sus 4 contenedores a mostrar', () => {
+  it('additionalVehicle declara los contenedores reales que revela el checkbox', () => {
     const opt = OptionRegistry.byKey('additionalVehicle');
     expect(opt.showsWhenChecked).toEqual([
-      'additionalVehicleContainer',
       'additionalSegmentContainer',
       'additionalVehicleSelectContainer',
       'additionalVehiclePriceContainer',
+      'extraAdditionalVehiclesContainer',
     ]);
   });
 });
