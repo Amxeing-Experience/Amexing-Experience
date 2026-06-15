@@ -6387,9 +6387,12 @@ class ItineraryBuilder {
               : '';
           }
 
-          if (conceptoApplySurchargesCheckbox && service.applySurcharges !== undefined) {
-            conceptoApplySurchargesCheckbox.checked = service.applySurcharges;
-            console.log('✅ CONCEPTO FIELD - Set applySurcharges to:', service.applySurcharges);
+          if (conceptoApplySurchargesCheckbox) {
+            // El recargo de concepto SIEMPRE se aplica (no se puede desactivar — decisión
+            // del cliente). Se fuerza checked=true aunque un concepto viejo se haya guardado
+            // con applySurcharges=false.
+            conceptoApplySurchargesCheckbox.checked = true;
+            console.log('✅ CONCEPTO FIELD - applySurcharges forzado a true (recargo siempre)');
           }
         };
 

@@ -23,9 +23,8 @@ hardcodeado del front es solo el cache de tours. Sin cambios.
 Decisión del cliente: si falta `price_child`/`price_no_alcohol`, usar el **precio de adulto**. Corregido en
 `calculateServicePrice` (`childPrice = service.childPrice || adultPrice`, igual sin-alcohol).
 
-### E3. ⚪ Semántica de duración (confirmar)
-Los precios por persona se **multiplican por la duración**. Ej.: 2 adultos @500, 1.5h → (1,000)×1.5 = 1,500.
-**Pregunta:** ¿el precio por persona se multiplica por horas, o el precio ya es por toda la experiencia (duración=1)?
+### E3. ✅ CONFIRMADO CORRECTO
+El precio de experiencia es **por persona × duración** (2 adultos@500, 1.5h → 1,500). Sin cambios.
 
 **Worked example (E):** 2 adultos @500 + 1 niño @300, 1.5h → efectivo **1,950**; transferencia 2% → **1,989**.
 
@@ -56,10 +55,11 @@ queda **2,500** (sin recargo).
 Fórmula: `base = precioCliente + (totalPersonas × precioPorPersona)`, luego recargo por forma de pago.
 Tiene un toggle único `conceptoApplySurcharges`. (`updateConceptoServicePrice` / dev breakdown)
 
-### C1. ⚪ Toggle de recargos exclusivo de concepto (confirmar intención)
-Solo concepto tiene un checkbox para **aplicar o no** el recargo por forma de pago; los demás tipos siempre lo
-aplican. Probablemente intencional (negociación con cliente).
-**Pregunta:** ¿es correcto que concepto pueda desactivar el recargo y los demás no?
+### C1. ✅ RESUELTO — el recargo SIEMPRE se aplica
+Decisión del cliente: el recargo de concepto **no se puede desactivar**. Los dos precios (unitario y por persona) se
+capturan en efectivo y siempre se les calcula el recargo. El checkbox ya estaba oculto (`d-none`) y `checked`; el
+único hueco era la restauración, que ponía el valor guardado — ahora se **fuerza `checked=true`** al editar (también
+para conceptos viejos guardados con `false`).
 
 ### C2. ⚪ Dos rutas de cálculo (robustez, valor hoy correcto)
 `updateDevPaymentPrices` (sin por-persona) y `updateDevPaymentBreakdown` (con por-persona) calculan concepto por
@@ -79,8 +79,11 @@ unifica. *No es bug de valor; es deuda.*
 | E2 | Experiencias: niño/sin-alcohol = $0 | ✅ resuelto | Fallback a precio de adulto |
 | W1 | Walking: manual sin recargo | ✅ resuelto | Manual = base efectivo + recargo (total-override corregido) |
 | W2 | Walking: guardado≠mostrado | ✅ resuelto | Con W1 (por-grupo ya estaba bien) |
-| E3/C1 | Semántica duración / toggle concepto | ⚪ | confirmar intención (no urgente) |
-| C2 | Concepto: 2 rutas + nombres confusos | ⚪ | se resuelve al migrar al motor |
+| E3 | Experiencias: precio × duración | ✅ confirmado | Correcto (por persona × duración) |
+| C1 | Concepto: recargo siempre aplica | ✅ resuelto | No se puede desactivar; restore fuerza checked=true |
+| C2 | Concepto: 2 rutas + nombres confusos | ⚪ deuda | se resuelve al migrar concepto al motor |
+
+**Auditoría PR2: CERRADA** — E1 (no bug), E2/W1/W2/C1 corregidos, E3 confirmado, C2 diferido a la migración al motor.
 
 ## Proceso
 1. El cliente confirma cada punto (correcto / regla correcta).
