@@ -568,6 +568,8 @@
     window.userRole = '<%= typeof userRole !== "undefined" ? userRole : "" %>';
 </script>
 <link rel="stylesheet" href="/dashboards/admin/sections/quote-services/quote-catalog-drag.css">
+<!-- Motor de cálculo único (isomórfico): debe cargar ANTES de pricing-utils y del builder -->
+<script src="/shared/pricing/pricingEngine.js"></script>
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
 <script src="/js/services-renderer-config.js"></script>
 <script src="/js/services-renderer.js"></script>
@@ -575,5 +577,7 @@
 <!-- Renderer DevTools for development -->
 <script src="/js/renderer-dev-tools.js"></script>
 <% } %>
+<!-- Registro de opciones data-driven (costura #2): debe cargar ANTES del builder -->
+<script src="/dashboards/admin/sections/quote-services/option-registry.js"></script>
 <script src="/dashboards/admin/sections/quote-services-v2.js"></script>
 <script src="/dashboards/admin/sections/quote-services/quote-catalog-drag.js"></script>

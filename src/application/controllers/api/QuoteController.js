@@ -1914,6 +1914,31 @@ class QuoteController {
         }
       }
 
+      // Consistencia de totales (costura #1 — backend, motor único).
+      // Verifica que el subtotal enviado por el front coincida con la suma de los
+      // totales por día. Por ahora SOLO observa (log warning) — NO cambia números
+      // (consolidación faithful). La recomputación autoritativa con el motor se hará
+      // en la fase de corrección de fórmulas.
+      try {
+        const pricingEngine = require('../../../domain/pricing/pricingEngine');
+        const sumOfDayTotals = pricingEngine.round2(
+          days.reduce((sum, day) => sum + (parseFloat(day.dayTotal) || 0), 0)
+        );
+        const subtotalRounded = pricingEngine.round2(subtotal);
+        if (Math.abs(sumOfDayTotals - subtotalRounded) > 0.01) {
+          logger.warn('⚠️ Inconsistencia de subtotal en cotización (builder vs suma de días)', {
+            quoteId,
+            subtotalRecibido: subtotalRounded,
+            sumaDeDias: sumOfDayTotals,
+            diferencia: pricingEngine.round2(subtotalRounded - sumOfDayTotals),
+            paymentType,
+            currency,
+          });
+        }
+      } catch (calcErr) {
+        logger.warn('No se pudo verificar la consistencia de totales con el motor', { error: calcErr.message });
+      }
+
       // Query quote
       const query = new Parse.Query('Quote');
       query.equalTo('exists', true);
@@ -2171,7 +2196,7 @@ class QuoteController {
 
         // Get price breakdown with surcharge
         const basePrice = service.get('price') || 0;
-        const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+        const priceBreakdown = pricingHelper.getBasePriceBreakdown(basePrice);
 
         // Add vehicle type to this route with price breakdown
         route.vehicles.push({
@@ -2336,7 +2361,7 @@ class QuoteController {
         if (!(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople)) {
           // Get price breakdown with surcharge (from RatePrices record)
           const basePrice = ratePrice.get('price') || 0;
-          const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+          const priceBreakdown = pricingHelper.getBasePriceBreakdown(basePrice);
 
           // Add vehicle type to this route with price breakdown and capacity info
           route.vehicles.push({
@@ -2460,7 +2485,7 @@ class QuoteController {
 
         // Get price breakdown with surcharge
         const basePrice = tour.get('price') || 0;
-        const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+        const priceBreakdown = pricingHelper.getBasePriceBreakdown(basePrice);
 
         // Get duration in minutes and convert to hours
         const durationMinutes = tour.get('time') || 0;
@@ -2811,7 +2836,7 @@ class QuoteController {
             // Include all vehicles
             // Get price breakdown with surcharge
             const basePrice = tour.get('price') || 0;
-            const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+            const priceBreakdown = pricingHelper.getBasePriceBreakdown(basePrice);
 
             // Get duration in minutes and convert to hours
             const durationMinutes = tour.get('time') || 0;

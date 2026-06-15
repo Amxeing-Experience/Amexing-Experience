@@ -500,25 +500,21 @@ class ItineraryBuilder {
 
     // Additional vehicle checkbox for transport - shows additional vehicle selection fields
     document.getElementById('additionalVehicleCheckbox')?.addEventListener('change', (e) => {
-      const segmentContainer = document.getElementById('additionalSegmentContainer');
-      const vehicleContainer = document.getElementById('additionalVehicleSelectContainer');
-      const priceContainer = document.getElementById('additionalVehiclePriceContainer');
-      const extraContainer = document.getElementById('extraAdditionalVehiclesContainer');
+      // Visibilidad derivada del registro de opciones (data-driven, costura #2).
+      // Fallback a los ids reales por seguridad si el registro no cargó.
+      const ADDITIONAL_VEHICLE_FALLBACK = [
+        'additionalSegmentContainer',
+        'additionalVehicleSelectContainer',
+        'additionalVehiclePriceContainer',
+        'extraAdditionalVehiclesContainer',
+      ];
+      this.setOptionContainersVisible('additionalVehicle', e.target.checked, ADDITIONAL_VEHICLE_FALLBACK);
 
       if (e.target.checked) {
-        // Show additional vehicle fields
-        segmentContainer?.classList.remove('d-none');
-        vehicleContainer?.classList.remove('d-none');
-        priceContainer?.classList.remove('d-none');
-        extraContainer?.classList.remove('d-none');
         // Populate segment dropdown with same options as main segment
         this.populateAdditionalSegmentDropdown();
       } else {
-        // Hide additional vehicle fields and clear selections
-        segmentContainer?.classList.add('d-none');
-        vehicleContainer?.classList.add('d-none');
-        priceContainer?.classList.add('d-none');
-        extraContainer?.classList.add('d-none');
+        // Clear selections when hiding
         document.getElementById('additionalSegmentSelect').value = '';
         document.getElementById('additionalVehicleSelect').value = '';
         document.getElementById('additionalVehicleSelect').disabled = true;
@@ -1642,27 +1638,15 @@ class ItineraryBuilder {
       this.handleServiceTypeChange('experience'); // Default to experience
     }
 
-    // Add event listener to clear flags when modal is hidden
+    // Limpiar el estado del modal en CADA cierre. El listener se registra UNA sola
+    // vez (antes usaba { once: true } y se re-agregaba en cada apertura: en reaperturas
+    // el estado del servicio anterior quedaba pegado). No re-renderiza al cancelar.
     const modalElement = document.getElementById('serviceModal');
-    if (modalElement) {
+    if (modalElement && !this._serviceModalHiddenBound) {
+      this._serviceModalHiddenBound = true;
       modalElement.addEventListener('hidden.bs.modal', () => {
-        this._editModalOpen = false;
-        this._restoringWalkingTourData = false;
-        this._populatingForm = false;
-        this.currentServiceCopy = null; // Clear the service copy
-
-        // Clear cache to prevent any future issues
-        this.serviceTypeFields = {
-          experience: {},
-          tour: {},
-          concepto: {},
-          transport: {},
-        };
-
-        console.log('✅ Service modal hidden - flags and cache cleared');
-        // Don't re-render when closing without saving - only render after actual save
-        // this.renderDaysContent(); // REMOVED: Prevents tags from disappearing when canceling
-      }, { once: true }); // Use once: true to avoid multiple listeners
+        this.resetServiceModalState();
+      });
     }
 
     modal.show();
@@ -5878,9 +5862,31 @@ class ItineraryBuilder {
           this._populatingTransportForm = false;
         }
 
+        // Hay vehículo adicional REAL solo si, además del flag, existe el id del vehículo.
+        // El flag hasAdditionalVehicle pudo quedar en true SIN vehículo por el leak previo
+        // del checkbox (al guardar se escribía hasAdditionalVehicle = checkbox.checked aunque
+        // no hubiera selección, dejando additionalVehicleId en null). Por eso no confiamos
+        // solo en el flag.
+        const hasRealAdditionalVehicle = !!(service.hasAdditionalVehicle && service.additionalVehicleId);
+
+        // Default determinista: si NO hay vehículo adicional real, desmarcar y ocultar
+        // (cubre tanto el estado pegado como el flag corrupto sin vehículo).
+        if (service.type !== 'tour' && !hasRealAdditionalVehicle) {
+          const avCheckbox = document.getElementById('additionalVehicleCheckbox');
+          if (avCheckbox) {
+            avCheckbox.checked = false;
+            this.setOptionContainersVisible('additionalVehicle', false, [
+              'additionalSegmentContainer',
+              'additionalVehicleSelectContainer',
+              'additionalVehiclePriceContainer',
+              'extraAdditionalVehiclesContainer',
+            ]);
+          }
+        }
+
         // Restore additional vehicle fields if service has them
         // Note: For tours, this is handled by restoreTourAdditionalVehicle in populateVehicleTourForm
-        if (service.hasAdditionalVehicle && service.type !== 'tour') {
+        if (hasRealAdditionalVehicle && service.type !== 'tour') {
           console.log('🚗 Restoring additional vehicle fields:', {
             hasAdditionalVehicle: service.hasAdditionalVehicle,
             additionalVehicleSegment: service.additionalVehicleSegment,
@@ -6623,9 +6629,22 @@ class ItineraryBuilder {
       serviceQuantityField.value = service.quantity;
     }
 
-    // Step 10: Handle additional vehicle if present
-    if (service.hasAdditionalVehicle) {
+    // Step 10: Handle additional vehicle if present.
+    // Solo si hay vehículo adicional REAL (flag + id). El flag hasAdditionalVehicle pudo
+    // quedar en true sin vehículo por el leak previo del checkbox; en ese caso desmarcar.
+    if (service.hasAdditionalVehicle && service.additionalVehicleId) {
       await this.restoreTourAdditionalVehicle(service);
+    } else {
+      const avCheckbox = document.getElementById('additionalVehicleCheckbox');
+      if (avCheckbox) {
+        avCheckbox.checked = false;
+        this.setOptionContainersVisible('additionalVehicle', false, [
+          'additionalSegmentContainer',
+          'additionalVehicleSelectContainer',
+          'additionalVehiclePriceContainer',
+          'extraAdditionalVehiclesContainer',
+        ]);
+      }
     }
 
     // Step 10b: Repaint EXTRA additional vehicles now that the tour rate is set and
@@ -8517,12 +8536,9 @@ class ItineraryBuilder {
     // Calculate base vehicle cost (total for all vehicles and hours)
     const baseVehicleTotal = Math.round((baseVehicleCostPerHour * hours * vehicleQuantity) * 100) / 100;
 
-    // Apply surcharge based on payment type
-    const originalPaymentType = document.getElementById('priceTypeSelect')?.value;
-    document.getElementById('priceTypeSelect').value = paymentType;
-    const vehicleTotalWithSurcharge = Math.round(this.getDisplayPrice(baseVehicleTotal) * 100) / 100;
-    // Restore original payment type
-    if (originalPaymentType) document.getElementById('priceTypeSelect').value = originalPaymentType;
+    // Apply surcharge based on payment type — pasa el tipo por parámetro al motor,
+    // SIN mutar el DOM (eliminado el efecto secundario frágil sobre #priceTypeSelect).
+    const vehicleTotalWithSurcharge = Math.round(this.getDisplayPrice(baseVehicleTotal, { paymentType }) * 100) / 100;
 
     // Calculate guide cost (no surcharge applied to guide)
     const guideTotalCost = Math.round((guideRate * hours * vehicleQuantity) * 100) / 100;
@@ -8535,7 +8551,8 @@ class ItineraryBuilder {
     if (hours > 0) {
       const discountPercentage = this.getADisposicionDiscount(hours);
       if (discountPercentage > 0) {
-        const finalCost = Math.round((baseVehicleTotal + guideTotalCost) * 100) / 100;
+        // Descuento sobre el total CON recargo (coherente con el motor pricingEngine).
+        const finalCost = Math.round((vehicleTotalWithSurcharge + guideTotalCost) * 100) / 100;
         discountAmount = Math.round((finalCost * (discountPercentage / 100)) * 100) / 100;
       }
     }
@@ -10296,17 +10313,35 @@ class ItineraryBuilder {
    * @param mxnPrice
    * @example
    */
-  getDisplayPrice(mxnPrice) {
-    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-    const currency = document.getElementById('currencySelect')?.value || 'MXN';
+  /**
+   * Precio mostrado a partir de un precio base en MXN.
+   * @param {number} mxnPrice - Precio base en MXN.
+   * @param {object} [opts] - Overrides explícitos. Si no se pasan, se leen del DOM.
+   *   { paymentType, currency } — permite calcular para una forma de pago SIN mutar el DOM.
+   * @returns {number}
+   */
+  getDisplayPrice(mxnPrice, opts = {}) {
+    const paymentType = opts.paymentType || document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    const currency = opts.currency || document.getElementById('currencySelect')?.value || 'MXN';
 
-    // Step 1: Apply cash rounding for efectivo payments
+    // Motor de cálculo único (isomórfico). Una sola fuente de verdad front/back.
+    if (window.PricingEngine) {
+      return window.PricingEngine.applyDisplayPrice(mxnPrice, {
+        paymentType,
+        currency,
+        transferRate: this.transferRate,
+        agencyRate: this.agencyRate,
+        exchangeRate: this.exchangeRate,
+        // Comportamiento actual: getDisplayPrice siempre redondea efectivo+MXN.
+        cashRoundingEnabled: true,
+      });
+    }
+
+    // Fallback (idéntico al comportamiento previo) por si el motor no cargó.
     let priceToProcess = mxnPrice;
     if (paymentType === 'efectivo' && currency === 'MXN' && window.PricingUtils && window.PricingUtils.applyCashRounding) {
       priceToProcess = PricingUtils.applyCashRounding(mxnPrice);
     }
-
-    // Step 2: Apply payment surcharge
     let withSurcharge = priceToProcess;
     if (window.PricingUtils) {
       withSurcharge = PricingUtils.applyPaymentRate(priceToProcess, paymentType, this.transferRate, this.agencyRate);
@@ -10315,25 +10350,10 @@ class ItineraryBuilder {
     } else if (paymentType === 'tarjeta' && this.agencyRate > 0) {
       withSurcharge = priceToProcess * (1 + this.agencyRate / 100);
     }
-
-    // Step 3: Currency conversion
     if (currency === 'USD' && this.exchangeRate > 0) {
       const usdPrice = withSurcharge / this.exchangeRate;
-      const finalPrice = window.PricingUtils ? PricingUtils.applyUSDRoundingRules(usdPrice) : Math.round(usdPrice);
-      console.log('💰 getDisplayPrice RESULT (USD):', {
-        originalMXN: mxnPrice,
-        withSurcharge,
-        usdPrice: finalPrice,
-        exchangeRate: this.exchangeRate,
-      });
-      return finalPrice;
+      return window.PricingUtils ? PricingUtils.applyUSDRoundingRules(usdPrice) : Math.round(usdPrice);
     }
-
-    console.log('💰 getDisplayPrice RESULT (MXN):', {
-      originalMXN: mxnPrice,
-      finalPrice: withSurcharge,
-      surchargeApplied: withSurcharge - priceToProcess,
-    });
     return withSurcharge;
   }
 
@@ -11979,6 +11999,46 @@ class ItineraryBuilder {
     }
   }
 
+  /**
+   * Restablece TODO el estado del modal de servicio (flags + cache de campos).
+   * Idempotente: seguro de llamar en cada cierre, por cualquier vía. Centraliza lo
+   * que antes estaba duplicado en el listener hidden.bs.modal y en closeModal.
+   * @example
+   */
+  resetServiceModalState() {
+    this._editModalOpen = false;
+    this._restoringWalkingTourData = false;
+    this._populatingForm = false;
+    this.currentServiceCopy = null;
+    this.serviceTypeFields = {
+      experience: {},
+      tour: {},
+      concepto: {},
+      transport: {},
+    };
+  }
+
+  /**
+   * Muestra u oculta los contenedores que revela una opción, según el registro
+   * data-driven (window.QuoteOptionRegistry). Reemplaza los classList dispersos.
+   * Cae a fallbackIds si el registro no está cargado (insurance — no rompe la UI).
+   * @param {string} optionKey - key de la opción en el registro.
+   * @param {boolean} isVisible - mostrar (true) u ocultar (false).
+   * @param {string[]} [fallbackIds] - ids a usar si el registro no está disponible.
+   * @example
+   */
+  setOptionContainersVisible(optionKey, isVisible, fallbackIds = []) {
+    const registry = (typeof window !== 'undefined') ? window.QuoteOptionRegistry : null;
+    const opt = registry ? registry.byKey(optionKey) : null;
+    const ids = (opt && Array.isArray(opt.showsWhenChecked) && opt.showsWhenChecked.length)
+      ? opt.showsWhenChecked
+      : fallbackIds;
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('d-none', !isVisible);
+    });
+  }
+
   closeModal(modalId) {
     const modal = bootstrap.Modal.getInstance(document.getElementById(modalId));
     if (modal) {
@@ -11987,21 +12047,9 @@ class ItineraryBuilder {
         this.clearModalAlert('dayModalAlert');
       } else if (modalId === 'serviceModal') {
         this.clearModalAlert('serviceModalAlert');
-        // Clear all flags and cache when closing service modal
-        this._editModalOpen = false;
-        this._restoringWalkingTourData = false;
-        this._populatingForm = false;
-        this.currentServiceCopy = null;
-
-        // Clear cache completely
-        this.serviceTypeFields = {
-          experience: {},
-          tour: {},
-          concepto: {},
-          transport: {},
-        };
-
-        console.log('✅ Edit modal closed - all flags and cache cleared');
+        // Estado del modal centralizado (idempotente). El listener hidden.bs.modal
+        // también lo ejecuta, así el cierre queda consistente por cualquier vía.
+        this.resetServiceModalState();
       }
       modal.hide();
     }
