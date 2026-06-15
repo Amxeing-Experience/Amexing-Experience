@@ -400,6 +400,25 @@ class PricingHelper {
     return pricingEngine.calcTotalWithIVA(subtotal, ivaRate);
   }
 
+  /**
+   * Desglose SOLO con precio base (sin recargo). Para listados/PDF SIN forma de pago
+   * elegida: el backend entrega el precio efectivo y el recargo por forma de pago lo
+   * aplica el motor (pricingEngine.applyDisplayPrice) cuando el usuario la elige. Así se
+   * usa una sola fuente y se evita el recargo único (21.09%) que divergía del builder.
+   * Mantiene la misma forma que getPriceBreakdown para no romper a los consumidores.
+   * @param {number} basePrice - Precio base (efectivo) en MXN.
+   * @returns {object} { basePrice, surcharge: 0, totalPrice: basePrice, surchargePercentage: 0 }.
+   */
+  getBasePriceBreakdown(basePrice) {
+    const base = pricingEngine.round2(basePrice);
+    return {
+      basePrice: base,
+      surcharge: 0,
+      totalPrice: base,
+      surchargePercentage: 0,
+    };
+  }
+
   // ============================================================
   // FORMATTING UTILITIES
   // ============================================================
