@@ -458,6 +458,32 @@ class ItineraryBuilder {
       input.dispatchEvent(new Event('input', { bubbles: true }));
     };
 
+    // Prevent non-integer characters on keypress (people counts have no decimals).
+    const preventNonIntegerChars = (e) => {
+      // Allow: backspace, delete, tab, escape, enter
+      if ([46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1
+        // Allow: Ctrl+A/C/V/X
+        || (e.keyCode === 65 && e.ctrlKey === true)
+        || (e.keyCode === 67 && e.ctrlKey === true)
+        || (e.keyCode === 86 && e.ctrlKey === true)
+        || (e.keyCode === 88 && e.ctrlKey === true)
+        // Allow: home, end, left, right
+        || (e.keyCode >= 35 && e.keyCode <= 39)) {
+        return;
+      }
+      // Block anything that is not a digit (top-row 48-57 or numpad 96-105)
+      if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+        e.preventDefault();
+      }
+    };
+
+    // Strip any non-digit character from an integer field (e.g. pasted letters).
+    const sanitizeIntegerInput = (e) => {
+      const input = e.target;
+      const cleaned = input.value.replace(/[^0-9]/g, '');
+      if (input.value !== cleaned) input.value = cleaned;
+    };
+
     // Day Management
     document.getElementById('addNewDayBtn')?.addEventListener('click', () => this.openDayModal());
     document.getElementById('addDaySidebarBtn')?.addEventListener('click', () => this.openDayModal());
@@ -476,12 +502,14 @@ class ItineraryBuilder {
     document.getElementById('additionalVehicleCheckbox')?.addEventListener('change', (e) => {
       const segmentContainer = document.getElementById('additionalSegmentContainer');
       const vehicleContainer = document.getElementById('additionalVehicleSelectContainer');
+      const priceContainer = document.getElementById('additionalVehiclePriceContainer');
       const extraContainer = document.getElementById('extraAdditionalVehiclesContainer');
 
       if (e.target.checked) {
         // Show additional vehicle fields
         segmentContainer?.classList.remove('d-none');
         vehicleContainer?.classList.remove('d-none');
+        priceContainer?.classList.remove('d-none');
         extraContainer?.classList.remove('d-none');
         // Populate segment dropdown with same options as main segment
         this.populateAdditionalSegmentDropdown();
@@ -489,18 +517,24 @@ class ItineraryBuilder {
         // Hide additional vehicle fields and clear selections
         segmentContainer?.classList.add('d-none');
         vehicleContainer?.classList.add('d-none');
+        priceContainer?.classList.add('d-none');
         extraContainer?.classList.add('d-none');
         document.getElementById('additionalSegmentSelect').value = '';
         document.getElementById('additionalVehicleSelect').value = '';
         document.getElementById('additionalVehicleSelect').disabled = true;
         document.getElementById('additionalVehicleSelect').innerHTML = '<option value="">Primero selecciona un segmento</option>';
+        const addPriceInput = document.getElementById('additionalVehiclePrice');
+        if (addPriceInput) addPriceInput.value = '';
+        const addListPriceEl = document.getElementById('additionalVehicleListPrice');
+        if (addListPriceEl) addListPriceEl.textContent = '';
         this.clearExtraAdditionalVehicles();
       }
 
       this.serviceModified = true; // Mark as modified when user changes additional vehicle
-      this.updateServicePriceBreakdown();
+      // Dev breakdown FIRST — the service breakdown reads its line items from it.
       this.updateDevPaymentPrices(); // Update dev prices
       this.updateDevPaymentBreakdown(); // Update dev breakdown to include/exclude additional vehicle
+      this.updateServicePriceBreakdown();
       
       // Adjust modal height when showing/hiding additional fields
       setTimeout(() => {
@@ -508,23 +542,39 @@ class ItineraryBuilder {
       }, 50);
     });
 
-    // Walking tour quantity inputs → update total people count for tier pricing
+    // Primary additional vehicle manual price → recalculate breakdown live.
+    document.getElementById('additionalVehiclePrice')?.addEventListener('input', () => {
+      this.serviceModified = true;
+      this.updateDevPaymentPrices();
+      this.updateDevPaymentBreakdown();
+      this.updateServicePriceBreakdown();
+    });
+
+    // Walking tour quantity inputs → update total people count for tier pricing.
+    // Block letters and update live on 'input' (not only on blur via 'change').
+    const handleWalkingTourQuantityUpdate = () => {
+      const adults = parseInt(document.getElementById('walkingTourAdultsQuantity')?.value || 0);
+      const children = parseInt(document.getElementById('walkingTourChildrenQuantity')?.value || 0);
+      const infants = parseInt(document.getElementById('walkingTourInfantsQuantity')?.value || 0);
+      const total = adults + children + infants;
+      const peopleCountField = document.getElementById('walkingTourPeopleCount');
+      if (peopleCountField) peopleCountField.value = total || 1;
+      // Re-highlight tier based on new total
+      if (this.currentTourData) this.highlightWalkingTourTier(this.currentTourData);
+      this.updateDevPaymentBreakdown();
+      // Small delay to ensure dev breakdown is updated before service breakdown reads it
+      setTimeout(() => {
+        this.updateServicePriceBreakdown();
+      }, 50);
+    };
     ['walkingTourAdultsQuantity', 'walkingTourChildrenQuantity', 'walkingTourInfantsQuantity'].forEach((id) => {
-      document.getElementById(id)?.addEventListener('change', () => {
-        const adults = parseInt(document.getElementById('walkingTourAdultsQuantity')?.value || 0);
-        const children = parseInt(document.getElementById('walkingTourChildrenQuantity')?.value || 0);
-        const infants = parseInt(document.getElementById('walkingTourInfantsQuantity')?.value || 0);
-        const total = adults + children + infants;
-        const peopleCountField = document.getElementById('walkingTourPeopleCount');
-        if (peopleCountField) peopleCountField.value = total || 1;
-        // Re-highlight tier based on new total
-        if (this.currentTourData) this.highlightWalkingTourTier(this.currentTourData);
-        this.updateDevPaymentBreakdown();
-        // Small delay to ensure dev breakdown is updated before service breakdown reads it
-        setTimeout(() => {
-          this.updateServicePriceBreakdown();
-        }, 50);
-      });
+      const field = document.getElementById(id);
+      if (!field) return;
+      field.addEventListener('keydown', preventNonIntegerChars);
+      field.addEventListener('paste', handlePricePaste);
+      field.addEventListener('input', sanitizeIntegerInput);
+      field.addEventListener('input', handleWalkingTourQuantityUpdate);
+      field.addEventListener('change', handleWalkingTourQuantityUpdate);
     });
 
     // Walking tour manual price input → validate and update breakdown
@@ -899,13 +949,19 @@ class ItineraryBuilder {
       });
     });
 
-    // People quantity inputs - update breakdown when quantities change
+    // People quantity inputs - update breakdown when quantities change.
+    // Block letters and update live on 'input' (not only on blur via 'change').
     ['tourAdultsQuantity', 'tourChildrenQuantity', 'tourInfantsQuantity',
       'adultsQuantity', 'childrenQuantity', 'adultsNoAlcoholQuantity',
       'conceptoAdultsQuantity', 'conceptoChildrenQuantity', 'conceptoAdultsNoAlcoholQuantity'].forEach((id) => {
-        document.getElementById(id)?.addEventListener('change', () => {
-          this.updateServicePriceBreakdown();
-        });
+        const field = document.getElementById(id);
+        if (!field) return;
+        const update = () => this.updateServicePriceBreakdown();
+        field.addEventListener('keydown', preventNonIntegerChars);
+        field.addEventListener('paste', handlePricePaste);
+        field.addEventListener('input', sanitizeIntegerInput);
+        field.addEventListener('input', update);
+        field.addEventListener('change', update);
       });
 
     // Concepto client price and surcharge listeners
@@ -965,8 +1021,10 @@ class ItineraryBuilder {
       this.calculateTourEndTime();
     });
 
-    // Tour duration field listener - validate, calculate end time, and update pricing
-    document.getElementById('tourDuration')?.addEventListener('change', () => {
+    // Tour duration field listener - validate, calculate end time, and update pricing.
+    // Listen on both 'input' (live, as the user types) and 'change' (on blur) so the
+    // formula/breakdown updates immediately instead of only after clicking outside.
+    const handleTourDurationUpdate = () => {
       this.serviceModified = true; // Mark as modified when user changes duration
       this.validateTourDuration();
       this.calculateTourEndTime();
@@ -976,7 +1034,15 @@ class ItineraryBuilder {
       setTimeout(() => {
         this.updateServicePriceBreakdown();
       }, 50);
-    });
+    };
+    const tourDurationField = document.getElementById('tourDuration');
+    // Block letters/invalid characters in the duration field (digits + one decimal only).
+    // validatePriceInput runs first to strip any invalid char before recalculating.
+    tourDurationField?.addEventListener('keydown', preventInvalidPriceChars);
+    tourDurationField?.addEventListener('paste', handlePricePaste);
+    tourDurationField?.addEventListener('input', validatePriceInput);
+    tourDurationField?.addEventListener('input', handleTourDurationUpdate);
+    tourDurationField?.addEventListener('change', handleTourDurationUpdate);
 
     // Transport flight time listeners - calculate suggested departure time
     // One-way flight time
@@ -1055,7 +1121,9 @@ class ItineraryBuilder {
     // Waiting time hours listener (Transport)
     document.getElementById('waitingTimeHours')?.addEventListener('input', () => {
       // Don't recalculate price for transport (keep vehicle price only)
-      // Just update the breakdown to show the waiting time cost
+      // Just update the breakdown to show the waiting time cost.
+      // Dev breakdown FIRST — the service breakdown reads its line items from it.
+      this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
     });
 
@@ -1568,9 +1636,8 @@ class ItineraryBuilder {
       const greeterInVehicleContainer = document.getElementById('greeterInVehicleContainer');
       if (greeterInVehicleContainer) greeterInVehicleContainer.classList.add('d-none');
 
-      // Clear price breakdown (keep visible during editing)
-      const breakdown = document.getElementById('servicePriceBreakdown');
-      // if (breakdown) breakdown.classList.add('d-none'); // Commented out - always show breakdown when editing
+      // Clear the previous service's price breakdown when opening for a new service
+      this.clearServicePriceBreakdown();
 
       this.handleServiceTypeChange('experience'); // Default to experience
     }
@@ -1624,10 +1691,36 @@ class ItineraryBuilder {
     }
   }
 
+  /**
+   * Clear the price breakdown ("desglose") panel: empty its items/total and hide it.
+   * Used when switching service type or opening the modal for a new service so the
+   * previous service's breakdown isn't shown. It re-appears automatically once
+   * updateServicePriceBreakdown() runs with real data.
+   * @example
+   */
+  clearServicePriceBreakdown() {
+    const serviceModal = document.getElementById('serviceModal');
+    const addServiceModal = document.getElementById('addServiceModal');
+    const containers = [
+      serviceModal?.querySelector('#servicePriceBreakdown'),
+      addServiceModal?.querySelector('#servicePriceBreakdown'),
+      document.getElementById('servicePriceBreakdown'),
+    ].filter(Boolean);
+    containers.forEach((container) => {
+      const itemsDiv = container.querySelector('#breakdownItems');
+      const totalSpan = container.querySelector('#breakdownTotal');
+      if (itemsDiv) itemsDiv.innerHTML = '';
+      if (totalSpan) totalSpan.textContent = '';
+      container.classList.add('d-none');
+    });
+  }
+
   handleServiceTypeChange(type) {
-    // Clear breakdown panel when switching service types (keep visible during editing)
-    const breakdown = document.getElementById('servicePriceBreakdown');
-    // if (breakdown) breakdown.classList.add('d-none'); // Commented out - always show breakdown when editing
+    // Clear the previous service's breakdown when the user switches service type.
+    // Skip while populating an existing service for edit — it re-renders right after.
+    if (!this._populatingForm) {
+      this.clearServicePriceBreakdown();
+    }
 
     // Hide additional vehicle checkbox (shown only for transport)
     document.getElementById('additionalVehicleContainer')?.classList.add('d-none');
@@ -1635,6 +1728,7 @@ class ItineraryBuilder {
     // Also hide individual additional vehicle containers and clear their state
     document.getElementById('additionalSegmentContainer')?.classList.add('d-none');
     document.getElementById('additionalVehicleSelectContainer')?.classList.add('d-none');
+    document.getElementById('additionalVehiclePriceContainer')?.classList.add('d-none');
     // Clear selections to prevent orphaned state
     const additionalSegmentSelect = document.getElementById('additionalSegmentSelect');
     const additionalVehicleSelect = document.getElementById('additionalVehicleSelect');
@@ -1643,6 +1737,20 @@ class ItineraryBuilder {
       additionalVehicleSelect.value = '';
       additionalVehicleSelect.disabled = true;
       additionalVehicleSelect.innerHTML = '<option value="">Primero selecciona un segmento</option>';
+    }
+    // Clear the primary additional vehicle price + list price so it doesn't carry over.
+    const handleServiceTypeAddPrice = document.getElementById('additionalVehiclePrice');
+    if (handleServiceTypeAddPrice) handleServiceTypeAddPrice.value = '';
+    const handleServiceTypeAddListPrice = document.getElementById('additionalVehicleListPrice');
+    if (handleServiceTypeAddListPrice) handleServiceTypeAddListPrice.textContent = '';
+    // Fully reset the additional-vehicle toggle + its extra rows so activating it in one
+    // service (transport / vehicle tour) doesn't carry the section over to other service
+    // types. Skip during edit population so a saved service's additional vehicles aren't wiped.
+    if (!this._populatingForm) {
+      const additionalVehicleCheckbox = document.getElementById('additionalVehicleCheckbox');
+      if (additionalVehicleCheckbox) additionalVehicleCheckbox.checked = false;
+      document.getElementById('extraAdditionalVehiclesContainer')?.classList.add('d-none');
+      this.clearExtraAdditionalVehicles();
     }
 
     // Clear guide/greeter checkboxes and re-enable when switching service types
@@ -1688,6 +1796,17 @@ class ItineraryBuilder {
     // Clear experience schedules when switching away from experience type
     if (type !== 'experience') {
       this.clearExperienceSchedule();
+      // Also reset the selected experience so returning to the experience type starts
+      // fresh. Previously the dropdown kept its value while the detail fields were
+      // empty, leaving an incoherent half-filled state. Skip during edit population
+      // so an existing experience being loaded isn't wiped.
+      if (!this._populatingForm) {
+        const experienceSelect = document.getElementById('experienceSelect');
+        if (experienceSelect) experienceSelect.value = '';
+        this.handleExperienceSelection(''); // resets price + details for an empty selection
+        // Drop any saved experience fields so they aren't restored on the way back.
+        if (this.serviceTypeFields) this.serviceTypeFields.experience = {};
+      }
     }
 
     // Hide "Incluir en total" checkbox for all types except concepto
@@ -1883,6 +2002,7 @@ class ItineraryBuilder {
         // Ensure additional vehicle containers are hidden by default (until checkbox is checked)
         document.getElementById('additionalSegmentContainer')?.classList.add('d-none');
         document.getElementById('additionalVehicleSelectContainer')?.classList.add('d-none');
+        document.getElementById('additionalVehiclePriceContainer')?.classList.add('d-none');
 
         // Show pricing fields
         if (standardPricingSection) {
@@ -1964,6 +2084,7 @@ class ItineraryBuilder {
       // Ensure additional vehicle containers are hidden by default (until checkbox is checked)
       document.getElementById('additionalSegmentContainer')?.classList.add('d-none');
       document.getElementById('additionalVehicleSelectContainer')?.classList.add('d-none');
+      document.getElementById('additionalVehiclePriceContainer')?.classList.add('d-none');
 
       // Reset title and checkbox label for Transport
       if (serviciosLabel) {
@@ -2171,6 +2292,12 @@ class ItineraryBuilder {
               if (tourSelect?.value) {
                 this.handleTourSelection(tourSelect.value);
               }
+            } else if (serviceType === 'transport') {
+              // Re-calculate the catalog price so the manual value doesn't stick.
+              this.recalculateTransportPrice();
+            } else if (serviceType === 'aDisposicion') {
+              // Re-calculate the catalog price so the manual value doesn't stick.
+              this.calculateADisposicionPrice();
             }
           }
         }
@@ -3080,6 +3207,8 @@ class ItineraryBuilder {
         concept: `${typeLabel}: ${serviceData.origin} - ${serviceData.destination} (Ida)`,
         startTime: serviceData.startTime,
         endTime: '',
+        // Per-leg schedule so the list reflects (and clears) the Ida time correctly.
+        selectedSchedule: serviceData.startTime || '',
         startDate: serviceData.startDate,
         endDate: '',
         returnOrigin: '',
@@ -3105,6 +3234,8 @@ class ItineraryBuilder {
         destination: serviceData.returnDestination,
         startTime: serviceData.endTime,
         endTime: '',
+        // Per-leg schedule so the list reflects (and clears) the Vuelta time correctly.
+        selectedSchedule: serviceData.endTime || '',
         startDate: serviceData.endDate,
         endDate: '',
         airline: serviceData.returnAirline || '',
@@ -3603,6 +3734,8 @@ class ItineraryBuilder {
             additionalVehicleCostEfectivo = vehicle.finalPrice || vehicle.basePrice || 0;
           }
         }
+        // Apply the per-vehicle manual price override (falls back to the list price).
+        additionalVehicleCostEfectivo = this.getPrimaryAdditionalVehiclePrice(additionalVehicleCostEfectivo);
       }
 
       const totalEfectivo = vehicleEfectivoTotal + waitingCostEfectivo + guideCostEfectivo + greeterCostEfectivo + additionalVehicleCostEfectivo;
@@ -3801,6 +3934,16 @@ class ItineraryBuilder {
       hasAdditionalVehicle: (type === 'transport' || type === 'tour') && document.getElementById('additionalVehicleCheckbox')?.checked,
       additionalVehicleSegment: document.getElementById('additionalSegmentSelect')?.value || null,
       additionalVehicleId: document.getElementById('additionalVehicleSelect')?.value || null,
+      // Per-vehicle custom price for the primary additional vehicle (null = use list price),
+      // plus the list (catalog) price for reference.
+      additionalVehiclePrice: document.getElementById('additionalVehiclePrice')?.value
+        ? (parseFloat(document.getElementById('additionalVehiclePrice').value) || 0)
+        : null,
+      additionalVehicleListPrice: (() => {
+        const sel = document.getElementById('additionalVehicleSelect');
+        const opt = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+        return opt ? (parseFloat(opt.dataset.efectivoPrice || '0') || 0) : 0;
+      })(),
       additionalVehicleTypeName: null, // Will be set below if additional vehicle is selected
       additionalVehicleSegmentName: null, // Will be set below if additional segment is selected
       additionalVehicleSegmentColor: null, // Rate color (hex) for the additional segment — set below
@@ -4129,9 +4272,13 @@ class ItineraryBuilder {
           data.adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
           data.childPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0);
           data.noAlcoholPrice = parseFloat(document.getElementById('tourNoAlcoholPrice')?.value || 0);
-          // Store the actual price from the field as customPrice
-          // This is the user's manually entered price that should be persisted
-          data.customPrice = data.price;
+          // Store the actual price from the field as customPrice — this is the user's
+          // manually entered base (vehicle-cost) price. data.price is the computed total
+          // (with guide/greeter/surcharge), so persist the raw field value instead for a
+          // correct round-trip: the edit restore puts customPrice back into servicePrice,
+          // which the breakdown treats as the base vehicle cost. (Storing data.price stored
+          // the total here, which on edit inflated the base price and totals.)
+          data.customPrice = basePrice;
           data.priceOverride = true; // Ensure this is set
           console.log('✅ Tour price override ENABLED - storing custom price:', {
             priceOverride: data.priceOverride,
@@ -4302,19 +4449,23 @@ class ItineraryBuilder {
           // Flight details (if airport transport)
           if (data.transportType === 'aeropuerto') {
             data.flightNumber = document.getElementById('flightNumber')?.value;
-            data.flightTime = document.getElementById('flightTime')?.value;
-            data.flightDepartureTimeSuggested = document.getElementById('flightDepartureTimeSuggested')?.value;
+            data.flightTime = document.getElementById('flightTime')?.value || '';
+            data.flightDepartureTimeSuggested = document.getElementById('flightDepartureTimeSuggested')?.value || '';
             data.startTime = data.flightTime; // Use flight time for sorting
             data.airline = document.getElementById('airline')?.value;
+            // Keep selectedSchedule in sync so removing the time also clears the list display.
+            data.selectedSchedule = data.flightTime || '';
           } else {
             // Punto a Punto / Local: collect schedule fields
             const transportStartTime = document.getElementById('transportStartTime')?.value;
             const transportEndTime = document.getElementById('transportEndTime')?.value;
             data.startTime = transportStartTime || '';
             data.endTime = transportEndTime || '';
-            if (transportStartTime) {
-              data.selectedSchedule = transportEndTime ? `${transportStartTime} - ${transportEndTime}` : transportStartTime;
-            }
+            // Always (re)build selectedSchedule — when the time is removed this clears it
+            // so the service list ("Horario de salida") doesn't keep the old value.
+            data.selectedSchedule = transportStartTime
+              ? (transportEndTime ? `${transportStartTime} - ${transportEndTime}` : transportStartTime)
+              : '';
           }
 
           // Resolve origin display name from the active field
@@ -4387,10 +4538,15 @@ class ItineraryBuilder {
         data.waitingTimeHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
         data.waitingTimePricePerHour = this.getWaitingTimePrice()?.pricePerHour || 0;
 
-        // Store transport price override flag
+        // Store transport price override flag.
+        // The price field holds the per-vehicle base price (the breakdown multiplies it
+        // by quantity and adds guide/greeter/waiting). data.price is the computed total,
+        // so persist the raw field value for a correct round-trip — the edit restore puts
+        // customPrice back into the per-vehicle servicePrice field. (Storing data.price
+        // stored the total here, which on edit inflated the base price and totals.)
         data.priceOverride = document.getElementById('transportOverridePrices')?.checked || false;
         if (data.priceOverride) {
-          data.customPrice = data.price;
+          data.customPrice = basePrice;
         }
 
         break;
@@ -4425,14 +4581,26 @@ class ItineraryBuilder {
             data.endTime = adEndTime;
             data.selectedSchedule = `${adStartTime} - ${adEndTime}`;
           } else {
+            data.endTime = '';
             data.selectedSchedule = adStartTime;
           }
+        } else {
+          // Schedule removed by the user — clear it explicitly so the edit merge
+          // ({...existingService, ...data}) drops the previous values instead of keeping them.
+          data.startTime = '';
+          data.endTime = '';
+          data.selectedSchedule = '';
         }
 
-        // Store a disposición price override flag
+        // Store a disposición price override flag.
+        // The price field holds the PER-HOUR efectivo rate, while data.price is the
+        // computed total. Persist the raw field value (basePrice) so the override
+        // round-trips correctly — the edit restore puts customPrice back into the
+        // per-hour servicePrice field. (Storing data.price stored the total here,
+        // which on edit inflated the base price and totals.)
         data.priceOverride = document.getElementById('aDisposicionOverridePrices')?.checked || false;
         if (data.priceOverride) {
-          data.customPrice = data.price;
+          data.customPrice = basePrice;
         }
 
         break;
@@ -4468,23 +4636,25 @@ class ItineraryBuilder {
 
         // Collect schedule data if checkbox is checked
         const hasSchedule = document.getElementById('conceptoHasSchedule')?.checked;
-        if (hasSchedule) {
-          const startTimeEl = document.getElementById('conceptoStartTime');
-          const endTimeEl = document.getElementById('conceptoEndTime');
-
-          const startTime = startTimeEl?.value;
-          const endTime = endTimeEl?.value;
-
-          if (startTime) {
-            data.startTime = startTime;
-            // Create a schedule string for display
-            if (endTime) {
-              data.endTime = endTime;
-              data.selectedSchedule = `${startTime} - ${endTime}`;
-            } else {
-              data.selectedSchedule = startTime;
-            }
+        const conceptoStartTime = document.getElementById('conceptoStartTime')?.value;
+        const conceptoEndTime = document.getElementById('conceptoEndTime')?.value;
+        if (hasSchedule && conceptoStartTime) {
+          data.startTime = conceptoStartTime;
+          // Create a schedule string for display
+          if (conceptoEndTime) {
+            data.endTime = conceptoEndTime;
+            data.selectedSchedule = `${conceptoStartTime} - ${conceptoEndTime}`;
+          } else {
+            data.endTime = '';
+            data.selectedSchedule = conceptoStartTime;
           }
+        } else {
+          // Schedule removed (checkbox off or time cleared) — clear it explicitly so the
+          // edit merge ({...existingService, ...data}) drops the previous values instead
+          // of keeping the old schedule.
+          data.startTime = '';
+          data.endTime = '';
+          data.selectedSchedule = '';
         }
         break;
       }
@@ -5001,9 +5171,13 @@ class ItineraryBuilder {
           experienceSelect.value = service.experienceId;
           console.log('📝 EDIT EXPERIENCE DEBUG - Experience selected in dropdown:', service.experienceId);
 
-          // Trigger the experience selection to show pricing section
+          // Trigger the experience selection to show pricing section.
+          // Flag the restore so handleExperienceSelection doesn't reset the price
+          // override here (that reset is only meant for genuine user changes).
           if (this.handleExperienceSelection) {
+            this._restoringExperienceData = true;
             this.handleExperienceSelection(service.experienceId);
+            this._restoringExperienceData = false;
 
             // Force show pricing section after selection
             setTimeout(() => {
@@ -5866,6 +6040,23 @@ class ItineraryBuilder {
                       if (restored) {
                         console.log('✅ Additional vehicle restored successfully:', service.additionalVehicleId);
 
+                        // Restore the per-vehicle custom price, show its container + list price.
+                        // Re-applied a couple of times because the vehicle 'change' event (and
+                        // the async round-trip load) can fire syncPrimaryAdditionalVehiclePrice(true)
+                        // afterwards and reset the input to the list price.
+                        const restoreAddVehiclePrice = () => {
+                          const addPriceContainer = document.getElementById('additionalVehiclePriceContainer');
+                          if (addPriceContainer) addPriceContainer.classList.remove('d-none');
+                          const addPriceInput = document.getElementById('additionalVehiclePrice');
+                          if (addPriceInput && service.additionalVehiclePrice !== undefined && service.additionalVehiclePrice !== null) {
+                            addPriceInput.value = parseFloat(service.additionalVehiclePrice).toFixed(2);
+                          }
+                          this.syncPrimaryAdditionalVehiclePrice(false);
+                        };
+                        restoreAddVehiclePrice();
+                        setTimeout(restoreAddVehiclePrice, 150);
+                        setTimeout(restoreAddVehiclePrice, 400);
+
                         // Trigger price recalculation now that additional vehicle is set
                         this.updateServicePriceBreakdown();
                         this.updateDevPaymentPrices();
@@ -5993,6 +6184,19 @@ class ItineraryBuilder {
         break;
 
       case 'a-disposicion':
+        // Ensure the "Editar precio manualmente" checkbox is visible when editing.
+        // It lives inside standardPricingSection; make sure both are shown so the
+        // toggle doesn't go missing on the edit flow.
+        if (this.canEditPrices) {
+          document.getElementById('aDisposicionOverridePricesContainer')?.classList.remove('d-none');
+        }
+        {
+          const adStandardPricing = document.getElementById('standardPricingSection');
+          if (adStandardPricing) {
+            adStandardPricing.classList.remove('d-none');
+            adStandardPricing.style.display = '';
+          }
+        }
         if (service.startTime) document.getElementById('aDisposicionStartTime').value = service.startTime;
         if (service.endTime) document.getElementById('aDisposicionEndTime').value = service.endTime;
 
@@ -6033,10 +6237,22 @@ class ItineraryBuilder {
           const { customPrice } = service;
           console.log('🔄 A Disposición: Restoring custom price with timeouts:', customPrice);
 
+          // Restore the manual price override checkbox so the breakdown uses the custom
+          // price (the efectivo base) instead of recalculating from the catalog rate.
+          // Without this, getADisposicionBaseVehicleCost reads isOverride=false and the
+          // desglose falls back to the per-hour catalog rate, ignoring the custom price.
+          const aDisposicionOverrideCheckbox = document.getElementById('aDisposicionOverridePrices');
+          if (aDisposicionOverrideCheckbox) {
+            aDisposicionOverrideCheckbox.checked = true;
+          }
+
           // Immediate restoration attempt
           const priceField = document.getElementById('servicePrice');
           if (priceField) {
             priceField.value = customPrice;
+            priceField.readOnly = false;
+            priceField.removeAttribute('readonly');
+            priceField.classList.add('price-override-active');
             console.log('✅ Immediate custom price restoration:', customPrice);
           }
 
@@ -6051,8 +6267,11 @@ class ItineraryBuilder {
                 console.log(`✅ Timeout ${index + 1} (${delay}ms): Custom price already correct:`, currentField.value);
               }
 
-              // Refresh service breakdown after final custom price restoration
+              // Refresh breakdown after final custom price restoration. Dev breakdown
+              // first so it recomputes with the override now active, then the service
+              // breakdown reads from it.
               if (index === 3) { // Last timeout (500ms)
+                this.updateDevPaymentBreakdown();
                 this.updateServicePriceBreakdown();
                 console.log('🔧 A Disposición: Updated service breakdown after custom price restoration');
               }
@@ -6691,8 +6910,9 @@ class ItineraryBuilder {
       // Calculate main vehicle cost with surcharge
       const vehicleCost = mainVehicleCost * tourDuration * multiplier;
       const guideCost = guideRate * tourDuration; // Guide doesn't get surcharge
+      // Use the per-vehicle manual price override (per-hour) when set, else the list cost.
       const additionalCost = additionalVehicleInfo
-        ? additionalVehicleInfo.baseCost * tourDuration * multiplier : 0;
+        ? this.getPrimaryAdditionalVehiclePrice(additionalVehicleInfo.baseCost) * tourDuration * multiplier : 0;
       // Extras: each extra row's efectivo price × duration × payment multiplier
       const extraVehiclesTotal = extraVehicleItemsForTour.reduce((sum, item) => {
         const efectivoUnit = parseFloat(item.efectivoPrice) || 0;
@@ -8267,21 +8487,13 @@ class ItineraryBuilder {
     // Always use fresh API data for accurate breakdown calculations
     // Removed flawed saved prices logic that caused incorrect base rates
 
-    // If override, use price field
+    // If override, use price field. The manual override price is ALWAYS entered as
+    // efectivo, so use it directly as the base rate — do NOT reverse-calculate by the
+    // current payment type (that would undercharge it). Surcharges are applied later
+    // per payment type by calculateADisposicionPricing.
     if (isOverride) {
-      const currentPrice = parseFloat(document.getElementById('servicePrice')?.value || 0);
-      const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-
-      // Reverse-calculate to get base efectivo rate
-      let baseHourlyRate = currentPrice;
-      if (currentPaymentType === 'transferencia' && this.transferRate > 0) {
-        baseHourlyRate = currentPrice / (1 + (this.transferRate / 100));
-      } else if (currentPaymentType === 'tarjeta' && this.agencyRate > 0) {
-        baseHourlyRate = currentPrice / (1 + (this.agencyRate / 100));
-      }
-
-      vehicleBaseCost = baseHourlyRate;
-      console.log('📊 Using override rate:', vehicleBaseCost);
+      vehicleBaseCost = parseFloat(document.getElementById('servicePrice')?.value || 0);
+      console.log('📊 Using override rate (efectivo base):', vehicleBaseCost);
       return vehicleBaseCost;
     }
 
@@ -8502,18 +8714,23 @@ class ItineraryBuilder {
       }
     } else if (serviceType === 'a-disposicion') {
       try {
-        // A Disposición: Reverse-calculate base efectivo price from servicePrice
-        // servicePrice may have surcharges applied, but devPriceEfectivo should show base price
+        // A Disposición: derive the base efectivo price from servicePrice.
         const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
         let baseEfectivoPrice = currentPrice || 0;
 
-        // If payment type has surcharges, reverse-calculate to get base efectivo price
-        if (currentPaymentType === 'transferencia' && this.transferRate > 0) {
-          baseEfectivoPrice = currentPrice / (1 + (this.transferRate / 100));
-        } else if (currentPaymentType === 'tarjeta' && this.agencyRate > 0) {
-          baseEfectivoPrice = currentPrice / (1 + (this.agencyRate / 100));
+        // The manual override price is ALWAYS entered as efectivo, so use it as-is.
+        // Only the AUTO-calculated price carries the current payment type's surcharge
+        // (calculateADisposicionPrice applies getDisplayPrice), which must be reversed
+        // to recover the efectivo base. Reversing the manual price would undercharge it.
+        const isOverrideActive = document.getElementById('aDisposicionOverridePrices')?.checked || false;
+        if (!isOverrideActive) {
+          if (currentPaymentType === 'transferencia' && this.transferRate > 0) {
+            baseEfectivoPrice = currentPrice / (1 + (this.transferRate / 100));
+          } else if (currentPaymentType === 'tarjeta' && this.agencyRate > 0) {
+            baseEfectivoPrice = currentPrice / (1 + (this.agencyRate / 100));
+          }
+          // If payment type is 'efectivo', use currentPrice directly (no surcharge to remove)
         }
-        // If payment type is 'efectivo', use currentPrice directly (no surcharge to remove)
 
         baseTotal = baseEfectivoPrice;
 
@@ -8966,8 +9183,14 @@ class ItineraryBuilder {
         return;
       }
 
-      // Get the efectivo base price (originalMXN from database)
-      const efectivoBasePrice = this.getTransportVehiclePrice(selectedVehicleId) || 0;
+      // Get the efectivo base price (originalMXN from database).
+      // When the manual price override is active, the entered price is ALWAYS the
+      // efectivo per-vehicle base; the surcharges below derive transferencia/tarjeta.
+      // Previously this ignored the override and used the catalog price.
+      const isTransportPriceOverride = document.getElementById('transportOverridePrices')?.checked || false;
+      const efectivoBasePrice = isTransportPriceOverride
+        ? parseFloat(document.getElementById('servicePrice')?.value || 0)
+        : (this.getTransportVehiclePrice(selectedVehicleId) || 0);
       if (efectivoBasePrice === 0) {
         console.warn('⚠️ Transport breakdown: No base price found for selected vehicle');
         return;
@@ -9060,7 +9283,9 @@ class ItineraryBuilder {
           }
         }
 
-        // Apply leg multiplier for round-trip and calculate surcharged prices
+        // Apply the per-vehicle manual price override (falls back to the list price),
+        // then the leg multiplier for round-trip and the payment surcharges.
+        additionalVehicleCostEfectivo = this.getPrimaryAdditionalVehiclePrice(additionalVehicleCostEfectivo);
         if (additionalVehicleCostEfectivo > 0) {
           additionalVehicleCostEfectivo *= legMultiplier;
           additionalVehicleCostTransferencia = additionalVehicleCostEfectivo * (1 + (this.transferRate / 100));
@@ -9084,8 +9309,13 @@ class ItineraryBuilder {
         extraVehiclesCostEfectivo += efectivo;
         extraVehiclesCostTransferencia += transferencia;
         extraVehiclesCostTarjeta += tarjeta;
+        // Show the list (catalog) price alongside when a custom price overrides it.
+        const listEfectivo = (parseFloat(item.listPrice) || 0) * legMultiplier;
+        const listNote = (listEfectivo > 0 && Math.abs(listEfectivo - efectivo) > 0.01)
+          ? ` (Lista: ${this.formatCurrency(listEfectivo)})`
+          : '';
         return {
-          label: `Vehículo adicional (${item.vehicleType}${item.segmentName ? ` · ${item.segmentName}` : ''})`,
+          label: `Vehículo adicional (${item.vehicleType}${item.segmentName ? ` · ${item.segmentName}` : ''})${listNote}`,
           efectivo,
           transferencia,
           tarjeta,
@@ -12087,8 +12317,11 @@ class ItineraryBuilder {
       const service = this.services.get(serviceId);
       if (!service) continue;
 
-      // Create a unique key for deduplication
-      const uniqueKey = `${service.concept || ''}-${service.startTime || ''}-${service.price || 0}-${service.type || ''}`;
+      // De-duplicate by service ID only. A content-based key (concept-time-price-type)
+      // wrongly removed intentionally duplicated services — the "Duplicar" feature creates
+      // content-identical copies, so they vanished on reload. Same-ID entries (accidental
+      // double-listing of one service) are still collapsed.
+      const uniqueKey = serviceId;
 
       if (!seenServices.has(uniqueKey)) {
         seenServices.add(uniqueKey);
@@ -12445,25 +12678,40 @@ class ItineraryBuilder {
     row.className = 'row g-2 mb-2 extra-additional-vehicle-row align-items-end';
     row.dataset.index = String(rowIdx);
     row.innerHTML = `
-      <div class="col-md-5">
+      <div class="col-md-4">
         <label class="form-label small text-muted mb-1">Segmento</label>
         <select class="form-select form-select-sm extra-segment-select">
           <option value="">Seleccionar segmento</option>
         </select>
       </div>
-      <div class="col-md-5">
+      <div class="col-md-4">
         <label class="form-label small text-muted mb-1">Vehículo</label>
         <select class="form-select form-select-sm extra-vehicle-select" disabled>
           <option value="">Primero selecciona un segmento</option>
         </select>
       </div>
-      <div class="col-md-2 text-end">
+      <div class="col-md-3">
+        <label class="form-label small text-muted mb-1">Precio</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">$</span>
+          <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-price-input" placeholder="0.00">
+        </div>
+        <small class="text-muted extra-list-price d-block"></small>
+      </div>
+      <div class="col-md-1 text-end">
         <button type="button" class="btn btn-sm btn-outline-danger remove-extra-additional-vehicle-btn" title="Quitar">
           <i class="ti ti-x"></i>
         </button>
       </div>
     `;
     list.appendChild(row);
+
+    // Restore a saved custom price into the editable price input (the list price is
+    // filled/shown by syncExtraRowPrice once the vehicle options finish loading).
+    const priceInput = row.querySelector('.extra-price-input');
+    if (priceInput && vehicle.customPrice !== undefined && vehicle.customPrice !== null && vehicle.customPrice !== '') {
+      priceInput.value = parseFloat(vehicle.customPrice).toFixed(2);
+    }
 
     // Mirror the segment options from #transportCategory (synchronous: options
     // already populated by the time the user opens this form).
@@ -12497,6 +12745,14 @@ class ItineraryBuilder {
       this.updateServicePriceBreakdown();
     });
     vehicleSelect.addEventListener('change', () => {
+      // Reset the editable price to the newly-selected vehicle's list price.
+      this.syncExtraRowPrice(row, true);
+      this.serviceModified = true;
+      this.updateDevPaymentBreakdown();
+      this.updateServicePriceBreakdown();
+    });
+    // Manual per-vehicle price edits feed the breakdown.
+    priceInput?.addEventListener('input', () => {
       this.serviceModified = true;
       this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
@@ -12557,6 +12813,8 @@ class ItineraryBuilder {
         });
         vehicleSelect.disabled = false;
         if (preselectVehicleId) vehicleSelect.value = preselectVehicleId;
+        // Show the list price + default the editable price (keeps a restored custom price).
+        this.syncExtraRowPrice(row);
         this.updateDevPaymentBreakdown();
         this.updateServicePriceBreakdown();
         return;
@@ -12666,10 +12924,35 @@ class ItineraryBuilder {
     });
     vehicleSelect.disabled = false;
     if (preselectVehicleId) vehicleSelect.value = preselectVehicleId;
+    // Show the list price + default the editable price (keeps a restored custom price).
+    this.syncExtraRowPrice(row);
     // Refresh the breakdown after the prices are wired into the options so the totals
     // reflect this row even on initial edit-mode population.
     this.updateDevPaymentBreakdown();
     this.updateServicePriceBreakdown();
+  }
+
+  // Reflect the selected vehicle's list (catalog) price on a row and default the
+  // editable price input. forceListPrice=true overwrites the input (used when the user
+  // changes the vehicle); otherwise the input is only defaulted when empty (so a
+  // restored/typed custom price is preserved).
+  syncExtraRowPrice(row, forceListPrice = false) {
+    if (!row) return;
+    const vehicleSelect = row.querySelector('.extra-vehicle-select');
+    const priceInput = row.querySelector('.extra-price-input');
+    const listEl = row.querySelector('.extra-list-price');
+    if (!vehicleSelect || !priceInput) return;
+    const opt = vehicleSelect.selectedIndex >= 0 ? vehicleSelect.options[vehicleSelect.selectedIndex] : null;
+    const listPrice = opt ? (parseFloat(opt.dataset.efectivoPrice || '0') || 0) : 0;
+    if (vehicleSelect.value && listPrice > 0) {
+      if (listEl) listEl.textContent = `Lista: ${this.formatCurrency(listPrice)}`;
+      if (forceListPrice || priceInput.value === '' || priceInput.value === null) {
+        priceInput.value = listPrice.toFixed(2);
+      }
+    } else {
+      if (listEl) listEl.textContent = '';
+      if (!vehicleSelect.value) priceInput.value = '';
+    }
   }
 
   // Sum of efectivo prices across all extra additional vehicle rows.
@@ -12682,8 +12965,10 @@ class ItineraryBuilder {
       if (!select || !select.value) return;
       const opt = select.options[select.selectedIndex];
       if (!opt) return;
-      const price = parseFloat(opt.dataset.efectivoPrice || '0') || 0;
-      total += price;
+      const listPrice = parseFloat(opt.dataset.efectivoPrice || '0') || 0;
+      const priceInput = row.querySelector('.extra-price-input');
+      const custom = priceInput && priceInput.value !== '' ? (parseFloat(priceInput.value) || 0) : null;
+      total += (custom !== null && custom > 0) ? custom : listPrice;
     });
     return total;
   }
@@ -12699,12 +12984,16 @@ class ItineraryBuilder {
       if (!vehicleSelect || !vehicleSelect.value) return;
       const opt = vehicleSelect.options[vehicleSelect.selectedIndex];
       if (!opt) return;
-      const price = parseFloat(opt.dataset.efectivoPrice || '0') || 0;
+      const listPrice = parseFloat(opt.dataset.efectivoPrice || '0') || 0;
+      const priceInput = row.querySelector('.extra-price-input');
+      const custom = priceInput && priceInput.value !== '' ? (parseFloat(priceInput.value) || 0) : null;
+      // Use the per-vehicle custom price when set, otherwise the list (catalog) price.
+      const price = (custom !== null && custom > 0) ? custom : listPrice;
       const vehicleType = opt.dataset.vehicleType || 'Vehículo';
       const segmentName = (segmentSelect && segmentSelect.selectedIndex >= 0)
         ? (segmentSelect.options[segmentSelect.selectedIndex]?.text || '')
         : '';
-      items.push({ vehicleType, segmentName, efectivoPrice: price });
+      items.push({ vehicleType, segmentName, efectivoPrice: price, listPrice });
     });
     return items;
   }
@@ -12738,12 +13027,23 @@ class ItineraryBuilder {
         const segmentColor = segmentId
           ? (typeof this.getSegmentColorById === 'function' ? this.getSegmentColorById(segmentId) : '')
           : '';
+        // Per-vehicle custom price + the list (catalog) price for reference.
+        const vehicleOpt = vehicleId && vehicleSelect?.selectedIndex >= 0
+          ? vehicleSelect.options[vehicleSelect.selectedIndex]
+          : null;
+        const listPrice = vehicleOpt ? (parseFloat(vehicleOpt.dataset.efectivoPrice || '0') || 0) : 0;
+        const priceInput = row.querySelector('.extra-price-input');
+        const customPrice = priceInput && priceInput.value !== ''
+          ? (parseFloat(priceInput.value) || 0)
+          : null;
         return {
           segment: segmentId,
           segmentName,
           segmentColor,
           vehicleId,
           vehicleTypeName,
+          customPrice,
+          listPrice,
         };
       })
       .filter((v) => v.vehicleId);
@@ -13662,8 +13962,35 @@ class ItineraryBuilder {
       document.getElementById('servicePrice').value = '0.00';
       this.clearExperienceDetails();
       this.currentServiceAvailabilityPending = false;
+      this._loadedExperienceId = '';
       return;
     }
+
+    // When switching to a DIFFERENT experience, reset the manual price override so the
+    // new experience's prices load instead of stale manual prices from the previous one.
+    // Only on a genuine change of experience: edit-restore and the modal-shown re-dispatch
+    // (Event('change')) call this with the SAME id and must NOT wipe the saved custom
+    // prices. Also skipped during edit population/restore.
+    const isExperienceChange = experienceId !== this._loadedExperienceId;
+    if (isExperienceChange && !this._populatingForm && !this._restoringExperienceData) {
+      const overrideCheckbox = document.getElementById('experienceOverridePrices');
+      if (overrideCheckbox?.checked) {
+        overrideCheckbox.checked = false;
+        // Re-lock the per-person price fields; fillExperienceFields below repopulates
+        // them with the new experience's prices now that the override is off.
+        ['adultPrice', 'childPrice', 'noAlcoholPrice'].forEach((fieldId) => {
+          const field = document.getElementById(fieldId);
+          if (field) {
+            field.readOnly = true;
+            field.setAttribute('readonly', 'readonly');
+            field.classList.remove('price-override-active');
+            field.style.backgroundColor = '#f5f5f5';
+          }
+        });
+      }
+    }
+    // Remember the loaded experience so re-entrant calls with the same id don't reset.
+    this._loadedExperienceId = experienceId;
 
     // Check if selected option is marked as unavailable
     const expSelect = document.getElementById('experienceSelect');
@@ -13701,6 +14028,13 @@ class ItineraryBuilder {
 
         // Show experience details
         this.showExperienceDetails(selectedExperience);
+
+        // Refresh the desglose with the freshly-loaded prices (fillExperienceFields
+        // sets the price fields programmatically, which doesn't fire input events).
+        this.updateDevPaymentBreakdown();
+        setTimeout(() => {
+          this.updateServicePriceBreakdown();
+        }, 50);
       } else {
         console.warn('Experience not found in cache:', experienceId);
         document.getElementById('servicePrice').value = '0.00';
@@ -14145,6 +14479,12 @@ class ItineraryBuilder {
 
       // Update dev breakdown to reflect no vehicle
       this.updateDevPaymentBreakdown();
+
+      // Refresh the visible desglose (reads from the dev breakdown updated above).
+      // Without this the breakdown kept showing the previous "con vehículo" values.
+      setTimeout(() => {
+        this.updateServicePriceBreakdown();
+      }, 50);
 
       // Update the current service data to reflect no vehicle
       if (this.currentServiceId) {
@@ -14616,6 +14956,20 @@ class ItineraryBuilder {
     });
 
     if (currentServiceType === 'transport') {
+      // Changing the segment/rate redefines the price, so reset the manual price
+      // override (transportOverridePrices) to keep the breakdown on the recalculated
+      // price instead of a stale manual one. Skip during edit population.
+      if (!this._populatingForm) {
+        const transportOverrideCheckbox = document.getElementById('transportOverridePrices');
+        if (transportOverrideCheckbox?.checked) {
+          transportOverrideCheckbox.checked = false;
+          if (servicePriceField) {
+            servicePriceField.readOnly = true;
+            servicePriceField.setAttribute('readonly', 'readonly');
+            servicePriceField.classList.remove('price-override-active');
+          }
+        }
+      }
       this.handleTransportRateSelection(rateId);
       this.updateWaitingTimeRateDisplay();
       return;
@@ -15451,6 +15805,33 @@ class ItineraryBuilder {
 
     // RESTORED: Original calculation logic for non-walking tour services
     if (serviceType === 'transport') {
+      // Mirror the dev breakdown for the selected payment type (the single source of
+      // truth computed by updateDevPaymentBreakdown). Parse its line items instead of
+      // recomputing here — the recompute double-applied the round-trip leg multiplier
+      // (serviceQuantity already encodes the 2 legs), so the service total didn't match.
+      const txPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+      let txDevField = document.getElementById('devBreakdownEfectivo');
+      if (txPaymentType === 'transferencia') {
+        txDevField = document.getElementById('devBreakdownTransferencia') || txDevField;
+      } else if (txPaymentType === 'tarjeta') {
+        txDevField = document.getElementById('devBreakdownTarjeta') || txDevField;
+      }
+      (txDevField?.value || '').split('\n').forEach((rawLine) => {
+        const lineText = rawLine.trim();
+        // Skip summary lines and the recargo line (component lines are already surcharged).
+        if (!lineText || /^(Subtotal|Total|Recargo)/i.test(lineText)) return;
+        const lineAmounts = lineText.match(/-?\$[0-9,.]+/g);
+        const amountMXN = lineAmounts && lineAmounts.length
+          ? parseFloat(lineAmounts[lineAmounts.length - 1].replace('$', '').replace(/,/g, ''))
+          : 0;
+        if (amountMXN === 0) return;
+        const label = lineText.replace(/\s*=\s*-?\$[0-9,.]+\s*$/, '');
+        items.push({ label, amountMXN, alreadySurcharged: true });
+      });
+
+      // Legacy recomputation kept below but DISABLED — the dev breakdown parsed above is
+      // now the single source of truth for the transport desglose.
+      if (false) {
       const vehicleSelect = document.getElementById('vehicleSelect');
       const selectedVehicleId = vehicleSelect?.value;
       const quantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
@@ -15572,6 +15953,9 @@ class ItineraryBuilder {
           }
         }
 
+        // Apply the per-vehicle manual price override (falls back to the list price).
+        additionalVehiclePrice = this.getPrimaryAdditionalVehiclePrice(additionalVehiclePrice);
+
         if (additionalVehiclePrice > 0 && additionalVehicleInfo) {
           // Apply surcharge to additional vehicle price
           const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
@@ -15651,6 +16035,7 @@ class ItineraryBuilder {
           items.push({ label: `Tiempo de espera (${brkWaitingHours}h × ${this.formatCurrency(displayHourly)})${legSuffix}`, amountMXN: wtCost });
         }
       }
+      } // end disabled legacy transport recompute
     } else if (serviceType === 'tour') {
       // Check if it's a walking tour
       let isWalkingTourBreakdown = false;
@@ -16102,10 +16487,35 @@ class ItineraryBuilder {
         surchargeApplied: finalTotal !== baseTotal,
       });
     } else if (serviceType === 'a-disposicion') {
+      // Mirror the dev breakdown for the selected payment type (the single source of
+      // truth computed by updateDevPaymentBreakdown). Parse its line items instead of
+      // recomputing here, which had drifted from the dev breakdown totals.
+      const adPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+      let adDevField = document.getElementById('devBreakdownEfectivo');
+      if (adPaymentType === 'transferencia') {
+        adDevField = document.getElementById('devBreakdownTransferencia') || adDevField;
+      } else if (adPaymentType === 'tarjeta') {
+        adDevField = document.getElementById('devBreakdownTarjeta') || adDevField;
+      }
+      (adDevField?.value || '').split('\n').forEach((rawLine) => {
+        const lineText = rawLine.trim();
+        if (!lineText || /^(Subtotal|Total)\s*:/i.test(lineText)) return;
+        const lineAmounts = lineText.match(/-?\$[0-9,.]+/g);
+        const amountMXN = lineAmounts && lineAmounts.length
+          ? parseFloat(lineAmounts[lineAmounts.length - 1].replace('$', '').replace(/,/g, ''))
+          : 0;
+        if (amountMXN === 0) return;
+        const label = lineText.replace(/\s*=\s*-?\$[0-9,.]+\s*$/, '');
+        // Dev breakdown amounts are already final for this payment type.
+        items.push({ label, amountMXN, alreadySurcharged: true });
+      });
+
       // Check if price is overridden for a disposición
       const isADisposicionPriceOverride = document.getElementById('aDisposicionOverridePrices')?.checked || false;
 
-      if (isADisposicionPriceOverride) {
+      // Legacy recomputation kept below but DISABLED — the dev breakdown parsed above
+      // is now the single source of truth for the A Disposición desglose.
+      if (false && isADisposicionPriceOverride) {
         // Use the manual price as HOURLY RATE when override is checked
         const hourlyRate = parseFloat(document.getElementById('servicePrice')?.value || 0);
         const hours = parseFloat(document.getElementById('aDisposicionHours')?.value || 0);
@@ -16202,7 +16612,7 @@ class ItineraryBuilder {
         if (hourlyRate > 0 && this.canEditPrices) {
           items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precio personalizado</span>', amountMXN: 0 });
         }
-      } else {
+      } else if (false) {
         // Use calculated pricing when override is not checked - now using unified calculation method
         const baseHourlyRate = this.getADisposicionBaseVehicleCost(); // Use same logic as devPaymentPrices
         const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
@@ -16514,9 +16924,13 @@ class ItineraryBuilder {
       }
     }
 
-    // Use fallbacks from service data if form fields are empty (edit race condition)
-    if (!originName && fallbackOrigin) originName = fallbackOrigin;
-    if (!destinationName && fallbackDestination) destinationName = fallbackDestination;
+    // Prefer the explicit fallbacks when provided. The edit-restore flow passes the saved
+    // service's origin/destination here — that's the authoritative route for THIS leg.
+    // For round-trip the form resolution above always reads the IDA fields, which sends the
+    // wrong route for the VUELTA/salida (departure) leg and returns 0 vehicles. Live user
+    // selection passes no fallbacks, so the form fields are still used there.
+    if (fallbackOrigin) originName = fallbackOrigin;
+    if (fallbackDestination) destinationName = fallbackDestination;
 
     if (!originName || !destinationName) {
       this.clearVehicleDropdown();
@@ -16943,7 +17357,9 @@ class ItineraryBuilder {
 
     this.updatePriceField(displayPrice);
 
-    // Update breakdown after transport price recalculation
+    // The service breakdown now reads from the dev breakdown, so recompute the dev
+    // breakdown FIRST, then render the service breakdown from it.
+    this.updateDevPaymentBreakdown();
     this.updateServicePriceBreakdown();
   }
 
@@ -17030,9 +17446,13 @@ class ItineraryBuilder {
 
     // Check if the selected segment matches the main segment
     const mainSegmentId = document.getElementById('transportCategory')?.value;
-    console.log('🔍 Checking segments:', { segmentId, mainSegmentId, hasCachedData: !!this.transportPriceData?.vehicles });
+    const cachedVehicleCount = this.transportPriceData?.vehicles?.length || 0;
+    console.log('🔍 Checking segments:', { segmentId, mainSegmentId, hasCachedData: cachedVehicleCount > 0 });
 
-    if (segmentId === mainSegmentId && this.transportPriceData?.vehicles) {
+    // Require a NON-EMPTY cache. On round-trip the active transportPriceData can belong to
+    // the other leg (empty vehicles for this one), so an empty array must fall through to
+    // the API fetch below instead of failing with "No vehicles provided".
+    if (segmentId === mainSegmentId && cachedVehicleCount > 0) {
       // Same segment - use cached data, no API call needed!
       console.log('🚀 Using cached vehicle data for additional segment');
 
@@ -17196,7 +17616,10 @@ class ItineraryBuilder {
           hasData: !!result.data,
         });
 
-        if (result.success && result.data?.vehicles) {
+        // Require a NON-EMPTY vehicles array — an empty array is truthy and would call
+        // populateAdditionalVehicleDropdown(0) which fails. Route it to the graceful
+        // "no vehicles" branch instead of throwing an unhandled rejection.
+        if (result.success && result.data?.vehicles?.length > 0) {
           // Store the additional transport price data for use in breakdown
           this.additionalTransportPriceData = result.data;
           const populationResult = await this.populateAdditionalVehicleDropdown(result.data.vehicles);
@@ -17343,6 +17766,10 @@ class ItineraryBuilder {
 
       const clientIndicator = isClientPrice ? ' ⭐' : '';
       option.textContent = `${vehicleType} - ${capacityDisplay}${clientIndicator}`;
+      // Cache the per-hour list (catalog) price so the custom-price UI can show "Lista: $X"
+      // and default the editable input (the tour breakdown multiplies by duration later).
+      const perHour = this.getVehiclePriceWithPriority(vehicleType, tourId, rateId) || 0;
+      option.dataset.efectivoPrice = String(perHour);
 
       additionalVehicleSelect.appendChild(option);
     });
@@ -17355,10 +17782,41 @@ class ItineraryBuilder {
    * @example
    */
   handleAdditionalVehicleSelection() {
+    // Reset the editable price to the newly-selected vehicle's list price.
+    this.syncPrimaryAdditionalVehiclePrice(true);
     this.serviceModified = true;
     this.updateServicePriceBreakdown();
     this.updateDevPaymentPrices();
     this.updateDevPaymentBreakdown(); // Update dev breakdown to include selected additional vehicle
+  }
+
+  // Effective per-vehicle price for the PRIMARY additional vehicle: the manual price if
+  // entered, otherwise the provided list (catalog) price.
+  getPrimaryAdditionalVehiclePrice(listPrice) {
+    const input = document.getElementById('additionalVehiclePrice');
+    const custom = input && input.value !== '' ? (parseFloat(input.value) || 0) : null;
+    return (custom !== null && custom > 0) ? custom : (parseFloat(listPrice) || 0);
+  }
+
+  // Reflect the selected primary additional vehicle's list price and default the editable
+  // price input. forceListPrice=true overwrites it (on vehicle change); otherwise it's
+  // only defaulted when empty (so a restored/typed custom price is kept).
+  syncPrimaryAdditionalVehiclePrice(forceListPrice = false) {
+    const select = document.getElementById('additionalVehicleSelect');
+    const priceInput = document.getElementById('additionalVehiclePrice');
+    const listEl = document.getElementById('additionalVehicleListPrice');
+    if (!select || !priceInput) return;
+    const opt = select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
+    const listPrice = opt ? (parseFloat(opt.dataset.efectivoPrice || '0') || 0) : 0;
+    if (select.value && listPrice > 0) {
+      if (listEl) listEl.textContent = `Lista: ${this.formatCurrency(listPrice)}`;
+      if (forceListPrice || priceInput.value === '' || priceInput.value === null) {
+        priceInput.value = listPrice.toFixed(2);
+      }
+    } else {
+      if (listEl) listEl.textContent = '';
+      if (!select.value) priceInput.value = '';
+    }
   }
 
   /**
@@ -17414,6 +17872,8 @@ class ItineraryBuilder {
         const vehicleType = vehicle.vehicleType || 'Vehículo desconocido';
 
         option.textContent = `${vehicleType} - ${pax} pax, ${trunk} carry-on${clientIndicator}`;
+        // Cache the list (catalog) efectivo price so the custom-price UI can show it.
+        option.dataset.efectivoPrice = String(parseFloat(vehicle.finalPrice ?? vehicle.basePrice ?? 0) || 0);
 
         additionalVehicleSelect.appendChild(option);
         populatedCount++;
@@ -17799,11 +18259,21 @@ class ItineraryBuilder {
             // Trigger change event to update UI and breakdown
             vehicleSelect.dispatchEvent(new Event('change', { bubbles: true }));
 
-            // Update breakdowns
-            this.updateServicePriceBreakdown();
-            if (this.isDevelopmentMode) {
-              this.updateDevPaymentBreakdown();
+            // Restore the per-vehicle custom price (the change above resets it to the list
+            // price), show its container + list price, then recompute so the breakdown
+            // reflects the custom price.
+            const addPriceContainer = document.getElementById('additionalVehiclePriceContainer');
+            if (addPriceContainer) addPriceContainer.classList.remove('d-none');
+            const addPriceInput = document.getElementById('additionalVehiclePrice');
+            if (addPriceInput && service.additionalVehiclePrice !== undefined && service.additionalVehiclePrice !== null) {
+              addPriceInput.value = parseFloat(service.additionalVehiclePrice).toFixed(2);
             }
+            this.syncPrimaryAdditionalVehiclePrice(false);
+
+            // Dev breakdown first so the tour breakdown recomputes with the custom price,
+            // then the service breakdown reads from it.
+            this.updateDevPaymentBreakdown();
+            this.updateServicePriceBreakdown();
 
             console.log('🎉 [TOUR] Additional vehicle restoration completed successfully!');
           } else {
@@ -17957,6 +18427,22 @@ class ItineraryBuilder {
     document.getElementById('servicePrice').value = '';
     document.getElementById('aDisposicionDiscountInfo').textContent = '';
 
+    // Changing the rate redefines the price, so reset the manual price override
+    // (aDisposicionOverridePrices) — calculateADisposicionPrice skips updating
+    // servicePrice while it's checked. Skip during edit population.
+    if (!this._populatingForm) {
+      const aDisposicionOverrideCheckbox = document.getElementById('aDisposicionOverridePrices');
+      if (aDisposicionOverrideCheckbox?.checked) {
+        aDisposicionOverrideCheckbox.checked = false;
+        const servicePriceFieldReset = document.getElementById('servicePrice');
+        if (servicePriceFieldReset) {
+          servicePriceFieldReset.readOnly = true;
+          servicePriceFieldReset.setAttribute('readonly', 'readonly');
+          servicePriceFieldReset.classList.remove('price-override-active');
+        }
+      }
+    }
+
     if (!rateId) return;
 
     try {
@@ -18060,13 +18546,15 @@ class ItineraryBuilder {
           : '';
       }
 
+      // The service breakdown (desglose) now reads its line items from the dev breakdown
+      // for the selected payment type, so recompute the dev breakdown FIRST — regardless
+      // of dev mode — then render the service breakdown from it.
+      this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
 
-      // Update dev payment prices and breakdown for A Disposición changes
-      // This ensures dev price fields show the correct API rates after they're loaded
+      // Dev-only price fields (efectivo/transferencia/tarjeta display)
       if (this.isDevelopmentMode) {
         this.updateDevPaymentPrices();
-        this.updateDevPaymentBreakdown();
         console.log('🔧 A Disposición: Updated dev price fields after API rate loaded');
       }
     } catch (error) {
@@ -18118,6 +18606,20 @@ class ItineraryBuilder {
 
     // Store tour data for tier re-highlight on quantity change
     this.currentTourData = tour;
+
+    // When the user switches to a different walking tour, reset the "editar precios
+    // manualmente" override so the breakdown uses THIS tour's per-group/tier prices
+    // instead of a stale manual price from the previously selected tour. Skip during
+    // edit/restore so a saved custom price isn't wiped.
+    const isRestoringWalkingOverride = this._restoringWalkingTourData === true || this._populatingForm === true;
+    if (!isRestoringWalkingOverride) {
+      const overrideCheckbox = document.getElementById('tourOverridePrices');
+      if (overrideCheckbox?.checked) {
+        overrideCheckbox.checked = false;
+        // Hides the manual price UI, clears it, and reverts to automatic tier pricing.
+        this.handlePriceOverrideToggle('tour', false);
+      }
+    }
 
     // Pre-fill individual person counts from quote data (but only for NEW walking tours, not when editing)
     const adultsField = document.getElementById('walkingTourAdultsQuantity');
@@ -18193,8 +18695,16 @@ class ItineraryBuilder {
       clientNotes: tour.client_booking_notes || '',
     });
     this.handleTourSchedule(tour);
-    this.updateServicePriceBreakdown();
+    // Reflect the (default) duration in the end-time field on selection,
+    // not only when the user later edits the duration field.
+    this.calculateTourEndTime();
+    // Update the dev breakdown first, then the service breakdown reads from it.
+    // This mirrors the duration/people-count handlers; calling them in the
+    // reverse order made the price read stale data until a manual edit.
     this.updateDevPaymentBreakdown();
+    setTimeout(() => {
+      this.updateServicePriceBreakdown();
+    }, 50);
   }
 
   /**
@@ -18639,6 +19149,23 @@ class ItineraryBuilder {
           this.handleTourTransportToggle(true); // Show transport fields automatically
         }
 
+        // When switching to a different vehicle tour, reset the manual price override
+        // (tourVehicleOverridePrices) so the breakdown uses the recalculated price for
+        // THIS tour/vehicle instead of a stale manual price — recalculateTourPrice skips
+        // updating servicePrice while the override is checked. Skip during edit population.
+        if (!this._populatingForm) {
+          const vehicleOverrideCheckbox = document.getElementById('tourVehicleOverridePrices');
+          if (vehicleOverrideCheckbox?.checked) {
+            vehicleOverrideCheckbox.checked = false;
+            const servicePriceFieldReset = document.getElementById('servicePrice');
+            if (servicePriceFieldReset) {
+              servicePriceFieldReset.readOnly = true;
+              servicePriceFieldReset.setAttribute('readonly', 'readonly');
+              servicePriceFieldReset.classList.remove('price-override-active');
+            }
+          }
+        }
+
         // Get client-specific tour price or use base price
         const price = this.getPriceForTour(tourId, null) || selectedTour.price || 0;
 
@@ -18855,8 +19382,17 @@ class ItineraryBuilder {
         // Handle tour schedule/availability
         this.handleTourSchedule(selectedTour);
 
-        // Update breakdown after all tour fields are populated
-        this.updateServicePriceBreakdown();
+        // Reflect the (default) duration on selection — vehicle tours multiply the
+        // price by duration, so recalculate now instead of only when the user edits
+        // the duration field manually.
+        this.validateTourDuration();
+        this.calculateTourEndTime();
+        this.recalculateTourPrice();
+        // Dev breakdown first, then the service breakdown reads from it (correct order).
+        this.updateDevPaymentBreakdown();
+        setTimeout(() => {
+          this.updateServicePriceBreakdown();
+        }, 50);
       } else {
         console.warn('Tour not found in cache:', tourId);
         document.getElementById('servicePrice').value = '0.00';
@@ -19823,6 +20359,10 @@ class ItineraryBuilder {
           });
 
           const subconcept = {
+            // Stable per-service id so the backend can de-duplicate by id instead of by
+            // content — otherwise intentionally duplicated services (identical concept/
+            // time/price/type) get stripped on save and vanish on reload.
+            id: serviceId,
             type: service.type || 'regular',
             concept: this.getServiceTitle(service),
             time: normalizeTimeHHMM(service.startTime), // Backend expects 'time' not 'startTime'
@@ -20211,10 +20751,12 @@ class ItineraryBuilder {
     if (!originalService) return;
 
     const newServiceId = this.generateId('service');
-    this.services.set(newServiceId, {
-      ...originalService,
-      id: newServiceId,
-    });
+    // Deep copy so the duplicate doesn't share nested arrays/objects with the original
+    // (attendees, extraAdditionalVehicles, pricesByType, etc.) — editing one would
+    // otherwise mutate the other.
+    const duplicatedService = JSON.parse(JSON.stringify(originalService));
+    duplicatedService.id = newServiceId;
+    this.services.set(newServiceId, duplicatedService);
 
     // Add to the same day
     const day = this.days.find((d) => d.id === originalService.dayId);
@@ -21473,6 +22015,12 @@ function populateDropdownsForTransportType(transportType, directionType) {
           destinations.add(service.destination);
         }
       }
+    } else if (transportType === 'punto-a-punto') {
+      // Punto a Punto routes are bidirectional: either endpoint can be the
+      // origin or the destination, so both dropdowns list every endpoint.
+      // (e.g. a stored "Querétaro → San Miguel" route also enables "San Miguel → Querétaro")
+      if (service.origin) { origins.add(service.origin); destinations.add(service.origin); }
+      if (service.destination) { origins.add(service.destination); destinations.add(service.destination); }
     } else if (directionType === 'departure') {
       // Departure for non-aeropuerto: swap origins/destinations
       // User departs FROM destination → TO origin (relative to DB)
@@ -21722,8 +22270,16 @@ function updateDestinationsForOrigin(selectedOrigin = null) {
   // So filter by service.destination and return service.origin as destination options
   const isDeparture = directionType === 'departure';
   const isDepartureWithSelect = isDeparture && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
+  // Punto a Punto routes are bidirectional: match the selected origin against
+  // either endpoint and offer the opposite endpoint as the destination.
+  const isBidirectional = transportType === 'punto-a-punto';
 
-  const relevantServices = services.filter((service) => (isDeparture ? service.destination === originalOriginName : service.origin === originalOriginName));
+  const relevantServices = services.filter((service) => {
+    if (isBidirectional) {
+      return service.origin === originalOriginName || service.destination === originalOriginName;
+    }
+    return isDeparture ? service.destination === originalOriginName : service.origin === originalOriginName;
+  });
 
   if (relevantServices.length === 0) {
     return;
@@ -21732,7 +22288,14 @@ function updateDestinationsForOrigin(selectedOrigin = null) {
   // Get matching destinations
   const destinations = new Set();
   relevantServices.forEach((service) => {
-    if (isDeparture) {
+    if (isBidirectional) {
+      // Offer whichever endpoint is NOT the selected origin
+      if (service.origin === originalOriginName && service.destination) {
+        destinations.add(service.destination);
+      } else if (service.destination === originalOriginName && service.origin) {
+        destinations.add(service.origin);
+      }
+    } else if (isDeparture) {
       // Departure: show matching origins as destination options
       if (service.origin) {
         destinations.add(service.origin);
@@ -21742,7 +22305,7 @@ function updateDestinationsForOrigin(selectedOrigin = null) {
     }
   });
 
-  if (isDepartureWithSelect) {
+  if (isDepartureWithSelect || isBidirectional) {
     // Aeropuerto / Punto a Punto departure: update destination SELECT
     const destSelect = document.getElementById('transportDestinationSelect');
     if (destSelect) {

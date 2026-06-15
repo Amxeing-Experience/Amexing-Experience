@@ -541,8 +541,14 @@ class AuthenticationService extends AuthenticationServiceCore {
       await user.save(null, { useMasterKey: true });
       console.log('🔐 DEBUG: User saved with reset token');
 
-      // Generate reset URL
-      const baseUrl = process.env.PUBLIC_URL || 'http://localhost:1337';
+      // Generate reset URL.
+      // Derive the public base URL from PARSE_PUBLIC_SERVER_URL (correctly set in
+      // every environment: localhost in dev, real domain in prod) so the link in the
+      // email is always reachable by the recipient. Fall back to APP_BASE_URL, then
+      // localhost. NOTE: the old `process.env.PUBLIC_URL` was never defined in any
+      // env file, so the link always pointed to localhost and broke in production.
+      const publicServerBase = (process.env.PARSE_PUBLIC_SERVER_URL || '').replace(/\/parse\/?$/, '');
+      const baseUrl = publicServerBase || process.env.APP_BASE_URL || 'http://localhost:1337';
       const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
 
       console.log('🔐 DEBUG: Reset URL generated:', resetUrl);

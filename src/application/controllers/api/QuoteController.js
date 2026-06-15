@@ -3884,14 +3884,23 @@ class QuoteController {
         return day;
       }
 
-      // Remove duplicates based on concept, time, unitPrice, and type
+      // Remove duplicates. Prefer de-duping by stable id so intentionally duplicated
+      // services (identical concept/time/price/type) survive — only collapse entries
+      // that share the SAME id. Fall back to content matching for legacy subconcepts
+      // that have no id.
       const uniqueSubconcepts = day.subconcepts.filter(
-        (subconcept, index, self) => index === self.findIndex(
-          (s) => s.concept === subconcept.concept
-            && s.time === subconcept.time
-            && s.unitPrice === subconcept.unitPrice
-            && s.type === subconcept.type
-        )
+        (subconcept, index, self) => {
+          if (subconcept.id) {
+            return index === self.findIndex((s) => s.id === subconcept.id);
+          }
+          return index === self.findIndex(
+            (s) => !s.id
+              && s.concept === subconcept.concept
+              && s.time === subconcept.time
+              && s.unitPrice === subconcept.unitPrice
+              && s.type === subconcept.type
+          );
+        }
       );
 
       // Sort subconcepts by time (chronological order)
