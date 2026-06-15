@@ -13,10 +13,11 @@ Leyenda: 🔴 bug confirmado · 🟡 a confirmar (regla de negocio) · ⚪ robus
 Fórmula actual: `total = (adultos×precioAdulto + niños×precioNiño + sinAlcohol×precioSinAlcohol) × duración`,
 luego recargo por forma de pago sobre el total. (quote-services-v2.js: `calculateServicePrice`)
 
-### E1. 🔴 Los precios de cliente NO se cargan para experiencias
-La carga de ClientPrices está **hardcodeada a `itemType: 'TOUR'`** → para experiencias **nunca** se aplica el
-precio especial del cliente (siempre usa el de catálogo). El modelo SÍ soporta `itemType: EXPERIENCES`.
-**Pregunta:** ¿las experiencias deben respetar precios por cliente (como tours)? (asumo que sí → es bug)
+### E1. ✅ NO es bug (verificado)
+Confirmado con el cliente: **las experiencias no tienen precio de cliente** (intencional). Y los **transportes SÍ
+aplican precio de cliente** por otra ruta: `prices-by-route` pasa `clientId` (quote-services-v2.js:12940) y el backend
+`getPricesByRoute` consulta `ClientPrices` con `itemType: 'SERVICES'` (ServicesController.js:3936+). El `'TOUR'`
+hardcodeado del front es solo el cache de tours. Sin cambios.
 
 ### E2. 🟡 Sin precio de niño / sin alcohol → se cobra $0 (gratis)
 Si la experiencia no tiene `price_child`/`price_no_alcohol`, el cálculo usa **0** (niños/sin-alcohol gratis).
@@ -75,7 +76,7 @@ unifica. *No es bug de valor; es deuda.*
 
 | # | Tipo | Severidad | Necesita decisión del cliente |
 | :-- | :-- | :-- | :-- |
-| E1 | Experiencias: client prices no cargan | 🔴 bug | ¿Experiencias respetan precio por cliente? (sí→fix) |
+| E1 | Experiencias client prices | ✅ no bug | Cerrado: experiencias sin client price (intencional); transportes sí aplican vía prices-by-route |
 | E2 | Experiencias: niño/sin-alcohol = $0 | 🟡 | ¿fallback a precio adulto o $0? |
 | W1 | Walking: manual sin recargo (inconsistente) | 🟡 | ¿regla uniforme: manual = efectivo o con recargo? |
 | W2 | Walking: guardado≠mostrado en override por grupo | 🟡 | (depende de W1) |
