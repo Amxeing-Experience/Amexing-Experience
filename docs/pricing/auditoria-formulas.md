@@ -17,7 +17,13 @@ Leyenda: 🔴 sospecha fuerte de bug · 🟡 a confirmar · ⚪ probablemente co
   ejemplo). Aplicado en motor + builder. (commit fix #2)
 - **#3 Greeter — ✅ CONFIRMADO CORRECTO.** La fórmula (basePrice + hourlyRate×h) viene del endpoint GreeterRate
   y redondea a centena. Sin cambios.
-- **#4 Redondeo a efectivo $5 / #5 USD / #6 IVA 16% — pendiente de confirmar** (abajo).
+- **#4 Redondeo a efectivo $5 — ✅ CONFIRMADO CORRECTO.** Se redondea el efectivo a múltiplos de $5. Sin cambios.
+- **#6 IVA 16% — ✅ CONFIRMADO CORRECTO.** El IVA se calcula y muestra SOLO en el resumen de la cotización
+  (precio final), cuando el usuario elige transferencia o tarjeta (no en efectivo). No se usa en otro lugar. Sin cambios.
+- **#5 USD — DEFERIDO.** La moneda USD está deshabilitada hoy (forzada a MXN). El motor ya soporta USD para
+  cuando se reactive; no se toca por ahora.
+
+**Fase de corrección de fórmulas: CERRADA.** Bugs reales corregidos (#1, #2); el resto confirmado correcto o deferido.
 
 ---
 
