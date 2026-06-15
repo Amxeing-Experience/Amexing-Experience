@@ -8,6 +8,17 @@ con test golden actualizado, propagando a builder + PDF + backend).
 
 Leyenda: 🔴 sospecha fuerte de bug · 🟡 a confirmar · ⚪ probablemente correcto (confirmar).
 
+## Estado de resoluciones (actualizado)
+
+- **#1 Recargo por forma de pago — ✅ RESUELTO.** Confirmado: transferRate/agencyRate vienen del endpoint
+  (no hardcodeados). Los listados backend sin forma de pago ahora entregan SOLO el precio base; el motor aplica
+  el rate al elegir forma de pago. (commit fix #1)
+- **#2 Descuento A-Disposición — ✅ RESUELTO.** Se calcula sobre el total CON recargo (opción coherente, 515 en el
+  ejemplo). Aplicado en motor + builder. (commit fix #2)
+- **#3 Greeter — ✅ CONFIRMADO CORRECTO.** La fórmula (basePrice + hourlyRate×h) viene del endpoint GreeterRate
+  y redondea a centena. Sin cambios.
+- **#4 Redondeo a efectivo $5 / #5 USD / #6 IVA 16% — pendiente de confirmar** (abajo).
+
 ---
 
 ## 1. 🔴 Recargo por forma de pago — DOS modelos distintos conviviendo
