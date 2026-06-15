@@ -5862,9 +5862,31 @@ class ItineraryBuilder {
           this._populatingTransportForm = false;
         }
 
+        // Hay vehículo adicional REAL solo si, además del flag, existe el id del vehículo.
+        // El flag hasAdditionalVehicle pudo quedar en true SIN vehículo por el leak previo
+        // del checkbox (al guardar se escribía hasAdditionalVehicle = checkbox.checked aunque
+        // no hubiera selección, dejando additionalVehicleId en null). Por eso no confiamos
+        // solo en el flag.
+        const hasRealAdditionalVehicle = !!(service.hasAdditionalVehicle && service.additionalVehicleId);
+
+        // Default determinista: si NO hay vehículo adicional real, desmarcar y ocultar
+        // (cubre tanto el estado pegado como el flag corrupto sin vehículo).
+        if (service.type !== 'tour' && !hasRealAdditionalVehicle) {
+          const avCheckbox = document.getElementById('additionalVehicleCheckbox');
+          if (avCheckbox) {
+            avCheckbox.checked = false;
+            this.setOptionContainersVisible('additionalVehicle', false, [
+              'additionalSegmentContainer',
+              'additionalVehicleSelectContainer',
+              'additionalVehiclePriceContainer',
+              'extraAdditionalVehiclesContainer',
+            ]);
+          }
+        }
+
         // Restore additional vehicle fields if service has them
         // Note: For tours, this is handled by restoreTourAdditionalVehicle in populateVehicleTourForm
-        if (service.hasAdditionalVehicle && service.type !== 'tour') {
+        if (hasRealAdditionalVehicle && service.type !== 'tour') {
           console.log('🚗 Restoring additional vehicle fields:', {
             hasAdditionalVehicle: service.hasAdditionalVehicle,
             additionalVehicleSegment: service.additionalVehicleSegment,
@@ -6607,9 +6629,22 @@ class ItineraryBuilder {
       serviceQuantityField.value = service.quantity;
     }
 
-    // Step 10: Handle additional vehicle if present
-    if (service.hasAdditionalVehicle) {
+    // Step 10: Handle additional vehicle if present.
+    // Solo si hay vehículo adicional REAL (flag + id). El flag hasAdditionalVehicle pudo
+    // quedar en true sin vehículo por el leak previo del checkbox; en ese caso desmarcar.
+    if (service.hasAdditionalVehicle && service.additionalVehicleId) {
       await this.restoreTourAdditionalVehicle(service);
+    } else {
+      const avCheckbox = document.getElementById('additionalVehicleCheckbox');
+      if (avCheckbox) {
+        avCheckbox.checked = false;
+        this.setOptionContainersVisible('additionalVehicle', false, [
+          'additionalSegmentContainer',
+          'additionalVehicleSelectContainer',
+          'additionalVehiclePriceContainer',
+          'extraAdditionalVehiclesContainer',
+        ]);
+      }
     }
 
     // Step 10b: Repaint EXTRA additional vehicles now that the tour rate is set and
