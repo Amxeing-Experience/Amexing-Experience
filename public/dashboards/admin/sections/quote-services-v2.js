@@ -8517,12 +8517,9 @@ class ItineraryBuilder {
     // Calculate base vehicle cost (total for all vehicles and hours)
     const baseVehicleTotal = Math.round((baseVehicleCostPerHour * hours * vehicleQuantity) * 100) / 100;
 
-    // Apply surcharge based on payment type
-    const originalPaymentType = document.getElementById('priceTypeSelect')?.value;
-    document.getElementById('priceTypeSelect').value = paymentType;
-    const vehicleTotalWithSurcharge = Math.round(this.getDisplayPrice(baseVehicleTotal) * 100) / 100;
-    // Restore original payment type
-    if (originalPaymentType) document.getElementById('priceTypeSelect').value = originalPaymentType;
+    // Apply surcharge based on payment type — pasa el tipo por parámetro al motor,
+    // SIN mutar el DOM (eliminado el efecto secundario frágil sobre #priceTypeSelect).
+    const vehicleTotalWithSurcharge = Math.round(this.getDisplayPrice(baseVehicleTotal, { paymentType }) * 100) / 100;
 
     // Calculate guide cost (no surcharge applied to guide)
     const guideTotalCost = Math.round((guideRate * hours * vehicleQuantity) * 100) / 100;
@@ -10296,17 +10293,35 @@ class ItineraryBuilder {
    * @param mxnPrice
    * @example
    */
-  getDisplayPrice(mxnPrice) {
-    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-    const currency = document.getElementById('currencySelect')?.value || 'MXN';
+  /**
+   * Precio mostrado a partir de un precio base en MXN.
+   * @param {number} mxnPrice - Precio base en MXN.
+   * @param {object} [opts] - Overrides explícitos. Si no se pasan, se leen del DOM.
+   *   { paymentType, currency } — permite calcular para una forma de pago SIN mutar el DOM.
+   * @returns {number}
+   */
+  getDisplayPrice(mxnPrice, opts = {}) {
+    const paymentType = opts.paymentType || document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    const currency = opts.currency || document.getElementById('currencySelect')?.value || 'MXN';
 
-    // Step 1: Apply cash rounding for efectivo payments
+    // Motor de cálculo único (isomórfico). Una sola fuente de verdad front/back.
+    if (window.PricingEngine) {
+      return window.PricingEngine.applyDisplayPrice(mxnPrice, {
+        paymentType,
+        currency,
+        transferRate: this.transferRate,
+        agencyRate: this.agencyRate,
+        exchangeRate: this.exchangeRate,
+        // Comportamiento actual: getDisplayPrice siempre redondea efectivo+MXN.
+        cashRoundingEnabled: true,
+      });
+    }
+
+    // Fallback (idéntico al comportamiento previo) por si el motor no cargó.
     let priceToProcess = mxnPrice;
     if (paymentType === 'efectivo' && currency === 'MXN' && window.PricingUtils && window.PricingUtils.applyCashRounding) {
       priceToProcess = PricingUtils.applyCashRounding(mxnPrice);
     }
-
-    // Step 2: Apply payment surcharge
     let withSurcharge = priceToProcess;
     if (window.PricingUtils) {
       withSurcharge = PricingUtils.applyPaymentRate(priceToProcess, paymentType, this.transferRate, this.agencyRate);
@@ -10315,25 +10330,10 @@ class ItineraryBuilder {
     } else if (paymentType === 'tarjeta' && this.agencyRate > 0) {
       withSurcharge = priceToProcess * (1 + this.agencyRate / 100);
     }
-
-    // Step 3: Currency conversion
     if (currency === 'USD' && this.exchangeRate > 0) {
       const usdPrice = withSurcharge / this.exchangeRate;
-      const finalPrice = window.PricingUtils ? PricingUtils.applyUSDRoundingRules(usdPrice) : Math.round(usdPrice);
-      console.log('💰 getDisplayPrice RESULT (USD):', {
-        originalMXN: mxnPrice,
-        withSurcharge,
-        usdPrice: finalPrice,
-        exchangeRate: this.exchangeRate,
-      });
-      return finalPrice;
+      return window.PricingUtils ? PricingUtils.applyUSDRoundingRules(usdPrice) : Math.round(usdPrice);
     }
-
-    console.log('💰 getDisplayPrice RESULT (MXN):', {
-      originalMXN: mxnPrice,
-      finalPrice: withSurcharge,
-      surchargeApplied: withSurcharge - priceToProcess,
-    });
     return withSurcharge;
   }
 

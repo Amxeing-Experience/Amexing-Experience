@@ -1914,6 +1914,31 @@ class QuoteController {
         }
       }
 
+      // Consistencia de totales (costura #1 — backend, motor único).
+      // Verifica que el subtotal enviado por el front coincida con la suma de los
+      // totales por día. Por ahora SOLO observa (log warning) — NO cambia números
+      // (consolidación faithful). La recomputación autoritativa con el motor se hará
+      // en la fase de corrección de fórmulas.
+      try {
+        const pricingEngine = require('../../../domain/pricing/pricingEngine');
+        const sumOfDayTotals = pricingEngine.round2(
+          days.reduce((sum, day) => sum + (parseFloat(day.dayTotal) || 0), 0)
+        );
+        const subtotalRounded = pricingEngine.round2(subtotal);
+        if (Math.abs(sumOfDayTotals - subtotalRounded) > 0.01) {
+          logger.warn('⚠️ Inconsistencia de subtotal en cotización (builder vs suma de días)', {
+            quoteId,
+            subtotalRecibido: subtotalRounded,
+            sumaDeDias: sumOfDayTotals,
+            diferencia: pricingEngine.round2(subtotalRounded - sumOfDayTotals),
+            paymentType,
+            currency,
+          });
+        }
+      } catch (calcErr) {
+        logger.warn('No se pudo verificar la consistencia de totales con el motor', { error: calcErr.message });
+      }
+
       // Query quote
       const query = new Parse.Query('Quote');
       query.equalTo('exists', true);

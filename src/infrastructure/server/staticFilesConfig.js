@@ -25,6 +25,13 @@ const staticRoutes = [
     directory: path.join(__dirname, '..', '..', '..', 'public'),
   },
   {
+    // Motor de cálculo isomórfico: mismo archivo que usa el backend
+    // (src/domain/pricing/pricingEngine.js), servido al navegador como
+    // /shared/pricing/pricingEngine.js. Evita duplicar el archivo (sin drift).
+    route: '/shared/pricing',
+    directory: path.join(__dirname, '..', '..', 'domain', 'pricing'),
+  },
+  {
     route: '/dashboard',
     directory: path.join(__dirname, '..', '..', '..', 'public', 'dashboard'),
   },
