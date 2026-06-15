@@ -8551,7 +8551,8 @@ class ItineraryBuilder {
     if (hours > 0) {
       const discountPercentage = this.getADisposicionDiscount(hours);
       if (discountPercentage > 0) {
-        const finalCost = Math.round((baseVehicleTotal + guideTotalCost) * 100) / 100;
+        // Descuento sobre el total CON recargo (coherente con el motor pricingEngine).
+        const finalCost = Math.round((vehicleTotalWithSurcharge + guideTotalCost) * 100) / 100;
         discountAmount = Math.round((finalCost * (discountPercentage / 100)) * 100) / 100;
       }
     }

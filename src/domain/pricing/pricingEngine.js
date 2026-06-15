@@ -196,7 +196,9 @@ const PricingEngine = (() => {
     if (hours > 0) {
       const discountPercentage = getADisposicionDiscount(hours);
       if (discountPercentage > 0) {
-        const finalCost = round2(baseVehicleTotal + guideTotalCost);
+        // El descuento se calcula sobre el total CON recargo (coherente: descuento y
+        // total sobre la misma base). Antes se calculaba sobre la base sin recargo.
+        const finalCost = round2(vehicleTotalWithSurcharge + guideTotalCost);
         discountAmount = round2(finalCost * (discountPercentage / 100));
       }
     }

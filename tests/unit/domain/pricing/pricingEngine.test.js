@@ -119,6 +119,23 @@ describe('PricingEngine — calculateADisposicion (desglose completo)', () => {
     expect(r.hourlyRatePerVehicle).toBe(500);
   });
 
+  it('transferencia, 10h × 2 vehículos: descuento 5% sobre el total CON recargo (515)', () => {
+    const r = PricingEngine.calculateADisposicion({
+      baseVehicleCostPerHour: 500,
+      hours: 10,
+      vehicleQuantity: 2,
+      guideRate: 0,
+      paymentType: 'transferencia',
+      transferRate: 3,
+      currency: 'MXN',
+    });
+    expect(r.baseVehicleTotal).toBe(10000);
+    expect(r.vehicleTotalWithSurcharge).toBe(10300); // 10000 × 1.03
+    expect(r.discountAmount).toBe(515); // 5% de 10,300 (total CON recargo), no de 10,000
+    expect(r.subtotal).toBe(9785); // 10,300 − 515
+    expect(r.finalTotal).toBe(9785);
+  });
+
   it('transferencia con guía, 4h × 1 vehículo, sin descuento (<8h)', () => {
     const r = PricingEngine.calculateADisposicion({
       baseVehicleCostPerHour: 500,
