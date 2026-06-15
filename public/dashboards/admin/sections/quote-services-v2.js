@@ -6387,9 +6387,12 @@ class ItineraryBuilder {
               : '';
           }
 
-          if (conceptoApplySurchargesCheckbox && service.applySurcharges !== undefined) {
-            conceptoApplySurchargesCheckbox.checked = service.applySurcharges;
-            console.log('✅ CONCEPTO FIELD - Set applySurcharges to:', service.applySurcharges);
+          if (conceptoApplySurchargesCheckbox) {
+            // El recargo de concepto SIEMPRE se aplica (no se puede desactivar — decisión
+            // del cliente). Se fuerza checked=true aunque un concepto viejo se haya guardado
+            // con applySurcharges=false.
+            conceptoApplySurchargesCheckbox.checked = true;
+            console.log('✅ CONCEPTO FIELD - applySurcharges forzado a true (recargo siempre)');
           }
         };
 
@@ -8218,8 +8221,10 @@ class ItineraryBuilder {
       const adultsNoAlcoholQuantity = service.adultsNoAlcoholQuantity || 0;
 
       const adultPrice = service.adultPrice || 0;
-      const childPrice = service.childPrice || 0;
-      const noAlcoholPrice = service.noAlcoholPrice || 0;
+      // Si no hay precio de niño / sin-alcohol, se usa el de adulto como fallback
+      // (decisión del cliente — antes se cobraba $0, es decir gratis).
+      const childPrice = service.childPrice || adultPrice;
+      const noAlcoholPrice = service.noAlcoholPrice || adultPrice;
 
       let totalPrice = 0;
 
@@ -9635,10 +9640,15 @@ class ItineraryBuilder {
         // Calculate groups for breakdown text
         const groups = this.calculateWalkingTourGroups(selectedTourData, peopleCount);
 
-        // Base total using effective (possibly overridden) tier prices.
-        const baseTotal = groups.reduce((sum, g) => sum + resolveTierPrice(g.tier) * duration, 0);
+        // Override de TOTAL manual: el precio capturado es la BASE en efectivo; el recargo
+        // por forma de pago se aplica después (decisión del cliente). En modo automático o
+        // por-grupo, la base se calcula con los precios por tier (resolveTierPrice).
+        const isTotalOverride = !!(overrideCheckbox?.checked && walkingMode === 'total');
+        const baseTotal = isTotalOverride
+          ? (parseFloat(document.getElementById('walkingTourManualPrice')?.value || 0))
+          : groups.reduce((sum, g) => sum + resolveTierPrice(g.tier) * duration, 0);
 
-        // Calculate totals with surcharges
+        // Calculate totals with surcharges (el manual cuenta como efectivo base)
         const efectivoTotal = baseTotal;
         const transferenciaTotal = baseTotal * (1 + (this.transferRate / 100));
         const tarjetaTotal = baseTotal * (1 + (this.agencyRate / 100));
@@ -9653,37 +9663,42 @@ class ItineraryBuilder {
         const devBreakdownTransferenciaField = document.getElementById('devBreakdownTransferencia');
         const devBreakdownTarjetaField = document.getElementById('devBreakdownTarjeta');
 
-        // Build breakdown text for efectivo
+        // Build breakdown text. En override de total manual, una sola línea (el manual es
+        // la base efectivo; el recargo se muestra aplicado). En automático/por-grupo, por grupo.
         let efectivoBreakdown = '';
-        groups.forEach((group, index) => {
-          const groupTotal = resolveTierPrice(group.tier) * duration;
-          if (efectivoBreakdown) efectivoBreakdown += '\n';
-          efectivoBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotal.toFixed(2)}`;
-        });
-        if (efectivoBreakdown) efectivoBreakdown += '\n';
-        efectivoBreakdown += `Total: $${efectivoTotal.toFixed(2)}`;
-
-        // Build breakdown text for transferencia (with surcharge applied to each group)
         let transferenciaBreakdown = '';
-        groups.forEach((group, index) => {
-          const groupTotal = resolveTierPrice(group.tier) * duration;
-          const groupTotalWithSurcharge = groupTotal * (1 + (this.transferRate / 100));
-          if (transferenciaBreakdown) transferenciaBreakdown += '\n';
-          transferenciaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotalWithSurcharge.toFixed(2)}`;
-        });
-        if (transferenciaBreakdown) transferenciaBreakdown += '\n';
-        transferenciaBreakdown += `Total: $${transferenciaTotal.toFixed(2)}`;
-
-        // Build breakdown text for tarjeta (with surcharge applied to each group)
         let tarjetaBreakdown = '';
-        groups.forEach((group, index) => {
-          const groupTotal = resolveTierPrice(group.tier) * duration;
-          const groupTotalWithSurcharge = groupTotal * (1 + (this.agencyRate / 100));
+        if (isTotalOverride) {
+          efectivoBreakdown = `Precio manual (efectivo): $${efectivoTotal.toFixed(2)}`;
+          transferenciaBreakdown = `Precio manual + recargo (${this.transferRate}%): $${transferenciaTotal.toFixed(2)}`;
+          tarjetaBreakdown = `Precio manual + recargo (${this.agencyRate}%): $${tarjetaTotal.toFixed(2)}`;
+        } else {
+          groups.forEach((group, index) => {
+            const groupTotal = resolveTierPrice(group.tier) * duration;
+            if (efectivoBreakdown) efectivoBreakdown += '\n';
+            efectivoBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotal.toFixed(2)}`;
+          });
+          if (efectivoBreakdown) efectivoBreakdown += '\n';
+          efectivoBreakdown += `Total: $${efectivoTotal.toFixed(2)}`;
+
+          groups.forEach((group, index) => {
+            const groupTotal = resolveTierPrice(group.tier) * duration;
+            const groupTotalWithSurcharge = groupTotal * (1 + (this.transferRate / 100));
+            if (transferenciaBreakdown) transferenciaBreakdown += '\n';
+            transferenciaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotalWithSurcharge.toFixed(2)}`;
+          });
+          if (transferenciaBreakdown) transferenciaBreakdown += '\n';
+          transferenciaBreakdown += `Total: $${transferenciaTotal.toFixed(2)}`;
+
+          groups.forEach((group, index) => {
+            const groupTotal = resolveTierPrice(group.tier) * duration;
+            const groupTotalWithSurcharge = groupTotal * (1 + (this.agencyRate / 100));
+            if (tarjetaBreakdown) tarjetaBreakdown += '\n';
+            tarjetaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotalWithSurcharge.toFixed(2)}`;
+          });
           if (tarjetaBreakdown) tarjetaBreakdown += '\n';
-          tarjetaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotalWithSurcharge.toFixed(2)}`;
-        });
-        if (tarjetaBreakdown) tarjetaBreakdown += '\n';
-        tarjetaBreakdown += `Total: $${tarjetaTotal.toFixed(2)}`;
+          tarjetaBreakdown += `Total: $${tarjetaTotal.toFixed(2)}`;
+        }
 
         // Update dev payment prices
         if (devPriceEfectivoField) devPriceEfectivoField.value = efectivoTotal.toFixed(2);
