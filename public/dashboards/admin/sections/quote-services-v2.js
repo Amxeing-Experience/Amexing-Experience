@@ -1642,27 +1642,15 @@ class ItineraryBuilder {
       this.handleServiceTypeChange('experience'); // Default to experience
     }
 
-    // Add event listener to clear flags when modal is hidden
+    // Limpiar el estado del modal en CADA cierre. El listener se registra UNA sola
+    // vez (antes usaba { once: true } y se re-agregaba en cada apertura: en reaperturas
+    // el estado del servicio anterior quedaba pegado). No re-renderiza al cancelar.
     const modalElement = document.getElementById('serviceModal');
-    if (modalElement) {
+    if (modalElement && !this._serviceModalHiddenBound) {
+      this._serviceModalHiddenBound = true;
       modalElement.addEventListener('hidden.bs.modal', () => {
-        this._editModalOpen = false;
-        this._restoringWalkingTourData = false;
-        this._populatingForm = false;
-        this.currentServiceCopy = null; // Clear the service copy
-
-        // Clear cache to prevent any future issues
-        this.serviceTypeFields = {
-          experience: {},
-          tour: {},
-          concepto: {},
-          transport: {},
-        };
-
-        console.log('✅ Service modal hidden - flags and cache cleared');
-        // Don't re-render when closing without saving - only render after actual save
-        // this.renderDaysContent(); // REMOVED: Prevents tags from disappearing when canceling
-      }, { once: true }); // Use once: true to avoid multiple listeners
+        this.resetServiceModalState();
+      });
     }
 
     modal.show();
@@ -11979,6 +11967,25 @@ class ItineraryBuilder {
     }
   }
 
+  /**
+   * Restablece TODO el estado del modal de servicio (flags + cache de campos).
+   * Idempotente: seguro de llamar en cada cierre, por cualquier vía. Centraliza lo
+   * que antes estaba duplicado en el listener hidden.bs.modal y en closeModal.
+   * @example
+   */
+  resetServiceModalState() {
+    this._editModalOpen = false;
+    this._restoringWalkingTourData = false;
+    this._populatingForm = false;
+    this.currentServiceCopy = null;
+    this.serviceTypeFields = {
+      experience: {},
+      tour: {},
+      concepto: {},
+      transport: {},
+    };
+  }
+
   closeModal(modalId) {
     const modal = bootstrap.Modal.getInstance(document.getElementById(modalId));
     if (modal) {
@@ -11987,21 +11994,9 @@ class ItineraryBuilder {
         this.clearModalAlert('dayModalAlert');
       } else if (modalId === 'serviceModal') {
         this.clearModalAlert('serviceModalAlert');
-        // Clear all flags and cache when closing service modal
-        this._editModalOpen = false;
-        this._restoringWalkingTourData = false;
-        this._populatingForm = false;
-        this.currentServiceCopy = null;
-
-        // Clear cache completely
-        this.serviceTypeFields = {
-          experience: {},
-          tour: {},
-          concepto: {},
-          transport: {},
-        };
-
-        console.log('✅ Edit modal closed - all flags and cache cleared');
+        // Estado del modal centralizado (idempotente). El listener hidden.bs.modal
+        // también lo ejecuta, así el cierre queda consistente por cualquier vía.
+        this.resetServiceModalState();
       }
       modal.hide();
     }
