@@ -18774,7 +18774,14 @@ class ItineraryBuilder {
       await this.loadADisposicionRowVehicles(saved.rateId, vehicleSel);
       if (saved.vehicleTypeId) {
         vehicleSel.value = saved.vehicleTypeId;
-        await this.refreshADisposicionRowRate(row, saved.rateId, saved.vehicleTypeId, rateLabel);
+        // Restaura los datos directo desde lo guardado (no dependemos del re-fetch de tarifa,
+        // que puede fallar/tardar y dejaría la fila sin hourlyRate → excluida del cálculo).
+        row.dataset.rateId = saved.rateId;
+        row.dataset.vehicleTypeId = saved.vehicleTypeId;
+        row.dataset.hourlyRate = String(saved.hourlyRate || 0);
+        row.dataset.vehicleLabel = saved.vehicleLabel || (vehicleSel.selectedOptions[0]?.textContent || '');
+        row.dataset.segmentLabel = saved.segmentLabel || (segmentSel.selectedOptions[0]?.textContent || '');
+        rateLabel.textContent = `${this.formatCurrency(saved.hourlyRate || 0)}/h`;
       }
     }
     // Solo marca modificado cuando lo agrega el usuario; en restauración (saved) no, para no
@@ -18862,6 +18869,10 @@ class ItineraryBuilder {
     // listas recalculamos, para que el desglose incluya los vehículos adicionales restaurados
     // (antes el recálculo corría antes de que terminaran los fetch y salían sin ellos).
     await this.calculateADisposicionPrice();
+    // Refuerzo: aunque calculateADisposicionPrice retorne temprano, repintamos el desglose
+    // (dev primero, luego service) para que muestre los vehículos adicionales restaurados.
+    this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
   }
 
   /** Recalcula a-disposición: precio + dev breakdown + service breakdown (en orden). */
