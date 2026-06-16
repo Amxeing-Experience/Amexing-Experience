@@ -3436,24 +3436,39 @@ class ItineraryBuilder {
 
       const conceptoApplySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
 
-      if (conceptoApplySurcharges) {
-        // Calculate prices with surcharges from client price
-        pricesByType = {
-          efectivo: conceptoClientPrice,
-          transferencia: conceptoClientPrice * (1 + (this.transferRate / 100)),
-          tarjeta: conceptoClientPrice * (1 + (this.agencyRate / 100)),
-        };
-      } else {
-        // No surcharges - all payment types have the same price
-        pricesByType = {
-          efectivo: conceptoClientPrice,
-          transferencia: conceptoClientPrice,
-          tarjeta: conceptoClientPrice,
-        };
-      }
+      // Base = precio unitario + (total de personas × precio por persona), igual que el
+      // desglose/preview. Antes el precio GUARDADO omitía el componente por-persona.
+      const pricePerPerson = parseFloat(document.getElementById('conceptoPricePerPerson')?.value || 0);
+      const totalPeople = (parseInt(document.getElementById('conceptoAdultsQuantity')?.value || 0))
+        + (parseInt(document.getElementById('conceptoChildrenQuantity')?.value || 0))
+        + (parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0));
+      const conceptoBaseEfectivo = conceptoClientPrice + (totalPeople * pricePerPerson);
 
-      // Override the base price to be the client price for concepto
-      basePriceEfectivo = conceptoClientPrice;
+      // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
+      const conceptoPricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: conceptoBaseEfectivo, surcharge: conceptoApplySurcharges }],
+        })
+        : (conceptoApplySurcharges ? {
+          efectivo: conceptoBaseEfectivo,
+          transferencia: conceptoBaseEfectivo * (1 + (this.transferRate / 100)),
+          tarjeta: conceptoBaseEfectivo * (1 + (this.agencyRate / 100)),
+        } : {
+          efectivo: conceptoBaseEfectivo,
+          transferencia: conceptoBaseEfectivo,
+          tarjeta: conceptoBaseEfectivo,
+        });
+
+      pricesByType = {
+        efectivo: conceptoPricing.efectivo,
+        transferencia: conceptoPricing.transferencia,
+        tarjeta: conceptoPricing.tarjeta,
+      };
+
+      // Override the base price to be the full base (unitario + por persona) for concepto
+      basePriceEfectivo = conceptoBaseEfectivo;
 
       console.log('✅ COLLECT SERVICE DATA - Concepto pricesByType from clientPrice:', {
         clientPrice: conceptoClientPrice,
@@ -8863,44 +8878,37 @@ class ItineraryBuilder {
         baseTotal = currentPrice || 0; // Safe fallback
       }
     } else if (serviceType === 'concepto') {
-      // For Concepto: Use CLIENT price as the base, not servicePrice
+      // For Concepto: base = precio unitario + (total de personas × precio por persona).
+      // Antes esta ruta (dev prices) omitía el por-persona, divergiendo del desglose (C2).
       const clientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
       const applySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
+      const pricePerPerson = parseFloat(document.getElementById('conceptoPricePerPerson')?.value || 0);
+      const totalPeople = (parseInt(document.getElementById('conceptoAdultsQuantity')?.value || 0))
+        + (parseInt(document.getElementById('conceptoChildrenQuantity')?.value || 0))
+        + (parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0));
+      const conceptoBaseEfectivo = clientPrice + (totalPeople * pricePerPerson);
 
-      // If surcharges are NOT applied, all payment types should be the same
-      if (!applySurcharges) {
-        // Set all fields to the same price (no surcharges)
-        if (efectivoField) efectivoField.value = clientPrice.toFixed(2);
-        if (transferenciaField) transferenciaField.value = clientPrice.toFixed(2);
-        if (tarjetaField) tarjetaField.value = clientPrice.toFixed(2);
-
-        console.log('💰 Concepto without surcharges - all payment types same:', {
-          clientPrice,
-          applySurcharges: false,
-          allPrices: clientPrice,
+      // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
+      const conceptoPricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: conceptoBaseEfectivo, surcharge: applySurcharges }],
+        })
+        : (applySurcharges ? {
+          efectivo: conceptoBaseEfectivo,
+          transferencia: conceptoBaseEfectivo * (1 + (this.transferRate / 100)),
+          tarjeta: conceptoBaseEfectivo * (1 + (this.agencyRate / 100)),
+        } : {
+          efectivo: conceptoBaseEfectivo,
+          transferencia: conceptoBaseEfectivo,
+          tarjeta: conceptoBaseEfectivo,
         });
-        return; // Exit early
-      }
 
-      // If surcharges ARE applied, calculate from client price base
-      const efectivoPrice = clientPrice;
-      const transferenciaPrice = clientPrice * (1 + (this.transferRate / 100));
-      const tarjetaPrice = clientPrice * (1 + (this.agencyRate / 100));
+      if (efectivoField) efectivoField.value = conceptoPricing.efectivo.toFixed(2);
+      if (transferenciaField) transferenciaField.value = conceptoPricing.transferencia.toFixed(2);
+      if (tarjetaField) tarjetaField.value = conceptoPricing.tarjeta.toFixed(2);
 
-      // Set the calculated prices
-      if (efectivoField) efectivoField.value = efectivoPrice.toFixed(2);
-      if (transferenciaField) transferenciaField.value = transferenciaPrice.toFixed(2);
-      if (tarjetaField) tarjetaField.value = tarjetaPrice.toFixed(2);
-
-      console.log('💰 Concepto with surcharges - calculated from client price:', {
-        clientPrice,
-        applySurcharges: true,
-        efectivo: efectivoPrice,
-        transferencia: transferenciaPrice,
-        tarjeta: tarjetaPrice,
-        transferRate: this.transferRate,
-        agencyRate: this.agencyRate,
-      });
       return; // Exit early - don't continue to general calculation
     } else {
       // For other non-tour, non-A Disposición, non-concepto services
@@ -9245,10 +9253,22 @@ class ItineraryBuilder {
       const personSubtotalTransfer = hasPerPerson ? totalPeople * pricePerPersonTransfer : 0;
       const personSubtotalTarjeta = hasPerPerson ? totalPeople * pricePerPersonTarjeta : 0;
 
-      const efectivoPrice = clientPrice + personSubtotalEfectivo;
       const transferenciaBase = clientPrice + personSubtotalEfectivo;
-      const transferenciaPrice = transferenciaBase * transferMult;
-      const tarjetaPrice = transferenciaBase * agencyMult;
+      // Totales por forma de pago vía el motor único (un solo nodo: el total base).
+      const conceptoTotals = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: transferenciaBase, surcharge: true }],
+        })
+        : {
+          efectivo: transferenciaBase,
+          transferencia: transferenciaBase * transferMult,
+          tarjeta: transferenciaBase * agencyMult,
+        };
+      const efectivoPrice = conceptoTotals.efectivo;
+      const transferenciaPrice = conceptoTotals.transferencia;
+      const tarjetaPrice = conceptoTotals.tarjeta;
 
       // Create breakdown texts for each payment type — per-person line appears
       // before the recargo / total so the math is obvious to read.

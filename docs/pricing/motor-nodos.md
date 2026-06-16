@@ -16,7 +16,7 @@ redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el
 | **A-Disposición** | ✅ vehículo × horas × cantidad · guía · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
 | **Experiencias** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ guardado + desglose | **HECHO** (sin duración; ver abajo) |
 | **Walking tours** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ desglose + fallback | **HECHO** (tiers/override en baseTotal) |
-| Concepto | ⚪ pendiente | inline | precio cliente + por persona |
+| **Concepto** | ✅ recargo vía `composeServiceNodes` (1 nodo: unitario + por persona) | ✅ guardado + dev prices + desglose | **HECHO** (fix por-persona + C2) |
 | Backend (validar al guardar) | ❌ | — | hoy es passthrough; debe re-correr el motor |
 
 ## Transporte — qué se hizo (1er nodo del árbol)
@@ -90,6 +90,18 @@ En la capa de recargo, walking es como experiencias: `baseTotal × recargo`. Tod
 `baseTotal`; el recargo por forma de pago ahora pasa por `PricingEngine.composeServiceNodes`
 (un nodo `base`) en el desglose y en el fallback de `collectServiceData`. El texto del desglose
 (por grupo o manual) queda igual. Sin cambio de valores.
+
+## Concepto — qué se hizo (6º nodo conectado) + cierre de C2
+
+Concepto tiene dos precios: **unitario** (`conceptoClientPrice`) y **por persona**
+(`conceptoPricePerPerson` × total de personas). El recargo siempre aplica (C1, checkbox oculto
+y forzado).
+
+**Fix de valor (decisión del cliente):** el precio **guardado** (`collectServiceData`) y la ruta
+de dev prices (`updateDevPaymentPrices`) **omitían el por-persona** — solo guardaban el unitario,
+divergiendo del desglose/preview. Ahora las tres rutas (guardado, dev prices, desglose) calculan
+`base = unitario + personas × porPersona` y aplican el recargo vía
+`PricingEngine.composeServiceNodes`. Esto **cierra la deuda C2** (las dos rutas dev ya no divergen).
 
 ## Pendientes diferidos (bugs de desglose / display, NO de cálculo)
 
