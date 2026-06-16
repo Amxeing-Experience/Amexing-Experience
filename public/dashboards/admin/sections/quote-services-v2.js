@@ -1129,6 +1129,8 @@ class ItineraryBuilder {
       this.serviceModified = true; // Mark as modified when user changes rate
       this.handleADisposicionRateChange(e.target.value);
     });
+    // Botón "+ Agregar vehículo" de vehículos adicionales de a-disposición
+    this.setupADisposicionAdditionalVehicles();
     document.getElementById('aDisposicionVehicle')?.addEventListener('change', () => {
       this.serviceModified = true; // Mark as modified when user changes vehicle
       this.calculateADisposicionPrice();
@@ -4645,6 +4647,7 @@ class ItineraryBuilder {
         // Collect includeGuide checkbox state for A disposición
         data.includeGuide = document.getElementById('aDisposicionGuide')?.checked || false;
         data.includeGreeter = document.getElementById('aDisposicionGreeter')?.checked || false;
+        data.aDisposicionAdditionalVehicles = this.getADisposicionAdditionalVehicles();
 
         // Store vehicle name for display
         const adVehicleSelect = document.getElementById('aDisposicionVehicle');
@@ -6331,6 +6334,9 @@ class ItineraryBuilder {
         if (aDisposicionGreeterCheckbox) {
           aDisposicionGreeterCheckbox.checked = service.includeGreeter || false;
         }
+
+        // Restore additional vehicles for A disposición (rebuilds the rows)
+        this.restoreADisposicionAdditionalVehicles(service.aDisposicionAdditionalVehicles);
 
         // Only recalculate price if no custom price override is set
         if (!service.priceOverride || service.customPrice === undefined) {
@@ -8676,12 +8682,17 @@ class ItineraryBuilder {
     const greeterCost = document.getElementById('aDisposicionGreeter')?.checked
       ? this.calculateGreeterPrice(hours * 60)
       : 0;
+    // Vehículos adicionales: cada uno = tarifa/hora × horas (efectivo); se suman. El motor
+    // les aplica el recargo y los incluye en la base con descuento.
+    const additionalVehiclesCost = this.getADisposicionAdditionalVehicles()
+      .reduce((sum, av) => sum + (av.hourlyRate * hours), 0);
     const params = {
       baseVehicleCostPerHour,
       hours,
       vehicleQuantity,
       guideRate,
       greeterCost,
+      additionalVehiclesCost,
       paymentType,
       currency,
       transferRate: this.transferRate,
@@ -8701,14 +8712,14 @@ class ItineraryBuilder {
     const baseVehicleTotal = round2(baseVehicleCostPerHour * hours * vehicleQuantity);
     const vehicleTotalWithSurcharge = round2(this.getDisplayPrice(baseVehicleTotal, { paymentType }));
     const guideTotalCost = round2((guideRate * hours * vehicleQuantity) * (1 + surchargePct));
-    const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost);
+    const additionalVehiclesTotal = round2(additionalVehiclesCost * (1 + surchargePct));
+    const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost + additionalVehiclesTotal);
 
     let discountAmount = 0;
     if (hours > 0) {
       const discountPercentage = this.getADisposicionDiscount(hours);
       if (discountPercentage > 0) {
-        const finalCost = round2(vehicleTotalWithSurcharge + guideTotalCost);
-        discountAmount = round2(finalCost * (discountPercentage / 100));
+        discountAmount = round2(baseTotal * (discountPercentage / 100));
       }
     }
 
@@ -8720,6 +8731,7 @@ class ItineraryBuilder {
       baseVehicleTotal,
       vehicleTotalWithSurcharge,
       guideTotalCost,
+      additionalVehiclesTotal,
       greeterTotalCost,
       baseTotal,
       discountAmount,
@@ -10029,13 +10041,19 @@ class ItineraryBuilder {
     // Discount amount (same for all payment types)
     const { discountAmount } = efectivoPricing;
 
+    // Vehículos adicionales (a-disp): una línea por vehículo; su efectivo = tarifa/h × horas.
+    const aDispAdditionalVehiclesList = this.getADisposicionAdditionalVehicles().map((av) => ({
+      label: `${av.vehicleLabel}${av.segmentLabel ? ` · ${av.segmentLabel}` : ''}`,
+      efectivo: av.hourlyRate * tourDuration,
+    }));
+
     // Cada forma de pago usa SU propio descuento: el descuento se calcula sobre la base CON
     // recargo, así que transferencia/tarjeta tienen un descuento mayor que efectivo. Antes las
     // tres usaban el de efectivo, y la línea de descuento no cuadraba con el total (el desglose
     // espeja estas líneas, por eso no coincidía con el dev breakdown).
-    const efectivoBreakdown = this.formatPaymentBreakdown('Efectivo', efectivoHourlyRate, guideRate, vehicleTotalEfectivo, guideTotalEfectivo, efectivoBaseTotal, efectivoPricing.discountAmount, efectivoSubtotal, efectivoTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalEfectivo);
-    const transferenciaBreakdown = this.formatPaymentBreakdown('Transferencia', transferHourlyRate, guideRate, vehicleTotalTransfer, guideTotalTransfer, transferBaseTotal, transferPricing.discountAmount, transferSubtotal, transferTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalTransfer);
-    const tarjetaBreakdown = this.formatPaymentBreakdown('Tarjeta', cardHourlyRate, guideRate, vehicleTotalCard, guideTotalCard, cardBaseTotal, cardPricing.discountAmount, cardSubtotal, cardTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalCard);
+    const efectivoBreakdown = this.formatPaymentBreakdown('Efectivo', efectivoHourlyRate, guideRate, vehicleTotalEfectivo, guideTotalEfectivo, efectivoBaseTotal, efectivoPricing.discountAmount, efectivoSubtotal, efectivoTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalEfectivo, aDispAdditionalVehiclesList);
+    const transferenciaBreakdown = this.formatPaymentBreakdown('Transferencia', transferHourlyRate, guideRate, vehicleTotalTransfer, guideTotalTransfer, transferBaseTotal, transferPricing.discountAmount, transferSubtotal, transferTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalTransfer, aDispAdditionalVehiclesList);
+    const tarjetaBreakdown = this.formatPaymentBreakdown('Tarjeta', cardHourlyRate, guideRate, vehicleTotalCard, guideTotalCard, cardBaseTotal, cardPricing.discountAmount, cardSubtotal, cardTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalCard, aDispAdditionalVehiclesList);
 
     // Comprehensive debugging for A Disposición breakdown calculations
     if (serviceType === 'a-disposicion') {
@@ -10191,7 +10209,7 @@ class ItineraryBuilder {
    * @param additionalVehicleInfo
    * @example
    */
-  formatPaymentBreakdown(paymentType, vehicleCostPerHour, guideCostPerHour, vehicleTotal, guideTotal, baseTotal, discountAmount, subtotal, total, duration = 1, vehicleQuantity = 1, additionalVehicleInfo = null, greeterTotal = 0) {
+  formatPaymentBreakdown(paymentType, vehicleCostPerHour, guideCostPerHour, vehicleTotal, guideTotal, baseTotal, discountAmount, subtotal, total, duration = 1, vehicleQuantity = 1, additionalVehicleInfo = null, greeterTotal = 0, additionalVehiclesList = []) {
     let breakdown = '';
 
     // Check service type for specific formatting
@@ -10285,6 +10303,17 @@ class ItineraryBuilder {
           amount: additionalAmount,
         });
       }
+    }
+
+    // Vehículos adicionales de a-disposición: una línea cada uno (antes del descuento, ya que
+    // entran en la base con descuento). Surchargeada por forma de pago.
+    if (Array.isArray(additionalVehiclesList) && additionalVehiclesList.length) {
+      const avMult = paymentType === 'Transferencia' ? 1 + (this.transferRate / 100)
+        : paymentType === 'Tarjeta' ? 1 + (this.agencyRate / 100) : 1;
+      additionalVehiclesList.forEach((av) => {
+        const lineTotal = (Number(av.efectivo) || 0) * avMult;
+        if (lineTotal > 0) breakdown += `Vehículo adicional (${av.label}): $${lineTotal.toFixed(2)}\n`;
+      });
     }
 
     // Add volume discount line if applicable
@@ -12231,6 +12260,10 @@ class ItineraryBuilder {
       concepto: {},
       transport: {},
     };
+    // Limpia las filas de vehículos adicionales de a-disposición para no arrastrar estado
+    // de un servicio anterior al abrir uno nuevo.
+    const aDispAvList = document.getElementById('aDisposicionAdditionalVehiclesList');
+    if (aDispAvList) aDispAvList.innerHTML = '';
   }
 
   /**
@@ -18654,6 +18687,174 @@ class ItineraryBuilder {
       option.textContent = displayText;
       rateSelect.appendChild(option);
     });
+  }
+
+  // ============================================================
+  // A-DISPOSICIÓN: VEHÍCULOS ADICIONALES (segmento por fila, precio por hora)
+  // ============================================================
+
+  /** Cablea el botón "+ Agregar vehículo" (una sola vez). */
+  setupADisposicionAdditionalVehicles() {
+    const btn = document.getElementById('aDisposicionAddVehicleBtn');
+    if (btn && !btn.dataset.wired) {
+      btn.dataset.wired = '1';
+      btn.addEventListener('click', () => this.addADisposicionAdditionalVehicleRow());
+    }
+  }
+
+  /** Construye un <select> de segmento para una fila de vehículo adicional. */
+  buildADisposicionSegmentSelect() {
+    const sel = document.createElement('select');
+    sel.className = 'form-select form-select-sm adisp-av-segment';
+    sel.innerHTML = '<option value="">-- Segmento --</option>';
+    (this.ratesCache || []).forEach((rate) => {
+      const label = rate.label || rate.name;
+      if (label) {
+        const norm = label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        if (norm === 'economico' || norm === 'economica') return;
+      }
+      const opt = document.createElement('option');
+      opt.value = rate.value || rate.objectId || rate.id;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    });
+    return sel;
+  }
+
+  /** Agrega una fila de vehículo adicional (segmento + vehículo + tarifa/h + quitar). */
+  async addADisposicionAdditionalVehicleRow(saved = null) {
+    const list = document.getElementById('aDisposicionAdditionalVehiclesList');
+    if (!list) return;
+    if (!this.ratesCache || this.ratesCache.length === 0) await this.loadAllRates();
+
+    const row = document.createElement('div');
+    row.className = 'adisp-av-row d-flex gap-2 align-items-center mb-2';
+    const segmentSel = this.buildADisposicionSegmentSelect();
+    const vehicleSel = document.createElement('select');
+    vehicleSel.className = 'form-select form-select-sm adisp-av-vehicle';
+    vehicleSel.innerHTML = '<option value="">-- Vehículo --</option>';
+    const rateLabel = document.createElement('small');
+    rateLabel.className = 'text-muted adisp-av-rate text-nowrap';
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn btn-sm btn-outline-danger';
+    removeBtn.innerHTML = '<i class="ti ti-trash"></i>';
+    row.appendChild(segmentSel);
+    row.appendChild(vehicleSel);
+    row.appendChild(rateLabel);
+    row.appendChild(removeBtn);
+    list.appendChild(row);
+
+    segmentSel.addEventListener('change', async () => {
+      row.dataset.hourlyRate = '';
+      rateLabel.textContent = '';
+      await this.loadADisposicionRowVehicles(segmentSel.value, vehicleSel);
+      this.recalcADisposicionWithBreakdown();
+    });
+    vehicleSel.addEventListener('change', async () => {
+      await this.refreshADisposicionRowRate(row, segmentSel.value, vehicleSel.value, rateLabel);
+      this.recalcADisposicionWithBreakdown();
+    });
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+      this.recalcADisposicionWithBreakdown();
+    });
+
+    if (saved && saved.rateId) {
+      segmentSel.value = saved.rateId;
+      await this.loadADisposicionRowVehicles(saved.rateId, vehicleSel);
+      if (saved.vehicleTypeId) {
+        vehicleSel.value = saved.vehicleTypeId;
+        await this.refreshADisposicionRowRate(row, saved.rateId, saved.vehicleTypeId, rateLabel);
+      }
+    }
+    this.serviceModified = true;
+  }
+
+  /** Carga los vehículos de un segmento en el select de una fila. */
+  async loadADisposicionRowVehicles(rateId, vehicleSel) {
+    vehicleSel.innerHTML = '<option value="">-- Vehículo --</option>';
+    if (!rateId) return;
+    try {
+      const accessToken = this.getAccessToken();
+      const response = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        (result.data || []).forEach((v) => {
+          const opt = document.createElement('option');
+          opt.value = v.value || v.id;
+          opt.textContent = `${v.label} - ${v.capacity} pax`;
+          vehicleSel.appendChild(opt);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading a-disp additional vehicles:', error);
+    }
+  }
+
+  /** Obtiene y guarda la tarifa/hora de una fila en sus data-*. */
+  async refreshADisposicionRowRate(row, rateId, vehicleTypeId, rateLabel) {
+    row.dataset.hourlyRate = '';
+    row.dataset.rateId = rateId || '';
+    row.dataset.vehicleTypeId = vehicleTypeId || '';
+    row.dataset.vehicleLabel = row.querySelector('.adisp-av-vehicle')?.selectedOptions[0]?.textContent || '';
+    row.dataset.segmentLabel = row.querySelector('.adisp-av-segment')?.selectedOptions[0]?.textContent || '';
+    if (!rateId || !vehicleTypeId) { rateLabel.textContent = ''; return; }
+    try {
+      const accessToken = this.getAccessToken();
+      const response = await fetch(`/api/disposable-prices/price?vehicleTypeId=${vehicleTypeId}&rateId=${rateId}`, {
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        const hourly = (result.data || {}).hourlyPrice || 0;
+        row.dataset.hourlyRate = String(hourly);
+        rateLabel.textContent = `${this.formatCurrency(hourly)}/h`;
+      }
+    } catch (error) {
+      console.error('Error fetching a-disp additional vehicle price:', error);
+    }
+  }
+
+  /** Lee todas las filas de vehículos adicionales de a-disposición. */
+  getADisposicionAdditionalVehicles() {
+    const rows = document.querySelectorAll('#aDisposicionAdditionalVehiclesList .adisp-av-row');
+    const out = [];
+    rows.forEach((row) => {
+      const hourlyRate = parseFloat(row.dataset.hourlyRate || 0) || 0;
+      const vehicleTypeId = row.dataset.vehicleTypeId || '';
+      if (hourlyRate > 0 && vehicleTypeId) {
+        out.push({
+          vehicleTypeId,
+          rateId: row.dataset.rateId || '',
+          hourlyRate,
+          vehicleLabel: row.dataset.vehicleLabel || 'Vehículo adicional',
+          segmentLabel: row.dataset.segmentLabel || '',
+        });
+      }
+    });
+    return out;
+  }
+
+  /** Reconstruye las filas guardadas al editar un servicio. */
+  async restoreADisposicionAdditionalVehicles(savedList) {
+    const list = document.getElementById('aDisposicionAdditionalVehiclesList');
+    if (list) list.innerHTML = '';
+    if (!Array.isArray(savedList)) return;
+    for (const saved of savedList) {
+      // eslint-disable-next-line no-await-in-loop
+      await this.addADisposicionAdditionalVehicleRow(saved);
+    }
+  }
+
+  /** Recalcula a-disposición: precio + dev breakdown + service breakdown (en orden). */
+  recalcADisposicionWithBreakdown() {
+    this.serviceModified = true;
+    this.calculateADisposicionPrice();
+    this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
   }
 
   /**

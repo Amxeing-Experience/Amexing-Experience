@@ -19,7 +19,13 @@ redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el
 - **A-Disposición:** la opción de chofer se renombró a **"Incluir Guía"** (solo etiqueta; el
   id/rate internos siguen igual). Se agregó **"Incluir Greeter"**: mismo cálculo que transporte
   (base + tarifa/h × horas), con recargo, y se suma **después** del descuento por volumen (el
-  greeter no se descuenta). Persiste como `includeGreeter`.
+  greeter no se descuenta). Persiste como `includeGreeter`. Guía y greeter son **mutuamente
+  excluyentes**.
+- **A-Disposición — vehículos adicionales:** se pueden agregar vehículos adicionales de **tipo y
+  segmento distintos** (cada fila: segmento + vehículo, con su **tarifa/hora**). Cada uno =
+  `tarifa/h × horas`, con recargo, y **entra al descuento** por volumen (es tiempo de vehículo).
+  La "Cantidad" sigue siendo solo del vehículo principal. Persiste como
+  `aDisposicionAdditionalVehicles: [{ vehicleTypeId, rateId, hourlyRate, ... }]`.
 
 ## Estado por tipo de servicio
 

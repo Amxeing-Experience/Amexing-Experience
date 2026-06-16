@@ -761,6 +761,18 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Vehículos adicionales (a-disposición; segmento por fila) -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="form-label mb-0"><i class="ti ti-car me-1"></i>Vehículos adicionales</label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="aDisposicionAddVehicleBtn">
+                                        <i class="ti ti-plus me-1"></i>Agregar vehículo
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block mb-2">Cada vehículo adicional usa su tarifa por hora × las horas del servicio.</small>
+                                <div id="aDisposicionAdditionalVehiclesList"></div>
+                            </div>
                         </div>
 
                         <!-- Concepto Fields -->
