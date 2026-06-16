@@ -16648,8 +16648,11 @@ class ItineraryBuilder {
       const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value || 0, 10) || 0;
       const noAlcoholQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0, 10) || 0;
       const adultPrice = parseFloat(document.getElementById('adultPrice')?.value || 0);
-      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0);
-      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0);
+      // Fallback niño/sin-alcohol → adulto (decisión E2), igual que el precio guardado y el
+      // dev breakdown. Antes, sin precio propio, estas líneas se omitían del desglose y solo
+      // aparecía el adulto aunque hubiera niños/sin-alcohol.
+      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0) || adultPrice;
+      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0) || adultPrice;
 
       // Check if prices are overridden
       const isPriceOverride = document.getElementById('experienceOverridePrices')?.checked || false;
