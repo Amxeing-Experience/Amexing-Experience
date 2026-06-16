@@ -15152,13 +15152,11 @@ class ItineraryBuilder {
     console.log('🔥 CRITICAL DEBUG: Calling updateVehicleCapacityNote()');
     this.updateVehicleCapacityNote();
 
-    console.log('🔥 CRITICAL DEBUG: Calling updateServicePriceBreakdown()');
-    this.updateServicePriceBreakdown();
-
-    // CRITICAL FIX: Update dev breakdown when guide checkbox changes
-    console.log('🔥 CRITICAL DEBUG: About to call updateDevPaymentBreakdown()');
+    // Dev breakdown PRIMERO — puebla los campos devBreakdown* que lee
+    // updateServicePriceBreakdown. Si se invierte el orden, el desglose va "una
+    // interacción atrás" (muestra el estado previo de guía/greeter).
     this.updateDevPaymentBreakdown();
-    console.log('🔥 CRITICAL DEBUG: Finished calling updateDevPaymentBreakdown()');
+    this.updateServicePriceBreakdown();
   }
 
   /**
@@ -15175,10 +15173,11 @@ class ItineraryBuilder {
       // Just update the breakdown to show the surcharges
     }
     this.updateVehicleCapacityNote();
-    this.updateServicePriceBreakdown();
 
-    // CRITICAL FIX: Update dev breakdown when greeter checkbox changes
+    // Dev breakdown PRIMERO — puebla los campos devBreakdown* que lee
+    // updateServicePriceBreakdown (evita el desfase de "una interacción atrás").
     this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
   }
 
   updateVehicleCapacityNote() {
