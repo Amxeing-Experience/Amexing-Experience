@@ -1454,25 +1454,37 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-provider-notes-input').value = experiencia.provider_notes || '';
             card.querySelector('.experiencia-team-notes-input').value = experiencia.team_notes || '';
             
-            // Populate photos if they exist
-            const photosContainer = $(card).find('.photos-preview-container');
-            if (experiencia.photos && experiencia.photos.length > 0) {
-                experiencia.photos.forEach((photo, index) => {
-                    // Backend now provides presigned URLs in dataUrl field
-                    const photoUrl = photo.dataUrl || photo.url;
-                    const fileName = photo.fileName || photo.name || 'image';
-                    
-                    if (photoUrl) {
-                        // Pass the entire photo object to preserve all data
-                        addPhotoPreview(photosContainer, { name: fileName }, photoUrl, photo);
-                    }
-                });
+            // Photos and availability rendering must never prevent the card itself
+            // from being shown: a single malformed photo or availability entry used
+            // to throw here and silently drop the whole experiencia (the count said
+            // "1" but nothing rendered). Guard each so the card always appends.
+            try {
+                // Populate photos if they exist
+                const photosContainer = $(card).find('.photos-preview-container');
+                if (experiencia.photos && experiencia.photos.length > 0) {
+                    experiencia.photos.forEach((photo) => {
+                        // Backend now provides presigned URLs in dataUrl field
+                        const photoUrl = photo.dataUrl || photo.url;
+                        const fileName = photo.fileName || photo.name || 'image';
+
+                        if (photoUrl) {
+                            // Pass the entire photo object to preserve all data
+                            addPhotoPreview(photosContainer, { name: fileName }, photoUrl, photo);
+                        }
+                    });
+                }
+            } catch (photoErr) {
+                console.error('Error rendering experiencia photos (card still shown):', photoErr);
             }
-            
-            // Update availability display and populate availability interface
-            updateAvailabilityDisplay($(card), experiencia.availability);
-            populateAvailabilityInterface($(card), experiencia.availability);
-            
+
+            try {
+                // Update availability display and populate availability interface
+                updateAvailabilityDisplay($(card), experiencia.availability);
+                populateAvailabilityInterface($(card), experiencia.availability);
+            } catch (availErr) {
+                console.error('Error rendering experiencia availability (card still shown):', availErr);
+            }
+
             // Add to container
             $('#providerExperienciasList').append(card);
             updateNoExperienciasMessage();
@@ -2093,17 +2105,45 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Clear all existing cards
             $('.experiencia-editable').remove();
             
-            // Render each experiencia as a card
+            // Render each experiencia as a card. Guard per-item so one bad card
+            // cannot abort the loop and hide the remaining experiencias.
             providerExperiencias.forEach((exp, index) => {
-                renderExperienciaCard(exp, index);
+                try {
+                    renderExperienciaCard(exp, index);
+                } catch (cardErr) {
+                    console.error(`Error rendering experiencia card #${index} (${exp?.name || 'sin nombre'}):`, cardErr);
+                }
             });
-            
+
             updateNoExperienciasMessage();
         }
         
+        function showExperienciasLoader() {
+            // Spinner shown inside the modal while experiencias (and their photo
+            // URLs) load, so the modal never looks frozen/broken.
+            $('#noExperienciasMessage').hide();
+            $('.experiencia-editable').remove();
+            if (!$('#experienciasLoader').length) {
+                $('#providerExperienciasList').append(`
+                    <div id="experienciasLoader" class="text-center text-muted py-4">
+                        <div class="spinner-border text-success mb-2" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <p class="mb-0">Cargando experiencias...</p>
+                    </div>
+                `);
+            }
+        }
+
+        function hideExperienciasLoader() {
+            $('#experienciasLoader').remove();
+        }
+
         function loadProviderExperiencias(providerId) {
             if (!providerId) return;
-            
+
+            showExperienciasLoader();
+
             $.ajax({
                 url: `/api/providers/${providerId}/experiencias`,
                 type: 'GET',
@@ -2114,10 +2154,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     if (response.success && response.data) {
                         providerExperiencias = response.data;
                         renderAllExperienciaCards();
+                    } else {
+                        console.error('Provider experiencias response without data:', response);
                     }
                 },
                 error: function(xhr) {
-                    console.error('Error loading provider experiencias:', xhr.responseJSON?.error);
+                    const msg = xhr.responseJSON?.error || `HTTP ${xhr.status}`;
+                    console.error('Error loading provider experiencias:', msg);
+                    if (typeof showErrorAlert === 'function') {
+                        showErrorAlert('No se pudieron cargar las experiencias del proveedor: ' + msg);
+                    }
+                },
+                complete: function() {
+                    // Runs on both success and error: always clear the spinner.
+                    hideExperienciasLoader();
+                    updateNoExperienciasMessage();
                 }
             });
         }
@@ -3189,9 +3240,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             } 
             // Check optimization metadata
             else if (optimizationMetadata && (optimizationMetadata.availableFormats || optimizationMetadata.formats)) {
-                const availableFormats = optimizationMetadata.availableFormats || 
-                                        optimizationMetadata.formats || 
+                const rawFormats = optimizationMetadata.availableFormats ||
+                                        optimizationMetadata.formats ||
                                         [];
+                // `formats` may be an array of names (['avif','webp',...]) OR an
+                // object keyed by format ({ avif: {...}, webp: {...} }). Normalize
+                // to an array of format names so .filter never blows up.
+                const availableFormats = Array.isArray(rawFormats)
+                    ? rawFormats
+                    : Object.keys(rawFormats || {});
                 // Count non-original formats (AVIF, WebP, JPEG)
                 const optimizedFormats = availableFormats.filter(f => f !== 'original');
                 const formatCount = optimizedFormats.length;

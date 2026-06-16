@@ -66,6 +66,12 @@ const { parseContextMiddleware } = require('./infrastructure/parseContext');
 const app = express();
 const PORT = process.env.PORT || 1337;
 
+// Use the 'extended' query parser (qs) so nested bracket params parse correctly.
+// Express 5 defaults to 'simple', which leaves keys like `order[0][column]` flat
+// and breaks DataTables server-side processing (sorting/search). 'extended'
+// restores the Express 4 behavior our controllers were written against.
+app.set('query parser', 'extended');
+
 // Trust proxy for production and staging (behind Nginx)
 if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
   app.set('trust proxy', 1);

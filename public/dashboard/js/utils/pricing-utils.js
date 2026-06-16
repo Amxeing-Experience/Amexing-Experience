@@ -22,6 +22,10 @@ window.PricingUtils = (function () {
    * PricingUtils.applyUSDRoundingRules(23.45); // Returns: 25 (ends in 3, rounds up)
    */
   function applyUSDRoundingRules(usdPrice) {
+    // Fuente de verdad única: delega en el motor isomórfico si está cargado.
+    if (typeof window !== 'undefined' && window.PricingEngine) {
+      return window.PricingEngine.applyUSDRoundingRules(usdPrice);
+    }
     const base = Math.floor(usdPrice / 5) * 5;
     const remainder = usdPrice % 5;
 
@@ -96,6 +100,10 @@ window.PricingUtils = (function () {
    * applyPaymentRate(100, 'transferencia', 3, 5); // Returns: 103
    */
   function applyPaymentRate(price, paymentType, transferRate, agencyRate) {
+    // Fuente de verdad única: delega en el motor isomórfico si está cargado.
+    if (typeof window !== 'undefined' && window.PricingEngine) {
+      return window.PricingEngine.applyPaymentRate(price, paymentType, transferRate, agencyRate);
+    }
     if (paymentType === 'transferencia') {
       return price * (1 + transferRate / 100);
     } if (paymentType === 'tarjeta') {
@@ -119,6 +127,10 @@ window.PricingUtils = (function () {
    * applyCashRounding(22.51); // Returns: 25
    */
   function applyCashRounding(price) {
+    // Fuente de verdad única: delega en el motor isomórfico si está cargado.
+    if (typeof window !== 'undefined' && window.PricingEngine) {
+      return window.PricingEngine.applyCashRounding(price);
+    }
     const integerPart = Math.floor(price);
     const decimalPart = price - integerPart;
 

@@ -82,6 +82,13 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
             </div>
         </div>
 
+        <% if (showClientColumn) { %>
+        <!-- Filtro genérico por Agencia / Cliente (solo admin/superadmin) -->
+        <div class="mb-3">
+            <%- include('../../molecules/filters/client-agency-filter', { idPrefix: 'quotes' }) %>
+        </div>
+        <% } %>
+
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">
@@ -519,7 +526,15 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     if (window.solicitadoFilterActive) {
                         data.statusFilter = 'requested';
                     }
-                    
+
+                    // Filtro genérico por agencia/cliente (molecule client-agency-filter)
+                    const acFilter = window.getClientAgencyFilter
+                        ? window.getClientAgencyFilter('quotes') : null;
+                    if (acFilter && acFilter.type !== 'all') {
+                        data.clientTypeFilter = acFilter.type; // 'agency' | 'client' (filtra por tipo)
+                        if (acFilter.id) data.clientIdFilter = acFilter.id; // y por entidad si hay
+                    }
+
                     return data;
                 },
                 dataSrc: function(json) {
@@ -964,6 +979,13 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     dataTable.ajax.reload();
                 }
             });
+        });
+
+        // Filtro genérico Agencia/Cliente: recarga la tabla cuando cambia la selección.
+        document.addEventListener('clientAgencyFilter:change', function(e) {
+            if (e.detail && e.detail.prefix === 'quotes' && dataTable) {
+                dataTable.ajax.reload();
+            }
         });
 
         // Status filter button handlers (client-side filtering using custom search)

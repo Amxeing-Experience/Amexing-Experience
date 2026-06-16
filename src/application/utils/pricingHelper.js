@@ -43,6 +43,10 @@
 const SettingsService = require('../services/SettingsService');
 const GreeterRate = require('../../domain/models/GreeterRate');
 const logger = require('../../infrastructure/logger');
+// Motor de cálculo puro e isomórfico: única fuente de verdad para el cálculo de
+// cotizaciones (mismas fórmulas en front y back). pricingHelper delega aquí en
+// lugar de duplicar la lógica.
+const pricingEngine = require('../../domain/pricing/pricingEngine');
 
 /**
  * PricingHelper class - Singleton for pricing calculations.
@@ -312,15 +316,8 @@ class PricingHelper {
    * pricingHelper.applyGreeterRounding(1100); // Returns: 1100
    */
   applyGreeterRounding(price) {
-    const integerPart = Math.floor(price);
-    const lastTwoDigits = integerPart % 100;
-
-    if (lastTwoDigits === 0) {
-      return integerPart;
-    } if (lastTwoDigits < 50) {
-      return Math.floor(integerPart / 100) * 100;
-    }
-    return Math.ceil(integerPart / 100) * 100;
+    // Delegado al motor único (misma fórmula).
+    return pricingEngine.applyGreeterRounding(price);
   }
 
   // ============================================================
@@ -343,20 +340,83 @@ class PricingHelper {
    * pricingHelper.applyUSDRoundingRules(27.8);  // Returns: 30 (remainder 2.8 > 2.7)
    */
   applyUSDRoundingRules(usdPrice) {
-    const base = Math.floor(usdPrice / 5) * 5;
-    const remainder = usdPrice % 5;
+    // Delegado al motor único (misma fórmula).
+    return pricingEngine.applyUSDRoundingRules(usdPrice);
+  }
 
-    if (remainder === 0) {
-      const lastDigitBeforeDecimal = Math.floor(usdPrice) % 10;
-      if (lastDigitBeforeDecimal === 3 || lastDigitBeforeDecimal === 8) {
-        return base + 5; // Round up for numbers ending in 3 or 8
-      }
-      return base; // Keep as multiple of 5
-    }
-    if (remainder <= 2.7) {
-      return base; // Round down
-    }
-    return base + 5; // Round up
+  // ============================================================
+  // CÁLCULO CANÓNICO DE COTIZACIONES (delegado al motor puro)
+  // ============================================================
+
+  /**
+   * Precio mostrado para una forma de pago, con el RATE pasado por parámetro
+   * (no hardcodeado). Modelo del builder: efectivo / transferencia (`transferRate`) /
+   * tarjeta (`agencyRate`), con conversión USD opcional. Misma lógica que el front.
+   * @param {number} basePrice - Precio base en MXN.
+   * @param {object} [opts] - { paymentType, currency, transferRate, agencyRate, exchangeRate, cashRoundingEnabled }.
+   * @returns {number} Precio mostrado en la moneda pedida.
+   * @example
+   * pricingHelper.getDisplayPrice(1000, { paymentType: 'transferencia', transferRate: 3 }); // 1030
+   */
+  getDisplayPrice(basePrice, opts = {}) {
+    return pricingEngine.applyDisplayPrice(basePrice, opts);
+  }
+
+  /**
+   * Descuento por volumen de A-Disposición según horas.
+   * @param {number} hours
+   * @returns {number} Porcentaje de descuento.
+   */
+  getADisposicionDiscount(hours) {
+    return pricingEngine.getADisposicionDiscount(hours);
+  }
+
+  /**
+   * Cálculo completo de A-Disposición con los rates por parámetro (no hardcodeados).
+   * @param {object} params - ver pricingEngine.calculateADisposicion.
+   * @returns {object} Desglose completo.
+   */
+  calculateADisposicion(params) {
+    return pricingEngine.calculateADisposicion(params);
+  }
+
+  /**
+   * IVA de un subtotal (tasa configurable, default 16%).
+   * @param {number} subtotal
+   * @param {number} [ivaRate]
+   * @returns {number}
+   */
+  calcIVA(subtotal, ivaRate) {
+    return pricingEngine.calcIVA(subtotal, ivaRate);
+  }
+
+  /**
+   * Subtotal + IVA.
+   * @param {number} subtotal
+   * @param {number} [ivaRate]
+   * @returns {number}
+   */
+  calcTotalWithIVA(subtotal, ivaRate) {
+    return pricingEngine.calcTotalWithIVA(subtotal, ivaRate);
+  }
+
+  /**
+   * Desglose SOLO con precio base (sin recargo). Para listados/PDF SIN forma de pago
+   * elegida: el backend entrega el precio efectivo y el recargo por forma de pago lo
+   * aplica el motor (pricingEngine.applyDisplayPrice) cuando el usuario la elige. Así se
+   * usa una sola fuente y se evita el recargo único (21.09%) que divergía del builder.
+   * Mantiene la misma forma que getPriceBreakdown para no romper a los consumidores.
+   * @param {number} basePrice - Precio base (efectivo) en MXN.
+   * @returns {object} { basePrice, surcharge: 0, totalPrice: basePrice, surchargePercentage: 0 }.
+   */
+  getBasePriceBreakdown(basePrice) {
+    const base = pricingEngine.round2(basePrice);
+    return {
+      basePrice: base,
+      surcharge: 0,
+      totalPrice: base,
+      surchargePercentage: 0,
+    };
   }
 
   // ============================================================

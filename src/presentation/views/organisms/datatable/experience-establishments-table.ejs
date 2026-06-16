@@ -2581,6 +2581,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 return;
             }
             
+            // Show loader inside the modal while experiencias (and their photo
+            // URLs) load, so it never looks frozen/broken.
+            $('#noEstablishmentExperienciasMessage').hide();
+            $('#establishmentExperienciasList .experiencia-editable').remove();
+            if (!$('#establishmentExperienciasLoader').length) {
+                $('#establishmentExperienciasList').append(`
+                    <div id="establishmentExperienciasLoader" class="text-center text-muted py-4">
+                        <div class="spinner-border text-primary mb-2" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <p class="mb-0">Cargando experiencias...</p>
+                    </div>
+                `);
+            }
+
             // Track the experiences request
             pendingEstablishmentRequests.experiences = $.ajax({
                 url: `/api/providers/${establishmentId}/experiencias`,
@@ -2630,6 +2645,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     
                     console.error('❌ Error loading establishment experiences:', { xhr, status, error });
                     // Not critical - establishment can exist without experiences
+                },
+                complete: function() {
+                    // Runs on success, error and abort: always clear the spinner.
+                    $('#establishmentExperienciasLoader').remove();
+                    updateEstablishmentNoExperienciasMessage();
                 }
             });
         }

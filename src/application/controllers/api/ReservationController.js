@@ -142,9 +142,22 @@ class ReservationController {
       const orderColumnIndex = parseInt(req.query.order?.[0]?.column) || 0;
       const orderDir = req.query.order?.[0]?.dir === 'desc' ? 'descending' : 'ascending';
 
-      // Column mapping for sorting
-      const columnMap = ['folio', 'clientPtr', 'eventType', 'startDate', 'numberOfPeople', 'totalAmount', 'status', 'createdAt'];
-      const orderField = columnMap[orderColumnIndex] || 'createdAt';
+      // Column mapping for sorting — index-aligned with the frontend DataTable
+      // columns (bookings.ejs). `null` marks computed/non-sortable columns
+      // (Servicios = assigned/total count, Acciones) which fall back to createdAt.
+      const columnMap = [
+        'folio', // 0 Folio
+        'clientPtr', // 1 Cliente
+        null, // 2 Propietario (computed: quotePtr.owner | createdBy)
+        'eventType', // 3 Motivo de Viaje
+        'startDate', // 4 Fecha Inicio
+        'numberOfPeople', // 5 Personas
+        null, // 6 Servicios (computed)
+        'status', // 7 Estado
+        'updatedAt', // 8 Última Modificación
+        null, // 9 Acciones (orderable: false)
+      ];
+      const orderField = columnMap[orderColumnIndex] || 'startDate';
 
       // Status filter
       const statusFilter = req.query.statusFilter || '';
@@ -157,6 +170,11 @@ class ReservationController {
       const monthFilter = req.query.monthFilter ? parseInt(req.query.monthFilter, 10) : null;
       const dayFilter = req.query.dayFilter ? parseInt(req.query.dayFilter, 10) : null;
 
+      // Agency/Client filter (molecule client-agency-filter). Empty type = no filter;
+      // 'agency'/'client' filter by type (even without a specific entity).
+      const clientTypeFilter = req.query.clientTypeFilter || ''; // '', 'agency', 'client'
+      const clientIdFilter = req.query.clientIdFilter || '';
+
       // Get role-based filter pointers (null = no filter for admins)
       const roleFilterPointers = await ReservationController.getRoleFilterPointers(req);
 
@@ -165,6 +183,9 @@ class ReservationController {
       query.equalTo('active', true);
       query.equalTo('exists', true);
       query.include('quotePtr');
+      query.include('quotePtr.owner'); // propietario (vive en la cotización)
+      query.include('quotePtr.client'); // agencia (AmexingUser)
+      query.include('quotePtr.companyClientPtr'); // cliente directo (Client)
       query.include('clientPtr');
       query.include('createdBy');
       if (roleFilterPointers) {
@@ -250,12 +271,51 @@ class ReservationController {
         if (endLt) q.lessThan('endDate', endLt);
       };
 
+      /**
+       * Constrain a Reservation query by agency/client. No-op when type is empty.
+       * Matches through the quote so it's consistent with the "Cliente" column:
+       * - 'agency': quotePtr.client (AmexingUser). With id → that agency; without
+       * id → any agency-type reservation (quote.client exists).
+       * - 'client': quotePtr.companyClientPtr (Client). With id → that client;
+       * without id → any direct-client reservation (companyClientPtr exists and
+       * client doesn't, to match the display where agency takes priority).
+       * @param {Parse.Query} q - Reservation query to constrain.
+       * @param {string} type - '' | 'agency' | 'client'.
+       * @param {string} id - ObjectId of the agency (AmexingUser) or Client (optional).
+       * @returns {void}
+       * @example
+       */
+      const applyClientFilter = (q, type, id) => {
+        if (type !== 'agency' && type !== 'client') return; // sin filtro
+        const innerQuote = new Parse.Query('Quote');
+        if (type === 'client') {
+          if (id) {
+            const ClientCls = Parse.Object.extend('Client');
+            const clientObj = new ClientCls();
+            clientObj.id = id;
+            innerQuote.equalTo('companyClientPtr', clientObj);
+          } else {
+            innerQuote.exists('companyClientPtr');
+            innerQuote.doesNotExist('client');
+          }
+        } else if (id) {
+          const UserCls = Parse.Object.extend('AmexingUser');
+          const userObj = new UserCls();
+          userObj.id = id;
+          innerQuote.equalTo('client', userObj);
+        } else {
+          innerQuote.exists('client');
+        }
+        q.matchesQuery('quotePtr', innerQuote);
+      };
+
       // Apply date filter based on startDate and endDate
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Start of today
 
       // Apply combined date constraints (upcoming/ongoing/past + year/month/day)
       applyDateConstraints(query, dateFilter, today, yearFilter, monthFilter, dayFilter);
+      applyClientFilter(query, clientTypeFilter, clientIdFilter);
 
       // Total count (without search/status filters, but with role filter)
       const totalQuery = new Parse.Query('Reservation');
@@ -267,6 +327,7 @@ class ReservationController {
 
       // Apply the same combined date constraints to the total count
       applyDateConstraints(totalQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
+      applyClientFilter(totalQuery, clientTypeFilter, clientIdFilter);
 
       const recordsTotal = await totalQuery.count({ useMasterKey: true });
 
@@ -306,8 +367,17 @@ class ReservationController {
         applyDateConstraints(eventQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
         applyDateConstraints(emailQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
 
+        // Apply the same agency/client filter to each search sub-query
+        applyClientFilter(folioQuery, clientTypeFilter, clientIdFilter);
+        applyClientFilter(contactQuery, clientTypeFilter, clientIdFilter);
+        applyClientFilter(eventQuery, clientTypeFilter, clientIdFilter);
+        applyClientFilter(emailQuery, clientTypeFilter, clientIdFilter);
+
         const compoundQuery = Parse.Query.or(folioQuery, contactQuery, eventQuery, emailQuery);
         compoundQuery.include('quotePtr');
+        compoundQuery.include('quotePtr.owner'); // propietario (vive en la cotización)
+        compoundQuery.include('quotePtr.client'); // agencia (AmexingUser)
+        compoundQuery.include('quotePtr.companyClientPtr'); // cliente directo (Client)
         compoundQuery.include('clientPtr');
         compoundQuery.include('createdBy');
 
@@ -357,6 +427,7 @@ class ReservationController {
 
       // Apply the same combined date constraints to the count query
       applyDateConstraints(countQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
+      applyClientFilter(countQuery, clientTypeFilter, clientIdFilter);
 
       const recordsFiltered = await countQuery.count({ useMasterKey: true });
 
@@ -1355,26 +1426,54 @@ class ReservationController {
    * @example
    */
   static formatReservationRow(reservation, serviceCount) {
-    const client = reservation.get('clientPtr');
+    // Cliente mostrado: se resuelve desde la cotización para reflejar el modelo real
+    // (agencia = quotePtr.client / cliente directo = quotePtr.companyClientPtr), con su
+    // tipo. Si la cotización no lo tiene, cae a clientPtr y luego a contactPerson.
+    const quotePtr = reservation.get('quotePtr');
+    const quoteAgency = quotePtr ? quotePtr.get('client') : null; // AmexingUser
+    const quoteDirectClient = quotePtr ? quotePtr.get('companyClientPtr') : null; // Client
 
-    // Try to get company name from contextualData first, then fallback to name fields
     let clientName = 'N/A';
-    if (client) {
-      const contextualData = client.get('contextualData');
-      if (contextualData && contextualData.companyName) {
-        clientName = contextualData.companyName;
-      } else {
-        clientName = client.get('fullName') || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim();
+    let clientType = null; // 'agency' | 'client' | null
+    if (quoteAgency) {
+      const cd = quoteAgency.get('contextualData');
+      clientName = (cd && cd.companyName)
+        || quoteAgency.get('companyName')
+        || `${quoteAgency.get('firstName') || ''} ${quoteAgency.get('lastName') || ''}`.trim()
+        || quoteAgency.get('username') || 'N/A';
+      clientType = 'agency';
+    } else if (quoteDirectClient) {
+      clientName = quoteDirectClient.get('name') || 'N/A';
+      clientType = 'client';
+    } else {
+      // Fallback: clientPtr (AmexingUser) y luego contactPerson.
+      const client = reservation.get('clientPtr');
+      if (client) {
+        const contextualData = client.get('contextualData');
+        clientName = (contextualData && contextualData.companyName)
+          || client.get('fullName')
+          || `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim()
+          || 'N/A';
       }
-    }
-
-    // Final fallback to contactPerson if no client data
-    if (clientName === 'N/A' || !clientName) {
-      clientName = reservation.get('contactPerson') || 'N/A';
+      if (clientName === 'N/A' || !clientName) {
+        clientName = reservation.get('contactPerson') || 'N/A';
+      }
     }
 
     const status = reservation.get('status');
     const quoteStatus = reservation.get('quotePtr')?.get('status') || '';
+
+    // Propietario: la Reservation no lo tiene; vive en la cotización (quotePtr.owner).
+    // Si la cotización no tiene un owner con nombre usable, caemos al creador (createdBy).
+    const createdBy = reservation.get('createdBy');
+    const quoteOwner = reservation.get('quotePtr')?.get('owner');
+    const hasUsableOwner = quoteOwner
+      && (quoteOwner.get('firstName') || quoteOwner.get('lastName') || quoteOwner.get('email'));
+    const ownerSource = hasUsableOwner ? quoteOwner : createdBy;
+    const ownerName = ownerSource
+      ? (`${ownerSource.get('firstName') || ''} ${ownerSource.get('lastName') || ''}`.trim()
+        || ownerSource.get('email') || ownerSource.get('username') || 'N/A')
+      : 'N/A';
     console.log(`🔍 [API] Reservation ${reservation.get('folio')} - Quote status: ${quoteStatus}, Reservation status: ${status}`);
 
     return {
@@ -1384,6 +1483,7 @@ class ReservationController {
       quoteFolio: reservation.get('quotePtr')?.get('folio') || '',
       quoteStatus,
       clientName,
+      clientType, // 'agency' | 'client' | null — para la etiqueta de tipo en la tabla
       eventType: reservation.get('eventType') || '',
       startDate: reservation.get('startDate'),
       // endDate is exposed so the UI can explain (in local/dev) why a reservation
@@ -1396,7 +1496,10 @@ class ReservationController {
       totalServices: serviceCount.totalCount,
       assignedServices: serviceCount.assignedCount,
       status,
+      owner: ownerName,
+      ownerIsCreator: !hasUsableOwner, // true cuando se usó el creador como fallback
       createdAt: reservation.createdAt,
+      updatedAt: reservation.updatedAt,
     };
   }
 
