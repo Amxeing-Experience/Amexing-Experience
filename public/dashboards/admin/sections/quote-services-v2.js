@@ -18777,7 +18777,9 @@ class ItineraryBuilder {
         await this.refreshADisposicionRowRate(row, saved.rateId, saved.vehicleTypeId, rateLabel);
       }
     }
-    this.serviceModified = true;
+    // Solo marca modificado cuando lo agrega el usuario; en restauración (saved) no, para no
+    // ensuciar el estado ni romper la lógica de "usar precios guardados".
+    if (!saved) this.serviceModified = true;
   }
 
   /** Carga los vehículos de un segmento en el select de una fila. */
@@ -18851,11 +18853,15 @@ class ItineraryBuilder {
   async restoreADisposicionAdditionalVehicles(savedList) {
     const list = document.getElementById('aDisposicionAdditionalVehiclesList');
     if (list) list.innerHTML = '';
-    if (!Array.isArray(savedList)) return;
+    if (!Array.isArray(savedList) || savedList.length === 0) return;
     for (const saved of savedList) {
       // eslint-disable-next-line no-await-in-loop
       await this.addADisposicionAdditionalVehicleRow(saved);
     }
+    // Las filas se reconstruyen async (fetch de vehículos + tarifas). Recién ahora que están
+    // listas recalculamos, para que el desglose incluya los vehículos adicionales restaurados
+    // (antes el recálculo corría antes de que terminaran los fetch y salían sin ellos).
+    await this.calculateADisposicionPrice();
   }
 
   /** Recalcula a-disposición: precio + dev breakdown + service breakdown (en orden). */
