@@ -16968,6 +16968,22 @@ class ItineraryBuilder {
     const surchargedBaseTotal = baseTotalNeedingSurcharge; // No getDisplayPrice to avoid cash rounding
     totalMXN = alreadySurchargedTotal + surchargedBaseTotal;
 
+    // Usa el Total AUTORITATIVO del dev breakdown (base × recargo, redondeado una sola vez) en
+    // lugar de la suma de los renglones ya redondeados. Evita descuadres de 1 centavo y empata
+    // con lo que se guarda/cobra (pricesByType). Para transporte/a-disp coincide con la suma de
+    // renglones; en experiencia/concepto/walking corrige el redondeo por renglón.
+    const activePaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    let devTotalField = document.getElementById('devBreakdownEfectivo');
+    if (activePaymentType === 'transferencia') {
+      devTotalField = document.getElementById('devBreakdownTransferencia') || devTotalField;
+    } else if (activePaymentType === 'tarjeta') {
+      devTotalField = document.getElementById('devBreakdownTarjeta') || devTotalField;
+    }
+    const devAuthoritativeTotal = this.extractTotalFromBreakdown(devTotalField?.value || '');
+    if (devAuthoritativeTotal > 0) {
+      totalMXN = devAuthoritativeTotal;
+    }
+
     qsDevLog('📊 SERVICE BREAKDOWN - Final total calculation:', {
       baseTotalNeedingSurcharge,
       surchargedBaseTotal,
