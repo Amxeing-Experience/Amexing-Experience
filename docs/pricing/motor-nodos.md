@@ -113,11 +113,18 @@ tipos espejean el dev breakdown** con un solo helper `collectServiceBreakdownIte
   **sin** línea de "Recargo" aparte. Se unificó en los dev breakdowns de transporte, experiencia
   y concepto (a-disposición y walking ya cumplían).
 - Experiencia y concepto pasan a espejar (antes recalculaban). Transporte y a-disposición ya
-  espejeaban. Se refresca el dev breakdown **antes** de espejarlo para no ir "una interacción atrás".
-- Bug reportado resuelto: en experiencia con 1 adulto + 1 niño + 1 sin-alcohol **sin** precio de
-  niño, ahora salen las 3 líneas (niño/sin-alcohol al precio de adulto) en vez de solo el adulto.
+  espejeaban; walking y vehicle tour espejean por sus propias funciones.
+- **Garantía global contra el "una interacción atrás":** `updateServicePriceBreakdown` refresca el
+  dev breakdown **al inicio, para TODOS los tipos** (antes de los early-returns de tour). Así el
+  desglose siempre espeja datos frescos **sin depender del orden** en que cada uno de los ~57
+  listeners llame. (Verificado sin recursión: ni `updateDevPaymentBreakdown` ni las funciones de
+  tour llaman de vuelta a `updateServicePriceBreakdown`.) Aun así, los handlers clave también se
+  ordenaron dev→service (guía/greeter, vehículo adicional).
+- Bugs reportados resueltos: experiencia con niño/sin-alcohol sin precio (salen las 3 líneas al
+  precio de adulto); vehículo adicional de transporte aparece en el desglose al seleccionarlo.
 
-Resultado: desglose mostrado == dev breakdown == precio guardado, para todos los tipos.
+Resultado: desglose mostrado == dev breakdown == precio guardado, para todos los tipos, siempre
+calculado por el motor único.
 
 ## Pendientes diferidos
 

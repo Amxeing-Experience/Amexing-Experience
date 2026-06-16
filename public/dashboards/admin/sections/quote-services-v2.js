@@ -15980,6 +15980,12 @@ class ItineraryBuilder {
       return;
     }
 
+    // Refresca el dev breakdown (fuente de verdad vía el motor) ANTES de cualquier desglose
+    // —tours incluidos— para que el service breakdown SIEMPRE espeje datos frescos y nunca
+    // vaya "una interacción atrás", sin depender del orden en que cada listener llame. Es la
+    // garantía global contra la queja del cliente (dev primero, luego service).
+    this.updateDevPaymentBreakdown();
+
     // CHECK IF IT'S A WALKING TOUR FIRST
     let isWalkingTour = false;
     if (serviceType === 'tour') {
@@ -16043,10 +16049,6 @@ class ItineraryBuilder {
 
     // Get payment type for the original logic
     const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-
-    // Refresca el dev breakdown (fuente de verdad vía el motor) ANTES de espejarlo, para
-    // que el desglose mostrado coincida con el cálculo actual y no vaya "una interacción atrás".
-    this.updateDevPaymentBreakdown();
 
     // RESTORED: Original calculation logic for non-walking tour services
     if (serviceType === 'transport') {
