@@ -15979,6 +15979,19 @@ class ItineraryBuilder {
       }
     }
 
+    // Total AUTORITATIVO del dev breakdown (redondeado una sola vez), no la suma de renglones
+    // ya redondeados — evita descuadres de 1 centavo y empata con lo guardado/cobrado.
+    let vtDevField = document.getElementById('devBreakdownEfectivo');
+    if (paymentType === 'transferencia') {
+      vtDevField = document.getElementById('devBreakdownTransferencia') || vtDevField;
+    } else if (paymentType === 'tarjeta') {
+      vtDevField = document.getElementById('devBreakdownTarjeta') || vtDevField;
+    }
+    const vtAuthoritativeTotal = this.extractTotalFromBreakdown(vtDevField?.value || '');
+    if (vtAuthoritativeTotal > 0) {
+      totalMXN = vtAuthoritativeTotal;
+    }
+
     // Hide if no items or total is 0
     if (items.length === 0 || totalMXN <= 0) {
       container.classList.add('d-none');
