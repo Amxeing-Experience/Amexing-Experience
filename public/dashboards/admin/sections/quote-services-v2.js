@@ -3537,10 +3537,23 @@ class ItineraryBuilder {
           const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
           const baseTotal = this.getWalkingTourPrice(selectedTourData, peopleCount, duration);
 
+          // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
+          const walkingPricing = window.PricingEngine
+            ? window.PricingEngine.composeServiceNodes({
+              transferRate: this.transferRate,
+              agencyRate: this.agencyRate,
+              nodes: [{ key: 'base', efectivo: baseTotal, surcharge: true }],
+            })
+            : {
+              efectivo: baseTotal,
+              transferencia: baseTotal * (1 + (this.transferRate / 100)),
+              tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+            };
+
           pricesByType = {
-            efectivo: baseTotal,
-            transferencia: baseTotal * (1 + (this.transferRate / 100)),
-            tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+            efectivo: walkingPricing.efectivo,
+            transferencia: walkingPricing.transferencia,
+            tarjeta: walkingPricing.tarjeta,
           };
           basePriceEfectivo = baseTotal;
 
@@ -9759,10 +9772,23 @@ class ItineraryBuilder {
           ? (parseFloat(document.getElementById('walkingTourManualPrice')?.value || 0))
           : groups.reduce((sum, g) => sum + resolveTierPrice(g.tier) * duration, 0);
 
-        // Calculate totals with surcharges (el manual cuenta como efectivo base)
-        const efectivoTotal = baseTotal;
-        const transferenciaTotal = baseTotal * (1 + (this.transferRate / 100));
-        const tarjetaTotal = baseTotal * (1 + (this.agencyRate / 100));
+        // Recargo por forma de pago vía el motor único (un solo nodo: el total base; el
+        // manual cuenta como efectivo base). La complejidad de tiers/grupos/override queda
+        // en baseTotal; la regla de recargo vive en un solo lugar.
+        const walkingPricing = window.PricingEngine
+          ? window.PricingEngine.composeServiceNodes({
+            transferRate: this.transferRate,
+            agencyRate: this.agencyRate,
+            nodes: [{ key: 'base', efectivo: baseTotal, surcharge: true }],
+          })
+          : {
+            efectivo: baseTotal,
+            transferencia: baseTotal * (1 + (this.transferRate / 100)),
+            tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+          };
+        const efectivoTotal = walkingPricing.efectivo;
+        const transferenciaTotal = walkingPricing.transferencia;
+        const tarjetaTotal = walkingPricing.tarjeta;
 
         // Get dev payment fields
         const devPriceEfectivoField = document.getElementById('devPriceEfectivo');

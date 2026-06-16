@@ -15,7 +15,7 @@ redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el
 | **Tours (con vehículos)** | ✅ vehículo · guía · vehículo adicional · extras (reusa `composeServiceNodes`) | ✅ `calculateVehicleTourDevBreakdown` usa el motor | **HECHO** |
 | **A-Disposición** | ✅ vehículo × horas × cantidad · guía · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
 | **Experiencias** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ guardado + desglose | **HECHO** (sin duración; ver abajo) |
-| Walking tours | ⚪ pendiente | inline | tiers / varios grupos |
+| **Walking tours** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ desglose + fallback | **HECHO** (tiers/override en baseTotal) |
 | Concepto | ⚪ pendiente | inline | precio cliente + por persona |
 | Backend (validar al guardar) | ❌ | — | hoy es passthrough; debe re-correr el motor |
 
@@ -82,6 +82,14 @@ cobraba $0 por niño/sin-alcohol cuando faltaba ese precio (divergía del previe
 **Duración:** se decidió dejar experiencias **plano** (por persona, sin duración). Hoy no hay
 campo de duración para experiencias y el `× duration` de `calculateServicePrice` es no-op
 (`service.duration` nunca se setea → `|| 1`). Sin cambio.
+
+## Walking tours — qué se hizo (5º nodo conectado)
+
+En la capa de recargo, walking es como experiencias: `baseTotal × recargo`. Toda la complejidad
+(tiers, varios grupos, override por-grupo, override de total manual, USD→MXN) queda en calcular
+`baseTotal`; el recargo por forma de pago ahora pasa por `PricingEngine.composeServiceNodes`
+(un nodo `base`) en el desglose y en el fallback de `collectServiceData`. El texto del desglose
+(por grupo o manual) queda igual. Sin cambio de valores.
 
 ## Pendientes diferidos (bugs de desglose / display, NO de cálculo)
 
