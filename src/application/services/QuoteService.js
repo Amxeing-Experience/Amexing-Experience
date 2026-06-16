@@ -2414,15 +2414,16 @@ class QuoteService {
         });
       }
 
-      const creationDate = new Date();
       const serviceYear = earliestServiceDate.getFullYear();
       const serviceYear2Digits = String(serviceYear).slice(-2); // Get last 2 digits of year
       const serviceMonthPrefix = this.getEnglishMonthPrefix(earliestServiceDate); // Use English month
-      const creationMonth = String(creationDate.getMonth() + 1).padStart(2, '0');
+      // Use the SERVICE (travel) month, not the creation month, so the folio's
+      // numeric block reflects when the trip happens (e.g. August trip → 2608).
+      const serviceMonth = String(earliestServiceDate.getMonth() + 1).padStart(2, '0');
 
       // Get consecutive number for this service month/year combination
-      // New format uses hyphens: MAY-2605-XXX
-      const prefix = `${serviceMonthPrefix}-${serviceYear2Digits}${creationMonth}`;
+      // New format uses hyphens: AUG-2608-XXX
+      const prefix = `${serviceMonthPrefix}-${serviceYear2Digits}${serviceMonth}`;
       const countQuery = new Parse.Query('Reservation');
       countQuery.startsWith('folio', prefix);
       countQuery.equalTo('exists', true);
@@ -2455,7 +2456,7 @@ class QuoteService {
         serviceMonthPrefix,
         serviceYear,
         serviceYear2Digits,
-        creationMonth,
+        serviceMonth,
         consecutiveNumber: nextNumber,
         folio,
       });

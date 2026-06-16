@@ -522,6 +522,34 @@ class QuoteController {
       const dateFilter = req.query.dateFilter || 'future';
       const statusFilter = req.query.statusFilter || null;
 
+      // Agency/Client filter (molecule client-agency-filter). On quotes the link is
+      // direct: 'agency' → quote.client (AmexingUser); 'client' → quote.companyClientPtr (Client).
+      // Empty type = no filter; with type but no id, filter by type. With id, by entity.
+      const clientTypeFilter = req.query.clientTypeFilter || ''; // '', 'agency', 'client'
+      const clientIdFilter = req.query.clientIdFilter || '';
+      const applyQuoteClientFilter = (q) => {
+        if (clientTypeFilter !== 'agency' && clientTypeFilter !== 'client') return;
+        if (clientTypeFilter === 'client') {
+          if (clientIdFilter) {
+            const ClientCls = Parse.Object.extend('Client');
+            const c = new ClientCls();
+            c.id = clientIdFilter;
+            q.equalTo('companyClientPtr', c);
+          } else {
+            // Cliente directo: companyClientPtr existe y client no (la agencia tiene prioridad)
+            q.exists('companyClientPtr');
+            q.doesNotExist('client');
+          }
+        } else if (clientIdFilter) {
+          const UserCls = Parse.Object.extend('AmexingUser');
+          const u = new UserCls();
+          u.id = clientIdFilter;
+          q.equalTo('client', u);
+        } else {
+          q.exists('client');
+        }
+      };
+
       // Column mapping for sorting (must match frontend columns exactly)
       // Frontend columns depend on user role (admin/superadmin show client column)
       const isAdminRole = ['admin', 'superadmin'].includes(req.userRole);
@@ -540,6 +568,7 @@ class QuoteController {
 
       // Use the same base query logic as the counter for perfect consistency
       const baseQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
+      applyQuoteClientFilter(baseQuery);
 
       // Get total records count using same base query logic
       const totalRecordsQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
@@ -553,9 +582,11 @@ class QuoteController {
         // Search in folio, client name, or contact person using same base query logic
         const folioQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
         folioQuery.matches('folio', searchValue, 'i');
+        applyQuoteClientFilter(folioQuery);
 
         const contactQuery = await this.buildBaseQuoteQuery(currentUser, req.userRole, statusFilter);
         contactQuery.matches('contactPerson', searchValue, 'i');
+        applyQuoteClientFilter(contactQuery);
 
         filteredQuery = Parse.Query.or(folioQuery, contactQuery);
         filteredQuery.include('client');

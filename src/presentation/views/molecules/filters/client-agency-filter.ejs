@@ -1,0 +1,218 @@
+<%
+/**
+ * Generic Agency/Client filter (molecule)
+ * Reusable across tables (reservations, quotes, ...). A 3-state type toggle
+ * (Todos / Agencia / Cliente) + a searchable select populated from
+ * GET /api/clients/mixed.
+ *
+ *   - "Todos"   → no filter (default). The picker is hidden.
+ *   - "Agencia" / "Cliente" → reveals the searchable picker; the table is only
+ *     filtered once a specific entity is chosen ("Todas/Todos" = no filter).
+ *
+ * Uses Choices.js (loaded globally in the dashboard layout) for the searchable
+ * dropdown, with a graceful fallback to a plain <select> if Choices is absent.
+ *
+ * Params (locals):
+ *   - idPrefix {string} REQUIRED. Namespaces element IDs and state so multiple
+ *     instances never collide (e.g. 'reservations', 'quotes').
+ *
+ * Integration (host page):
+ *   - Read the current selection in your DataTable ajax `data` function:
+ *       const f = window.getClientAgencyFilter('<idPrefix>');
+ *       if (f.id) { d.clientTypeFilter = f.type; d.clientIdFilter = f.id; }
+ *   - Reload the table when the filter changes:
+ *       document.addEventListener('clientAgencyFilter:change', (e) => {
+ *         if (e.detail.prefix === '<idPrefix>') table.ajax.reload(null, false);
+ *       });
+ *
+ * @author Denisse Maldonado
+ * @version 3.0.0
+ */
+const idPrefix = (locals && locals.idPrefix) ? locals.idPrefix : 'default';
+%>
+
+<div class="d-flex align-items-center gap-2 flex-wrap" id="<%= idPrefix %>-client-agency-filter">
+    <label class="form-label mb-0 me-1 text-muted">Filtrar por:</label>
+
+    <div class="btn-group btn-group-sm" role="group" aria-label="Tipo de cliente">
+        <input type="radio" class="btn-check" name="<%= idPrefix %>-acType" id="<%= idPrefix %>-acType-all" value="all" checked>
+        <label class="btn btn-outline-primary" for="<%= idPrefix %>-acType-all"><i class="ti ti-list me-1"></i>Todos</label>
+
+        <input type="radio" class="btn-check" name="<%= idPrefix %>-acType" id="<%= idPrefix %>-acType-agency" value="agency">
+        <label class="btn btn-outline-primary" for="<%= idPrefix %>-acType-agency"><i class="ti ti-building me-1"></i>Agencia</label>
+
+        <input type="radio" class="btn-check" name="<%= idPrefix %>-acType" id="<%= idPrefix %>-acType-client" value="client">
+        <label class="btn btn-outline-primary" for="<%= idPrefix %>-acType-client"><i class="ti ti-user me-1"></i>Cliente</label>
+    </div>
+
+    <!-- Ancho acotado; oculto por defecto (estado "Todos" = sin filtro) -->
+    <div style="width: 300px; display: none;" id="<%= idPrefix %>-acSelectWrap">
+        <select class="form-select form-select-sm" id="<%= idPrefix %>-acSelect" aria-label="Agencia o cliente">
+            <option value="">Todas las agencias</option>
+        </select>
+    </div>
+
+    <button type="button" class="btn btn-sm btn-link text-muted p-0 ms-1" id="<%= idPrefix %>-acClear" style="display:none;">
+        <i class="ti ti-x"></i> Limpiar
+    </button>
+</div>
+
+<script>
+(function() {
+    var PREFIX = '<%= idPrefix %>';
+    var container = document.getElementById(PREFIX + '-client-agency-filter');
+    if (!container) return;
+
+    var select = document.getElementById(PREFIX + '-acSelect');
+    var selectWrap = document.getElementById(PREFIX + '-acSelectWrap');
+    var clearBtn = document.getElementById(PREFIX + '-acClear');
+    var typeRadios = container.querySelectorAll('input[name="' + PREFIX + '-acType"]');
+
+    var useChoices = (typeof window.Choices !== 'undefined');
+    var choices = null;
+
+    // Estado por instancia, legible por la página anfitriona. type: all|agency|client.
+    window.clientAgencyFilters = window.clientAgencyFilters || {};
+    var state = window.clientAgencyFilters[PREFIX] = { type: 'all', id: '' };
+
+    // Getter público para que el ajax.data del DataTable lea la selección actual.
+    window.getClientAgencyFilter = window.getClientAgencyFilter || function(prefix) {
+        return (window.clientAgencyFilters && window.clientAgencyFilters[prefix]) || { type: 'all', id: '' };
+    };
+
+    function token() {
+        return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+    }
+
+    function allLabel() {
+        return state.type === 'client' ? 'Todos los clientes' : 'Todas las agencias';
+    }
+
+    // Clave efectiva del filtro para la tabla. "Todos" => sin filtro ('none').
+    // Agencia/Cliente filtran por TIPO aunque no se elija una entidad ('...:ALL');
+    // elegir una entidad acota más ('...:<id>'). Se usa para deduplicar recargas.
+    function effectiveKey() {
+        if (state.type === 'all') return 'none';
+        return state.type + ':' + (state.id || 'ALL');
+    }
+    var lastKey = 'none';
+
+    // Notifica a la anfitriona solo si el filtro efectivo realmente cambió.
+    function dispatchChange() {
+        var k = effectiveKey();
+        if (k === lastKey) return;
+        lastKey = k;
+        document.dispatchEvent(new CustomEvent('clientAgencyFilter:change', {
+            detail: { prefix: PREFIX, type: state.type, id: state.id }
+        }));
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, function(c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function syncClearBtn() {
+        clearBtn.style.display = state.id ? '' : 'none';
+    }
+
+    function showPicker(show) {
+        selectWrap.style.display = show ? '' : 'none';
+    }
+
+    // Inicialización perezosa de Choices: al mostrarse el picker (evita medir el
+    // ancho con el contenedor oculto).
+    function ensureChoices() {
+        if (!useChoices || choices) return;
+        choices = new window.Choices(select, {
+            searchEnabled: true,
+            searchPlaceholderValue: 'Buscar...',
+            itemSelectText: '',
+            shouldSort: false,
+            allowHTML: false,
+            noResultsText: 'Sin resultados',
+            noChoicesText: 'Sin opciones',
+        });
+    }
+
+    function setOptions(users) {
+        var arr = [{ value: '', label: allLabel() }];
+        (users || []).forEach(function(u) {
+            var name = (u.name || '').toString().trim() || 'Sin nombre';
+            arr.push({ value: String(u.id), label: name });
+        });
+        if (useChoices && choices) {
+            choices.setChoices(arr, 'value', 'label', true);
+            choices.setChoiceByValue(state.id || '');
+            choices.enable();
+        } else {
+            var html = '';
+            arr.forEach(function(o) {
+                html += '<option value="' + escapeHtml(o.value) + '">' + escapeHtml(o.label) + '</option>';
+            });
+            select.innerHTML = html;
+            select.disabled = false;
+            select.value = state.id || '';
+        }
+        syncClearBtn();
+    }
+
+    function setLoading() {
+        if (useChoices && choices) {
+            choices.setChoices([{ value: '', label: 'Cargando...' }], 'value', 'label', true);
+            choices.disable();
+        } else {
+            select.disabled = true;
+            select.innerHTML = '<option value="">Cargando...</option>';
+        }
+    }
+
+    function load() {
+        ensureChoices();
+        setLoading();
+        var apiType = state.type === 'client' ? 'clients' : 'agencies';
+        fetch('/api/clients/mixed?type=' + apiType + '&limit=1000', {
+            headers: { 'Authorization': 'Bearer ' + token() }
+        })
+            .then(function(r) { return r.json(); })
+            .then(function(json) {
+                setOptions((json && json.data && json.data.users) || []);
+            })
+            .catch(function() { setOptions([]); });
+    }
+
+    typeRadios.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            if (!this.checked) return;
+            state.type = this.value;
+            state.id = '';
+            syncClearBtn();
+            if (state.type === 'all') {
+                showPicker(false);
+            } else {
+                showPicker(true);
+                load();
+            }
+            dispatchChange(); // deduplicado: solo recarga si antes había un filtro
+        });
+    });
+
+    // Choices reemite 'change' en el <select> subyacente al elegir una opción.
+    select.addEventListener('change', function() {
+        state.id = (useChoices && choices) ? (choices.getValue(true) || '') : (this.value || '');
+        syncClearBtn();
+        dispatchChange();
+    });
+
+    clearBtn.addEventListener('click', function() {
+        if (!state.id) return;
+        state.id = '';
+        if (useChoices && choices) { choices.setChoiceByValue(''); } else { select.value = ''; }
+        syncClearBtn();
+        dispatchChange();
+    });
+
+    // Estado inicial: "Todos" → sin filtro, picker oculto, sin fetch.
+})();
+</script>

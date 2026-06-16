@@ -941,6 +941,71 @@ class OwnedClientsController {
   }
 
   /**
+   * PATCH /api/owned-clients/:id/toggle-status - Activate/deactivate an owned client.
+   * Only the owner or admins can change the status.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * PATCH /api/owned-clients/abc123/toggle-status
+   * Body: { active: false }
+   */
+  async toggleOwnedClientStatus(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      const { id } = req.params;
+      const { active } = req.body;
+
+      if (typeof active !== 'boolean') {
+        return this.sendError(res, 'Active status must be a boolean', 400);
+      }
+
+      const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
+
+      // Get the client
+      const query = this.createClientQuery();
+      const client = await query.get(id, { useMasterKey: true });
+
+      if (!client) {
+        return this.sendError(res, 'Client not found', 404);
+      }
+
+      // Check ownership
+      const ownedBy = client.get('ownedBy');
+      const isOwner = ownedBy && ownedBy.id === currentUser.id;
+      const isAdmin = ['admin', 'superadmin'].includes(userRole);
+
+      if (!isOwner && !isAdmin) {
+        return this.sendError(res, 'Access denied', 403);
+      }
+
+      // Update status
+      client.set('active', active);
+      client.set('modifiedBy', currentUser);
+      await client.save(null, { useMasterKey: true });
+
+      logger.info('Owned client status toggled', {
+        clientId: client.id,
+        active,
+        modifiedBy: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        message: `Client ${active ? 'activated' : 'deactivated'} successfully`,
+        data: { id: client.id, active },
+      });
+    } catch (error) {
+      logger.error('Error toggling owned client status:', error);
+      return this.sendError(res, 'Failed to change client status', 500);
+    }
+  }
+
+  /**
    * Build hierarchical query based on user role and clientId relationships.
    * @param {object} currentUser - Current user object.
    * @param {string} userRole - Current user role.

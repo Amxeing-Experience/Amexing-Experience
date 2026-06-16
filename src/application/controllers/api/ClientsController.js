@@ -533,10 +533,14 @@ class ClientsController {
       const skip = (page - 1) * limit;
       const type = req.query.type || 'all'; // all, agencies, clients
       const search = req.query.search?.trim() || '';
+      // Admin views can opt in to see inactive clients too (mirrors tours/experiences).
+      // Defaults to false so existing consumers keep getting active-only results.
+      const includeInactive = req.query.includeInactive === 'true';
 
       logger.info('getMixedClients called with filters', {
         type,
         search,
+        includeInactive,
         page,
         limit,
         userId: currentUser.id,
@@ -556,6 +560,8 @@ class ClientsController {
           limit: 1000,
           targetRole: 'department_manager',
           search,
+          // Only active agencies unless the caller opts in to inactive ones.
+          filters: includeInactive ? {} : { active: true },
         };
 
         const agencyCountResult = await this.userService.getUsers(currentUser, agencyOptions);
@@ -568,8 +574,11 @@ class ClientsController {
 
         const clientCountQuery = new Parse.Query(Client);
         clientCountQuery.equalTo('clientBelongsTo', 'amexing');
-        clientCountQuery.equalTo('active', true);
         clientCountQuery.equalTo('exists', true);
+        // Only active clients unless the caller opts in to inactive ones.
+        if (!includeInactive) {
+          clientCountQuery.equalTo('active', true);
+        }
 
         if (search) {
           clientCountQuery.matches('name', search, 'i');
@@ -593,6 +602,8 @@ class ClientsController {
             limit: totalAgenciesCount, // Get all agencies for now
             targetRole: 'department_manager',
             search,
+            // Only active agencies unless the caller opts in to inactive ones.
+            filters: includeInactive ? {} : { active: true },
           };
 
           const agencyResult = await this.userService.getUsers(currentUser, agencyOptions);
@@ -623,8 +634,11 @@ class ClientsController {
 
           const clientQuery = new Parse.Query(Client);
           clientQuery.equalTo('clientBelongsTo', 'amexing');
-          clientQuery.equalTo('active', true);
           clientQuery.equalTo('exists', true);
+          // Only active clients unless the caller opts in to inactive ones.
+          if (!includeInactive) {
+            clientQuery.equalTo('active', true);
+          }
 
           if (search) {
             clientQuery.matches('name', search, 'i');

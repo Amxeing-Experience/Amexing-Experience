@@ -119,6 +119,15 @@ router.delete('/:id', writeOperationsLimiter, async (req, res) => {
 });
 
 /**
+ * PATCH /api/owned-clients/:id/toggle-status - Activate/deactivate an owned client.
+ * Only the owner or admins can change the status.
+ * Body: { active: boolean }.
+ */
+router.patch('/:id/toggle-status', writeOperationsLimiter, async (req, res) => {
+  await ownedClientsController.toggleOwnedClientStatus(req, res);
+});
+
+/**
  * Error handling middleware for this router.
  * @param {Error} error - Error object.
  * @param {object} req - Express request object.

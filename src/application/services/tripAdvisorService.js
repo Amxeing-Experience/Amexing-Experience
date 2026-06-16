@@ -8,7 +8,26 @@
 const axios = require('axios');
 const logger = require('../../infrastructure/logger');
 
+/**
+ * Service responsible for retrieving, formatting and caching
+ * TripAdvisor reviews.
+ *
+ * Features:
+ * - TripAdvisor API integration
+ * - In-memory caching
+ * - Fallback reviews
+ * - Review normalization
+ * - Service categorization.
+ * @class
+ */
 class TripAdvisorService {
+  /**
+   * Creates a new TripAdvisorService instance.
+   *
+   * Initializes API configuration, cache settings and fallback reviews
+   * used when the TripAdvisor API is unavailable.
+   * @example
+   */
   constructor() {
     this.apiKey = process.env.TRIPADVISOR_API_KEY || '4FABE856A3C849588F6A0B5827BFA5E2';
     this.locationId = process.env.TRIPADVISOR_LOCATION_ID || '19425238';
@@ -203,10 +222,13 @@ class TripAdvisorService {
   }
 
   /**
-   * Format time ago from date.
-   * @param dateStr
-   * @param language
+   * Converts a publication date into a human-readable relative time string.
+   * @param {string|Date} dateStr - Date to be formatted.
+   * @param {string} [language] - Output language ('es' or 'en').
+   * @returns {string} Relative time string.
    * @example
+   * formatTimeAgo('2025-01-01T00:00:00Z', 'es');
+   * // Hace 2 meses
    */
   formatTimeAgo(dateStr, language = 'es') {
     const date = new Date(dateStr);
@@ -237,9 +259,10 @@ class TripAdvisorService {
   }
 
   /**
-   * Format TripAdvisor review to match our testimonial structure.
-   * @param review
-   * @param language
+   * Transforms a TripAdvisor review into the application's testimonial format.
+   * @param {object} review - Raw TripAdvisor review.
+   * @param {string} [language] - Output language.
+   * @returns {object} Formatted review object.
    * @example
    */
   formatReview(review, language = 'es') {
@@ -268,9 +291,10 @@ class TripAdvisorService {
   }
 
   /**
-   * Detect service type from review text.
-   * @param text
-   * @param language
+   * Detects the service category based on keywords found in the review text.
+   * @param {string} text - Review content.
+   * @param {string} [language] - Language used for category labels.
+   * @returns {string} Detected service category.
    * @example
    */
   detectServiceType(text, language = 'es') {
@@ -305,8 +329,10 @@ class TripAdvisorService {
   }
 
   /**
-   * Fetch reviews from TripAdvisor API.
-   * @param language
+   * Retrieves reviews from the TripAdvisor Content API.
+   * @async
+   * @param {string} [language] - Requested language.
+   * @returns {Promise<Array<object> | null>} Formatted reviews or null when the request fails.
    * @example
    */
   async fetchFromAPI(language = 'es') {
@@ -343,9 +369,17 @@ class TripAdvisorService {
   }
 
   /**
-   * Get reviews with caching.
-   * @param language
-   * @param forceRefresh
+   * Retrieves reviews using cache, API or fallback data.
+   *
+   * Cache strategy:
+   * 1. Return cached reviews when available.
+   * 2. Fetch fresh reviews from TripAdvisor.
+   * 3. Return stale cache if API is unavailable.
+   * 4. Return fallback reviews as last resort.
+   * @async
+   * @param {string} [language] - Requested language.
+   * @param {boolean} [forceRefresh] - Forces cache invalidation.
+   * @returns {Promise<Array<object>>} Collection of reviews.
    * @example
    */
   async getReviews(language = 'es', forceRefresh = false) {
@@ -389,9 +423,11 @@ class TripAdvisorService {
   }
 
   /**
-   * Get a specific number of top-rated reviews.
-   * @param count
-   * @param language
+   * Returns the top-rated reviews sorted by rating and publication date.
+   * @async
+   * @param {number} [count] - Maximum number of reviews to return.
+   * @param {string} [language] - Requested language.
+   * @returns {Promise<Array<object>>} Sorted review collection.
    * @example
    */
   async getTopReviews(count = 15, language = 'es') {
@@ -409,7 +445,8 @@ class TripAdvisorService {
   }
 
   /**
-   * Clear cache manually.
+   * Clears all cached reviews and cache expiration metadata.
+   * @returns {void}
    * @example
    */
   clearCache() {
