@@ -6954,20 +6954,48 @@ class ItineraryBuilder {
     const breakdowns = {};
     const prices = {};
 
+    // Nodos en efectivo; el recargo por forma de pago lo aplica el motor único, con las
+    // mismas reglas que transporte (vehículo/adicionales llevan recargo; la guía no).
+    const vehicleEfectivoBase = mainVehicleCost * tourDuration;
+    const guideEfectivoBase = guideRate * tourDuration;
+    const additionalEfectivoBase = additionalVehicleInfo
+      ? this.getPrimaryAdditionalVehiclePrice(additionalVehicleInfo.baseCost) * tourDuration : 0;
+    const extrasEfectivoBase = extraVehicleItemsForTour.reduce(
+      (sum, item) => sum + ((parseFloat(item.efectivoPrice) || 0) * tourDuration), 0,
+    );
+    const tourNodes = [
+      { key: 'vehicle', efectivo: vehicleEfectivoBase, surcharge: true },
+      { key: 'guide', efectivo: guideEfectivoBase, surcharge: false },
+      { key: 'additionalVehicle', efectivo: additionalEfectivoBase, surcharge: true },
+      { key: 'extraVehicles', efectivo: extrasEfectivoBase, surcharge: true },
+    ];
+    const tourPricing = window.PricingEngine
+      ? window.PricingEngine.calculateTransport({ transferRate: this.transferRate, agencyRate: this.agencyRate, nodes: tourNodes })
+      : (() => {
+        // Fallback (idéntico al motor) por si el motor no cargó.
+        const out = {
+          efectivo: 0, transferencia: 0, tarjeta: 0, nodes: {},
+        };
+        tourNodes.forEach((n) => {
+          const t = n.surcharge ? n.efectivo * (1 + (this.transferRate / 100)) : n.efectivo;
+          const c = n.surcharge ? n.efectivo * (1 + (this.agencyRate / 100)) : n.efectivo;
+          out.nodes[n.key] = { efectivo: n.efectivo, transferencia: t, tarjeta: c };
+          out.efectivo += n.efectivo;
+          out.transferencia += t;
+          out.tarjeta += c;
+        });
+        return out;
+      })();
+
     paymentTypes.forEach((paymentType) => {
       const multiplier = this.getPaymentMultiplier(paymentType);
 
-      // Calculate main vehicle cost with surcharge
-      const vehicleCost = mainVehicleCost * tourDuration * multiplier;
-      const guideCost = guideRate * tourDuration; // Guide doesn't get surcharge
-      // Use the per-vehicle manual price override (per-hour) when set, else the list cost.
-      const additionalCost = additionalVehicleInfo
-        ? this.getPrimaryAdditionalVehiclePrice(additionalVehicleInfo.baseCost) * tourDuration * multiplier : 0;
-      // Extras: each extra row's efectivo price × duration × payment multiplier
-      const extraVehiclesTotal = extraVehicleItemsForTour.reduce((sum, item) => {
-        const efectivoUnit = parseFloat(item.efectivoPrice) || 0;
-        return sum + (efectivoUnit * tourDuration * multiplier);
-      }, 0);
+      // Valores por nodo desde el motor (recargo en un solo lugar). multiplier se usa solo
+      // para el texto del desglose (precio por hora con recargo).
+      const vehicleCost = tourPricing.nodes.vehicle[paymentType];
+      const guideCost = tourPricing.nodes.guide[paymentType]; // Guide doesn't get surcharge
+      const additionalCost = tourPricing.nodes.additionalVehicle[paymentType];
+      const extraVehiclesTotal = tourPricing.nodes.extraVehicles[paymentType];
 
       // Debug guide cost calculation
       console.log(`👨‍🦯 ${paymentType} - Guide cost calculation:`, {

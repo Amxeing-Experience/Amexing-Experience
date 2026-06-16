@@ -12,7 +12,7 @@ redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el
 | Tipo | Nodos en el motor | Front conectado | Notas |
 | :-- | :-- | :-- | :-- |
 | **Transporte** | ✅ vehículo · espera · guía/chofer · greeter · vehículo adicional · extras | ✅ ruta principal **y** fallback | **HECHO** (ver abajo) |
-| Tours (con vehículos) | ⚪ pendiente | parcial (solo recargo display) | base + vehículo adicional siguen inline |
+| **Tours (con vehículos)** | ✅ vehículo · guía · vehículo adicional · extras (reusa `calculateTransport`) | ✅ `calculateVehicleTourDevBreakdown` usa el motor | **HECHO** |
 | **A-Disposición** | ✅ vehículo × horas × cantidad · guía · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
 | Experiencias | ⚪ pendiente | inline | por persona × duración |
 | Walking tours | ⚪ pendiente | inline | tiers / varios grupos |
@@ -60,7 +60,28 @@ cashRoundingEnabled })`, con fallback idéntico si el motor no cargó. Todos los
 (incluido el que arma `_aDisposicionBreakdownTotals`) usan ahora el motor. Mismos valores
 (ya cubiertos por los golden tests de a-disposición).
 
+## Tours con vehículos — qué se hizo (3er nodo conectado)
+
+`calculateVehicleTourDevBreakdown` calculaba por forma de pago con `getPaymentMultiplier`
+(= `1 + rate/100`), guía sin recargo — misma forma que transporte. Ahora precomputa los nodos
+en efectivo (vehículo · guía · vehículo adicional · extras) y **reusa
+`PricingEngine.calculateTransport`** (con fallback). El texto del desglose queda igual; los
+totales (`pricesByType` los parsea `collectServiceData` del texto) salen del motor.
+
+## Pendientes diferidos (bugs de desglose / display, NO de cálculo)
+
+Reportados por el cliente; se atacan **después** de unificar el cálculo (se arregla el display
+una sola vez, contra una fuente única). Son **previos** a esta migración:
+
+- **Desglose del servicio (vehículo/tours y al parecer varios tipos):** inconsistencias de
+  texto/render en el desglose. Pendiente de barrido general del display.
+- **A-Disposición — precio por-vehículo "baila por centavos" al subir la cantidad:** causado por
+  el redondeo a efectivo (`applyCashRounding`) aplicado al **total agregado** y luego dividido
+  entre la cantidad para el renglón por-vehículo. El total siempre queda en múltiplos de $5; solo
+  el renglón unitario se ve raro. **Decisión de producto pendiente:** ¿el redondeo a $5 va sobre
+  el total o sobre el precio por-vehículo?
+
 ## Siguiente
-- Migrar tours (vehículo + adicional), experiencias (por persona × duración), walking (tiers),
-  concepto (cliente + por persona) como nodos del motor.
+- Migrar experiencias (por persona × duración), walking (tiers), concepto (cliente + por persona).
 - Validación de total en backend con el mismo motor al guardar.
+- Barrido del desglose/display (los pendientes de arriba).
