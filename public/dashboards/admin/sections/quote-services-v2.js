@@ -8566,36 +8566,46 @@ class ItineraryBuilder {
    * @example
    */
   calculateADisposicionPricing(paymentType, baseVehicleCostPerHour, hours, vehicleQuantity, guideRate = 0) {
-    // Calculate base vehicle cost (total for all vehicles and hours)
-    const baseVehicleTotal = Math.round((baseVehicleCostPerHour * hours * vehicleQuantity) * 100) / 100;
+    // Resuelve la moneda del DOM (igual que getDisplayPrice) y delega TODO el cálculo al
+    // motor único (PricingEngine.calculateADisposicion): vehículo × horas × cantidad +
+    // recargo por forma de pago + guía (sin recargo) + descuento por volumen, en un solo
+    // lugar. Antes esta función replicaba esa fórmula inline.
+    const currency = document.getElementById('currencySelect')?.value || 'MXN';
+    const params = {
+      baseVehicleCostPerHour,
+      hours,
+      vehicleQuantity,
+      guideRate,
+      paymentType,
+      currency,
+      transferRate: this.transferRate,
+      agencyRate: this.agencyRate,
+      exchangeRate: this.exchangeRate,
+      cashRoundingEnabled: true,
+    };
 
-    // Apply surcharge based on payment type — pasa el tipo por parámetro al motor,
-    // SIN mutar el DOM (eliminado el efecto secundario frágil sobre #priceTypeSelect).
-    const vehicleTotalWithSurcharge = Math.round(this.getDisplayPrice(baseVehicleTotal, { paymentType }) * 100) / 100;
+    if (window.PricingEngine) {
+      return window.PricingEngine.calculateADisposicion(params);
+    }
 
-    // Calculate guide cost (no surcharge applied to guide)
-    const guideTotalCost = Math.round((guideRate * hours * vehicleQuantity) * 100) / 100;
+    // Fallback (idéntico al motor) por si el motor no cargó.
+    const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const baseVehicleTotal = round2(baseVehicleCostPerHour * hours * vehicleQuantity);
+    const vehicleTotalWithSurcharge = round2(this.getDisplayPrice(baseVehicleTotal, { paymentType }));
+    const guideTotalCost = round2(guideRate * hours * vehicleQuantity);
+    const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost);
 
-    // Calculate base total (vehicle + guide)
-    const baseTotal = Math.round((vehicleTotalWithSurcharge + guideTotalCost) * 100) / 100;
-
-    // Calculate discount if applicable
     let discountAmount = 0;
     if (hours > 0) {
       const discountPercentage = this.getADisposicionDiscount(hours);
       if (discountPercentage > 0) {
-        // Descuento sobre el total CON recargo (coherente con el motor pricingEngine).
-        const finalCost = Math.round((vehicleTotalWithSurcharge + guideTotalCost) * 100) / 100;
-        discountAmount = Math.round((finalCost * (discountPercentage / 100)) * 100) / 100;
+        const finalCost = round2(vehicleTotalWithSurcharge + guideTotalCost);
+        discountAmount = round2(finalCost * (discountPercentage / 100));
       }
     }
 
-    // Calculate final amounts
-    const subtotal = Math.round((baseTotal - discountAmount) * 100) / 100;
-    const finalTotal = subtotal;
-
-    // Calculate hourly rate for display (per vehicle)
-    const hourlyRatePerVehicle = Math.round((vehicleTotalWithSurcharge / (hours * vehicleQuantity)) * 100) / 100;
+    const subtotal = round2(baseTotal - discountAmount);
+    const divisor = hours * vehicleQuantity;
 
     return {
       baseVehicleTotal,
@@ -8604,8 +8614,8 @@ class ItineraryBuilder {
       baseTotal,
       discountAmount,
       subtotal,
-      finalTotal,
-      hourlyRatePerVehicle,
+      finalTotal: subtotal,
+      hourlyRatePerVehicle: divisor > 0 ? round2(vehicleTotalWithSurcharge / divisor) : 0,
       paymentType,
     };
   }

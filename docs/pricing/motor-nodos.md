@@ -13,7 +13,7 @@ redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el
 | :-- | :-- | :-- | :-- |
 | **Transporte** | ✅ vehículo · espera · guía/chofer · greeter · vehículo adicional · extras | ✅ ruta principal **y** fallback | **HECHO** (ver abajo) |
 | Tours (con vehículos) | ⚪ pendiente | parcial (solo recargo display) | base + vehículo adicional siguen inline |
-| A-Disposición | ✅ `calculateADisposicion` existe | ❌ el front usa su versión inline | reconectar `calculateADisposicionPricing` al motor |
+| **A-Disposición** | ✅ vehículo × horas × cantidad · guía · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
 | Experiencias | ⚪ pendiente | inline | por persona × duración |
 | Walking tours | ⚪ pendiente | inline | tiers / varios grupos |
 | Concepto | ⚪ pendiente | inline | precio cliente + por persona |
@@ -50,8 +50,17 @@ cuando el servicio tenía guía o greeter. Al enrutarlo por el motor, ambos cami
 coinciden (guía/greeter sin recargo). *Único cambio de valor de esta fase, y es a favor de la
 regla correcta.*
 
+## A-Disposición — qué se hizo (2º nodo conectado)
+
+`calculateADisposicionPricing` (front) era una réplica inline de `calculateADisposicion` del
+motor (el del motor se modeló sobre ella). Ahora **delega al motor**: resuelve la moneda del
+DOM y llama a `PricingEngine.calculateADisposicion({ baseVehicleCostPerHour, hours,
+vehicleQuantity, guideRate, paymentType, currency, transferRate, agencyRate, exchangeRate,
+cashRoundingEnabled })`, con fallback idéntico si el motor no cargó. Todos los callers
+(incluido el que arma `_aDisposicionBreakdownTotals`) usan ahora el motor. Mismos valores
+(ya cubiertos por los golden tests de a-disposición).
+
 ## Siguiente
-- Reconectar A-Disposición al `calculateADisposicion` que ya existe en el motor.
 - Migrar tours (vehículo + adicional), experiencias (por persona × duración), walking (tiers),
   concepto (cliente + por persona) como nodos del motor.
 - Validación de total en backend con el mismo motor al guardar.
