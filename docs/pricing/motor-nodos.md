@@ -103,13 +103,31 @@ divergiendo del desglose/preview. Ahora las tres rutas (guardado, dev prices, de
 `base = unitario + personas × porPersona` y aplican el recargo vía
 `PricingEngine.composeServiceNodes`. Esto **cierra la deuda C2** (las dos rutas dev ya no divergen).
 
-## Pendientes diferidos (bugs de desglose / display, NO de cálculo)
+## Desglose del servicio unificado (espejo del dev breakdown)
 
-Reportados por el cliente; se atacan **después** de unificar el cálculo (se arregla el display
-una sola vez, contra una fuente única). Son **previos** a esta migración:
+`updateServicePriceBreakdown` (lo que ve el cliente) recalculaba por su cuenta en experiencia y
+concepto, divergiendo del dev breakdown (la fuente de verdad vía el motor). Ahora **todos los
+tipos espejean el dev breakdown** con un solo helper `collectServiceBreakdownItemsFromDev()`:
 
-- **Desglose del servicio (vehículo/tours y al parecer varios tipos):** inconsistencias de
-  texto/render en el desglose. Pendiente de barrido general del display.
+- **Convención única** (decisión del cliente): cada renglón ya viene **con el recargo aplicado**,
+  **sin** línea de "Recargo" aparte. Se unificó en los dev breakdowns de transporte, experiencia
+  y concepto (a-disposición y walking ya cumplían).
+- Experiencia y concepto pasan a espejar (antes recalculaban). Transporte y a-disposición ya
+  espejeaban; walking y vehicle tour espejean por sus propias funciones.
+- **Garantía global contra el "una interacción atrás":** `updateServicePriceBreakdown` refresca el
+  dev breakdown **al inicio, para TODOS los tipos** (antes de los early-returns de tour). Así el
+  desglose siempre espeja datos frescos **sin depender del orden** en que cada uno de los ~57
+  listeners llame. (Verificado sin recursión: ni `updateDevPaymentBreakdown` ni las funciones de
+  tour llaman de vuelta a `updateServicePriceBreakdown`.) Aun así, los handlers clave también se
+  ordenaron dev→service (guía/greeter, vehículo adicional).
+- Bugs reportados resueltos: experiencia con niño/sin-alcohol sin precio (salen las 3 líneas al
+  precio de adulto); vehículo adicional de transporte aparece en el desglose al seleccionarlo.
+
+Resultado: desglose mostrado == dev breakdown == precio guardado, para todos los tipos, siempre
+calculado por el motor único.
+
+## Pendientes diferidos
+
 - **A-Disposición — precio por-vehículo "baila por centavos" al subir la cantidad:** causado por
   el redondeo a efectivo (`applyCashRounding`) aplicado al **total agregado** y luego dividido
   entre la cantidad para el renglón por-vehículo. El total siempre queda en múltiplos de $5; solo
