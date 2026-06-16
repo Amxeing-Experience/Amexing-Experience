@@ -9276,14 +9276,12 @@ class ItineraryBuilder {
         + buildPerPersonLine(pricePerPersonEfectivo)
         + `Total: $${efectivoPrice.toFixed(2)}`;
 
-      const transferenciaBreakdown = `Concepto${contextText}: $${clientPrice.toFixed(2)}\n`
+      const transferenciaBreakdown = `Concepto${contextText}: $${(clientPrice * transferMult).toFixed(2)}\n`
         + buildPerPersonLine(pricePerPersonTransfer)
-        + `Recargo transferencia (${this.transferRate}%): $${(transferenciaPrice - transferenciaBase).toFixed(2)}\n`
         + `Total: $${transferenciaPrice.toFixed(2)}`;
 
-      const tarjetaBreakdown = `Concepto${contextText}: $${clientPrice.toFixed(2)}\n`
+      const tarjetaBreakdown = `Concepto${contextText}: $${(clientPrice * agencyMult).toFixed(2)}\n`
         + buildPerPersonLine(pricePerPersonTarjeta)
-        + `Recargo tarjeta (${this.agencyRate}%): $${(tarjetaPrice - transferenciaBase).toFixed(2)}\n`
         + `Total: $${tarjetaPrice.toFixed(2)}`;
 
       // Update dev payment prices
@@ -9557,7 +9555,6 @@ class ItineraryBuilder {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.transferRate / 100));
         transferenciaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTransferencia.toFixed(2)}`;
       }
-      transferenciaBreakdown += `\nRecargo transferencia (${this.transferRate}%): $${(totalTransferencia - totalEfectivo).toFixed(2)}`;
       transferenciaBreakdown += `\nTotal: $${totalTransferencia.toFixed(2)}`;
 
       // Build tarjeta breakdown
@@ -9586,7 +9583,6 @@ class ItineraryBuilder {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.agencyRate / 100));
         tarjetaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTarjeta.toFixed(2)}`;
       }
-      tarjetaBreakdown += `\nRecargo tarjeta (${this.agencyRate}%): $${(totalTarjeta - totalEfectivo).toFixed(2)}`;
       tarjetaBreakdown += `\nTotal: $${totalTarjeta.toFixed(2)}`;
 
       // Update dev payment prices with vehicle prices only (excluding waiting time)
@@ -9679,42 +9675,36 @@ class ItineraryBuilder {
       if (efectivoBreakdown) efectivoBreakdown += '\n';
       efectivoBreakdown += `Total: $${efectivoTotal.toFixed(2)}`;
 
-      // Build breakdown text for transferencia
+      // Build breakdown text for transferencia (cada línea ya con recargo, sin línea aparte)
+      const tMult = 1 + (this.transferRate / 100);
       let transferenciaBreakdown = '';
       if (adultsQty > 0 && adultPrice > 0) {
-        transferenciaBreakdown += `Adultos: ${adultsQty} × $${adultPrice.toFixed(2)} = $${adultsTotal.toFixed(2)}`;
+        transferenciaBreakdown += `Adultos: ${adultsQty} × $${(adultPrice * tMult).toFixed(2)} = $${(adultsTotal * tMult).toFixed(2)}`;
       }
       if (childrenQty > 0 && childPrice > 0) {
         if (transferenciaBreakdown) transferenciaBreakdown += '\n';
-        transferenciaBreakdown += `Niños: ${childrenQty} × $${childPrice.toFixed(2)} = $${childrenTotal.toFixed(2)}`;
+        transferenciaBreakdown += `Niños: ${childrenQty} × $${(childPrice * tMult).toFixed(2)} = $${(childrenTotal * tMult).toFixed(2)}`;
       }
       if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
         if (transferenciaBreakdown) transferenciaBreakdown += '\n';
-        transferenciaBreakdown += `Sin alcohol: ${noAlcoholQty} × $${noAlcoholPrice.toFixed(2)} = $${noAlcoholTotal.toFixed(2)}`;
-      }
-      if (this.transferRate > 0) {
-        if (transferenciaBreakdown) transferenciaBreakdown += '\n';
-        transferenciaBreakdown += `Recargo transferencia (${this.transferRate}%): $${(transferenciaTotal - efectivoTotal).toFixed(2)}`;
+        transferenciaBreakdown += `Sin alcohol: ${noAlcoholQty} × $${(noAlcoholPrice * tMult).toFixed(2)} = $${(noAlcoholTotal * tMult).toFixed(2)}`;
       }
       if (transferenciaBreakdown) transferenciaBreakdown += '\n';
       transferenciaBreakdown += `Total: $${transferenciaTotal.toFixed(2)}`;
 
-      // Build breakdown text for tarjeta
+      // Build breakdown text for tarjeta (cada línea ya con recargo, sin línea aparte)
+      const cMult = 1 + (this.agencyRate / 100);
       let tarjetaBreakdown = '';
       if (adultsQty > 0 && adultPrice > 0) {
-        tarjetaBreakdown += `Adultos: ${adultsQty} × $${adultPrice.toFixed(2)} = $${adultsTotal.toFixed(2)}`;
+        tarjetaBreakdown += `Adultos: ${adultsQty} × $${(adultPrice * cMult).toFixed(2)} = $${(adultsTotal * cMult).toFixed(2)}`;
       }
       if (childrenQty > 0 && childPrice > 0) {
         if (tarjetaBreakdown) tarjetaBreakdown += '\n';
-        tarjetaBreakdown += `Niños: ${childrenQty} × $${childPrice.toFixed(2)} = $${childrenTotal.toFixed(2)}`;
+        tarjetaBreakdown += `Niños: ${childrenQty} × $${(childPrice * cMult).toFixed(2)} = $${(childrenTotal * cMult).toFixed(2)}`;
       }
       if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
         if (tarjetaBreakdown) tarjetaBreakdown += '\n';
-        tarjetaBreakdown += `Sin alcohol: ${noAlcoholQty} × $${noAlcoholPrice.toFixed(2)} = $${noAlcoholTotal.toFixed(2)}`;
-      }
-      if (this.agencyRate > 0) {
-        if (tarjetaBreakdown) tarjetaBreakdown += '\n';
-        tarjetaBreakdown += `Recargo tarjeta (${this.agencyRate}%): $${(tarjetaTotal - efectivoTotal).toFixed(2)}`;
+        tarjetaBreakdown += `Sin alcohol: ${noAlcoholQty} × $${(noAlcoholPrice * cMult).toFixed(2)} = $${(noAlcoholTotal * cMult).toFixed(2)}`;
       }
       if (tarjetaBreakdown) tarjetaBreakdown += '\n';
       tarjetaBreakdown += `Total: $${tarjetaTotal.toFixed(2)}`;
@@ -15944,6 +15934,38 @@ class ItineraryBuilder {
    * For walking tours, uses simplified approach. For others, calculates directly.
    * @example
    */
+  /**
+   * Lee el dev breakdown de la forma de pago activa (la fuente de verdad calculada por
+   * updateDevPaymentBreakdown vía el motor) y devuelve sus renglones como items del
+   * desglose de servicio. Convención única: cada línea ya viene con recargo, así que el
+   * desglose mostrado coincide 1:1 con el dev breakdown y con el precio guardado.
+   * @returns {Array<{label: string, amountMXN: number, alreadySurcharged: boolean}>}
+   * @example
+   */
+  collectServiceBreakdownItemsFromDev() {
+    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    let devField = document.getElementById('devBreakdownEfectivo');
+    if (paymentType === 'transferencia') {
+      devField = document.getElementById('devBreakdownTransferencia') || devField;
+    } else if (paymentType === 'tarjeta') {
+      devField = document.getElementById('devBreakdownTarjeta') || devField;
+    }
+    const items = [];
+    (devField?.value || '').split('\n').forEach((rawLine) => {
+      const lineText = rawLine.trim();
+      // Saltar líneas resumen; los componentes ya vienen con recargo (convención única).
+      if (!lineText || /^(Subtotal|Total|Recargo)/i.test(lineText)) return;
+      const lineAmounts = lineText.match(/-?\$[0-9,.]+/g);
+      const amountMXN = lineAmounts && lineAmounts.length
+        ? parseFloat(lineAmounts[lineAmounts.length - 1].replace('$', '').replace(/,/g, ''))
+        : 0;
+      if (amountMXN === 0) return;
+      const label = lineText.replace(/\s*=\s*-?\$[0-9,.]+\s*$/, '');
+      items.push({ label, amountMXN, alreadySurcharged: true });
+    });
+    return items;
+  }
+
   updateServicePriceBreakdown() {
     console.log('🔍 updateServicePriceBreakdown called');
 
@@ -16021,6 +16043,10 @@ class ItineraryBuilder {
 
     // Get payment type for the original logic
     const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+
+    // Refresca el dev breakdown (fuente de verdad vía el motor) ANTES de espejarlo, para
+    // que el desglose mostrado coincida con el cálculo actual y no vaya "una interacción atrás".
+    this.updateDevPaymentBreakdown();
 
     // RESTORED: Original calculation logic for non-walking tour services
     if (serviceType === 'transport') {
@@ -16641,73 +16667,15 @@ class ItineraryBuilder {
         console.log('❌ BREAKDOWN: Additional vehicle not selected or checkbox not checked');
       }
     } else if (serviceType === 'experience') {
-      // Read quantities straight from the modal — what the user actually typed.
-      // Quote-level numberOfAdults/Children/Infants prefill these on open but
-      // can diverge per-service, so the modal is the source of truth.
-      const adultsQty = parseInt(document.getElementById('adultsQuantity')?.value || 0, 10) || 0;
-      const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value || 0, 10) || 0;
-      const noAlcoholQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0, 10) || 0;
-      const adultPrice = parseFloat(document.getElementById('adultPrice')?.value || 0);
-      // Fallback niño/sin-alcohol → adulto (decisión E2), igual que el precio guardado y el
-      // dev breakdown. Antes, sin precio propio, estas líneas se omitían del desglose y solo
-      // aparecía el adulto aunque hubiera niños/sin-alcohol.
-      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0) || adultPrice;
-      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0) || adultPrice;
+      // Espeja el dev breakdown (fuente de verdad vía el motor). Antes recalculaba aparte
+      // (con split de recargo) y podía diverger del precio guardado; ahora coincide 1:1.
+      items.push(...this.collectServiceBreakdownItemsFromDev());
 
-      // Check if prices are overridden
+      // Indicador de precios personalizados (si aplica)
       const isPriceOverride = document.getElementById('experienceOverridePrices')?.checked || false;
-
-      // Calculate base totals for each category
-      const adultsTotal = adultsQty * adultPrice;
-      const childrenTotal = childrenQty * childPrice;
-      const noAlcoholTotal = noAlcoholQty * noAlcoholPrice;
-
-      // Calculate base total (efectivo)
-      const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal;
-
-      // Calculate surcharged total based on the active payment type.
-      let finalTotal = baseTotal;
-      if (paymentType === 'transferencia' && this.transferRate > 0) {
-        finalTotal = baseTotal * (1 + (this.transferRate / 100));
-      } else if (paymentType === 'tarjeta' && this.agencyRate > 0) {
-        finalTotal = baseTotal * (1 + (this.agencyRate / 100));
-      }
-
-      // Distribute the surcharge proportionally across categories. Guarded so we
-      // don't divide by 0 when baseTotal is empty.
-      const splitShare = baseTotal > 0 ? (finalTotal / baseTotal) : 0;
-
-      if (adultsQty > 0 && adultPrice > 0) {
-        const finalAdultTotal = adultsTotal * splitShare;
-        items.push({ label: `Adultos: ${adultsQty} × $${adultPrice.toFixed(2)} = $${finalAdultTotal.toFixed(2)}`, amountMXN: finalAdultTotal });
-      }
-      if (childrenQty > 0 && childPrice > 0) {
-        const finalChildTotal = childrenTotal * splitShare;
-        items.push({ label: `Niños: ${childrenQty} × $${childPrice.toFixed(2)} = $${finalChildTotal.toFixed(2)}`, amountMXN: finalChildTotal });
-      }
-      if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
-        const finalNoAlcoholTotal = noAlcoholTotal * splitShare;
-        items.push({ label: `Sin alcohol: ${noAlcoholQty} × $${noAlcoholPrice.toFixed(2)} = $${finalNoAlcoholTotal.toFixed(2)}`, amountMXN: finalNoAlcoholTotal });
-      }
-
-      // Add indicator if prices are overridden
       if (isPriceOverride && this.canEditPrices) {
         items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precios personalizados</span>', amountMXN: 0 });
       }
-
-      // Set the final total so the visibility guard at the end of the function
-      // doesn't hide the breakdown.
-      totalMXN = finalTotal;
-
-      console.log('📊 Experience service breakdown calculated:', {
-        quantities: { adultsQty, childrenQty, noAlcoholQty },
-        quantitySource: 'modal fields',
-        prices: { adultPrice, childPrice, noAlcoholPrice },
-        baseTotal,
-        paymentType,
-        finalTotal,
-        surchargeApplied: finalTotal !== baseTotal,
-      });
     } else if (serviceType === 'a-disposicion') {
       // Mirror the dev breakdown for the selected payment type (the single source of
       // truth computed by updateDevPaymentBreakdown). Parse its line items instead of
@@ -16886,16 +16854,10 @@ class ItineraryBuilder {
         }
       }
     } else if (serviceType === 'concepto') {
-      const price = parseFloat(document.getElementById('servicePrice')?.value || 0);
-      if (price > 0) {
-        // For concepto, the servicePrice already contains the final price (with or without surcharges)
-        // Mark it as alreadySurcharged to prevent double surcharging
-        items.push({
-          label: 'Precio',
-          amountMXN: price,
-          alreadySurcharged: true, // Prevent additional surcharging
-        });
-      }
+      // Espeja el dev breakdown (fuente de verdad vía el motor): unitario + por-persona,
+      // cada línea con recargo. Antes mostraba una sola línea "Precio" desde servicePrice,
+      // que omitía el por-persona y podía diverger del precio guardado.
+      items.push(...this.collectServiceBreakdownItemsFromDev());
     } // END OF SERVICE TYPE CHECKS
 
     // Calculate total with proper handling of mixed surcharge states

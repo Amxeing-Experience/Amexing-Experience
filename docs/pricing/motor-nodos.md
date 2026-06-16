@@ -103,13 +103,24 @@ divergiendo del desglose/preview. Ahora las tres rutas (guardado, dev prices, de
 `base = unitario + personas × porPersona` y aplican el recargo vía
 `PricingEngine.composeServiceNodes`. Esto **cierra la deuda C2** (las dos rutas dev ya no divergen).
 
-## Pendientes diferidos (bugs de desglose / display, NO de cálculo)
+## Desglose del servicio unificado (espejo del dev breakdown)
 
-Reportados por el cliente; se atacan **después** de unificar el cálculo (se arregla el display
-una sola vez, contra una fuente única). Son **previos** a esta migración:
+`updateServicePriceBreakdown` (lo que ve el cliente) recalculaba por su cuenta en experiencia y
+concepto, divergiendo del dev breakdown (la fuente de verdad vía el motor). Ahora **todos los
+tipos espejean el dev breakdown** con un solo helper `collectServiceBreakdownItemsFromDev()`:
 
-- **Desglose del servicio (vehículo/tours y al parecer varios tipos):** inconsistencias de
-  texto/render en el desglose. Pendiente de barrido general del display.
+- **Convención única** (decisión del cliente): cada renglón ya viene **con el recargo aplicado**,
+  **sin** línea de "Recargo" aparte. Se unificó en los dev breakdowns de transporte, experiencia
+  y concepto (a-disposición y walking ya cumplían).
+- Experiencia y concepto pasan a espejar (antes recalculaban). Transporte y a-disposición ya
+  espejeaban. Se refresca el dev breakdown **antes** de espejarlo para no ir "una interacción atrás".
+- Bug reportado resuelto: en experiencia con 1 adulto + 1 niño + 1 sin-alcohol **sin** precio de
+  niño, ahora salen las 3 líneas (niño/sin-alcohol al precio de adulto) en vez de solo el adulto.
+
+Resultado: desglose mostrado == dev breakdown == precio guardado, para todos los tipos.
+
+## Pendientes diferidos
+
 - **A-Disposición — precio por-vehículo "baila por centavos" al subir la cantidad:** causado por
   el redondeo a efectivo (`applyCashRounding`) aplicado al **total agregado** y luego dividido
   entre la cantidad para el renglón por-vehículo. El total siempre queda en múltiplos de $5; solo
