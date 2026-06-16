@@ -3436,24 +3436,39 @@ class ItineraryBuilder {
 
       const conceptoApplySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
 
-      if (conceptoApplySurcharges) {
-        // Calculate prices with surcharges from client price
-        pricesByType = {
-          efectivo: conceptoClientPrice,
-          transferencia: conceptoClientPrice * (1 + (this.transferRate / 100)),
-          tarjeta: conceptoClientPrice * (1 + (this.agencyRate / 100)),
-        };
-      } else {
-        // No surcharges - all payment types have the same price
-        pricesByType = {
-          efectivo: conceptoClientPrice,
-          transferencia: conceptoClientPrice,
-          tarjeta: conceptoClientPrice,
-        };
-      }
+      // Base = precio unitario + (total de personas × precio por persona), igual que el
+      // desglose/preview. Antes el precio GUARDADO omitía el componente por-persona.
+      const pricePerPerson = parseFloat(document.getElementById('conceptoPricePerPerson')?.value || 0);
+      const totalPeople = (parseInt(document.getElementById('conceptoAdultsQuantity')?.value || 0))
+        + (parseInt(document.getElementById('conceptoChildrenQuantity')?.value || 0))
+        + (parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0));
+      const conceptoBaseEfectivo = conceptoClientPrice + (totalPeople * pricePerPerson);
 
-      // Override the base price to be the client price for concepto
-      basePriceEfectivo = conceptoClientPrice;
+      // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
+      const conceptoPricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: conceptoBaseEfectivo, surcharge: conceptoApplySurcharges }],
+        })
+        : (conceptoApplySurcharges ? {
+          efectivo: conceptoBaseEfectivo,
+          transferencia: conceptoBaseEfectivo * (1 + (this.transferRate / 100)),
+          tarjeta: conceptoBaseEfectivo * (1 + (this.agencyRate / 100)),
+        } : {
+          efectivo: conceptoBaseEfectivo,
+          transferencia: conceptoBaseEfectivo,
+          tarjeta: conceptoBaseEfectivo,
+        });
+
+      pricesByType = {
+        efectivo: conceptoPricing.efectivo,
+        transferencia: conceptoPricing.transferencia,
+        tarjeta: conceptoPricing.tarjeta,
+      };
+
+      // Override the base price to be the full base (unitario + por persona) for concepto
+      basePriceEfectivo = conceptoBaseEfectivo;
 
       console.log('✅ COLLECT SERVICE DATA - Concepto pricesByType from clientPrice:', {
         clientPrice: conceptoClientPrice,
@@ -3469,19 +3484,34 @@ class ItineraryBuilder {
       const noAlcoholQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
 
       const adultPrice = parseFloat(document.getElementById('adultPrice')?.value || 0);
-      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0);
-      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0);
+      // Fallback de precio de niño / sin-alcohol al de adulto cuando falta (decisión E2,
+      // igual que calculateServicePrice). Antes el precio GUARDADO cobraba $0 por esos.
+      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0) || adultPrice;
+      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0) || adultPrice;
 
       // Calculate base total (efectivo)
       const baseTotal = (adultsQty * adultPrice)
         + (childrenQty * childPrice)
         + (noAlcoholQty * noAlcoholPrice);
 
+      // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
+      const experiencePricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: baseTotal, surcharge: true }],
+        })
+        : {
+          efectivo: baseTotal,
+          transferencia: baseTotal * (1 + (this.transferRate / 100)),
+          tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+        };
+
       // Calculate all payment types
       pricesByType = {
-        efectivo: baseTotal,
-        transferencia: baseTotal * (1 + (this.transferRate / 100)),
-        tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+        efectivo: experiencePricing.efectivo,
+        transferencia: experiencePricing.transferencia,
+        tarjeta: experiencePricing.tarjeta,
       };
 
       // Update basePriceEfectivo for consistency
@@ -3522,10 +3552,23 @@ class ItineraryBuilder {
           const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
           const baseTotal = this.getWalkingTourPrice(selectedTourData, peopleCount, duration);
 
+          // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
+          const walkingPricing = window.PricingEngine
+            ? window.PricingEngine.composeServiceNodes({
+              transferRate: this.transferRate,
+              agencyRate: this.agencyRate,
+              nodes: [{ key: 'base', efectivo: baseTotal, surcharge: true }],
+            })
+            : {
+              efectivo: baseTotal,
+              transferencia: baseTotal * (1 + (this.transferRate / 100)),
+              tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+            };
+
           pricesByType = {
-            efectivo: baseTotal,
-            transferencia: baseTotal * (1 + (this.transferRate / 100)),
-            tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+            efectivo: walkingPricing.efectivo,
+            transferencia: walkingPricing.transferencia,
+            tarjeta: walkingPricing.tarjeta,
           };
           basePriceEfectivo = baseTotal;
 
@@ -3722,12 +3765,40 @@ class ItineraryBuilder {
         additionalVehicleCostEfectivo = this.getPrimaryAdditionalVehiclePrice(additionalVehicleCostEfectivo);
       }
 
-      const totalEfectivo = vehicleEfectivoTotal + waitingCostEfectivo + guideCostEfectivo + greeterCostEfectivo + additionalVehicleCostEfectivo;
+      // Compone con el motor usando la MISMA regla de recargo que la ruta principal
+      // (vehículo/espera/vehículo adicional llevan recargo; guía y greeter no). Antes este
+      // fallback aplicaba el recargo al total completo (incluyendo guía/greeter), divergiendo
+      // de la ruta principal y sobre-cobrando transferencia/tarjeta cuando había guía/greeter.
+      const fallbackTransferRate = this.transferRate;
+      const fallbackAgencyRate = this.agencyRate;
+      const fallbackNodes = [
+        { key: 'vehicle', efectivo: vehicleEfectivoTotal, surcharge: true },
+        { key: 'waiting', efectivo: waitingCostEfectivo, surcharge: true },
+        { key: 'guide', efectivo: guideCostEfectivo, surcharge: false },
+        { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: false },
+        { key: 'additionalVehicle', efectivo: additionalVehicleCostEfectivo, surcharge: true },
+      ];
+      const fallbackPricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: fallbackTransferRate, agencyRate: fallbackAgencyRate, nodes: fallbackNodes,
+        })
+        : (() => {
+          const out = {
+            efectivo: 0, transferencia: 0, tarjeta: 0,
+          };
+          fallbackNodes.forEach((n) => {
+            out.efectivo += n.efectivo;
+            out.transferencia += n.surcharge ? n.efectivo * (1 + (fallbackTransferRate / 100)) : n.efectivo;
+            out.tarjeta += n.surcharge ? n.efectivo * (1 + (fallbackAgencyRate / 100)) : n.efectivo;
+          });
+          return out;
+        })();
+      const totalEfectivo = fallbackPricing.efectivo;
 
       pricesByType = {
-        efectivo: totalEfectivo,
-        transferencia: totalEfectivo * (1 + (this.transferRate / 100)),
-        tarjeta: totalEfectivo * (1 + (this.agencyRate / 100)),
+        efectivo: fallbackPricing.efectivo,
+        transferencia: fallbackPricing.transferencia,
+        tarjeta: fallbackPricing.tarjeta,
       };
 
       console.log('✅ COLLECT SERVICE DATA - Transport pricesByType fallback (includes all costs):', {
@@ -6926,20 +6997,48 @@ class ItineraryBuilder {
     const breakdowns = {};
     const prices = {};
 
+    // Nodos en efectivo; el recargo por forma de pago lo aplica el motor único, con las
+    // mismas reglas que transporte (vehículo/adicionales llevan recargo; la guía no).
+    const vehicleEfectivoBase = mainVehicleCost * tourDuration;
+    const guideEfectivoBase = guideRate * tourDuration;
+    const additionalEfectivoBase = additionalVehicleInfo
+      ? this.getPrimaryAdditionalVehiclePrice(additionalVehicleInfo.baseCost) * tourDuration : 0;
+    const extrasEfectivoBase = extraVehicleItemsForTour.reduce(
+      (sum, item) => sum + ((parseFloat(item.efectivoPrice) || 0) * tourDuration), 0,
+    );
+    const tourNodes = [
+      { key: 'vehicle', efectivo: vehicleEfectivoBase, surcharge: true },
+      { key: 'guide', efectivo: guideEfectivoBase, surcharge: false },
+      { key: 'additionalVehicle', efectivo: additionalEfectivoBase, surcharge: true },
+      { key: 'extraVehicles', efectivo: extrasEfectivoBase, surcharge: true },
+    ];
+    const tourPricing = window.PricingEngine
+      ? window.PricingEngine.composeServiceNodes({ transferRate: this.transferRate, agencyRate: this.agencyRate, nodes: tourNodes })
+      : (() => {
+        // Fallback (idéntico al motor) por si el motor no cargó.
+        const out = {
+          efectivo: 0, transferencia: 0, tarjeta: 0, nodes: {},
+        };
+        tourNodes.forEach((n) => {
+          const t = n.surcharge ? n.efectivo * (1 + (this.transferRate / 100)) : n.efectivo;
+          const c = n.surcharge ? n.efectivo * (1 + (this.agencyRate / 100)) : n.efectivo;
+          out.nodes[n.key] = { efectivo: n.efectivo, transferencia: t, tarjeta: c };
+          out.efectivo += n.efectivo;
+          out.transferencia += t;
+          out.tarjeta += c;
+        });
+        return out;
+      })();
+
     paymentTypes.forEach((paymentType) => {
       const multiplier = this.getPaymentMultiplier(paymentType);
 
-      // Calculate main vehicle cost with surcharge
-      const vehicleCost = mainVehicleCost * tourDuration * multiplier;
-      const guideCost = guideRate * tourDuration; // Guide doesn't get surcharge
-      // Use the per-vehicle manual price override (per-hour) when set, else the list cost.
-      const additionalCost = additionalVehicleInfo
-        ? this.getPrimaryAdditionalVehiclePrice(additionalVehicleInfo.baseCost) * tourDuration * multiplier : 0;
-      // Extras: each extra row's efectivo price × duration × payment multiplier
-      const extraVehiclesTotal = extraVehicleItemsForTour.reduce((sum, item) => {
-        const efectivoUnit = parseFloat(item.efectivoPrice) || 0;
-        return sum + (efectivoUnit * tourDuration * multiplier);
-      }, 0);
+      // Valores por nodo desde el motor (recargo en un solo lugar). multiplier se usa solo
+      // para el texto del desglose (precio por hora con recargo).
+      const vehicleCost = tourPricing.nodes.vehicle[paymentType];
+      const guideCost = tourPricing.nodes.guide[paymentType]; // Guide doesn't get surcharge
+      const additionalCost = tourPricing.nodes.additionalVehicle[paymentType];
+      const extraVehiclesTotal = tourPricing.nodes.extraVehicles[paymentType];
 
       // Debug guide cost calculation
       console.log(`👨‍🦯 ${paymentType} - Guide cost calculation:`, {
@@ -8538,36 +8637,46 @@ class ItineraryBuilder {
    * @example
    */
   calculateADisposicionPricing(paymentType, baseVehicleCostPerHour, hours, vehicleQuantity, guideRate = 0) {
-    // Calculate base vehicle cost (total for all vehicles and hours)
-    const baseVehicleTotal = Math.round((baseVehicleCostPerHour * hours * vehicleQuantity) * 100) / 100;
+    // Resuelve la moneda del DOM (igual que getDisplayPrice) y delega TODO el cálculo al
+    // motor único (PricingEngine.calculateADisposicion): vehículo × horas × cantidad +
+    // recargo por forma de pago + guía (sin recargo) + descuento por volumen, en un solo
+    // lugar. Antes esta función replicaba esa fórmula inline.
+    const currency = document.getElementById('currencySelect')?.value || 'MXN';
+    const params = {
+      baseVehicleCostPerHour,
+      hours,
+      vehicleQuantity,
+      guideRate,
+      paymentType,
+      currency,
+      transferRate: this.transferRate,
+      agencyRate: this.agencyRate,
+      exchangeRate: this.exchangeRate,
+      cashRoundingEnabled: true,
+    };
 
-    // Apply surcharge based on payment type — pasa el tipo por parámetro al motor,
-    // SIN mutar el DOM (eliminado el efecto secundario frágil sobre #priceTypeSelect).
-    const vehicleTotalWithSurcharge = Math.round(this.getDisplayPrice(baseVehicleTotal, { paymentType }) * 100) / 100;
+    if (window.PricingEngine) {
+      return window.PricingEngine.calculateADisposicion(params);
+    }
 
-    // Calculate guide cost (no surcharge applied to guide)
-    const guideTotalCost = Math.round((guideRate * hours * vehicleQuantity) * 100) / 100;
+    // Fallback (idéntico al motor) por si el motor no cargó.
+    const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const baseVehicleTotal = round2(baseVehicleCostPerHour * hours * vehicleQuantity);
+    const vehicleTotalWithSurcharge = round2(this.getDisplayPrice(baseVehicleTotal, { paymentType }));
+    const guideTotalCost = round2(guideRate * hours * vehicleQuantity);
+    const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost);
 
-    // Calculate base total (vehicle + guide)
-    const baseTotal = Math.round((vehicleTotalWithSurcharge + guideTotalCost) * 100) / 100;
-
-    // Calculate discount if applicable
     let discountAmount = 0;
     if (hours > 0) {
       const discountPercentage = this.getADisposicionDiscount(hours);
       if (discountPercentage > 0) {
-        // Descuento sobre el total CON recargo (coherente con el motor pricingEngine).
-        const finalCost = Math.round((vehicleTotalWithSurcharge + guideTotalCost) * 100) / 100;
-        discountAmount = Math.round((finalCost * (discountPercentage / 100)) * 100) / 100;
+        const finalCost = round2(vehicleTotalWithSurcharge + guideTotalCost);
+        discountAmount = round2(finalCost * (discountPercentage / 100));
       }
     }
 
-    // Calculate final amounts
-    const subtotal = Math.round((baseTotal - discountAmount) * 100) / 100;
-    const finalTotal = subtotal;
-
-    // Calculate hourly rate for display (per vehicle)
-    const hourlyRatePerVehicle = Math.round((vehicleTotalWithSurcharge / (hours * vehicleQuantity)) * 100) / 100;
+    const subtotal = round2(baseTotal - discountAmount);
+    const divisor = hours * vehicleQuantity;
 
     return {
       baseVehicleTotal,
@@ -8576,8 +8685,8 @@ class ItineraryBuilder {
       baseTotal,
       discountAmount,
       subtotal,
-      finalTotal,
-      hourlyRatePerVehicle,
+      finalTotal: subtotal,
+      hourlyRatePerVehicle: divisor > 0 ? round2(vehicleTotalWithSurcharge / divisor) : 0,
       paymentType,
     };
   }
@@ -8769,44 +8878,37 @@ class ItineraryBuilder {
         baseTotal = currentPrice || 0; // Safe fallback
       }
     } else if (serviceType === 'concepto') {
-      // For Concepto: Use CLIENT price as the base, not servicePrice
+      // For Concepto: base = precio unitario + (total de personas × precio por persona).
+      // Antes esta ruta (dev prices) omitía el por-persona, divergiendo del desglose (C2).
       const clientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
       const applySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
+      const pricePerPerson = parseFloat(document.getElementById('conceptoPricePerPerson')?.value || 0);
+      const totalPeople = (parseInt(document.getElementById('conceptoAdultsQuantity')?.value || 0))
+        + (parseInt(document.getElementById('conceptoChildrenQuantity')?.value || 0))
+        + (parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0));
+      const conceptoBaseEfectivo = clientPrice + (totalPeople * pricePerPerson);
 
-      // If surcharges are NOT applied, all payment types should be the same
-      if (!applySurcharges) {
-        // Set all fields to the same price (no surcharges)
-        if (efectivoField) efectivoField.value = clientPrice.toFixed(2);
-        if (transferenciaField) transferenciaField.value = clientPrice.toFixed(2);
-        if (tarjetaField) tarjetaField.value = clientPrice.toFixed(2);
-
-        console.log('💰 Concepto without surcharges - all payment types same:', {
-          clientPrice,
-          applySurcharges: false,
-          allPrices: clientPrice,
+      // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
+      const conceptoPricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: conceptoBaseEfectivo, surcharge: applySurcharges }],
+        })
+        : (applySurcharges ? {
+          efectivo: conceptoBaseEfectivo,
+          transferencia: conceptoBaseEfectivo * (1 + (this.transferRate / 100)),
+          tarjeta: conceptoBaseEfectivo * (1 + (this.agencyRate / 100)),
+        } : {
+          efectivo: conceptoBaseEfectivo,
+          transferencia: conceptoBaseEfectivo,
+          tarjeta: conceptoBaseEfectivo,
         });
-        return; // Exit early
-      }
 
-      // If surcharges ARE applied, calculate from client price base
-      const efectivoPrice = clientPrice;
-      const transferenciaPrice = clientPrice * (1 + (this.transferRate / 100));
-      const tarjetaPrice = clientPrice * (1 + (this.agencyRate / 100));
+      if (efectivoField) efectivoField.value = conceptoPricing.efectivo.toFixed(2);
+      if (transferenciaField) transferenciaField.value = conceptoPricing.transferencia.toFixed(2);
+      if (tarjetaField) tarjetaField.value = conceptoPricing.tarjeta.toFixed(2);
 
-      // Set the calculated prices
-      if (efectivoField) efectivoField.value = efectivoPrice.toFixed(2);
-      if (transferenciaField) transferenciaField.value = transferenciaPrice.toFixed(2);
-      if (tarjetaField) tarjetaField.value = tarjetaPrice.toFixed(2);
-
-      console.log('💰 Concepto with surcharges - calculated from client price:', {
-        clientPrice,
-        applySurcharges: true,
-        efectivo: efectivoPrice,
-        transferencia: transferenciaPrice,
-        tarjeta: tarjetaPrice,
-        transferRate: this.transferRate,
-        agencyRate: this.agencyRate,
-      });
       return; // Exit early - don't continue to general calculation
     } else {
       // For other non-tour, non-A Disposición, non-concepto services
@@ -9151,10 +9253,22 @@ class ItineraryBuilder {
       const personSubtotalTransfer = hasPerPerson ? totalPeople * pricePerPersonTransfer : 0;
       const personSubtotalTarjeta = hasPerPerson ? totalPeople * pricePerPersonTarjeta : 0;
 
-      const efectivoPrice = clientPrice + personSubtotalEfectivo;
       const transferenciaBase = clientPrice + personSubtotalEfectivo;
-      const transferenciaPrice = transferenciaBase * transferMult;
-      const tarjetaPrice = transferenciaBase * agencyMult;
+      // Totales por forma de pago vía el motor único (un solo nodo: el total base).
+      const conceptoTotals = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: transferenciaBase, surcharge: true }],
+        })
+        : {
+          efectivo: transferenciaBase,
+          transferencia: transferenciaBase * transferMult,
+          tarjeta: transferenciaBase * agencyMult,
+        };
+      const efectivoPrice = conceptoTotals.efectivo;
+      const transferenciaPrice = conceptoTotals.transferencia;
+      const tarjetaPrice = conceptoTotals.tarjeta;
 
       // Create breakdown texts for each payment type — per-person line appears
       // before the recargo / total so the math is obvious to read.
@@ -9218,16 +9332,12 @@ class ItineraryBuilder {
         return;
       }
 
-      // Calculate vehicle prices for each payment type
+      // Calculate vehicle efectivo base (el recargo por forma de pago lo aplica el motor abajo)
       const vehicleTotalEfectivo = efectivoBasePrice * quantity;
-      const vehicleTotalTransferencia = vehicleTotalEfectivo * (1 + (this.transferRate / 100));
-      const vehicleTotalTarjeta = vehicleTotalEfectivo * (1 + (this.agencyRate / 100));
 
       // Calculate waiting time costs if applicable
       const waitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
       let waitingCostEfectivo = 0;
-      let waitingCostTransferencia = 0;
-      let waitingCostTarjeta = 0;
       let waitingHourlyRate = 0;
 
       if (waitingHours > 0) {
@@ -9235,16 +9345,12 @@ class ItineraryBuilder {
         if (wtPrice) {
           waitingHourlyRate = wtPrice.pricePerHour;
           waitingCostEfectivo = waitingHourlyRate * waitingHours;
-          waitingCostTransferencia = waitingCostEfectivo * (1 + (this.transferRate / 100));
-          waitingCostTarjeta = waitingCostEfectivo * (1 + (this.agencyRate / 100));
         }
       }
 
       // Calculate guide costs if applicable
       const includeGuide = document.getElementById('includeGuide')?.checked || false;
       let guideCostEfectivo = 0;
-      let guideCostTransferencia = 0;
-      let guideCostTarjeta = 0;
       let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
 
       // When editing, use saved route duration if available
@@ -9257,26 +9363,18 @@ class ItineraryBuilder {
 
       if (includeGuide && routeDuration) {
         guideCostEfectivo = this.calculateGuideTransportCost(routeDuration);
-        guideCostTransferencia = guideCostEfectivo; // Guide cost doesn't get surcharge
-        guideCostTarjeta = guideCostEfectivo; // Guide cost doesn't get surcharge
       }
 
       // Calculate greeter costs if applicable
       const includeGreeter = document.getElementById('includeGreeter')?.checked || false;
       let greeterCostEfectivo = 0;
-      let greeterCostTransferencia = 0;
-      let greeterCostTarjeta = 0;
 
       if (includeGreeter && routeDuration) {
         greeterCostEfectivo = this.calculateGreeterPrice(routeDuration);
-        greeterCostTransferencia = greeterCostEfectivo; // Greeter cost doesn't get surcharge
-        greeterCostTarjeta = greeterCostEfectivo; // Greeter cost doesn't get surcharge
       }
 
       // Calculate additional vehicle costs if applicable
       let additionalVehicleCostEfectivo = 0;
-      let additionalVehicleCostTransferencia = 0;
-      let additionalVehicleCostTarjeta = 0;
       let additionalVehicleInfo = null;
 
       const additionalVehicleCheckbox = document.getElementById('additionalVehicleCheckbox');
@@ -9306,31 +9404,25 @@ class ItineraryBuilder {
         }
 
         // Apply the per-vehicle manual price override (falls back to the list price),
-        // then the leg multiplier for round-trip and the payment surcharges.
+        // then the leg multiplier for round-trip (el recargo lo aplica el motor abajo).
         additionalVehicleCostEfectivo = this.getPrimaryAdditionalVehiclePrice(additionalVehicleCostEfectivo);
         if (additionalVehicleCostEfectivo > 0) {
           additionalVehicleCostEfectivo *= legMultiplier;
-          additionalVehicleCostTransferencia = additionalVehicleCostEfectivo * (1 + (this.transferRate / 100));
-          additionalVehicleCostTarjeta = additionalVehicleCostEfectivo * (1 + (this.agencyRate / 100));
         }
       }
 
       // Extra additional vehicles (beyond the first) — sum their efectivo prices and
-      // apply the leg multiplier + payment surcharge the same way the primary additional
-      // vehicle does. Per-row items are kept so the breakdown text can show one line each.
+      // apply the leg multiplier. El recargo del total lo aplica el motor sobre la suma en
+      // efectivo; cada renglón conserva su propio valor con recargo para el texto del desglose.
       const extraVehicleItems = (additionalVehicleCheckbox?.checked && typeof this.getExtraAdditionalVehiclesBreakdownItems === 'function')
         ? this.getExtraAdditionalVehiclesBreakdownItems()
         : [];
       let extraVehiclesCostEfectivo = 0;
-      let extraVehiclesCostTransferencia = 0;
-      let extraVehiclesCostTarjeta = 0;
       const extraVehicleLines = extraVehicleItems.map((item) => {
         const efectivo = (parseFloat(item.efectivoPrice) || 0) * legMultiplier;
         const transferencia = efectivo * (1 + (this.transferRate / 100));
         const tarjeta = efectivo * (1 + (this.agencyRate / 100));
         extraVehiclesCostEfectivo += efectivo;
-        extraVehiclesCostTransferencia += transferencia;
-        extraVehiclesCostTarjeta += tarjeta;
         // Show the list (catalog) price alongside when a custom price overrides it.
         const listEfectivo = (parseFloat(item.listPrice) || 0) * legMultiplier;
         const listNote = (listEfectivo > 0 && Math.abs(listEfectivo - efectivo) > 0.01)
@@ -9344,11 +9436,52 @@ class ItineraryBuilder {
         };
       });
 
-      // Calculate total costs including waiting time, guide, greeter, primary additional
-      // vehicle and any extra additional vehicles.
-      const totalEfectivo = vehicleTotalEfectivo + waitingCostEfectivo + guideCostEfectivo + greeterCostEfectivo + additionalVehicleCostEfectivo + extraVehiclesCostEfectivo;
-      const totalTransferencia = vehicleTotalTransferencia + waitingCostTransferencia + guideCostTransferencia + greeterCostTransferencia + additionalVehicleCostTransferencia + extraVehiclesCostTransferencia;
-      const totalTarjeta = vehicleTotalTarjeta + waitingCostTarjeta + guideCostTarjeta + greeterCostTarjeta + additionalVehicleCostTarjeta + extraVehiclesCostTarjeta;
+      // Compone todos los nodos de costo del transporte con el motor único. El motor aplica
+      // la regla de recargo (vehículo, espera y vehículos adicionales sí lo reciben; guía y
+      // greeter no) y devuelve los totales por forma de pago + el desglose por nodo.
+      const transferRate = this.transferRate;
+      const agencyRate = this.agencyRate;
+      const transportNodes = [
+        { key: 'vehicle', efectivo: vehicleTotalEfectivo, surcharge: true },
+        { key: 'waiting', efectivo: waitingCostEfectivo, surcharge: true },
+        { key: 'guide', efectivo: guideCostEfectivo, surcharge: false },
+        { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: false },
+        { key: 'additionalVehicle', efectivo: additionalVehicleCostEfectivo, surcharge: true },
+        { key: 'extraVehicles', efectivo: extraVehiclesCostEfectivo, surcharge: true },
+      ];
+      const transportPricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({ transferRate, agencyRate, nodes: transportNodes })
+        : (() => {
+          // Fallback (idéntico al motor) por si el motor no cargó.
+          const out = {
+            efectivo: 0, transferencia: 0, tarjeta: 0, nodes: {},
+          };
+          transportNodes.forEach((n) => {
+            const t = n.surcharge ? n.efectivo * (1 + (transferRate / 100)) : n.efectivo;
+            const c = n.surcharge ? n.efectivo * (1 + (agencyRate / 100)) : n.efectivo;
+            out.nodes[n.key] = { efectivo: n.efectivo, transferencia: t, tarjeta: c };
+            out.efectivo += n.efectivo;
+            out.transferencia += t;
+            out.tarjeta += c;
+          });
+          return out;
+        })();
+
+      // Valores por nodo con recargo (se conservan los nombres originales para el desglose).
+      const vehicleTotalTransferencia = transportPricing.nodes.vehicle.transferencia;
+      const vehicleTotalTarjeta = transportPricing.nodes.vehicle.tarjeta;
+      const waitingCostTransferencia = transportPricing.nodes.waiting.transferencia;
+      const waitingCostTarjeta = transportPricing.nodes.waiting.tarjeta;
+      const guideCostTransferencia = transportPricing.nodes.guide.transferencia;
+      const guideCostTarjeta = transportPricing.nodes.guide.tarjeta;
+      const greeterCostTransferencia = transportPricing.nodes.greeter.transferencia;
+      const greeterCostTarjeta = transportPricing.nodes.greeter.tarjeta;
+      const additionalVehicleCostTransferencia = transportPricing.nodes.additionalVehicle.transferencia;
+      const additionalVehicleCostTarjeta = transportPricing.nodes.additionalVehicle.tarjeta;
+
+      const totalEfectivo = transportPricing.efectivo;
+      const totalTransferencia = transportPricing.transferencia;
+      const totalTarjeta = transportPricing.tarjeta;
 
       // Store totals for use in collectServiceData (like A Disposición does)
       this._transportBreakdownTotals = {
@@ -9491,10 +9624,10 @@ class ItineraryBuilder {
       const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value || 0);
       const noAlcoholQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
 
-      // Get prices
+      // Get prices (fallback niño/sin-alcohol → adulto, decisión E2 — igual que el guardado)
       const adultPrice = parseFloat(document.getElementById('adultPrice')?.value || 0);
-      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0);
-      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0);
+      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0) || adultPrice;
+      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0) || adultPrice;
 
       // Calculate base totals for each category
       const adultsTotal = adultsQty * adultPrice;
@@ -9504,10 +9637,21 @@ class ItineraryBuilder {
       // Calculate base total (efectivo)
       const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal;
 
-      // Calculate totals with surcharges
-      const efectivoTotal = baseTotal;
-      const transferenciaTotal = baseTotal * (1 + (this.transferRate / 100));
-      const tarjetaTotal = baseTotal * (1 + (this.agencyRate / 100));
+      // Totales por forma de pago vía el motor único (un solo nodo: el total base).
+      const experiencePricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: baseTotal, surcharge: true }],
+        })
+        : {
+          efectivo: baseTotal,
+          transferencia: baseTotal * (1 + (this.transferRate / 100)),
+          tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+        };
+      const efectivoTotal = experiencePricing.efectivo;
+      const transferenciaTotal = experiencePricing.transferencia;
+      const tarjetaTotal = experiencePricing.tarjeta;
 
       // Get dev payment fields
       const devPriceEfectivoField = document.getElementById('devPriceEfectivo');
@@ -9648,10 +9792,23 @@ class ItineraryBuilder {
           ? (parseFloat(document.getElementById('walkingTourManualPrice')?.value || 0))
           : groups.reduce((sum, g) => sum + resolveTierPrice(g.tier) * duration, 0);
 
-        // Calculate totals with surcharges (el manual cuenta como efectivo base)
-        const efectivoTotal = baseTotal;
-        const transferenciaTotal = baseTotal * (1 + (this.transferRate / 100));
-        const tarjetaTotal = baseTotal * (1 + (this.agencyRate / 100));
+        // Recargo por forma de pago vía el motor único (un solo nodo: el total base; el
+        // manual cuenta como efectivo base). La complejidad de tiers/grupos/override queda
+        // en baseTotal; la regla de recargo vive en un solo lugar.
+        const walkingPricing = window.PricingEngine
+          ? window.PricingEngine.composeServiceNodes({
+            transferRate: this.transferRate,
+            agencyRate: this.agencyRate,
+            nodes: [{ key: 'base', efectivo: baseTotal, surcharge: true }],
+          })
+          : {
+            efectivo: baseTotal,
+            transferencia: baseTotal * (1 + (this.transferRate / 100)),
+            tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+          };
+        const efectivoTotal = walkingPricing.efectivo;
+        const transferenciaTotal = walkingPricing.transferencia;
+        const tarjetaTotal = walkingPricing.tarjeta;
 
         // Get dev payment fields
         const devPriceEfectivoField = document.getElementById('devPriceEfectivo');
@@ -15105,13 +15262,11 @@ class ItineraryBuilder {
     console.log('🔥 CRITICAL DEBUG: Calling updateVehicleCapacityNote()');
     this.updateVehicleCapacityNote();
 
-    console.log('🔥 CRITICAL DEBUG: Calling updateServicePriceBreakdown()');
-    this.updateServicePriceBreakdown();
-
-    // CRITICAL FIX: Update dev breakdown when guide checkbox changes
-    console.log('🔥 CRITICAL DEBUG: About to call updateDevPaymentBreakdown()');
+    // Dev breakdown PRIMERO — puebla los campos devBreakdown* que lee
+    // updateServicePriceBreakdown. Si se invierte el orden, el desglose va "una
+    // interacción atrás" (muestra el estado previo de guía/greeter).
     this.updateDevPaymentBreakdown();
-    console.log('🔥 CRITICAL DEBUG: Finished calling updateDevPaymentBreakdown()');
+    this.updateServicePriceBreakdown();
   }
 
   /**
@@ -15128,10 +15283,11 @@ class ItineraryBuilder {
       // Just update the breakdown to show the surcharges
     }
     this.updateVehicleCapacityNote();
-    this.updateServicePriceBreakdown();
 
-    // CRITICAL FIX: Update dev breakdown when greeter checkbox changes
+    // Dev breakdown PRIMERO — puebla los campos devBreakdown* que lee
+    // updateServicePriceBreakdown (evita el desfase de "una interacción atrás").
     this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
   }
 
   updateVehicleCapacityNote() {
@@ -17210,46 +17366,54 @@ class ItineraryBuilder {
    * @example
    */
   calculateGuideTransportCost(durationMinutes) {
-    const durationHours = durationMinutes / 60;
-    if (!durationHours || durationHours <= 0) return 0;
-
-    // Get current rate
+    // Resuelve las tarifas/configuración (caché + evaluador) y delega el cálculo al motor
+    // único (PricingEngine.calculateGuideTransportCost). La fórmula vive en un solo lugar.
     const guideRate = this.guideTransportRateCache?.value || 400;
 
-    // Try to use the generic formula evaluator if available
+    let componentsCost = null;
+    let roundTripMultiplier = null;
+    let minimumCharge = 0;
+
+    // Evaluador de fórmula avanzada, si está disponible.
     if (typeof GuideFormulaEvaluator !== 'undefined' && GuideFormulaEvaluator.formulaConfig) {
       const config = GuideFormulaEvaluator.formulaConfig;
-
-      // Use advanced formula components if available
+      minimumCharge = config.minimumCharge || 0;
       if (config.formulaComponents && config.formulaComponents.length > 0) {
-        const calculatedCost = GuideFormulaEvaluator.evaluateComponents(config.formulaComponents, durationMinutes, guideRate);
-        const minimumCharge = config.minimumCharge || 0;
-        const finalCost = Math.max(calculatedCost, minimumCharge);
-        return finalCost;
-      }
-      // Otherwise use multiplier formula
-      if (config.roundTripMultiplier) {
-        const calculatedCost = durationHours * config.roundTripMultiplier * guideRate;
-        const minimumCharge = config.minimumCharge || 0;
-        const finalCost = Math.max(calculatedCost, minimumCharge);
-        console.log(`📊 [Quote] Using simple formula: ${durationHours}h × ${config.roundTripMultiplier} × $${guideRate} = $${finalCost}`);
-        return finalCost;
+        componentsCost = GuideFormulaEvaluator.evaluateComponents(config.formulaComponents, durationMinutes, guideRate);
+      } else if (config.roundTripMultiplier) {
+        roundTripMultiplier = config.roundTripMultiplier;
       }
     }
 
-    // Fallback to cached formula config or default
-    const formulaConfig = this.guideFormulaConfigCache || {
-      roundTripMultiplier: 2,
-      minimumCharge: 0,
+    // Fallback a la config cacheada o el default cuando no hay evaluador aplicable.
+    if (componentsCost === null && roundTripMultiplier === null) {
+      const formulaConfig = this.guideFormulaConfigCache || {
+        roundTripMultiplier: 2,
+        minimumCharge: 0,
+      };
+      roundTripMultiplier = formulaConfig.roundTripMultiplier;
+      minimumCharge = formulaConfig.minimumCharge || 0;
+    }
+
+    const params = {
+      durationMinutes,
+      guideRate,
+      roundTripMultiplier,
+      minimumCharge,
+      componentsCost,
     };
 
-    // Apply the configurable formula
-    const calculatedCost = durationHours * formulaConfig.roundTripMultiplier * guideRate;
+    if (window.PricingEngine) {
+      return window.PricingEngine.calculateGuideTransportCost(params);
+    }
 
-    // Apply minimum charge if configured
-    const finalCost = Math.max(calculatedCost, formulaConfig.minimumCharge);
-    console.log(`⚠️ [Quote] Using fallback formula: ${durationHours}h × ${formulaConfig.roundTripMultiplier} × $${guideRate} = $${finalCost}`);
-    return finalCost;
+    // Fallback (idéntico al motor) por si el motor no cargó.
+    const durationHours = durationMinutes / 60;
+    if (!durationHours || durationHours <= 0) return 0;
+    if (componentsCost !== null) {
+      return Math.max(componentsCost, minimumCharge);
+    }
+    return Math.max(durationHours * (roundTripMultiplier || 0) * guideRate, minimumCharge);
   }
 
   /**
@@ -17288,14 +17452,16 @@ class ItineraryBuilder {
     const basePrice = this.greeterRateCache?.basePrice || 760;
     const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
 
+    // Resuelve las tarifas (caché) y delega la fórmula al motor único. El redondeo
+    // especial se aplica al total del servicio, no aquí.
+    if (window.PricingEngine) {
+      return window.PricingEngine.calculateGreeterPrice({ durationMinutes, basePrice, hourlyRate });
+    }
+
+    // Fallback (idéntico al motor) por si el motor no cargó.
     const durationHours = durationMinutes / 60;
     if (!durationHours || durationHours <= 0) return basePrice;
-
-    // Calculate final price using configurable formula (no special rounding here)
-    // Note: Special rounding now applied to final service total, not individual greeter calculation
-    const finalPrice = basePrice + (hourlyRate * durationHours);
-
-    return finalPrice;
+    return basePrice + (hourlyRate * durationHours);
   }
 
   /**

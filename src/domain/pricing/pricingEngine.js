@@ -220,6 +220,94 @@ const PricingEngine = (() => {
   }
 
   // ============================================================
+  // NODOS DE TRANSPORTE (greeter, guia/chofer, composicion)
+  // ============================================================
+
+  /**
+   * Costo del greeter segun la duracion de la ruta (version sin DOM/cache de
+   * calculateGreeterPrice). Formula: basePrice + hourlyRate * horas. Si la duracion
+   * es 0 o invalida devuelve basePrice.
+   * @param {object} p - Parametros.
+   * @param {number} p.durationMinutes - Duracion de la ruta en minutos.
+   * @param {number} p.basePrice - Tarifa base del greeter.
+   * @param {number} p.hourlyRate - Tarifa por hora del greeter.
+   * @returns {number} Costo del greeter (sin recargo por forma de pago).
+   */
+  function calculateGreeterPrice(p) {
+    const o = p || {};
+    const basePrice = Number(o.basePrice) || 0;
+    const hourlyRate = Number(o.hourlyRate) || 0;
+    const durationHours = (Number(o.durationMinutes) || 0) / 60;
+    if (!durationHours || durationHours <= 0) return basePrice;
+    return basePrice + (hourlyRate * durationHours);
+  }
+
+  /**
+   * Costo de guia + chofer para transporte segun la duracion (version sin DOM/cache/
+   * evaluador de calculateGuideTransportCost). Si se pasa componentsCost (resultado del
+   * evaluador de formula avanzada) se usa ese valor; de lo contrario aplica la formula
+   * simple horas * roundTripMultiplier * guideRate. Siempre respeta el cargo minimo.
+   * Duracion 0 o invalida devuelve 0.
+   * @param {object} p - Parametros.
+   * @param {number} p.durationMinutes - Duracion de la ruta en minutos.
+   * @param {number} [p.guideRate] - Tarifa de guia por hora.
+   * @param {number} [p.roundTripMultiplier] - Multiplicador de la formula simple.
+   * @param {number} [p.minimumCharge] - Cargo minimo.
+   * @param {number} [p.componentsCost] - Costo precalculado por el evaluador avanzado.
+   * @returns {number} Costo de guia + chofer (sin recargo por forma de pago).
+   */
+  function calculateGuideTransportCost(p) {
+    const o = p || {};
+    const durationHours = (Number(o.durationMinutes) || 0) / 60;
+    if (!durationHours || durationHours <= 0) return 0;
+    const minimumCharge = Number(o.minimumCharge) || 0;
+    if (o.componentsCost !== undefined && o.componentsCost !== null) {
+      return Math.max(Number(o.componentsCost) || 0, minimumCharge);
+    }
+    const guideRate = Number(o.guideRate) || 0;
+    const roundTripMultiplier = Number(o.roundTripMultiplier) || 0;
+    const calculatedCost = durationHours * roundTripMultiplier * guideRate;
+    return Math.max(calculatedCost, minimumCharge);
+  }
+
+  /**
+   * Compositor generico de nodos de costo de un servicio (lo usan transporte y tours, y
+   * sirve para cualquier tipo con nodos). Cada nodo aporta su costo en efectivo (MXN) y
+   * declara si recibe recargo por forma de pago (p.ej. vehiculo/espera/adicionales si;
+   * guia/greeter no). Solo conoce la REGLA de recargo, no las tarifas ni que nodos existen
+   * (eso lo arma el caller). Devuelve los tres totales (efectivo/transferencia/tarjeta) y el
+   * desglose por nodo, para que builder, validacion backend y PDF compartan la misma regla.
+   * @param {object} p - Parametros.
+   * @param {number} [p.transferRate] - Porcentaje de recargo por transferencia.
+   * @param {number} [p.agencyRate] - Porcentaje de recargo por tarjeta.
+   * @param {Array<{key: string, efectivo: number, surcharge: boolean}>} [p.nodes] - Nodos de costo.
+   * @returns {object} Totales y desglose por nodo.
+   */
+  function composeServiceNodes(p) {
+    const o = p || {};
+    const transferRate = Number(o.transferRate) || 0;
+    const agencyRate = Number(o.agencyRate) || 0;
+    const nodes = Array.isArray(o.nodes) ? o.nodes : [];
+
+    const out = {
+      efectivo: 0,
+      transferencia: 0,
+      tarjeta: 0,
+      nodes: {},
+    };
+    nodes.forEach((n) => {
+      const base = Number(n.efectivo) || 0;
+      const transferencia = n.surcharge ? base * (1 + transferRate / 100) : base;
+      const tarjeta = n.surcharge ? base * (1 + agencyRate / 100) : base;
+      out.nodes[n.key] = { efectivo: base, transferencia, tarjeta };
+      out.efectivo += base;
+      out.transferencia += transferencia;
+      out.tarjeta += tarjeta;
+    });
+    return out;
+  }
+
+  // ============================================================
   // IVA / TOTALES
   // ============================================================
 
@@ -257,6 +345,9 @@ const PricingEngine = (() => {
     applyDisplayPrice,
     getADisposicionDiscount,
     calculateADisposicion,
+    calculateGreeterPrice,
+    calculateGuideTransportCost,
+    composeServiceNodes,
     DEFAULT_IVA_RATE,
     calcIVA,
     calcTotalWithIVA,
