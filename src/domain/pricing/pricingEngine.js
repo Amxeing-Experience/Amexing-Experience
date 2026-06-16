@@ -181,6 +181,7 @@ const PricingEngine = (() => {
    * @param {number} [p.exchangeRate] - Tipo de cambio USD.
    * @param {boolean} [p.cashRoundingEnabled] - Aplicar redondeo a efectivo.
    * @param {number} [p.greeterCost] - Costo del greeter en efectivo (add-on, recibe recargo, se suma tras el descuento).
+   * @param {number} [p.additionalVehiclesCost] - Efectivo sumado de vehiculos adicionales (recibe recargo, entra al descuento).
    * @returns {object} Desglose con totales por vehiculo, guia, greeter, descuento y subtotal.
    */
   function calculateADisposicion(p) {
@@ -194,16 +195,19 @@ const PricingEngine = (() => {
     // nodos lo reciben). Se aplica solo el porcentaje (applyPaymentRate); efectivo no cambia.
     const guideBaseTotal = round2(guideRate * hours * vehicleQuantity);
     const guideTotalCost = round2(applyPaymentRate(guideBaseTotal, p.paymentType || 'efectivo', p.transferRate, p.agencyRate));
-    const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost);
+    // Vehiculos adicionales (a-disp): el caller pasa el efectivo ya sumado (Sigma tarifa/h x
+    // horas por cada veh adicional). Reciben recargo y ENTRAN en la base con descuento (son
+    // tiempo de vehiculo, igual que el principal).
+    const additionalVehiclesBase = round2(Number(p.additionalVehiclesCost) || 0);
+    const additionalVehiclesTotal = round2(applyPaymentRate(additionalVehiclesBase, p.paymentType || 'efectivo', p.transferRate, p.agencyRate));
+    const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost + additionalVehiclesTotal);
 
     let discountAmount = 0;
     if (hours > 0) {
       const discountPercentage = getADisposicionDiscount(hours);
       if (discountPercentage > 0) {
-        // El descuento se calcula sobre el total CON recargo (coherente: descuento y
-        // total sobre la misma base). Antes se calculaba sobre la base sin recargo.
-        const finalCost = round2(vehicleTotalWithSurcharge + guideTotalCost);
-        discountAmount = round2(finalCost * (discountPercentage / 100));
+        // El descuento se calcula sobre el total CON recargo (vehiculo + guia + adicionales).
+        discountAmount = round2(baseTotal * (discountPercentage / 100));
       }
     }
 
@@ -218,6 +222,7 @@ const PricingEngine = (() => {
       baseVehicleTotal,
       vehicleTotalWithSurcharge,
       guideTotalCost,
+      additionalVehiclesTotal,
       greeterTotalCost,
       baseTotal,
       discountAmount,

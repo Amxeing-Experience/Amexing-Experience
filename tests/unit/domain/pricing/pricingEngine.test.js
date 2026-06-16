@@ -187,6 +187,23 @@ describe('PricingEngine — calculateADisposicion (desglose completo)', () => {
     expect(r.greeterTotalCost).toBe(1720); // efectivo: sin recargo
     expect(r.subtotal).toBe(9520); // 8000 − 200 + 1720
   });
+
+  it('vehículos adicionales entran al descuento (8h, efectivo)', () => {
+    const r = PricingEngine.calculateADisposicion({
+      baseVehicleCostPerHour: 500,
+      hours: 8,
+      vehicleQuantity: 1,
+      guideRate: 0,
+      additionalVehiclesCost: 2400, // efectivo ya sumado: 300/h × 8h
+      paymentType: 'efectivo',
+      currency: 'MXN',
+    });
+    expect(r.vehicleTotalWithSurcharge).toBe(4000);
+    expect(r.additionalVehiclesTotal).toBe(2400);
+    expect(r.baseTotal).toBe(6400); // 4000 + 0 + 2400
+    expect(r.discountAmount).toBe(160); // 2.5% de 6400 (incluye adicionales)
+    expect(r.subtotal).toBe(6240); // 6400 − 160
+  });
 });
 
 describe('PricingEngine — IVA / totales', () => {
