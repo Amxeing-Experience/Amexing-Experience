@@ -1469,12 +1469,24 @@ class ItineraryBuilder {
     if (transportChildrenField) transportChildrenField.value = numberOfChildren || '';
     if (transportInfantsField) transportInfantsField.value = numberOfInfants || '';
 
-    // Experience fields (only adults and children)
+    // Experience fields (adultos, niños, sin-alcohol). Se llenan con los datos de la
+    // cotización; si el valor es 0 se deja el campo VACÍO con placeholder "0" (no un 0 que el
+    // usuario tenga que borrar). Sin-alcohol no tiene dato de cotización → siempre placeholder.
     const experienceAdultsField = document.getElementById('adultsQuantity');
     const experienceChildrenField = document.getElementById('childrenQuantity');
+    const experienceNoAlcoholField = document.getElementById('adultsNoAlcoholQuantity');
 
-    if (experienceAdultsField) experienceAdultsField.value = numberOfAdults;
-    if (experienceChildrenField) experienceChildrenField.value = numberOfChildren;
+    if (experienceAdultsField) {
+      experienceAdultsField.value = numberOfAdults || '';
+      experienceAdultsField.placeholder = '0';
+    }
+    if (experienceChildrenField) {
+      experienceChildrenField.value = numberOfChildren || '';
+      experienceChildrenField.placeholder = '0';
+    }
+    if (experienceNoAlcoholField) {
+      experienceNoAlcoholField.placeholder = '0';
+    }
 
     // Concepto fields (auto-fill from quote information)
     const conceptoAdultsField = document.getElementById('conceptoAdultsQuantity');
