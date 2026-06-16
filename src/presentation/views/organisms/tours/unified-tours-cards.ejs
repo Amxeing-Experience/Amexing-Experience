@@ -1027,6 +1027,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
 .tour-info-value {
     color: #111827;
     font-weight: 600;
+    text-align: right;
 }
 
 .tour-price {
@@ -1997,7 +1998,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (validDays.length === 7) {
                     availabilityText = 'Todos los días';
                 } else if (validDays.length > 0) {
-                    const days = validDays.sort((a, b) => a - b).map(day => dayNames[day]).filter(Boolean);
+                    // Order Monday-first so Sunday (0) shows last (e.g. "Vi, Sa, Do")
+                    // instead of first; matches the detail view and locale expectations.
+                    const weekOrder = d => (d + 6) % 7;
+                    const days = validDays.sort((a, b) => weekOrder(a) - weekOrder(b)).map(day => dayNames[day]).filter(Boolean);
                     availabilityText = days.join(', ');
                 }
             }
@@ -3324,7 +3328,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="content-section">
                     <h5 class="text-info mb-3"><i class="ti ti-calendar me-2"></i>Horarios Sugeridos</h5>
                     <div class="availability-grid">
-                        ${Array.isArray(tour.availability) && tour.availability.length > 0 ? tour.availability.map(item => {
+                        ${Array.isArray(tour.availability) && tour.availability.length > 0 ? [...tour.availability].sort((a, b) => {
+                            const da = typeof a === 'object' && a ? a.day : a;
+                            const db = typeof b === 'object' && b ? b.day : b;
+                            return ((da + 6) % 7) - ((db + 6) % 7); // Monday-first, Sunday last
+                        }).map(item => {
                             const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
                             let dayName = '';
                             if (typeof item === 'object' && typeof item.day === 'number') {

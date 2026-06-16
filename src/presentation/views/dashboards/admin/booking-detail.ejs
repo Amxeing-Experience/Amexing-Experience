@@ -628,7 +628,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Assignment counter
         const totalSvc = (d.services || []).length;
-        const assignedSvc = (d.services || []).filter(s => s.status === 'assigned' || s.status === 'completed').length;
+        // Los servicios 'concepto' no requieren asignación → cuentan como asignados.
+        const assignedSvc = (d.services || []).filter(s => s.status === 'assigned' || s.status === 'completed' || s.type === 'concepto').length;
         const completedSvc = (d.services || []).filter(s => s.status === 'completed').length;
         const counterEl = document.getElementById('infoAssignmentCounter');
         if (totalSvc > 0) {
@@ -1006,13 +1007,13 @@ document.addEventListener('DOMContentLoaded', async function() {
                                     ${pairsHtml ? `<div class="d-flex flex-wrap gap-2">${pairsHtml}</div>` : ''}
                                     ${rolesHtml ? `<div class="d-flex flex-wrap gap-3 mt-2">${rolesHtml}</div>` : ''}
                                 </div>
-                            ` : '<div class="mt-2"><small class="text-muted">Sin asignar</small></div>'}
+                            ` : (svc.type === 'concepto' ? '<div class="mt-2"><small class="text-muted">No requiere asignación</small></div>' : '<div class="mt-2"><small class="text-muted">Sin asignar</small></div>')}
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        ${getReservationStatusBadge(svc.status)}
+                        ${svc.type === 'concepto' && svc.status !== 'cancelled' ? '<span class="badge bg-success text-white">Lista</span>' : getReservationStatusBadge(svc.status)}
                         <span class="text-end" style="min-width: 80px;">${formatCurrency(getServicePriceByType(svc, reservationData.paymentType), reservationData.currency)}</span>
-                        ${canAssign && svc.status !== 'cancelled' ? `<button class="btn btn-sm ${svc.status === 'completed' ? 'btn-success' : (svc.status === 'assigned' ? 'btn-outline-success' : 'btn-outline-secondary')} status-toggle-btn" data-service-id="${svc.id}" data-current-status="${svc.status}" title="${svc.status === 'completed' ? 'Revertir a asignada' : (svc.status === 'assigned' ? 'Marcar completada' : 'Marcar asignada')}"><i class="ti ${svc.status === 'completed' ? 'ti-circle-check-filled' : (svc.status === 'assigned' ? 'ti-circle-check' : 'ti-circle')}"></i></button>` : ''}
+                        ${canAssign && svc.status !== 'cancelled' && svc.type !== 'concepto' ? `<button class="btn btn-sm ${svc.status === 'completed' ? 'btn-success' : (svc.status === 'assigned' ? 'btn-outline-success' : 'btn-outline-secondary')} status-toggle-btn" data-service-id="${svc.id}" data-current-status="${svc.status}" title="${svc.status === 'completed' ? 'Revertir a asignada' : (svc.status === 'assigned' ? 'Marcar completada' : 'Marcar asignada')}"><i class="ti ${svc.status === 'completed' ? 'ti-circle-check-filled' : (svc.status === 'assigned' ? 'ti-circle-check' : 'ti-circle')}"></i></button>` : ''}
                         ${canAssign ? (() => {
             // Build the extras payload merging the REQUESTED list (from subconcept blob — never
             // overwritten by assignments) with any current assignment info already on the record.

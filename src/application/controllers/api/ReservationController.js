@@ -150,12 +150,13 @@ class ReservationController {
         'clientPtr', // 1 Cliente
         null, // 2 Propietario (computed: quotePtr.owner | createdBy)
         'eventType', // 3 Motivo de Viaje
-        'startDate', // 4 Fecha Inicio
-        'numberOfPeople', // 5 Personas
-        null, // 6 Servicios (computed)
-        'status', // 7 Estado
-        'updatedAt', // 8 Última Modificación
-        null, // 9 Acciones (orderable: false)
+        'contactPerson', // 4 Cliente Final
+        'startDate', // 5 Fecha Inicio
+        'numberOfPeople', // 6 Personas
+        null, // 7 Servicios (computed)
+        'status', // 8 Estado
+        'updatedAt', // 9 Última Modificación
+        null, // 10 Acciones (orderable: false)
       ];
       const orderField = columnMap[orderColumnIndex] || 'startDate';
 
@@ -1409,12 +1410,18 @@ class ReservationController {
     totalQuery.equalTo('exists', true);
     const totalCount = await totalQuery.count({ useMasterKey: true });
 
-    const assignedQuery = new Parse.Query('ReservationService');
-    assignedQuery.equalTo('reservationPtr', resPointer);
-    assignedQuery.equalTo('active', true);
-    assignedQuery.equalTo('exists', true);
-    assignedQuery.equalTo('status', 'assigned');
-    const assignedCount = await assignedQuery.count({ useMasterKey: true });
+    // Pendientes de asignación REALES: requieren asignación (no 'concepto') y siguen
+    // 'pending'. Los concepto no requieren asignación → no cuentan como pendientes.
+    const pendingQuery = new Parse.Query('ReservationService');
+    pendingQuery.equalTo('reservationPtr', resPointer);
+    pendingQuery.equalTo('active', true);
+    pendingQuery.equalTo('exists', true);
+    pendingQuery.notEqualTo('type', 'concepto');
+    pendingQuery.equalTo('status', 'pending');
+    const pendingCount = await pendingQuery.count({ useMasterKey: true });
+
+    // "Asignados" = total menos los realmente pendientes (concepto cuenta como satisfecho).
+    const assignedCount = totalCount - pendingCount;
 
     return { totalCount, assignedCount };
   }
@@ -1484,6 +1491,10 @@ class ReservationController {
       quoteStatus,
       clientName,
       clientType, // 'agency' | 'client' | null — para la etiqueta de tipo en la tabla
+      // Cliente Final: copiado a la reservación desde la cotización (no hace falta el quote).
+      contactPerson: reservation.get('contactPerson') || '',
+      leadGuestFirstName: reservation.get('leadGuestFirstName') || '',
+      leadGuestLastName: reservation.get('leadGuestLastName') || '',
       eventType: reservation.get('eventType') || '',
       startDate: reservation.get('startDate'),
       // endDate is exposed so the UI can explain (in local/dev) why a reservation
@@ -1520,8 +1531,13 @@ class ReservationController {
 
     const currentStatus = reservation.get('status');
     const statuses = services.map((s) => s.get('status'));
+    // Los servicios tipo 'concepto' NO requieren asignación, así que no deben mantener
+    // la reserva en 'pending' (Asignaciones pendientes). Se excluyen del check de asignación.
+    const assignableStatuses = services
+      .filter((s) => s.get('type') !== 'concepto')
+      .map((s) => s.get('status'));
     const allCompleted = statuses.every((s) => s === 'completed' || s === 'cancelled');
-    const allAssigned = statuses.every((s) => s === 'assigned' || s === 'completed' || s === 'cancelled');
+    const allAssigned = assignableStatuses.every((s) => s === 'assigned' || s === 'completed' || s === 'cancelled');
     const someInProgress = statuses.some((s) => s === 'in_progress');
 
     let newStatus = currentStatus;

@@ -29,6 +29,7 @@ const PricingEngine = (() => {
    * Redondea a 2 decimales (el redondeo estandar usado en todo el calculo).
    * @param {number} value - Valor a redondear.
    * @returns {number} Valor con 2 decimales.
+   * @example
    */
   function round2(value) {
     return Math.round((Number(value) || 0) * 100) / 100;
@@ -40,6 +41,7 @@ const PricingEngine = (() => {
    * igual a 2.7 baja; resto mayor a 2.7 sube. Identico a PricingUtils y pricingHelper.
    * @param {number} usdPrice - Precio USD a redondear.
    * @returns {number} Precio USD redondeado.
+   * @example
    */
   function applyUSDRoundingRules(usdPrice) {
     const base = Math.floor(usdPrice / 5) * 5;
@@ -62,6 +64,7 @@ const PricingEngine = (() => {
    * a 0.50 sube. Identico a PricingUtils.applyCashRounding.
    * @param {number} price - Precio a redondear.
    * @returns {number} Precio redondeado (multiplo de 5).
+   * @example
    */
   function applyCashRounding(price) {
     const integerPart = Math.floor(price);
@@ -76,13 +79,14 @@ const PricingEngine = (() => {
   }
 
   /**
-   * Aplica el recargo por forma de pago. transferencia usa transferRate, tarjeta usa
+   * Aplica el recargo por forma de pago. Transferencia usa transferRate, tarjeta usa
    * agencyRate, efectivo no cambia. Identico a PricingUtils.applyPaymentRate.
    * @param {number} price - Precio base.
-   * @param {string} paymentType - efectivo, transferencia o tarjeta.
+   * @param {string} paymentType - Efectivo, transferencia o tarjeta.
    * @param {number} transferRate - Porcentaje de recargo por transferencia.
    * @param {number} agencyRate - Porcentaje de recargo por tarjeta.
    * @returns {number} Precio con recargo aplicado.
+   * @example
    */
   function applyPaymentRate(price, paymentType, transferRate, agencyRate) {
     if (paymentType === 'transferencia') {
@@ -99,6 +103,7 @@ const PricingEngine = (() => {
    * centena, si no sube. Identico a pricingHelper.applyGreeterRounding.
    * @param {number} price - Precio a redondear.
    * @returns {number} Precio redondeado a la centena.
+   * @example
    */
   function applyGreeterRounding(price) {
     const integerPart = Math.floor(price);
@@ -123,13 +128,14 @@ const PricingEngine = (() => {
    * Version sin DOM de getDisplayPrice (que hoy lee y muta #priceTypeSelect).
    * @param {number} mxnPrice - Precio base en MXN.
    * @param {object} opts - Opciones de calculo.
-   * @param {string} [opts.paymentType] - efectivo, transferencia o tarjeta.
+   * @param {string} [opts.paymentType] - Efectivo, transferencia o tarjeta.
    * @param {string} [opts.currency] - MXN o USD.
    * @param {number} [opts.transferRate] - Porcentaje de recargo transferencia.
    * @param {number} [opts.agencyRate] - Porcentaje de recargo tarjeta.
    * @param {number} [opts.exchangeRate] - Tipo de cambio USD (MXN por USD).
    * @param {boolean} [opts.cashRoundingEnabled] - Aplicar redondeo a efectivo.
    * @returns {number} Precio mostrado en la moneda pedida.
+   * @example
    */
   function applyDisplayPrice(mxnPrice, opts) {
     const o = opts || {};
@@ -158,6 +164,7 @@ const PricingEngine = (() => {
    * Descuento por volumen de A-Disposicion segun horas (escalonado).
    * @param {number} hours - Horas del servicio.
    * @returns {number} Porcentaje de descuento.
+   * @example
    */
   function getADisposicionDiscount(hours) {
     if (hours >= 16) return 10;
@@ -174,13 +181,14 @@ const PricingEngine = (() => {
    * @param {number} p.hours - Horas.
    * @param {number} p.vehicleQuantity - Cantidad de vehiculos.
    * @param {number} [p.guideRate] - Tarifa de guia por hora por vehiculo (sin recargo).
-   * @param {string} [p.paymentType] - efectivo, transferencia o tarjeta.
+   * @param {string} [p.paymentType] - Efectivo, transferencia o tarjeta.
    * @param {string} [p.currency] - MXN o USD.
    * @param {number} [p.transferRate] - Porcentaje de recargo transferencia.
    * @param {number} [p.agencyRate] - Porcentaje de recargo tarjeta.
    * @param {number} [p.exchangeRate] - Tipo de cambio USD.
    * @param {boolean} [p.cashRoundingEnabled] - Aplicar redondeo a efectivo.
    * @returns {object} Desglose con totales por vehiculo, guia, descuento y subtotal.
+   * @example
    */
   function calculateADisposicion(p) {
     const hours = Number(p.hours) || 0;
@@ -231,6 +239,7 @@ const PricingEngine = (() => {
    * @param {number} subtotal - Subtotal base.
    * @param {number} [ivaRate] - Tasa de IVA (default 0.16).
    * @returns {number} IVA redondeado a 2 decimales.
+   * @example
    */
   function calcIVA(subtotal, ivaRate) {
     const rate = (ivaRate === undefined || ivaRate === null) ? DEFAULT_IVA_RATE : ivaRate;
@@ -242,6 +251,7 @@ const PricingEngine = (() => {
    * @param {number} subtotal - Subtotal base.
    * @param {number} [ivaRate] - Tasa de IVA (default 0.16).
    * @returns {number} Total con IVA.
+   * @example
    */
   function calcTotalWithIVA(subtotal, ivaRate) {
     const s = Number(subtotal) || 0;

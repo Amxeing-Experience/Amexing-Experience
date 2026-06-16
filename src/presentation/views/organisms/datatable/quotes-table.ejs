@@ -96,6 +96,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         <th>Folio</th>
                         <% if (showClientColumn) { %><th>Cliente</th><% } %>
                         <th>Propietario de la cotización</th>
+                        <th>Motivo de Viaje</th>
                         <th>Cliente Final</th>
                         <th class="text-center">No. Personas</th>
                         <th class="text-center">Fecha inicio de servicios</th>
@@ -592,6 +593,13 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     }
                 },
                 {
+                    data: 'eventType',
+                    render: function(data) {
+                        if (!data || !data.trim()) return '<em class="text-muted">—</em>';
+                        return `<span>${data}</span>`;
+                    }
+                },
+                {
                     data: 'contactPerson',
                     render: function(data, type, row) {
                         const name = (data && data.trim())
@@ -621,11 +629,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     render: function(data, type, row) {
                         const serviceItems = row.serviceItems || {};
                         const days = serviceItems.days || [];
-                        
-                        if (days.length === 0) {
-                            return '<em class="text-muted">Sin servicios</em>';
-                        }
-                        
+
                         let startDate = null;
                         for (const day of days) {
                             if (day.date) {
@@ -635,24 +639,34 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                                 }
                             }
                         }
-                        
+
+                        // Valor ordenable (timestamp) para que el orden en cliente sea
+                        // cronológico y no lexicográfico sobre "DD/MM/YYYY". Sin fecha
+                        // => al final cuando es ascendente.
+                        if (type === 'sort' || type === 'type') {
+                            return startDate ? startDate.getTime() : Number.POSITIVE_INFINITY;
+                        }
+
+                        if (days.length === 0) {
+                            return '<em class="text-muted">Sin servicios</em>';
+                        }
                         if (!startDate) {
                             return '<em class="text-muted">Sin fecha</em>';
                         }
-                        
+
                         const dateStr = startDate.toLocaleDateString('es-MX', {
                             year: 'numeric',
                             month: '2-digit',
                             day: '2-digit'
                         });
-                        
+
                         return `<div class="fw-semibold text-info">${dateStr}</div>`;
                     }
                 },
                 {
                     data: 'createdAt',
                     className: 'text-center',
-                    visible: false, // Hidden per request (still used for default ordering)
+                    visible: false, // Hidden; el orden por defecto ahora es Fecha inicio de servicios
                     render: function(data) {
                         if (!data) return '<em class="text-muted">N/A</em>';
                         const date = new Date(data);
@@ -875,11 +889,18 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     }
                 }] : [])
             ],
+            columnDefs: [
+                // Solo "Fecha inicio de servicios" es ordenable; el resto se deshabilita.
+                // Índice de esa columna: 6 con la columna Cliente (admin) / 5 sin ella.
+                { orderable: false, targets: '_all' },
+                { orderable: true, targets: [<%= showClientColumn ? 6 : 5 %>] }
+            ],
             language: {
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando Cotizaciones...'
             },
-            order: [[<%= showClientColumn ? 8 : 7 %>, 'desc']], // Sort by updatedAt by default (most recent first). Index: with Cliente column (admin/superadmin) updatedAt is 8, otherwise 7
+            // Orden por defecto: Fecha inicio de servicios ascendente (lo más próximo primero).
+            order: [[<%= showClientColumn ? 6 : 5 %>, 'asc']],
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
