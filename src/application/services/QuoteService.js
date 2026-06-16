@@ -1896,6 +1896,15 @@ class QuoteService {
             reservationId: reservation.id,
             servicesCount: servicesToSave.length,
           });
+
+          // Status inicial: los servicios 'concepto' no requieren asignación. Si NO hay
+          // servicios asignables (todos concepto), la reserva nace 'assigned' (lista), no
+          // 'pending' (Asignaciones pendientes). Si hay asignables, queda 'pending'.
+          const hasAssignable = servicesToSave.some((s) => s.get('type') !== 'concepto');
+          if (!hasAssignable) {
+            reservation.set('status', 'assigned');
+            await reservation.save(null, { useMasterKey: true });
+          }
         } catch (servicesError) {
           logger.error('❌ Failed to save reservation services', {
             quoteId: quote.id,

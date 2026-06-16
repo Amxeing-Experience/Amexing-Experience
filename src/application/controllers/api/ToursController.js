@@ -385,7 +385,7 @@ class ToursController {
           return {
             id: tourPrice.id,
             price,
-            formattedPrice: `$${Math.round(price).toLocaleString()} MXN`,
+            formattedPrice: `$${Number(price).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`,
             rate: rate ? {
               id: rate.id,
               name: rate.get('name'),
@@ -1224,7 +1224,7 @@ class ToursController {
           }
 
           // Format price to MXN
-          const formattedPrice = `$${Math.round(price).toLocaleString()} MXN`;
+          const formattedPrice = `$${Number(price).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`;
 
           pricesMap[tourId].push({
             id: tourPrice.id,
@@ -1519,7 +1519,7 @@ class ToursController {
         const price = tourPrice.get('price') || 0;
 
         // Format price to MXN
-        const formattedPrice = `$${Math.round(price).toLocaleString()} MXN`;
+        const formattedPrice = `$${Number(price).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`;
 
         return {
           id: tourPrice.id,
@@ -1681,7 +1681,7 @@ class ToursController {
         return {
           id: tourPrice.id,
           price: finalPrice,
-          formattedPrice: `$${Math.round(finalPrice).toLocaleString()} MXN`,
+          formattedPrice: `$${Number(finalPrice).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`,
           basePrice,
           isClientPrice: hasClientPrice,
           rate: rate
@@ -1719,7 +1719,7 @@ class ToursController {
             formattedPrices.push({
               id: `client_${clientPrice.id}`, // Use client price ID with prefix
               price: clientPriceValue,
-              formattedPrice: `$${Math.round(clientPriceValue).toLocaleString()} MXN`,
+              formattedPrice: `$${Number(clientPriceValue).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`,
               basePrice: 0, // No base price since there's no TourPrice record
               isClientPrice: true,
               rate: ratePtr

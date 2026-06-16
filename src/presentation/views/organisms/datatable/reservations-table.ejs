@@ -153,6 +153,7 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                                     <th>Cliente</th>
                                     <th>Propietario</th>
                                     <th>Motivo de Viaje</th>
+                                    <th>Cliente Final</th>
                                     <th class="text-center">Fecha Inicio</th>
                                     <th class="text-center">Personas</th>
                                     <th class="text-center">Servicios</th>
@@ -391,6 +392,15 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             { data: 'eventType', defaultContent: '—' },
             {
+                data: 'contactPerson',
+                render: function(data, type, row) {
+                    const name = (data && data.trim())
+                        || `${row.leadGuestFirstName || ''} ${row.leadGuestLastName || ''}`.trim();
+                    if (!name) return '<em class="text-muted">—</em>';
+                    return `<span>${name}</span>`;
+                }
+            },
+            {
                 data: 'startDate',
                 className: 'text-center',
                 render: function(data, type, row) {
@@ -443,14 +453,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         ],
         columnDefs: [
-            // Solo "Fecha Inicio" (col 4) es ordenable; el resto se deshabilita.
+            // Solo "Fecha Inicio" (col 5) es ordenable; el resto se deshabilita.
             // Cliente, Propietario y Servicios no tienen un campo de orden fiable en
             // Parse, y se optó por dejar el ordenamiento únicamente por fecha de inicio.
-            { orderable: false, targets: [0, 1, 2, 3, 5, 6, 7, 8, 9] },
+            { orderable: false, targets: [0, 1, 2, 3, 4, 6, 7, 8, 9, 10] },
         ],
         // Orden por defecto: Fecha Inicio asc (pill inicial = Próximas).
         // En cada cambio de pill se reajusta con applyDefaultOrder().
-        order: [[4, 'asc']],
+        order: [[5, 'asc']],
         language: {
             processing: 'Cargando...',
             search: 'Buscar:',
@@ -526,8 +536,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return false;
     }
 
-    // Índice de la columna "Fecha Inicio" en la tabla (Folio=0 ... Fecha Inicio=4).
-    const STARTDATE_COL = 4;
+    // Índice de la columna "Fecha Inicio" en la tabla (Folio=0 ... Fecha Inicio=5).
+    const STARTDATE_COL = 5;
 
     // Dirección de orden por defecto de "Fecha Inicio" según el pill activo:
     //   Próximas / En curso → asc (lo más próximo primero)

@@ -82,9 +82,12 @@ class ServicesController {
 
       // If specific rate requested, filter by it
       if (rateId) {
+        // The Rate class is 'Rate' (singular). Using 'Rates' here made the pointer
+        // never match, so this rate filter returned 0 rows and the caller fell back
+        // to showing ANY rate's price under the selected rate's label.
         ratePricesQuery.equalTo('rate', {
           __type: 'Pointer',
-          className: 'Rates',
+          className: 'Rate',
           objectId: rateId,
         });
       }
@@ -93,39 +96,19 @@ class ServicesController {
       if (specificVehicleId) {
         ratePricesQuery.equalTo('vehicleType', {
           __type: 'Pointer',
-          className: 'VehicleTypes',
+          className: 'VehicleType', // class is 'VehicleType' (singular)
           objectId: specificVehicleId,
         });
       }
 
-      let ratePrices = await ratePricesQuery.find({ useMasterKey: true });
+      const ratePrices = await ratePricesQuery.find({ useMasterKey: true });
 
       if (ratePrices.length === 0) {
-        // FALLBACK: If specific rateId was requested but no pricing found, try without rateId filter
-        if (rateId) {
-          const fallbackRatePricesQuery = new Parse.Query('RatePrices');
-          fallbackRatePricesQuery.equalTo('service', {
-            __type: 'Pointer',
-            className: 'Services',
-            objectId: serviceId,
-          });
-          fallbackRatePricesQuery.equalTo('exists', true);
-          fallbackRatePricesQuery.equalTo('active', true);
-          fallbackRatePricesQuery.doesNotExist('valid_until'); // Only active (non-historical) prices
-          fallbackRatePricesQuery.include(['rate', 'vehicleType', 'service']);
-          fallbackRatePricesQuery.ascending('rate'); // Get consistent ordering
-
-          const fallbackRatePrices = await fallbackRatePricesQuery.find({ useMasterKey: true });
-
-          if (fallbackRatePrices.length > 0) {
-            // Use the fallback pricing
-            ratePrices = fallbackRatePrices;
-          } else {
-            return null; // No pricing data found
-          }
-        } else {
-          return null; // No pricing data found
-        }
+        // Sin fallback a otros rates: si se pidió un rate específico (p.ej. Económico)
+        // y NO tiene precios, no se deben mostrar los de otro rate (mostraba los de
+        // Premium bajo la etiqueta de Económico → mala UX). Devolver null para que el
+        // servicio aparezca como "Sin precios para <rate>" en la tabla.
+        return null;
       }
 
       // Get client-specific prices if clientId provided
@@ -231,7 +214,12 @@ class ServicesController {
 
           return result;
         }
-        // Use all vehicles if none match the specific rate
+        // Si se pidió un rate específico y ningún vehículo coincide, NO devolver los de
+        // otro rate (mostraría precios de otra tarifa bajo la seleccionada → mala UX).
+        if (rateId) {
+          return null;
+        }
+        // Sin rate específico: devolver todos.
         const result = allVehiclePricing[0];
         result.allVehicleOptions = allVehiclePricing;
 
@@ -248,7 +236,7 @@ class ServicesController {
         matchingRatePrices = ratePrices.filter((rp) => rp.get('rate')?.id === rateId);
 
         if (matchingRatePrices.length === 0) {
-          matchingRatePrices = ratePrices;
+          return null; // sin precios para el rate pedido → no caer a otro rate
         }
       }
 
@@ -845,7 +833,7 @@ class ServicesController {
                   ratePriceQuery.include(['rate', 'vehicleType']);
 
                   if (rateId) {
-                    const ratePointer = new Parse.Object('Rates');
+                    const ratePointer = new Parse.Object('Rate'); // class is 'Rate' (singular)
                     ratePointer.id = rateId;
                     ratePriceQuery.equalTo('rate', ratePointer);
                   }
@@ -981,9 +969,13 @@ class ServicesController {
                 } catch (fallbackError) {
                   console.error('❌ FALLBACK ERROR:', fallbackError.message);
                 }
-              } else {
-                // FALLBACK 3: Final fallback - try to get any available pricing
-                // for this service when other methods have failed
+              } else if (!rateId) {
+                // Final fallback ONLY when NO rate is selected (e.g. initial load):
+                // show any available price so the row isn't blank. If a specific rate
+                // IS selected and the helper returned null, we intentionally show
+                // nothing here — substituting another rate's price made e.g. a
+                // Premium price appear under the "Económico" label (wrong rate).
+                // The frontend then renders "Sin precios para <rate>".
 
                 try {
                   // Get any RatePrice for this service (prefer Economic rate if available)

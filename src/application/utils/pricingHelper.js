@@ -366,6 +366,7 @@ class PricingHelper {
    * Descuento por volumen de A-Disposición según horas.
    * @param {number} hours
    * @returns {number} Porcentaje de descuento.
+   * @example
    */
   getADisposicionDiscount(hours) {
     return pricingEngine.getADisposicionDiscount(hours);
@@ -373,8 +374,9 @@ class PricingHelper {
 
   /**
    * Cálculo completo de A-Disposición con los rates por parámetro (no hardcodeados).
-   * @param {object} params - ver pricingEngine.calculateADisposicion.
+   * @param {object} params - Ver pricingEngine.calculateADisposicion.
    * @returns {object} Desglose completo.
+   * @example
    */
   calculateADisposicion(params) {
     return pricingEngine.calculateADisposicion(params);
@@ -385,6 +387,7 @@ class PricingHelper {
    * @param {number} subtotal
    * @param {number} [ivaRate]
    * @returns {number}
+   * @example
    */
   calcIVA(subtotal, ivaRate) {
     return pricingEngine.calcIVA(subtotal, ivaRate);
@@ -395,6 +398,7 @@ class PricingHelper {
    * @param {number} subtotal
    * @param {number} [ivaRate]
    * @returns {number}
+   * @example
    */
   calcTotalWithIVA(subtotal, ivaRate) {
     return pricingEngine.calcTotalWithIVA(subtotal, ivaRate);
@@ -408,6 +412,7 @@ class PricingHelper {
    * Mantiene la misma forma que getPriceBreakdown para no romper a los consumidores.
    * @param {number} basePrice - Precio base (efectivo) en MXN.
    * @returns {object} { basePrice, surcharge: 0, totalPrice: basePrice, surchargePercentage: 0 }.
+   * @example
    */
   getBasePriceBreakdown(basePrice) {
     const base = pricingEngine.round2(basePrice);

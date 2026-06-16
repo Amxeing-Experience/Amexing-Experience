@@ -54,10 +54,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             <i class="ti ti-plus me-1"></i>
                             Nuevo Cliente
                         </button>
-                        <button type="button" class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#bulkImportModal">
-                            <i class="ti ti-file-upload me-1"></i>
-                            Carga Masiva
-                        </button>
                     </div>
                 <% } %>
             </div>
@@ -825,6 +821,21 @@ document.addEventListener('DOMContentLoaded', function() {
     color: #f76b1c !important;
     border: 1px solid #f76b1c;
     background-color: transparent !important;
+}
+
+/* Processing indicator: DataTables positions it absolutely inside the table by
+   default, so on taller result sets (Todos/Agencias) it lands off-screen and
+   only shows for short ones (Clientes). Pin it fixed-centered so the "Procesando..."
+   loader is consistently visible — keep the default DataTables look, only reposition. */
+#<%= dtTableId %>_wrapper .dataTables_processing {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    /* Cancel DataTables' default negative margins (margin-left/-top) which would
+       stack with the transform and push the loader up-left ("chueco"). */
+    margin: 0;
+    transform: translate(-50%, -50%);
+    z-index: 1060;
 }
 
 </style>

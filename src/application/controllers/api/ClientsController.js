@@ -493,6 +493,13 @@ class ClientsController {
         'Status changed via clients dashboard'
       );
 
+      // toggleUserStatus returns { success:false, message } on a soft failure (e.g.
+      // permission denied) WITHOUT throwing — surface it instead of masking it as a
+      // success (that left the agency unchanged while the UI showed "exitoso").
+      if (!result || !result.success) {
+        return this.sendError(res, result?.message || 'No se pudo cambiar el estado del cliente', 403);
+      }
+
       this.sendSuccess(res, result, `Client ${active ? 'activated' : 'deactivated'} successfully`);
     } catch (error) {
       logger.error('Error in ClientsController.toggleClientStatus', {
@@ -536,6 +543,11 @@ class ClientsController {
       // Admin views can opt in to see inactive clients too (mirrors tours/experiences).
       // Defaults to false so existing consumers keep getting active-only results.
       const includeInactive = req.query.includeInactive === 'true';
+      // Sorting (DataTables sends the column's data key + direction). Only allow
+      // fields that exist on the formatted rows so the column headers actually sort.
+      const allowedSortFields = ['name', 'email', 'active', 'createdAt', 'updatedAt'];
+      const sortField = allowedSortFields.includes(req.query.sortField) ? req.query.sortField : 'createdAt';
+      const sortDirection = (req.query.sortDirection || 'desc').toLowerCase() === 'asc' ? 1 : -1;
 
       logger.info('getMixedClients called with filters', {
         type,
@@ -553,6 +565,10 @@ class ClientsController {
       let totalAgenciesCount = 0;
       let totalDirectClientsCount = 0;
       let paginatedData = [];
+      // Effective totals AFTER the in-memory search filter (what the table shows).
+      let effectiveTotal = 0;
+      let agenciesShown = 0;
+      let clientsShown = 0;
 
       if (type === 'all' || type === 'agencies') {
         const agencyOptions = {
@@ -580,10 +596,9 @@ class ClientsController {
           clientCountQuery.equalTo('active', true);
         }
 
-        if (search) {
-          clientCountQuery.matches('name', search, 'i');
-        }
-
+        // NOTE: search is applied in-memory across the merged set (see below), not
+        // here, so this counts all clients of this type — they all get loaded and
+        // then filtered, which lets search match email too (not just name).
         totalDirectClientsCount = await clientCountQuery.count({ useMasterKey: true });
       }
 
@@ -640,8 +655,12 @@ class ClientsController {
             clientQuery.equalTo('active', true);
           }
 
-          if (search) {
-            clientQuery.matches('name', search, 'i');
+          // Parse's find() defaults to 100 results. Agencies + direct clients are
+          // merged, sorted and paginated in memory here, so we must load ALL matching
+          // direct clients (use the count computed above) or rows past 100 would be
+          // invisible to sorting/pagination.
+          if (totalDirectClientsCount > 0) {
+            clientQuery.limit(totalDirectClientsCount);
           }
 
           const clientResults = await clientQuery.find({ useMasterKey: true });
@@ -663,11 +682,47 @@ class ClientsController {
           allData.push(...directClients);
         }
 
-        // Sort combined data by creation date (newest first)
-        allData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        // Free-text search across BOTH types in memory. getUsers ignores the
+        // search option and direct clients were only matchable by name, so filter
+        // the merged set here on name + email + contact name — consistent results
+        // in every tab (Todos / Agencias / Clientes).
+        let rows = allData;
+        if (search) {
+          const q = search.toLowerCase();
+          rows = allData.filter((r) => [r.name, r.email, r.firstName, r.lastName]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(q));
+        }
+
+        effectiveTotal = rows.length;
+        agenciesShown = rows.filter((r) => r.type === 'agency').length;
+        clientsShown = rows.filter((r) => r.type === 'client').length;
+
+        // Sort combined data by the requested field/direction so the DataTable
+        // column headers work (agencies + direct clients are merged, so sorting
+        // must happen here on the combined set, not per-query).
+        rows.sort((a, b) => {
+          let av = a[sortField];
+          let bv = b[sortField];
+          if (sortField === 'createdAt' || sortField === 'updatedAt') {
+            av = av ? new Date(av).getTime() : 0;
+            bv = bv ? new Date(bv).getTime() : 0;
+          } else if (typeof av === 'boolean' || typeof bv === 'boolean') {
+            av = av ? 1 : 0;
+            bv = bv ? 1 : 0;
+          } else {
+            av = (av ?? '').toString().toLowerCase();
+            bv = (bv ?? '').toString().toLowerCase();
+          }
+          if (av < bv) return -1 * sortDirection;
+          if (av > bv) return 1 * sortDirection;
+          return 0;
+        });
 
         // Apply pagination
-        paginatedData = allData.slice(skip, skip + limit);
+        paginatedData = rows.slice(skip, skip + limit);
       }
 
       return res.json({
@@ -678,13 +733,13 @@ class ClientsController {
         pagination: {
           page,
           limit,
-          totalCount,
-          totalPages: Math.ceil(totalCount / limit),
+          totalCount: effectiveTotal,
+          totalPages: Math.ceil(effectiveTotal / limit),
         },
         summary: {
-          totalAgencies: totalAgenciesCount,
-          totalDirectClients: totalDirectClientsCount,
-          totalCombined: totalCount,
+          totalAgencies: agenciesShown,
+          totalDirectClients: clientsShown,
+          totalCombined: effectiveTotal,
         },
       });
     } catch (error) {
