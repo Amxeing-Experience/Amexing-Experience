@@ -740,15 +740,24 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 </div>
                             </div>
 
-                            <!-- Guía/Chofer Option -->
+                            <!-- Guía / Greeter Options -->
                             <div class="row mb-3">
-                                <div class="col-md-12">
+                                <div class="col-md-6">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" id="aDisposicionGuide">
                                         <label class="form-check-label" for="aDisposicionGuide">
-                                            <i class="ti ti-user me-1"></i>Incluir Chofer
+                                            <i class="ti ti-user me-1"></i>Incluir Guía
                                         </label>
-                                        <small class="text-muted d-block ms-4">Se agregará el costo del conductor turístico especializado</small>
+                                        <small class="text-muted d-block ms-4">Se agregará el costo de la guía</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="aDisposicionGreeter">
+                                        <label class="form-check-label" for="aDisposicionGreeter">
+                                            <i class="ti ti-user-check me-1"></i>Incluir Greeter
+                                        </label>
+                                        <small class="text-muted d-block ms-4">Se agregará el costo del greeter</small>
                                     </div>
                                 </div>
                             </div>

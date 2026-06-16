@@ -180,7 +180,8 @@ const PricingEngine = (() => {
    * @param {number} [p.agencyRate] - Porcentaje de recargo tarjeta.
    * @param {number} [p.exchangeRate] - Tipo de cambio USD.
    * @param {boolean} [p.cashRoundingEnabled] - Aplicar redondeo a efectivo.
-   * @returns {object} Desglose con totales por vehiculo, guia, descuento y subtotal.
+   * @param {number} [p.greeterCost] - Costo del greeter en efectivo (add-on, recibe recargo, se suma tras el descuento).
+   * @returns {object} Desglose con totales por vehiculo, guia, greeter, descuento y subtotal.
    */
   function calculateADisposicion(p) {
     const hours = Number(p.hours) || 0;
@@ -206,13 +207,18 @@ const PricingEngine = (() => {
       }
     }
 
-    const subtotal = round2(baseTotal - discountAmount);
+    // Greeter: add-on que recibe recargo y se suma DESPUES del descuento (no se descuenta).
+    const greeterBaseTotal = round2(Number(p.greeterCost) || 0);
+    const greeterTotalCost = round2(applyPaymentRate(greeterBaseTotal, p.paymentType || 'efectivo', p.transferRate, p.agencyRate));
+
+    const subtotal = round2(baseTotal - discountAmount + greeterTotalCost);
     const divisor = hours * vehicleQuantity;
 
     return {
       baseVehicleTotal,
       vehicleTotalWithSurcharge,
       guideTotalCost,
+      greeterTotalCost,
       baseTotal,
       discountAmount,
       subtotal,

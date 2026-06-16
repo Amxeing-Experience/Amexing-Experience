@@ -154,6 +154,39 @@ describe('PricingEngine — calculateADisposicion (desglose completo)', () => {
     expect(r.subtotal).toBe(2472);
     expect(r.hourlyRatePerVehicle).toBe(515); // 2060 / 4
   });
+
+  it('greeter add-on: recibe recargo y se suma después (transferencia, 4h)', () => {
+    const r = PricingEngine.calculateADisposicion({
+      baseVehicleCostPerHour: 500,
+      hours: 4,
+      vehicleQuantity: 1,
+      guideRate: 0,
+      greeterCost: 1720, // base en efectivo (base 760 + 640×1.5, etc.)
+      paymentType: 'transferencia',
+      transferRate: 3,
+      currency: 'MXN',
+    });
+    expect(r.vehicleTotalWithSurcharge).toBe(2060); // 2000 × 1.03
+    expect(r.greeterTotalCost).toBeCloseTo(1771.6, 4); // 1720 × 1.03 (con recargo)
+    expect(r.discountAmount).toBe(0);
+    expect(r.subtotal).toBeCloseTo(3831.6, 4); // 2060 + 1771.6
+  });
+
+  it('greeter NO entra en el descuento por volumen (8h, descuento solo a vehículo+guía)', () => {
+    const r = PricingEngine.calculateADisposicion({
+      baseVehicleCostPerHour: 500,
+      hours: 8,
+      vehicleQuantity: 2,
+      guideRate: 0,
+      greeterCost: 1720,
+      paymentType: 'efectivo',
+      currency: 'MXN',
+    });
+    expect(r.baseVehicleTotal).toBe(8000);
+    expect(r.discountAmount).toBe(200); // 2.5% de 8000 (NO de 9720)
+    expect(r.greeterTotalCost).toBe(1720); // efectivo: sin recargo
+    expect(r.subtotal).toBe(9520); // 8000 − 200 + 1720
+  });
 });
 
 describe('PricingEngine — IVA / totales', () => {

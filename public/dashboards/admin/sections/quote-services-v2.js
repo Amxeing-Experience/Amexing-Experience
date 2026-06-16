@@ -902,6 +902,17 @@ class ItineraryBuilder {
       }, 50);
     });
 
+    // A disposición greeter checkbox listener - update pricing and breakdown
+    document.getElementById('aDisposicionGreeter')?.addEventListener('change', (e) => {
+      this.serviceModified = true;
+      qsDevLog('🚗 A Disposición greeter checkbox changed:', e.target.checked);
+      this.calculateADisposicionPrice();
+      this.updateDevPaymentBreakdown();
+      setTimeout(() => {
+        this.updateServicePriceBreakdown();
+      }, 50);
+    });
+
     // Price input listener - update conversion preview when user types a price
     const servicePriceField = document.getElementById('servicePrice');
     if (servicePriceField) {
@@ -4620,6 +4631,7 @@ class ItineraryBuilder {
 
         // Collect includeGuide checkbox state for A disposición
         data.includeGuide = document.getElementById('aDisposicionGuide')?.checked || false;
+        data.includeGreeter = document.getElementById('aDisposicionGreeter')?.checked || false;
 
         // Store vehicle name for display
         const adVehicleSelect = document.getElementById('aDisposicionVehicle');
@@ -6299,6 +6311,12 @@ class ItineraryBuilder {
         const aDisposicionGuideCheckbox = document.getElementById('aDisposicionGuide');
         if (aDisposicionGuideCheckbox) {
           aDisposicionGuideCheckbox.checked = service.includeGuide || false;
+        }
+
+        // Restore includeGreeter checkbox state for A disposición
+        const aDisposicionGreeterCheckbox = document.getElementById('aDisposicionGreeter');
+        if (aDisposicionGreeterCheckbox) {
+          aDisposicionGreeterCheckbox.checked = service.includeGreeter || false;
         }
 
         // Only recalculate price if no custom price override is set
@@ -8637,14 +8655,20 @@ class ItineraryBuilder {
   calculateADisposicionPricing(paymentType, baseVehicleCostPerHour, hours, vehicleQuantity, guideRate = 0) {
     // Resuelve la moneda del DOM (igual que getDisplayPrice) y delega TODO el cálculo al
     // motor único (PricingEngine.calculateADisposicion): vehículo × horas × cantidad +
-    // recargo por forma de pago + guía (sin recargo) + descuento por volumen, en un solo
-    // lugar. Antes esta función replicaba esa fórmula inline.
+    // recargo (vehículo y guía) + descuento por volumen + greeter (add-on, con recargo,
+    // sin descuento), en un solo lugar.
     const currency = document.getElementById('currencySelect')?.value || 'MXN';
+    // Greeter opcional: misma fórmula que transporte (base + tarifa/h × horas), en efectivo;
+    // el motor le aplica el recargo. Se suma DESPUÉS del descuento por volumen.
+    const greeterCost = document.getElementById('aDisposicionGreeter')?.checked
+      ? this.calculateGreeterPrice(hours * 60)
+      : 0;
     const params = {
       baseVehicleCostPerHour,
       hours,
       vehicleQuantity,
       guideRate,
+      greeterCost,
       paymentType,
       currency,
       transferRate: this.transferRate,
@@ -8659,9 +8683,11 @@ class ItineraryBuilder {
 
     // Fallback (idéntico al motor) por si el motor no cargó.
     const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const surchargePct = paymentType === 'transferencia' ? (this.transferRate / 100)
+      : paymentType === 'tarjeta' ? (this.agencyRate / 100) : 0;
     const baseVehicleTotal = round2(baseVehicleCostPerHour * hours * vehicleQuantity);
     const vehicleTotalWithSurcharge = round2(this.getDisplayPrice(baseVehicleTotal, { paymentType }));
-    const guideTotalCost = round2(guideRate * hours * vehicleQuantity);
+    const guideTotalCost = round2((guideRate * hours * vehicleQuantity) * (1 + surchargePct));
     const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost);
 
     let discountAmount = 0;
@@ -8673,13 +8699,15 @@ class ItineraryBuilder {
       }
     }
 
-    const subtotal = round2(baseTotal - discountAmount);
+    const greeterTotalCost = round2(greeterCost * (1 + surchargePct));
+    const subtotal = round2(baseTotal - discountAmount + greeterTotalCost);
     const divisor = hours * vehicleQuantity;
 
     return {
       baseVehicleTotal,
       vehicleTotalWithSurcharge,
       guideTotalCost,
+      greeterTotalCost,
       baseTotal,
       discountAmount,
       subtotal,
@@ -9980,12 +10008,17 @@ class ItineraryBuilder {
     const cardTotal = cardPricing.finalTotal;
     const cardHourlyRate = cardPricing.hourlyRatePerVehicle;
 
+    // Greeter (add-on con recargo, ya calculado por el motor por forma de pago)
+    const greeterTotalEfectivo = efectivoPricing.greeterTotalCost || 0;
+    const greeterTotalTransfer = transferPricing.greeterTotalCost || 0;
+    const greeterTotalCard = cardPricing.greeterTotalCost || 0;
+
     // Discount amount (same for all payment types)
     const { discountAmount } = efectivoPricing;
 
-    const efectivoBreakdown = this.formatPaymentBreakdown('Efectivo', efectivoHourlyRate, guideRate, vehicleTotalEfectivo, guideTotalEfectivo, efectivoBaseTotal, discountAmount, efectivoSubtotal, efectivoTotal, tourDuration, vehicleQuantity, additionalVehicleInfo);
-    const transferenciaBreakdown = this.formatPaymentBreakdown('Transferencia', transferHourlyRate, guideRate, vehicleTotalTransfer, guideTotalTransfer, transferBaseTotal, discountAmount, transferSubtotal, transferTotal, tourDuration, vehicleQuantity, additionalVehicleInfo);
-    const tarjetaBreakdown = this.formatPaymentBreakdown('Tarjeta', cardHourlyRate, guideRate, vehicleTotalCard, guideTotalCard, cardBaseTotal, discountAmount, cardSubtotal, cardTotal, tourDuration, vehicleQuantity, additionalVehicleInfo);
+    const efectivoBreakdown = this.formatPaymentBreakdown('Efectivo', efectivoHourlyRate, guideRate, vehicleTotalEfectivo, guideTotalEfectivo, efectivoBaseTotal, discountAmount, efectivoSubtotal, efectivoTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalEfectivo);
+    const transferenciaBreakdown = this.formatPaymentBreakdown('Transferencia', transferHourlyRate, guideRate, vehicleTotalTransfer, guideTotalTransfer, transferBaseTotal, discountAmount, transferSubtotal, transferTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalTransfer);
+    const tarjetaBreakdown = this.formatPaymentBreakdown('Tarjeta', cardHourlyRate, guideRate, vehicleTotalCard, guideTotalCard, cardBaseTotal, discountAmount, cardSubtotal, cardTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalCard);
 
     // Comprehensive debugging for A Disposición breakdown calculations
     if (serviceType === 'a-disposicion') {
@@ -10141,7 +10174,7 @@ class ItineraryBuilder {
    * @param additionalVehicleInfo
    * @example
    */
-  formatPaymentBreakdown(paymentType, vehicleCostPerHour, guideCostPerHour, vehicleTotal, guideTotal, baseTotal, discountAmount, subtotal, total, duration = 1, vehicleQuantity = 1, additionalVehicleInfo = null) {
+  formatPaymentBreakdown(paymentType, vehicleCostPerHour, guideCostPerHour, vehicleTotal, guideTotal, baseTotal, discountAmount, subtotal, total, duration = 1, vehicleQuantity = 1, additionalVehicleInfo = null, greeterTotal = 0) {
     let breakdown = '';
 
     // Check service type for specific formatting
@@ -10240,6 +10273,11 @@ class ItineraryBuilder {
     // Add volume discount line if applicable
     if (discountAmount > 0) {
       breakdown += `Descuento por volumen: -$${discountAmount.toFixed(2)}\n`;
+    }
+
+    // Greeter add-on line (después del descuento; el greeter no se descuenta)
+    if (greeterTotal > 0) {
+      breakdown += `Greeter: $${greeterTotal.toFixed(2)}\n`;
     }
 
     // Calculate final total including additional vehicle

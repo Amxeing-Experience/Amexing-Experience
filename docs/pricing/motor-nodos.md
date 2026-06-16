@@ -16,6 +16,10 @@ redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el
 - **Vehículo principal de transporte = siempre 1.** El campo "Cantidad" no multiplica el
   vehículo principal; para varios vehículos se usan **vehículos adicionales** (siempre
   desglosados).
+- **A-Disposición:** la opción de chofer se renombró a **"Incluir Guía"** (solo etiqueta; el
+  id/rate internos siguen igual). Se agregó **"Incluir Greeter"**: mismo cálculo que transporte
+  (base + tarifa/h × horas), con recargo, y se suma **después** del descuento por volumen (el
+  greeter no se descuenta). Persiste como `includeGreeter`.
 
 ## Estado por tipo de servicio
 
@@ -23,7 +27,7 @@ redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el
 | :-- | :-- | :-- | :-- |
 | **Transporte** | ✅ vehículo · espera · guía/chofer · greeter · vehículo adicional · extras | ✅ ruta principal **y** fallback | **HECHO** (ver abajo) |
 | **Tours (con vehículos)** | ✅ vehículo · guía · vehículo adicional · extras (reusa `composeServiceNodes`) | ✅ `calculateVehicleTourDevBreakdown` usa el motor | **HECHO** |
-| **A-Disposición** | ✅ vehículo × horas × cantidad · guía · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
+| **A-Disposición** | ✅ vehículo × horas × cantidad · guía · **greeter (add-on)** · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
 | **Experiencias** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ guardado + desglose | **HECHO** (sin duración; ver abajo) |
 | **Walking tours** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ desglose + fallback | **HECHO** (tiers/override en baseTotal) |
 | **Concepto** | ✅ recargo vía `composeServiceNodes` (1 nodo: unitario + por persona) | ✅ guardado + dev prices + desglose | **HECHO** (fix por-persona + C2) |
