@@ -14,7 +14,7 @@ redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el
 | **Transporte** | ✅ vehículo · espera · guía/chofer · greeter · vehículo adicional · extras | ✅ ruta principal **y** fallback | **HECHO** (ver abajo) |
 | **Tours (con vehículos)** | ✅ vehículo · guía · vehículo adicional · extras (reusa `composeServiceNodes`) | ✅ `calculateVehicleTourDevBreakdown` usa el motor | **HECHO** |
 | **A-Disposición** | ✅ vehículo × horas × cantidad · guía · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
-| Experiencias | ⚪ pendiente | inline | por persona × duración |
+| **Experiencias** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ guardado + desglose | **HECHO** (sin duración; ver abajo) |
 | Walking tours | ⚪ pendiente | inline | tiers / varios grupos |
 | Concepto | ⚪ pendiente | inline | precio cliente + por persona |
 | Backend (validar al guardar) | ❌ | — | hoy es passthrough; debe re-correr el motor |
@@ -67,6 +67,21 @@ cashRoundingEnabled })`, con fallback idéntico si el motor no cargó. Todos los
 en efectivo (vehículo · guía · vehículo adicional · extras) y **reusa
 `PricingEngine.composeServiceNodes`** (con fallback). El texto del desglose queda igual; los
 totales (`pricesByType` los parsea `collectServiceData` del texto) salen del motor.
+
+## Experiencias — qué se hizo (4º nodo conectado)
+
+`collectServiceData` (precio guardado) y el desglose ahora arman el total base
+(adultos·niños·sin-alcohol × precio) y aplican el recargo vía
+`PricingEngine.composeServiceNodes` (un solo nodo `base`, con recargo).
+
+**Fix de valor (decisión del cliente):** el **fallback de precio de niño/sin-alcohol → precio
+de adulto** (E2) estaba solo en `calculateServicePrice` (preview); ahora también en el precio
+**guardado** y el desglose (`childPrice || adultPrice`, igual sin-alcohol). Antes el guardado
+cobraba $0 por niño/sin-alcohol cuando faltaba ese precio (divergía del preview).
+
+**Duración:** se decidió dejar experiencias **plano** (por persona, sin duración). Hoy no hay
+campo de duración para experiencias y el `× duration` de `calculateServicePrice` es no-op
+(`service.duration` nunca se setea → `|| 1`). Sin cambio.
 
 ## Pendientes diferidos (bugs de desglose / display, NO de cálculo)
 

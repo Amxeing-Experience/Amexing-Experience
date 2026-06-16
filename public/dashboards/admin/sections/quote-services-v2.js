@@ -3469,19 +3469,34 @@ class ItineraryBuilder {
       const noAlcoholQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
 
       const adultPrice = parseFloat(document.getElementById('adultPrice')?.value || 0);
-      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0);
-      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0);
+      // Fallback de precio de niño / sin-alcohol al de adulto cuando falta (decisión E2,
+      // igual que calculateServicePrice). Antes el precio GUARDADO cobraba $0 por esos.
+      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0) || adultPrice;
+      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0) || adultPrice;
 
       // Calculate base total (efectivo)
       const baseTotal = (adultsQty * adultPrice)
         + (childrenQty * childPrice)
         + (noAlcoholQty * noAlcoholPrice);
 
+      // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
+      const experiencePricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: baseTotal, surcharge: true }],
+        })
+        : {
+          efectivo: baseTotal,
+          transferencia: baseTotal * (1 + (this.transferRate / 100)),
+          tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+        };
+
       // Calculate all payment types
       pricesByType = {
-        efectivo: baseTotal,
-        transferencia: baseTotal * (1 + (this.transferRate / 100)),
-        tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+        efectivo: experiencePricing.efectivo,
+        transferencia: experiencePricing.transferencia,
+        tarjeta: experiencePricing.tarjeta,
       };
 
       // Update basePriceEfectivo for consistency
@@ -9576,10 +9591,10 @@ class ItineraryBuilder {
       const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value || 0);
       const noAlcoholQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
 
-      // Get prices
+      // Get prices (fallback niño/sin-alcohol → adulto, decisión E2 — igual que el guardado)
       const adultPrice = parseFloat(document.getElementById('adultPrice')?.value || 0);
-      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0);
-      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0);
+      const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0) || adultPrice;
+      const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0) || adultPrice;
 
       // Calculate base totals for each category
       const adultsTotal = adultsQty * adultPrice;
@@ -9589,10 +9604,21 @@ class ItineraryBuilder {
       // Calculate base total (efectivo)
       const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal;
 
-      // Calculate totals with surcharges
-      const efectivoTotal = baseTotal;
-      const transferenciaTotal = baseTotal * (1 + (this.transferRate / 100));
-      const tarjetaTotal = baseTotal * (1 + (this.agencyRate / 100));
+      // Totales por forma de pago vía el motor único (un solo nodo: el total base).
+      const experiencePricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: baseTotal, surcharge: true }],
+        })
+        : {
+          efectivo: baseTotal,
+          transferencia: baseTotal * (1 + (this.transferRate / 100)),
+          tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+        };
+      const efectivoTotal = experiencePricing.efectivo;
+      const transferenciaTotal = experiencePricing.transferencia;
+      const tarjetaTotal = experiencePricing.tarjeta;
 
       // Get dev payment fields
       const devPriceEfectivoField = document.getElementById('devPriceEfectivo');
