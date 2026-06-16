@@ -15982,9 +15982,13 @@ class ItineraryBuilder {
 
     // Refresca el dev breakdown (fuente de verdad vía el motor) ANTES de cualquier desglose
     // —tours incluidos— para que el service breakdown SIEMPRE espeje datos frescos y nunca
-    // vaya "una interacción atrás", sin depender del orden en que cada listener llame. Es la
-    // garantía global contra la queja del cliente (dev primero, luego service).
-    this.updateDevPaymentBreakdown();
+    // vaya "una interacción atrás", sin depender del orden en que cada listener llame.
+    // En try/catch para que un fallo del refresh NUNCA aborte el render del desglose.
+    try {
+      this.updateDevPaymentBreakdown();
+    } catch (devRefreshError) {
+      console.warn('⚠️ No se pudo refrescar el dev breakdown antes del desglose:', devRefreshError);
+    }
 
     // CHECK IF IT'S A WALKING TOUR FIRST
     let isWalkingTour = false;
@@ -16942,9 +16946,10 @@ class ItineraryBuilder {
       // Call debug payment breakdown with items for component analysis
       this.updateModalDebugPaymentTypes(pricesByType, items);
 
-      // Update dev payment prices and breakdown AFTER we have all the data
+      // Update dev payment prices AFTER we have all the data. El dev breakdown ya se
+      // refrescó al inicio de esta función; recomputarlo aquí corría la función pesada otra
+      // vez por llamada (lentitud). Se elimina esa segunda corrida.
       this.updateDevPaymentPrices();
-      this.updateDevPaymentBreakdown();
     } catch (error) {
       console.warn('⚠️ Debug payment section update failed:', error);
     }
