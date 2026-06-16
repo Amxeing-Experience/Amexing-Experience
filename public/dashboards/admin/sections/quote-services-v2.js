@@ -3736,7 +3736,7 @@ class ItineraryBuilder {
         { key: 'additionalVehicle', efectivo: additionalVehicleCostEfectivo, surcharge: true },
       ];
       const fallbackPricing = window.PricingEngine
-        ? window.PricingEngine.calculateTransport({
+        ? window.PricingEngine.composeServiceNodes({
           transferRate: fallbackTransferRate, agencyRate: fallbackAgencyRate, nodes: fallbackNodes,
         })
         : (() => {
@@ -6970,7 +6970,7 @@ class ItineraryBuilder {
       { key: 'extraVehicles', efectivo: extrasEfectivoBase, surcharge: true },
     ];
     const tourPricing = window.PricingEngine
-      ? window.PricingEngine.calculateTransport({ transferRate: this.transferRate, agencyRate: this.agencyRate, nodes: tourNodes })
+      ? window.PricingEngine.composeServiceNodes({ transferRate: this.transferRate, agencyRate: this.agencyRate, nodes: tourNodes })
       : (() => {
         // Fallback (idéntico al motor) por si el motor no cargó.
         const out = {
@@ -9402,7 +9402,7 @@ class ItineraryBuilder {
         { key: 'extraVehicles', efectivo: extraVehiclesCostEfectivo, surcharge: true },
       ];
       const transportPricing = window.PricingEngine
-        ? window.PricingEngine.calculateTransport({ transferRate, agencyRate, nodes: transportNodes })
+        ? window.PricingEngine.composeServiceNodes({ transferRate, agencyRate, nodes: transportNodes })
         : (() => {
           // Fallback (idéntico al motor) por si el motor no cargó.
           const out = {

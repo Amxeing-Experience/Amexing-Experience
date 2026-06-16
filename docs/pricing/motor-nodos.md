@@ -12,7 +12,7 @@ redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el
 | Tipo | Nodos en el motor | Front conectado | Notas |
 | :-- | :-- | :-- | :-- |
 | **Transporte** | ✅ vehículo · espera · guía/chofer · greeter · vehículo adicional · extras | ✅ ruta principal **y** fallback | **HECHO** (ver abajo) |
-| **Tours (con vehículos)** | ✅ vehículo · guía · vehículo adicional · extras (reusa `calculateTransport`) | ✅ `calculateVehicleTourDevBreakdown` usa el motor | **HECHO** |
+| **Tours (con vehículos)** | ✅ vehículo · guía · vehículo adicional · extras (reusa `composeServiceNodes`) | ✅ `calculateVehicleTourDevBreakdown` usa el motor | **HECHO** |
 | **A-Disposición** | ✅ vehículo × horas × cantidad · guía · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
 | Experiencias | ⚪ pendiente | inline | por persona × duración |
 | Walking tours | ⚪ pendiente | inline | tiers / varios grupos |
@@ -29,7 +29,7 @@ Funciones nuevas en el motor (puras, con golden tests en
 - `calculateGuideTransportCost({ durationMinutes, guideRate, roundTripMultiplier, minimumCharge, componentsCost })`
   — fórmula simple `horas × multiplicador × tarifa`, respeta cargo mínimo, y soporta el
   evaluador avanzado (`componentsCost`). Duración 0 → 0. Sin recargo.
-- `calculateTransport({ transferRate, agencyRate, nodes:[{key, efectivo, surcharge}] })`
+- `composeServiceNodes({ transferRate, agencyRate, nodes:[{key, efectivo, surcharge}] })`
   — compone los nodos y aplica la **regla de recargo en un solo lugar**: vehículo, espera y
   vehículos adicionales **sí** reciben recargo; guía y greeter **no**. Devuelve los tres
   totales (efectivo/transferencia/tarjeta) + el desglose por nodo.
@@ -39,7 +39,7 @@ Front reconectado (`public/dashboards/admin/sections/quote-services-v2.js`):
 1. `calculateGuideTransportCost` y `calculateGreeterPrice` ahora **resuelven caché/config** y
    **delegan la fórmula al motor** (con fallback idéntico si el motor no cargó).
 2. El bloque de desglose (`updateDevPaymentBreakdown`) arma los nodos en efectivo y llama a
-   `PricingEngine.calculateTransport`; de ahí salen `_transportBreakdownTotals` (lo que se
+   `PricingEngine.composeServiceNodes`; de ahí salen `_transportBreakdownTotals` (lo que se
    guarda en `pricesByType`).
 3. El **fallback** de `collectServiceData` (al editar sin recalcular) también pasa por el motor.
 
@@ -65,7 +65,7 @@ cashRoundingEnabled })`, con fallback idéntico si el motor no cargó. Todos los
 `calculateVehicleTourDevBreakdown` calculaba por forma de pago con `getPaymentMultiplier`
 (= `1 + rate/100`), guía sin recargo — misma forma que transporte. Ahora precomputa los nodos
 en efectivo (vehículo · guía · vehículo adicional · extras) y **reusa
-`PricingEngine.calculateTransport`** (con fallback). El texto del desglose queda igual; los
+`PricingEngine.composeServiceNodes`** (con fallback). El texto del desglose queda igual; los
 totales (`pricesByType` los parsea `collectServiceData` del texto) salen del motor.
 
 ## Pendientes diferidos (bugs de desglose / display, NO de cálculo)

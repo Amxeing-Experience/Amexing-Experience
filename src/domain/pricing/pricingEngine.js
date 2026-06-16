@@ -271,19 +271,19 @@ const PricingEngine = (() => {
   }
 
   /**
-   * Compone el precio total de un servicio de transporte a partir de sus nodos de costo.
-   * Cada nodo aporta su costo en efectivo (MXN) y declara si recibe recargo por forma de
-   * pago: vehiculo, tiempo de espera y vehiculos adicionales si; guia y greeter no.
-   * Devuelve los tres totales (efectivo/transferencia/tarjeta) y el desglose por nodo.
-   * Reproduce la suma actual del builder (mismo orden de nodos) en un solo lugar, para
-   * que builder, validacion backend y PDF compartan la misma regla de recargo.
+   * Compositor generico de nodos de costo de un servicio (lo usan transporte y tours, y
+   * sirve para cualquier tipo con nodos). Cada nodo aporta su costo en efectivo (MXN) y
+   * declara si recibe recargo por forma de pago (p.ej. vehiculo/espera/adicionales si;
+   * guia/greeter no). Solo conoce la REGLA de recargo, no las tarifas ni que nodos existen
+   * (eso lo arma el caller). Devuelve los tres totales (efectivo/transferencia/tarjeta) y el
+   * desglose por nodo, para que builder, validacion backend y PDF compartan la misma regla.
    * @param {object} p - Parametros.
    * @param {number} [p.transferRate] - Porcentaje de recargo por transferencia.
    * @param {number} [p.agencyRate] - Porcentaje de recargo por tarjeta.
    * @param {Array<{key: string, efectivo: number, surcharge: boolean}>} [p.nodes] - Nodos de costo.
    * @returns {object} Totales y desglose por nodo.
    */
-  function calculateTransport(p) {
+  function composeServiceNodes(p) {
     const o = p || {};
     const transferRate = Number(o.transferRate) || 0;
     const agencyRate = Number(o.agencyRate) || 0;
@@ -347,7 +347,7 @@ const PricingEngine = (() => {
     calculateADisposicion,
     calculateGreeterPrice,
     calculateGuideTransportCost,
-    calculateTransport,
+    composeServiceNodes,
     DEFAULT_IVA_RATE,
     calcIVA,
     calcTotalWithIVA,

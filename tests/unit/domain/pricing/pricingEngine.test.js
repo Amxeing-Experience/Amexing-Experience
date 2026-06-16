@@ -207,11 +207,11 @@ describe('PricingEngine — guía/chofer (calculateGuideTransportCost)', () => {
   });
 });
 
-describe('PricingEngine — composición de transporte (calculateTransport)', () => {
+describe('PricingEngine — composición de nodos (composeServiceNodes)', () => {
   const RATES = { transferRate: 3, agencyRate: 5 };
 
   it('vehículo solo: recarga transferencia/tarjeta, sin otros nodos', () => {
-    const r = PricingEngine.calculateTransport({
+    const r = PricingEngine.composeServiceNodes({
       ...RATES,
       nodes: [{ key: 'vehicle', efectivo: 3000, surcharge: true }],
     });
@@ -221,7 +221,7 @@ describe('PricingEngine — composición de transporte (calculateTransport)', ()
   });
 
   it('guía y greeter NO reciben recargo (efectivo == transferencia == tarjeta)', () => {
-    const r = PricingEngine.calculateTransport({
+    const r = PricingEngine.composeServiceNodes({
       ...RATES,
       nodes: [
         { key: 'guide', efectivo: 1200, surcharge: false },
@@ -238,7 +238,7 @@ describe('PricingEngine — composición de transporte (calculateTransport)', ()
   });
 
   it('composición completa: vehículo + espera + guía + greeter + vehículo adicional', () => {
-    const r = PricingEngine.calculateTransport({
+    const r = PricingEngine.composeServiceNodes({
       ...RATES,
       nodes: [
         { key: 'vehicle', efectivo: 1000, surcharge: true },
@@ -266,7 +266,7 @@ describe('PricingEngine — composición de transporte (calculateTransport)', ()
       { key: 'additionalVehicle', efectivo: 650, surcharge: true },
       { key: 'extraVehicles', efectivo: 410, surcharge: true },
     ];
-    const r = PricingEngine.calculateTransport({ ...RATES, nodes });
+    const r = PricingEngine.composeServiceNodes({ ...RATES, nodes });
     // Referencia: misma suma que hace el builder hoy (nodo a nodo).
     const ref = nodes.reduce((acc, n) => {
       acc.efectivo += n.efectivo;
