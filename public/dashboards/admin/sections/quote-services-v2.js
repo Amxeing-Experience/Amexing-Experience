@@ -7838,6 +7838,14 @@ class ItineraryBuilder {
                                                     </div>
                                                 </div>
                                             ` : ''}
+                                            ${service.type === 'a-disposicion' && Array.isArray(service.aDisposicionAdditionalVehicles) && service.aDisposicionAdditionalVehicles.length
+        ? service.aDisposicionAdditionalVehicles.map((av) => {
+          const name = (av && (av.vehicleLabel || av.vehicleType)) || 'Vehículo adicional';
+          const seg = (av && av.segmentLabel) || '';
+          return `<div class="ms-3 mt-1">
+                                                                <span><strong>${name}</strong>${seg ? ` <span class="text-muted">· ${seg}</span>` : ''}</span>
+                                                            </div>`;
+        }).join('') : ''}
                                             ${(Array.isArray(service.extraAdditionalVehicles) ? service.extraAdditionalVehicles : []).map((v) => {
         const name = (v && (v.vehicleTypeName || '')).trim() || 'Vehículo adicional';
         const seg = (v && v.segmentName) || '';
@@ -7851,11 +7859,11 @@ class ItineraryBuilder {
                                         <div class="row g-2 text-success small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-user me-1"></i>
-                                                <strong>${service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía'}</strong>
+                                                <strong>Incluye Guía</strong>
                                             </div>
                                         </div>
                                     ` : ''}
-                                    ${(service.type === 'tour' || service.type === 'transport') && service.includeGreeter ? `
+                                    ${(service.type === 'tour' || service.type === 'transport' || service.type === 'a-disposicion') && service.includeGreeter ? `
                                         <div class="row g-2 text-info small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-users me-1"></i>
