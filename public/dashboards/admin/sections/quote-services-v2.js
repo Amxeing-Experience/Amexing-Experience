@@ -891,6 +891,12 @@ class ItineraryBuilder {
       this.serviceModified = true; // Mark as modified when user changes guide checkbox
       qsDevLog('🚗 A Disposición guide checkbox changed:', e.target.checked);
 
+      // Guía y greeter son mutuamente excluyentes: al marcar guía, se desmarca greeter.
+      if (e.target.checked) {
+        const greeterCheckbox = document.getElementById('aDisposicionGreeter');
+        if (greeterCheckbox) greeterCheckbox.checked = false;
+      }
+
       // Recalculate price with guide rate
       this.calculateADisposicionPrice();
 
@@ -906,6 +912,13 @@ class ItineraryBuilder {
     document.getElementById('aDisposicionGreeter')?.addEventListener('change', (e) => {
       this.serviceModified = true;
       qsDevLog('🚗 A Disposición greeter checkbox changed:', e.target.checked);
+
+      // Guía y greeter son mutuamente excluyentes: al marcar greeter, se desmarca guía.
+      if (e.target.checked) {
+        const guideCheckbox = document.getElementById('aDisposicionGuide');
+        if (guideCheckbox) guideCheckbox.checked = false;
+      }
+
       this.calculateADisposicionPrice();
       this.updateDevPaymentBreakdown();
       setTimeout(() => {
