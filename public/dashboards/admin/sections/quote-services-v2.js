@@ -539,7 +539,6 @@ class ItineraryBuilder {
       this.serviceModified = true; // Mark as modified when user changes additional vehicle
       // Dev breakdown FIRST — the service breakdown reads its line items from it.
       this.updateDevPaymentPrices(); // Update dev prices
-      this.updateDevPaymentBreakdown(); // Update dev breakdown to include/exclude additional vehicle
       this.updateServicePriceBreakdown();
       
       // Adjust modal height when showing/hiding additional fields
@@ -552,7 +551,6 @@ class ItineraryBuilder {
     document.getElementById('additionalVehiclePrice')?.addEventListener('input', () => {
       this.serviceModified = true;
       this.updateDevPaymentPrices();
-      this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
     });
 
@@ -810,7 +808,6 @@ class ItineraryBuilder {
           }
         }
         // Dev breakdown FIRST so service breakdown reads fresh override values.
-        this.updateDevPaymentBreakdown();
         this.updateServicePriceBreakdown();
       });
 
@@ -923,7 +920,6 @@ class ItineraryBuilder {
         validatePriceInput(e);
         // Dev breakdown FIRST — it populates the devBreakdown* fields that
         // updateServicePriceBreakdown reads from.
-        this.updateDevPaymentBreakdown();
         this.updateServicePriceBreakdown();
       });
       servicePriceField.addEventListener('keydown', preventInvalidPriceChars);
@@ -1009,7 +1005,6 @@ class ItineraryBuilder {
       conceptoPricePerPersonField.addEventListener('input', (e) => {
         validatePriceInput(e);
         this.updateConceptoServicePrice();
-        this.updateDevPaymentBreakdown();
         this.updateServicePriceBreakdown();
       });
       conceptoPricePerPersonField.addEventListener('keydown', preventInvalidPriceChars);
@@ -1017,7 +1012,6 @@ class ItineraryBuilder {
     ['conceptoAdultsQuantity', 'conceptoChildrenQuantity', 'conceptoAdultsNoAlcoholQuantity'].forEach((id) => {
       document.getElementById(id)?.addEventListener('change', () => {
         this.updateConceptoServicePrice();
-        this.updateDevPaymentBreakdown();
         this.updateServicePriceBreakdown();
       });
     });
@@ -1129,7 +1123,6 @@ class ItineraryBuilder {
       // Don't recalculate price for transport (keep vehicle price only)
       // Just update the breakdown to show the waiting time cost.
       // Dev breakdown FIRST — the service breakdown reads its line items from it.
-      this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
     });
 
@@ -1584,7 +1577,6 @@ class ItineraryBuilder {
       if (this.isDevelopmentMode) {
         setTimeout(() => {
           this.updateDevPaymentPrices();
-          this.updateDevPaymentBreakdown();
           this.updateServicePriceBreakdown(); // Refresh service breakdown with fresh totals
           qsDevLog('🔄 Updated dev payment displays after populating edit form');
         }, 200);
@@ -5562,7 +5554,6 @@ class ItineraryBuilder {
                     if (saved[i] !== undefined) inp.value = parseFloat(saved[i]).toFixed(2);
                   });
                   // Dev breakdown FIRST so service breakdown reads fresh values.
-                  this.updateDevPaymentBreakdown();
                   this.updateServicePriceBreakdown();
                 }, 50);
               } else if (service.walkingTourPriceMode === 'total') {
@@ -5572,7 +5563,6 @@ class ItineraryBuilder {
                 if (manualPrice && service.walkingTourPrice !== undefined && service.walkingTourPrice !== null) {
                   manualPrice.value = parseFloat(service.walkingTourPrice).toFixed(2);
                 }
-                this.updateDevPaymentBreakdown();
                 this.updateServicePriceBreakdown();
               }
             }, 150);
@@ -6358,7 +6348,6 @@ class ItineraryBuilder {
               // first so it recomputes with the override now active, then the service
               // breakdown reads from it.
               if (index === 3) { // Last timeout (500ms)
-                this.updateDevPaymentBreakdown();
                 this.updateServicePriceBreakdown();
                 qsDevLog('🔧 A Disposición: Updated service breakdown after custom price restoration');
               }
@@ -6760,7 +6749,6 @@ class ItineraryBuilder {
     // Step 13: Trigger final calculations after all fields are set
     setTimeout(() => {
       qsDevLog('🔄 Vehicle tour: Triggering final calculations');
-      this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
 
       // Clear the flag after everything is done
@@ -12961,26 +12949,22 @@ class ItineraryBuilder {
         console.error('Failed loading vehicles for extra additional vehicle row', err);
       });
       this.serviceModified = true;
-      this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
     });
     vehicleSelect.addEventListener('change', () => {
       // Reset the editable price to the newly-selected vehicle's list price.
       this.syncExtraRowPrice(row, true);
       this.serviceModified = true;
-      this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
     });
     // Manual per-vehicle price edits feed the breakdown.
     priceInput?.addEventListener('input', () => {
       this.serviceModified = true;
-      this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
     });
     row.querySelector('.remove-extra-additional-vehicle-btn')?.addEventListener('click', () => {
       row.remove();
       this.serviceModified = true;
-      this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
     });
   }
@@ -13035,7 +13019,6 @@ class ItineraryBuilder {
         if (preselectVehicleId) vehicleSelect.value = preselectVehicleId;
         // Show the list price + default the editable price (keeps a restored custom price).
         this.syncExtraRowPrice(row);
-        this.updateDevPaymentBreakdown();
         this.updateServicePriceBreakdown();
         return;
       } catch (err) {
@@ -13148,7 +13131,6 @@ class ItineraryBuilder {
     this.syncExtraRowPrice(row);
     // Refresh the breakdown after the prices are wired into the options so the totals
     // reflect this row even on initial edit-mode population.
-    this.updateDevPaymentBreakdown();
     this.updateServicePriceBreakdown();
   }
 
@@ -15145,7 +15127,6 @@ class ItineraryBuilder {
     });
 
     // Update breakdowns
-    this.updateDevPaymentBreakdown();
     this.updateServicePriceBreakdown();
   }
 
@@ -15265,7 +15246,6 @@ class ItineraryBuilder {
     // Dev breakdown PRIMERO — puebla los campos devBreakdown* que lee
     // updateServicePriceBreakdown. Si se invierte el orden, el desglose va "una
     // interacción atrás" (muestra el estado previo de guía/greeter).
-    this.updateDevPaymentBreakdown();
     this.updateServicePriceBreakdown();
   }
 
@@ -15286,7 +15266,6 @@ class ItineraryBuilder {
 
     // Dev breakdown PRIMERO — puebla los campos devBreakdown* que lee
     // updateServicePriceBreakdown (evita el desfase de "una interacción atrás").
-    this.updateDevPaymentBreakdown();
     this.updateServicePriceBreakdown();
   }
 
@@ -17570,7 +17549,6 @@ class ItineraryBuilder {
 
     // The service breakdown now reads from the dev breakdown, so recompute the dev
     // breakdown FIRST, then render the service breakdown from it.
-    this.updateDevPaymentBreakdown();
     this.updateServicePriceBreakdown();
   }
 
@@ -18000,7 +17978,6 @@ class ItineraryBuilder {
     // después. Si se invierte, el desglose va "una interacción atrás" y no muestra el
     // vehículo adicional recién seleccionado aunque el total sí lo incluya.
     this.updateDevPaymentPrices();
-    this.updateDevPaymentBreakdown();
     this.updateServicePriceBreakdown();
   }
 
@@ -18486,7 +18463,6 @@ class ItineraryBuilder {
 
             // Dev breakdown first so the tour breakdown recomputes with the custom price,
             // then the service breakdown reads from it.
-            this.updateDevPaymentBreakdown();
             this.updateServicePriceBreakdown();
 
             qsDevLog('🎉 [TOUR] Additional vehicle restoration completed successfully!');
@@ -18763,7 +18739,6 @@ class ItineraryBuilder {
       // The service breakdown (desglose) now reads its line items from the dev breakdown
       // for the selected payment type, so recompute the dev breakdown FIRST — regardless
       // of dev mode — then render the service breakdown from it.
-      this.updateDevPaymentBreakdown();
       this.updateServicePriceBreakdown();
 
       // Dev-only price fields (efectivo/transferencia/tarjeta display)
@@ -22020,7 +21995,6 @@ class ItineraryBuilder {
           }
           // Dev breakdown must run FIRST — it populates the devBreakdown* fields
           // that updateServicePriceBreakdown reads from.
-          this.updateDevPaymentBreakdown();
           this.updateServicePriceBreakdown();
         });
 
