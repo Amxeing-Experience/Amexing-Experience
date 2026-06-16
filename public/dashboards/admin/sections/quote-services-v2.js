@@ -10029,9 +10029,13 @@ class ItineraryBuilder {
     // Discount amount (same for all payment types)
     const { discountAmount } = efectivoPricing;
 
-    const efectivoBreakdown = this.formatPaymentBreakdown('Efectivo', efectivoHourlyRate, guideRate, vehicleTotalEfectivo, guideTotalEfectivo, efectivoBaseTotal, discountAmount, efectivoSubtotal, efectivoTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalEfectivo);
-    const transferenciaBreakdown = this.formatPaymentBreakdown('Transferencia', transferHourlyRate, guideRate, vehicleTotalTransfer, guideTotalTransfer, transferBaseTotal, discountAmount, transferSubtotal, transferTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalTransfer);
-    const tarjetaBreakdown = this.formatPaymentBreakdown('Tarjeta', cardHourlyRate, guideRate, vehicleTotalCard, guideTotalCard, cardBaseTotal, discountAmount, cardSubtotal, cardTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalCard);
+    // Cada forma de pago usa SU propio descuento: el descuento se calcula sobre la base CON
+    // recargo, así que transferencia/tarjeta tienen un descuento mayor que efectivo. Antes las
+    // tres usaban el de efectivo, y la línea de descuento no cuadraba con el total (el desglose
+    // espeja estas líneas, por eso no coincidía con el dev breakdown).
+    const efectivoBreakdown = this.formatPaymentBreakdown('Efectivo', efectivoHourlyRate, guideRate, vehicleTotalEfectivo, guideTotalEfectivo, efectivoBaseTotal, efectivoPricing.discountAmount, efectivoSubtotal, efectivoTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalEfectivo);
+    const transferenciaBreakdown = this.formatPaymentBreakdown('Transferencia', transferHourlyRate, guideRate, vehicleTotalTransfer, guideTotalTransfer, transferBaseTotal, transferPricing.discountAmount, transferSubtotal, transferTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalTransfer);
+    const tarjetaBreakdown = this.formatPaymentBreakdown('Tarjeta', cardHourlyRate, guideRate, vehicleTotalCard, guideTotalCard, cardBaseTotal, cardPricing.discountAmount, cardSubtotal, cardTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalCard);
 
     // Comprehensive debugging for A Disposición breakdown calculations
     if (serviceType === 'a-disposicion') {
