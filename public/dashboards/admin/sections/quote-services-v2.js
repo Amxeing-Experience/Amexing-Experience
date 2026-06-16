@@ -12538,6 +12538,7 @@ class ItineraryBuilder {
             vehicleCount: subconcept.vehicleCount || null,
             hourlyPrice: subconcept.hourlyPrice || null,
             discountPercent: subconcept.discountPercent || null,
+            aDisposicionAdditionalVehicles: subconcept.aDisposicionAdditionalVehicles || [],
           };
 
           this.services.set(serviceId, serviceData);
@@ -20895,6 +20896,9 @@ class ItineraryBuilder {
             vehicleCount: service.vehicleCount || null,
             hourlyPrice: service.hourlyPrice || null,
             discountPercent: service.discountPercent || null,
+            // Vehículos adicionales de a-disposición (segmento/tipo por fila) — se persisten
+            // para que el desglose, la lista de items y el resumen los muestren.
+            aDisposicionAdditionalVehicles: service.aDisposicionAdditionalVehicles || [],
             // Walking tour fields
             isWalkingTour: service.isWalkingTour || false,
             walkingTourPeopleCount: service.walkingTourPeopleCount || null,
