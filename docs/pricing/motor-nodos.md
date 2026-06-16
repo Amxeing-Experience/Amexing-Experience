@@ -7,6 +7,16 @@ motor único (`src/domain/pricing/pricingEngine.js`), de modo que builder, valid
 y PDF compartan **una sola fuente de verdad**. Hoy el motor era solo la capa final (recargo +
 redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el back usaban.
 
+## Reglas de negocio vigentes (decisión del cliente)
+
+- **Recargo uniforme:** el recargo por forma de pago (transferencia/tarjeta) se aplica a
+  **TODOS** los nodos, **incluidos guía/chofer y greeter**. (Antes guía/greeter quedaban
+  exentos; se cambió a petición del cliente.) En la práctica:
+  `total_forma_pago = total_efectivo × (1 + %)`.
+- **Vehículo principal de transporte = siempre 1.** El campo "Cantidad" no multiplica el
+  vehículo principal; para varios vehículos se usan **vehículos adicionales** (siempre
+  desglosados).
+
 ## Estado por tipo de servicio
 
 | Tipo | Nodos en el motor | Front conectado | Notas |

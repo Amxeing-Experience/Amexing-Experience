@@ -3702,7 +3702,7 @@ class ItineraryBuilder {
       }
 
       const quantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
-      const vehicleEfectivoTotal = vehicleBasePrice * quantity;
+      const vehicleEfectivoTotal = vehicleBasePrice; // vehiculo principal siempre 1 (multiples = vehiculos adicionales)
 
       // Add waiting time costs
       const waitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
@@ -3776,8 +3776,8 @@ class ItineraryBuilder {
       const fallbackNodes = [
         { key: 'vehicle', efectivo: vehicleEfectivoTotal, surcharge: true },
         { key: 'waiting', efectivo: waitingCostEfectivo, surcharge: true },
-        { key: 'guide', efectivo: guideCostEfectivo, surcharge: false },
-        { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: false },
+        { key: 'guide', efectivo: guideCostEfectivo, surcharge: true },
+        { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: true },
         { key: 'additionalVehicle', efectivo: additionalVehicleCostEfectivo, surcharge: true },
       ];
       const fallbackPricing = window.PricingEngine
@@ -7006,7 +7006,7 @@ class ItineraryBuilder {
     );
     const tourNodes = [
       { key: 'vehicle', efectivo: vehicleEfectivoBase, surcharge: true },
-      { key: 'guide', efectivo: guideEfectivoBase, surcharge: false },
+      { key: 'guide', efectivo: guideEfectivoBase, surcharge: true },
       { key: 'additionalVehicle', efectivo: additionalEfectivoBase, surcharge: true },
       { key: 'extraVehicles', efectivo: extrasEfectivoBase, surcharge: true },
     ];
@@ -9329,7 +9329,7 @@ class ItineraryBuilder {
       }
 
       // Calculate vehicle efectivo base (el recargo por forma de pago lo aplica el motor abajo)
-      const vehicleTotalEfectivo = efectivoBasePrice * quantity;
+      const vehicleTotalEfectivo = efectivoBasePrice; // vehiculo principal siempre 1 (multiples = vehiculos adicionales)
 
       // Calculate waiting time costs if applicable
       const waitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
@@ -9440,8 +9440,8 @@ class ItineraryBuilder {
       const transportNodes = [
         { key: 'vehicle', efectivo: vehicleTotalEfectivo, surcharge: true },
         { key: 'waiting', efectivo: waitingCostEfectivo, surcharge: true },
-        { key: 'guide', efectivo: guideCostEfectivo, surcharge: false },
-        { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: false },
+        { key: 'guide', efectivo: guideCostEfectivo, surcharge: true },
+        { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: true },
         { key: 'additionalVehicle', efectivo: additionalVehicleCostEfectivo, surcharge: true },
         { key: 'extraVehicles', efectivo: extraVehiclesCostEfectivo, surcharge: true },
       ];
@@ -17521,7 +17521,7 @@ class ItineraryBuilder {
 
     // Multiply vehicle price by quantity (number of vehicles)
     const quantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
-    const vehicleEfectivoTotal = efectivoBasePrice * quantity;
+    const vehicleEfectivoTotal = efectivoBasePrice; // vehiculo principal siempre 1 (multiples = vehiculos adicionales)
 
     // Calculate and display price based on selected payment type
     const selectedPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';

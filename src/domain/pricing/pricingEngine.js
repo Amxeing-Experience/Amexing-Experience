@@ -173,7 +173,7 @@ const PricingEngine = (() => {
    * @param {number} p.baseVehicleCostPerHour - Costo base por hora por vehiculo (MXN).
    * @param {number} p.hours - Horas.
    * @param {number} p.vehicleQuantity - Cantidad de vehiculos.
-   * @param {number} [p.guideRate] - Tarifa de guia por hora por vehiculo (sin recargo).
+   * @param {number} [p.guideRate] - Tarifa de guia por hora por vehiculo (recibe recargo).
    * @param {string} [p.paymentType] - efectivo, transferencia o tarjeta.
    * @param {string} [p.currency] - MXN o USD.
    * @param {number} [p.transferRate] - Porcentaje de recargo transferencia.
@@ -189,7 +189,10 @@ const PricingEngine = (() => {
 
     const baseVehicleTotal = round2((Number(p.baseVehicleCostPerHour) || 0) * hours * vehicleQuantity);
     const vehicleTotalWithSurcharge = round2(applyDisplayPrice(baseVehicleTotal, p));
-    const guideTotalCost = round2(guideRate * hours * vehicleQuantity);
+    // La guia ahora TAMBIEN recibe el recargo por forma de pago (regla uniforme: todos los
+    // nodos lo reciben). Se aplica solo el porcentaje (applyPaymentRate); efectivo no cambia.
+    const guideBaseTotal = round2(guideRate * hours * vehicleQuantity);
+    const guideTotalCost = round2(applyPaymentRate(guideBaseTotal, p.paymentType || 'efectivo', p.transferRate, p.agencyRate));
     const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost);
 
     let discountAmount = 0;
