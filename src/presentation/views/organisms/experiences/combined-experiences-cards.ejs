@@ -2625,17 +2625,42 @@ document.addEventListener('DOMContentLoaded', function() {
                         <i class="ti ti-calendar me-2"></i>Horarios Sugeridos
                     </h5>
                     <div class="availability-grid">
-                        ${Array.isArray(experience.availability) ? experience.availability.map(item => {
+                        ${Array.isArray(experience.availability) ? (() => {
                             const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-                            let dayName = '';
-                            if (typeof item === 'object' && typeof item.day === 'number') {
-                                dayName = item.day >= 0 && item.day <= 6 ? daysOfWeek[item.day] : 'Día ' + item.day;
-                            } else if (typeof item === 'number') {
-                                dayName = item >= 0 && item <= 6 ? daysOfWeek[item] : 'Día ' + item;
-                            }
-                            const times = item.times && Array.isArray(item.times) ? item.times.map(t => t.start && t.end ? t.start + ' - ' + t.end : '').filter(Boolean) : [];
-                            return '<div class="availability-day-card"><strong>' + dayName + '</strong>' + (times.length > 0 ? '<div class="text-muted small mt-1">' + times.map(t => '<span class="d-block">• ' + t + '</span>').join('') + '</div>' : '') + '</div>';
-                        }).join('') : '<div class="availability-info">' + formatAvailability(experience.availability) + '</div>'}
+                            // Availability is stored in several historical shapes:
+                            //   {day, times:[{start,end}]}      (current)
+                            //   {day, start_time, end_time}      (legacy, one entry per slot)
+                            //   {day, startTime, endTime}        (tours, one entry per slot)
+                            // Normalize all of them and GROUP by day so a day with
+                            // multiple slots renders as ONE card instead of duplicated
+                            // cards with no times shown.
+                            const byDay = new Map();
+                            const addSlot = (day, start, end) => {
+                                if (typeof day !== 'number') return;
+                                if (!byDay.has(day)) byDay.set(day, []);
+                                if (start && end) {
+                                    const label = start + ' - ' + end;
+                                    if (!byDay.get(day).includes(label)) byDay.get(day).push(label);
+                                }
+                            };
+                            experience.availability.forEach(item => {
+                                if (typeof item === 'number') { addSlot(item); return; }
+                                if (!item || typeof item !== 'object') return;
+                                if (Array.isArray(item.times)) {
+                                    if (item.times.length === 0) addSlot(item.day);
+                                    item.times.forEach(t => addSlot(item.day, t.start, t.end));
+                                } else {
+                                    addSlot(item.day, item.start_time || item.startTime, item.end_time || item.endTime);
+                                }
+                            });
+                            // Order Monday-first (1..6, then 0=Sunday last).
+                            const weekOrder = d => (d + 6) % 7;
+                            return Array.from(byDay.keys()).sort((a, b) => weekOrder(a) - weekOrder(b)).map(day => {
+                                const dayName = day >= 0 && day <= 6 ? daysOfWeek[day] : 'Día ' + day;
+                                const times = byDay.get(day);
+                                return '<div class="availability-day-card"><strong>' + dayName + '</strong>' + (times.length > 0 ? '<div class="text-muted small mt-1">' + times.map(t => '<span class="d-block">• ' + t + '</span>').join('') + '</div>' : '') + '</div>';
+                            }).join('');
+                        })() : '<div class="availability-info">' + formatAvailability(experience.availability) + '</div>'}
                     </div>
                 </div>
             ` : ''}

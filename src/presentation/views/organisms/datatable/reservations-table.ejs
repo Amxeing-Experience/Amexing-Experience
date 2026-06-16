@@ -1,0 +1,614 @@
+<%
+/**
+ * Reservations table (organism) — shared across admin / client / department_manager.
+ * Contains the filters, DataTable and scripts. The page header lives in each role view.
+ *
+ * Params (locals):
+ *   - basePath {string} REQUIRED — role segment for links: 'admin' | 'client' | 'department_manager'.
+ *   - showAgencyClientFilter {boolean} — show the agency/client filter (admin only; /api/clients/mixed is admin-only).
+ *   - canManageReservations {boolean} — true → "Editar reservación" (quote w/ ?context); false → "Ver cotización".
+ *
+ * @author Denisse Maldonado
+ * @version 1.0.0
+ */
+const basePath = (locals && locals.basePath) ? locals.basePath : 'admin';
+const showAgencyClientFilter = !!(locals && locals.showAgencyClientFilter);
+const canManageReservations = !!(locals && locals.canManageReservations);
+%>
+
+<style>
+    /* Loader overlay for the reservations datatable while filters reload data */
+    .reservations-loading-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(1px);
+        border-radius: 0.5rem;
+    }
+</style>
+
+<!-- Page Content -->
+<div class="page-content">
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h5 class="card-title mb-0 text-white">
+                                <i class="ti ti-clipboard-list me-2"></i>Reservaciones
+                            </h5>
+                            <small class="text-white" style="opacity: 0.9;">Reservaciones creadas a partir de cotizaciones agendadas</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <!-- Date Filter Pills and Date Selectors -->
+                    <div class="mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-md-auto mb-2 mb-md-0">
+                                <div class="btn-group" role="group" aria-label="Filtro por fecha de reservaciones">
+                                    <input type="radio" class="btn-check" name="dateFilter" id="filterUpcoming" value="upcoming" checked>
+                                    <label class="btn btn-outline-primary" for="filterUpcoming">
+                                        <i class="ti ti-calendar-forward me-1"></i>PRÓXIMAS
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="dateFilter" id="filterOngoing" value="ongoing">
+                                    <label class="btn btn-outline-info" for="filterOngoing">
+                                        <i class="ti ti-calendar-event me-1"></i>EN CURSO
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="dateFilter" id="filterPast" value="past">
+                                    <label class="btn btn-outline-secondary" for="filterPast">
+                                        <i class="ti ti-calendar-time me-1"></i>PASADAS
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-auto">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted">|</span>
+                                    
+                                    <!-- Year Filter -->
+                                    <div class="d-flex align-items-center">
+                                        <label for="yearFilter" class="form-label mb-0 me-2 text-muted">Año:</label>
+                                        <select class="form-select form-select-sm" id="yearFilter" style="width: 100px;">
+                                            <!-- Options will be populated by JavaScript -->
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Month Filter -->
+                                    <div class="d-flex align-items-center">
+                                        <label for="monthFilter" class="form-label mb-0 me-2 text-muted">Mes:</label>
+                                        <select class="form-select form-select-sm" id="monthFilter" style="width: 130px;">
+                                            <option value="">Todos</option>
+                                            <option value="1">Enero</option>
+                                            <option value="2">Febrero</option>
+                                            <option value="3">Marzo</option>
+                                            <option value="4">Abril</option>
+                                            <option value="5">Mayo</option>
+                                            <option value="6">Junio</option>
+                                            <option value="7">Julio</option>
+                                            <option value="8">Agosto</option>
+                                            <option value="9">Septiembre</option>
+                                            <option value="10">Octubre</option>
+                                            <option value="11">Noviembre</option>
+                                            <option value="12">Diciembre</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Day Filter -->
+                                    <div class="d-flex align-items-center">
+                                        <label for="dayFilter" class="form-label mb-0 me-2 text-muted">Día:</label>
+                                        <select class="form-select form-select-sm" id="dayFilter" style="width: 85px;">
+                                            <option value="">Todos</option>
+                                            <!-- Days 1-31 will be populated by JavaScript -->
+                                        </select>
+                                    </div>
+
+                                    <!-- Info: cómo funcionan los filtros de fecha -->
+                                    <i class="ti ti-info-circle text-primary"
+                                       role="button"
+                                       tabindex="0"
+                                       style="cursor: pointer; font-size: 1.15rem;"
+                                       aria-label="Cómo funcionan los filtros de fecha"
+                                       data-bs-toggle="popover"
+                                       data-bs-html="true"
+                                       data-bs-trigger="hover focus"
+                                       data-bs-placement="bottom"
+                                       data-bs-title="¿Cómo funcionan los filtros?"
+                                       data-bs-content="Una reservación aparece según el rango de fechas de sus servicios (inicio y fin):<br><br><strong>Próximas:</strong> aún no inicia.<br><strong>En curso:</strong> ya inició y no ha terminado.<br><strong>Pasadas:</strong> ya terminó.<br><br>El Año/Mes/Día acota a ese periodo: se muestra si la reservación tiene un servicio en la fecha seleccionada."></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <% if (showAgencyClientFilter) { %>
+                    <!-- Filtro genérico por Agencia / Cliente (solo admin) -->
+                    <div class="mb-3">
+                        <%- include('../../molecules/filters/client-agency-filter', { idPrefix: 'reservations' }) %>
+                    </div>
+                    <% } %>
+
+                    <div class="position-relative">
+                        <!-- Loader overlay shown while filters reload the table -->
+                        <div id="reservations-loading" class="reservations-loading-overlay d-none">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <div class="mt-2 text-primary fw-semibold">Cargando...</div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                        <table id="reservations-table" class="table table-hover" style="width:100%">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Folio</th>
+                                    <th>Cliente</th>
+                                    <th>Propietario</th>
+                                    <th>Motivo de Viaje</th>
+                                    <th class="text-center">Fecha Inicio</th>
+                                    <th class="text-center">Personas</th>
+                                    <th class="text-center">Servicios</th>
+                                    <th class="text-center">Estado</th>
+                                    <th class="text-center">Última Modificación</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sophisticated cancel modal will be dynamically created by shared JavaScript utilities -->
+
+<!-- Shared cancel utilities -->
+<script src="/js/reservation-cancel-utils.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    let pendingCancelId = null;
+    
+    // Populate year dropdown
+    function populateYearDropdown() {
+        const yearSelect = document.getElementById('yearFilter');
+        const currentYear = new Date().getFullYear();
+        
+        // Add years from current year -2 to current year +2
+        for (let year = currentYear - 2; year <= currentYear + 2; year++) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            if (year === currentYear) {
+                option.selected = true;
+            }
+            yearSelect.appendChild(option);
+        }
+    }
+    
+    // Populate day dropdown
+    function populateDayDropdown() {
+        const daySelect = document.getElementById('dayFilter');
+        
+        for (let day = 1; day <= 31; day++) {
+            const option = document.createElement('option');
+            option.value = day;
+            option.textContent = day;
+            daySelect.appendChild(option);
+        }
+    }
+    
+    // Initialize dropdowns
+    populateYearDropdown();
+    populateDayDropdown();
+
+    function getQuoteStatusBadge(status) {
+        if (!status) return '';
+        const map = {
+            scheduled: { label: 'Agendada', cls: 'bg-success text-white' },
+            hold: { label: 'Bloqueada', cls: 'bg-warning text-dark' },
+            requested: { label: 'Solicitada', cls: 'bg-info text-white' },
+            quoted: { label: 'Cotizada', cls: 'bg-primary text-white' },
+            rejected: { label: 'Rechazada', cls: 'bg-danger text-white' },
+        };
+        const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}" title="Estado de cotización origen">${s.label}</span>`;
+    }
+    
+    function getReservationStatusBadge(status) {
+        const map = {
+            pending: { label: 'Asignaciones pendientes', cls: 'bg-warning text-dark' },
+            assigned: { label: 'Asignada', cls: 'bg-info text-white' },
+            in_progress: { label: 'En Progreso', cls: 'bg-primary text-white' },
+            completed: { label: 'Completada', cls: 'bg-success text-white' },
+            cancelled: { label: 'Cancelada', cls: 'bg-danger text-white' },
+            confirmed: { label: 'Confirmada', cls: 'bg-success text-white' },
+            hold: { label: 'En Espera', cls: 'bg-warning text-dark' },
+        };
+        const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}" title="Estado operacional de reservación">${s.label}</span>`;
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '—';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function formatCurrency(amount, currency) {
+        const sym = currency === 'USD' ? 'USD $' : '$';
+        return `${sym}${(amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    // Muestra la fecha de fin en texto pequeño bajo la fecha de inicio, en TODOS
+    // los entornos. Ayuda a entender por qué una reservación cae en cierto filtro
+    // (los filtros usan el rango inicio–fin de la reservación).
+    function renderEndDate(row) {
+        const fEnd = row.endDate ? formatDate(row.endDate) : '—';
+        return `<div class="small text-muted">Fin: ${fEnd}</div>`;
+    }
+
+    // --- Debug de filtros (solo en local: dev y production-local) ---
+    // Producción real corre en quotes.amexingexperience.com; localhost cubre
+    // `npm run dev` y `npm run production-local`.
+    const DEBUG_FILTERS = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+    // Explica por qué una reservación aparece en el filtro activo, mostrando la
+    // fecha que dispara la clasificación. La lógica refleja exactamente las
+    // queries del backend en ReservationController.getReservations():
+    //   upcoming: startDate > hoy
+    //   ongoing : startDate <= hoy <= endDate
+    //   past    : endDate < hoy
+    function renderFilterReason(row) {
+        if (!DEBUG_FILTERS) return '';
+
+        const activeFilter = document.querySelector('input[name="dateFilter"]:checked');
+        const filter = activeFilter ? activeFilter.value : 'upcoming';
+
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const start = row.startDate ? new Date(row.startDate) : null;
+        const end = row.endDate ? new Date(row.endDate) : null;
+        const fStart = start ? formatDate(row.startDate) : '— (sin fecha)';
+        const fEnd = end ? formatDate(row.endDate) : '— (sin fecha)';
+        const fToday = formatDate(today);
+
+        let reason = '';
+        let cls = 'bg-secondary';
+        if (filter === 'upcoming') {
+            cls = 'bg-primary';
+            reason = `Inicio ${fStart} &gt; hoy ${fToday}`;
+        } else if (filter === 'ongoing') {
+            cls = 'bg-info';
+            reason = `Inicio ${fStart} ≤ hoy ${fToday} ≤ Fin ${fEnd}`;
+        } else if (filter === 'past') {
+            cls = 'bg-dark';
+            reason = `Fin ${fEnd} &lt; hoy ${fToday}`;
+        }
+
+        // Marca anomalías: sin endDate, o fin anterior al inicio.
+        let warn = '';
+        if (!end) {
+            warn = '<div class="text-danger fw-semibold mt-1" style="font-size:.7rem;">⚠ Sin Fecha Fin (endDate)</div>';
+        } else if (start && end < start) {
+            warn = '<div class="text-danger fw-semibold mt-1" style="font-size:.7rem;">⚠ Fin anterior al Inicio</div>';
+        }
+
+        // Inicio/Fin ya se muestran en la celda (Fin vía renderEndDate en todos los
+        // entornos), así que aquí solo va el badge de razón + advertencias de dev.
+        return `
+            <div class="mt-1 text-start" style="font-size:.7rem; line-height:1.3;">
+                <span class="badge ${cls} mt-1" style="white-space:normal;" title="Razón por la que aparece en este filtro">${reason}</span>
+                ${warn}
+            </div>`;
+    }
+
+    const table = $('#reservations-table').DataTable({
+        // Built-in indicator off — we show our own overlay (#reservations-loading)
+        // via preXhr.dt/xhr.dt to avoid a double "Cargando..." on filter reloads.
+        processing: false,
+        serverSide: true,
+        ajax: {
+            url: '/api/reservations',
+            type: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` },
+            data: function(d) {
+                // Add date filter
+                const activeFilter = document.querySelector('input[name="dateFilter"]:checked');
+                if (activeFilter) {
+                    d.dateFilter = activeFilter.value;
+                }
+
+                // Optional status filter (present in client/department_manager headers).
+                const statusVal = $('#statusFilter').val();
+                if (statusVal) d.statusFilter = statusVal;
+
+                // Add year, month, day filters
+                const yearFilter = document.getElementById('yearFilter').value;
+                const monthFilter = document.getElementById('monthFilter').value;
+                const dayFilter = document.getElementById('dayFilter').value;
+                
+                if (yearFilter) d.yearFilter = yearFilter;
+                if (monthFilter) d.monthFilter = monthFilter;
+                if (dayFilter) d.dayFilter = dayFilter;
+
+                // Filtro genérico por agencia/cliente (molecule client-agency-filter)
+                const acFilter = window.getClientAgencyFilter
+                    ? window.getClientAgencyFilter('reservations') : null;
+                if (acFilter && acFilter.type !== 'all') {
+                    d.clientTypeFilter = acFilter.type; // 'agency' | 'client' (filtra por tipo)
+                    if (acFilter.id) d.clientIdFilter = acFilter.id; // y por entidad si hay
+                }
+
+                return d;
+            },
+            error: function(xhr) {
+                console.error('Error loading reservations:', xhr);
+            }
+        },
+        columns: [
+            {
+                data: 'folio',
+                render: function(data, type, row) {
+                    return `<a href="/dashboard/<%= basePath %>/bookings/${row.id}" class="fw-semibold text-decoration-none">${data}</a>`;
+                }
+            },
+            {
+                data: 'clientName',
+                render: function(data, type, row) {
+                    const name = data || 'N/A';
+                    if (type !== 'display') return name;
+                    if (row.clientType === 'agency') {
+                        return `${name} <span class="badge bg-light text-primary border ms-1">Agencia</span>`;
+                    }
+                    if (row.clientType === 'client') {
+                        return `${name} <span class="badge bg-light text-success border ms-1">Cliente</span>`;
+                    }
+                    return name;
+                }
+            },
+            {
+                data: 'owner',
+                render: function(data, type, row) {
+                    const name = data || 'N/A';
+                    // Si no hay propietario en la cotización, se muestra el creador.
+                    if (row.ownerIsCreator) {
+                        return `${name} <span class="badge bg-light text-muted ms-1" title="Sin propietario asignado; se muestra el creador de la reservación">creador</span>`;
+                    }
+                    return name;
+                }
+            },
+            { data: 'eventType', defaultContent: '—' },
+            {
+                data: 'startDate',
+                className: 'text-center',
+                render: function(data, type, row) {
+                    return `<div>${formatDate(data)}</div>${renderEndDate(row)}${renderFilterReason(row)}`;
+                }
+            },
+            { data: 'numberOfPeople', className: 'text-center' },
+            {
+                data: null,
+                className: 'text-center',
+                render: function(data, type, row) {
+                    return `<span class="badge bg-light text-dark">${row.assignedServices}/${row.totalServices}</span>`;
+                }
+            },
+            {
+                data: null,
+                className: 'text-center',
+                responsivePriority: 1,  // High priority - always show
+                render: function(data, type, row) {
+                    const quoteBadge = getQuoteStatusBadge(row.quoteStatus);
+                    const reservationBadge = getReservationStatusBadge(row.status);
+                    return `${quoteBadge} ${reservationBadge}`;
+                }
+            },
+            {
+                data: 'updatedAt',
+                className: 'text-center',
+                responsivePriority: 2,  // High priority
+                render: function(data) { return formatDate(data); }
+            },
+            {
+                data: null,
+                className: 'text-center',
+                orderable: false,
+                responsivePriority: 1,  // High priority for actions
+                render: function(data, type, row) {
+                    let actions = `<a href="/dashboard/<%= basePath %>/bookings/${row.id}" class="btn btn-sm btn-outline-primary me-1" title="Ver detalle"><i class="ti ti-eye"></i></a>`;
+                    if (row.quoteFolio) {
+                        <% if (canManageReservations) { %>
+                        actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}?context=reservation" class="btn btn-sm btn-outline-secondary me-1" title="Editar reservación"><i class="ti ti-edit"></i></a>`;
+                        <% } else { %>
+                        actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-invoice"></i></a>`;
+                        <% } %>
+                    }
+                    if (row.status !== 'cancelled' && row.status !== 'completed') {
+                        actions += `<button class="btn btn-sm btn-outline-danger cancel-res-btn" data-id="${row.id}" title="Cancelar"><i class="ti ti-x"></i></button>`;
+                    }
+                    return actions;
+                }
+            }
+        ],
+        columnDefs: [
+            // Solo "Fecha Inicio" (col 4) es ordenable; el resto se deshabilita.
+            // Cliente, Propietario y Servicios no tienen un campo de orden fiable en
+            // Parse, y se optó por dejar el ordenamiento únicamente por fecha de inicio.
+            { orderable: false, targets: [0, 1, 2, 3, 5, 6, 7, 8, 9] },
+        ],
+        // Orden por defecto: Fecha Inicio asc (pill inicial = Próximas).
+        // En cada cambio de pill se reajusta con applyDefaultOrder().
+        order: [[4, 'asc']],
+        language: {
+            processing: 'Cargando...',
+            search: 'Buscar:',
+            lengthMenu: 'Mostrar _MENU_ registros',
+            info: 'Mostrando _START_ a _END_ de _TOTAL_ reservaciones',
+            infoEmpty: 'No hay reservaciones',
+            infoFiltered: '(filtrado de _MAX_ total)',
+            zeroRecords: 'No se encontraron reservaciones',
+            emptyTable: 'No hay reservaciones registradas',
+            paginate: { first: 'Primera', previous: 'Anterior', next: 'Siguiente', last: 'Última' },
+        },
+        responsive: true,
+        pageLength: 10,
+    });
+
+    // Show/hide the loader overlay on every AJAX reload triggered by filters
+    const loadingOverlay = document.getElementById('reservations-loading');
+    $('#reservations-table')
+        .on('preXhr.dt', function() {
+            if (loadingOverlay) loadingOverlay.classList.remove('d-none');
+        })
+        .on('xhr.dt', function() {
+            if (loadingOverlay) loadingOverlay.classList.add('d-none');
+        });
+
+    // Calcula el periodo [inicio, fin) elegido en los selectores Año/Mes/Día,
+    // reflejando exactamente la lógica del backend
+    // (ReservationController.applyDateConstraints). El año siempre está presente.
+    function getSelectedPeriod() {
+        const yearVal = parseInt(document.getElementById('yearFilter').value, 10);
+        const monthRaw = document.getElementById('monthFilter').value;
+        const dayRaw = document.getElementById('dayFilter').value;
+        const monthVal = monthRaw ? parseInt(monthRaw, 10) : null;
+        const dayVal = dayRaw ? parseInt(dayRaw, 10) : null;
+        if (Number.isNaN(yearVal)) return null;
+        if (monthVal !== null && dayVal !== null) {
+            return { start: new Date(yearVal, monthVal - 1, dayVal), end: new Date(yearVal, monthVal - 1, dayVal + 1) };
+        }
+        if (monthVal !== null) {
+            return { start: new Date(yearVal, monthVal - 1, 1), end: new Date(yearVal, monthVal, 1) };
+        }
+        return { start: new Date(yearVal, 0, 1), end: new Date(yearVal + 1, 0, 1) };
+    }
+
+    // Ajusta el pill de estado según el periodo elegido:
+    //  - periodo ENTERO en el pasado            → Pasadas
+    //  - periodo ENTERO en el futuro            → Próximas
+    //  - periodo es EXACTAMENTE hoy (un día)    → En curso (hoy es el ancla de "en curso")
+    //  - periodo amplio que cruza hoy (mes/año actual) → respeta el pill actual
+    // El cambio del radio es programático: NO dispara 'change', así que no provoca
+    // una recarga doble — quien llama recarga la tabla una sola vez después.
+    function autoAdjustStatusFromDate() {
+        const period = getSelectedPeriod();
+        if (!period) return;
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+        let target = null;
+        if (period.end <= today) {
+            target = 'filterPast';        // el periodo ya terminó
+        } else if (period.start > today) {
+            target = 'filterUpcoming';    // el periodo aún no empieza
+        } else if (period.start.getTime() === today.getTime()
+                && period.end.getTime() === tomorrow.getTime()) {
+            target = 'filterOngoing';     // el periodo es exactamente HOY → en curso
+        }
+        // else: periodo amplio que contiene hoy (mes/año actual) → respeta el pill
+        if (!target) return false;
+        const radio = document.getElementById(target);
+        if (radio && !radio.checked) {
+            radio.checked = true;
+            return true; // el pill cambió
+        }
+        return false;
+    }
+
+    // Índice de la columna "Fecha Inicio" en la tabla (Folio=0 ... Fecha Inicio=4).
+    const STARTDATE_COL = 4;
+
+    // Dirección de orden por defecto de "Fecha Inicio" según el pill activo:
+    //   Próximas / En curso → asc (lo más próximo primero)
+    //   Pasadas             → desc (lo más reciente primero)
+    function orderDirForActivePill() {
+        const active = document.querySelector('input[name="dateFilter"]:checked');
+        const val = active ? active.value : 'upcoming';
+        return val === 'past' ? 'desc' : 'asc';
+    }
+
+    // Fija el orden por defecto (Fecha Inicio, dirección según pill) SIN redibujar;
+    // el draw lo dispara la recarga posterior, así que no hay petición doble.
+    function applyDefaultOrder() {
+        table.order([STARTDATE_COL, orderDirForActivePill()]);
+    }
+
+    // Caso inverso al auto-ajuste: al cambiar el pill de estado, reestablece los
+    // selectores de fecha a su valor por defecto (año actual, Mes/Día = Todos).
+    // Si no, una fecha previa (p.ej. abril) sigue combinándose con el nuevo estado
+    // (p.ej. En curso) y devuelve 0 filas. Es programático: no dispara 'change',
+    // así que no provoca recarga doble ni re-ajusta el pill.
+    function resetDateSelectors() {
+        const currentYear = new Date().getFullYear();
+        document.getElementById('yearFilter').value = String(currentYear);
+        document.getElementById('monthFilter').value = '';
+        document.getElementById('dayFilter').value = '';
+    }
+
+    // Optional status filter (client/department_manager). No-op if the select
+    // isn't present (admin has no status filter).
+    $('#statusFilter').on('change', function() {
+        table.ajax.reload();
+    });
+
+    // Date filter change
+    document.querySelectorAll('input[name="dateFilter"]').forEach(button => {
+        button.addEventListener('change', function() {
+            if (this.checked) {
+                // Reestablece la fecha para que no contradiga el nuevo estado.
+                resetDateSelectors();
+                // Orden por defecto del nuevo estado (Fecha Inicio asc/desc).
+                applyDefaultOrder();
+                // Force DataTable to recalculate columns and reload
+                table.ajax.reload(function() {
+                    // Callback after reload to ensure columns are properly rendered
+                    table.columns.adjust();
+                    // Force responsive to recalculate
+                    if (table.responsive) {
+                        table.responsive.recalc();
+                    }
+                    table.draw();
+                }, false);
+            }
+        });
+    });
+    
+    // Year, Month, Day filter change
+    ['yearFilter', 'monthFilter', 'dayFilter'].forEach(filterId => {
+        document.getElementById(filterId).addEventListener('change', function() {
+            // Ajusta el pill de estado según la fecha antes de recargar (una sola vez).
+            // Si el estado cambió, reaplica el orden por defecto de ese estado;
+            // si no (periodo amplio), respeta el orden actual del usuario.
+            if (autoAdjustStatusFromDate()) applyDefaultOrder();
+            table.ajax.reload(null, false);
+        });
+    });
+
+    // Filtro genérico Agencia/Cliente: recarga la tabla cuando cambia la selección.
+    document.addEventListener('clientAgencyFilter:change', function(e) {
+        if (e.detail && e.detail.prefix === 'reservations') {
+            table.ajax.reload(null, false);
+        }
+    });
+
+    // Cancel reservation - using shared utilities
+    $(document).on('click', '.cancel-res-btn', function() {
+        const reservationId = $(this).data('id');
+        // Use shared utility with table reload callback
+        openReservationCancelModal(reservationId, () => {
+            table.ajax.reload();
+        });
+    });
+});
+</script>

@@ -193,6 +193,9 @@ function initializeClientsDataTable(totalCount) {
                 params.append('type', activeFilter.value);
             }
 
+            // Admin table lists both active and inactive clients/agencies.
+            params.append('includeInactive', 'true');
+
             fetch(`<%= dtApiEndpoint %>?${params.toString()}`, {
                 method: 'GET',
                 credentials: 'include',
@@ -342,6 +345,7 @@ function initializeClientsDataTable(totalCount) {
                     actions += `<button type="button"
                                 class="btn ${statusClass} btn-toggle-status"
                                 data-client-id="${row.id}"
+                                data-client-type="${row.type}"
                                 data-current-status="${row.active}"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="top"
@@ -492,7 +496,7 @@ function editClient(clientId, clientType) {
  * @param {string} clientId - Client ID
  * @param {boolean} currentStatus - Current active status
  */
-function toggleClientStatus(clientId, currentStatus) {
+function toggleClientStatus(clientId, currentStatus, clientType) {
     const newStatus = !currentStatus;
     const action = newStatus ? 'activar' : 'desactivar';
     const actionTitle = newStatus ? 'Activar' : 'Desactivar';
@@ -533,16 +537,23 @@ function toggleClientStatus(clientId, currentStatus) {
     // Handle confirmation
     document.getElementById('confirmToggleBtn').addEventListener('click', async function() {
         modal.hide();
-        await executeToggleStatus(clientId, newStatus);
+        await executeToggleStatus(clientId, newStatus, clientType);
     });
 }
 
 /**
  * Execute toggle status API call
  */
-async function executeToggleStatus(clientId, newStatus) {
+async function executeToggleStatus(clientId, newStatus, clientType) {
     try {
-        const response = await fetch(`<%= dtApiEndpoint %>/${clientId}/toggle-status`, {
+        // The list endpoint (dtApiEndpoint) is "/api/clients/mixed"; item operations
+        // must target the resource route, which differs by type (mirrors edit/delete):
+        // agencies → /api/clients/:id, direct clients → /api/owned-clients/:id.
+        const toggleEndpoint = clientType === 'agency'
+            ? `/api/clients/${encodeURIComponent(clientId)}/toggle-status`
+            : `/api/owned-clients/${encodeURIComponent(clientId)}/toggle-status`;
+
+        const response = await fetch(toggleEndpoint, {
             method: 'PATCH',
             credentials: 'include',
             headers: {
@@ -552,10 +563,21 @@ async function executeToggleStatus(clientId, newStatus) {
             body: JSON.stringify({ active: newStatus })
         });
 
-        const result = await response.json();
+        // Parse defensively: a non-JSON body (HTML error page, empty, redirect)
+        // would otherwise throw the cryptic "The string did not match the
+        // expected pattern." in Safari. Surface the real status/body instead.
+        const raw = await response.text();
+        let result = {};
+        if (raw) {
+            try {
+                result = JSON.parse(raw);
+            } catch (parseErr) {
+                throw new Error(`Respuesta no válida del servidor (HTTP ${response.status}): ${raw.slice(0, 200)}`);
+            }
+        }
 
         if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Error al cambiar el estado del cliente');
+            throw new Error(result.error || `Error al cambiar el estado del cliente (HTTP ${response.status})`);
         }
 
         showSuccessAlert(`Cliente ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
@@ -682,8 +704,9 @@ function setupEventDelegation() {
         // Toggle status button
         if (target.classList.contains('btn-toggle-status')) {
             const clientId = target.getAttribute('data-client-id');
+            const clientType = target.getAttribute('data-client-type');
             const currentStatus = target.getAttribute('data-current-status') === 'true';
-            toggleClientStatus(clientId, currentStatus);
+            toggleClientStatus(clientId, currentStatus, clientType);
             return;
         }
 
