@@ -493,6 +493,13 @@ class ClientsController {
         'Status changed via clients dashboard'
       );
 
+      // toggleUserStatus returns { success:false, message } on a soft failure (e.g.
+      // permission denied) WITHOUT throwing — surface it instead of masking it as a
+      // success (that left the agency unchanged while the UI showed "exitoso").
+      if (!result || !result.success) {
+        return this.sendError(res, result?.message || 'No se pudo cambiar el estado del cliente', 403);
+      }
+
       this.sendSuccess(res, result, `Client ${active ? 'activated' : 'deactivated'} successfully`);
     } catch (error) {
       logger.error('Error in ClientsController.toggleClientStatus', {

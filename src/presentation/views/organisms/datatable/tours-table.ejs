@@ -448,8 +448,8 @@ table.dataTable tbody tr.hover {
                     <!-- Campos de tiempo -->
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Duración (hrs)</label>
-                            <input type="number" class="form-control" id="tourDuration" min="0" step="0.5" 
+                            <label class="form-label form-label-sm fw-medium text-success">Duración (hrs) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="tourDuration" min="0" step="0.5"
                                    placeholder="2.5">
                             <div class="form-text">
                                 <small>Tiempo total del tour</small>
@@ -799,6 +799,10 @@ async function getAccessToken() {
     function initToursTable() {
         const tableId = '<%= dtTableId %>';
         const apiEndpoint = '<%= dtApiEndpoint %>';
+        // apiEndpoint carries list query params (e.g. "?includeInactive=true&tourType=vehicle").
+        // Per-item operations (/:id/...) must use the bare path, otherwise the id ends up
+        // AFTER the query string ("/api/tours?...=vehicle/ID/toggle-status") → 404.
+        const apiBase = apiEndpoint.split('?')[0];
         const showActions = <%= dtShowActions %>;
         const showClientPricing = <%= dtShowClientPricing %>;
         const canEdit = <%= canEdit %>;
@@ -2514,25 +2518,40 @@ async function getAccessToken() {
 
                 // Show the pricing section
                 $('#basePricingSection').show();
-                
+
+                // Build the FULL grid from the catalog (rates × vehicles) — igual que al
+                // crear — para que las etiquetas de tarifa/vehículo siempre sean correctas,
+                // aunque algún registro TourPrices venga corrupto (rate/vehicle en null,
+                // que antes se mostraba como "Sin tarifa" / "Vehículo").
+                await loadEmptyPricingStructure();
+
                 // Get tour base prices from API
                 const token = await getAccessToken();
-                const response = await fetch(`${apiEndpoint}/${tourId}/all-prices`, {
+                const response = await fetch(`${apiBase}/${tourId}/all-prices`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                
+
                 const priceData = await response.json();
-                
-                if (priceData.success && priceData.data) {
-                    renderBasePricing(priceData.data);
-                } else {
-                    throw new Error('Invalid pricing data received');
+
+                // Overlay existing prices onto the catalog grid (match by rate + vehicle).
+                // Records sin rate/vehículo se ignoran (no se puede mapear → ya no se pintan).
+                if (priceData.success && Array.isArray(priceData.data)) {
+                    priceData.data.forEach((item) => {
+                        const rateId = item.rate?.id;
+                        const vehicleId = item.vehicleType?.id;
+                        if (!rateId || !vehicleId) return;
+                        const input = $(`#basePricesContainer .base-price-input[data-rate-id="${rateId}"][data-vehicle-id="${vehicleId}"]`);
+                        if (input.length) {
+                            input.val(item.price || 0);
+                            input.attr('data-price-id', item.id || '');
+                        }
+                    });
                 }
             } catch (error) {
                 console.error('Error loading base pricing:', error);
@@ -2969,7 +2988,7 @@ async function getAccessToken() {
             
             try {
                 const token = await getAccessToken();
-                const url = `${apiEndpoint}/${tourId}/update-base-prices`;
+                const url = `${apiBase}/${tourId}/update-base-prices`;
                 const requestBody = {
                     prices: basePrices
                 };
@@ -3609,9 +3628,14 @@ async function getAccessToken() {
                     tourData.availability = availability;
                 }
 
-                // Validate required fields
-                if (!tourData.destinationPOI || !tourData.time) {
-                    showModalError('Por favor completa todos los campos requeridos');
+                // Validate required fields — mensajes específicos para que el usuario
+                // sepa exactamente qué falta (antes salía un genérico confuso).
+                if (!tourData.destinationPOI) {
+                    showModalError('Por favor selecciona un destino para el tour');
+                    return;
+                }
+                if (!tourData.time) {
+                    showModalError('Por favor indica la duración del tour (en horas)');
                     return;
                 }
 
@@ -3620,7 +3644,7 @@ async function getAccessToken() {
                     return;
                 }
 
-                const url = isEdit ? `${apiEndpoint}/${tourId}` : apiEndpoint;
+                const url = isEdit ? `${apiBase}/${tourId}` : apiEndpoint;
                 const method = isEdit ? 'PUT' : 'POST';
 
                 // Check if there are images to optimize
@@ -3905,7 +3929,7 @@ async function getAccessToken() {
             // Handle confirmation
             $('#confirmToggleTourBtn').on('click', function() {
                 $.ajax({
-                    url: `${apiEndpoint}/${tourId}/toggle-status`,
+                    url: `${apiBase}/${tourId}/toggle-status`,
                     type: 'PATCH',
                     contentType: 'application/json',
                     data: JSON.stringify({ active: newStatus }),
@@ -3966,7 +3990,7 @@ async function getAccessToken() {
             // Handle confirmation
             $('#confirmDeleteTourBtn').on('click', function() {
                 $.ajax({
-                    url: `${apiEndpoint}/${tourId}`,
+                    url: `${apiBase}/${tourId}`,
                     type: 'DELETE',
                     success: function(response) {
                         if (response.success) {
