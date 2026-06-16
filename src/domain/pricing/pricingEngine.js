@@ -180,14 +180,16 @@ const PricingEngine = (() => {
    * @param {number} p.baseVehicleCostPerHour - Costo base por hora por vehiculo (MXN).
    * @param {number} p.hours - Horas.
    * @param {number} p.vehicleQuantity - Cantidad de vehiculos.
-   * @param {number} [p.guideRate] - Tarifa de guia por hora por vehiculo (sin recargo).
+   * @param {number} [p.guideRate] - Tarifa de guia por hora por vehiculo (recibe recargo).
    * @param {string} [p.paymentType] - Efectivo, transferencia o tarjeta.
    * @param {string} [p.currency] - MXN o USD.
    * @param {number} [p.transferRate] - Porcentaje de recargo transferencia.
    * @param {number} [p.agencyRate] - Porcentaje de recargo tarjeta.
    * @param {number} [p.exchangeRate] - Tipo de cambio USD.
    * @param {boolean} [p.cashRoundingEnabled] - Aplicar redondeo a efectivo.
-   * @returns {object} Desglose con totales por vehiculo, guia, descuento y subtotal.
+   * @param {number} [p.greeterCost] - Costo del greeter en efectivo (add-on, recibe recargo, se suma tras el descuento).
+   * @param {number} [p.additionalVehiclesCost] - Efectivo sumado de vehiculos adicionales (recibe recargo, entra al descuento).
+   * @returns {object} Desglose con totales por vehiculo, guia, greeter, descuento y subtotal.
    * @example
    */
   function calculateADisposicion(p) {
@@ -197,27 +199,39 @@ const PricingEngine = (() => {
 
     const baseVehicleTotal = round2((Number(p.baseVehicleCostPerHour) || 0) * hours * vehicleQuantity);
     const vehicleTotalWithSurcharge = round2(applyDisplayPrice(baseVehicleTotal, p));
-    const guideTotalCost = round2(guideRate * hours * vehicleQuantity);
-    const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost);
+    // La guia ahora TAMBIEN recibe el recargo por forma de pago (regla uniforme: todos los
+    // nodos lo reciben). Se aplica solo el porcentaje (applyPaymentRate); efectivo no cambia.
+    const guideBaseTotal = round2(guideRate * hours * vehicleQuantity);
+    const guideTotalCost = round2(applyPaymentRate(guideBaseTotal, p.paymentType || 'efectivo', p.transferRate, p.agencyRate));
+    // Vehiculos adicionales (a-disp): el caller pasa el efectivo ya sumado (Sigma tarifa/h x
+    // horas por cada veh adicional). Reciben recargo y ENTRAN en la base con descuento (son
+    // tiempo de vehiculo, igual que el principal).
+    const additionalVehiclesBase = round2(Number(p.additionalVehiclesCost) || 0);
+    const additionalVehiclesTotal = round2(applyPaymentRate(additionalVehiclesBase, p.paymentType || 'efectivo', p.transferRate, p.agencyRate));
+    const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost + additionalVehiclesTotal);
 
     let discountAmount = 0;
     if (hours > 0) {
       const discountPercentage = getADisposicionDiscount(hours);
       if (discountPercentage > 0) {
-        // El descuento se calcula sobre el total CON recargo (coherente: descuento y
-        // total sobre la misma base). Antes se calculaba sobre la base sin recargo.
-        const finalCost = round2(vehicleTotalWithSurcharge + guideTotalCost);
-        discountAmount = round2(finalCost * (discountPercentage / 100));
+        // El descuento se calcula sobre el total CON recargo (vehiculo + guia + adicionales).
+        discountAmount = round2(baseTotal * (discountPercentage / 100));
       }
     }
 
-    const subtotal = round2(baseTotal - discountAmount);
+    // Greeter: add-on que recibe recargo y se suma DESPUES del descuento (no se descuenta).
+    const greeterBaseTotal = round2(Number(p.greeterCost) || 0);
+    const greeterTotalCost = round2(applyPaymentRate(greeterBaseTotal, p.paymentType || 'efectivo', p.transferRate, p.agencyRate));
+
+    const subtotal = round2(baseTotal - discountAmount + greeterTotalCost);
     const divisor = hours * vehicleQuantity;
 
     return {
       baseVehicleTotal,
       vehicleTotalWithSurcharge,
       guideTotalCost,
+      additionalVehiclesTotal,
+      greeterTotalCost,
       baseTotal,
       discountAmount,
       subtotal,

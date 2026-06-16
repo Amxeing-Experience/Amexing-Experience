@@ -7,13 +7,33 @@ motor único (`src/domain/pricing/pricingEngine.js`), de modo que builder, valid
 y PDF compartan **una sola fuente de verdad**. Hoy el motor era solo la capa final (recargo +
 redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el back usaban.
 
+## Reglas de negocio vigentes (decisión del cliente)
+
+- **Recargo uniforme:** el recargo por forma de pago (transferencia/tarjeta) se aplica a
+  **TODOS** los nodos, **incluidos guía/chofer y greeter**. (Antes guía/greeter quedaban
+  exentos; se cambió a petición del cliente.) En la práctica:
+  `total_forma_pago = total_efectivo × (1 + %)`.
+- **Vehículo principal de transporte = siempre 1.** El campo "Cantidad" no multiplica el
+  vehículo principal; para varios vehículos se usan **vehículos adicionales** (siempre
+  desglosados).
+- **A-Disposición:** la opción de chofer se renombró a **"Incluir Guía"** (solo etiqueta; el
+  id/rate internos siguen igual). Se agregó **"Incluir Greeter"**: mismo cálculo que transporte
+  (base + tarifa/h × horas), con recargo, y se suma **después** del descuento por volumen (el
+  greeter no se descuenta). Persiste como `includeGreeter`. Guía y greeter son **mutuamente
+  excluyentes**.
+- **A-Disposición — vehículos adicionales:** se pueden agregar vehículos adicionales de **tipo y
+  segmento distintos** (cada fila: segmento + vehículo, con su **tarifa/hora**). Cada uno =
+  `tarifa/h × horas`, con recargo, y **entra al descuento** por volumen (es tiempo de vehículo).
+  La "Cantidad" sigue siendo solo del vehículo principal. Persiste como
+  `aDisposicionAdditionalVehicles: [{ vehicleTypeId, rateId, hourlyRate, ... }]`.
+
 ## Estado por tipo de servicio
 
 | Tipo | Nodos en el motor | Front conectado | Notas |
 | :-- | :-- | :-- | :-- |
 | **Transporte** | ✅ vehículo · espera · guía/chofer · greeter · vehículo adicional · extras | ✅ ruta principal **y** fallback | **HECHO** (ver abajo) |
 | **Tours (con vehículos)** | ✅ vehículo · guía · vehículo adicional · extras (reusa `composeServiceNodes`) | ✅ `calculateVehicleTourDevBreakdown` usa el motor | **HECHO** |
-| **A-Disposición** | ✅ vehículo × horas × cantidad · guía · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
+| **A-Disposición** | ✅ vehículo × horas × cantidad · guía · **greeter (add-on)** · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
 | **Experiencias** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ guardado + desglose | **HECHO** (sin duración; ver abajo) |
 | **Walking tours** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ desglose + fallback | **HECHO** (tiers/override en baseTotal) |
 | **Concepto** | ✅ recargo vía `composeServiceNodes` (1 nodo: unitario + por persona) | ✅ guardado + dev prices + desglose | **HECHO** (fix por-persona + C2) |

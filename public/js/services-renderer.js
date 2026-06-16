@@ -611,21 +611,30 @@
                             </div>
                         </div>
                     ` : ''}
+                    ${service.type === 'a-disposicion' && Array.isArray(service.aDisposicionAdditionalVehicles) && service.aDisposicionAdditionalVehicles.length
+                        ? service.aDisposicionAdditionalVehicles.map((av) => `
+                        <div class="ms-3 mt-1">
+                            <div class="d-flex align-items-center gap-2">
+                                <span>
+                                    <strong>${(av && (av.vehicleLabel || av.vehicleType)) || 'Vehículo adicional'}</strong>${(av && av.segmentLabel) ? ` <span class="text-muted">· ${av.segmentLabel}</span>` : ''}
+                                </span>
+                            </div>
+                        </div>
+                    `).join('') : ''}
                     ${this.renderExtraAdditionalVehicleRows(service)}
                 </div>`;
             }
 
-            // Guide (label differs: a-disposicion uses a Chofer, tours/experiences use a Guía)
+            // Guide ("Incluye Guía" en todos los tipos; a-disposición se renombró de Chofer a Guía)
             if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
-                const guideLabel = service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía';
                 html += `<div class="service-detail-item text-success mt-1">
                     <i class="ti ti-user me-1"></i>
-                    <strong>${guideLabel}</strong>
+                    <strong>Incluye Guía</strong>
                 </div>`;
             }
 
-            // Greeter
-            if ((service.type === 'tour' || service.type === 'transport') && service.includeGreeter) {
+            // Greeter (transporte, tours y a-disposición)
+            if ((service.type === 'tour' || service.type === 'transport' || service.type === 'a-disposicion') && service.includeGreeter) {
                 const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
                 html += `<div class="service-detail-item text-info mt-1">
                     <i class="ti ti-users me-1"></i>
