@@ -17979,9 +17979,12 @@ class ItineraryBuilder {
     // Reset the editable price to the newly-selected vehicle's list price.
     this.syncPrimaryAdditionalVehiclePrice(true);
     this.serviceModified = true;
-    this.updateServicePriceBreakdown();
+    // Dev breakdown PRIMERO (puebla los campos que espeja el service breakdown), display
+    // después. Si se invierte, el desglose va "una interacción atrás" y no muestra el
+    // vehículo adicional recién seleccionado aunque el total sí lo incluya.
     this.updateDevPaymentPrices();
-    this.updateDevPaymentBreakdown(); // Update dev breakdown to include selected additional vehicle
+    this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
   }
 
   // Effective per-vehicle price for the PRIMARY additional vehicle: the manual price if
