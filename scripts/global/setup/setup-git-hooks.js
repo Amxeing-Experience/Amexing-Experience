@@ -384,9 +384,18 @@ log_success "Hook executed successfully!"
 
     let allInstalled = true;
 
+    // Windows (NTFS) has no Unix executable bit, and chmod is effectively a
+    // no-op there. Git for Windows runs hooks via its bundled bash regardless,
+    // so existence is the only meaningful check on win32.
+    const isWindows = process.platform === 'win32';
+
     this.hooks.forEach(hookName => {
       const targetHook = path.join(this.hooksDir, hookName);
       if (fs.existsSync(targetHook)) {
+        if (isWindows) {
+          this.log(`${hookName}: installed (executable bit not applicable on Windows)`, 'success');
+          return;
+        }
         const stats = fs.statSync(targetHook);
         if (stats.mode & 0o111) { // Check if executable
           this.log(`${hookName}: installed and executable`, 'success');
