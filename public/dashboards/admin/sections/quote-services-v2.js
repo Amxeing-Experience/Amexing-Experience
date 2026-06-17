@@ -14367,23 +14367,21 @@ class ItineraryBuilder {
       const childrenQuantityField = document.getElementById('childrenQuantity');
       const adultsNoAlcoholQuantityField = document.getElementById('adultsNoAlcoholQuantity');
 
-      // Set default values for people quantities
+      // Cantidades por default: default de la experiencia → dato de la cotización → vacío.
+      // Nunca 0 literal: si queda en 0 se deja vacío con placeholder "0" (no un 0 que borrar).
+      const quoteAdults = this.quoteData?.numberOfAdults || 0;
+      const quoteChildren = this.quoteData?.numberOfChildren || 0;
       if (adultsQuantityField) {
-        adultsQuantityField.value = experience.defaultAdults || '';
-      } else {
-
+        adultsQuantityField.value = experience.defaultAdults || quoteAdults || '';
+        adultsQuantityField.placeholder = '0';
       }
-
       if (childrenQuantityField) {
-        childrenQuantityField.value = experience.defaultChildren || 0;
-      } else {
-
+        childrenQuantityField.value = experience.defaultChildren || quoteChildren || '';
+        childrenQuantityField.placeholder = '0';
       }
-
       if (adultsNoAlcoholQuantityField) {
-        adultsNoAlcoholQuantityField.value = experience.defaultAdultsNoAlcohol || 0;
-      } else {
-
+        adultsNoAlcoholQuantityField.value = experience.defaultAdultsNoAlcohol || '';
+        adultsNoAlcoholQuantityField.placeholder = '0';
       }
     } else {
 
