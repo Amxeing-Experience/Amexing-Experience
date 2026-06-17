@@ -7878,7 +7878,7 @@ class ItineraryBuilder {
                                             ` : ''}
                                             ${service.type === 'a-disposicion' && Array.isArray(service.aDisposicionAdditionalVehicles) && service.aDisposicionAdditionalVehicles.length
         ? service.aDisposicionAdditionalVehicles.map((av) => {
-          const name = (av && (av.vehicleLabel || av.vehicleType)) || 'Vehículo adicional';
+          const name = (((av && (av.vehicleLabel || av.vehicleType)) || 'Vehículo adicional').split(' - ')[0].trim());
           const seg = (av && av.segmentLabel) || '';
           return `<div class="ms-3 mt-1">
                                                                 <span><strong>${name}</strong>${seg ? ` <span class="text-muted">· ${seg}</span>` : ''}</span>

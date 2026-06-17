@@ -616,7 +616,7 @@
                         <div class="ms-3 mt-1">
                             <div class="d-flex align-items-center gap-2">
                                 <span>
-                                    <strong>${(av && (av.vehicleLabel || av.vehicleType)) || 'Vehículo adicional'}</strong>${(av && av.segmentLabel) ? ` <span class="text-muted">· ${av.segmentLabel}</span>` : ''}
+                                    <strong>${(((av && (av.vehicleLabel || av.vehicleType)) || 'Vehículo adicional').split(' - ')[0].trim())}</strong>${(av && av.segmentLabel) ? ` <span class="text-muted">· ${av.segmentLabel}</span>` : ''}
                                 </span>
                             </div>
                         </div>
