@@ -8753,7 +8753,7 @@ class ItineraryBuilder {
       transferRate: this.transferRate,
       agencyRate: this.agencyRate,
       exchangeRate: this.exchangeRate,
-      cashRoundingEnabled: true,
+      cashRoundingEnabled: false, // Redondeo a $5 (efectivo) desactivado: números reales
     };
 
     if (window.PricingEngine) {
@@ -10631,16 +10631,14 @@ class ItineraryBuilder {
         transferRate: this.transferRate,
         agencyRate: this.agencyRate,
         exchangeRate: this.exchangeRate,
-        // Comportamiento actual: getDisplayPrice siempre redondea efectivo+MXN.
-        cashRoundingEnabled: true,
+        // Redondeo a $5 (efectivo) desactivado: mostrar números reales en todos los servicios.
+        cashRoundingEnabled: false,
       });
     }
 
     // Fallback (idéntico al comportamiento previo) por si el motor no cargó.
-    let priceToProcess = mxnPrice;
-    if (paymentType === 'efectivo' && currency === 'MXN' && window.PricingUtils && window.PricingUtils.applyCashRounding) {
-      priceToProcess = PricingUtils.applyCashRounding(mxnPrice);
-    }
+    // Redondeo a $5 (efectivo) desactivado: mostrar números reales en todos los servicios.
+    const priceToProcess = mxnPrice;
     let withSurcharge = priceToProcess;
     if (window.PricingUtils) {
       withSurcharge = PricingUtils.applyPaymentRate(priceToProcess, paymentType, this.transferRate, this.agencyRate);
