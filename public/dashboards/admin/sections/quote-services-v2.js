@@ -1749,6 +1749,9 @@ class ItineraryBuilder {
     // Skip while populating an existing service for edit — it re-renders right after.
     if (!this._populatingForm) {
       this.clearServicePriceBreakdown();
+      // También vacía los campos del dev breakdown (texto + precios): si no, al cambiar de tipo
+      // (experiencia → tour → …) el nuevo tipo hereda el desglose del anterior.
+      this.clearDevBreakdownFields();
     }
 
     // Hide additional vehicle checkbox (shown only for transport)
@@ -12313,22 +12316,29 @@ class ItineraryBuilder {
       if (el) el.checked = false;
     });
 
-    // Totales de desglose por tipo: evita que un servicio herede los del anterior.
-    this._transportBreakdownTotals = null;
-    this._aDisposicionBreakdownTotals = null;
-    this._walkingTourBreakdownTotals = null;
+    // Campos del dev breakdown + totales en memoria (fuente que espeja el desglose del cliente).
+    this.clearDevBreakdownFields();
 
-    // Campos del dev breakdown (texto + precios por forma de pago): son la fuente que espeja
-    // el desglose del cliente, así que si no se limpian se heredan del servicio anterior.
+    // Limpia el desglose visible para que no muestre cálculos del servicio anterior
+    // (se vuelve a poblar al recalcular el servicio que se abre).
+    if (typeof this.clearServicePriceBreakdown === 'function') this.clearServicePriceBreakdown();
+  }
+
+  /**
+   * Vacía los campos del dev breakdown (texto + precios por forma de pago) y los totales por
+   * tipo en memoria. Es la fuente que espeja el desglose del cliente, así que se limpia tanto al
+   * abrir el modal como al cambiar de tipo de servicio (si no, se heredan del servicio anterior).
+   * @example
+   */
+  clearDevBreakdownFields() {
     ['devBreakdownEfectivo', 'devBreakdownTransferencia', 'devBreakdownTarjeta',
       'devPriceEfectivo', 'devPriceTransferencia', 'devPriceTarjeta'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
-
-    // Limpia el desglose visible para que no muestre cálculos del servicio anterior
-    // (se vuelve a poblar al recalcular el servicio que se abre).
-    if (typeof this.clearServicePriceBreakdown === 'function') this.clearServicePriceBreakdown();
+    this._transportBreakdownTotals = null;
+    this._aDisposicionBreakdownTotals = null;
+    this._walkingTourBreakdownTotals = null;
   }
 
   resetServiceModalState() {
