@@ -51,7 +51,7 @@ class PublicReservationController {
       const pdfBuffer = await renderUrlToPdf(url);
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="Reservacion_${folio}.pdf"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${folio}.pdf"`);
       return res.end(pdfBuffer);
     } catch (error) {
       logger.error('Failed to render reservation PDF', {

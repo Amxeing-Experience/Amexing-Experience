@@ -88,12 +88,26 @@ async function renderUrlToPdf(url, options = {}) {
     // page-break behavior is still respected via the CSS `page-break-inside: avoid` rules in
     // `.pdf-export-mode` (which we toggle on via the `?pdf=1` query param).
     await page.emulateMediaType('screen');
+    // Running footer on every page: brand link + page numbers. It softens page breaks
+    // (each page reads as intentional rather than an arbitrary chop) and surfaces
+    // amexingexperience.com in the PDF, matching the on-screen public view. Puppeteer
+    // needs `displayHeaderFooter` plus room in the bottom margin, so we widen `bottom`
+    // past the body `margin`. The empty header template suppresses Puppeteer's default
+    // date/title header. Inline font-size is required — the default is 0.
+    const footerTemplate = `
+      <div style="width:100%; box-sizing:border-box; padding:0 ${margin}; font-size:8px; color:#969b81; font-family:'Segoe UI',Tahoma,sans-serif; display:flex; justify-content:space-between; align-items:center;">
+        <span>amexingexperience.com</span>
+        <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
+      </div>`;
     const pdfBuffer = await page.pdf({
       format,
       printBackground: true,
       preferCSSPageSize: false,
+      displayHeaderFooter: true,
+      headerTemplate: '<span></span>',
+      footerTemplate,
       margin: {
-        top: margin, bottom: margin, left: margin, right: margin,
+        top: margin, bottom: '16mm', left: margin, right: margin,
       },
     });
     return pdfBuffer;

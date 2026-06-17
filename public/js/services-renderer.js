@@ -313,6 +313,37 @@
                     .services-renderer-preview.hide-prices .day-footer {
                         display: none !important;
                     }
+
+                    /* ===== PDF pagination (section-per-day strategy) =====
+                       Per stakeholder request: prefer whole, readable sections over
+                       compact pages — even if that leaves blank space at the bottom of a
+                       page, that reads better than an arbitrary mid-content cut.
+                       - Each day starts on a fresh page (except the first, which flows
+                         right under the header / client info).
+                       - A single service is never split across pages. Assignments are
+                         hidden from the PDF (below), so services stay short enough that
+                         break-inside:avoid is always physically honorable.
+                       Scoped to .pdf-export-mode (added to <body> by PdfRenderService)
+                       so on-screen rendering is untouched. */
+                    .pdf-export-mode .day-card + .day-card {
+                        break-before: page;
+                        page-break-before: always;
+                    }
+                    .pdf-export-mode .service-item,
+                    .pdf-export-mode .day-footer {
+                        break-inside: avoid;
+                        page-break-inside: avoid;
+                    }
+                    .pdf-export-mode .day-header {
+                        break-after: avoid;
+                        page-break-after: avoid;
+                    }
+                    /* Internal assignments (drivers, vehicles, guides, greeters) are
+                       operational data — hidden from the exported PDF. The on-screen
+                       public view still renders them. */
+                    .pdf-export-mode .assignments-block {
+                        display: none !important;
+                    }
                 </style>
             `;
 
@@ -615,21 +646,23 @@
                 </div>`;
             }
 
-            // Guide (label differs: a-disposicion uses a Chofer, tours/experiences use a Guía)
+            // Guide. A-disposición IS the chauffeur service, so it just reads "Incluye Chofer".
+            // Tours bundle a guide AND a chofer, so the label combines both per stakeholder
+            // request: "Incluye Guía + Chofer".
             if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
-                const guideLabel = service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía';
+                const guideLabel = service.type === 'a-disposicion' ? 'Incluye Driver' : 'Incluye Guía + Driver';
                 html += `<div class="service-detail-item text-success mt-1">
                     <i class="ti ti-user me-1"></i>
                     <strong>${guideLabel}</strong>
                 </div>`;
             }
 
-            // Greeter
+            // Greeter — always paired with a chofer: "Incluye Greeter + Chofer".
             if ((service.type === 'tour' || service.type === 'transport') && service.includeGreeter) {
                 const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
                 html += `<div class="service-detail-item text-info mt-1">
                     <i class="ti ti-users me-1"></i>
-                    <strong>Incluye Greeter${greeterLocation}</strong>
+                    <strong>Incluye Greeter${greeterLocation} + Driver</strong>
                 </div>`;
             }
 
