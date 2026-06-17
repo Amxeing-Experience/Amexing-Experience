@@ -7639,13 +7639,18 @@ class ItineraryBuilder {
     // Recalcula los conflictos de horario por día en cada render, para que las banderas
     // nunca queden viejas (p. ej. tras borrar un servicio, o si una mutación en memoria no
     // pasó por un sort). detectScheduleOverlaps limpia y recomputa, y respeta la regla de
-    // no marcar transporte ni concepto.
-    this.days.forEach((day) => {
-      const dayServices = (day.services || [])
-        .map((sid) => ({ service: this.services.get(sid) }))
-        .filter((s) => s.service);
-      this.detectScheduleOverlaps(dayServices);
-    });
+    // no marcar transporte ni concepto. En try/catch para que un fallo de la detección
+    // (p. ej. un caché aún no inicializado) NUNCA aborte el render de la lista de servicios.
+    try {
+      this.days.forEach((day) => {
+        const dayServices = (day.services || [])
+          .map((sid) => ({ service: this.services.get(sid) }))
+          .filter((s) => s.service);
+        this.detectScheduleOverlaps(dayServices);
+      });
+    } catch (overlapError) {
+      console.warn('⚠️ No se pudo recalcular conflictos de horario antes del render:', overlapError);
+    }
 
     container.innerHTML = this.days.map((day) => this.renderDayCard(day)).join('');
 
