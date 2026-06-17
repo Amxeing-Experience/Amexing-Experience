@@ -8732,6 +8732,13 @@ class ItineraryBuilder {
    * @example
    */
   calculateADisposicionPricing(paymentType, baseVehicleCostPerHour, hours, vehicleQuantity, guideRate = 0) {
+    // Guía simétrica al greeter: el greeter se lee del DOM aquí dentro y por eso siempre suma;
+    // la guía dependía solo del param `guideRate`, que en a-disposición a veces llegaba en 0
+    // (por eso "no agregaba nada"). Si el param no trae tarifa (> 0) pero el checkbox
+    // "Incluir Guía" está marcado, derivar la tarifa del caché de driver tour rate.
+    if ((Number(guideRate) || 0) <= 0 && document.getElementById('aDisposicionGuide')?.checked) {
+      guideRate = Number(this.driverTourRateCache && this.driverTourRateCache.value) || 0;
+    }
     // Resuelve la moneda del DOM (igual que getDisplayPrice) y delega TODO el cálculo al
     // motor único (PricingEngine.calculateADisposicion): vehículo × horas × cantidad +
     // recargo (vehículo y guía) + descuento por volumen + greeter (add-on, con recargo,
@@ -10064,6 +10071,13 @@ class ItineraryBuilder {
           qsDevLog('🚗 [DEV BREAKDOWN] Additional vehicle costs calculated:', additionalVehicleInfo);
         }
       }
+    }
+
+    // Guía a-disposición robusta: derivar del checkbox + caché (simétrico al greeter) por si el
+    // guideRate calculado arriba quedó en 0. Así el TOTAL y la LÍNEA del desglose la incluyen
+    // (formatPaymentBreakdown usa este guideRate para decidir si muestra la guía).
+    if (document.getElementById('aDisposicionGuide')?.checked) {
+      guideRate = Number(this.driverTourRateCache && this.driverTourRateCache.value) || guideRate || 0;
     }
 
     // Use unified calculation method for all payment types - eliminates code duplication and ensures identical results
