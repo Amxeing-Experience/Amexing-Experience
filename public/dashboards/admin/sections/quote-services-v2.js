@@ -5962,17 +5962,8 @@ class ItineraryBuilder {
 
           // Restore price (populateTransportVehicleDropdown resets it to 0)
           // Apply surcharge based on current payment type
-          const currentPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-          let displayPrice = savedPrice;
-
-          if (!service.priceOverride) {
-            // Apply surcharges only if not using custom price
-            if (currentPaymentType === 'transferencia') {
-              displayPrice = savedPrice * (1 + (this.transferRate / 100));
-            } else if (currentPaymentType === 'tarjeta') {
-              displayPrice = savedPrice * (1 + (this.agencyRate / 100));
-            }
-          }
+          // El campo muestra el efectivo base; el recargo se aplica en el desglose.
+          const displayPrice = savedPrice;
 
           document.getElementById('servicePrice').value = parseFloat(displayPrice).toFixed(2);
           // Update capacity note now that vehicle is populated
@@ -10741,26 +10732,9 @@ class ItineraryBuilder {
     const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
     if (serviceType === 'tour') {
       this.recalculateTourPrice();
-
-      // If recalculateTourPrice didn't update the field (no vehicle/tour selected),
-      // update it based on current field value + payment surcharge
-      const servicePriceField = document.getElementById('servicePrice');
-      if (servicePriceField && servicePriceField.value) {
-        const currentValue = parseFloat(servicePriceField.value) || 0;
-        if (currentValue > 0) {
-          // Check if the field value looks like it needs payment surcharge applied
-          const expectedWithSurcharge = this.getDisplayPrice(currentValue);
-          if (Math.abs(currentValue - expectedWithSurcharge) > 1) {
-            // Current value seems to be base price, apply surcharge
-            servicePriceField.value = expectedWithSurcharge.toFixed(2);
-            qsDevLog('✅ Applied payment surcharge to existing price:', {
-              originalValue: currentValue,
-              newValue: expectedWithSurcharge,
-              paymentType,
-            });
-          }
-        }
-      }
+      // El campo servicePrice siempre muestra el efectivo base; el recargo va en el desglose.
+      // (Antes aquí se re-aplicaba el recargo al campo al cambiar de forma de pago, lo que lo
+      // sacaba del efectivo y no coincidía con el label "(efectivo)".)
     } else if (serviceType === 'transport') {
       this.recalculateTransportPrice();
     } else if (serviceType === 'a-disposicion') {
@@ -15260,8 +15234,9 @@ class ItineraryBuilder {
         // Apply payment surcharge to the total (vehicle + guide)
         const finalPricePerHour = this.getDisplayPrice(baseTotalCost);
 
-        servicePriceField.value = finalPricePerHour.toFixed(2);
-        this.lastValidTourPrice = finalPricePerHour.toFixed(2); // Store for readonly enforcement
+        // El campo muestra el efectivo base; el recargo se aplica en el desglose.
+        servicePriceField.value = baseTotalCost.toFixed(2);
+        this.lastValidTourPrice = baseTotalCost.toFixed(2); // Store for readonly enforcement
         qsDevLog('✅ Updated tour price field:', {
           baseTotalCost,
           finalPriceWithSurcharge: finalPricePerHour,
@@ -15350,7 +15325,8 @@ class ItineraryBuilder {
     // Otherwise, use the combined base as-is.
     const finalPrice = applySurcharges ? this.getDisplayPrice(baseEfectivo) : baseEfectivo;
 
-    servicePriceField.value = finalPrice.toFixed(2);
+    // El campo muestra el efectivo base; el recargo se aplica en el desglose.
+    servicePriceField.value = baseEfectivo.toFixed(2);
 
     qsDevLog('💰 Updated concepto service price:', {
       clientPrice,
@@ -17848,7 +17824,8 @@ class ItineraryBuilder {
       finalPrecioBase: displayPrice,
     });
 
-    this.updatePriceField(displayPrice);
+    // El campo siempre muestra el efectivo base; el recargo por forma de pago va en el desglose.
+    this.updatePriceField(vehicleEfectivoTotal);
 
     // The service breakdown now reads from the dev breakdown, so recompute the dev
     // breakdown FIRST, then render the service breakdown from it.
@@ -19226,8 +19203,8 @@ class ItineraryBuilder {
       // Only update price field if price override is not active
       const isOverrideActive = document.getElementById('aDisposicionOverridePrices')?.checked || false;
       if (priceField && !isOverrideActive) {
-        // Show price WITH payment type surcharges
-        priceField.value = displayPrice.toFixed(2);
+        // El campo muestra el efectivo base (por hora); el recargo se aplica en el desglose.
+        priceField.value = basePrice.toFixed(2);
         qsDevLog('💰 A Disposición price field set with payment surcharge:', {
           basePrice,
           displayPrice,
