@@ -45,8 +45,8 @@ const serviciosLinks = [
 
 const recursosLinks = [
     { name: 'FAQ', href: '/recursos/faq' },
-    { name: 'Aviso de privacidad', href: '/legal/privacy' },
-    { name: 'Términos y condiciones', href: '/legal/terms' },
+    { name: 'Aviso de privacidad', href: '/docs/AMEXING_Aviso_Privacidad_2026_V1.pdf', external: true },
+    { name: 'Términos y condiciones', href: '/docs/AMEXING_Condiciones_2026_V1.pdf', external: true },
     { name: 'Política de cancelación', href: '/legal/cancellation' }
 ];
 
@@ -110,7 +110,7 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
                     <ul class="landing-footer__list">
                         <% recursosLinks.forEach(function(link) { %>
                         <li class="landing-footer__list-item">
-                            <a href="<%= link.href %>" class="landing-footer__link">
+                            <a href="<%= link.href %>" class="landing-footer__link"<% if (link.external) { %> target="_blank" rel="noopener noreferrer"<% } %>>
                                 <%= link.name %>
                             </a>
                         </li>
@@ -218,7 +218,7 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
 }
 
 .landing-footer__title {
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-newsreader, 'Newsreader', Georgia, 'Times New Roman', serif);
     font-size: 1.1rem;
     font-weight: 600;
     color: #333;
@@ -243,9 +243,9 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
 .landing-footer__link {
     color: #666;
     text-decoration: none;
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-myriad, 'Myriad Pro', 'Helvetica Neue', Arial, sans-serif);
     font-size: 0.95rem;
-    font-weight: 400;
+    font-weight: 300;
     transition: color 0.3s ease;
     line-height: 1.4;
 }
@@ -356,9 +356,9 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
 }
 
 .landing-footer__copyright {
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-myriad, 'Myriad Pro', 'Helvetica Neue', Arial, sans-serif);
     font-size: 0.9rem;
-    font-weight: 400;
+    font-weight: 300;
     color: #666;
     margin: 0;
 }
