@@ -7636,6 +7636,17 @@ class ItineraryBuilder {
     const container = document.getElementById('daysContainer');
     if (!container) return;
 
+    // Recalcula los conflictos de horario por día en cada render, para que las banderas
+    // nunca queden viejas (p. ej. tras borrar un servicio, o si una mutación en memoria no
+    // pasó por un sort). detectScheduleOverlaps limpia y recomputa, y respeta la regla de
+    // no marcar transporte ni concepto.
+    this.days.forEach((day) => {
+      const dayServices = (day.services || [])
+        .map((sid) => ({ service: this.services.get(sid) }))
+        .filter((s) => s.service);
+      this.detectScheduleOverlaps(dayServices);
+    });
+
     container.innerHTML = this.days.map((day) => this.renderDayCard(day)).join('');
 
     // Attach event listeners to dynamic elements
