@@ -15,30 +15,53 @@
     <!-- Tabler Icons -->
     <link rel="stylesheet" href="/dashboard/css/icons/tabler-icons/tabler-icons.css">
 
+    <!-- Brand fonts (match landing) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/fonts.css">
+
     <!-- Auth-specific styles -->
     <style>
-        /* Auth Layout Styles */
+        /* Brand tokens (match landing) */
+        :root {
+            --amx-gold-1: #B8860B;
+            --amx-gold-2: #DAA520;
+            --amx-green-1: #969B81;
+            --amx-green-2: #7f846a;
+            --amx-charcoal: #2e2e2d;
+            --amx-sage: #969B81;
+            --amx-cream: #faf9f6;
+            --amx-ink: #2e2e2d;
+            --amx-muted: #6b6b66;
+        }
+
+        * { box-sizing: border-box; }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: var(--font-myriad), 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: radial-gradient(circle at 20% 20%, #3a3a37 0%, #2e2e2d 45%, #1c1c1b 100%);
+            color: var(--amx-ink);
             min-height: 100vh;
         }
 
         .auth-wrapper {
             min-height: 100vh;
             display: flex;
-            align-items: center;
+            align-items: stretch;
             justify-content: center;
-            padding: 2rem 1rem;
+            padding: 0;
             position: relative;
             overflow: hidden;
         }
 
         .auth-wrapper.with-header {
             min-height: calc(100vh - 200px);
-            padding-top: 1rem;
+            align-items: center;
+            padding: 2rem 1rem 1rem;
         }
 
+        /* Subtle gold grid texture */
         .auth-wrapper::before {
             content: '';
             position: absolute;
@@ -46,133 +69,162 @@
             left: -50%;
             width: 200%;
             height: 200%;
-            background: url('data:image/svg+xml,<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></pattern></defs><rect width="100%" height="100%" fill="url(%23grid)" /></svg>');
-            animation: float 20s ease-in-out infinite;
+            background-image:
+                repeating-linear-gradient(0deg, transparent 0, transparent 27px, rgba(218, 165, 32, 0.05) 27px, rgba(218, 165, 32, 0.05) 28px),
+                repeating-linear-gradient(90deg, transparent 0, transparent 27px, rgba(218, 165, 32, 0.05) 27px, rgba(218, 165, 32, 0.05) 28px);
+            animation: float 26s ease-in-out infinite;
             pointer-events: none;
         }
 
         @keyframes float {
-            0%, 100% { transform: translate(0, 0) rotate(0deg); }
-            33% { transform: translate(30px, -30px) rotate(120deg); }
-            66% { transform: translate(-20px, 20px) rotate(240deg); }
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(28px, -28px); }
         }
 
+        /* Split card — full screen */
         .auth-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 1200px;
-            padding: 3rem;
             position: relative;
             z-index: 2;
-            transform: translateY(0);
-            transition: all 0.3s ease;
+            display: flex;
+            width: 100%;
+            max-width: none;
+            min-height: 100vh;
+            background: #fff;
+            border-radius: 0;
+            overflow: hidden;
+            box-shadow: none;
         }
 
+        /* Contained card variant (auth flows that show a header) */
         .auth-wrapper.with-header .auth-card {
-            max-width: 1200px;
-            padding: 2rem;
+            max-width: 960px;
+            min-height: 600px;
+            border-radius: 22px;
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45);
         }
 
-        .auth-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        /* Brand (left) panel */
+        .auth-brand {
+            position: relative;
+            flex: 1 1 50%;
+            max-width: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 3rem 3.25rem 3.5rem;
+            color: #fff;
+            background-image:
+                linear-gradient(180deg, rgba(20, 20, 19, 0.25) 0%, rgba(20, 20, 19, 0.55) 55%, rgba(18, 18, 17, 0.92) 100%),
+                url('/images/hero-background.jpg');
+            background-size: cover;
+            background-position: center;
         }
 
-        /* Responsive adjustments for auth-card */
-        @media (max-width: 1400px) {
-            .auth-card {
-                max-width: 90%;
-                padding: 2.5rem;
-            }
+        .auth-brand__logo img {
+            height: 46px;
+            width: auto;
+            filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
         }
 
-        @media (max-width: 1200px) {
-            .auth-card {
-                max-width: 85%;
-                padding: 2rem;
-            }
+        .auth-brand__content {
+            margin-top: auto;
+            max-width: 26rem;
         }
 
-        @media (max-width: 768px) {
-            .auth-card {
-                max-width: 95%;
-                padding: 1.5rem;
-            }
+        .auth-brand__eyebrow {
+            display: inline-block;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: var(--amx-gold-2);
+            margin-bottom: 0.85rem;
         }
 
-        @media (max-width: 576px) {
-            .auth-card {
-                max-width: 100%;
-                padding: 1rem;
-                margin: 0 1rem;
-            }
+        .auth-brand__rule {
+            width: 52px;
+            height: 2px;
+            border: 0;
+            margin: 0 0 1.1rem;
+            background: linear-gradient(135deg, var(--amx-gold-1), var(--amx-gold-2));
+            opacity: 1;
         }
 
-        .auth-logo {
-            text-align: center;
-            margin-bottom: 2rem;
+        .auth-brand__title {
+            font-family: var(--font-arpona), 'Montserrat', serif;
+            font-size: 2.55rem;
+            font-weight: 400;
+            line-height: 1.12;
+            letter-spacing: 0.2px;
+            margin: 0 0 1rem;
+            color: #ffffff;
+            text-shadow: 0 2px 16px rgba(0, 0, 0, 0.55);
         }
 
-        .auth-logo img {
-            max-height: 60px;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
-        }
-
-        .auth-title {
-            text-align: center;
-            color: #2d3748;
-            font-size: 1.75rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .auth-subtitle {
-            text-align: center;
-            color: #718096;
+        .auth-brand__subtitle {
             font-size: 1rem;
-            margin-bottom: 2rem;
+            font-weight: 300;
+            line-height: 1.55;
+            color: rgba(255, 255, 255, 0.85);
+            margin: 0;
+            text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
         }
 
-        /* Form Styles */
+        /* Body (right) panel */
+        .auth-body {
+            flex: 1 1 50%;
+            max-width: 50%;
+            background: var(--amx-cream);
+            padding: 3rem 3.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow-y: auto;
+        }
+
+        /* Legacy single-logo block hidden in the split layout */
+        .auth-logo { display: none; }
+
+        /* Form controls */
         .form-control {
-            background: rgba(255, 255, 255, 0.8);
-            border: 1px solid rgba(0, 0, 0, 0.1);
+            background: #fff;
+            border: 1px solid #e2ded3;
             border-radius: 12px;
-            padding: 0.875rem 1rem;
-            font-size: 1rem;
-            transition: all 0.3s ease;
+            padding: 0.8rem 1rem;
+            font-size: 0.975rem;
+            transition: all 0.25s ease;
         }
 
         .form-control:focus {
-            background: rgba(255, 255, 255, 0.95);
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-            transform: translateY(-1px);
+            background: #fff;
+            border-color: var(--amx-gold-2);
+            box-shadow: 0 0 0 3px rgba(218, 165, 32, 0.16);
         }
 
+        /* Buttons */
         .btn {
             border-radius: 12px;
-            padding: 0.875rem 1.5rem;
+            padding: 0.8rem 1.4rem;
             font-weight: 600;
-            font-size: 1rem;
-            transition: all 0.3s ease;
+            font-size: 0.975rem;
+            letter-spacing: 0.2px;
+            transition: all 0.25s ease;
             border: none;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, var(--amx-green-1) 0%, var(--amx-green-2) 100%);
+            color: #fff;
+            box-shadow: 0 8px 22px rgba(127, 132, 106, 0.35);
         }
 
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+        .btn-primary:hover,
+        .btn-primary:focus {
+            background: linear-gradient(135deg, #878c6e 0%, #6e7259 100%);
+            color: #fff;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 10px 26px rgba(127, 132, 106, 0.45);
         }
 
         /* Loading Animation */
@@ -182,7 +234,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(102, 126, 234, 0.1);
+            background: rgba(28, 28, 27, 0.45);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -200,31 +252,14 @@
         .loading-spinner {
             width: 40px;
             height: 40px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
+            border: 3px solid rgba(218, 165, 32, 0.25);
             border-radius: 50%;
-            border-top-color: #667eea;
+            border-top-color: var(--amx-gold-2);
             animation: spin 1s ease-in-out infinite;
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
-        }
-
-        /* Responsive */
-        @media (max-width: 576px) {
-            .auth-card {
-                padding: 2rem 1.5rem;
-                margin: 1rem;
-                border-radius: 16px;
-            }
-
-            .auth-title {
-                font-size: 1.5rem;
-            }
-
-            .auth-subtitle {
-                font-size: 0.875rem;
-            }
         }
 
         /* Accessibility */
@@ -246,8 +281,35 @@
         input:focus,
         select:focus,
         textarea:focus {
-            outline: 2px solid #667eea;
+            outline: 2px solid var(--amx-gold-2);
             outline-offset: 2px;
+        }
+
+        /* Responsive: stack the panels */
+        @media (max-width: 860px) {
+            .auth-card {
+                flex-direction: column;
+            }
+
+            .auth-wrapper.with-header .auth-card {
+                max-width: 480px;
+                min-height: 0;
+            }
+
+            .auth-brand,
+            .auth-body {
+                max-width: 100%;
+                flex-basis: auto;
+            }
+
+            .auth-brand {
+                min-height: 210px;
+                padding: 1.75rem;
+            }
+
+            .auth-body {
+                padding: 2.5rem 1.5rem;
+            }
         }
     </style>
 
@@ -284,49 +346,57 @@
     <!-- Auth Wrapper -->
     <div class="auth-wrapper <%= typeof showAuthHeader !== 'undefined' && showAuthHeader ? 'with-header' : '' %>">
         <div class="auth-card">
-            <!-- Logo (only if no header) -->
-            <% if (!(typeof showAuthHeader !== 'undefined' && showAuthHeader)) { %>
-                <div class="auth-logo">
-                    <img src="/dashboard/images/logos/amexing-logo.svg"
-                         alt="Amexing Logo">
+            <!-- Brand panel -->
+            <aside class="auth-brand">
+                <div class="auth-brand__logo">
+                    <img src="/images/logos/light_white_amexing.png" alt="Amexing Experience">
                 </div>
-            <% } %>
+                <div class="auth-brand__content">
+                    <span class="auth-brand__eyebrow">Bienvenido de vuelta</span>
+                    <hr class="auth-brand__rule">
+                    <h2 class="auth-brand__title">Elevamos la experiencia de viaje</h2>
+                    <p class="auth-brand__subtitle">Gestión premium de viajes y experiencias a la medida.</p>
+                </div>
+            </aside>
 
-            <!-- Flash Messages (only show if no content or body - content handles its own messages) -->
-            <% if (!(typeof body !== 'undefined' && body) && !(typeof content !== 'undefined' && content)) { %>
-                <% if (typeof error !== 'undefined' && error) { %>
-                    <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
-                        <i class="ti ti-alert-circle me-2"></i>
-                        <div><%= error %></div>
-                    </div>
+            <!-- Body panel -->
+            <div class="auth-body">
+                <!-- Flash Messages (only show if no content or body - content handles its own messages) -->
+                <% if (!(typeof body !== 'undefined' && body) && !(typeof content !== 'undefined' && content)) { %>
+                    <% if (typeof error !== 'undefined' && error) { %>
+                        <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
+                            <i class="ti ti-alert-circle me-2"></i>
+                            <div><%= error %></div>
+                        </div>
+                    <% } %>
+
+                    <% if (typeof success !== 'undefined' && success) { %>
+                        <div class="alert alert-success d-flex align-items-center mb-4" role="alert">
+                            <i class="ti ti-circle-check me-2"></i>
+                            <div><%= success %></div>
+                        </div>
+                    <% } %>
                 <% } %>
 
-                <% if (typeof success !== 'undefined' && success) { %>
-                    <div class="alert alert-success d-flex align-items-center mb-4" role="alert">
-                        <i class="ti ti-circle-check me-2"></i>
-                        <div><%= success %></div>
-                    </div>
-                <% } %>
-            <% } %>
-
-            <!-- Content -->
-            <div class="auth-content">
-                <% if (typeof content !== 'undefined' && content) { %>
-                    <!-- New atomic design content -->
-                    <%- content %> <%# nosemgrep: trusted pre-rendered atomic component content %>
-                <% } else if (typeof body !== 'undefined' && body) { %>
-                    <!-- Legacy body content -->
-                    <%- body %> <%# nosemgrep: trusted pre-rendered template content %>
-                <% } else { %>
-                    <!-- Default forgot password form if no content provided -->
-                    <%- include('../molecules/auth/forgot-password-form', {
-                        error: typeof error !== 'undefined' ? error : '',
-                        success: typeof success !== 'undefined' ? success : '',
-                        csrfToken: typeof csrfToken !== 'undefined' ? csrfToken : '',
-                        email: typeof email !== 'undefined' ? email : '',
-                        showBackToLogin: true
-                    }) %>
-                <% } %>
+                <!-- Content -->
+                <div class="auth-content">
+                    <% if (typeof content !== 'undefined' && content) { %>
+                        <!-- New atomic design content -->
+                        <%- content %> <%# nosemgrep: trusted pre-rendered atomic component content %>
+                    <% } else if (typeof body !== 'undefined' && body) { %>
+                        <!-- Legacy body content -->
+                        <%- body %> <%# nosemgrep: trusted pre-rendered template content %>
+                    <% } else { %>
+                        <!-- Default forgot password form if no content provided -->
+                        <%- include('../molecules/auth/forgot-password-form', {
+                            error: typeof error !== 'undefined' ? error : '',
+                            success: typeof success !== 'undefined' ? success : '',
+                            csrfToken: typeof csrfToken !== 'undefined' ? csrfToken : '',
+                            email: typeof email !== 'undefined' ? email : '',
+                            showBackToLogin: true
+                        }) %>
+                    <% } %>
+                </div>
             </div>
         </div>
     </div>
@@ -340,10 +410,10 @@
         document.addEventListener('DOMContentLoaded', function() {
             const loader = document.getElementById('authLoader');
             const urlParams = new URLSearchParams(window.location.search);
-            
+
             // Check if this is a redirect from a failed form submission
             const isErrorRedirect = urlParams.has('error') || urlParams.has('message');
-            
+
             if (isErrorRedirect) {
                 // Immediately hide loader for error redirects - no delay
                 if (loader) {
@@ -353,12 +423,12 @@
                     loader.style.visibility = 'hidden';
                     loader.style.display = 'none';
                 }
-                
+
                 // Reset all submit buttons to normal state
                 const submitBtns = document.querySelectorAll('button[type="submit"]');
                 submitBtns.forEach(btn => {
                     btn.disabled = false;
-                    
+
                     // Restore original button text if available, otherwise use default
                     if (btn.dataset.originalText) {
                         btn.innerHTML = btn.dataset.originalText;
@@ -407,7 +477,7 @@
                             if (!submitBtn.dataset.originalText) {
                                 submitBtn.dataset.originalText = submitBtn.innerHTML;
                             }
-                            
+
                             submitBtn.innerHTML = `
                                 <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                                 Processing...
@@ -471,7 +541,7 @@
             if (!document.hidden) {
                 const loader = document.getElementById('authLoader');
                 const urlParams = new URLSearchParams(window.location.search);
-                
+
                 // If there are error/message parameters, ensure loader is hidden
                 if ((urlParams.has('error') || urlParams.has('message')) && loader) {
                     loader.classList.remove('show');
