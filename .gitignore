@@ -113,3 +113,5 @@ reports/
 *.env.local
 *.env.production-local
 backups/
+docs/backlog/README.md
+docs/backlog/_plantilla.md

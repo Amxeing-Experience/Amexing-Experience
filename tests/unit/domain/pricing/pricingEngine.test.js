@@ -148,11 +148,61 @@ describe('PricingEngine — calculateADisposicion (desglose completo)', () => {
     });
     expect(r.baseVehicleTotal).toBe(2000);
     expect(r.vehicleTotalWithSurcharge).toBe(2060); // 2000 × 1.03
-    expect(r.guideTotalCost).toBe(400); // guía sin recargo
-    expect(r.baseTotal).toBe(2460);
+    expect(r.guideTotalCost).toBe(412); // guía CON recargo: 400 × 1.03 (regla uniforme)
+    expect(r.baseTotal).toBe(2472); // 2060 + 412
     expect(r.discountAmount).toBe(0);
-    expect(r.subtotal).toBe(2460);
+    expect(r.subtotal).toBe(2472);
     expect(r.hourlyRatePerVehicle).toBe(515); // 2060 / 4
+  });
+
+  it('greeter add-on: recibe recargo y se suma después (transferencia, 4h)', () => {
+    const r = PricingEngine.calculateADisposicion({
+      baseVehicleCostPerHour: 500,
+      hours: 4,
+      vehicleQuantity: 1,
+      guideRate: 0,
+      greeterCost: 1720, // base en efectivo (base 760 + 640×1.5, etc.)
+      paymentType: 'transferencia',
+      transferRate: 3,
+      currency: 'MXN',
+    });
+    expect(r.vehicleTotalWithSurcharge).toBe(2060); // 2000 × 1.03
+    expect(r.greeterTotalCost).toBeCloseTo(1771.6, 4); // 1720 × 1.03 (con recargo)
+    expect(r.discountAmount).toBe(0);
+    expect(r.subtotal).toBeCloseTo(3831.6, 4); // 2060 + 1771.6
+  });
+
+  it('greeter NO entra en el descuento por volumen (8h, descuento solo a vehículo+guía)', () => {
+    const r = PricingEngine.calculateADisposicion({
+      baseVehicleCostPerHour: 500,
+      hours: 8,
+      vehicleQuantity: 2,
+      guideRate: 0,
+      greeterCost: 1720,
+      paymentType: 'efectivo',
+      currency: 'MXN',
+    });
+    expect(r.baseVehicleTotal).toBe(8000);
+    expect(r.discountAmount).toBe(200); // 2.5% de 8000 (NO de 9720)
+    expect(r.greeterTotalCost).toBe(1720); // efectivo: sin recargo
+    expect(r.subtotal).toBe(9520); // 8000 − 200 + 1720
+  });
+
+  it('vehículos adicionales entran al descuento (8h, efectivo)', () => {
+    const r = PricingEngine.calculateADisposicion({
+      baseVehicleCostPerHour: 500,
+      hours: 8,
+      vehicleQuantity: 1,
+      guideRate: 0,
+      additionalVehiclesCost: 2400, // efectivo ya sumado: 300/h × 8h
+      paymentType: 'efectivo',
+      currency: 'MXN',
+    });
+    expect(r.vehicleTotalWithSurcharge).toBe(4000);
+    expect(r.additionalVehiclesTotal).toBe(2400);
+    expect(r.baseTotal).toBe(6400); // 4000 + 0 + 2400
+    expect(r.discountAmount).toBe(160); // 2.5% de 6400 (incluye adicionales)
+    expect(r.subtotal).toBe(6240); // 6400 − 160
   });
 });
 
@@ -220,41 +270,36 @@ describe('PricingEngine — composición de nodos (composeServiceNodes)', () => 
     expect(r.tarjeta).toBeCloseTo(3150, 6); // 3000 × 1.05
   });
 
-  it('guía y greeter NO reciben recargo (efectivo == transferencia == tarjeta)', () => {
+  it('el flag surcharge:false deja el nodo sin recargo (primitivo del compositor)', () => {
+    // El compositor es genérico y respeta el flag; sirve para verificar la mecánica.
     const r = PricingEngine.composeServiceNodes({
       ...RATES,
-      nodes: [
-        { key: 'guide', efectivo: 1200, surcharge: false },
-        { key: 'greeter', efectivo: 1720, surcharge: false },
-      ],
+      nodes: [{ key: 'x', efectivo: 1200, surcharge: false }],
     });
-    expect(r.nodes.guide.transferencia).toBe(1200);
-    expect(r.nodes.guide.tarjeta).toBe(1200);
-    expect(r.nodes.greeter.transferencia).toBe(1720);
-    expect(r.nodes.greeter.tarjeta).toBe(1720);
-    expect(r.efectivo).toBe(2920);
-    expect(r.transferencia).toBe(2920);
-    expect(r.tarjeta).toBe(2920);
+    expect(r.nodes.x.transferencia).toBe(1200);
+    expect(r.nodes.x.tarjeta).toBe(1200);
   });
 
-  it('composición completa: vehículo + espera + guía + greeter + vehículo adicional', () => {
+  it('composición completa con regla uniforme: TODOS los nodos reciben recargo', () => {
+    // Regla de negocio actual: guía y greeter también reciben recargo (surcharge:true).
     const r = PricingEngine.composeServiceNodes({
       ...RATES,
       nodes: [
         { key: 'vehicle', efectivo: 1000, surcharge: true },
         { key: 'waiting', efectivo: 200, surcharge: true },
-        { key: 'guide', efectivo: 1200, surcharge: false },
-        { key: 'greeter', efectivo: 1720, surcharge: false },
+        { key: 'guide', efectivo: 1200, surcharge: true },
+        { key: 'greeter', efectivo: 1720, surcharge: true },
         { key: 'additionalVehicle', efectivo: 500, surcharge: true },
         { key: 'extraVehicles', efectivo: 0, surcharge: true },
       ],
     });
-    // efectivo = 1000+200+1200+1720+500
+    // efectivo = 4620 → transferencia = 4620×1.03, tarjeta = 4620×1.05
     expect(r.efectivo).toBeCloseTo(4620, 6);
-    // transferencia = 1030+206+1200+1720+515
-    expect(r.transferencia).toBeCloseTo(4671, 6);
-    // tarjeta = 1050+210+1200+1720+525
-    expect(r.tarjeta).toBeCloseTo(4705, 6);
+    expect(r.transferencia).toBeCloseTo(4758.6, 6);
+    expect(r.tarjeta).toBeCloseTo(4851, 6);
+    // guía y greeter ahora SÍ cambian con la forma de pago
+    expect(r.nodes.guide.transferencia).toBeCloseTo(1236, 6);
+    expect(r.nodes.greeter.tarjeta).toBeCloseTo(1806, 6);
   });
 
   it('el total equivale a sumar los nodos por forma de pago (paridad con el builder)', () => {

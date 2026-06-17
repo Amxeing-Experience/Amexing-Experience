@@ -891,12 +891,36 @@ class ItineraryBuilder {
       this.serviceModified = true; // Mark as modified when user changes guide checkbox
       qsDevLog('🚗 A Disposición guide checkbox changed:', e.target.checked);
 
+      // Guía y greeter son mutuamente excluyentes: al marcar guía, se desmarca greeter.
+      if (e.target.checked) {
+        const greeterCheckbox = document.getElementById('aDisposicionGreeter');
+        if (greeterCheckbox) greeterCheckbox.checked = false;
+      }
+
       // Recalculate price with guide rate
       this.calculateADisposicionPrice();
 
       // Update breakdown to show guide details
       this.updateDevPaymentBreakdown();
       // Small delay to ensure dev breakdown is updated before service breakdown reads it
+      setTimeout(() => {
+        this.updateServicePriceBreakdown();
+      }, 50);
+    });
+
+    // A disposición greeter checkbox listener - update pricing and breakdown
+    document.getElementById('aDisposicionGreeter')?.addEventListener('change', (e) => {
+      this.serviceModified = true;
+      qsDevLog('🚗 A Disposición greeter checkbox changed:', e.target.checked);
+
+      // Guía y greeter son mutuamente excluyentes: al marcar greeter, se desmarca guía.
+      if (e.target.checked) {
+        const guideCheckbox = document.getElementById('aDisposicionGuide');
+        if (guideCheckbox) guideCheckbox.checked = false;
+      }
+
+      this.calculateADisposicionPrice();
+      this.updateDevPaymentBreakdown();
       setTimeout(() => {
         this.updateServicePriceBreakdown();
       }, 50);
@@ -1105,6 +1129,8 @@ class ItineraryBuilder {
       this.serviceModified = true; // Mark as modified when user changes rate
       this.handleADisposicionRateChange(e.target.value);
     });
+    // Botón "+ Agregar vehículo" de vehículos adicionales de a-disposición
+    this.setupADisposicionAdditionalVehicles();
     document.getElementById('aDisposicionVehicle')?.addEventListener('change', () => {
       this.serviceModified = true; // Mark as modified when user changes vehicle
       this.calculateADisposicionPrice();
@@ -1443,12 +1469,24 @@ class ItineraryBuilder {
     if (transportChildrenField) transportChildrenField.value = numberOfChildren || '';
     if (transportInfantsField) transportInfantsField.value = numberOfInfants || '';
 
-    // Experience fields (only adults and children)
+    // Experience fields (adultos, niños, sin-alcohol). Se llenan con los datos de la
+    // cotización; si el valor es 0 se deja el campo VACÍO con placeholder "0" (no un 0 que el
+    // usuario tenga que borrar). Sin-alcohol no tiene dato de cotización → siempre placeholder.
     const experienceAdultsField = document.getElementById('adultsQuantity');
     const experienceChildrenField = document.getElementById('childrenQuantity');
+    const experienceNoAlcoholField = document.getElementById('adultsNoAlcoholQuantity');
 
-    if (experienceAdultsField) experienceAdultsField.value = numberOfAdults;
-    if (experienceChildrenField) experienceChildrenField.value = numberOfChildren;
+    if (experienceAdultsField) {
+      experienceAdultsField.value = numberOfAdults || '';
+      experienceAdultsField.placeholder = '0';
+    }
+    if (experienceChildrenField) {
+      experienceChildrenField.value = numberOfChildren || '';
+      experienceChildrenField.placeholder = '0';
+    }
+    if (experienceNoAlcoholField) {
+      experienceNoAlcoholField.placeholder = '0';
+    }
 
     // Concepto fields (auto-fill from quote information)
     const conceptoAdultsField = document.getElementById('conceptoAdultsQuantity');
@@ -1502,6 +1540,11 @@ class ItineraryBuilder {
     this.currentServiceId = serviceId;
     this.currentServiceAvailabilityPending = false;
     this.serviceModified = false; // Track if user has made changes since opening
+
+    // Limpia el estado de opciones/cálculo que puede filtrarse de un servicio a otro (checkbox
+    // de vehículo adicional, filas adicionales de a-disp, guía/greeter, totales de desglose).
+    // Se hace SIEMPRE al abrir, antes de poblar — luego la restauración pone lo del servicio.
+    this.clearServiceOptionState();
 
     const modal = new bootstrap.Modal(document.getElementById('serviceModal'));
     const form = document.getElementById('serviceForm');
@@ -1706,6 +1749,9 @@ class ItineraryBuilder {
     // Skip while populating an existing service for edit — it re-renders right after.
     if (!this._populatingForm) {
       this.clearServicePriceBreakdown();
+      // También vacía los campos del dev breakdown (texto + precios): si no, al cambiar de tipo
+      // (experiencia → tour → …) el nuevo tipo hereda el desglose del anterior.
+      this.clearDevBreakdownFields();
     }
 
     // Hide additional vehicle checkbox (shown only for transport)
@@ -3702,7 +3748,7 @@ class ItineraryBuilder {
       }
 
       const quantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
-      const vehicleEfectivoTotal = vehicleBasePrice * quantity;
+      const vehicleEfectivoTotal = vehicleBasePrice; // vehiculo principal siempre 1 (multiples = vehiculos adicionales)
 
       // Add waiting time costs
       const waitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
@@ -3776,8 +3822,8 @@ class ItineraryBuilder {
       const fallbackNodes = [
         { key: 'vehicle', efectivo: vehicleEfectivoTotal, surcharge: true },
         { key: 'waiting', efectivo: waitingCostEfectivo, surcharge: true },
-        { key: 'guide', efectivo: guideCostEfectivo, surcharge: false },
-        { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: false },
+        { key: 'guide', efectivo: guideCostEfectivo, surcharge: true },
+        { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: true },
         { key: 'additionalVehicle', efectivo: additionalVehicleCostEfectivo, surcharge: true },
       ];
       const fallbackPricing = window.PricingEngine
@@ -3899,6 +3945,12 @@ class ItineraryBuilder {
         });
       }
     }
+
+    // SAFEGUARD: garantiza que pricesByType lleve el recargo por forma de pago. Si por timing
+    // (rates aún no cargados al renderar el desglose) transferencia/tarjeta quedaron faltantes,
+    // en 0, o iguales a efectivo, se recomputan desde efectivo. Evita guardar un costo sin
+    // recargo (en la lista se ve como un precio que "no cambia con la forma de pago").
+    this.ensurePricesByTypeSurcharge(pricesByType, type);
 
     // Update debug display for development
     this.updateDebugPriceDisplay(pricesByType);
@@ -4620,6 +4672,8 @@ class ItineraryBuilder {
 
         // Collect includeGuide checkbox state for A disposición
         data.includeGuide = document.getElementById('aDisposicionGuide')?.checked || false;
+        data.includeGreeter = document.getElementById('aDisposicionGreeter')?.checked || false;
+        data.aDisposicionAdditionalVehicles = this.getADisposicionAdditionalVehicles();
 
         // Store vehicle name for display
         const adVehicleSelect = document.getElementById('aDisposicionVehicle');
@@ -4726,6 +4780,18 @@ class ItineraryBuilder {
     data.clientNotes = document.getElementById('clientNotes')?.value || '';
     data.providerNotes = document.getElementById('providerNotes')?.value || '';
     data.teamNotes = document.getElementById('teamNotes')?.value || '';
+
+    // Nombre del segmento principal: resolverlo SIEMPRE desde el ID (rateId para tours y
+    // a-disposición, category para transporte) para que el chip del segmento aparezca en la
+    // vista pública / PDF, donde el caché de rates no carga (no hay token). El builder admin sí
+    // tiene el caché al guardar, así que getSegmentNameById resuelve el nombre real. Antes solo
+    // transporte seteaba categoryName y además no se persistía (faltaba en el whitelist).
+    {
+      const mainSegmentId = data.rateId || data.category;
+      if (mainSegmentId && (!data.categoryName || data.categoryName === 'Segmento')) {
+        data.categoryName = this.getSegmentNameById(mainSegmentId);
+      }
+    }
 
     return data;
   }
@@ -6301,6 +6367,15 @@ class ItineraryBuilder {
           aDisposicionGuideCheckbox.checked = service.includeGuide || false;
         }
 
+        // Restore includeGreeter checkbox state for A disposición
+        const aDisposicionGreeterCheckbox = document.getElementById('aDisposicionGreeter');
+        if (aDisposicionGreeterCheckbox) {
+          aDisposicionGreeterCheckbox.checked = service.includeGreeter || false;
+        }
+
+        // Restore additional vehicles for A disposición (rebuilds the rows)
+        this.restoreADisposicionAdditionalVehicles(service.aDisposicionAdditionalVehicles);
+
         // Only recalculate price if no custom price override is set
         if (!service.priceOverride || service.customPrice === undefined) {
           // Always calculate price from API to get current rates
@@ -7006,7 +7081,7 @@ class ItineraryBuilder {
     );
     const tourNodes = [
       { key: 'vehicle', efectivo: vehicleEfectivoBase, surcharge: true },
-      { key: 'guide', efectivo: guideEfectivoBase, surcharge: false },
+      { key: 'guide', efectivo: guideEfectivoBase, surcharge: true },
       { key: 'additionalVehicle', efectivo: additionalEfectivoBase, surcharge: true },
       { key: 'extraVehicles', efectivo: extrasEfectivoBase, surcharge: true },
     ];
@@ -7801,6 +7876,14 @@ class ItineraryBuilder {
                                                     </div>
                                                 </div>
                                             ` : ''}
+                                            ${service.type === 'a-disposicion' && Array.isArray(service.aDisposicionAdditionalVehicles) && service.aDisposicionAdditionalVehicles.length
+        ? service.aDisposicionAdditionalVehicles.map((av) => {
+          const name = (((av && (av.vehicleLabel || av.vehicleType)) || 'Vehículo adicional').split(' - ')[0].trim());
+          const seg = (av && av.segmentLabel) || '';
+          return `<div class="ms-3 mt-1">
+                                                                <span><strong>${name}</strong>${seg ? ` <span class="text-muted">· ${seg}</span>` : ''}</span>
+                                                            </div>`;
+        }).join('') : ''}
                                             ${(Array.isArray(service.extraAdditionalVehicles) ? service.extraAdditionalVehicles : []).map((v) => {
         const name = (v && (v.vehicleTypeName || '')).trim() || 'Vehículo adicional';
         const seg = (v && v.segmentName) || '';
@@ -7814,11 +7897,11 @@ class ItineraryBuilder {
                                         <div class="row g-2 text-success small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-user me-1"></i>
-                                                <strong>${service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía'}</strong>
+                                                <strong>Incluye Guía</strong>
                                             </div>
                                         </div>
                                     ` : ''}
-                                    ${(service.type === 'tour' || service.type === 'transport') && service.includeGreeter ? `
+                                    ${(service.type === 'tour' || service.type === 'transport' || service.type === 'a-disposicion') && service.includeGreeter ? `
                                         <div class="row g-2 text-info small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-users me-1"></i>
@@ -8637,14 +8720,25 @@ class ItineraryBuilder {
   calculateADisposicionPricing(paymentType, baseVehicleCostPerHour, hours, vehicleQuantity, guideRate = 0) {
     // Resuelve la moneda del DOM (igual que getDisplayPrice) y delega TODO el cálculo al
     // motor único (PricingEngine.calculateADisposicion): vehículo × horas × cantidad +
-    // recargo por forma de pago + guía (sin recargo) + descuento por volumen, en un solo
-    // lugar. Antes esta función replicaba esa fórmula inline.
+    // recargo (vehículo y guía) + descuento por volumen + greeter (add-on, con recargo,
+    // sin descuento), en un solo lugar.
     const currency = document.getElementById('currencySelect')?.value || 'MXN';
+    // Greeter opcional: misma fórmula que transporte (base + tarifa/h × horas), en efectivo;
+    // el motor le aplica el recargo. Se suma DESPUÉS del descuento por volumen.
+    const greeterCost = document.getElementById('aDisposicionGreeter')?.checked
+      ? this.calculateGreeterPrice(hours * 60)
+      : 0;
+    // Vehículos adicionales: cada uno = tarifa/hora × horas (efectivo); se suman. El motor
+    // les aplica el recargo y los incluye en la base con descuento.
+    const additionalVehiclesCost = this.getADisposicionAdditionalVehicles()
+      .reduce((sum, av) => sum + (av.hourlyRate * hours), 0);
     const params = {
       baseVehicleCostPerHour,
       hours,
       vehicleQuantity,
       guideRate,
+      greeterCost,
+      additionalVehiclesCost,
       paymentType,
       currency,
       transferRate: this.transferRate,
@@ -8659,27 +8753,32 @@ class ItineraryBuilder {
 
     // Fallback (idéntico al motor) por si el motor no cargó.
     const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const surchargePct = paymentType === 'transferencia' ? (this.transferRate / 100)
+      : paymentType === 'tarjeta' ? (this.agencyRate / 100) : 0;
     const baseVehicleTotal = round2(baseVehicleCostPerHour * hours * vehicleQuantity);
     const vehicleTotalWithSurcharge = round2(this.getDisplayPrice(baseVehicleTotal, { paymentType }));
-    const guideTotalCost = round2(guideRate * hours * vehicleQuantity);
-    const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost);
+    const guideTotalCost = round2((guideRate * hours * vehicleQuantity) * (1 + surchargePct));
+    const additionalVehiclesTotal = round2(additionalVehiclesCost * (1 + surchargePct));
+    const baseTotal = round2(vehicleTotalWithSurcharge + guideTotalCost + additionalVehiclesTotal);
 
     let discountAmount = 0;
     if (hours > 0) {
       const discountPercentage = this.getADisposicionDiscount(hours);
       if (discountPercentage > 0) {
-        const finalCost = round2(vehicleTotalWithSurcharge + guideTotalCost);
-        discountAmount = round2(finalCost * (discountPercentage / 100));
+        discountAmount = round2(baseTotal * (discountPercentage / 100));
       }
     }
 
-    const subtotal = round2(baseTotal - discountAmount);
+    const greeterTotalCost = round2(greeterCost * (1 + surchargePct));
+    const subtotal = round2(baseTotal - discountAmount + greeterTotalCost);
     const divisor = hours * vehicleQuantity;
 
     return {
       baseVehicleTotal,
       vehicleTotalWithSurcharge,
       guideTotalCost,
+      additionalVehiclesTotal,
+      greeterTotalCost,
       baseTotal,
       discountAmount,
       subtotal,
@@ -9329,7 +9428,7 @@ class ItineraryBuilder {
       }
 
       // Calculate vehicle efectivo base (el recargo por forma de pago lo aplica el motor abajo)
-      const vehicleTotalEfectivo = efectivoBasePrice * quantity;
+      const vehicleTotalEfectivo = efectivoBasePrice; // vehiculo principal siempre 1 (multiples = vehiculos adicionales)
 
       // Calculate waiting time costs if applicable
       const waitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
@@ -9440,8 +9539,8 @@ class ItineraryBuilder {
       const transportNodes = [
         { key: 'vehicle', efectivo: vehicleTotalEfectivo, surcharge: true },
         { key: 'waiting', efectivo: waitingCostEfectivo, surcharge: true },
-        { key: 'guide', efectivo: guideCostEfectivo, surcharge: false },
-        { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: false },
+        { key: 'guide', efectivo: guideCostEfectivo, surcharge: true },
+        { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: true },
         { key: 'additionalVehicle', efectivo: additionalVehicleCostEfectivo, surcharge: true },
         { key: 'extraVehicles', efectivo: extraVehiclesCostEfectivo, surcharge: true },
       ];
@@ -9980,12 +10079,27 @@ class ItineraryBuilder {
     const cardTotal = cardPricing.finalTotal;
     const cardHourlyRate = cardPricing.hourlyRatePerVehicle;
 
+    // Greeter (add-on con recargo, ya calculado por el motor por forma de pago)
+    const greeterTotalEfectivo = efectivoPricing.greeterTotalCost || 0;
+    const greeterTotalTransfer = transferPricing.greeterTotalCost || 0;
+    const greeterTotalCard = cardPricing.greeterTotalCost || 0;
+
     // Discount amount (same for all payment types)
     const { discountAmount } = efectivoPricing;
 
-    const efectivoBreakdown = this.formatPaymentBreakdown('Efectivo', efectivoHourlyRate, guideRate, vehicleTotalEfectivo, guideTotalEfectivo, efectivoBaseTotal, discountAmount, efectivoSubtotal, efectivoTotal, tourDuration, vehicleQuantity, additionalVehicleInfo);
-    const transferenciaBreakdown = this.formatPaymentBreakdown('Transferencia', transferHourlyRate, guideRate, vehicleTotalTransfer, guideTotalTransfer, transferBaseTotal, discountAmount, transferSubtotal, transferTotal, tourDuration, vehicleQuantity, additionalVehicleInfo);
-    const tarjetaBreakdown = this.formatPaymentBreakdown('Tarjeta', cardHourlyRate, guideRate, vehicleTotalCard, guideTotalCard, cardBaseTotal, discountAmount, cardSubtotal, cardTotal, tourDuration, vehicleQuantity, additionalVehicleInfo);
+    // Vehículos adicionales (a-disp): una línea por vehículo; su efectivo = tarifa/h × horas.
+    const aDispAdditionalVehiclesList = this.getADisposicionAdditionalVehicles().map((av) => ({
+      label: `${av.vehicleLabel}${av.segmentLabel ? ` · ${av.segmentLabel}` : ''}`,
+      efectivo: av.hourlyRate * tourDuration,
+    }));
+
+    // Cada forma de pago usa SU propio descuento: el descuento se calcula sobre la base CON
+    // recargo, así que transferencia/tarjeta tienen un descuento mayor que efectivo. Antes las
+    // tres usaban el de efectivo, y la línea de descuento no cuadraba con el total (el desglose
+    // espeja estas líneas, por eso no coincidía con el dev breakdown).
+    const efectivoBreakdown = this.formatPaymentBreakdown('Efectivo', efectivoHourlyRate, guideRate, vehicleTotalEfectivo, guideTotalEfectivo, efectivoBaseTotal, efectivoPricing.discountAmount, efectivoSubtotal, efectivoTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalEfectivo, aDispAdditionalVehiclesList);
+    const transferenciaBreakdown = this.formatPaymentBreakdown('Transferencia', transferHourlyRate, guideRate, vehicleTotalTransfer, guideTotalTransfer, transferBaseTotal, transferPricing.discountAmount, transferSubtotal, transferTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalTransfer, aDispAdditionalVehiclesList);
+    const tarjetaBreakdown = this.formatPaymentBreakdown('Tarjeta', cardHourlyRate, guideRate, vehicleTotalCard, guideTotalCard, cardBaseTotal, cardPricing.discountAmount, cardSubtotal, cardTotal, tourDuration, vehicleQuantity, additionalVehicleInfo, greeterTotalCard, aDispAdditionalVehiclesList);
 
     // Comprehensive debugging for A Disposición breakdown calculations
     if (serviceType === 'a-disposicion') {
@@ -10141,7 +10255,7 @@ class ItineraryBuilder {
    * @param additionalVehicleInfo
    * @example
    */
-  formatPaymentBreakdown(paymentType, vehicleCostPerHour, guideCostPerHour, vehicleTotal, guideTotal, baseTotal, discountAmount, subtotal, total, duration = 1, vehicleQuantity = 1, additionalVehicleInfo = null) {
+  formatPaymentBreakdown(paymentType, vehicleCostPerHour, guideCostPerHour, vehicleTotal, guideTotal, baseTotal, discountAmount, subtotal, total, duration = 1, vehicleQuantity = 1, additionalVehicleInfo = null, greeterTotal = 0, additionalVehiclesList = []) {
     let breakdown = '';
 
     // Check service type for specific formatting
@@ -10237,9 +10351,25 @@ class ItineraryBuilder {
       }
     }
 
+    // Vehículos adicionales de a-disposición: una línea cada uno (antes del descuento, ya que
+    // entran en la base con descuento). Surchargeada por forma de pago.
+    if (Array.isArray(additionalVehiclesList) && additionalVehiclesList.length) {
+      const avMult = paymentType === 'Transferencia' ? 1 + (this.transferRate / 100)
+        : paymentType === 'Tarjeta' ? 1 + (this.agencyRate / 100) : 1;
+      additionalVehiclesList.forEach((av) => {
+        const lineTotal = (Number(av.efectivo) || 0) * avMult;
+        if (lineTotal > 0) breakdown += `Vehículo adicional (${av.label}): $${lineTotal.toFixed(2)}\n`;
+      });
+    }
+
     // Add volume discount line if applicable
     if (discountAmount > 0) {
       breakdown += `Descuento por volumen: -$${discountAmount.toFixed(2)}\n`;
+    }
+
+    // Greeter add-on line (después del descuento; el greeter no se descuenta)
+    if (greeterTotal > 0) {
+      breakdown += `Greeter: $${greeterTotal.toFixed(2)}\n`;
     }
 
     // Calculate final total including additional vehicle
@@ -11408,6 +11538,43 @@ class ItineraryBuilder {
    * @returns {number} Price for current payment type.
    * @example
    */
+  /**
+   * Safeguard de recargo para pricesByType. La regla de negocio es "recargo uniforme":
+   * transferencia/tarjeta siempre son mayores que efectivo cuando los rates son > 0. Si por un
+   * problema de timing (rates aún no cargados al renderar el desglose) transferencia o tarjeta
+   * quedaron faltantes, en 0, o iguales a efectivo, se recomputan desde efectivo con el recargo
+   * configurado. Solo corrige datos rotos: nunca modifica un total que ya trae recargo válido.
+   * @param {{efectivo:number, transferencia:number, tarjeta:number}} prices pricesByType (se muta).
+   * @param {string} type Tipo de servicio (solo para el log).
+   * @example
+   */
+  ensurePricesByTypeSurcharge(prices, type) {
+    if (!prices || typeof prices !== 'object') return;
+    const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const efe = Number(prices.efectivo) || 0;
+    if (efe <= 0) return; // sin base efectivo no hay de dónde derivar el recargo
+    const tRate = Number(this.transferRate) || 0;
+    const aRate = Number(this.agencyRate) || 0;
+    const fixed = [];
+    if (tRate > 0) {
+      const tra = Number(prices.transferencia);
+      if (!(tra > 0) || Math.abs(tra - efe) < 0.01) {
+        prices.transferencia = r2(efe * (1 + (tRate / 100)));
+        fixed.push('transferencia');
+      }
+    }
+    if (aRate > 0) {
+      const tar = Number(prices.tarjeta);
+      if (!(tar > 0) || Math.abs(tar - efe) < 0.01) {
+        prices.tarjeta = r2(efe * (1 + (aRate / 100)));
+        fixed.push('tarjeta');
+      }
+    }
+    if (fixed.length) {
+      console.warn(`⚠️ pricesByType safeguard: recargo recomputado para [${fixed.join(', ')}] en servicio "${type}" (estaban sin recargo). efectivo=${efe}`, prices);
+    }
+  }
+
   getCorrectPriceForPaymentType(subconcept, backendPaymentType = null) {
     // Priority 1: Use backend payment type if provided
     // Priority 2: Use dropdown value
@@ -12165,6 +12332,70 @@ class ItineraryBuilder {
    * que antes estaba duplicado en el listener hidden.bs.modal y en closeModal.
    * @example
    */
+  /**
+   * Limpia el estado de opciones/cálculo que puede filtrarse de un servicio a otro al abrir el
+   * modal (corrige: el checkbox de vehículo adicional aparece donde no va, o el desglose trae
+   * cálculos de otro servicio). Se llama SIEMPRE al abrir; la restauración pone después lo del
+   * servicio que se edita. NO limpia las cachés de fetch (esas son por-clave, son perf).
+   * @example
+   */
+  clearServiceOptionState() {
+    // Vehículo adicional (transporte / vehicle tour)
+    const addCheckbox = document.getElementById('additionalVehicleCheckbox');
+    if (addCheckbox) addCheckbox.checked = false;
+    ['additionalVehicleContainer', 'additionalSegmentContainer', 'additionalVehicleSelectContainer',
+      'additionalVehiclePriceContainer', 'extraAdditionalVehiclesContainer'].forEach((id) => {
+      document.getElementById(id)?.classList.add('d-none');
+    });
+    const addSeg = document.getElementById('additionalSegmentSelect');
+    if (addSeg) addSeg.value = '';
+    const addVeh = document.getElementById('additionalVehicleSelect');
+    if (addVeh) {
+      addVeh.value = '';
+      addVeh.disabled = true;
+      addVeh.innerHTML = '<option value="">Primero selecciona un segmento</option>';
+    }
+    const addPrice = document.getElementById('additionalVehiclePrice');
+    if (addPrice) addPrice.value = '';
+    const addListPrice = document.getElementById('additionalVehicleListPrice');
+    if (addListPrice) addListPrice.textContent = '';
+    if (typeof this.clearExtraAdditionalVehicles === 'function') this.clearExtraAdditionalVehicles();
+
+    // Vehículos adicionales de a-disposición
+    const adispList = document.getElementById('aDisposicionAdditionalVehiclesList');
+    if (adispList) adispList.innerHTML = '';
+
+    // Guía / greeter (todos los tipos)
+    ['includeGuide', 'includeGreeter', 'aDisposicionGuide', 'aDisposicionGreeter'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.checked = false;
+    });
+
+    // Campos del dev breakdown + totales en memoria (fuente que espeja el desglose del cliente).
+    this.clearDevBreakdownFields();
+
+    // Limpia el desglose visible para que no muestre cálculos del servicio anterior
+    // (se vuelve a poblar al recalcular el servicio que se abre).
+    if (typeof this.clearServicePriceBreakdown === 'function') this.clearServicePriceBreakdown();
+  }
+
+  /**
+   * Vacía los campos del dev breakdown (texto + precios por forma de pago) y los totales por
+   * tipo en memoria. Es la fuente que espeja el desglose del cliente, así que se limpia tanto al
+   * abrir el modal como al cambiar de tipo de servicio (si no, se heredan del servicio anterior).
+   * @example
+   */
+  clearDevBreakdownFields() {
+    ['devBreakdownEfectivo', 'devBreakdownTransferencia', 'devBreakdownTarjeta',
+      'devPriceEfectivo', 'devPriceTransferencia', 'devPriceTarjeta'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    this._transportBreakdownTotals = null;
+    this._aDisposicionBreakdownTotals = null;
+    this._walkingTourBreakdownTotals = null;
+  }
+
   resetServiceModalState() {
     this._editModalOpen = false;
     this._restoringWalkingTourData = false;
@@ -12176,6 +12407,10 @@ class ItineraryBuilder {
       concepto: {},
       transport: {},
     };
+    // Limpia las filas de vehículos adicionales de a-disposición para no arrastrar estado
+    // de un servicio anterior al abrir uno nuevo.
+    const aDispAvList = document.getElementById('aDisposicionAdditionalVehiclesList');
+    if (aDispAvList) aDispAvList.innerHTML = '';
   }
 
   /**
@@ -12399,6 +12634,9 @@ class ItineraryBuilder {
             pickupAddressVuelta: subconcept.pickupAddressVuelta || '',
             dropoffAddressVuelta: subconcept.dropoffAddressVuelta || '',
             category: subconcept.category || null,
+            // Segment name/color snapshots so the chip survives edit→re-save sin depender del caché
+            categoryName: subconcept.categoryName || '',
+            categoryColor: subconcept.categoryColor || '',
             transportAdults: subconcept.transportAdults || 0,
             transportChildren: subconcept.transportChildren || 0,
             transportInfants: subconcept.transportInfants || 0,
@@ -12415,6 +12653,7 @@ class ItineraryBuilder {
             additionalVehicleId: subconcept.additionalVehicleId || null,
             additionalVehicleTypeName: subconcept.additionalVehicleTypeName || null,
             additionalVehicleSegmentName: subconcept.additionalVehicleSegmentName || null,
+            additionalVehicleSegmentColor: subconcept.additionalVehicleSegmentColor || null,
             // Round trip fields
             startDate: subconcept.startDate || null,
             endDate: subconcept.endDate || null,
@@ -12450,6 +12689,7 @@ class ItineraryBuilder {
             vehicleCount: subconcept.vehicleCount || null,
             hourlyPrice: subconcept.hourlyPrice || null,
             discountPercent: subconcept.discountPercent || null,
+            aDisposicionAdditionalVehicles: subconcept.aDisposicionAdditionalVehicles || [],
           };
 
           this.services.set(serviceId, serviceData);
@@ -14258,23 +14498,21 @@ class ItineraryBuilder {
       const childrenQuantityField = document.getElementById('childrenQuantity');
       const adultsNoAlcoholQuantityField = document.getElementById('adultsNoAlcoholQuantity');
 
-      // Set default values for people quantities
+      // Cantidades por default: default de la experiencia → dato de la cotización → vacío.
+      // Nunca 0 literal: si queda en 0 se deja vacío con placeholder "0" (no un 0 que borrar).
+      const quoteAdults = this.quoteData?.numberOfAdults || 0;
+      const quoteChildren = this.quoteData?.numberOfChildren || 0;
       if (adultsQuantityField) {
-        adultsQuantityField.value = experience.defaultAdults || '';
-      } else {
-
+        adultsQuantityField.value = experience.defaultAdults || quoteAdults || '';
+        adultsQuantityField.placeholder = '0';
       }
-
       if (childrenQuantityField) {
-        childrenQuantityField.value = experience.defaultChildren || 0;
-      } else {
-
+        childrenQuantityField.value = experience.defaultChildren || quoteChildren || '';
+        childrenQuantityField.placeholder = '0';
       }
-
       if (adultsNoAlcoholQuantityField) {
-        adultsNoAlcoholQuantityField.value = experience.defaultAdultsNoAlcohol || 0;
-      } else {
-
+        adultsNoAlcoholQuantityField.value = experience.defaultAdultsNoAlcohol || '';
+        adultsNoAlcoholQuantityField.placeholder = '0';
       }
     } else {
 
@@ -15777,6 +16015,9 @@ class ItineraryBuilder {
       return;
     }
 
+    // Cuadra los renglones con el total (absorbe el centavo de redondeo).
+    this.reconcileBreakdownItemsToTotal(items, totalMXN);
+
     // Update Desglose title with payment type
     const desgloseTitle = document.getElementById('desgloseTitle');
     if (desgloseTitle) {
@@ -15799,6 +16040,31 @@ class ItineraryBuilder {
     itemsDiv.innerHTML = itemsHTML;
     totalSpan.textContent = this.formatCurrency(totalMXN);
     container.classList.remove('d-none');
+  }
+
+  /**
+   * Reconcilia los renglones del desglose para que la suma de los montos mostrados
+   * cuadre con el total autoritativo (lo que se cobra). Absorbe el centavo de redondeo
+   * por-renglón en el ultimo renglon positivo, sin tocar descuentos. Cosmetico: el Total
+   * no cambia, solo se elimina el "1 centavo de diferencia" entre la columna y el Total.
+   * @param {Array<{label:string, amountMXN:number}>} items Renglones del desglose (se mutan).
+   * @param {number} total Total autoritativo contra el que deben sumar los renglones.
+   * @example
+   */
+  reconcileBreakdownItemsToTotal(items, total) {
+    if (!Array.isArray(items) || items.length === 0 || !(total > 0)) return;
+    const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const sum = r2(items.reduce((s, it) => s + (Number(it.amountMXN) || 0), 0));
+    const residual = r2(total - sum);
+    // Solo absorbe diferencias de centavos (redondeo). Algo mayor a $1 es otro problema:
+    // se deja visible en vez de enmascararlo.
+    if (Math.abs(residual) < 0.01 || Math.abs(residual) > 1) return;
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      if ((Number(items[i].amountMXN) || 0) > 0) {
+        items[i].amountMXN = r2((Number(items[i].amountMXN) || 0) + residual);
+        break;
+      }
+    }
   }
 
   /**
@@ -15882,11 +16148,27 @@ class ItineraryBuilder {
       }
     }
 
+    // Total AUTORITATIVO del dev breakdown (redondeado una sola vez), no la suma de renglones
+    // ya redondeados — evita descuadres de 1 centavo y empata con lo guardado/cobrado.
+    let vtDevField = document.getElementById('devBreakdownEfectivo');
+    if (paymentType === 'transferencia') {
+      vtDevField = document.getElementById('devBreakdownTransferencia') || vtDevField;
+    } else if (paymentType === 'tarjeta') {
+      vtDevField = document.getElementById('devBreakdownTarjeta') || vtDevField;
+    }
+    const vtAuthoritativeTotal = this.extractTotalFromBreakdown(vtDevField?.value || '');
+    if (vtAuthoritativeTotal > 0) {
+      totalMXN = vtAuthoritativeTotal;
+    }
+
     // Hide if no items or total is 0
     if (items.length === 0 || totalMXN <= 0) {
       container.classList.add('d-none');
       return;
     }
+
+    // Cuadra los renglones con el total (absorbe el centavo de redondeo).
+    this.reconcileBreakdownItemsToTotal(items, totalMXN);
 
     // Update Desglose title with payment type
     const desgloseTitle = document.getElementById('desgloseTitle');
@@ -16871,6 +17153,22 @@ class ItineraryBuilder {
     const surchargedBaseTotal = baseTotalNeedingSurcharge; // No getDisplayPrice to avoid cash rounding
     totalMXN = alreadySurchargedTotal + surchargedBaseTotal;
 
+    // Usa el Total AUTORITATIVO del dev breakdown (base × recargo, redondeado una sola vez) en
+    // lugar de la suma de los renglones ya redondeados. Evita descuadres de 1 centavo y empata
+    // con lo que se guarda/cobra (pricesByType). Para transporte/a-disp coincide con la suma de
+    // renglones; en experiencia/concepto/walking corrige el redondeo por renglón.
+    const activePaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    let devTotalField = document.getElementById('devBreakdownEfectivo');
+    if (activePaymentType === 'transferencia') {
+      devTotalField = document.getElementById('devBreakdownTransferencia') || devTotalField;
+    } else if (activePaymentType === 'tarjeta') {
+      devTotalField = document.getElementById('devBreakdownTarjeta') || devTotalField;
+    }
+    const devAuthoritativeTotal = this.extractTotalFromBreakdown(devTotalField?.value || '');
+    if (devAuthoritativeTotal > 0) {
+      totalMXN = devAuthoritativeTotal;
+    }
+
     qsDevLog('📊 SERVICE BREAKDOWN - Final total calculation:', {
       baseTotalNeedingSurcharge,
       surchargedBaseTotal,
@@ -16898,6 +17196,9 @@ class ItineraryBuilder {
       const paymentLabel = paymentLabels[paymentType] || paymentType;
       desgloseTitle.innerHTML = `<i class="ti ti-list-details me-1"></i>Desglose ${paymentLabel.toLowerCase()}`;
     }
+
+    // Cuadra los renglones con el total (absorbe el centavo de redondeo).
+    this.reconcileBreakdownItemsToTotal(items, totalMXN);
 
     // Render all service-specific breakdown items first
     const itemsHTML = items.map((item) => {
@@ -17521,7 +17822,7 @@ class ItineraryBuilder {
 
     // Multiply vehicle price by quantity (number of vehicles)
     const quantity = parseInt(document.getElementById('serviceQuantity')?.value || 1);
-    const vehicleEfectivoTotal = efectivoBasePrice * quantity;
+    const vehicleEfectivoTotal = efectivoBasePrice; // vehiculo principal siempre 1 (multiples = vehiculos adicionales)
 
     // Calculate and display price based on selected payment type
     const selectedPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
@@ -18601,6 +18902,210 @@ class ItineraryBuilder {
     });
   }
 
+  // ============================================================
+  // A-DISPOSICIÓN: VEHÍCULOS ADICIONALES (segmento por fila, precio por hora)
+  // ============================================================
+
+  /** Cablea el botón "+ Agregar vehículo" (una sola vez). */
+  setupADisposicionAdditionalVehicles() {
+    const btn = document.getElementById('aDisposicionAddVehicleBtn');
+    if (btn && !btn.dataset.wired) {
+      btn.dataset.wired = '1';
+      btn.addEventListener('click', () => this.addADisposicionAdditionalVehicleRow());
+    }
+  }
+
+  /** Construye un <select> de segmento para una fila de vehículo adicional. */
+  buildADisposicionSegmentSelect() {
+    const sel = document.createElement('select');
+    sel.className = 'form-select form-select-sm adisp-av-segment';
+    sel.innerHTML = '<option value="">-- Segmento --</option>';
+    (this.ratesCache || []).forEach((rate) => {
+      const label = rate.label || rate.name;
+      if (label) {
+        const norm = label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        if (norm === 'economico' || norm === 'economica') return;
+      }
+      const opt = document.createElement('option');
+      opt.value = rate.value || rate.objectId || rate.id;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    });
+    return sel;
+  }
+
+  /** Agrega una fila de vehículo adicional (segmento + vehículo + tarifa/h + quitar). */
+  async addADisposicionAdditionalVehicleRow(saved = null) {
+    const list = document.getElementById('aDisposicionAdditionalVehiclesList');
+    if (!list) return;
+    if (!this.ratesCache || this.ratesCache.length === 0) await this.loadAllRates();
+
+    const row = document.createElement('div');
+    row.className = 'adisp-av-row d-flex gap-2 align-items-center mb-2';
+    const segmentSel = this.buildADisposicionSegmentSelect();
+    const vehicleSel = document.createElement('select');
+    vehicleSel.className = 'form-select form-select-sm adisp-av-vehicle';
+    vehicleSel.innerHTML = '<option value="">-- Vehículo --</option>';
+    const rateLabel = document.createElement('small');
+    rateLabel.className = 'text-muted adisp-av-rate text-nowrap';
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn btn-sm btn-outline-danger';
+    removeBtn.innerHTML = '<i class="ti ti-trash"></i>';
+    row.appendChild(segmentSel);
+    row.appendChild(vehicleSel);
+    row.appendChild(rateLabel);
+    row.appendChild(removeBtn);
+    list.appendChild(row);
+
+    segmentSel.addEventListener('change', async () => {
+      row.dataset.hourlyRate = '';
+      rateLabel.textContent = '';
+      await this.loadADisposicionRowVehicles(segmentSel.value, vehicleSel);
+      this.recalcADisposicionWithBreakdown();
+    });
+    vehicleSel.addEventListener('change', async () => {
+      await this.refreshADisposicionRowRate(row, segmentSel.value, vehicleSel.value, rateLabel);
+      this.recalcADisposicionWithBreakdown();
+    });
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+      this.recalcADisposicionWithBreakdown();
+    });
+
+    if (saved && saved.rateId) {
+      segmentSel.value = saved.rateId;
+      await this.loadADisposicionRowVehicles(saved.rateId, vehicleSel);
+      if (saved.vehicleTypeId) {
+        vehicleSel.value = saved.vehicleTypeId;
+        // Restaura los datos directo desde lo guardado (no dependemos del re-fetch de tarifa,
+        // que puede fallar/tardar y dejaría la fila sin hourlyRate → excluida del cálculo).
+        row.dataset.rateId = saved.rateId;
+        row.dataset.vehicleTypeId = saved.vehicleTypeId;
+        row.dataset.hourlyRate = String(saved.hourlyRate || 0);
+        row.dataset.vehicleLabel = saved.vehicleLabel || (vehicleSel.selectedOptions[0]?.textContent || '');
+        row.dataset.segmentLabel = saved.segmentLabel || (segmentSel.selectedOptions[0]?.textContent || '');
+        rateLabel.textContent = `${this.formatCurrency(saved.hourlyRate || 0)}/h`;
+      }
+    }
+    // Solo marca modificado cuando lo agrega el usuario; en restauración (saved) no, para no
+    // ensuciar el estado ni romper la lógica de "usar precios guardados".
+    if (!saved) this.serviceModified = true;
+  }
+
+  /** Carga los vehículos de un segmento en el select de una fila (con caché por segmento). */
+  async loadADisposicionRowVehicles(rateId, vehicleSel) {
+    vehicleSel.innerHTML = '<option value="">-- Vehículo --</option>';
+    if (!rateId) return;
+    // Caché por segmento: re-seleccionar el mismo segmento (otra fila o reapertura) no vuelve
+    // a pegarle a la API → el dropdown responde al instante.
+    this._adispVehiclesCache = this._adispVehiclesCache || new Map();
+    let vehicles = this._adispVehiclesCache.get(rateId);
+    if (!vehicles) {
+      try {
+        const accessToken = this.getAccessToken();
+        const response = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        });
+        if (response.ok) {
+          const result = await response.json();
+          vehicles = result.data || [];
+          this._adispVehiclesCache.set(rateId, vehicles);
+        }
+      } catch (error) {
+        console.error('Error loading a-disp additional vehicles:', error);
+      }
+    }
+    (vehicles || []).forEach((v) => {
+      const opt = document.createElement('option');
+      opt.value = v.value || v.id;
+      opt.textContent = `${v.label} - ${v.capacity} pax`;
+      vehicleSel.appendChild(opt);
+    });
+  }
+
+  /** Tarifa/hora de a-disposición por vehículo+segmento, con caché (evita refetch). */
+  async getADisposicionHourlyPriceCached(vehicleTypeId, rateId) {
+    this._adispPriceCache = this._adispPriceCache || new Map();
+    const key = `${vehicleTypeId}_${rateId}`;
+    if (this._adispPriceCache.has(key)) return this._adispPriceCache.get(key);
+    let hourly = 0;
+    try {
+      const accessToken = this.getAccessToken();
+      const response = await fetch(`/api/disposable-prices/price?vehicleTypeId=${vehicleTypeId}&rateId=${rateId}`, {
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        hourly = (result.data || {}).hourlyPrice || 0;
+      }
+    } catch (error) {
+      console.error('Error fetching a-disp additional vehicle price:', error);
+    }
+    this._adispPriceCache.set(key, hourly);
+    return hourly;
+  }
+
+  /** Obtiene y guarda la tarifa/hora de una fila en sus data-* (usa caché). */
+  async refreshADisposicionRowRate(row, rateId, vehicleTypeId, rateLabel) {
+    row.dataset.hourlyRate = '';
+    row.dataset.rateId = rateId || '';
+    row.dataset.vehicleTypeId = vehicleTypeId || '';
+    row.dataset.vehicleLabel = row.querySelector('.adisp-av-vehicle')?.selectedOptions[0]?.textContent || '';
+    row.dataset.segmentLabel = row.querySelector('.adisp-av-segment')?.selectedOptions[0]?.textContent || '';
+    if (!rateId || !vehicleTypeId) { rateLabel.textContent = ''; return; }
+    const hourly = await this.getADisposicionHourlyPriceCached(vehicleTypeId, rateId);
+    row.dataset.hourlyRate = String(hourly);
+    rateLabel.textContent = `${this.formatCurrency(hourly)}/h`;
+  }
+
+  /** Lee todas las filas de vehículos adicionales de a-disposición. */
+  getADisposicionAdditionalVehicles() {
+    const rows = document.querySelectorAll('#aDisposicionAdditionalVehiclesList .adisp-av-row');
+    const out = [];
+    rows.forEach((row) => {
+      const hourlyRate = parseFloat(row.dataset.hourlyRate || 0) || 0;
+      const vehicleTypeId = row.dataset.vehicleTypeId || '';
+      if (hourlyRate > 0 && vehicleTypeId) {
+        out.push({
+          vehicleTypeId,
+          rateId: row.dataset.rateId || '',
+          hourlyRate,
+          vehicleLabel: row.dataset.vehicleLabel || 'Vehículo adicional',
+          segmentLabel: row.dataset.segmentLabel || '',
+        });
+      }
+    });
+    return out;
+  }
+
+  /** Reconstruye las filas guardadas al editar un servicio. */
+  async restoreADisposicionAdditionalVehicles(savedList) {
+    const list = document.getElementById('aDisposicionAdditionalVehiclesList');
+    if (list) list.innerHTML = '';
+    if (!Array.isArray(savedList) || savedList.length === 0) return;
+    for (const saved of savedList) {
+      // eslint-disable-next-line no-await-in-loop
+      await this.addADisposicionAdditionalVehicleRow(saved);
+    }
+    // Las filas se reconstruyen async (fetch de vehículos + tarifas). Recién ahora que están
+    // listas recalculamos, para que el desglose incluya los vehículos adicionales restaurados
+    // (antes el recálculo corría antes de que terminaran los fetch y salían sin ellos).
+    await this.calculateADisposicionPrice();
+    // Refuerzo: aunque calculateADisposicionPrice retorne temprano, repintamos el desglose
+    // (dev primero, luego service) para que muestre los vehículos adicionales restaurados.
+    this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
+  }
+
+  /** Recalcula a-disposición: precio + dev breakdown + service breakdown (en orden). */
+  recalcADisposicionWithBreakdown() {
+    this.serviceModified = true;
+    this.calculateADisposicionPrice();
+    this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
+  }
+
   /**
    * Handle A Disposición rate change — load available vehicles.
    * @param rateId
@@ -18635,29 +19140,34 @@ class ItineraryBuilder {
 
     if (!rateId) return;
 
-    try {
-      const accessToken = this.getAccessToken();
-      const response = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        const vehicles = result.data || [];
-
-        vehicles.forEach((vehicle) => {
-          const option = document.createElement('option');
-          option.value = vehicle.value || vehicle.id;
-          option.textContent = `${vehicle.label} - ${vehicle.capacity} pax`;
-          vehicleSelect.appendChild(option);
+    // Caché por segmento (compartida con las filas de vehículos adicionales): re-seleccionar
+    // el mismo segmento no vuelve a pegarle a la API.
+    this._adispVehiclesCache = this._adispVehiclesCache || new Map();
+    let vehicles = this._adispVehiclesCache.get(rateId);
+    if (!vehicles) {
+      try {
+        const accessToken = this.getAccessToken();
+        const response = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
         });
+        if (response.ok) {
+          const result = await response.json();
+          vehicles = result.data || [];
+          this._adispVehiclesCache.set(rateId, vehicles);
+        }
+      } catch (error) {
+        console.error('Error loading vehicles for A Disposición:', error);
       }
-    } catch (error) {
-      console.error('Error loading vehicles for A Disposición:', error);
     }
+    (vehicles || []).forEach((vehicle) => {
+      const option = document.createElement('option');
+      option.value = vehicle.value || vehicle.id;
+      option.textContent = `${vehicle.label} - ${vehicle.capacity} pax`;
+      vehicleSelect.appendChild(option);
+    });
   }
 
   /**
@@ -20639,6 +21149,9 @@ class ItineraryBuilder {
             vehicleCount: service.vehicleCount || null,
             hourlyPrice: service.hourlyPrice || null,
             discountPercent: service.discountPercent || null,
+            // Vehículos adicionales de a-disposición (segmento/tipo por fila) — se persisten
+            // para que el desglose, la lista de items y el resumen los muestren.
+            aDisposicionAdditionalVehicles: service.aDisposicionAdditionalVehicles || [],
             // Walking tour fields
             isWalkingTour: service.isWalkingTour || false,
             walkingTourPeopleCount: service.walkingTourPeopleCount || null,
@@ -20666,8 +21179,9 @@ class ItineraryBuilder {
             conceptoPricePerPerson: service.conceptoPricePerPerson !== undefined ? service.conceptoPricePerPerson : null,
             // Persisted user decision to dismiss the overlap warning for this service
             overlapAccepted: service.overlapAccepted || false,
-            // Segment color cache so public/summary view can render the chip without
-            // re-fetching the Rate catalog
+            // Segment name + color cache so public/summary/PDF can render the chip without
+            // re-fetching the Rate catalog (the public/PDF context has no auth token to fetch it).
+            categoryName: service.categoryName || '',
             categoryColor: service.categoryColor || '',
             additionalVehicleSegmentColor: service.additionalVehicleSegmentColor || '',
             // Devbreakdown text snapshots (used in production where the dev panel is hidden
