@@ -1541,6 +1541,11 @@ class ItineraryBuilder {
     this.currentServiceAvailabilityPending = false;
     this.serviceModified = false; // Track if user has made changes since opening
 
+    // Limpia el estado de opciones/cálculo que puede filtrarse de un servicio a otro (checkbox
+    // de vehículo adicional, filas adicionales de a-disp, guía/greeter, totales de desglose).
+    // Se hace SIEMPRE al abrir, antes de poblar — luego la restauración pone lo del servicio.
+    this.clearServiceOptionState();
+
     const modal = new bootstrap.Modal(document.getElementById('serviceModal'));
     const form = document.getElementById('serviceForm');
 
@@ -12269,6 +12274,55 @@ class ItineraryBuilder {
    * que antes estaba duplicado en el listener hidden.bs.modal y en closeModal.
    * @example
    */
+  /**
+   * Limpia el estado de opciones/cálculo que puede filtrarse de un servicio a otro al abrir el
+   * modal (corrige: el checkbox de vehículo adicional aparece donde no va, o el desglose trae
+   * cálculos de otro servicio). Se llama SIEMPRE al abrir; la restauración pone después lo del
+   * servicio que se edita. NO limpia las cachés de fetch (esas son por-clave, son perf).
+   * @example
+   */
+  clearServiceOptionState() {
+    // Vehículo adicional (transporte / vehicle tour)
+    const addCheckbox = document.getElementById('additionalVehicleCheckbox');
+    if (addCheckbox) addCheckbox.checked = false;
+    ['additionalVehicleContainer', 'additionalSegmentContainer', 'additionalVehicleSelectContainer',
+      'additionalVehiclePriceContainer', 'extraAdditionalVehiclesContainer'].forEach((id) => {
+      document.getElementById(id)?.classList.add('d-none');
+    });
+    const addSeg = document.getElementById('additionalSegmentSelect');
+    if (addSeg) addSeg.value = '';
+    const addVeh = document.getElementById('additionalVehicleSelect');
+    if (addVeh) {
+      addVeh.value = '';
+      addVeh.disabled = true;
+      addVeh.innerHTML = '<option value="">Primero selecciona un segmento</option>';
+    }
+    const addPrice = document.getElementById('additionalVehiclePrice');
+    if (addPrice) addPrice.value = '';
+    const addListPrice = document.getElementById('additionalVehicleListPrice');
+    if (addListPrice) addListPrice.textContent = '';
+    if (typeof this.clearExtraAdditionalVehicles === 'function') this.clearExtraAdditionalVehicles();
+
+    // Vehículos adicionales de a-disposición
+    const adispList = document.getElementById('aDisposicionAdditionalVehiclesList');
+    if (adispList) adispList.innerHTML = '';
+
+    // Guía / greeter (todos los tipos)
+    ['includeGuide', 'includeGreeter', 'aDisposicionGuide', 'aDisposicionGreeter'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.checked = false;
+    });
+
+    // Totales de desglose por tipo: evita que un servicio herede los del anterior.
+    this._transportBreakdownTotals = null;
+    this._aDisposicionBreakdownTotals = null;
+    this._walkingTourBreakdownTotals = null;
+
+    // Limpia el desglose visible para que no muestre cálculos del servicio anterior
+    // (se vuelve a poblar al recalcular el servicio que se abre).
+    if (typeof this.clearServicePriceBreakdown === 'function') this.clearServicePriceBreakdown();
+  }
+
   resetServiceModalState() {
     this._editModalOpen = false;
     this._restoringWalkingTourData = false;
