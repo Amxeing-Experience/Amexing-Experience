@@ -1419,12 +1419,10 @@
             };
 
             // Pair card with optional segment chip in the corner
-            const pairCard = (slotIndex, driver, vehicle, segmentName, segmentColor) => {
-                const safeColor = segmentColor && /^#?[0-9a-f]{3,8}$/i.test(segmentColor)
-                    ? (segmentColor.startsWith('#') ? segmentColor : `#${segmentColor}`)
-                    : '#969b81';
+            const pairCard = (slotIndex, driver, vehicle, segmentName) => {
+                // Segmento sin color: badge neutro (se removió el color por segmento).
                 const segChip = segmentName
-                    ? `<span class="badge" style="background:${safeColor};color:#fff;font-size:0.65rem;font-weight:500;padding:2px 8px;letter-spacing:0.03em;">${segmentName}</span>`
+                    ? `<span class="badge" style="background:#f1f3f4;color:#5f6368;font-size:0.65rem;font-weight:500;padding:2px 8px;letter-spacing:0.03em;">${segmentName}</span>`
                     : '';
                 const slotChip = `<span class="text-muted" style="font-size:0.7rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;">${slotIndex === 1 ? 'Vehículo principal' : `Vehículo adicional ${slotIndex - 1}`}</span>`;
                 return `
@@ -1717,10 +1715,11 @@
         }
 
         // Helper: Render a segment name as a small colored chip.
-        renderSegmentChip(name, color) {
+        // Segmento sin color: badge neutro (se removió el color por segmento). Se conserva el
+        // segundo parámetro por compatibilidad con los callers, pero ya no se usa.
+        renderSegmentChip(name) {
             if (!name) return '';
-            const bg = color || '#6366F1';
-            return `<span class="badge ms-1" style="background-color: ${bg}; color: #fff; font-weight: 500;">${name}</span>`;
+            return `<span class="badge ms-1" style="background-color: #f1f3f4; color: #5f6368; font-weight: 500;">${name}</span>`;
         }
 
         // Helper: Resolve main segment name + color and return the formatted " - <chip>" suffix.
