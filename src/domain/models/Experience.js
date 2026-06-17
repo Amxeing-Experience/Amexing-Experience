@@ -335,6 +335,124 @@ class Experience extends BaseModel {
   }
 
   /**
+   * Get cancellation policy.
+   * @returns {string|null} Cancellation policy or null if not set.
+   * @example
+   */
+  getCancellationPolicy() {
+    return this.get('cancellation_policy') || null;
+  }
+
+  /**
+   * Set cancellation policy.
+   * @param {string} cancellationPolicy - Cancellation policy text.
+   * @example
+   */
+  setCancellationPolicy(cancellationPolicy) {
+    if (cancellationPolicy !== null && cancellationPolicy !== undefined && cancellationPolicy !== '') {
+      this.set('cancellation_policy', String(cancellationPolicy).trim());
+    } else {
+      this.set('cancellation_policy', null);
+    }
+  }
+
+  /**
+   * Get buy-out amount.
+   * @returns {number|null} Buy-out amount or null if not set.
+   * @example
+   */
+  getBuyout() {
+    const value = this.get('buyout');
+    return (value !== null && value !== undefined) ? value : null;
+  }
+
+  /**
+   * Set buy-out amount.
+   * @param {number} buyout - Buy-out amount (must be >= 0).
+   * @example
+   */
+  setBuyout(buyout) {
+    if (buyout !== null && buyout !== undefined && buyout !== '') {
+      if (parseFloat(buyout) < 0) {
+        throw new Error('Buy-out must be greater than or equal to 0');
+      }
+      this.set('buyout', parseFloat(buyout));
+    } else {
+      this.set('buyout', null);
+    }
+  }
+
+  /**
+   * Get private minimum type ('personas' or 'monto').
+   * @returns {string|null} Private minimum type or null if not set.
+   * @example
+   */
+  getPrivateMinType() {
+    return this.get('private_min_type') || null;
+  }
+
+  /**
+   * Set private minimum type.
+   * @param {string} privateMinType - 'personas' or 'monto'.
+   * @example
+   */
+  setPrivateMinType(privateMinType) {
+    if (privateMinType !== null && privateMinType !== undefined && privateMinType !== '') {
+      if (privateMinType !== 'personas' && privateMinType !== 'monto') {
+        throw new Error("Private minimum type must be 'personas' or 'monto'");
+      }
+      this.set('private_min_type', privateMinType);
+    } else {
+      this.set('private_min_type', null);
+    }
+  }
+
+  /**
+   * Get private minimum value (amount or number of people).
+   * @returns {number|null} Private minimum value or null if not set.
+   * @example
+   */
+  getPrivateMinValue() {
+    const value = this.get('private_min_value');
+    return (value !== null && value !== undefined) ? value : null;
+  }
+
+  /**
+   * Set private minimum value.
+   * @param {number} privateMinValue - Amount or number of people (must be >= 0).
+   * @example
+   */
+  setPrivateMinValue(privateMinValue) {
+    if (privateMinValue !== null && privateMinValue !== undefined && privateMinValue !== '') {
+      if (parseFloat(privateMinValue) < 0) {
+        throw new Error('Private minimum value must be greater than or equal to 0');
+      }
+      this.set('private_min_value', parseFloat(privateMinValue));
+    } else {
+      this.set('private_min_value', null);
+    }
+  }
+
+  /**
+   * Get whether the schedule is fixed (vs. Suggested).
+   * When true, the detail view shows "Horarios"; otherwise "Horarios sugeridos".
+   * @returns {boolean} True if the schedule is fixed.
+   * @example
+   */
+  getFixedSchedule() {
+    return this.get('fixed_schedule') === true;
+  }
+
+  /**
+   * Set whether the schedule is fixed (vs. Suggested).
+   * @param {boolean} fixedSchedule - True for a fixed schedule.
+   * @example
+   */
+  setFixedSchedule(fixedSchedule) {
+    this.set('fixed_schedule', fixedSchedule === true || fixedSchedule === 'true');
+  }
+
+  /**
    * Get journey time in hours.
    * @returns {number|null} Journey time or null if not set.
    * @example

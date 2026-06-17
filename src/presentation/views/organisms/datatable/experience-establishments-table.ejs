@@ -182,9 +182,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         </div>
                         <div class="col-md-6">
                             <label for="quickEstablishmentExperienciaMaxPeople" class="form-label form-label-sm fw-medium text-success">Máx. Personas</label>
-                            <input type="number" class="form-control" id="quickEstablishmentExperienciaMaxPeople" min="1" step="1" 
+                            <input type="number" class="form-control" id="quickEstablishmentExperienciaMaxPeople" min="1" step="1"
                                    placeholder="10">
                         </div>
+                    </div>
+
+                    <!-- Horario fijo -->
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="quickEstablishmentExperienciaFixedSchedule">
+                        <label class="form-check-label form-label-sm fw-medium text-success" for="quickEstablishmentExperienciaFixedSchedule">
+                            Horario fijo
+                            <small class="d-block text-muted fw-normal">Si se activa, en el detalle muestra "Horarios" en lugar de "Horarios sugeridos" (ej. viñedos).</small>
+                        </label>
                     </div>
 
                     <!-- Incluye y No Incluye en 2 columnas -->
@@ -501,12 +510,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <div class="availability-section">
                 <!-- Availability Summary View (default) -->
                 <div class="availability-summary">
-                    <label class="form-label form-label-sm fw-medium d-flex justify-content-between align-items-center" style="color: #f59e0b;">
-                        <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
+                    <div class="form-label form-label-sm fw-medium d-flex justify-content-between align-items-center mb-1" style="color: #f59e0b;">
+                        <span class="d-flex align-items-center gap-2 flex-wrap">
+                            <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
+                            <span class="form-check form-switch mb-0" title='Si se activa, en el detalle muestra "Horarios" en lugar de "Horarios sugeridos" (ej. viñedos).'>
+                                <input class="form-check-input experiencia-fixed-schedule-input" type="checkbox">
+                                <label class="form-check-label small fw-medium">Horario fijo</label>
+                            </span>
+                        </span>
                         <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Configurar horarios" style="color: #f59e0b;">
                             <i class="ti ti-settings"></i>
                         </button>
-                    </label>
+                    </div>
                     <div class="availability-display bg-light border rounded p-2" style="min-height: 35px;">
                         <small style="color: #f59e0b;">
                             <i class="ti ti-check-circle me-1"></i>
@@ -1175,6 +1190,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             advance_booking_time: parseInt($('#quickEstablishmentExperienciaAdvanceTime').val()) || null,
             min_people: parseInt($('#quickEstablishmentExperienciaMinPeople').val()) || null,
             max_people: parseInt($('#quickEstablishmentExperienciaMaxPeople').val()) || null,
+            fixed_schedule: $('#quickEstablishmentExperienciaFixedSchedule').is(':checked'),
             tipo: $('#quickEstablishmentExperienciaTipo').val() || null
         };
         
@@ -1322,12 +1338,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 exists: true
             };
             
-            // Add destinationPOI if selected
+            // Siempre enviar destinationPOI para poder SETEAR o LIMPIAR el destino:
+            // vacío => el backend lo hace unset en update (en create simplemente lo ignora).
+            // Antes solo se enviaba cuando había valor, así que no se podía quitar.
             const destinationPOIId = $('#establishmentDestino').val();
-            if (destinationPOIId && destinationPOIId.trim() !== '') {
-                formData.destinationPOI = destinationPOIId.trim();
-                console.log('📍 Including destinationPOI in form data:', destinationPOIId);
-            }
+            formData.destinationPOI = (destinationPOIId && destinationPOIId.trim() !== '') ? destinationPOIId.trim() : '';
+            console.log('📍 destinationPOI in form data:', formData.destinationPOI || '(none)');
 
             // Collect establishment experiences data (save separately, not in main payload)
             const experienciasData = collectEstablishmentExperienciasData();
@@ -2144,7 +2160,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     advance_booking_time: getInt('.experiencia-advance-minutes-input'),
                     min_people: getInt('.experiencia-min-people-input'),
                     max_people: getInt('.experiencia-max-people-input'),
-                    
+                    fixed_schedule: card.querySelector('.experiencia-fixed-schedule-input') ? card.querySelector('.experiencia-fixed-schedule-input').checked : false,
+
                     // Convert strings to arrays (like provider table)
                     includes: getName('.experiencia-includes-input') ? 
                         getName('.experiencia-includes-input').split('\n').map(item => item.trim()).filter(item => item.length > 0) : [],
@@ -2332,6 +2349,24 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         }
     }
     
+    // Destino del establecimiento en edición ({ id, name } o null). Fuente de verdad
+    // para mantener el seleccionado a prueba de timing (las opciones cargan async y el
+    // catálogo activo puede no incluir el POI guardado).
+    let pendingEstablishmentDestino = null;
+
+    // Aplica el destino pendiente al select: reinyecta su opción si no existe (POI no
+    // listado / opciones aún no cargadas) y lo selecciona. Se llama tras cada repoblado.
+    function applyEstablishmentDestino() {
+        const $sel = $('#establishmentDestino');
+        if ($sel.length === 0) return;
+        if (!pendingEstablishmentDestino || !pendingEstablishmentDestino.id) return;
+        const { id, name } = pendingEstablishmentDestino;
+        if ($sel.find(`option[value="${id}"]`).length === 0) {
+            $sel.append($('<option>').val(id).text(name || id));
+        }
+        $sel.val(id);
+    }
+
     // Populate Destino selectbox with POI options
     function populateDestinoSelect(selectId, pois) {
         const select = document.getElementById(selectId);
@@ -2340,9 +2375,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             return;
         }
         
+        // Preserva la selección actual: el catálogo de POIs carga async y se puede
+        // repoblar DESPUÉS de que el editar ya seteó el destino — sin esto, se borraría.
+        const prevValue = select.value;
+
         // Clear existing options except the first one
         select.innerHTML = '<option value="">Seleccione un destino...</option>';
-        
+
         // Add POI options
         pois.forEach(poi => {
             const option = document.createElement('option');
@@ -2351,7 +2390,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             option.setAttribute('data-service-type', poi.serviceType?.name || '');
             select.appendChild(option);
         });
-        
+
+        // Restaura la selección previa si el POI sigue disponible en la lista.
+        if (prevValue) {
+            select.value = prevValue;
+        }
+
+        // Reaplica el destino del establecimiento en edición (reinyecta su opción si el
+        // POI no vino en la lista) → seleccionado a prueba de timing.
+        if (selectId === 'establishmentDestino') {
+            applyEstablishmentDestino();
+        }
+
         console.log(`✅ Populated ${selectId} with ${pois.length} POI options`);
     }
     
@@ -2431,6 +2481,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             // Reset form
             document.getElementById('establishmentForm').reset();
+            // Limpia el destino pendiente al abrir; el editar lo vuelve a setear tras el GET.
+            pendingEstablishmentDestino = null;
             
             // CRITICAL: Enhanced form reset - explicitly clear fields for create mode
             if (!isEdit) {
@@ -2535,13 +2587,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#establishmentName').val(establishment.name);
                         $('#establishmentDescription').val(establishment.description || '');
                         
-                        // Populate destinationPOI field
+                        // Populate destinationPOI field — guarda el destino como "pendiente"
+                        // y lo aplica. Se re-aplica solo tras cada repoblado del catálogo
+                        // (a prueba de timing y de POIs que no estén en la lista activa).
                         if (establishment.destinationPOI && establishment.destinationPOI.id) {
-                            $('#establishmentDestino').val(establishment.destinationPOI.id);
-                            console.log('📍 Loaded destinationPOI:', establishment.destinationPOI.name || establishment.destinationPOI.id);
+                            pendingEstablishmentDestino = {
+                                id: establishment.destinationPOI.id,
+                                name: establishment.destinationPOI.name || establishment.destinationPOI.id,
+                            };
+                            console.log('📍 Loaded destinationPOI:', pendingEstablishmentDestino.name);
                         } else {
+                            pendingEstablishmentDestino = null;
                             $('#establishmentDestino').val('');
                         }
+                        applyEstablishmentDestino();
                         
                         // Clear loading message
                         $('#establishmentModalAlerts').html('');
@@ -2691,6 +2750,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-advance-minutes-input').value = experiencia.advance_booking_time || '';
             card.querySelector('.experiencia-min-people-input').value = experiencia.min_people || '';
             card.querySelector('.experiencia-max-people-input').value = experiencia.max_people || '';
+            const establishmentFixedScheduleInput = card.querySelector('.experiencia-fixed-schedule-input');
+            if (establishmentFixedScheduleInput) establishmentFixedScheduleInput.checked = !!experiencia.fixed_schedule;
             card.querySelector('.experiencia-includes-input').value = Array.isArray(experiencia.includes) 
                 ? experiencia.includes.join('\n') 
                 : (experiencia.includes || '');

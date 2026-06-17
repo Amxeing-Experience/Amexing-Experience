@@ -7,17 +7,37 @@ motor único (`src/domain/pricing/pricingEngine.js`), de modo que builder, valid
 y PDF compartan **una sola fuente de verdad**. Hoy el motor era solo la capa final (recargo +
 redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el back usaban.
 
+## Reglas de negocio vigentes (decisión del cliente)
+
+- **Recargo uniforme:** el recargo por forma de pago (transferencia/tarjeta) se aplica a
+  **TODOS** los nodos, **incluidos guía/chofer y greeter**. (Antes guía/greeter quedaban
+  exentos; se cambió a petición del cliente.) En la práctica:
+  `total_forma_pago = total_efectivo × (1 + %)`.
+- **Vehículo principal de transporte = siempre 1.** El campo "Cantidad" no multiplica el
+  vehículo principal; para varios vehículos se usan **vehículos adicionales** (siempre
+  desglosados).
+- **A-Disposición:** la opción de chofer se renombró a **"Incluir Guía"** (solo etiqueta; el
+  id/rate internos siguen igual). Se agregó **"Incluir Greeter"**: mismo cálculo que transporte
+  (base + tarifa/h × horas), con recargo, y se suma **después** del descuento por volumen (el
+  greeter no se descuenta). Persiste como `includeGreeter`. Guía y greeter son **mutuamente
+  excluyentes**.
+- **A-Disposición — vehículos adicionales:** se pueden agregar vehículos adicionales de **tipo y
+  segmento distintos** (cada fila: segmento + vehículo, con su **tarifa/hora**). Cada uno =
+  `tarifa/h × horas`, con recargo, y **entra al descuento** por volumen (es tiempo de vehículo).
+  La "Cantidad" sigue siendo solo del vehículo principal. Persiste como
+  `aDisposicionAdditionalVehicles: [{ vehicleTypeId, rateId, hourlyRate, ... }]`.
+
 ## Estado por tipo de servicio
 
 | Tipo | Nodos en el motor | Front conectado | Notas |
 | :-- | :-- | :-- | :-- |
 | **Transporte** | ✅ vehículo · espera · guía/chofer · greeter · vehículo adicional · extras | ✅ ruta principal **y** fallback | **HECHO** (ver abajo) |
 | **Tours (con vehículos)** | ✅ vehículo · guía · vehículo adicional · extras (reusa `composeServiceNodes`) | ✅ `calculateVehicleTourDevBreakdown` usa el motor | **HECHO** |
-| **A-Disposición** | ✅ vehículo × horas × cantidad · guía · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
+| **A-Disposición** | ✅ vehículo × horas × cantidad · guía · **greeter (add-on)** · descuento por volumen · recargo · moneda | ✅ `calculateADisposicionPricing` delega al motor | **HECHO** |
 | **Experiencias** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ guardado + desglose | **HECHO** (sin duración; ver abajo) |
 | **Walking tours** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ desglose + fallback | **HECHO** (tiers/override en baseTotal) |
 | **Concepto** | ✅ recargo vía `composeServiceNodes` (1 nodo: unitario + por persona) | ✅ guardado + dev prices + desglose | **HECHO** (fix por-persona + C2) |
-| Backend (validar al guardar) | ❌ | — | hoy es passthrough; debe re-correr el motor |
+| Backend (validar al guardar) | 🟡 log-only | `updateServiceItems` verifica con el motor | Observa y loggea divergencias (subtotal vs Σ subconcepts; total = subtotal+IVA; total por-subconcept vs pricesByType[formaPago]); NO cambia ni bloquea. Recálculo autoritativo desde catálogo = capa futura |
 
 ## Transporte — qué se hizo (1er nodo del árbol)
 
@@ -125,6 +145,29 @@ tipos espejean el dev breakdown** con un solo helper `collectServiceBreakdownIte
 
 Resultado: desglose mostrado == dev breakdown == precio guardado, para todos los tipos, siempre
 calculado por el motor único.
+
+**Cuadre de centavos (cosmético):** los renglones se muestran redondeados, así que la suma de la
+columna podía quedar a 1 centavo del Total (que es el autoritativo/cobrado). `reconcileBreakdownItemsToTotal`
+absorbe ese residual (solo si es ≤ $1) en el último renglón **positivo** (no toca descuentos), en
+los tres caminos de render (principal, walking, vehicle tour). El Total no cambia; solo cuadra la columna.
+
+## pricesByType: total del breakdown + safeguard de recargo
+
+**Auditoría (todos los tipos):** el `pricesByType` que se persiste sale del **gate final** de
+`collectServiceData` que lo reconcilia desde el **total del texto del desglose**
+(`extractTotalFromBreakdown` de `devBreakdownEfectivo/Transferencia/Tarjeta`). Es decir, guarda el
+**total** (con todos los nodos: guía, greeter, vehículos adicionales, descuentos, recargo), **no un
+costo base** — la base queda aparte en `basePrice`/`basePriceEfectivo`. Verificado para concepto,
+experiencia, walking, vehicle tour, transporte y a-disposición.
+
+**Safeguard `ensurePricesByTypeSurcharge`:** la regla es **recargo uniforme** (transferencia/tarjeta
+> efectivo cuando los rates son > 0). Si por un problema de **timing** (los rates `transferRate`/
+`agencyRate` aún no habían cargado al renderar el desglose) transferencia/tarjeta quedaban
+**faltantes, en 0, o iguales a efectivo**, se persistía un total **sin recargo** (en la lista se ve
+como un precio que no cambia con la forma de pago). El safeguard, corriendo **después** del gate de
+reconciliación, recomputa esos casos desde `efectivo × (1 + rate)`. Solo corrige datos rotos; nunca
+toca un total que ya trae recargo válido. (Datos viejos ya guardados sin recargo se corrigen al
+re-editar/guardar ese servicio.)
 
 ## Pendientes diferidos
 

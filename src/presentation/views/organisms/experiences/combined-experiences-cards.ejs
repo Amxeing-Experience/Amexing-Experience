@@ -2630,7 +2630,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ${experience.availability ? `
                 <div class="content-section">
                     <h5 class="text-info mb-3">
-                        <i class="ti ti-calendar me-2"></i>Horarios Sugeridos
+                        <i class="ti ti-calendar me-2"></i>${experience.fixed_schedule ? 'Horarios' : 'Horarios Sugeridos'}
                     </h5>
                     <div class="availability-grid">
                         ${Array.isArray(experience.availability) ? (() => {
@@ -2726,6 +2726,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="languages">
                         ${experience.languages.map(lang => `<span class="badge bg-info me-2">${lang}</span>`).join('')}
                     </div>
+                </div>
+            ` : ''}
+
+            ${(experience.cancellation_policy || (experience.buyout !== null && experience.buyout !== undefined) || (experience.private_min_value !== null && experience.private_min_value !== undefined)) ? `
+                <div class="content-section">
+                    <h5 class="text-warning mb-3"><i class="ti ti-file-description me-2"></i>Condiciones</h5>
+                    <ul class="list-unstyled mb-0">
+                        ${experience.cancellation_policy ? `<li class="mb-2"><strong><i class="ti ti-calendar-x me-1"></i>Políticas de cancelación:</strong> ${experience.cancellation_policy}</li>` : ''}
+                        ${(experience.buyout !== null && experience.buyout !== undefined) ? `<li class="mb-2"><strong><i class="ti ti-cash me-1"></i>Buy-out:</strong> $${Number(experience.buyout).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</li>` : ''}
+                        ${(experience.private_min_value !== null && experience.private_min_value !== undefined) ? `<li class="mb-2"><strong><i class="ti ti-lock me-1"></i>Mínimo para hacerlo privado:</strong> ${experience.private_min_type === 'monto' ? '$' + Number(experience.private_min_value).toLocaleString('es-MX', { minimumFractionDigits: 2 }) : Number(experience.private_min_value) + ' personas'}</li>` : ''}
+                    </ul>
                 </div>
             ` : ''}
         `;

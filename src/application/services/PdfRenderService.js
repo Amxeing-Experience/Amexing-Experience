@@ -94,10 +94,19 @@ async function renderUrlToPdf(url, options = {}) {
     // needs `displayHeaderFooter` plus room in the bottom margin, so we widen `bottom`
     // past the body `margin`. The empty header template suppresses Puppeteer's default
     // date/title header. Inline font-size is required — the default is 0.
+    // Two-line letterhead-style footer: a thin sage rule, the brand name (large,
+    // letter-spaced, uppercase, matching the AMEXING logo aesthetic) over the website,
+    // and the page number on the right. printBackground + print-color-adjust keep the
+    // sage tones. Needs a taller bottom margin than a single line.
     const footerTemplate = `
-      <div style="width:100%; box-sizing:border-box; padding:0 ${margin}; font-size:8px; color:#969b81; font-family:'Segoe UI',Tahoma,sans-serif; display:flex; justify-content:space-between; align-items:center;">
-        <span>amexingexperience.com</span>
-        <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
+      <div style="width:100%; box-sizing:border-box; padding:0 ${margin}; font-family:'Segoe UI',Tahoma,Geneva,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+        <div style="border-top:1px solid #d8dac9; padding-top:6px; display:flex; justify-content:space-between; align-items:flex-end;">
+          <div style="text-align:left; line-height:1.35;">
+            <div style="font-size:11px; font-weight:600; letter-spacing:2.5px; color:#969b81; text-transform:uppercase;">Amexing Experience</div>
+            <div style="font-size:7.5px; color:#9aa0a6; letter-spacing:0.5px; margin-top:2px;">amexingexperience.com</div>
+          </div>
+          <div style="font-size:8px; color:#9aa0a6; text-align:right; padding-bottom:1px;">Página <span class="pageNumber"></span> de <span class="totalPages"></span></div>
+        </div>
       </div>`;
     const pdfBuffer = await page.pdf({
       format,
@@ -107,7 +116,7 @@ async function renderUrlToPdf(url, options = {}) {
       headerTemplate: '<span></span>',
       footerTemplate,
       margin: {
-        top: margin, bottom: '16mm', left: margin, right: margin,
+        top: margin, bottom: '22mm', left: margin, right: margin,
       },
     });
     return pdfBuffer;
