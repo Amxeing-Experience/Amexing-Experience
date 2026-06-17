@@ -146,6 +146,11 @@ tipos espejean el dev breakdown** con un solo helper `collectServiceBreakdownIte
 Resultado: desglose mostrado == dev breakdown == precio guardado, para todos los tipos, siempre
 calculado por el motor único.
 
+**Cuadre de centavos (cosmético):** los renglones se muestran redondeados, así que la suma de la
+columna podía quedar a 1 centavo del Total (que es el autoritativo/cobrado). `reconcileBreakdownItemsToTotal`
+absorbe ese residual (solo si es ≤ $1) en el último renglón **positivo** (no toca descuentos), en
+los tres caminos de render (principal, walking, vehicle tour). El Total no cambia; solo cuadra la columna.
+
 ## Pendientes diferidos
 
 - **A-Disposición — precio por-vehículo "baila por centavos" al subir la cantidad:** causado por

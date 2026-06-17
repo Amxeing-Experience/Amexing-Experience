@@ -15956,6 +15956,9 @@ class ItineraryBuilder {
       return;
     }
 
+    // Cuadra los renglones con el total (absorbe el centavo de redondeo).
+    this.reconcileBreakdownItemsToTotal(items, totalMXN);
+
     // Update Desglose title with payment type
     const desgloseTitle = document.getElementById('desgloseTitle');
     if (desgloseTitle) {
@@ -15978,6 +15981,31 @@ class ItineraryBuilder {
     itemsDiv.innerHTML = itemsHTML;
     totalSpan.textContent = this.formatCurrency(totalMXN);
     container.classList.remove('d-none');
+  }
+
+  /**
+   * Reconcilia los renglones del desglose para que la suma de los montos mostrados
+   * cuadre con el total autoritativo (lo que se cobra). Absorbe el centavo de redondeo
+   * por-renglón en el ultimo renglon positivo, sin tocar descuentos. Cosmetico: el Total
+   * no cambia, solo se elimina el "1 centavo de diferencia" entre la columna y el Total.
+   * @param {Array<{label:string, amountMXN:number}>} items Renglones del desglose (se mutan).
+   * @param {number} total Total autoritativo contra el que deben sumar los renglones.
+   * @example
+   */
+  reconcileBreakdownItemsToTotal(items, total) {
+    if (!Array.isArray(items) || items.length === 0 || !(total > 0)) return;
+    const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const sum = r2(items.reduce((s, it) => s + (Number(it.amountMXN) || 0), 0));
+    const residual = r2(total - sum);
+    // Solo absorbe diferencias de centavos (redondeo). Algo mayor a $1 es otro problema:
+    // se deja visible en vez de enmascararlo.
+    if (Math.abs(residual) < 0.01 || Math.abs(residual) > 1) return;
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      if ((Number(items[i].amountMXN) || 0) > 0) {
+        items[i].amountMXN = r2((Number(items[i].amountMXN) || 0) + residual);
+        break;
+      }
+    }
   }
 
   /**
@@ -16079,6 +16107,9 @@ class ItineraryBuilder {
       container.classList.add('d-none');
       return;
     }
+
+    // Cuadra los renglones con el total (absorbe el centavo de redondeo).
+    this.reconcileBreakdownItemsToTotal(items, totalMXN);
 
     // Update Desglose title with payment type
     const desgloseTitle = document.getElementById('desgloseTitle');
@@ -17106,6 +17137,9 @@ class ItineraryBuilder {
       const paymentLabel = paymentLabels[paymentType] || paymentType;
       desgloseTitle.innerHTML = `<i class="ti ti-list-details me-1"></i>Desglose ${paymentLabel.toLowerCase()}`;
     }
+
+    // Cuadra los renglones con el total (absorbe el centavo de redondeo).
+    this.reconcileBreakdownItemsToTotal(items, totalMXN);
 
     // Render all service-specific breakdown items first
     const itemsHTML = items.map((item) => {
