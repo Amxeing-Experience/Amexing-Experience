@@ -4781,6 +4781,18 @@ class ItineraryBuilder {
     data.providerNotes = document.getElementById('providerNotes')?.value || '';
     data.teamNotes = document.getElementById('teamNotes')?.value || '';
 
+    // Nombre del segmento principal: resolverlo SIEMPRE desde el ID (rateId para tours y
+    // a-disposición, category para transporte) para que el chip del segmento aparezca en la
+    // vista pública / PDF, donde el caché de rates no carga (no hay token). El builder admin sí
+    // tiene el caché al guardar, así que getSegmentNameById resuelve el nombre real. Antes solo
+    // transporte seteaba categoryName y además no se persistía (faltaba en el whitelist).
+    {
+      const mainSegmentId = data.rateId || data.category;
+      if (mainSegmentId && (!data.categoryName || data.categoryName === 'Segmento')) {
+        data.categoryName = this.getSegmentNameById(mainSegmentId);
+      }
+    }
+
     return data;
   }
 
@@ -12622,6 +12634,9 @@ class ItineraryBuilder {
             pickupAddressVuelta: subconcept.pickupAddressVuelta || '',
             dropoffAddressVuelta: subconcept.dropoffAddressVuelta || '',
             category: subconcept.category || null,
+            // Segment name/color snapshots so the chip survives edit→re-save sin depender del caché
+            categoryName: subconcept.categoryName || '',
+            categoryColor: subconcept.categoryColor || '',
             transportAdults: subconcept.transportAdults || 0,
             transportChildren: subconcept.transportChildren || 0,
             transportInfants: subconcept.transportInfants || 0,
@@ -12638,6 +12653,7 @@ class ItineraryBuilder {
             additionalVehicleId: subconcept.additionalVehicleId || null,
             additionalVehicleTypeName: subconcept.additionalVehicleTypeName || null,
             additionalVehicleSegmentName: subconcept.additionalVehicleSegmentName || null,
+            additionalVehicleSegmentColor: subconcept.additionalVehicleSegmentColor || null,
             // Round trip fields
             startDate: subconcept.startDate || null,
             endDate: subconcept.endDate || null,
@@ -21163,8 +21179,9 @@ class ItineraryBuilder {
             conceptoPricePerPerson: service.conceptoPricePerPerson !== undefined ? service.conceptoPricePerPerson : null,
             // Persisted user decision to dismiss the overlap warning for this service
             overlapAccepted: service.overlapAccepted || false,
-            // Segment color cache so public/summary view can render the chip without
-            // re-fetching the Rate catalog
+            // Segment name + color cache so public/summary/PDF can render the chip without
+            // re-fetching the Rate catalog (the public/PDF context has no auth token to fetch it).
+            categoryName: service.categoryName || '',
             categoryColor: service.categoryColor || '',
             additionalVehicleSegmentColor: service.additionalVehicleSegmentColor || '',
             // Devbreakdown text snapshots (used in production where the dev panel is hidden
