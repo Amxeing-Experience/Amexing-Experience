@@ -12318,6 +12318,14 @@ class ItineraryBuilder {
     this._aDisposicionBreakdownTotals = null;
     this._walkingTourBreakdownTotals = null;
 
+    // Campos del dev breakdown (texto + precios por forma de pago): son la fuente que espeja
+    // el desglose del cliente, así que si no se limpian se heredan del servicio anterior.
+    ['devBreakdownEfectivo', 'devBreakdownTransferencia', 'devBreakdownTarjeta',
+      'devPriceEfectivo', 'devPriceTransferencia', 'devPriceTarjeta'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+
     // Limpia el desglose visible para que no muestre cálculos del servicio anterior
     // (se vuelve a poblar al recalcular el servicio que se abre).
     if (typeof this.clearServicePriceBreakdown === 'function') this.clearServicePriceBreakdown();
