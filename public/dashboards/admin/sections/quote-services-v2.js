@@ -1948,7 +1948,7 @@ class ItineraryBuilder {
 
         // Update labels to remove asterisk
         if (priceLabel) {
-          priceLabel.innerHTML = 'Precio';
+          priceLabel.innerHTML = 'Precio <small class="text-muted">(efectivo)</small>';
         }
         if (currencyLabel) {
           currencyLabel.innerHTML = 'Moneda';
@@ -1973,7 +1973,7 @@ class ItineraryBuilder {
 
         // Update labels to add asterisk
         if (priceLabel) {
-          priceLabel.innerHTML = 'Precio <span class="text-danger">*</span>';
+          priceLabel.innerHTML = 'Precio <small class="text-muted">(efectivo)</small> <span class="text-danger">*</span>';
         }
         if (currencyLabel) {
           currencyLabel.innerHTML = 'Moneda <span class="text-danger">*</span>';
@@ -1996,7 +1996,7 @@ class ItineraryBuilder {
 
         // Update labels to add asterisk
         if (priceLabel) {
-          priceLabel.innerHTML = 'Precio <span class="text-danger">*</span>';
+          priceLabel.innerHTML = 'Precio <small class="text-muted">(efectivo)</small> <span class="text-danger">*</span>';
         }
         if (currencyLabel) {
           currencyLabel.innerHTML = 'Moneda <span class="text-danger">*</span>';
@@ -2048,7 +2048,7 @@ class ItineraryBuilder {
 
         // Update labels to add asterisk
         if (priceLabel) {
-          priceLabel.innerHTML = 'Precio <span class="text-danger">*</span>';
+          priceLabel.innerHTML = 'Precio <small class="text-muted">(efectivo)</small> <span class="text-danger">*</span>';
         }
         if (currencyLabel) {
           currencyLabel.innerHTML = 'Moneda <span class="text-danger">*</span>';
@@ -2079,7 +2079,7 @@ class ItineraryBuilder {
 
         // Update labels to remove asterisk
         if (priceLabel) {
-          priceLabel.innerHTML = 'Precio';
+          priceLabel.innerHTML = 'Precio <small class="text-muted">(efectivo)</small>';
         }
         if (currencyLabel) {
           currencyLabel.innerHTML = 'Moneda';
@@ -13139,7 +13139,7 @@ class ItineraryBuilder {
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label small text-muted mb-1">Precio</label>
+        <label class="form-label small text-muted mb-1">Precio (efectivo)</label>
         <div class="input-group input-group-sm">
           <span class="input-group-text">$</span>
           <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-price-input" placeholder="0.00">
@@ -17255,9 +17255,11 @@ class ItineraryBuilder {
         tarjeta: 'Tarjeta de Crédito/Débito',
       };
       const paymentLabel = paymentLabels[paymentType] || paymentType;
-
-      // Show price label with selected payment type
-      priceLabel.innerHTML = `Precio base <small class="text-muted">(MXN - ${paymentLabel})</small> <span class="text-danger">*</span>`;
+      // El campo siempre captura el precio en EFECTIVO (base); el recargo por forma de pago
+      // se aplica en el desglose. Antes el label mostraba la forma de pago actual (paymentLabel),
+      // lo que confundía (parecía que el campo cambiaba con la forma de pago).
+      void paymentLabel;
+      priceLabel.innerHTML = 'Precio base <small class="text-muted">(efectivo · MXN)</small> <span class="text-danger">*</span>';
     }
 
     // Update debug price display for development
