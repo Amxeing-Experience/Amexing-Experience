@@ -19,8 +19,8 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
 
 <div class="login-form-container">
     <div class="text-center mb-4">
-        <h2 class="fw-bold text-primary mb-3">Iniciar Sesión</h2>
-        <p class="text-muted">Accede a tu cuenta Amexing</p>
+        <h2 class="login-title mb-2">Iniciar Sesión</h2>
+        <p class="login-subtitle">Accede a tu cuenta Amexing</p>
     </div>
 
     <!-- Error Alert -->
@@ -96,7 +96,7 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
 
         <!-- Forgot Password -->
         <div class="d-flex justify-content-end align-items-center mb-4">
-            <a href="/auth/forgot-password" class="text-primary text-decoration-none">
+            <a href="/auth/forgot-password" class="login-link text-decoration-none">
                 <i class="ti ti-help me-1"></i>¿Olvidaste tu contraseña?
             </a>
         </div>
@@ -111,7 +111,7 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
     <% if (loginOauthProviders && loginOauthProviders.length > 0) { %>
         <div class="auth-divider mb-4">
             <hr class="my-3">
-            <span class="auth-divider-text bg-white px-3 text-muted">O inicia sesión con</span>
+            <span class="auth-divider-text px-3 text-muted">O inicia sesión con</span>
         </div>
 
         <div class="oauth-providers">
@@ -132,7 +132,7 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
         <p class="text-muted mb-0">
             ¿Eres una agencia de viajes?
             <a href="/auth/request-access"
-               class="text-primary text-decoration-none fw-semibold">
+               class="login-link text-decoration-none fw-semibold">
                 Solicitar Acceso como Agencia
             </a>
         </p>
@@ -186,6 +186,30 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
         margin: 0 auto;
     }
 
+    .login-title {
+        font-family: var(--font-arpona), 'Montserrat', serif;
+        font-weight: 500;
+        font-size: 1.85rem;
+        color: #2e2e2d;
+        letter-spacing: 0.2px;
+    }
+
+    .login-subtitle {
+        color: #6b6b66;
+        font-size: 0.95rem;
+        margin-bottom: 0;
+    }
+
+    .login-link {
+        color: #B8860B;
+        font-weight: 500;
+        transition: color 0.2s ease;
+    }
+
+    .login-link:hover {
+        color: #a9790a;
+    }
+
     .auth-divider {
         position: relative;
         text-align: center;
@@ -194,6 +218,7 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
     .auth-divider-text {
         position: relative;
         font-size: 0.875rem;
+        background: #faf9f6;
     }
 
     .oauth-providers .oauth-btn {
@@ -213,9 +238,13 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
     }
 
     .oauth-google:hover {
-        background-color: #4285F4;
+        background-color: #969B81;
         color: white;
-        border-color: #4285F4;
+        border-color: #7f846a;
+    }
+
+    .oauth-providers .oauth-btn:hover {
+        box-shadow: 0 6px 16px rgba(127, 132, 106, 0.30);
     }
 
     .oauth-microsoft:hover {
@@ -225,8 +254,8 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
     }
 
     .form-control:focus {
-        border-color: var(--primary-color, #5d87ff);
-        box-shadow: 0 0 0 0.2rem rgba(93, 135, 255, 0.25);
+        border-color: #DAA520;
+        box-shadow: 0 0 0 0.2rem rgba(218, 165, 32, 0.18);
     }
 
     .input-group .form-control:focus {
@@ -268,15 +297,15 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
     }
 
     #togglePassword:hover {
-        background: rgba(102, 126, 234, 0.1) !important;
-        color: #667eea !important;
-        border-color: #667eea !important;
+        background: rgba(218, 165, 32, 0.12) !important;
+        color: #B8860B !important;
+        border-color: #DAA520 !important;
     }
 
     #togglePassword:hover #togglePasswordIcon,
     #togglePassword:hover i.ti-eye,
     #togglePassword:hover i.ti-eye-off {
-        color: #667eea !important;
+        color: #B8860B !important;
     }
 
     /* Ensure the icon pseudo-element is visible with correct unicode */
@@ -311,13 +340,13 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
     }
 
     #togglePassword:focus {
-        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(218, 165, 32, 0.22);
+        border-color: #DAA520;
         outline: none;
     }
 
     #togglePassword:active {
-        background: rgba(102, 126, 234, 0.15);
+        background: rgba(218, 165, 32, 0.16);
         transform: scale(0.98);
     }
     

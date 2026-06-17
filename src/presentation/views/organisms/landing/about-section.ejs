@@ -127,6 +127,7 @@ Created by Denisse Maldonado
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    aspect-ratio: 8 / 9;
 }
 
 .mvv-section__card--values {
@@ -172,7 +173,7 @@ Created by Denisse Maldonado
 }
 
 .mvv-section__title {
-    font-family: var(--font-arpona);
+    font-family: var(--font-newsreader);
     font-size: 3rem;
     font-weight: 300;
     color: #ffffff;
@@ -190,6 +191,7 @@ Created by Denisse Maldonado
 
 .mvv-section__text {
     font-family: var(--font-myriad);
+    font-weight: 300;
     font-size: 1.05rem;
     line-height: 1.8;
     color: rgba(255, 255, 255, 0.85);
@@ -207,7 +209,7 @@ Created by Denisse Maldonado
 }
 
 .mvv-section__value-title {
-    font-family: var(--font-myriad);
+    font-family: var(--font-newsreader);
     font-size: 1.3rem;
     font-weight: 500;
     color: #ffffff;
@@ -225,6 +227,7 @@ Created by Denisse Maldonado
 
 .mvv-section__value-text {
     font-family: var(--font-myriad);
+    font-weight: 300;
     font-size: 1rem;
     color: rgba(255, 255, 255, 0.8);
     line-height: 1.6;
@@ -263,7 +266,12 @@ Created by Denisse Maldonado
         padding: 3rem 2rem;
         min-height: auto;
     }
-    
+
+    .mvv-section__card--mission,
+    .mvv-section__card--vision {
+        aspect-ratio: auto;
+    }
+
     .mvv-section__card--values {
         padding: 3rem 2rem;
     }
