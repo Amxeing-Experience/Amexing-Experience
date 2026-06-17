@@ -945,33 +945,6 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <span class="input-group-text">MXN</span>
                             </div>
                             
-                            <!-- Development Mode: Payment Type Prices Display -->
-                            <div id="devPaymentPrices" class="d-none mt-3">
-                                <div class="row g-2">
-                                    <div class="col-md-4">
-                                        <label class="form-label text-muted small">💰 Precio Efectivo (base)</label>
-                                        <div class="input-group input-group-sm">
-                                            <span class="input-group-text">$</span>
-                                            <input type="text" class="form-control" id="devPriceEfectivo" readonly>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label text-muted small">🏦 Precio Transferencia</label>
-                                        <div class="input-group input-group-sm">
-                                            <span class="input-group-text">$</span>
-                                            <input type="text" class="form-control" id="devPriceTransferencia" readonly>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label text-muted small">💳 Precio Tarjeta</label>
-                                        <div class="input-group input-group-sm">
-                                            <span class="input-group-text">$</span>
-                                            <input type="text" class="form-control" id="devPriceTarjeta" readonly>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
                             <!-- Tour Vehicle Price Override Toggle (Admin Only) -->
                             <% if (canEditPrices) { %>
                             <div class="form-check mt-2 d-none" id="tourVehicleOverridePricesContainer">
