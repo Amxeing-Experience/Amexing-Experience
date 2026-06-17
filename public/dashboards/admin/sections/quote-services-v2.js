@@ -7646,7 +7646,14 @@ class ItineraryBuilder {
   }
 
   renderDayCard(day) {
-    const services = day.services.map((sid) => this.services.get(sid)).filter(Boolean);
+    // Ordena por horario (ascendente). No hay reorden manual de servicios, así que el orden
+    // siempre es cronológico; ordenar aquí garantiza el orden correcto sin depender de cuándo
+    // se haya ordenado day.services por última vez.
+    const services = day.services
+      .map((sid) => this.services.get(sid))
+      .filter(Boolean)
+      .sort((a, b) => this.parseTimeForSorting(a.selectedSchedule || a.startTime || '')
+        - this.parseTimeForSorting(b.selectedSchedule || b.startTime || ''));
     const dayTotalMXN = services.reduce((sum, service) => {
       if (service.includeInTotal === false) return sum;
 
@@ -21022,6 +21029,9 @@ class ItineraryBuilder {
       days: this.days.map((day, index) => {
         // Calculate day total from services (using display prices)
         let dayTotal = 0;
+        // Ordena los servicios por horario (ascendente) para que el resumen/PDF reflejen el
+        // mismo orden cronológico que el builder.
+        day.services = this.sortServicesByTime(day.services);
         const subconcepts = day.services.map((serviceId) => {
           const service = this.services.get(serviceId);
           if (!service) return null;
