@@ -19635,22 +19635,14 @@ class ItineraryBuilder {
     // Find all labels that say "Precios por Grupo"
     const labels = document.querySelectorAll('label.form-label');
 
-    // Map payment types to display names
-    const paymentTypeDisplay = {
-      efectivo: 'Efectivo',
-      transferencia: 'Transferencia',
-      tarjeta: 'Tarjeta',
-    };
-
-    const displayType = paymentTypeDisplay[paymentType] || 'Efectivo';
-
     labels.forEach((label) => {
       // Check if this is a "Precios por Grupo" label
       if (label.textContent.includes('Precios por Grupo')) {
-        // Remove any existing payment type in parentheses
+        // Los precios por grupo se capturan en EFECTIVO (base); el recargo va en el desglose.
+        // Siempre etiquetar "(efectivo)" en small text, sin importar la forma de pago.
         const baseText = label.textContent.replace(/\s*\([^)]*\)\s*$/, '');
         if (baseText === 'Precios por Grupo') {
-          label.textContent = `Precios por Grupo (${displayType})`;
+          label.innerHTML = 'Precios por Grupo <small class="text-muted">(efectivo)</small>';
         }
       }
     });
