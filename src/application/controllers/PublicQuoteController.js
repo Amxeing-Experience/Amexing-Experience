@@ -108,7 +108,7 @@ class PublicQuoteController {
       const pdfBuffer = await renderUrlToPdf(url);
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="Cotizacion_${folio}.pdf"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${folio}.pdf"`);
       return res.end(pdfBuffer);
     } catch (error) {
       logger.error('Failed to render quote PDF', {
