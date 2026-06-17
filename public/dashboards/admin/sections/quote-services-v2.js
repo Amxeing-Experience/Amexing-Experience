@@ -5724,7 +5724,8 @@ class ItineraryBuilder {
           }
           document.getElementById('roundTripDateIda').value = service.startDate || '';
           document.getElementById('roundTripTimeIda').value = service.startTime || '';
-          if (service.roundTripDepartureTimeSuggestedIda) document.getElementById('roundTripDepartureTimeSuggestedIda').value = service.roundTripDepartureTimeSuggestedIda;
+          // Campo "hora de salida sugerida" del ida (llegada) removido del modal; restaurar solo si existe.
+          { const idaSug = document.getElementById('roundTripDepartureTimeSuggestedIda'); if (idaSug && service.roundTripDepartureTimeSuggestedIda) idaSug.value = service.roundTripDepartureTimeSuggestedIda; }
 
           // Vuelta origin
           const vueltaOriginCombo = document.getElementById('roundTripOriginVueltaCombo');
