@@ -12853,10 +12853,13 @@ class ItineraryBuilder {
             continue; // Skip conflict - same destination allows overlapping activities
           }
 
-          // Transport ↔ transport overlaps are expected (e.g. ida + vuelta windows,
-          // round-trip pairs, suggested-departure buffers) and shouldn't surface a
-          // warning since the operator coordinates them as a single leg.
-          if (serviceA.type === 'transport' && serviceB.type === 'transport') {
+          // No mostrar conflictos de horario cuando intervienen transporte o concepto:
+          // el transporte lo coordina el operador (ida/vuelta, ventanas, buffers de salida
+          // sugerida) y el concepto es un ítem informativo. Si cualquiera de los dos servicios
+          // es transporte o concepto, no se marca el overlap (ni en él ni en el otro por esta
+          // pareja); los conflictos siguen aplicando entre tours/experiencias/a-disposición.
+          const noOverlapTypes = ['transport', 'concepto'];
+          if (noOverlapTypes.includes(serviceA.type) || noOverlapTypes.includes(serviceB.type)) {
             continue;
           }
 
