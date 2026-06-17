@@ -241,6 +241,11 @@ class ProviderExperienciaController {
           duration: exp.get('duration'),
           min_people: exp.get('min_people'),
           max_people: exp.get('max_people'),
+          cancellation_policy: exp.get('cancellation_policy') || null,
+          buyout: exp.get('buyout') ?? null,
+          private_min_type: exp.get('private_min_type') || null,
+          private_min_value: exp.get('private_min_value') ?? null,
+          fixed_schedule: exp.get('fixed_schedule') === true,
           availability: exp.get('availability') || null,
           active: exp.get('active'),
 
@@ -482,6 +487,11 @@ class ProviderExperienciaController {
         travel_duration: travelDuration,
         min_people: minPeople,
         max_people: maxPeople,
+        cancellation_policy: cancellationPolicy,
+        buyout,
+        private_min_type: privateMinType,
+        private_min_value: privateMinValue,
+        fixed_schedule: fixedSchedule,
         displayOrder,
         tipo,
         availability,
@@ -562,6 +572,21 @@ class ProviderExperienciaController {
       }
       if (maxPeople !== undefined && maxPeople !== null) {
         experiencia.setMaxPeople(maxPeople);
+      }
+      if (cancellationPolicy !== undefined) {
+        experiencia.setCancellationPolicy(cancellationPolicy);
+      }
+      if (buyout !== undefined) {
+        experiencia.setBuyout(buyout);
+      }
+      if (privateMinType !== undefined) {
+        experiencia.setPrivateMinType(privateMinType);
+      }
+      if (privateMinValue !== undefined) {
+        experiencia.setPrivateMinValue(privateMinValue);
+      }
+      if (fixedSchedule !== undefined) {
+        experiencia.setFixedSchedule(fixedSchedule);
       }
       if (displayOrder !== undefined && displayOrder !== null) {
         experiencia.setDisplayOrder(displayOrder);
@@ -681,6 +706,11 @@ class ProviderExperienciaController {
         travel_duration: travelDuration,
         min_people: minPeople,
         max_people: maxPeople,
+        cancellation_policy: cancellationPolicy,
+        buyout,
+        private_min_type: privateMinType,
+        private_min_value: privateMinValue,
+        fixed_schedule: fixedSchedule,
         displayOrder,
         active,
         tipo,
@@ -752,8 +782,13 @@ class ProviderExperienciaController {
       }
       if (minPeople !== undefined) experiencia.setMinPeople(minPeople);
       if (maxPeople !== undefined) experiencia.setMaxPeople(maxPeople);
+      if (cancellationPolicy !== undefined) experiencia.setCancellationPolicy(cancellationPolicy);
+      if (buyout !== undefined) experiencia.setBuyout(buyout);
+      if (privateMinType !== undefined) experiencia.setPrivateMinType(privateMinType);
+      if (privateMinValue !== undefined) experiencia.setPrivateMinValue(privateMinValue);
+      if (fixedSchedule !== undefined) experiencia.setFixedSchedule(fixedSchedule);
       if (displayOrder !== undefined) experiencia.setDisplayOrder(displayOrder);
-      if (active !== undefined) experiencia.setActive(active);
+      if (active !== undefined) experiencia.set('active', active); // setActive() no existe en el modelo
       if (availability !== undefined) experiencia.setAvailability(availability);
 
       // Update includes, languages, notincludes, advance booking time, and photos fields
@@ -962,15 +997,16 @@ class ProviderExperienciaController {
         return this.sendError(res, 'Experiencia does not belong to this provider/establishment', 403);
       }
 
-      // Soft delete
-      experiencia.setExists(false);
-      experiencia.setActive(false);
+      // Soft delete (set() — antes usaba setExists()/setActive() que NO existen en
+      // el objeto Parse → lanzaba TypeError → 500 "Failed to delete experiencia").
+      experiencia.set('exists', false);
+      experiencia.set('active', false);
       await experiencia.save(null, { useMasterKey: true });
 
       logger.info('Provider experiencia deleted', {
         providerId,
         experienciaId: id,
-        name: experiencia.getName(),
+        name: experiencia.get('name'),
         userId: req.user.id,
       });
 
@@ -1327,6 +1363,11 @@ class ProviderExperienciaController {
       travel_duration: experiencia.get('travel_duration') || null,
       min_people: experiencia.getMinPeople(),
       max_people: experiencia.getMaxPeople(),
+      cancellation_policy: experiencia.getCancellationPolicy(),
+      buyout: experiencia.getBuyout(),
+      private_min_type: experiencia.getPrivateMinType(),
+      private_min_value: experiencia.getPrivateMinValue(),
+      fixed_schedule: experiencia.getFixedSchedule(),
       includes: experiencia.get('includes') || [],
       languages: experiencia.get('languages') || [],
       notincludes: experiencia.get('notincludes') || [],
