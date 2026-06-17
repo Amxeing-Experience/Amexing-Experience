@@ -1,0 +1,881 @@
+"Epic","ID","Rol","Historia","Reglas de negocio","Estado","Trazabilidad","Tests","Notas"
+"COTIZACIÓN","HU-001","Admin","Como administrador quiero que cada cotización avance por estados definidos para controlar su ciclo de vida","• Estados: COTIZADO → SOLICITADO → BLOQUEADO → AGENDADO/RECHAZADO
+• Estado por defecto al crear: COTIZADO (quoted)
+• Convertir a reservación cambia a SOLICITADO","✅ En producción","Quote.getStatus/setStatus (src/domain/models/Quote.js) · POST /api/quotes/:id/convert-to-reservation","","Estado sugerido — confirmar"
+"COTIZACIÓN","HU-002","Admin","Como administrador quiero crear, editar y duplicar cotizaciones para gestionar ofertas","• Crear genera folio QTE-YYYY-####
+• Duplicar incrementa ""Opción X"" en eventType, copia serviceItems y pone validUntil = hoy+30 días
+• Metadata e itinerario se editan por separado","✅ En producción","QuoteController.createQuote/duplicateQuote · POST /api/quotes · POST /api/quotes/:id/duplicate · PUT /api/quotes/:id · PUT /api/quotes/:id/service-items","tests/integration/api/quotes-duplicate.test.js","Verificado con test"
+"COTIZACIÓN","HU-003","Admin","Como administrador quiero asignar y transferir la propiedad de una cotización para gestionar responsables","• Cada cotización tiene exactamente un propietario actual (isCurrent)
+• Transferencia crea registro histórico con razón y timestamp
+• Al transferir se desactiva la colaboración del propietario anterior","✅ En producción","QuoteOwnership.createInitialOwnership/transferOwnership · POST /api/quotes/:quoteId/ownership/transfer · GET /api/quotes/:quoteId/ownership/history","","Estado sugerido — confirmar"
+"COTIZACIÓN","HU-004","Admin","Como propietario de una cotización quiero gestionar colaboradores y aprobar sus ediciones para controlar cambios","• Solo el propietario agrega/quita/cambia rol de colaboradores
+• Si collaborationEnabled y requireApproval, las ediciones de no-propietarios requieren aprobación
+• Ediciones quedan pendientes/aprobadas/rechazadas","✅ En producción","QuoteCollaborationController · POST/DELETE/PUT /api/quotes/:quoteId/collaborators · POST /api/quotes/:quoteId/edits/:editId/approve|reject","","Estado sugerido — confirmar"
+"COTIZACIÓN","HU-005","Usuario","Como usuario con acceso quiero ver el historial de cambios de una cotización para dar seguimiento","• Registro de ediciones (quién, qué, cuándo)
+• Visible para usuarios con acceso","🟡 En progreso","QuoteEdit (src/domain/models/QuoteEdit.js) · GET /api/quotes/:quoteId/edits","","La hoja pide ""visualizar de manera más sencilla"" — mejora pendiente"
+"COTIZACIÓN","HU-006","Admin","Como administrador quiero recordatorios automáticos según el estatus para no perder seguimiento","• Recordatorios en cotizaciones COTIZADO
+• 3 tipos: initial/follow_up/final
+• Intervalo 5 días por defecto (config 1-30)
+• Máx 6 recordatorios
+• isDue: pending + active + nextReminderDate<=now","✅ En producción","QuoteReminder.isDue/scheduleNextReminder (src/domain/models/QuoteReminder.js)","","Estado sugerido — confirmar"
+"COTIZACIÓN","HU-007","Sistema","Como sistema quiero limitar qué cotizaciones ve cada rol para proteger la información","• Agentes solo ven las que crearon o donde son propietario/editor
+• Gerentes ven todas donde la agencia es el cliente
+• Administrador ve/edita todas","✅ En producción","quotesRoutes.js (middleware de roles) · GET /api/quotes · GET /api/quotes/owned","","Estado sugerido — confirmar"
+"COTIZACIÓN","HU-008","Admin","Como administrador quiero compartir la cotización por link público y correo para enviarla al cliente","• Genera URL pública
+• Enviar por correo precarga emails de contacto, lead guest y propietario","✅ En producción","QuoteController.generateShareLink/sendEmail · POST /api/quotes/:id/share-link · POST /api/quotes/:id/send-email · PublicQuoteController.preparePublicQuoteData","","Estado sugerido — confirmar"
+"COTIZACIÓN","HU-009","Admin","Como administrador quiero convertir una cotización en reservación cuando se confirma","• Crea Reservation a partir de la cotización
+• Cambia el estatus según el flujo (SOLICITADO/AGENDADO)","✅ En producción","QuoteController.convertToReservation · POST /api/quotes/:id/convert-to-reservation","","Estado sugerido — confirmar"
+"COTIZACIÓN","HU-010","Admin","Como administrador quiero generar recibo y solicitar factura de una cotización agendada","• Recibo y solicitud de factura solo para cotización agendada
+• Recibo se ajusta al diseño compartido","✅ En producción","QuoteController.generateReceipt/requestInvoice · POST /api/quotes/:id/generate-receipt · POST /api/quotes/:id/request-invoice","","Estado sugerido — confirmar"
+"PRECIOS Y TARIFAS","HU-011","Admin","Como administrador quiero gestionar el catálogo base de tarifas para aplicarlas a servicios, tours y vehículos","• Cada tarifa: name, percentage (0-100%), color, active, exists
+• Markup/descuento sobre precios base
+• valid_until=null indica vigente
+• Soft delete (exists=false) preserva historial
+• Escritura: Admin (nivel 6+)","✅ En producción","RateController.getRates/createRate/updateRate/toggleStatus/deleteRate · GET/POST/PUT/DELETE /api/rates · src/domain/models/Rate.js","tests/integration/api/services-rate-filter.test.js","Verificado con test"
+"PRECIOS Y TARIFAS","HU-012","Admin","Como administrador quiero gestionar precios base de servicios por tarifa, POI origen/destino y tipo de vehículo","• RatePrices = (rate + service + originPOI + destinationPOI + vehicleType) → precio
+• Unique (ratePtr, tourPtr, vehicleType)
+• active/exists = ciclo de vida","✅ En producción","src/domain/models/RatePrices.js","tests/integration/seeds/rateprices-seed.test.js","Verificado con test (621 registros seed)"
+"PRECIOS Y TARIFAS","HU-013","Admin","Como administrador quiero gestionar precios específicos de tour por tarifa y tipo de vehículo","• TourPrices = (ratePtr + tourPtr + vehicleType) → precio
+• currency default MXN
+• valid_until=null vigente; update versiona con valid_until=hoy","✅ En producción","src/domain/models/TourPrices.js · GET /api/tour-prices · GET /api/tour-prices/by-tour/:tourId","tests/integration/api/vehicles-with-rates.test.js","Verificado con test"
+"PRECIOS Y TARIFAS","HU-014","Admin","Como administrador quiero gestionar precios personalizados por cliente que sobrescriban el tarifario base","• ClientPrices = (clientPtr + ratePtr + vehiclePtr + itemType + itemId) → precio
+• itemType: SERVICES/TOURS/EXPERIENCES
+• Precio cliente tiene prioridad sobre tarifario base
+• Versionado: valid_until=null activo; update cierra con hoy 23:59:59","✅ En producción","ClientPrices.saveClientPrices (src/domain/models/ClientPrices.js) · GET /api/client-prices · GET /api/client-prices/by-tour/:tourId","tests/integration/seeds/clientprices-seed.test.js","Verificado con test"
+"PRECIOS Y TARIFAS","HU-015","Admin","Como administrador quiero gestionar precios de vehículo por tarifa con historial completo","• VehicleRatePrices = (rateId + vehicleTypeId) → precio con valid_from/until
+• getCurrentPrice (sin valid_until)
+• getPriceAtDate (válido para fecha)
+• createNewPrice cierra actual y crea nuevo
+• Audit: created_by, reason_for_change","✅ En producción","src/domain/models/VehicleRatePrices.js · GET /api/vehicle-rate-prices/current|by-rate|at-date|history · POST /api/vehicle-rate-prices/update|bulk-update","tests/integration/api/vehicles-with-rates.test.js","Verificado con test"
+"PRECIOS Y TARIFAS","HU-016","Admin","Como administrador quiero gestionar precios por hora para A-Disposición (renta por hora) por vehículo","• DisposablePrices = (vehicleType + rate) → hourlyPrice versionado
+• currency default MXN
+• effectiveDate/endDate (null=vigente)
+• isCurrentlyEffective
+• Descuentos por volumen según horas/vehículos","✅ En producción","src/domain/models/DisposablePrices.js · GET /api/disposable-prices · /by-vehicle-type · /vehicle/:id · /history/:id · PUT /api/disposable-prices/batch-update","","Estado sugerido — confirmar (sin test)"
+"PRECIOS Y TARIFAS","HU-017","Admin","Como administrador quiero gestionar el tipo de cambio USD→MXN para conversión de precios","• ExchangeRate.value (ej. 18.50)
+• getCurrentExchangeRate: active+exists, más reciente
+• getCurrentValue con fallback 18.5
+• Crear nuevo desactiva el anterior (historial)
+• Lectura nivel 2+; escritura nivel 6+","✅ En producción","ExchangeRateController.getCurrent/getHistory/create · GET /api/exchange-rate/current|history · POST /api/exchange-rate · src/domain/models/ExchangeRate.js","","Estado sugerido — confirmar (sin test)"
+"PRECIOS Y TARIFAS","HU-018","Admin","Como administrador quiero gestionar el porcentaje de inflación para ajuste de precios","• InflationRate.value (% ej. 3.5)
+• getCurrentInflationRate: active+exists
+• Crear nuevo desactiva el anterior
+• Historial con createdBy/description
+• Solo Admin (6+)","✅ En producción","InflationRateController.getCurrent/getHistory/create · GET /api/inflation-rate/current|history · POST /api/inflation-rate · src/domain/models/InflationRate.js","","Estado sugerido — confirmar (sin test)"
+"PRECIOS Y TARIFAS","HU-019","Admin","Como administrador quiero gestionar el porcentaje de comisión de agencia para el cálculo de costos","• AgencyRate.value (% ej. 10)
+• getCurrentAgencyRate: active+exists
+• costo total = precio × (1 + agencyRate%)
+• Crear nuevo desactiva el anterior
+• Lectura 2+; escritura 6+","✅ En producción","AgencyRateController.getCurrent/getHistory/create · GET /api/agency-rate/current|history · POST /api/agency-rate · src/domain/models/AgencyRate.js","","Estado sugerido — confirmar (sin test)"
+"PRECIOS Y TARIFAS","HU-020","Admin","Como administrador quiero gestionar la comisión de transferencia para el cobro de pagos","• TransferRate.value (% 0.01–50.00) con validación de rango
+• getCurrentTransferRate: active+exists
+• Crear nuevo desactiva el anterior
+• createdBy + description (razón)","✅ En producción","TransferRateController.getCurrent/getHistory/create · GET /api/transfer-rate/current|history · POST /api/transfer-rate · src/domain/models/TransferRate.js","","Estado sugerido — confirmar (sin test)"
+"PRECIOS Y TARIFAS","HU-021","Admin","Como administrador quiero gestionar la tarifa de pago al conductor por tour","• DriverTourRate.value
+• getCurrentDriverTourRate: active+exists
+• Crear nuevo desactiva el anterior
+• Historial createdBy/description
+• Lectura 2+; escritura 6+","✅ En producción","DriverTourRateController.getCurrent/getHistory/create · GET /api/driver-tour-rate/current|history · POST /api/driver-tour-rate · src/domain/models/DriverTourRate.js","","Estado sugerido — confirmar (sin test)"
+"PRECIOS Y TARIFAS","HU-022","Admin","Como administrador quiero gestionar la tarifa de transporte del guía turístico","• GuideTransportRate.value
+• getCurrentGuideTransportRate: active+exists, auto-creación fallback
+• Crear nuevo desactiva el anterior
+• Historial createdBy","✅ En producción","GuideTransportRateController.getCurrent/getHistory/create · GET /api/guide-transport-rate/current|history · POST /api/guide-transport-rate · src/domain/models/GuideTransportRate.js","","La hoja pide revisar la fórmula de greeter/guía"
+"PRECIOS Y TARIFAS","HU-023","Admin","Como administrador quiero gestionar la tarifa de recibimiento (greeter) con fórmula y simulación","• GreeterRate.value + configuración de fórmula y simulación
+• getCurrentGreeterRate: active+exists, auto-creación fallback
+• Crear nuevo desactiva el anterior","✅ En producción","GreeterRateController.getCurrent/getHistory/create · GET /api/greeter-rate/current|history · POST /api/greeter-rate · src/domain/models/GreeterRate.js","","La hoja pide revisar la fórmula de greeter/guía"
+"PRECIOS Y TARIFAS","HU-024","Admin","Como administrador quiero gestionar ajustes manuales de precio para overrides puntuales","• PriceAdjustments.type: exchange_rate/inflation/agency/transfer
+• Cada tipo con historial y ""current"" (active=true)
+• Crear nuevo desactiva el anterior
+• value + currency (MXN/USD/EUR) + effectiveDate + note
+• Solo Admin (6+)","✅ En producción","PriceAdjustmentsController.getAllCurrent/getHistory/getCurrentAdjustment/createAdjustment · GET/POST /api/price-adjustments/:type · src/domain/models/PriceAdjustments.js","","Estado sugerido — confirmar (sin test)"
+"PRECIOS Y TARIFAS","HU-025","Admin","Como administrador quiero aplicar markup masivo a los precios de un cliente para actualizar tarifas en bloque","• bulkApplyPricing(client, markup%) cierra activos (until=hoy) y crea nuevos = basePrice × (1+markup/100)
+• Variante con progreso por processId (polling)
+• Audit: createdBy/lastModifiedBy
+• Solo Admin (6+)","✅ En producción","ClientPricesController.bulkApplyPricing/applyServicesPricing/getProgressUpdates · POST /api/client-prices/bulk-apply · /bulk-apply-with-progress · GET /api/client-prices/pricing-progress/:processId","","Estado sugerido — confirmar (sin test)"
+"PRECIOS Y TARIFAS","HU-026","Sistema","Como sistema quiero aplicar tipo de cambio, inflación y comisiones en el cálculo del precio final","• Orden: exchange → inflation → agency/transfer
+• USD→MXN = precio × getCurrentValue()
+• inflación: base × (1+rate/100)
+• agencia: total × (1+agencyRate/100)
+• Redondeo a 2 decimales (Math.round(x*100)/100)
+• Currencies MXN(default)/USD/EUR","✅ En producción","ExchangeRate.getCurrentValue · InflationRate.getValue · AgencyRate.getValue · TransferRate.getValue · ClientPrices.getFormattedPrice (Intl.NumberFormat)","","La hoja reporta ""arreglar cálculo de dólares al cambiar moneda"" — verificar"
+"RESERVACIÓN","HU-027","Admin","Como administrador quiero listar todas las reservaciones con filtros por estado, fecha y búsqueda","• Paginación DataTables (draw/start/length)
+• Filtros: status, periodo (upcoming/ongoing/past), año/mes/día
+• Búsqueda por folio, cliente, eventType
+• Roles: admin/superadmin ven todas; gerente su depto; cliente su organización","✅ En producción","ReservationController.getReservations · GET /api/reservations","tests/integration/api/reservations.test.js","Verificado con test"
+"RESERVACIÓN","HU-028","Agente","Como agente quiero ver el detalle completo de una reservación para revisar servicios, asignaciones y totales","• Retorna Quote, cliente, ReservationService[] y asignaciones
+• Total = subtotal servicios + cargos − descuentos (2 decimales)
+• Snapshots preservan datos si el cliente no está disponible","✅ En producción","ReservationController.getReservationById · GET /api/reservations/:id","tests/integration/api/reservations.test.js","Verificado con test"
+"RESERVACIÓN","HU-029","Gerente","Como gerente de operaciones quiero asignar chofer, guía, greeter y vehículo a un servicio","• Params: driverId, guideId, greeterId, vehicleId, serviceCustomerId, extraAssignments
+• Auto-transición pending → assigned al asignar chofer
+• extraAssignments permite múltiples vehículos por servicio","✅ En producción","ReservationController.assignEmployee · PUT /api/reservations/:id/services/:serviceId/assign","tests/integration/api/reservations.test.js","Verificado con test"
+"RESERVACIÓN","HU-030","Admin","Como administrador quiero asignar empleados a múltiples servicios en lote","• Array [{serviceId, driverId, …}]
+• Aplica las reglas de asignación individual a cada uno
+• Registra la cantidad procesada","✅ En producción","ReservationController.batchAssignEmployees · PUT /api/reservations/:id/services/batch-assign","tests/integration/api/reservations.test.js","Verificado con test"
+"RESERVACIÓN","HU-031","Gerente","Como jefe de operaciones quiero asignar un responsable de seguimiento a nivel reservación","• serviceCustomerId (AmexingUser); se quita si se omite
+• Esa persona recibe notificaciones de progreso
+• Rol: gerente+","✅ En producción","ReservationController.assignServiceCustomer · PUT /api/reservations/:id/service-customer","tests/integration/api/reservations.test.js","Verificado con test"
+"RESERVACIÓN","HU-032","Admin","Como administrador quiero actualizar el estado de cada servicio de la reservación","• Estados válidos: pending/assigned/completed/cancelled
+• Rechaza valor inválido (400)
+• Log userId + timestamp
+• Soft-delete preserva auditoría","✅ En producción","ReservationController.updateServiceStatus · PATCH /api/reservations/:id/services/:serviceId/status","tests/integration/api/reservations.test.js","Verificado con test"
+"RESERVACIÓN","HU-033","Admin","Como administrador quiero agregar cargos o descuentos para ajustar el precio final","• Type charge|discount
+• Valida amount>0 o percentage 0-100
+• Total = subtotal + cargos − descuentos (2 decimales)
+• Solo admin/superadmin, con auditoría","✅ En producción","ReservationController.addAdjustment · POST /api/reservations/:id/adjustments","tests/integration/api/reservations.test.js","Verificado con test"
+"RESERVACIÓN","HU-034","Admin","Como administrador quiero remover un cargo/descuento aplicado","• Valida pertenencia
+• Recalcula el total
+• Solo admin/superadmin
+• Log de la eliminación","✅ En producción","ReservationController.removeAdjustment · DELETE /api/reservations/:id/adjustments/:adjustmentId","tests/integration/api/reservations.test.js","Verificado con test"
+"RESERVACIÓN","HU-035","Gerente","Como gerente quiero ver la reservación en formato público por folio para compartirla","• GET por folio sin autenticación
+• Formato: cliente, servicios[], precios con IVA
+• Snapshots preservan datos","✅ En producción","PublicReservationController.getPublicReservation · GET /public/reservations/:folio","","Estado sugerido — confirmar"
+"RESERVACIÓN","HU-036","Cliente","Como cliente quiero exportar la reservación a PDF para archivarla","• PDF vía Chrome headless (puppeteer) desde la URL pública
+• Formato carta, márgenes 10mm
+• Incluye logo, cliente, servicios, precios
+• URLs S3 prefirmadas; timeout 45s","✅ En producción","PdfRenderService.renderUrlToPdf","","Estado sugerido — confirmar"
+"RESERVACIÓN","HU-037","Agente","Como agente quiero cancelar una reservación con motivo documentado","• reason requerido
+• Estado → cancelled
+• Guarda motivo + timestamp
+• Rol gerente+; soft-delete","✅ En producción","ReservationController.cancelReservation · POST /api/reservations/:id/cancel","tests/integration/api/reservations.test.js","Verificado con test"
+"RESERVACIÓN","HU-038","Sistema","Como sistema quiero vincular cada reservación con su cotización origen","• Reservation.quotePtr → Quote
+• Se crea al confirmar (Agendado) copiando numberOfPeople, eventType, fechas, nombres de huésped y notas
+• Snapshot de subconcepts como fallback","✅ En producción","Reservation.js / ReservationService.js","tests/integration/api/reservations.test.js","Verificado con test"
+"VEHÍCULOS Y FLOTA","HU-039","Admin","Como administrador quiero crear un vehículo para agregar inventario a la flota","• Requeridos: brand, model, year, licensePlate, vehicleTypeId, capacity, color, maintenanceStatus
+• licensePlate único (case-insensitive); VIN opcional pero único (17 chars, sin I/O/Q)
+• year 1990–próximo; capacity 1-100
+• maintenanceStatus: operational/maintenance/repair/out_of_service
+• Rate opcional solo si está activa","✅ En producción","VehicleController.createVehicle · POST /api/vehicles","","Estado sugerido — confirmar"
+"VEHÍCULOS Y FLOTA","HU-040","Admin","Como administrador quiero editar los atributos de un vehículo","• Actualiza marca/modelo/año/placa/VIN/tipo/rate/capacidad/maletas/color/maintenanceStatus/insuranceExpiry/active
+• Revalida unicidad de placa/VIN
+• Verifica que VehicleType exista y Rate esté activa
+• insuranceExpiry normalizado a fin de día UTC","✅ En producción","VehicleController.updateVehicle · PUT /api/vehicles/:id","","Estado sugerido — confirmar"
+"VEHÍCULOS Y FLOTA","HU-041","Admin","Como administrador quiero listar vehículos con filtro y paginación para gestionar la flota","• DataTables server-side (búsqueda marca/modelo/placa, orden)
+• Filtro por rateId
+• Solo exists=true
+• Incluye VehicleType e imagen principal (batch para evitar N+1)
+• URLs S3 prefirmadas con prioridad optimizadas>original>legacy","✅ En producción","VehicleController.getVehicles · GET /api/vehicles","tests/integration/api/vehicle-filtering.test.js","Verificado con test"
+"VEHÍCULOS Y FLOTA","HU-042","Admin","Como administrador quiero ver el detalle de un vehículo para editarlo","• Todos los campos + VehicleType + imagen principal
+• insuranceExpiry como YYYY-MM-DD
+• Fallback de imagen: optimizadas>originalS3>Parse.File>url legacy","✅ En producción","VehicleController.getVehicleById · GET /api/vehicles/:id","","Estado sugerido — confirmar"
+"VEHÍCULOS Y FLOTA","HU-043","Admin","Como administrador quiero eliminar un vehículo del sistema","• Soft delete (exists=false, active=false) preserva auditoría
+• Log de quién y cuándo","🟡 En progreso","VehicleController.deleteVehicle · DELETE /api/vehicles/:id","","TODO en código: validar que el vehículo no tenga traslados/bookings activos antes de eliminar"
+"VEHÍCULOS Y FLOTA","HU-044","Admin","Como administrador quiero gestionar tipos de vehículo para clasificar la flota","• CRUD + toggle activo
+• name y code requeridos; code único, lowercase, [a-z0-9_-]
+• defaultCapacity 1-100, trunkCapacity 0-50, sortOrder≥0, icon Tabler
+• Soft-delete valida que ningún vehículo use el tipo
+• Seeding: Sedan/SUV/Van/Bus/Limousine","✅ En producción","VehicleTypeController (CRUD/toggleVehicleTypeStatus) · /api/vehicle-types","tests/unit/controllers/api/VehicleTypeController.test.js","Verificado con test"
+"VEHÍCULOS Y FLOTA","HU-045","Admin","Como administrador quiero obtener los tipos de vehículo activos para formularios y dropdowns","• Solo active=true
+• Formato {value,label,code,capacity,trunkCapacity,icon} ordenado por sortOrder
+• Requiere solo autenticación básica","✅ En producción","VehicleTypeController.getActiveVehicleTypes · GET /api/vehicle-types/active","","Estado sugerido — confirmar"
+"VEHÍCULOS Y FLOTA","HU-046","Admin","Como administrador quiero subir imágenes de vehículos a S3 y gestionar la galería","• Upload multipart (JPEG/PNG/WEBP, máx 250MB)
+• Optimización server-side a AVIF/WebP/JPEG
+• Almacena en S3 (s3Key/bucket/region/variants)
+• Primera imagen = principal
+• Batch hasta 10 archivos","✅ En producción","VehicleImageController.uploadImage/listImages · POST /api/vehicles/:id/images","tests/integration/api/vehicle-images-s3.test.js","Test marcado skip (requiere AWS real)"
+"VEHÍCULOS Y FLOTA","HU-047","Admin","Como administrador quiero ordenar y administrar la galería de imágenes de un vehículo","• Reordenar displayOrder
+• Marcar imagen principal
+• Soft-delete de imágenes
+• Listado ordenado con URLs prefirmadas (default 24h)","✅ En producción","VehicleImageController.reorderImages/setPrimary/deleteImage · PATCH/DELETE /api/vehicles/:id/images/*","tests/integration/api/vehicle-images-s3.test.js","Test marcado skip (requiere AWS real)"
+"TOURS Y EXPERIENCIAS","HU-048","Admin","Como administrador quiero CRUD de tours para gestionar el catálogo","• Tour: destinationPOI, time (min), vehicleType, rate
+• Disponibilidad en formato legacy (availableDays/startTime/endTime) y nuevo (availability[] por día)
+• Disponibilidad opcional pero completa si se da; se ordena cronológicamente
+• isWalkingTour vs vehículo; flags active/exists","🟡 En progreso","ToursController.createTour/updateTour/getTours/deleteTour · /api/tours","tests/integration/api/tours-availability.test.js","Test skip: migración de formato de disponibilidad legacy→nuevo pendiente"
+"TOURS Y EXPERIENCIAS","HU-049","Admin","Como administrador quiero subir y gestionar galerías de imágenes de tours","• Multi-formato AVIF/WebP/JPEG con calidad por formato
+• 4 tamaños responsivos (thumb/mobile/desktop/original)
+• S3 vía FileStorageService
+• Soft-delete de imágenes","✅ En producción","TourImageController.uploadImage/deleteImage · POST/DELETE /api/tours/:id/images","","Estado sugerido — confirmar"
+"TOURS Y EXPERIENCIAS","HU-050","Admin","Como administrador quiero CRUD de experiencias (paquetes) para armar productos","• Experience puede contener experiencias (experiences[]) y tours (tours[]) formando paquetes
+• Tipo Experience o Provider
+• cost≥0; soporta includedExperiences y subconcepts/iva/total
+• flags active/exists","✅ En producción","ExperienceController.createExperience/updateExperience/getExperiences · /api/experiences","tests/unit/controllers/api/ExperienceController.test.js","Verificado con test"
+"TOURS Y EXPERIENCIAS","HU-051","Admin","Como administrador quiero validar dependencias antes de desactivar/eliminar una experiencia","• Impide eliminar si está incluida en otra experiencia
+• Devuelve la lista de experiencias dependientes","✅ En producción","ExperienceController.checkDependencies · GET /api/experiences/:id/dependencies","","Estado sugerido — confirmar"
+"TOURS Y EXPERIENCIAS","HU-052","Admin","Como administrador quiero subir y gestionar galerías de imágenes de experiencias","• Mismo procesamiento que tours (AVIF/WebP/JPEG multi-tamaño)
+• Secuencia/orden de imágenes
+• Soft-delete","✅ En producción","ExperienceImageController.uploadImage/deleteImage · POST/DELETE /api/experiences/:id/images","tests/unit/controllers/api/ExperienceImageController.test.js","Test marcado skip — validar funcionalidad"
+"TOURS Y EXPERIENCIAS","HU-053","Admin","Como administrador quiero gestionar experiencias de proveedores específicos","• ProviderExperiencia scoped a un proveedor
+• Reordenamiento dentro del proveedor
+• flags active/exists","✅ En producción","ProviderExperienciaController.create/update/delete/reorder · /api/providers/:providerId/experiencias","","Estado sugerido — confirmar"
+"TOURS Y EXPERIENCIAS","HU-054","Admin","Como administrador quiero filtrar tours por tipo (walking vs vehículo) en los listados","• isWalkingTour distingue tipo
+• ?tourType=walking|vehicle filtra
+• DataTables con búsqueda y orden","✅ En producción","ToursController.getTours · GET /api/tours?tourType=","tests/integration/api/tours-availability.test.js","Estado sugerido — confirmar"
+"TOURS Y EXPERIENCIAS","HU-055","Admin","Como administrador quiero activar/desactivar un tour sin eliminarlo","• toggle-status con {active}
+• Distingue active=false (inactivo visible) de exists=false (soft-delete)","✅ En producción","ToursController.toggleTourStatus · PATCH /api/tours/:id/toggle-status","","Estado sugerido — confirmar"
+"TOURS Y EXPERIENCIAS","HU-056","Admin","Como administrador quiero ver el nombre de destino formateado de un tour","• Display = nombre del POI destino + duración en horas (1 decimal), ej. 'Centro Histórico | 2.5h'","✅ En producción","Tour.getDisplayName","","Estado sugerido — confirmar"
+"SERVICIOS Y POIs","HU-057","Admin","Como administrador quiero gestionar el catálogo de POIs (puntos de interés) para definir orígenes/destinos","• POI con nombre único (case-insensitive) y tipo de servicio
+• Nombre 1-280 chars
+• Ciclo de vida active/exists (oculto preserva históricos; soft-delete)
+• Query incluye serviceType","✅ En producción","POIController (CRUD/toggle) · /api/pois · /api/pois/active","tests/integration/seed-system.test.js","Verificado con seed test"
+"SERVICIOS Y POIs","HU-058","Admin","Como administrador quiero definir tipos de servicio de transporte para clasificar traslados","• ServiceType con nombre único (máx 280)
+• Tipos predefinidos protegidos (Aeropuerto, Punto a Punto, Local, Tours) no se pueden eliminar
+• Ciclo de vida active/exists","✅ En producción","ServiceTypeController (CRUD/toggle) · /api/service-types · /api/service-types/active","tests/integration/seed-system.test.js","Verificado con seed test"
+"SERVICIOS Y POIs","HU-059","Admin","Como administrador quiero crear rutas de transporte (origen→destino + tipo de vehículo)","• Servicio = origin POI (opcional en aeropuerto/local) + destination POI (requerido) + vehicleType + rate
+• origin≠destination cuando ambos existen
+• Precio manual o 'pendiente' si no hay match de tarifa
+• routeDuration (min)
+• soft-delete","✅ En producción","ServicesController.createService/updateService · POST/PUT /api/services-new","tests/integration/seed-system.test.js","Verificado con seed test"
+"SERVICIOS Y POIs","HU-060","Agente","Como agente quiero ver los servicios activos en un dropdown para seleccionarlos rápido al cotizar","• /api/services/active devuelve {value,label} simplificado
+• Solo active=true,exists=true
+• Incluye origin/destination POI, rate, vehicleType","✅ En producción","ServicesController.getActiveServices · GET /api/services/active","","Estado sugerido — confirmar"
+"SERVICIOS Y POIs","HU-061","Gerente","Como gerente quiero consultar el precio de traslado por ruta (origen+destino+segmento) con override de cliente","• prices-by-route por originPOI+destinationPOI+rateId(+clientId) devuelve vehículos con precio base y override de cliente
+• Fallback a cualquier rate disponible si no hay match exacto
+• clientPricesMap busca `${rateId}_${vehicleTypeId}` en ClientPrices
+• Prioridad: precio de cliente > tarifario base","🟡 En progreso","ServicesController.getPricesByRoute/getServiceVehicleTypeAndPrice · GET /api/services/prices-by-route","","Feature de autopoblado de precio de transporte (en desarrollo)"
+"SERVICIOS Y POIs","HU-062","Gerente","Como gerente quiero ver todas las tarifas (categorías) de un servicio","• all-rate-prices devuelve la estructura de precios para todas las rates activas (vehicleType+rate+price)
+• Variante con override de cliente por clientId","🟡 En progreso","ServicesController.getAllRatePricesForService · GET /api/services/:id/all-rate-prices(-with-client-prices)","","Estado sugerido — confirmar"
+"SERVICIOS Y POIs","HU-063","Admin","Como administrador quiero activar/desactivar servicios para ocultar rutas sin perder histórico","• toggle-status alterna active manteniendo exists=true
+• Audit log: userId, estado previo/nuevo, motivo","✅ En producción","ServicesController.toggleServiceStatus · PATCH /api/services-new/:id/toggle-status","","Estado sugerido — confirmar"
+"SERVICIOS Y POIs","HU-064","Admin","Como administrador quiero buscar/filtrar servicios de aeropuerto para gestionar transferencias aeroportuarias","• filterAeropuerto=true: obtiene ServiceType Aeropuerto → POIs de ese tipo → OR (origin∨destination) en Services
+• includeInactive=true muestra activos+inactivos
+• Búsqueda en nombres de POI, rate y nota","✅ En producción","ServicesController.getServices/createBaseQuery · GET /api/services?filterAeropuerto=true","","Estado sugerido — confirmar"
+"SERVICIOS Y POIs","HU-065","Chofer","Como transportista quiero ver la duración estimada de la ruta para planear itinerarios","• routeDuration en minutos
+• set/getRouteDuration
+• Retornado en getServices","🟡 En progreso","Services.getRouteDuration/setRouteDuration","","Estado sugerido — confirmar"
+"SERVICIOS Y POIs","HU-066","Admin","Como administrador quiero registrar notas en un servicio para documentar restricciones/detalles","• Campo note en el servicio
+• set/getNote
+• Incluido en getServices","✅ En producción","Services.getNote/setNote","","Estado sugerido — confirmar"
+"CLIENTES Y AGENCIAS","HU-067","Admin","Como administrador quiero crear un cliente directo de Amexing para gestionar la cartera propia","• clientBelongsTo='amexing' distingue directos de agencias
+• Creación rápida con email autogenerado
+• Asigna rol department_manager automáticamente
+• Solo Admin/SuperAdmin","✅ En producción","ClientsController.createQuickDirectClient · POST /api/clients/amexing-direct/quick","tests/unit/controllers/api/ClientsController.test.js","Verificado con test"
+"CLIENTES Y AGENCIAS","HU-068","Admin","Como administrador quiero ver agencias y clientes directos en una vista unificada","• /api/clients/mixed combina agencias (AmexingUser role=department_manager) + directos (Client clientBelongsTo='amexing')
+• Solo active=true,exists=true
+• Búsqueda por nombre (regex) + paginación","✅ En producción","ClientsController.getMixedClients · GET /api/clients/mixed","tests/unit/controllers/api/ClientsController.test.js","Verificado con test"
+"CLIENTES Y AGENCIAS","HU-069","Gerente","Como gerente o cliente quiero gestionar mis clientes secundarios en una jerarquía","• OwnedClients = relación propietario→secundarios
+• ownerType: department_manager|client|admin
+• ownedBy apunta al propietario
+• Filtrable por active","✅ En producción","OwnedClientsController.getOwnedClients · GET /api/owned-clients","","Estado sugerido — confirmar"
+"CLIENTES Y AGENCIAS","HU-070","Cliente","Como cliente quiero crear un cliente secundario (sub-cliente/reseller)","• Hereda ownerType del creador
+• Requeridos: firstName, lastName, email
+• Deduplicación por companyName","✅ En producción","OwnedClientsController.createOwnedClient · POST /api/owned-clients","","Estado sugerido — confirmar"
+"CLIENTES Y AGENCIAS","HU-071","Admin","Como administrador quiero administrar los empleados dentro de una organización cliente","• ClientEmployees vinculados al cliente padre
+• Roles permitidos: client, department_manager
+• Valida empleado.clientId == padre.id
+• toggle-status activa/inactiva
+• DELETE = soft-delete","✅ En producción","ClientEmployeesController (CRUD/toggle) · /api/clients/:clientId/employees","tests/unit/controllers/api/ClientEmployeesController.test.js","Verificado con test"
+"CLIENTES Y AGENCIAS","HU-072","Sistema","Como sistema quiero distinguir cotizaciones de cliente directo vs agencia","• Quote.clientType: direct vs agency
+• Direct: companyClientPtr → Client
+• Agency: getClient → AmexingUser (department_manager)
+• getAvailableOwners valida cliente válido (compat ambos paths)","✅ En producción","QuoteOwnershipService.getAvailableOwners · Client.getEmployees/getDepartments","","Estado sugerido — confirmar"
+"CLIENTES Y AGENCIAS","HU-073","Admin","Como administrador quiero eliminar clientes de forma segura sin perder histórico","• Soft-delete: exists=false (active=false)
+• BaseModel.queryActive filtra exists=true
+• Preserva createdAt/updatedAt y audit logs","✅ En producción","ClientsController.deactivateClient · DELETE /api/clients/:id","tests/unit/routes/clientsRoutes.test.js","Verificado con test"
+"FACTURACIÓN","HU-074","Cliente","Como cliente o agente quiero solicitar la factura de una cotización agendada","• Marca quote.invoiceRequested=true y crea la solicitud
+• Solo para cotización agendada
+• Liga solicitante (requestedBy) y cotización","✅ En producción","QuoteController.requestInvoice / InvoiceController · POST /api/quotes/:id/request-invoice","tests/integration/api/invoices.test.js","Verificado con test"
+"FACTURACIÓN","HU-075","Admin","Como administrador quiero ver y monitorear las solicitudes de factura pendientes","• Listado DataTables (búsqueda por folio, solicitante)
+• Detalle con quote/cliente/solicitante/procesador
+• Contador de pendientes para badge
+• Solo admin/superadmin","✅ En producción","InvoiceController.getPendingInvoices/getInvoiceDetails/getPendingCount · GET /api/invoices · /:id · /pending-count","tests/integration/api/invoices.test.js","Verificado con test"
+"FACTURACIÓN","HU-076","Admin","Como administrador quiero procesar o cancelar una solicitud de factura","• Completar requiere status=pending + invoiceNumber; markCompleted y pone quote.invoiceRequested=false
+• Cancelar valida pending, markCancelled con motivo y limpia flags","✅ En producción","InvoiceController.completeInvoice/cancelInvoice · PUT /api/invoices/:id/complete · DELETE /api/invoices/:id","tests/integration/invoice-workflow.test.js","Verificado con test"
+"FACTURACIÓN","HU-077","Admin","Como administrador quiero subir y descargar los archivos XML/PDF de la factura","• Acepta .xml/.pdf (MIME+extensión)
+• Almacena en S3 con fallback GridFS
+• Autocompleta la factura cuando están XML+PDF (si pending)
+• Descarga vía presigned URL; solo facturas completed","✅ En producción","InvoiceController.uploadInvoiceFile/downloadInvoiceFile · POST /api/invoices/upload-file · GET /api/invoices/download/:id/:fileType","tests/integration/api/invoices.test.js","Verificado con test"
+"FACTURACIÓN","HU-078","Usuario","Como usuario quiero gestionar perfiles de facturación multi-país para emitir mis facturas","• CRUD de BillingProfile
+• Solo 1 isPrimary por usuario (auto-promueve al borrar el primary)
+• México: valida RFC, código postal (5), razón social, régimen, uso CFDI
+• Soft-delete
+• Solo dueño o admin editan","✅ En producción","BillingProfileController (CRUD/setPrimary) · /api/billing-profiles · BillingProfile.validateExplicitly","tests/integration/api/billing.test.js","Verificado con test"
+"FACTURACIÓN","HU-079","Usuario","Como usuario quiero subir y descargar la constancia fiscal y documentos de mi perfil","• Constancia: solo PDF (valida header %PDF-), S3/GridFS, presigned URL 1h
+• Documentos adicionales: varios MIME en array con metadata
+• Solo dueño o admin","✅ En producción","BillingProfileController.uploadConstancia/downloadConstancia/uploadDocument/removeDocument · /api/billing-profiles/:id/...","tests/integration/api/billing.test.js","Verificado con test"
+"FACTURACIÓN","HU-080","Admin","Como administrador quiero consultar los datos de facturación de cualquier cliente para auditoría","• Admin/superadmin/gerente/cliente según alcance
+• Si userId es un Client, resuelve al createdBy (gerente)
+• Devuelve perfiles + metadata del usuario
+• Log de acceso","✅ En producción","BillingProfileController.getByUser / BillingController.getUserBillingInfo · GET /api/billing-profiles/user/:userId","tests/integration/api/billing.test.js","Verificado con test"
+"FACTURACIÓN","HU-081","Admin","Como administrador quiero conectar con la API externa de facturación para timbrar CFDI","• Generar/timbrar la factura fiscal (CFDI) automáticamente vía PAC/API externa al completar la solicitud","🔴 No iniciado","(sin implementación en código)","—","Requerimiento del Excel ('Conectar con API de facturación'); hoy el flujo es manual subiendo XML/PDF (ver HU-077)"
+"CANCELACIONES","HU-082","Cliente","Como cliente quiero solicitar la cancelación de una cotización para obtener reembolso","• Regla 24h: >24h antes del evento cancela directo; <24h crea solicitud pending para aprobación
+• Requiere quoteFolio + reason (obligatorio) + priority (default normal)
+• La cotización debe estar agendada
+• Log de auditoría","✅ En producción","CancellationRequestsController.createCancellationRequest · POST /api/cancellation-requests","—","Sin test específico — sugerir cobertura"
+"CANCELACIONES","HU-083","Admin","Como administrador quiero aprobar o rechazar solicitudes de cancelación en ventanas críticas","• Solo admin/superadmin
+• decision approve|reject (normaliza approved/rejected)
+• Comentarios obligatorios si rechaza
+• refundAmount y cancellationFee opcionales
+• active→false tras resolver","✅ En producción","CancellationRequestsController.reviewCancellationRequest · PUT /api/cancellation-requests/:id/review","—","Sin test específico — sugerir cobertura"
+"CANCELACIONES","HU-084","Admin","Como administrador quiero listar las solicitudes de cancelación con filtros y un contador de pendientes","• Filtros por status/folio/fecha + paginación (default 25, max 100)
+• Devuelve folio, cliente, solicitante, estado, prioridad, horas antes del evento
+• Contador de pendientes","✅ En producción","CancellationRequestsController.getCancellationRequests · GET /api/cancellation-requests · /pending/count","—","Sin test específico — sugerir cobertura"
+"CANCELACIONES","HU-085","Admin","Como administrador quiero ver el detalle de una solicitud para decidir con contexto","• Devuelve cotización, solicitante, reason, estado, prioridad, horas antes del evento, comentarios, refundAmount, cancellationFee","✅ En producción","CancellationRequestsController.getCancellationRequestById · GET /api/cancellation-requests/:id","—","Sin test específico — sugerir cobertura"
+"CANCELACIONES","HU-086","Admin","Como administrador quiero ver el historial de cancelaciones de una cotización","• Busca por folio y devuelve todas las solicitudes (pendientes/aprobadas/rechazadas)","✅ En producción","GET /api/cancellation-requests/quote/:quoteFolio","—","Sin test específico — sugerir cobertura"
+"CANCELACIONES","HU-087","Sistema","Como sistema quiero soft-delete y trazabilidad de las solicitudes de cancelación","• Activa (active+exists), resuelta (active=false,exists=true), eliminada (false/false)
+• Registra revisor, timestamps, comentarios y montos","✅ En producción","CancellationRequest (modelo, ciclo de vida)","—","Sin test específico — sugerir cobertura"
+"PERSONAL Y NÓMINA","HU-088","Admin","Como administrador quiero CRUD de empleados para gestionar al personal","• Roles: employee_amexing, driver, guía, greeter, limpieza, admin
+• Soft-delete (exists=false)
+• Filtros active/búsqueda + paginación
+• Solo Admin/SuperAdmin escriben","✅ En producción","EmployeesController (CRUD) · /api/employees","tests/unit/controllers/api/EmployeesController.test.js","Verificado con test"
+"PERSONAL Y NÓMINA","HU-089","Admin","Como administrador quiero gestionar greeters (recepción) vinculados a puntos de interés","• Greeter: name, poi (pointer), price, description, active/exists
+• CRUD con DataTables (búsqueda por nombre, filtro por POI)
+• Lectura nivel 2+; escritura Admin","✅ En producción","GreeterController (CRUD) · /api/greeter · src/domain/models/Greeter.js","","Estado sugerido — confirmar"
+"PERSONAL Y NÓMINA","HU-090","Chofer","Como chofer quiero acceder a mis reservaciones asignadas para verlas y actualizar su estado","• Driver = AmexingUser role=driver
+• Ve solo sus reservaciones (filtro driverId)
+• Puede actualizar estado del servicio (pending→assigned→en_route→completed/cancelado)
+• RBAC: solo sus registros
+• Auditoría performedBy/requestedAt","✅ En producción","ReservationController (driver scope) · AmexingUser (roleId)","tests/unit/models/AmexingUser-rbac.test.js","Verificado con test (la hoja pide 'acceso a choferes: actualizar reservaciones')"
+"PERSONAL Y NÓMINA","HU-091","Admin","Como administrador quiero desactivar empleados sin perder su histórico","• DELETE → exists=false (soft-delete)
+• toggle-status alterna active
+• Preserva relaciones con reservaciones/ganancias","✅ En producción","EmployeesController.deactivateEmployee/toggleEmployeeStatus · DELETE /api/employees/:id · PATCH /:id/toggle-status","tests/integration/api/employees.test.js","Verificado con test"
+"PERSONAL Y NÓMINA","HU-092","Admin","Como administrador quiero que el acceso a datos de empleados y choferes sea por rol","• AmexingUser RBAC con roleId (Pointer a Role) + role legacy
+• Niveles 1-7 (guest→superadmin)
+• Middleware requireRoleLevel: empleados nivel 6+, greeter lectura 2+
+• organizationId validado","✅ En producción","AmexingUser (RBAC) · jwtMiddleware.requireRoleLevel","tests/unit/models/AmexingUser-rbac.test.js","Verificado con test"
+"PERSONAL Y NÓMINA","HU-093","Admin","Como administrador quiero ver las ganancias y comisiones de los conductores por periodo","• Permiso driver view_earnings
+• Comisiones ligadas a servicios completados (driverId en asignaciones)
+• El dashboard de chofer expone earnings","🟡 En progreso","DriverController · RoleBasedController (permiso view_earnings)","—","Acceso a ganancias existe, pero la API de nómina/pago no está completa"
+"PERSONAL Y NÓMINA","HU-094","Admin","Como administrador quiero el tabulador y el histórico de pagos de nómina de los empleados","• Tabulador de precios por empleado de Amexing
+• Histórico de pagos visible
+• Cálculo de comisiones por servicios + tarifas de conductor","🔴 No iniciado","(sin implementación; referenciado en OAuth scope 'payroll_access')","—","Requerimiento del Excel (Nómina: tabulador + historial de pagos); el modelo PaymentRelation no existe"
+"USUARIOS, ROLES Y PERMISOS","HU-095","Superadmin","Como superadmin quiero crear usuarios con cualquier rol para gestionar el acceso al sistema","• Solo superadmin crea usuarios
+• email único + firstName/lastName + rol obligatorio
+• Contraseña con bcrypt (12 rounds)
+• Inactivo por defecto hasta verificación de email","✅ En producción","UserManagementService.createUser / UserManagementController.createUser · POST /api/users","tests/integration/rbac/permission-system.integration.test.js","Verificado con test"
+"USUARIOS, ROLES Y PERMISOS","HU-096","Admin","Como administrador quiero listar y filtrar usuarios por rol, departamento y estado","• Admin ve solo su organización/depto; superadmin ve todo
+• Filtros: role, active, clientId, departmentId, búsqueda
+• Paginación (default 25, max 100)
+• Auditado (PCI DSS 10.2.1)","✅ En producción","UserManagementController.getUsers · GET /api/users","tests/integration/rbac/permission-system.integration.test.js","Verificado con test"
+"USUARIOS, ROLES Y PERMISOS","HU-097","Superadmin","Como superadmin quiero gestionar la jerarquía de 7 niveles de roles para controlar permisos","• Jerarquía guest(1)→driver(2)→employee(3)→department_manager(4)→client(5)→admin(6)→superadmin(7)
+• Nivel alto gestiona al bajo (canManage)
+• inheritsFrom hereda permisos
+• maxDelegationLevel limita delegación
+• isSystemRole para predefinidos","✅ En producción","Role.getSystemRoles/getLevel/isHigherThan/canManage · /api/roles","tests/unit/routes/api/rolesRoutes.test.js","Verificado con test"
+"USUARIOS, ROLES Y PERMISOS","HU-098","Superadmin","Como superadmin quiero permisos granulares (resource.action) con condiciones de contexto","• Formato resource.action (ej. bookings.approve)
+• Scope: own<department<organization<system
+• Condiciones: maxAmount, businessHoursOnly, departmentScope
+• Wildcard '*' otorga todo (con evaluación de condiciones)
+• isDelegatable","✅ En producción","Permission.create/getSystemPermissions/validateContext","tests/integration/rbac/permission-system.integration.test.js","Verificado con test"
+"USUARIOS, ROLES Y PERMISOS","HU-099","Gerente","Como gerente quiero delegar permisos a empleados temporalmente (ej. cobertura de vacaciones)","• Solo roles delegatable
+• Valida from≠to, permiso en basePermissions, nivel destino ≤ maxDelegationLevel
+• Restricciones: expiración, usageLimit, condiciones
+• Estados: active/expired/revoked/suspended
+• Audit trail (usageHistory/extensionHistory)","✅ En producción","DelegatedPermission.create/hasPermission/trackUsage · AmexingUser.delegatePermissions","tests/unit/models/AmexingUser-rbac.test.js","Verificado con test"
+"USUARIOS, ROLES Y PERMISOS","HU-100","Sistema","Como sistema quiero validar el permiso con contexto antes de ejecutar una acción","• hasPermission(permission, context) valida rol + delegaciones
+• Contexto: amount, departmentId, timestamp, organizationId
+• validateContext verifica maxAmount, businessHoursOnly (9-18 L-V), departmentScope
+• Devuelve {valid, reason}","✅ En producción","AmexingUser.hasPermission · Permission.validateContext · DelegatedPermission.validateContext","tests/integration/rbac/permission-system.integration.test.js","Verificado con test"
+"USUARIOS, ROLES Y PERMISOS","HU-101","Admin","Como administrador quiero activar/desactivar usuarios y manejar bloqueo por intentos fallidos","• Soft-delete (active=false, exists=false); reactivación requiere admin+
+• recordFailedLogin incrementa intentos; máx 5 (MAX_LOGIN_ATTEMPTS)
+• Bloqueo lockedUntil 30 min (ACCOUNT_LOCKOUT_DURATION_MINUTES)
+• Login exitoso resetea intentos","✅ En producción","AmexingUser.recordFailedLogin/recordSuccessfulLogin · UserManagementService.deactivateUser/reactivateUser","tests/unit/models/AmexingUser-rbac.test.js","Verificado con test"
+"USUARIOS, ROLES Y PERMISOS","HU-102","Sistema","Como sistema quiero que la contraseña cumpla PCI DSS para seguridad","• setPassword valida fortaleza
+• minLength 12, mayúsculas, minúsculas, números y especiales (configurable por env)
+• Bcrypt 12 rounds (BCRYPT_ROUNDS)
+• passwordChangedAt registrado","✅ En producción","AmexingUser.setPassword/validatePasswordStrength","tests/unit/models/AmexingUser-rbac.test.js","Verificado con test"
+"USUARIOS, ROLES Y PERMISOS","HU-103","Admin","Como administrador quiero segregar permisos entre organizaciones (Amexing vs clientes)","• organizationId: amexing (interno) vs cliente
+• Role.organization: amexing/client/external
+• organizationScope: system/client/own
+• Usuarios amexing acceso total; usuarios cliente solo su org
+• Todas las queries filtran por organizationId","✅ En producción","Role.canAccessOrganization · AmexingUser.canAccessOrganization/getOrganization","tests/integration/rbac/permission-system.integration.test.js","Verificado con test"
+"AUDITORÍA Y CUMPLIMIENTO","HU-104","Admin","Como administrador quiero consultar el registro de auditoría con filtros para investigar cambios","• Acceso solo admin/superadmin
+• Filtros: userId, username, action, entityType, entityId, rango de fechas
+• Paginación (máx 1000, default 50)
+• Rate limit 200/15min
+• Registros inmutables","✅ En producción","AuditLogController.getAuditLogs/getUserAuditLogs/getEntityAuditLogs · GET /api/audit/logs · /user/:userId · /entity/:entityType/:entityId","—","Sin test específico — sugerir cobertura"
+"AUDITORÍA Y CUMPLIMIENTO","HU-105","Superadmin","Como superadmin quiero ver estadísticas y actividad reciente de auditoría para un panorama de cumplimiento","• Totales, usuarios únicos, desglose por acción y por tipo de entidad
+• Actividad reciente: últimas 24h, 10 registros
+• Acciones: CREATE/READ/UPDATE/DELETE/LOGIN/LOGOUT","✅ En producción","AuditLogController.getStatistics/getRecentActivity · GET /api/audit/statistics","—","Sin test específico — sugerir cobertura"
+"AUDITORÍA Y CUMPLIMIENTO","HU-106","Sistema","Como sistema quiero registrar automáticamente los cambios CREATE/UPDATE/DELETE","• Hooks beforeSave/afterSave/beforeDelete registran userId, acción, entityType, entityId y campos modificados
+• Contexto desde headers x-audit-*, sessionToken o request.user
+• Excluye AuditLog/_Session/_Role/_Installation
+• Registrado en Client/Employee/Driver/AmexingUser/Vehicle/Department/Service/Experience","✅ En producción","src/cloud/hooks/auditTrailHooks.js (beforeSave/afterSave/beforeDelete)","—","Sin test específico — sugerir cobertura"
+"AUDITORÍA Y CUMPLIMIENTO","HU-107","Admin","Como oficial de cumplimiento quiero registrar el acceso de LECTURA a datos sensibles (PCI DSS 10.2.1)","• Clases auditadas: AmexingUser/Client/Employee/Driver/Payment/Transaction/AuditLog
+• logReadAccess (individual) y logBulkReadAccess (listados) implementados manualmente en controladores
+• Registra userId, acción READ/READ_BULK, entityType, IP, endpoint, timestamp","✅ En producción","src/application/utils/auditHelper.js (logReadAccess/logBulkReadAccess)","—","Hooks automáticos de READ deshabilitados por límite de Parse; cobertura manual en controladores (User/Client) — extender a Employee/Driver/Payment"
+"AUDITORÍA Y CUMPLIMIENTO","HU-108","Admin","Como auditor quiero rastrear el historial completo de correos enviados","• EmailLog: messageId, destinatario, tipo, asunto, contenido, status, sentAt/deliveredAt
+• Canales email/push/SMS
+• Estados sent/delivered/failed/bounced
+• updateStatus por webhook del proveedor
+• Masking de email (PCI)
+• Queries por destinatario/tipo/estado/metadata","✅ En producción","src/domain/models/EmailLog.js (create/updateStatus/getBy*)","tests/integration/email/emailLog.test.js","Verificado con test"
+"AUDITORÍA Y CUMPLIMIENTO","HU-109","Admin","Como oficial de cumplimiento quiero que los registros de auditoría sean inmutables y de acceso restringido","• deactivate()/softDelete() lanzan error en AuditLog (no se modifican ni borran)
+• Sin endpoints de edición (solo GET)
+• Acceso solo admin/superadmin (JWT + validación de rol)
+• Lecturas con useMasterKey","✅ En producción","AuditLog.deactivate/softDelete · auditRoutes.validateAuditAccess · AuditLogHelper.validatePermissions","—","Sin test específico — sugerir cobertura"
+"REPORTES Y ANALÍTICA","HU-110","Admin","Como administrador quiero exportar el tarifario en Excel o PDF para compartirlo con clientes","• Secciones: vehículos, traslados, a-disposición, experiencias, tours, greeter
+• Formatos Excel/PDF
+• Parámetros paymentType (efectivo/transferencia/tarjeta) y currency (MXN/USD)
+• Resuelve clientId por rol (admin→query, gerente→user.id, cliente→user.clientId)
+• Aplica ExchangeRate/TransferRate/AgencyRate","✅ En producción","TarifarioExportController.exportTarifario / TarifarioExportService.exportSections · GET /api/tarifario/export","—","Estado sugerido — confirmar"
+"REPORTES Y ANALÍTICA","HU-111","Cliente","Como cliente quiero exportar el tarifario filtrado para mi empresa","• Acceso restringido al tarifario de su gerente vía clientId
+• Mismas secciones/formatos que admin pero con precios de cliente (ClientPrices)","✅ En producción","GET /api/tarifario/export (resuelve user.clientId) · vista client/tarifario-export","—","Estado sugerido — confirmar"
+"REPORTES Y ANALÍTICA","HU-112","Admin","Como administrador quiero una vista de reportes que consuma la auditoría por rol","• Vista reports con DataTable (audit-table)
+• Consume la API de auditoría (HU-104/105)
+• Acceso admin/superadmin/gerente según rol","✅ En producción","AdminController.reports / SuperAdminController.reports · GET /dashboard/{admin,superadmin}/reports","—","Estado sugerido — confirmar"
+"REPORTES Y ANALÍTICA","HU-113","Superadmin","Como superadmin quiero analítica del sistema (crecimiento, ingresos, tendencias de reservas)","• getSystemAnalytics devuelve userGrowth/revenueGrowth/bookingTrends/systemPerformance
+• Vista analytics
+• Acceso solo superadmin","🟡 En progreso","SuperAdminController.analytics/getSystemAnalytics · GET /dashboard/superadmin/analytics","—","La vista existe pero los datos están VACÍOS/placeholder — falta conectar a datos reales"
+"REPORTES Y ANALÍTICA","HU-114","Superadmin","Como superadmin quiero estadísticas operativas en el dashboard principal","• getSystemStats: totalUsers, totalClients, totalBookings, totalRevenue, activeDrivers, uptime, dailyActiveUsers, pendingApprovals
+• getRecentSystemActivity","🟡 En progreso","SuperAdminController.index/getSystemStats/getRecentSystemActivity · GET /dashboard/superadmin","—","La estructura existe pero los datos son MOCK — falta conectarlos a la BD real"
+"NOTIFICACIONES","HU-115","Cliente","Como cliente quiero recibir por correo la confirmación de reserva y de cotización (con PDF)","• sendBookingConfirmation y sendQuoteConfirmation (PDF base64 'Cotizacion-{folio}.pdf')
+• Plantilla con variables dinámicas; soporta CC múltiple
+• Registra en EmailLog
+• Fallback SMTP si MailerSend no disponible","✅ En producción","EmailService.sendBookingConfirmation/sendQuoteConfirmation","tests/integration/email/emailService.test.js","Verificado con test"
+"NOTIFICACIONES","HU-116","Usuario","Como usuario quiero recordatorios automáticos de cotización por correo","• sendQuoteReminder con tipos initial/follow_up/final
+• Plantillas quote_reminder_*
+• Variables: folio, total, fecha de vencimiento, número de recordatorio, URL
+• Metadata para auditoría","✅ En producción","EmailService.sendQuoteReminder · TemplateService.render","tests/integration/email/emailService.test.js","Verificado con test (cadencia en HU-006)"
+"NOTIFICACIONES","HU-117","Usuario","Como usuario nuevo quiero recibir un correo de bienvenida con acceso al dashboard","• sendWelcomeEmail con plantilla welcome
+• Variables: nombre, email, tipo de cuenta, URL dashboard
+• En development simula envío sin token","✅ En producción","EmailService.sendWelcomeEmail","tests/integration/email/emailService.test.js","Verificado con test"
+"NOTIFICACIONES","HU-118","Usuario","Como usuario quiero restablecer mi contraseña mediante un enlace por correo","• sendPasswordResetEmail con plantilla password_reset
+• Enlace válido 1h
+• CTA + fallback en texto plano
+• Masking de email en logs
+• Status sent/failed","✅ En producción","EmailService.sendPasswordResetEmail","tests/integration/email/emailService.test.js","Verificado con test (la hoja pide rediseñar este correo)"
+"NOTIFICACIONES","HU-119","Agente","Como agente quiero ver y marcar como leídas mis notificaciones in-app","• GET /api/notifications (lista + unreadCount); PATCH /:id/read y /mark-all-read
+• Requiere permiso notifications.read/update
+• Rate limit 100/15min","🟡 En progreso","NotificationsController.getNotifications/markAsRead/markAllAsRead · /api/notifications","—","Stub: devuelve lista vacía; falta persistencia en BD (la hoja pide notificación al asignar cotización)"
+"NOTIFICACIONES","HU-120","Superadmin","Como superadmin quiero monitorear el uso de email y respetar los límites del proveedor","• getUsageStats: hoy y mes (sent/limit/remaining/percentage, successRate)
+• Límites MailerSend: 100/día, 3000/mes
+• Solo SuperAdmin","✅ En producción","EmailService.getUsageStats · GET /api/emails/usage","tests/integration/email/emailService.test.js","Verificado con test"
+"FORMULARIOS","HU-121","Admin","Como administrador quiero diseñar formularios con interfaz drag-and-drop sin código","• Arrastrar componentes de paleta a canvas
+• Reordenar con SortableJS
+• Undo/redo (historial hasta 50)
+• Validación de ruta de componente (anti path-traversal)
+• Ancho de campo en 12 variantes Bootstrap","✅ En producción","public/js/form-builder.js · FormController.saveTemplate · GET /dashboard/admin/forms","—","Sin test — pruebas manuales"
+"FORMULARIOS","HU-122","Admin","Como administrador quiero configurar tipos de campo y sus validaciones","• 12+ tipos: text/textarea/email/number/select/checkbox/radio/toggle/datepicker/timepicker/file-upload/phone/location/daterange
+• Props: label, placeholder, required, helpText, validation
+• Validaciones: minLength/maxLength/pattern/min/max/email","✅ En producción","FormRenderer.renderField/renderComponent · FormTemplate.fields","—","Sin test — pruebas manuales"
+"FORMULARIOS","HU-123","Admin","Como administrador quiero guardar y publicar plantillas con versionado y estados","• Versionado automático en cada save
+• Estados draft/active/inactive
+• Soft-delete (active/exists)
+• Rastreo createdBy/lastModifiedBy
+• Permisos: admin/superadmin crean/editan; solo superadmin elimina","✅ En producción","FormController.saveTemplate · POST /api/forms/save-template","—","Sin test — pruebas manuales"
+"FORMULARIOS","HU-124","Admin","Como administrador quiero previsualizar el formulario antes de publicarlo","• Render dinámico desde JSON por modo create/edit/view
+• Modo readonly para vista
+• Agrupación por secciones
+• Devuelve HTML para el DOM","✅ En producción","FormController.renderForm / FormRenderer.renderForm · GET /api/forms/:id/render · vista form-preview","—","Sin test — pruebas manuales"
+"FORMULARIOS","HU-125","Usuario","Como usuario quiero rellenar y enviar formularios con validación cliente y servidor","• Validación server-side por campo (required/minLength/maxLength/pattern/email/rango)
+• Mensajes en español
+• Requiere autenticación (mixedAuth)
+• Validación de campo en tiempo real (validate-field)
+• Devuelve submissionId o errores","✅ En producción","FormController.submitForm/validateField · POST /api/forms/:id/submit · /validate-field","—","Sin test — pruebas manuales"
+"FORMULARIOS","HU-126","Admin","Como administrador quiero gestionar y exportar los envíos de formulario","• FormSubmission: data, submittedBy, submittedAt, status, confirmationCode
+• Soft-delete
+• Listado con filtros (fecha/status)
+• Export JSON/CSV","✅ En producción","FormController.getSubmissions/deleteSubmission/exportData · GET /api/forms/:id/submissions · /export","—","Export PDF aún pendiente (JSON/CSV funcionan)"
+"SITIO PÚBLICO Y LANDING","HU-127","Visitante","Como visitante quiero navegar las páginas públicas informativas para conocer la empresa y servicios","• 5 páginas sin autenticación: home/landing, nosotros, servicios, flota, contacto
+• Ruteo bilingüe ES/EN
+• Datos: SEO, company data, testimonios
+• Rate limit 100/15min","✅ En producción","homeController (index/nosotros/servicios/fleet/contacto) · webRoutes.js","—","Estado sugerido — confirmar"
+"SITIO PÚBLICO Y LANDING","HU-128","Visitante","Como prospecto quiero enviar el formulario de contacto para solicitar información","• POST /api/contact: name/email/message requeridos, phone/subject opcionales
+• Validación (email, name 2-100, message 10-2000)
+• Rate limiter estricto
+• Envía email + log de auditoría","✅ En producción","apiController.submitContactForm / ContactFormService.processContactForm · POST /api/contact","—","La hoja pide quitar el campo 'empresa' del formulario (pendiente UI)"
+"SITIO PÚBLICO Y LANDING","HU-129","Visitante","Como visitante quiero cambiar el idioma del sitio (ES/EN)","• Idiomas es/en
+• Cookie i18next (1 año, secure+httpOnly en prod)
+• Ruteo bilingüe (/ es, /en en)
+• req.t() en vistas","✅ En producción","webRoutes.js (/set-language/:lang) · homeController","—","La hoja pide insertar el ícono de idiomas (pendiente UI)"
+"SITIO PÚBLICO Y LANDING","HU-130","Visitante","Como visitante quiero ver reseñas de TripAdvisor en la landing para dar credibilidad","• homeController.index obtiene top 15 reseñas vía tripAdvisorService.getTopReviews
+• Fallback a testimonios por defecto si falla
+• Idioma detectado","✅ En producción","homeController.index · tripAdvisorService.getTopReviews · landing.ejs","—","Estado sugerido — confirmar"
+"SITIO PÚBLICO Y LANDING","HU-131","Visitante","Como visitante quiero la landing pulida según la nueva identidad de marca","• Ajustes pendientes del Excel: sección 'nuestra historia'
+• proporciones de la sección de misión
+• centrar transportes/colaboraciones/certificaciones
+• tipografía de marca (Myriad/Arpona)
+• paleta de colores del login a la nueva identidad","🔴 No iniciado","Vistas: landing.ejs, nosotros.ejs, auth/*.ejs (CSS/contenido)","—","Conjunto de ajustes de diseño UX listados como pendientes en el Excel"
+"CONFIGURACIÓN DEL SISTEMA","HU-132","Admin","Como administrador quiero configurar el redondeo a efectivo (múltiplos de $5 MXN)","• Setting key cashRoundingEnabled (categoría pricing)
+• get devuelve default true si no existe
+• update valida boolean
+• Aplicado en pricingHelper","✅ En producción","SettingsController.getCashRoundingSetting/updateCashRoundingSetting · GET/PUT /api/settings/cash-rounding","—","Estado sugerido — confirmar"
+"CONFIGURACIÓN DEL SISTEMA","HU-133","Admin","Como administrador quiero la página de ajustes de precios para gestionar tasas y comisiones","• Carga valores actuales de 7 modelos de tarifa (Exchange/Inflation/Agency/Transfer/DriverTour/GuideTransport/Greeter)
+• Crea defaults si no existen (inflación 5.25%, agencia 15%, traslado 3%)","🟡 En progreso","AdminController.priceSettings · GET /dashboard/admin/price-settings","—","Vista funcional pero apoyada en defaults; revisar conexión completa"
+"CONFIGURACIÓN DEL SISTEMA","HU-134","Admin","Como administrador quiero un almacén de configuración por categoría (key-value)","• Setting: key, value, valueType (string/number/boolean/json), category, displayName, editable
+• findByKey/findByCategory con coerción de tipos
+• Hoy solo 'pricing' está poblada","🟡 En progreso","SettingsController.getPricingSettings · Setting.js · GET /api/settings/pricing","—","Infraestructura lista; pocas categorías pobladas"
+"CONFIGURACIÓN DEL SISTEMA","HU-135","Cliente","Como cliente quiero consultar el estado y versión del sistema","• GET /api/status: {status, timestamp, environment} sin auth
+• GET /api/version: {version, parseVersion, nodeVersion, api}","✅ En producción","apiController.getStatus/getVersion · GET /api/status · /api/version","—","Estado sugerido — confirmar"
+"CONFIGURACIÓN DEL SISTEMA","HU-136","Admin","Como administrador quiero las páginas de notificaciones, ajustes generales, integraciones y seguridad","• Vistas renderizadas (notifications, settings, integrations, security) pero con estructuras vacías (placeholder), sin lógica de backend","🔴 No iniciado","AdminController.notifications/settings · SuperAdminController.integrations/security","—","Páginas placeholder detectadas en código — sin persistencia"
+"AUTENTICACIÓN","HU-137","Usuario","Como usuario quiero iniciar sesión con email y contraseña para acceder a mi cuenta","• email+password requeridos; bcrypt
+• Bloqueo tras 5 intentos fallidos
+• JWT access (8h) + refresh (7d) en cookies httpOnly
+• Resetea intentos en login exitoso","✅ En producción","authController/authRoutes.js (POST /auth/login)","tests/integration/api/auth.test.js","Verificado con test"
+"AUTENTICACIÓN","HU-138","Usuario","Como usuario nuevo quiero registrarme para crear una cuenta","• username/email/password/firstName/lastName
+• Valida password==confirm (timing-safe)
+• Cloud function registerUser (role='user')
+• Verificación de email
+• Tokens JWT automáticos","✅ En producción","authRoutes.js (POST /auth/register) · cloud registerUser","tests/integration/api/auth.test.js","Verificado con test"
+"AUTENTICACIÓN","HU-139","Usuario","Como usuario autenticado quiero cerrar sesión","• Limpia cookies access/refresh
+• Regenera sesión (preserva CSRF)","✅ En producción","authRoutes.js (POST /auth/logout)","tests/integration/api/auth.test.js","Verificado con test"
+"AUTENTICACIÓN","HU-140","Usuario","Como usuario quiero recuperar mi contraseña si la olvidé","• forgot-password (rate limit 10/5min) genera token + email; siempre responde success (anti-enumeración)
+• reset-password valida token no expirado y actualiza contraseña","✅ En producción","authController.processForgotPassword · authRoutes.js (POST /auth/reset-password) · cloud requestPasswordReset","tests/integration/api/auth.test.js","Hotfix reciente #148 'fix: password reset'; la hoja pide rediseñar el correo (ver HU-118)"
+"AUTENTICACIÓN","HU-141","Usuario","Como usuario autenticado quiero cambiar mi contraseña","• Requiere auth
+• currentPassword/newPassword/confirm
+• Valida coincidencia y verifica la actual antes de actualizar","✅ En producción","authRoutes.js (POST /auth/change-password) · AuthenticationService.changePassword","tests/integration/api/auth.test.js","Verificado con test"
+"AUTENTICACIÓN","HU-142","Cliente","Como cliente quiero renovar mi token antes de que expire","• refresh desde cookie o header Bearer
+• Cloud function refreshToken
+• Devuelve nuevos access (8h) y refresh (7d)","✅ En producción","authRoutes.js (POST /auth/refresh) · cloud refreshToken","tests/integration/api/auth.test.js","Verificado con test"
+"AUTENTICACIÓN","HU-143","Usuario","Como usuario corporativo quiero iniciar sesión con OAuth/SSO (Apple y corporativo)","• Lista de proveedores
+• Inicio con state (CSRF) y redirección
+• Callback con cookies httpOnly y redirección por rol
+• Confirmación de linking si el email difiere
+• Link/unlink de cuentas (previene lockout)","✅ En producción","authRoutes.js (/auth/oauth/*) · cloud getOAuthProviders/generateOAuthUrl/handleOAuthCallback/linkOAuthAccount","tests/oauth/integration/oauth-flow.integration.test.js","Verificado con test"
+"AUTENTICACIÓN","HU-144","Admin","Como administrador quiero verificar la salud y métricas de las sesiones","• session/health devuelve healthy/expired/invalid
+• session/metrics devuelve estadísticas de sesiones activas","🟡 En progreso","apiController · GET /api/session/health · /api/session/metrics","—","Endpoints presentes; métricas por completar"
+"AUTENTICACIÓN","HU-145","Usuario","Como usuario web quiero obtener un JWT para llamadas programáticas al API","• Requiere sesión
+• generateTokens(user)
+• Devuelve {token, tokenType: Bearer, expiresIn: 8h}","✅ En producción","authController.getCredentials · GET /auth/credentials","tests/integration/api/auth.test.js","Verificado con test"
+"INTEGRACIONES","HU-146","Admin","Como administrador quiero almacenar imágenes y documentos de forma segura en S3","• AWS SDK S3
+• Presigned URLs (expiración 1h)
+• Cifrado AES256 server-side
+• Carpetas por dominio (vehicles/experiences/documents)
+• Estrategias de borrado (soft/mover/hard)
+• Logging de seguridad","✅ En producción","FileStorageService.uploadFile · imageFormatNegotiation","tests/integration/api/vehicle-images-s3.test.js","Test marcado skip (requiere AWS real)"
+"INTEGRACIONES","HU-147","Visitante","Como visitante quiero ver reseñas reales de TripAdvisor (conector externo)","• API content.tripadvisor.com v1
+• Config por env (API key + location id)
+• Cache 1h con TTL
+• Fallback a reseñas hardcodeadas si falla
+• Parámetro de idioma es/en","✅ En producción","tripAdvisorService.getTopReviews · GET /api/reviews/tripadvisor","—","Estado sugerido — confirmar (sin test dedicado)"
+"INTEGRACIONES","HU-148","Agente","Como agente quiero conectar con Flightstats para info de vuelos en tiempo real","• Conectar la API de vuelos para conocer adelantos/retrasos y actualizar oportunamente los servicios de traslado","🔴 No iniciado","(sin implementación: no hay servicio, endpoint ni dependencia en package.json)","—","Pendiente del Excel; confirmado por código que NO existe"
+"INTEGRACIONES","HU-149","Admin","Como administrador quiero sincronizar las reservaciones con Google Calendar","• Al pasar a bloqueado/agendado crear/actualizar el evento; si se cancela en el calendario, reflejarlo en el sistema y notificar","🔴 No iniciado","(sin implementación: existen scopes de Google OAuth para otros servicios, pero no hay lógica de Calendar)","—","Pendiente del Excel; confirmado por código que NO existe la sincronización"
+"COTIZACIÓN","HU-150","Admin","Como administrador quiero elegir el tipo de transporte (aeropuerto, punto a punto, local) y que la forma ajuste sus campos","• Aeropuerto muestra campos de vuelo y oculta horario/dirección; punto a punto y local muestran horario y dirección específica
+• Cambiar de tipo limpia los campos previos","✅ En producción","quote-services-v2.js: handleTransportTypeChange/clearTransportFormFields","—","Deep-dive transporte"
+"COTIZACIÓN","HU-151","Admin","Como administrador quiero elegir dirección Llegada o Salida en viajes one-way para configurar origen/destino","• Selector de dirección solo en one-way
+• Llegada: origen aeropuerto → destino ciudad/hotel; Salida: inverso
+• En local los campos son texto libre","✅ En producción","quote-services-v2.js: handleDirectionTypeChange","—","Deep-dive transporte"
+"COTIZACIÓN","HU-152","Sistema","Como sistema quiero calcular la hora de salida sugerida SOLO en transporte de salida de aeropuerto","• Solo si dirección=departure y tipo=aeropuerto
+• suggested = flightTime − routeDuration (min)
+• Campo de solo lectura, desbloqueable
+• En llegada NO se calcula","✅ En producción","quote-services-v2.js: calculateSuggestedDepartureTime/updateSuggestedDepartureTimeFields","—","Deep-dive transporte (regla del Excel)"
+"COTIZACIÓN","HU-153","Admin","Como administrador quiero seleccionar POI de origen y destino desde el catálogo registrado","• Carga POIs activos
+• Origen opcional en aeropuerto/local; destino obligatorio siempre
+• Permite seleccionar cualquier POI dado de alta","✅ En producción","quote-services-v2.js (resolución de ruta) · ServicesController.getPricesByRoute","—","Deep-dive transporte"
+"COTIZACIÓN","HU-154","Sistema","Como sistema quiero buscar la tarifa base por ruta exacta (origen+destino+rate)","• Query RatePrices por service.originPOI+destinationPOI+rate, active, valid_until=null
+• Búsqueda bidireccional (intenta dirección inversa)
+• Si no hay match, lista de vehículos vacía","✅ En producción","ServicesController.getPricesByRoute (filterRatePricesByDirection)","—","Deep-dive transporte"
+"COTIZACIÓN","HU-155","Sistema","Como sistema quiero poblar el dropdown de vehículos con los tipos disponibles para la ruta","• Extrae vehicleType únicos de los RatePrices
+• Formato 'Nombre (pax, baúl)'
+• Deduplica; placeholder si no hay vehículos","✅ En producción","ServicesController.getPricesByRoute (lista de vehículos)","—","Deep-dive transporte"
+"COTIZACIÓN","HU-156","Sistema","Como sistema quiero resolver el precio priorizando el precio del cliente sobre el tarifario base","• Precio base de RatePrices.price
+• Si existe ClientPrices (cliente+item+vehículo+rate, activo) usa su precio
+• Flag isClientPrice
+• Muestra moneda del tarifario (default MXN)","✅ En producción","ServicesController.getServiceVehicleTypeAndPrice/getPricesByRoute","—","Deep-dive transporte"
+"COTIZACIÓN","HU-157","Admin","Como administrador quiero dejar el precio como 'pendiente' y capturarlo manual si no hay tarifa","• Si no hay RatePrices coincidentes, el campo de precio queda editable/pendiente
+• El precio manual no se sobrescribe al cambiar origen/destino","✅ En producción","quote-services-v2.js (fallback de precio) · saveServiceData","—","Deep-dive transporte (regla del Excel)"
+"COTIZACIÓN","HU-158","Admin","Como administrador quiero seleccionar un vehículo y obtener su precio base de la ruta","• Busca el vehículo en los precios de la ruta y toma su precio
+• El precio NO se multiplica por número de personas","✅ En producción","quote-services-v2.js: getVehicleBaseRate/getVehicleCost","—","Deep-dive transporte"
+"COTIZACIÓN","HU-159","Admin","Como administrador quiero agregar un vehículo adicional con su propio precio en la misma ruta","• Checkbox habilita el dropdown del vehículo adicional (mismo segmento)
+• Precio independiente que se suma al total","✅ En producción","quote-services-v2.js (vehículo adicional) · addExtraAdditionalVehicleRow","—","Deep-dive transporte"
+"COTIZACIÓN","HU-160","Sistema","Como sistema quiero fijar la cantidad automáticamente (1 one-way, 2 round-trip)","• Campo cantidad de solo lectura
+• one-way=1, round-trip=2
+• No se afecta por vehículos adicionales","✅ En producción","quote-services-v2.js: handleTripTypeChange","—","Deep-dive transporte"
+"COTIZACIÓN","HU-161","Admin","Como administrador quiero que el round-trip use IDA (llegada) y VUELTA (salida) con origen/destino invertidos","• Dos secciones IDA/VUELTA
+• IDA patrón llegada, VUELTA patrón salida
+• Intercambia origen↔destino según dirección","✅ En producción","quote-services-v2.js: updateRoundTripFieldVisibility","—","Deep-dive transporte"
+"COTIZACIÓN","HU-162","Sistema","Como sistema quiero tratar las rutas Punto a Punto como bidireccionales","• Intenta dirección exacta y, si no hay, la inversa
+• Usa el mismo vehículo/precio en ambos sentidos","✅ En producción","ServicesController.getPricesByRoute (dirección inversa)","—","Deep-dive transporte"
+"COTIZACIÓN","HU-163","Admin","Como administrador quiero agregar el transporte configurado al itinerario","• Recopila ruta/vehículo/precio/notas/horarios
+• Valida origen/destino (origen opcional según tipo) y precio (o pendiente)
+• Renderiza el item con editar/eliminar","✅ En producción","quote-services-v2.js: saveServiceData('transport')/renderTransportServiceItem","—","Deep-dive transporte"
+"COTIZACIÓN","HU-164","Admin","Como administrador quiero editar un transporte del itinerario sin perder el precio manual","• Pre-llena todos los campos
+• No sobrescribe el precio manual al cambiar origen/destino
+• Preserva las notas","✅ En producción","quote-services-v2.js: populateFormWithServiceData","—","Deep-dive transporte"
+"COTIZACIÓN","HU-165","Admin","Como administrador quiero configurar tiers de grupo (pequeño/mediano/grande) para un walking tour","• Cada tour a pie tiene 3 tiers: rango de personas + precio por hora + moneda
+• Tier activo si tiene label y rango válido","✅ En producción","Tour.js (walkingRange/Price*) · quote-services-v2.js: calculateWalkingTourGroups","—","Deep-dive tours (regla del Excel)"
+"COTIZACIÓN","HU-166","Sistema","Como sistema quiero distribuir N personas entre los tiers del walking tour","• Ordena tiers por capacidad desc y asigna; ej. 20 personas = grupo de 15 + grupo de 5","✅ En producción","quote-services-v2.js: calculateWalkingTourGroups","—","Deep-dive tours (regla del Excel)"
+"COTIZACIÓN","HU-167","Sistema","Como sistema quiero calcular el walking tour como suma(precio_grupo × horas)","• Por cada grupo: precio_tier × duración
+• Conversión USD→MXN si aplica
+• Surcharge por tipo de pago","✅ En producción","quote-services-v2.js: getWalkingTourPrice","—","Deep-dive tours (regla del Excel)"
+"COTIZACIÓN","HU-168","Admin","Como administrador quiero sobrescribir el precio del walking tour (total o por grupo)","• Checkbox de override
+• Modo total o precio por tier
+• Los precios manuales se cuentan como efectivo (sin surcharge)","✅ En producción","quote-services-v2.js (collectServiceData / renderWalkingTourPricing)","—","Deep-dive tours (regla del Excel)"
+"COTIZACIÓN","HU-169","Admin","Como administrador quiero ver el desglose del walking tour (grupo × horas)","• Una línea por grupo (tier, horas, subtotal) o línea única si un solo grupo
+• Aplica surcharge por línea","✅ En producción","quote-services-v2.js: calculateDevPaymentBreakdown","—","Deep-dive tours"
+"COTIZACIÓN","HU-170","Sistema","Como sistema quiero calcular el vehicle tour = precio_base × horas (+ guía/chofer)","• Precio base de TourPrices(rate,tour,vehículo) × duración
+• Si includeGuide suma driverTourRate (fijo por tour)","✅ En producción","quote-services-v2.js: recalculateTourPrice","—","Deep-dive tours (regla del Excel)"
+"COTIZACIÓN","HU-171","Admin","Como administrador quiero el dropdown de vehículos con 'X pax, Y carry-on' y marca de precio cliente","• Formato 'Vehículo - X pax, Y carry-on (*)'
+• Solo vehículos con TourPrices(rate,tour)
+• (*) si precio de cliente","✅ En producción","quote-services-v2.js: populateVehicleDropdownWithPrices · VehicleType.js","—","Deep-dive tours"
+"COTIZACIÓN","HU-172","Sistema","Como sistema quiero el precio de vehículo con prioridad cliente > catálogo","• Revisa ClientPrice(cliente,tour,rate,vehículo) primero; si no, TourPrices
+• Marca isClientPrice","✅ En producción","quote-services-v2.js: getVehiclePriceWithPriority","—","Deep-dive tours"
+"COTIZACIÓN","HU-173","Admin","Como administrador quiero agregar vehículos adicionales al tour con precio manual c/u","• Checkbox habilita selección
+• Precio manual por vehículo extra × cantidad
+• Se cuentan como efectivo","✅ En producción","quote-services-v2.js (additionalVehicle handling)","—","Deep-dive tours (regla del Excel)"
+"COTIZACIÓN","HU-174","Sistema","Como sistema quiero agregar guía+chofer solo al vehículo principal del tour","• driverTourRate se suma una vez al vehículo principal, nunca a los adicionales","✅ En producción","quote-services-v2.js: handleIncludeGuideChange","—","Deep-dive tours (regla del Excel)"
+"COTIZACIÓN","HU-175","Admin","Como administrador quiero el flujo de 3 pasos para tours: rate → destino → vehículos","• Paso 1 rate, paso 2 destino (deduplicado), paso 3 vehículos disponibles para rate+destino","✅ En producción","quote-services-v2.js: handleRateSelection/handleTourSelection/handleVehicleSelection","—","Deep-dive tours"
+"COTIZACIÓN","HU-176","Admin","Como administrador quiero sobrescribir manualmente el precio por línea de tour","• Checkbox de override hace editable el precio
+• En vehicle tour el precio capturado es base y se multiplica por duración","✅ En producción","quote-services-v2.js (toggle de override de precio)","—","Deep-dive tours"
+"COTIZACIÓN","HU-177","Admin","Como administrador quiero bloquear un tour por día de la semana","• Marcar días en que el tour NO está disponible y validar al elegir fecha en la cotización","🔴 No iniciado","Tour.js (sin atributo/lógica de bloqueo por día)","—","Pendiente del Excel; confirmado que no existe"
+"COTIZACIÓN","HU-178","Admin","Como administrador quiero bloquear un tour por rango de fechas (ej. Día de Muertos, bodas)","• Definir rangos de fechas bloqueados y validar al cotizar","🔴 No iniciado","Tour.js (sin atributo/lógica de rangos bloqueados)","—","Pendiente del Excel; confirmado que no existe"
+"COTIZACIÓN","HU-179","Admin","Como administrador quiero filtrar tours por destino en el modal y drag-and-drop","• Agrupar/filtrar tours por POI destino al cotizar (modal y drag-and-drop)","🟡 En progreso","ServicesController (destinos por rate) · quote-services-v2.js (tourSelect)","—","Parcial: backend agrupa; falta filtro activo en el modal"
+"COTIZACIÓN","HU-180","Sistema","Como sistema quiero convertir el precio USD del walking tour a MXN","• Si walkingPriceCurrency=USD: precio × tipo de cambio vigente
+• Redondeo 2 decimales","✅ En producción","quote-services-v2.js: getWalkingTourPrice","—","Deep-dive tours"
+"COTIZACIÓN","HU-181","Sistema","Como sistema quiero exponer los endpoints de selección de tours para el flujo de 3 pasos","• tours-by-rate/:rateId · tours/destinations-by-rate/:rateId · tours/vehicles-by-rate-destination/:rateId/:destinationId (acceso gerente+)","✅ En producción","quotesRoutes.js · QuoteController (tours by rate/destination/vehicles)","—","Deep-dive tours"
+"COTIZACIÓN","HU-182","Admin","Como administrador quiero manejar tres tipos: experiencia, experiencia de proveedor y establecimiento","• type Experience/Provider/Establishment
+• Provider scoped a proveedor; conversión permitida Provider↔Establishment, NO Experience→Establishment","✅ En producción","ExperienceController · ProviderExperienciaController · Experience.js","—","Deep-dive experiencias (regla del Excel)"
+"COTIZACIÓN","HU-183","Sistema","Como sistema quiero calcular el costo de la experiencia por tipo de persona","• total = adultos×costo + niños×precio_niño + sin_alcohol×precio_sin_alcohol
+• Si falta un precio usa el costo base","🟡 En progreso","Experience.js (cost/price_child/price_no_alcohol) · quote-services-v2.js (calculatedPrices)","—","Campos existen; el desglose por tipo no está completamente surfaced en UI (regla del Excel)"
+"COTIZACIÓN","HU-184","Admin","Como administrador quiero editar manualmente el precio de la experiencia por tipo de persona","• Permitir precio manual distinto por adulto/niño/sin alcohol sin recálculo automático","🔴 No iniciado","(no presente en el código revisado)","—","Pendiente del Excel; el override manual por tipo de persona no existe"
+"COTIZACIÓN","HU-185","Admin","Como administrador quiero ver la experiencia en el catálogo aunque no esté disponible en la fecha","• Si la experiencia no está disponible el día seleccionado, igual aparece en el catálogo","🟡 En progreso","ExperienceController.getExperiences (filtro dayDate) · quote-services-v2.js","—","Backend filtra por día; el comportamiento de 'mostrar siempre' por confirmar (regla del Excel)"
+"COTIZACIÓN","HU-186","Sistema","Como sistema quiero agregar la nota 'se verificará disponibilidad' cuando la experiencia no está disponible","• Si la fecha no está en la disponibilidad, agregar nota informativa al servicio (sin más interacción)","🟡 En progreso","availabilityUtils.validateDaySchedules · quote-services-v2.js (alta del servicio)","—","La validación existe; la nota automática aún no se agrega (regla del Excel)"
+"COTIZACIÓN","HU-187","Admin","Como administrador quiero filtrar experiencias por destino (modal, drag-and-drop y tarifario)","• Filtro por destino en el catálogo y en la búsqueda del tarifario","🟡 En progreso","quote-services-v2.js (experiencesCache) · ExperienceController.getExperiences","—","Parcial: filtro por destino no evidente en el modal (regla del Excel)"
+"COTIZACIÓN","HU-188","Sistema","Como sistema quiero priorizar el precio de cliente de experiencias sobre el catálogo","• ClientPrices(cliente,experiencia,itemType=EXPERIENCES) gana sobre Experience.cost","🟡 En progreso","ClientPrices.js · quote-services-v2.js (clientPricesCache)","—","Estructura existe; lógica de override por documentar/verificar"
+"COTIZACIÓN","HU-189","Sistema","Como sistema quiero validar la disponibilidad de experiencias por día y ventana horaria","• availability = [{dayOfWeek,startTime,endTime}]
+• Valida que la fecha coincida con el día y la hora con el rango","✅ En producción","Experience.js (availability) · availabilityUtils","—","Deep-dive experiencias"
+"COTIZACIÓN","HU-190","Admin","Como administrador quiero armar paquetes de experiencias (experiencias/tours/proveedores)","• Experience puede contener experiences[]/tours[]/providerExperiences[] (máx 20 c/u, total ≤ 30)","✅ En producción","Experience.js · ExperienceController.validateExperienceArrays/processExperienceRelationships","—","Deep-dive experiencias"
+"COTIZACIÓN","HU-191","Sistema","Como sistema quiero versionar el precio al cambiar el costo de una experiencia","• Al cambiar cost se crea nuevo registro y el anterior queda con valid_until=hoy
+• Las queries usan la versión activa","✅ En producción","ExperienceController.updateExperience (versioning)","—","Deep-dive experiencias"
+"COTIZACIÓN","HU-192","Sistema","Como sistema quiero calcular A-Disposición por horas y cantidad de vehículos","• Precio = hourlyPrice × horas × vehículos
+• hourlyPrice de DisposablePrices por tipo de vehículo","✅ En producción","quote-services-v2.js: getServicePrice (a-disposicion) · DisposablePrices.getPriceByVehicleType","tests/integration/api/services-pricing-edit.test.js","Deep-dive A-disposición (regla del Excel)"
+"COTIZACIÓN","HU-193","Sistema","Como sistema quiero aplicar descuentos por volumen en A-Disposición según horas","• 16+ h→10%, 12-15→7.5%, 10-11→5%, 8-9→2.5%, <8→0%
+• totalPrice ×= (1 − desc/100)","✅ En producción","quote-services-v2.js: getADisposicionDiscount","—","Deep-dive A-disposición (regla del Excel)"
+"COTIZACIÓN","HU-194","Admin","Como administrador quiero capturar un precio manual (override) en A-Disposición","• Checkbox habilita el precio horario manual
+• Fórmula con override: customPrice × horas × vehículos − descuento","✅ En producción","quote-services-v2.js: getServicePrice (custom price)","—","Deep-dive A-disposición"
+"COTIZACIÓN","HU-195","Sistema","Como sistema quiero incluir la tarifa de guía en A-Disposición como costo único","• Si includeGuide suma driverTourRate después del descuento
+• NO se multiplica por número de vehículos","✅ En producción","quote-services-v2.js (guide rate) · pricingHelper","—","Deep-dive A-disposición"
+"COTIZACIÓN","HU-196","Sistema","Como sistema quiero recalcular los precios al cambiar la moneda (MXN/USD/EUR)","• USD: precio MXN ÷ tipo de cambio + reglas de redondeo USD
+• MXN: redondeo 2 decimales","🟡 En progreso","quote-services-v2.js: getDisplayPrice · pricingHelper.applyUSDRoundingRules","tests/unit/utils/pricingHelper.test.js","BUG del Excel: el listener de cambio de moneda está comentado; riesgo de desync USD/MXN; falta cobertura"
+"COTIZACIÓN","HU-197","Sistema","Como sistema quiero aplicar el tipo de cambio a los precios en USD","• ExchangeRate.getCurrentValue (default 18.5)
+• Conversión en tiempo real al cambiar moneda","✅ En producción","ExchangeRate.getCurrentValue · quote-services-v2.js","—","Deep-dive A-disposición/moneda"
+"COTIZACIÓN","HU-198","Sistema","Como sistema quiero calcular el subtotal por tipo de pago (efectivo/transferencia/tarjeta)","• Subtotal efectivo = base − descuento + guía
+• Transferencia/tarjeta = efectivo + surcharge
+• Redondeo 2 decimales","✅ En producción","quote-services-v2.js: calculateADisposicionPricing · pricingHelper.calculateSurcharge","—","Deep-dive totales"
+"COTIZACIÓN","HU-199","Sistema","Como sistema quiero calcular el IVA (16%) sobre el subtotal en pagos no-efectivo","• IVA = subtotal × 0.16
+• Solo transferencia/tarjeta, no efectivo
+• Redondeo 2 decimales","✅ En producción","quote-services-v2.js (cálculo de IVA)","tests/integration/api/services-pricing-edit.test.js","Deep-dive totales"
+"COTIZACIÓN","HU-200","Sistema","Como sistema quiero calcular el gran total (subtotal + IVA) por tipo de pago","• Efectivo = subtotal; transferencia/tarjeta = subtotal + IVA
+• Redondeo 2 decimales","✅ En producción","quote-services-v2.js (total) · _aDisposicionBreakdownTotals","—","Deep-dive totales"
+"COTIZACIÓN","HU-201","Sistema","Como sistema quiero redondear el efectivo a múltiplos de $5 MXN cuando está habilitado","• Solo MXN
+• .00-.49 baja, .50-.99 sube al múltiplo de 5
+• Controlado por cashRoundingEnabled","✅ En producción","cash-rounding.js · /api/settings/cash-rounding","—","Deep-dive totales"
+"COTIZACIÓN","HU-202","Sistema","Como sistema quiero persistir A-Disposición con el desglose por tipo de pago","• Guarda _aDisposicionBreakdownTotals {efectivo,transferencia,tarjeta}
+• Prefiere los valores editados manualmente sobre el cache","✅ En producción","quote-services-v2.js: collectServiceData (a-disposicion)","—","Deep-dive totales"
+"COTIZACIÓN","HU-203","Sistema","Como sistema quiero el estatus COTIZADO con sus reglas de visibilidad y recordatorio","• Visible/editable por cliente; recordatorio 1 semana antes del primer servicio","🟡 En progreso","Quote.js (status) · QuoteReminder.findDueReminders","—","Detalle de HU-001; timings por verificar (regla del Excel)"
+"COTIZACIÓN","HU-204","Admin","Como administrador quiero el estatus SOLICITADO disparado por el cliente","• Botón 'solicitar' cambia a SOLICITADO y envía email + notificación al equipo para revisar viabilidad","🟡 En progreso","QuoteController (status) · flujo de notificación","—","Detalle de HU-001; email/notificación por confirmar (regla del Excel)"
+"COTIZACIÓN","HU-205","Sistema","Como sistema quiero el estatus BLOQUEADO con recordatorios de datos faltantes","• Se activa al aceptar servicios con datos faltantes
+• Recordatorios 2 días y 24h antes","🟡 En progreso","Quote.js (status hold) · QuoteReminder","—","Detalle de HU-001; timings por verificar (regla del Excel)"
+"COTIZACIÓN","HU-206","Sistema","Como sistema quiero el estatus AGENDADO al confirmar todo y crear la reservación","• Requiere todos los servicios confirmados + pagado
+• Crea la Reservation y pasa de cotización a reservación","🟡 En progreso","QuoteController.convertToReservation","—","Detalle de HU-001/009; flujo de creación parcial (regla del Excel)"
+"COTIZACIÓN","HU-207","Admin","Como administrador quiero rechazar una cotización (RECHAZADO)","• Cambia a rejected
+• Soft-delete preservando auditoría","✅ En producción","QuoteController (status rejected)","—","Detalle de HU-001 (regla del Excel)"
+"COTIZACIÓN","HU-208","Admin","Como administrador quiero enviar la cotización por correo con destinatarios por defecto","• Pre-carga email de contacto + lead guest + propietario
+• Adjunta PDF","🟡 En progreso","QuoteController.sendEmail · POST /api/quotes/:id/send-email","—","Detalle de HU-008; lógica de destinatarios por defecto por verificar (regla del Excel)"
+"COTIZACIÓN","HU-209","Sistema","Como sistema quiero notificar por correo y app cuando se asigna un usuario a una cotización","• Al asignar propietario/colaborador, enviar email + notificación in-app","🔴 No iniciado","(no encontrado en el código)","—","Pendiente del Excel; no existe la notificación al asignar"
+"COTIZACIÓN","HU-210","Admin","Como administrador quiero ver el historial de cambios de forma más sencilla","• Vista de historial de ediciones más legible/resumida","🟡 En progreso","QuoteEdit · GET /api/quotes/:quoteId/edits","—","Detalle de HU-005; el Excel pide simplificar la vista"
+"COTIZACIÓN","HU-211","Admin","Como administrador quiero hacer más intuitivo el ajuste de horario en el modal de cotización","• Mejorar la edición del horario en el modal (se reporta confuso/incómodo)","🟡 En progreso","quote-services-modals.ejs · quote-services-v2.js (horarios)","—","Regla del Excel (UX del modal)"
+"PRECIOS Y TARIFAS","HU-212","Admin","Como administrador quiero configurar la fórmula y simulación de la tarifa de greeter","• GreeterRate con basePrice y hourlyRate + componentes de fórmula (v2)
+• Redondeo especial a centenas (últimos 2 dígitos <50 baja, ≥50 sube)
+• calculateCost(duración) y simulación","🟡 En progreso","GreeterRate.getFormulaConfiguration/calculateCost/applySpecialRounding · GreeterRateController","—","El Excel pide revisar la fórmula de greeter; verificar el redondeo especial contra el Excel de pricing"
+"PRECIOS Y TARIFAS","HU-213","Admin","Como administrador quiero configurar la fórmula de la tarifa de transporte de guía","• GuideTransportRate con value base + componentes de fórmula + roundTripMultiplier (1-5) + minimumCharge
+• Validación de operadores y paréntesis","🟡 En progreso","GuideTransportRate.getFormulaConfiguration/updateFormulaConfiguration · GuideTransportRateController","—","El Excel pide revisar la fórmula de guía/greeter"
+"PRECIOS Y TARIFAS","HU-214","Admin","Como administrador quiero aplicar markup masivo a precios de cliente con progreso en tiempo real","• POST devuelve processId
+• Stream de progreso (status/progress/complete) por processId
+• Mantiene procesos activos en memoria","✅ En producción","ClientPricesController.bulkApplyPricingWithProgress/getProgressUpdates · POST /api/client-prices/bulk-apply-with-progress · GET /pricing-progress/:processId","—","Detalle fino de HU-025"
+"PRECIOS Y TARIFAS","HU-215","Admin","Como administrador quiero ver el historial de precios de vehículo con fechas de vigencia","• getCurrentPrice (sin valid_until), getPriceAtDate, getPriceHistory (desc), createNewPrice cierra el actual con motivo","🟡 En progreso","VehicleRatePrices (modelo) · vehicleRatePricesController (varios endpoints stubbed 501)","—","El modelo soporta historial; algunos endpoints de historial están sin implementar"
+"PRECIOS Y TARIFAS","HU-216","Sistema","Como sistema quiero versionar consistentemente todos los precios","• ClientPrices y VehicleRatePrices versionan con valid_until/valid_from
+• RatePrices y TourPrices SOBRESCRIBEN sin historial (inconsistencia)","🟡 En progreso","RatePrices.js · TourPrices.js (sin versionado) vs ClientPrices.js · VehicleRatePrices.js (con versionado)","—","Gap real: RatePrices/TourPrices no guardan historial al actualizar"
+"PRECIOS Y TARIFAS","HU-217","Admin","Como administrador quiero actualizar precios A-Disposición en lote con fecha efectiva e historial","• batch-update acepta [{id, price, notes}] + effectiveDate
+• Desactiva los anteriores y crea nuevos
+• Historial paginado","✅ En producción","DisposablePricesController.updateBatch/getHistory · POST /api/disposable-prices/batch-update","—","Detalle fino de HU-016"
+"PRECIOS Y TARIFAS","HU-218","Admin","Como administrador quiero buscar y filtrar el historial de tarifas en la tabla","• Historial DataTables server-side (paginación, orden)
+• La búsqueda/filtro por texto está marcada como TODO en el código","🟡 En progreso","ExchangeRateController.getHistory (search TODO) y controllers de tarifas análogos","—","El filtrado de búsqueda en el historial está pendiente (TODO en código)"
+"PRECIOS Y TARIFAS","HU-219","Sistema","Como sistema quiero crear tarifas por defecto si no existen (greeter, guía)","• createDefaultIfNotExists para GreeterRate (basePrice 760, hourlyRate 640) y GuideTransportRate (value 450, roundTripMultiplier 2)
+• Solo si getCurrentRate es null","✅ En producción","GreeterRate.createDefaultIfNotExists · GuideTransportRate (análogo)","—","Auto-fallback; sin tests sistemáticos"
+"PRECIOS Y TARIFAS","HU-220","Sistema","Como sistema quiero validar rangos por tipo de tarifa al crearlas","• ExchangeRate 0<v<1000 (default 18.5)
+• InflationRate 0<%≤100
+• TransferRate 0.01-50%
+• AgencyRate 0.01-99.99%
+• Rechaza NaN/fuera de rango","✅ En producción","Validaciones en cada modelo de tarifa","—","Validación presente (no centralizada)"
+"RESERVACIÓN","HU-221","Admin","Como administrador quiero filtros avanzados de reservaciones","• Filtro por estado; periodo upcoming/ongoing/past; año/mes/día (se fusionan sin pisarse); búsqueda en folio/contacto/eventType/email; orden por columna; paginación DataTables","✅ En producción","ReservationController.getReservations · GET /api/reservations","tests/integration/api/reservations.test.js","Detalle fino de HU-027"
+"RESERVACIÓN","HU-222","Admin","Como administrador quiero asignar por separado conductor, guía, greeter y vehículo a un servicio","• Cada asignación independiente (driverId/guideId/greeterId/vehicleId/serviceCustomerId)
+• Asignar chofer auto-transiciona pending→assigned; quitarlo revierte a pending","✅ En producción","ReservationController.assignEmployee · PUT /api/reservations/:id/services/:serviceId/assign","tests/integration/api/reservations.test.js","Detalle fino de HU-029"
+"RESERVACIÓN","HU-223","Admin","Como administrador quiero asignar varios vehículos extra a un mismo servicio","• extraAssignments[] con {vehicleId, segmentId, segmentName, segmentColor}
+• El vehículo principal queda en assignedVehicle; estos son adicionales","✅ En producción","ReservationController.assignEmployee (extraAssignments)","tests/integration/api/reservations.test.js","Para servicios que requieren más de un vehículo"
+"RESERVACIÓN","HU-224","Sistema","Como sistema quiero gestionar las transiciones de estado del servicio y recalcular el de la reservación","• Estados servicio: pending/assigned/in_progress/completed/cancelled/confirmed/hold
+• Recalcula reservación: preserva confirmed/hold salvo que todos completed; alguno in_progress→in_progress; todos assigned→assigned","✅ En producción","ReservationController.updateServiceStatus/updateReservationStatus · PATCH /api/reservations/:id/services/:serviceId/status","tests/integration/api/reservations.test.js","Detalle fino de HU-032"
+"RESERVACIÓN","HU-225","Admin","Como administrador quiero asignación inteligente/automática de vehículos según horarios","• Sugerir/asignar vehículo disponible validando que no haya conflicto de horario, priorizando el tipo de vehículo requerido","🔴 No iniciado","(no existe; requiere manejar horarios de cada vehículo)","—","Pendiente del Excel ('automatizar la asignación de vehículos de manera inteligente')"
+"RESERVACIÓN","HU-226","Admin","Como administrador quiero notas por servicio visibles a agentes con notificación al enviar un set de cambios","• El modelo ReservationService tiene notes
+• Falta endpoint para editarlas y notificación (email/app) a los asignados al mandar un set de cambios","🔴 No iniciado","ReservationService.notes (modelo) · endpoint y notificación faltan","—","Pendiente del Excel (notas de servicio + envío de cambios con correo/notificación)"
+"RESERVACIÓN","HU-227","Admin","Como administrador quiero exportar el formato de reserva con posibilidad de enviarlo por correo","• Exportar la reserva (PDF/Excel) con datos de cliente/servicios/totales y opción de envío por correo","🔴 No iniciado","(no existe endpoint de exportación en reservationRoutes)","—","Pendiente del Excel ('Exportar formato de reserva y posibilidad de envío de correos')"
+"RESERVACIÓN","HU-228","Admin","Como administrador quiero exportar la relación de servicios de una reserva","• Reporte tabular: fecha, servicio, chofer, guía, vehículo, greeter, notas, estado","🔴 No iniciado","(no existe endpoint de relación de servicios)","—","Pendiente del Excel ('Exportar relación de servicios')"
+"RESERVACIÓN","HU-229","Admin","Como administrador quiero cambiar el diseño/layout de la reserva para administrador","• Mostrar/ocultar y ordenar campos por rol; persistir en settings y aplicar en la vista de reserva","🟡 En progreso","SettingsController (marco existe; layout de reserva pendiente)","—","Pendiente del Excel ('Cambiar el diseño a administrador')"
+"RESERVACIÓN","HU-230","Chofer","Como chofer quiero acceder y actualizar mis reservaciones asignadas","• Ver solo sus servicios asignados y actualizar estado/notas propias","🟡 En progreso","ReservationController (asignación) · DriverController.trips (stub)","—","Pendiente del Excel ('Acceso a choferes: actualizar reservaciones'); backend parcial"
+"SERVICIOS Y POIs","HU-231","Admin","Como administrador quiero crear un POI con nombre único","• Nombre requerido (1-280), único case-insensitive (409 si duplica)
+• Asociado a un tipo de servicio activo
+• active/exists true","✅ En producción","POIController.createPOI · POI.validate/isNameUnique · POST /api/pois","—","Deep-dive catálogo"
+"SERVICIOS Y POIs","HU-232","Admin","Como administrador quiero editar un POI revalidando unicidad","• 404 si no existe
+• Revalida unicidad del nombre excluyendo el actual
+• Verifica que el serviceType esté activo","✅ En producción","POIController.updatePOI · PUT /api/pois/:id","—","Deep-dive catálogo"
+"SERVICIOS Y POIs","HU-233","Admin","Como administrador quiero activar/desactivar un POI con auditoría","• active booleano requerido
+• exists permanece true
+• Audita id/email/usuario","✅ En producción","POIController.togglePOIStatus · PATCH /api/pois/:id/toggle-status","—","Deep-dive catálogo"
+"SERVICIOS Y POIs","HU-234","Admin","Como administrador quiero eliminar un POI de forma lógica","• Soft-delete exists=false, active=false
+• Preserva auditoría
+• No aparece en activos","✅ En producción","POIController.deletePOI · DELETE /api/pois/:id","—","Deep-dive catálogo"
+"SERVICIOS Y POIs","HU-235","Admin","Como administrador quiero crear un tipo de servicio con nombre único","• Nombre requerido (máx 280), único (409)
+• No permite nombres reservados (Aeropuerto/Punto a Punto/Local/Tours)","✅ En producción","ServiceTypeController.createServiceType · POST /api/service-types","—","Deep-dive catálogo"
+"SERVICIOS Y POIs","HU-236","Sistema","Como sistema quiero proteger los tipos de servicio predefinidos","• Bloquea editar/renombrar a Aeropuerto/Punto a Punto/Local/Tours (403/400)
+• La protección de borrado se delega al servicio","🟡 En progreso","ServiceTypeController.updateServiceType/deleteServiceType","—","Protección de edición confirmada; la de borrado está delegada y sin verificar"
+"SERVICIOS Y POIs","HU-237","Admin","Como administrador quiero crear un servicio (ruta) con validación","• Destino obligatorio, origen opcional
+• origen≠destino si ambos
+• Rechaza ruta duplicada (409) por origen/destino/vehículo/rate","✅ En producción","ServicesController.createService · Service.validate/findByRoute · POST /api/services-new","—","Deep-dive catálogo"
+"SERVICIOS Y POIs","HU-238","Admin","Como administrador quiero editar un servicio (duración de ruta y nota)","• 404 si no existe
+• Destino obligatorio; origen opcional; origen≠destino
+• routeDuration entero positivo opcional
+• note sin límite","✅ En producción","ServicesController.updateService · PUT /api/services-new/:id","—","Deep-dive catálogo"
+"SERVICIOS Y POIs","HU-239","Admin","Como administrador quiero activar/desactivar y eliminar servicios","• Toggle cambia solo active (exists=true)
+• Soft-delete exists=false/active=false
+• Auditado","✅ En producción","ServicesController.toggleServiceStatus/deleteService","—","Deep-dive catálogo"
+"SERVICIOS Y POIs","HU-240","Admin","Como administrador quiero ver el detalle de un servicio con su precio","• 404 si no existe
+• Incluye origin/destination POI, vehicleType, rate
+• Calcula precio desde RatePrices","✅ En producción","ServicesController.getServiceById · GET /api/services/:id","—","Deep-dive catálogo"
+"TOURS Y EXPERIENCIAS","HU-241","Admin","Como administrador quiero crear un tour (destino, duración, vehículo, tarifa, precio)","• Requeridos: destinationPOI, time(min)>0, vehicleType, rate, price>0
+• Crea TourPrice
+• active/exists true","✅ En producción","ToursController.createTour · POST /api/tours","—","Deep-dive catálogo"
+"TOURS Y EXPERIENCIAS","HU-242","Admin","Como administrador quiero editar un tour","• Edita destino/duración/vehículo/notas
+• Mantiene exists=true
+• Auditado","✅ En producción","ToursController.updateTour · PUT /api/tours/:id","—","Deep-dive catálogo"
+"TOURS Y EXPERIENCIAS","HU-243","Admin","Como administrador quiero marcar un tour como walking (a pie)","• isWalkingTour distingue a pie vs vehículo
+• Filtrado por tourType=walking|vehicle funciona","✅ En producción","Tour.js (isWalkingTour) · ToursController.getTours","—","El flag se usa en filtro; su validación en create/edit no está documentada"
+"TOURS Y EXPERIENCIAS","HU-244","Admin","Como administrador quiero definir la disponibilidad del tour por día y horario","• Campos de disponibilidad (legacy availableDays/startTime/endTime y nuevo availability[]) en el modelo","🔴 No iniciado","Tour.js (campos existen) · ToursController.createTour/updateTour (sin lógica) · tours-availability.test.js (skipped)","—","Gap real: los controllers no guardan/retornan disponibilidad; tests skipped"
+"TOURS Y EXPERIENCIAS","HU-245","Admin","Como administrador quiero gestionar la galería de imágenes de tours","• Upload S3 (JPEG/PNG/WebP, 250MB)
+• Variantes AVIF/WebP/JPEG
+• displayOrder; reordenar; soft-delete","✅ En producción","TourImageController.uploadImage/reorderImages/deleteImage · /api/tours/:id/images","—","Deep-dive catálogo"
+"TOURS Y EXPERIENCIAS","HU-246","Admin","Como administrador quiero activar/desactivar y eliminar tours","• Toggle solo active (exists=true)
+• Soft-delete exists=false/active=false","✅ En producción","ToursController.toggleTourStatus/deleteTour","—","Deep-dive catálogo"
+"TOURS Y EXPERIENCIAS","HU-247","Admin","Como administrador quiero crear una experiencia con tipo y paquetes anidados","• type Experience/Provider/Establishment
+• Puede incluir experiences[]/tours[]/providerExperiences[] (máx 20 c/u, total ≤30)
+• cost>0","✅ En producción","ExperienceController.createExperience/validateExperienceArrays · POST /api/experiences","—","Deep-dive catálogo"
+"TOURS Y EXPERIENCIAS","HU-248","Admin","Como administrador quiero editar una experiencia con versionado de precio","• Edita campos y relaciones anidadas
+• Al cambiar cost crea nueva versión (valid_until)","🟡 En progreso","ExperienceController.updateExperience/updateExperienceRelationships","—","Update base ✅; el versionado de precio está poco documentado"
+"TOURS Y EXPERIENCIAS","HU-249","Admin","Como administrador quiero ver las dependencias antes de eliminar una experiencia","• Lista las experiencias que la incluyen como sub-item para evitar referencias rotas","✅ En producción","ExperienceController.checkDependencies · GET /api/experiences/:id/dependencies","—","Deep-dive catálogo"
+"TOURS Y EXPERIENCIAS","HU-250","Admin","Como administrador quiero gestionar la galería de imágenes de experiencias","• Upload S3 con optimización; marcar principal; soft-delete (hasta 10 archivos)","✅ En producción","ExperienceImageController · POST/DELETE /api/experiences/:id/images","—","Deep-dive catálogo"
+"TOURS Y EXPERIENCIAS","HU-251","Admin","Como administrador quiero gestionar experiencias por proveedor con reordenamiento","• CRUD scoped al providerId
+• Reordenar por displayOrder
+• Valida pertenencia al proveedor","✅ En producción","ProviderExperienciaController.create/update/delete/reorder · /api/providers/:providerId/experiencias","—","Deep-dive catálogo"
+"VEHÍCULOS Y FLOTA","HU-252","Admin","Como administrador quiero crear un vehículo con validaciones exhaustivas","• Placa única (case-insensitive)
+• VIN 17 chars sin I/O/Q único
+• año 1990-próximo
+• capacidad 1-100
+• maintenanceStatus enum
+• rate opcional solo si activa","✅ En producción","VehicleController.createVehicle · Vehicle.validate · POST /api/vehicles","tests/integration/api/vehicles-with-rates.test.js","Deep-dive flota"
+"VEHÍCULOS Y FLOTA","HU-253","Admin","Como administrador quiero editar un vehículo revalidando cada campo","• Revalida unicidad de placa/VIN si cambian
+• Verifica VehicleType y Rate activa
+• Permite quitar rate (null)","✅ En producción","VehicleController.updateVehicle · PUT /api/vehicles/:id","—","Deep-dive flota"
+"VEHÍCULOS Y FLOTA","HU-254","Admin","Como administrador quiero eliminar un vehículo validando que no tenga reservas activas","• Soft-delete exists=false/active=false","🟡 En progreso","VehicleController.deleteVehicle (TODO: validar bookings activos)","—","Gap real: hoy borra sin validar reservas activas (TODO en código)"
+"VEHÍCULOS Y FLOTA","HU-255","Admin","Como administrador quiero crear tipos de vehículo con validación de código","• name y code requeridos
+• code lowercase [a-z0-9_-]
+• defaultCapacity 1-100, trunkCapacity 0-50, sortOrder≥0","✅ En producción","VehicleTypeController.createVehicleType · Vehicle Type.validate","tests/unit/services/VehicleTypeService.test.js","Deep-dive flota"
+"VEHÍCULOS Y FLOTA","HU-256","Admin","Como administrador quiero activar/desactivar tipos de vehículo y tener seeding por defecto","• Toggle active
+• Seeding: Sedan/SUV/Van/Bus/Limousine","✅ En producción","VehicleTypeController.toggleVehicleTypeStatus","tests/unit/controllers/api/VehicleTypeController.test.js","Deep-dive flota"
+"VEHÍCULOS Y FLOTA","HU-257","Admin","Como administrador quiero subir imágenes de vehículo a S3 con optimización","• Multer memory (250MB, JPG/PNG/WEBP)
+• Variantes AVIF/WEBP/JPEG
+• Primera = principal
+• Logging PCI","✅ En producción","VehicleImageController.uploadImage · POST /api/vehicles/:id/images","tests/integration/api/vehicle-images-s3.test.js","Deep-dive flota"
+"VEHÍCULOS Y FLOTA","HU-258","Admin","Como administrador quiero subir varias imágenes de vehículo en lote","• Hasta 10 archivos por request
+• Mismo flujo de optimización/orden/principal","✅ En producción","VehicleImageController (multer array) · POST /api/vehicles/:id/images","—","Deep-dive flota (sin test de batch)"
+"VEHÍCULOS Y FLOTA","HU-259","Admin","Como administrador quiero marcar la imagen principal del vehículo","• Desmarca la anterior y marca la nueva (isPrimary)","✅ En producción","VehicleImageController.setPrimary · PATCH /api/vehicles/:id/images/:imageId/primary","—","Deep-dive flota"
+"VEHÍCULOS Y FLOTA","HU-260","Admin","Como administrador quiero reordenar y eliminar imágenes del vehículo","• Reordena displayOrder
+• Soft-delete reasigna principal a la siguiente
+• Mueve a carpeta deleted/ en S3","✅ En producción","VehicleImageController.reorderImages/deleteImage","tests/integration/api/vehicle-images-s3.test.js","Deep-dive flota"
+"VEHÍCULOS Y FLOTA","HU-261","Sistema","Como sistema quiero normalizar la fecha de vencimiento del seguro a fin de día UTC","• insuranceExpiry (YYYY-MM-DD) → fin de día UTC al guardar; ISO al leer","✅ En producción","VehicleController (create/update) · Vehicle.setInsuranceExpiry","—","Deep-dive flota"
+"CLIENTES Y AGENCIAS","HU-262","Admin","Como administrador quiero crear una agencia con formulario completo","• Requeridos firstName/lastName/email/companyName/password (12+ compleja)
+• Crea AmexingUser role=department_manager, organizationId=client
+• bcrypt","✅ En producción","ClientsController.createClient · POST /api/clients","tests/unit/controllers/api/ClientsController.test.js","Deep-dive clientes"
+"CLIENTES Y AGENCIAS","HU-263","Admin","Como administrador quiero CRUD completo de clientes directos de Amexing","• Lista/detalle/edición con dirección estructurada o legacy
+• clientBelongsTo=amexing
+• Tom Select para dropdowns","✅ En producción","ClientsController.getAmexingDirectClients/getClientById/updateClient","tests/unit/controllers/api/ClientsController.test.js","Deep-dive clientes"
+"CLIENTES Y AGENCIAS","HU-264","Admin","Como administrador quiero gestionar departamentos dentro de un cliente","• Department con clientId, name, managerId, budget, costCenter
+• create/get/update en el modelo","🟡 En progreso","Client.createDepartment/getDepartments · Department.js","—","Gap: métodos del modelo existen pero los endpoints REST no están expuestos"
+"CLIENTES Y AGENCIAS","HU-265","Admin","Como administrador quiero asignar/remover el manager de un departamento","• assignManager escala a department_manager; removeManager puede degradar a employee; updateBudget con auditoría","🟡 En progreso","Department.assignManager/removeManager/updateBudget","—","Gap: métodos existen, rutas no expuestas"
+"CLIENTES Y AGENCIAS","HU-266","Admin","Como administrador quiero promover un agente a manager intercambiando datos","• Swap de firstName/lastName/email/phone entre agente y manager
+• Opción de preservar al manager anterior
+• Ambos re-loguean","✅ En producción","ClientEmployeesController.assignAsManager · DepartmentManagerSwapService · POST /api/clients/:clientId/employees/assign-manager","—","Deep-dive clientes"
+"CLIENTES Y AGENCIAS","HU-267","Admin","Como administrador quiero resetear la contraseña de un cliente de forma segura","• Genera 12 chars (may/min/dígito/especial)
+• bcrypt
+• Resetea intentos/lock
+• Log con IP/UA/adminId","✅ En producción","ClientsController.resetClientPassword · POST /api/clients/:id/reset-password","—","Deep-dive clientes"
+"CLIENTES Y AGENCIAS","HU-268","Sistema","Como sistema quiero auto-aprovisionar empleados de cliente vía OAuth por dominio","• Si autoProvisionEmployees y el email coincide con oauthDomain, crea/reactiva el usuario con defaultEmployeeRole y registra el proveedor","✅ En producción","Client.autoProvisionEmployee","—","Deep-dive clientes (SSO corporativo)"
+"CLIENTES Y AGENCIAS","HU-269","Admin","Como administrador quiero crear sub-clientes rápido o asignados a una empresa","• quick create (mínimos) hereda ownerType
+• admin-create-subclient asigna ownedBy=enterpriseId (valida que exista/activo)","✅ En producción","OwnedClientsController.createQuickOwnedClient/adminCreateSubClient","—","Deep-dive clientes"
+"CLIENTES Y AGENCIAS","HU-270","Admin","Como administrador quiero ver estadísticas de cliente y departamento","• Cliente: #departamentos, #empleados, #órdenes activas
+• Departamento: presupuesto usado/restante, utilización %, #miembros","🟡 En progreso","Client.getStatistics · Department.getStatistics","—","Métodos del modelo existen; endpoint/dashboard por exponer"
+"CLIENTES Y AGENCIAS","HU-271","Sistema","Como sistema quiero soportar dirección legacy y estructurada de clientes","• Legacy {street,city,state,zip,country} y nuevo {streetType,streetName,exterior,interior,colonia,...}
+• Merge parcial en update","✅ En producción","Client.create · ClientsController.processAddressData","—","Deep-dive clientes"
+"PERSONAL Y NÓMINA","HU-272","Admin","Como administrador quiero subir y quitar la foto de perfil de un empleado","• Upload optimizado a S3 (webp/jpeg)
+• removePhoto limpia url/s3Key/optimization","✅ En producción","EmployeesController.createEmployee/updateEmployee (profilePhoto)","tests/integration/api/employees.test.js","Deep-dive personal"
+"PERSONAL Y NÓMINA","HU-273","Chofer","Como chofer quiero ver mi perfil y estadísticas en el dashboard","• Dashboard de chofer con viajes hoy/semana/mes, ganancias, rating, completionRate","🟡 En progreso","DriverController.index/getDriverStats","—","Las estadísticas son MOCK; faltan queries reales a la BD"
+"PERSONAL Y NÓMINA","HU-274","Chofer","Como chofer quiero ver y actualizar el estado de mis viajes asignados","• Listar viajes propios con filtros; actualizar estado (in_progress→completed)","🔴 No iniciado","DriverController.trips (placeholder, retorna [])","—","Gap real: endpoint placeholder sin lógica de consulta a reservaciones"
+"PERSONAL Y NÓMINA","HU-275","Sistema","Como sistema quiero calcular las ganancias/comisiones del chofer desde los viajes completados","• Agregar comisiones de servicios completados por chofer por periodo","🔴 No iniciado","DriverController.earnings (placeholder)","—","Gap real: no existe lógica de cálculo de comisiones"
+"PERSONAL Y NÓMINA","HU-276","Admin","Como administrador quiero gestionar los métodos de pago de empleados/choferes","• PaymentInfo: paymentMethod (invoice/card/bank_transfer), paymentTerms (0/7/15/30/60/90)
+• Soft-delete","✅ En producción","PaymentInfo.js (CRUD) · /api/payment-info","tests/integration/api/billing.test.js","Deep-dive personal"
+"FACTURACIÓN","HU-277","Sistema","Como sistema quiero autocompletar la factura cuando se suben XML y PDF","• Si tras la subida existen xmlFileS3Key y pdfFileS3Key, marca completed con número AUTO-{id}-{timestamp}","✅ En producción","InvoiceController.uploadInvoiceFile (auto-complete)","tests/integration/api/invoices.test.js","Deep-dive facturación"
+"FACTURACIÓN","HU-278","Usuario","Como usuario quiero guardar mis datos de facturación legacy en mi perfil","• billingInfo en AmexingUser
+• Valida RFC (regex) y código postal (5 dígitos)
+• Admin puede ver el de cualquier usuario","✅ En producción","BillingController.saveBillingInfo/getBillingInfo/getUserBillingInfo · /api/billing","tests/integration/api/billing.test.js","Capa legacy junto a BillingProfile (HU-078)"
+"CANCELACIONES","HU-279","Admin","Como administrador quiero que las cancelaciones con +24h se apliquen directo con cascada","• ≥24h antes del evento cancela la quote (cancellationType=direct) sin solicitud
+• Cascada: cancela Reservation + ReservationServices","✅ En producción","CancellationRequestsController.cancelQuoteDirectly · POST /api/cancellation-requests","—","Deep-dive cancelaciones (regla 24h)"
+"CANCELACIONES","HU-280","Sistema","Como sistema quiero impedir revisar dos veces una solicitud ya resuelta","• Solo transición pending→approved|rejected
+• Si status≠pending devuelve 400","✅ En producción","CancellationRequestsController.reviewCancellationRequest","—","Deep-dive cancelaciones"
+"CANCELACIONES","HU-281","Sistema","Como sistema quiero calcular horas antes del evento y mostrar urgencia","• hoursBeforeEvent desde serviceItems.days[0].date
+• Badges de urgencia (rojo <12h, naranja <24h)","✅ En producción","CancellationRequest.calculateHoursBeforeEvent/requiresApproval","—","Deep-dive cancelaciones"
+"CANCELACIONES","HU-282","Sistema","Como sistema quiero notificar al cliente y admin al aprobar/rechazar una cancelación","• Enviar email/notificación en la resolución de la solicitud","🔴 No iniciado","(no hay evidencia de notificación en aprobación/rechazo)","—","Gap real: las solicitudes se resuelven sin notificar"
+"CANCELACIONES","HU-283","Sistema","Como sistema quiero procesar el reembolso de una cancelación aprobada","• refundAmount y cancellationFee se guardan pero deben ejecutar un reembolso real","🔴 No iniciado","(refundAmount/cancellationFee se almacenan, no se procesan)","—","Gap real: no hay integración de procesamiento de reembolsos"
+"USUARIOS, ROLES Y PERMISOS","HU-284","Superadmin","Como superadmin quiero consultar roles y editar solo el nombre visible","• GET lista/detalle de roles (solo superadmin)
+• PUT solo displayName
+• No hay create/delete (roles de sistema)","✅ En producción","RolesController.getRoles/getRoleById/updateRole · /api/roles","tests/unit/controllers/api/RolesController.test.js","Deep-dive RBAC"
+"USUARIOS, ROLES Y PERMISOS","HU-285","Admin","Como administrador quiero gestionar usuarios internos de Amexing con restricción de rol","• CRUD de usuarios amexing (nivel 6+)
+• Admin crea admin/employee_amexing/driver; solo superadmin crea superadmin
+• Scope organizationId=amexing","✅ En producción","AmexingUsersController (CRUD) · /api/amexingusers","—","Deep-dive RBAC"
+"USUARIOS, ROLES Y PERMISOS","HU-286","Gerente","Como gerente quiero revocar y extender delegaciones de permisos con auditoría","• revoke (status=revoked, revokedBy/At, motivo)
+• extend (nuevo validUntil + extensionHistory)","🟡 En progreso","DelegatedPermission.revoke/extend (modelo)","tests/unit/models/DelegatedPermission.test.js","Modelo soporta los campos; los endpoints de revoke/extend están por exponer"
+"USUARIOS, ROLES Y PERMISOS","HU-287","Admin","Como administrador quiero buscar usuarios por email/nombre con filtros","• Búsqueda parcial case-insensitive (email/nombre/apellido/username) + filtros rol/estado + paginación","🟡 En progreso","UserManagementController.searchUsers · GET /api/users/search","—","Endpoint existe; cobertura de pruebas por completar"
+"USUARIOS, ROLES Y PERMISOS","HU-288","Admin","Como administrador quiero ver estadísticas de usuarios","• total, activos, nuevos del mes, pendientes de verificación, distribución por rol, tendencia mensual","🟡 En progreso","UserManagementController.getUserStatistics · GET /api/users/statistics","—","Endpoint existe; lógica de cálculo por completar"
+"USUARIOS, ROLES Y PERMISOS","HU-289","Usuario","Como usuario quiero verificar mi correo mediante un enlace con token","• emailVerified=false al crear
+• emailVerificationToken
+• Verificar pone emailVerified=true","🟡 En progreso","AmexingUser (campos emailVerified/token) · flujo de verificación","—","Campos existen; el endpoint/flujo de verificación está por completar"
+"AUDITORÍA Y CUMPLIMIENTO","HU-290","Sistema","Como sistema quiero extraer los cambios (antes/después) en cada modificación","• extractChanges compara dirty fields vs serverData
+• Omite password/sessionToken/authData/ACL
+• CREATE guarda objeto completo","✅ En producción","auditTrailHooks.extractChanges","—","Deep-dive auditoría"
+"AUDITORÍA Y CUMPLIMIENTO","HU-291","Sistema","Como sistema quiero atribuir cada acción a un usuario (contexto)","• extractUserContext en cascada (AsyncLocalStorage→headers→request.user→sessionToken→masterKey)
+• Fallback system/anonymous","🟡 En progreso","auditTrailHooks.extractUserContext","—","AsyncLocalStorage no opera en cloud hooks; los headers requieren middleware adicional"
+"AUDITORÍA Y CUMPLIMIENTO","HU-292","Sistema","Como oficial de cumplimiento quiero auditar el acceso de LECTURA a datos sensibles (PCI 10.2.1)","• Helpers logReadAccess/logBulkReadAccess para AmexingUser/Client/Employee/Driver/Payment/Transaction/AuditLog","🔴 No iniciado","auditHelper.logReadAccess (helpers) · auditTrailHooks.afterFindHook (deshabilitado)","—","Gap real: los afterFind hooks están deshabilitados (sin contexto de usuario) y los helpers NO se invocan desde los controllers"
+"AUDITORÍA Y CUMPLIMIENTO","HU-293","Superadmin","Como superadmin quiero una política de retención y archivado de logs de auditoría","• Definir tiempo de retención y purga/archivado automático (PCI 10.7)","🔴 No iniciado","(no existe política ni job de retención)","—","Gap real: sin política de retención definida"
+"AUDITORÍA Y CUMPLIMIENTO","HU-294","Sistema","Como sistema quiero validar email único y registrar intentos duplicados","• beforeSave valida formato y unicidad de email
+• Log de seguridad DUPLICATE_EMAIL_ATTEMPT (email enmascarado)","✅ En producción","auditTrailHooks.beforeSaveHook (validación de email)","—","Deep-dive auditoría"
+"REPORTES Y ANALÍTICA","HU-295","Admin","Como administrador quiero que el tarifario aplique overrides de cliente por sección","• En traslados/tours busca ClientPrices por `${itemId}-${rateId}-${vehicleTypeId}` y usa su precio; si no, el precio base","✅ En producción","TarifarioExportService (lookup de ClientPrices por sección)","—","Detalle fino de HU-110"
+"REPORTES Y ANALÍTICA","HU-296","Admin","Como administrador quiero que el tarifario exportado tenga el branding de Amexing","• Encabezado con logo (AVIF→PNG), nombre/dirección/contacto, colores corporativos, formato de moneda por locale (es-MX/en-US)","✅ En producción","TarifarioExportService (Excel ExcelJS / PDF PDFKit)","—","Detalle fino de HU-110"
+"NOTIFICACIONES","HU-297","Sistema","Como sistema quiero un fallback SMTP si MailerSend falla","• sendViaSmtp con Nodemailer (EMAIL_HOST/PORT/USER/PASS)
+• Registra status sent_smtp/failed_smtp en EmailLog","✅ En producción","EmailService.sendViaSmtp","—","Deep-dive notificaciones (resiliencia)"
+"NOTIFICACIONES","HU-298","Admin","Como administrador quiero reenviar un correo desde el registro de auditoría","• resendEmail toma el EmailLog original y reenvía con prefijo [Reenvío]
+• Guarda resendFrom/resendAt en metadata","✅ En producción","EmailService.resendEmail","—","Deep-dive notificaciones"
+"NOTIFICACIONES","HU-299","Admin","Como administrador quiero consultar el historial de correos de un usuario","• getByRecipient ordenado por sentAt desc, paginado
+• También por email/tipo/estado/metadata","✅ En producción","EmailService.getEmailHistory · EmailLog.getByRecipient","—","Deep-dive notificaciones"
+"FORMULARIOS","HU-300","Admin","Como administrador quiero deshacer/rehacer cambios en el constructor (hasta 50)","• maxHistorySize=50
+• undo/redo por historyIndex
+• saveHistory al agregar/duplicar/reordenar","✅ En producción","public/js/form-builder.js: saveHistory/undo/redo/restoreState","—","Deep-dive formularios"
+"FORMULARIOS","HU-301","Usuario","Como usuario quiero validación de campo en tiempo real (al perder foco)","• POST /api/forms/validate-field {formId,fieldName,value}
+• Devuelve {success,errors} con mensajes localizados","✅ En producción","FormController.validateField · POST /api/forms/validate-field","—","Deep-dive formularios"
+"FORMULARIOS","HU-302","Admin","Como administrador quiero acciones post-envío (email/webhook/redirect)","• settings.postSubmissionActions [{type,...}]
+• email/webhook son placeholder (log, sin envío real); redirect en cliente","🟡 En progreso","FormRenderer.executePostSubmissionActions/sendEmailNotification/callWebhook","—","Email/webhook son placeholder (no entregan realmente)"
+"FORMULARIOS","HU-303","Admin","Como administrador quiero exportar los envíos a PDF","• Export JSON/CSV funciona; PDF devuelve placeholder 'no implementado'","🔴 No iniciado","FormRenderer.exportToPDF (placeholder)","—","Gap real: export PDF de formularios sin implementar"
+"FORMULARIOS","HU-304","Sistema","Como sistema quiero validar rutas de componentes contra path traversal","• path.normalize + verifica startsWith(atomsPath)
+• Lanza 'Invalid component path' si falla","✅ En producción","FormRenderer.renderComponent (validación de ruta)","—","Deep-dive formularios (seguridad)"
+"SITIO PÚBLICO Y LANDING","HU-305","Visitante","Como visitante quiero leer la sección 'nuestra historia' en Nosotros","• Contenido narrativo de la historia (1994→hoy) en historia-section","🔴 No iniciado","organisms/landing/historia-section.ejs (contenido pendiente)","—","Pendiente del Excel: falta el contenido de 'nuestra historia'"
+"SITIO PÚBLICO Y LANDING","HU-306","Visitante","Como visitante quiero la sección de misión con proporciones correctas","• Layout/proporciones de la sección misión/valores","🟡 En progreso","organisms/landing/about-section.ejs","—","Pendiente del Excel: arreglar proporciones de misión"
+"SITIO PÚBLICO Y LANDING","HU-307","Visitante","Como visitante quiero un formulario de contacto sin el campo 'empresa'","• Quitar el campo company del formulario visible (el backend ya lo trata como opcional)","🔴 No iniciado","contacto.ejs (campo company visible) · apiController.submitContactForm","—","Pendiente del Excel: quitar empresa del formulario de contacto"
+"SITIO PÚBLICO Y LANDING","HU-308","Visitante","Como visitante quiero un ícono/botón visible para cambiar de idioma","• Selector de idioma (ES/EN) visible en el navbar
+• Llama GET /set-language/:lang","🟡 En progreso","landing-navigation.ejs · GET /set-language/:lang (endpoint listo)","—","Pendiente del Excel: insertar ícono de idiomas (endpoint existe)"
+"SITIO PÚBLICO Y LANDING","HU-309","Visitante","Como visitante quiero las secciones de transporte/colaboraciones/certificaciones centradas","• Centrar y organizar en grid esas secciones","🟡 En progreso","organisms/landing/{transporte,colaboraciones,certificaciones}-section.ejs","—","Pendiente del Excel: centrar esas secciones"
+"SITIO PÚBLICO Y LANDING","HU-310","Visitante","Como visitante quiero tipografía de marca consistente en el sitio","• Headings/acentos con las fuentes de marca (Arpona/Myriad)","🟡 En progreso","css/fonts.css · vistas públicas","—","Pendiente del Excel: unificar tipografía con el ilustrador"
+"SITIO PÚBLICO Y LANDING","HU-311","Usuario","Como usuario quiero el login con la nueva paleta de colores de Amexing","• Aplicar paleta de identidad a las vistas de auth","🟡 En progreso","views/auth/*.ejs (CSS)","—","Pendiente del Excel: actualizar paleta del login"
+"CONFIGURACIÓN DEL SISTEMA","HU-312","Sistema","Como sistema quiero un almacén de settings con coerción de tipos","• Setting: key/value/valueType(string/number/boolean/json)/category
+• getTypedValue coerciona
+• validate con validationRules (min/max)","✅ En producción","Setting.getTypedValue/findByKey/findByCategory","—","Deep-dive configuración"
+"AUTENTICACIÓN","HU-313","Usuario","Como usuario quiero que el callback de OAuth maneje login, vinculación y solicitud de agencia","• callback con code/state
+• 3 salidas: login directo / confirmación de vinculación (email distinto) / solicitud de agencia
+• Cookies httpOnly + redirección por rol","✅ En producción","authRoutes.js (/auth/oauth/:provider/callback) · cloud handleOAuthCallback","tests/oauth/integration/oauth-flow.integration.test.js","Deep-dive auth (detalle de HU-143)"
+"AUTENTICACIÓN","HU-314","Sistema","Como sistema quiero rate limiting en autenticación","• Login 50 req/15min
+• Reset de contraseña 10 req/5min
+• Headers RateLimit-*","✅ En producción","authRoutes.js (rate limiters)","—","Deep-dive auth"
+"INTEGRACIONES","HU-315","Sistema","Como sistema quiero enviar correos vía MailerSend con fallback SMTP","• SDK MailerSend (token env)
+• EmailParams (destinatario/asunto/HTML/CC/adjuntos/tags)
+• Fallback Nodemailer
+• Log en EmailLog","✅ En producción","EmailService.init/sendEmail/sendViaSmtp","tests/unit/services/EmailService.test.js","Conector de integración (también en Notificaciones)"
+"INTEGRACIONES","HU-316","Usuario","Como usuario quiero iniciar sesión con Apple (Sign in with Apple)","• Verifica firma del id_token con llaves públicas de Apple
+• Valida aud=APPLE_CLIENT_ID y exp
+• Extrae sub/email/nombre","✅ En producción","AppleOAuthService.verifyIdToken · AppleIdTokenValidator","tests/oauth/integration/oauth-flow.integration.test.js","Deep-dive integraciones"
+"INTEGRACIONES","HU-317","Admin","Como administrador quiero OAuth corporativo (Google/Microsoft) con scopes por departamento","• Scopes por depto/proveedor (Directory/Sheets/Analytics)
+• DepartmentOAuthConfig con customScopes
+• NOTA: hay scopes de Google pero NO de Calendar","✅ En producción","DepartmentOAuthFlowService (departmentScopes/loadDepartmentConfigurations)","tests/oauth/integration/oauth-flow.integration.test.js","Scopes de Directory/Sheets/Analytics; sin Calendar (ver HU-149)"

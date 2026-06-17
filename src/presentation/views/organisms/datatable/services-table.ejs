@@ -1181,11 +1181,16 @@ table.dataTable thead th:nth-child(2) select {
                         if (row.originPOI?.name?.includes('Querétaro') || row.destinationPOI?.name?.includes('Querétaro')) {
                         }
                         
+                        // Solo considerar entradas con un precio REAL registrado (> 0).
+                        // Un rate sin precio (registro RatePrices en 0/vacío) NO debe mostrarse;
+                        // es mala UX. Si no queda ninguno, cae a "Sin precios para <rate>".
+                        const realPrices = (row.priceData || []).filter(p => p && p.price > 0);
+
                         // Check if we have expanded price data for the selected rate
-                        if (row.priceData && row.priceData.length > 0) {
+                        if (realPrices.length > 0) {
                             // Show ALL vehicle types for selected rate (no limit) with enhanced card design
                             // Sort prices from low to high
-                            const sortedPrices = [...row.priceData].sort((a, b) => (a.price || 0) - (b.price || 0));
+                            const sortedPrices = [...realPrices].sort((a, b) => (a.price || 0) - (b.price || 0));
                             let pricesHtml = sortedPrices.map(p => {
                                 // Get capacity info from price data
                                 let defaultCapacity = p.vehicleType?.defaultCapacity || 4;
@@ -1259,9 +1264,9 @@ table.dataTable thead th:nth-child(2) select {
                                         </div>
                                         ${expandButton}
                                     </div>`;
-                        } else if (selectedRate && row.priceData && row.priceData.length > 0) {
+                        } else if (selectedRate && realPrices.length > 0) {
                             // Main table view: Show service-level price
-                            const firstPrice = row.priceData[0];
+                            const firstPrice = realPrices[0];
                             const priceFormatted = `$${firstPrice.price.toLocaleString()} MXN`;
                             const mainPriceHtml = `<div class="fw-bold text-primary small">${priceFormatted}</div>`;
                             
@@ -2672,15 +2677,18 @@ table.dataTable thead th:nth-child(2) select {
                     },
                     success: function(response) {
                         if (response.success && response.data) {
-                            // Group prices by rate
+                            // Group prices by rate. Solo precios reales (> 0): un rate sin
+                            // precio registrado no debe aparecer (mala UX mostrar $0).
                             const pricesByRate = {};
-                            response.data.forEach(item => {
-                                const rateName = item.rate?.name || 'Sin tarifa';
-                                if (!pricesByRate[rateName]) {
-                                    pricesByRate[rateName] = [];
-                                }
-                                pricesByRate[rateName].push(item);
-                            });
+                            response.data
+                                .filter(item => item && item.price > 0)
+                                .forEach(item => {
+                                    const rateName = item.rate?.name || 'Sin tarifa';
+                                    if (!pricesByRate[rateName]) {
+                                        pricesByRate[rateName] = [];
+                                    }
+                                    pricesByRate[rateName].push(item);
+                                });
                             
                             // Get current filter states - read fresh values each time
                             const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');

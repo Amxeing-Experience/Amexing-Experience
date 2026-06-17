@@ -1832,6 +1832,23 @@ class UserManagementService {
     if (!currentRole && typeof currentUser?.get === 'function') {
       currentRole = currentUser.get('role');
     }
+    // Admins/agencies store their role as a roleId Pointer (and the auth middleware
+    // caches the resolved Role in _cachedRole), NOT as a 'role' string. Resolve from
+    // there too — otherwise currentRole stays undefined, currentLevel falls back to 0,
+    // and the level check wrongly blocks legitimate modifications (e.g. an admin
+    // activating/deactivating an agency). Mirrors how targetRole is resolved below.
+    if (!currentRole) {
+      const cachedRole = currentUser?._cachedRole;
+      if (cachedRole && typeof cachedRole.get === 'function') {
+        currentRole = cachedRole.get('name');
+      }
+      if (!currentRole && typeof currentUser?.get === 'function') {
+        const currentRolePtr = currentUser.get('roleId');
+        if (currentRolePtr && typeof currentRolePtr.get === 'function') {
+          currentRole = currentRolePtr.get('name');
+        }
+      }
+    }
 
     // Get role from targetUser - handle Pointer, property, or get() method
     let targetRole = null;

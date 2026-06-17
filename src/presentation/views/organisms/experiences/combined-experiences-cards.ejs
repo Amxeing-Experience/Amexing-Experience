@@ -479,10 +479,17 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentTransferRate = 0; // Transfer payment surcharge percentage
     let currentAgencyRate = 0; // Credit card payment surcharge percentage
     
-    // Helper function to format duration in hours (for experience duration)
+    // Helper function to format experience duration (stored as decimal hours, e.g.
+    // 1.5 or 0.75) into a readable "Xh Ymin" string instead of showing ".5h"/".75".
     function formatDuration(hours) {
-        if (!hours) return 'No especificada';
-        return `${hours}h`;
+        const h = parseFloat(hours);
+        if (!h || isNaN(h)) return 'No especificada';
+        const totalMinutes = Math.round(h * 60);
+        const hh = Math.floor(totalMinutes / 60);
+        const mm = totalMinutes % 60;
+        if (hh > 0 && mm > 0) return `${hh}h ${mm}min`;
+        if (hh > 0) return `${hh}h`;
+        return `${mm}min`;
     }
 
     // Helper function to format travel duration from minutes to hours and minutes (for travel_duration)
@@ -1071,8 +1078,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         let dayValue = null;
                         
                         if (typeof day === 'object' && day !== null) {
-                            // If it's an object, try to get the day property
-                            dayValue = day.day || day.Day || day.name || day.value;
+                            // Use !== undefined so day 0 (Domingo) is not dropped by
+                            // the falsy-0 problem (0 || x would skip Sunday).
+                            dayValue = day.day !== undefined ? day.day : (day.Day || day.name || day.value);
                         } else if (typeof day === 'string' || typeof day === 'number') {
                             // If it's already a string or number, use it directly
                             dayValue = day;
@@ -2622,7 +2630,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ${experience.availability ? `
                 <div class="content-section">
                     <h5 class="text-info mb-3">
-                        <i class="ti ti-calendar me-2"></i>Horarios Sugeridos
+                        <i class="ti ti-calendar me-2"></i>${experience.fixed_schedule ? 'Horarios' : 'Horarios Sugeridos'}
                     </h5>
                     <div class="availability-grid">
                         ${Array.isArray(experience.availability) ? (() => {
@@ -2718,6 +2726,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="languages">
                         ${experience.languages.map(lang => `<span class="badge bg-info me-2">${lang}</span>`).join('')}
                     </div>
+                </div>
+            ` : ''}
+
+            ${(experience.cancellation_policy || (experience.buyout !== null && experience.buyout !== undefined) || (experience.private_min_value !== null && experience.private_min_value !== undefined)) ? `
+                <div class="content-section">
+                    <h5 class="text-warning mb-3"><i class="ti ti-file-description me-2"></i>Condiciones</h5>
+                    <ul class="list-unstyled mb-0">
+                        ${experience.cancellation_policy ? `<li class="mb-2"><strong><i class="ti ti-calendar-x me-1"></i>Políticas de cancelación:</strong> ${experience.cancellation_policy}</li>` : ''}
+                        ${(experience.buyout !== null && experience.buyout !== undefined) ? `<li class="mb-2"><strong><i class="ti ti-cash me-1"></i>Buy-out:</strong> $${Number(experience.buyout).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</li>` : ''}
+                        ${(experience.private_min_value !== null && experience.private_min_value !== undefined) ? `<li class="mb-2"><strong><i class="ti ti-lock me-1"></i>Mínimo para hacerlo privado:</strong> ${experience.private_min_type === 'monto' ? '$' + Number(experience.private_min_value).toLocaleString('es-MX', { minimumFractionDigits: 2 }) : Number(experience.private_min_value) + ' personas'}</li>` : ''}
+                    </ul>
                 </div>
             ` : ''}
         `;

@@ -1945,25 +1945,58 @@ class QuoteController {
         }
       }
 
-      // Consistencia de totales (costura #1 — backend, motor único).
-      // Verifica que el subtotal enviado por el front coincida con la suma de los
-      // totales por día. Por ahora SOLO observa (log warning) — NO cambia números
-      // (consolidación faithful). La recomputación autoritativa con el motor se hará
-      // en la fase de corrección de fórmulas.
+      // Consistencia de totales (costura #1 — backend, motor único). SOLO OBSERVA: re-verifica
+      // con el motor que los números del front sean consistentes y loggea divergencias; NO
+      // cambia valores ni bloquea el guardado (prioridad: que funcione). Usa solo los datos del
+      // payload (sin fetches extra a la BD) para no afectar el rendimiento.
       try {
         const pricingEngine = require('../../../domain/pricing/pricingEngine');
-        const sumOfDayTotals = pricingEngine.round2(
-          days.reduce((sum, day) => sum + (parseFloat(day.dayTotal) || 0), 0)
-        );
-        const subtotalRounded = pricingEngine.round2(subtotal);
-        if (Math.abs(sumOfDayTotals - subtotalRounded) > 0.01) {
-          logger.warn('⚠️ Inconsistencia de subtotal en cotización (builder vs suma de días)', {
+        const r2 = pricingEngine.round2;
+
+        // 1) Subtotal vs suma de los totales de los subconcepts (lo que realmente se cobra),
+        //    y por-subconcept que su total coincida con pricesByType[forma de pago].
+        let sumOfSubconceptTotals = 0;
+        let subconceptMismatches = 0;
+        days.forEach((day) => {
+          (day.subconcepts || []).forEach((sc) => {
+            if (sc.includeInTotal === false) return;
+            const scTotal = parseFloat(sc.total) || 0;
+            sumOfSubconceptTotals += scTotal;
+            if (sc.pricesByType && typeof sc.pricesByType === 'object') {
+              const expected = parseFloat(sc.pricesByType[paymentType]);
+              if (!Number.isNaN(expected) && Math.abs(r2(expected) - r2(scTotal)) > 0.01) {
+                subconceptMismatches += 1;
+              }
+            }
+          });
+        });
+        sumOfSubconceptTotals = r2(sumOfSubconceptTotals);
+        const subtotalRounded = r2(subtotal);
+        if (Math.abs(sumOfSubconceptTotals - subtotalRounded) > 0.01) {
+          logger.warn('⚠️ Inconsistencia de subtotal (front vs suma de subconcepts)', {
             quoteId,
             subtotalRecibido: subtotalRounded,
-            sumaDeDias: sumOfDayTotals,
-            diferencia: pricingEngine.round2(subtotalRounded - sumOfDayTotals),
+            sumaSubconcepts: sumOfSubconceptTotals,
+            diferencia: r2(subtotalRounded - sumOfSubconceptTotals),
             paymentType,
             currency,
+          });
+        }
+        if (subconceptMismatches > 0) {
+          logger.warn('⚠️ Subconcepts cuyo total no coincide con pricesByType[formaPago]', {
+            quoteId, count: subconceptMismatches, paymentType,
+          });
+        }
+
+        // 2) total = subtotal + IVA (coherencia del agregado).
+        const totalEsperado = r2(subtotalRounded + (parseFloat(iva) || 0));
+        if (Math.abs(totalEsperado - r2(total)) > 0.01) {
+          logger.warn('⚠️ Inconsistencia de total (subtotal + IVA vs total recibido)', {
+            quoteId,
+            subtotal: subtotalRounded,
+            iva: r2(parseFloat(iva) || 0),
+            totalEsperado,
+            totalRecibido: r2(total),
           });
         }
       } catch (calcErr) {

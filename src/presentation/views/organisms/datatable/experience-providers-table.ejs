@@ -182,9 +182,43 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         </div>
                         <div class="col-md-6">
                             <label for="quickExperienciaMaxPeople" class="form-label form-label-sm fw-medium text-success">Máx. Personas</label>
-                            <input type="number" class="form-control" id="quickExperienciaMaxPeople" min="1" step="1" 
+                            <input type="number" class="form-control" id="quickExperienciaMaxPeople" min="1" step="1"
                                    placeholder="10">
                         </div>
+                    </div>
+
+                    <!-- Mínimo para privado + Buy-out -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm fw-medium text-success">Mínimo para privado</label>
+                            <div class="input-group">
+                                <select class="form-select" id="quickExperienciaPrivateMinType" style="max-width: 150px;">
+                                    <option value="">N/A</option>
+                                    <option value="personas">Por personas</option>
+                                    <option value="monto">Monto fijo ($)</option>
+                                </select>
+                                <input type="number" class="form-control" id="quickExperienciaPrivateMinValue" min="0" step="0.01"
+                                       placeholder="N° personas o monto">
+                            </div>
+                            <div class="form-text"><small>Personas mínimas o monto fijo para hacerlo privado</small></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="quickExperienciaBuyout" class="form-label form-label-sm fw-medium text-success">Buy-out</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="quickExperienciaBuyout" min="0" step="0.01"
+                                       placeholder="0.00">
+                            </div>
+                            <div class="form-text"><small>Monto para reservar la experiencia completa (buy-out)</small></div>
+                        </div>
+                    </div>
+
+                    <!-- Políticas de cancelación -->
+                    <div class="mb-3">
+                        <label for="quickExperienciaCancellationPolicy" class="form-label form-label-sm fw-medium text-success">Políticas de cancelación</label>
+                        <textarea class="form-control" id="quickExperienciaCancellationPolicy" rows="3"
+                                  placeholder="Ej. Cancelación gratuita hasta 48h antes; después se cobra el 50%..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
                     </div>
 
                     <!-- Incluye y No Incluye en 2 columnas -->
@@ -239,12 +273,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <div class="availability-section mb-3">
                         <!-- Availability Summary View (default) -->
                         <div class="availability-summary-quickadd">
-                            <label class="form-label form-label-sm fw-medium text-success d-flex justify-content-between align-items-center">
-                                <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
+                            <div class="form-label form-label-sm fw-medium text-success d-flex justify-content-between align-items-center mb-1">
+                                <span class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
+                                    <span class="form-check form-switch mb-0" title='Si se activa, en el detalle muestra "Horarios" en lugar de "Horarios sugeridos" (ej. viñedos).'>
+                                        <input class="form-check-input" type="checkbox" id="quickExperienciaFixedSchedule">
+                                        <label class="form-check-label small fw-medium" for="quickExperienciaFixedSchedule">Horario fijo</label>
+                                    </span>
+                                </span>
                                 <button type="button" class="btn btn-sm btn-link p-0 toggle-quickadd-availability-btn" title="Configurar horarios">
                                     <i class="ti ti-settings"></i>
                                 </button>
-                            </label>
+                            </div>
                             <div class="availability-display bg-light border rounded p-2" style="min-height: 35px;">
                                 <small class="text-success">
                                     <i class="ti ti-check-circle me-1"></i>
@@ -595,11 +635,45 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 </div>
                 <div class="col-md-6">
                     <label class="form-label form-label-sm fw-medium text-success">Máx. Personas</label>
-                    <input type="number" class="form-control experiencia-max-people-input" min="1" step="1" 
+                    <input type="number" class="form-control experiencia-max-people-input" min="1" step="1"
                            placeholder="10">
                 </div>
             </div>
-            
+
+            <!-- Mínimo para privado + Buy-out -->
+            <div class="row mb-2">
+                <div class="col-md-6">
+                    <label class="form-label form-label-sm fw-medium text-success">Mínimo para privado</label>
+                    <div class="input-group">
+                        <select class="form-select experiencia-private-min-type-input" style="max-width: 150px;">
+                            <option value="">N/A</option>
+                            <option value="personas">Por personas</option>
+                            <option value="monto">Monto fijo ($)</option>
+                        </select>
+                        <input type="number" class="form-control experiencia-private-min-value-input" min="0" step="0.01"
+                               placeholder="N° personas o monto">
+                    </div>
+                    <div class="form-text"><small>Personas mínimas o monto fijo para hacerlo privado</small></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label form-label-sm fw-medium text-success">Buy-out</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control experiencia-buyout-input" min="0" step="0.01"
+                               placeholder="0.00">
+                    </div>
+                    <div class="form-text"><small>Monto para reservar la experiencia completa (buy-out)</small></div>
+                </div>
+            </div>
+
+            <!-- Políticas de cancelación -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium text-success">Políticas de cancelación</label>
+                <textarea class="form-control experiencia-cancellation-policy-input" rows="3"
+                          placeholder="Ej. Cancelación gratuita hasta 48h antes; después se cobra el 50%..."
+                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+            </div>
+
             <!-- Incluye y No Incluye en 2 columnas -->
             <div class="row">
                 <div class="col-md-6">
@@ -652,12 +726,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <div class="availability-section">
                 <!-- Availability Summary View (default) -->
                 <div class="availability-summary">
-                    <label class="form-label form-label-sm fw-medium text-success d-flex justify-content-between align-items-center">
-                        <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
+                    <div class="form-label form-label-sm fw-medium text-success d-flex justify-content-between align-items-center mb-1">
+                        <span class="d-flex align-items-center gap-2 flex-wrap">
+                            <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
+                            <span class="form-check form-switch mb-0" title='Si se activa, en el detalle muestra "Horarios" en lugar de "Horarios sugeridos" (ej. viñedos).'>
+                                <input class="form-check-input experiencia-fixed-schedule-input" type="checkbox">
+                                <label class="form-check-label small fw-medium">Horario fijo</label>
+                            </span>
+                        </span>
                         <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Configurar horarios">
                             <i class="ti ti-settings"></i>
                         </button>
-                    </label>
+                    </div>
                     <div class="availability-display bg-light border rounded p-2" style="min-height: 35px;">
                         <small class="text-success">
                             <i class="ti ti-check-circle me-1"></i>
@@ -1219,6 +1299,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 advance_booking_time: $('#quickExperienciaAdvanceTime').val() ? parseInt($('#quickExperienciaAdvanceTime').val()) : null,
                 min_people: $('#quickExperienciaMinPeople').val() ? parseInt($('#quickExperienciaMinPeople').val()) : null,
                 max_people: $('#quickExperienciaMaxPeople').val() ? parseInt($('#quickExperienciaMaxPeople').val()) : null,
+                cancellation_policy: $('#quickExperienciaCancellationPolicy').val().trim() || null,
+                buyout: $('#quickExperienciaBuyout').val() ? parseFloat($('#quickExperienciaBuyout').val()) : null,
+                private_min_type: $('#quickExperienciaPrivateMinType').val() || null,
+                private_min_value: $('#quickExperienciaPrivateMinValue').val() ? parseFloat($('#quickExperienciaPrivateMinValue').val()) : null,
+                fixed_schedule: $('#quickExperienciaFixedSchedule').is(':checked'),
                 includes: includesList,
                 languages: languagesList,
                 notincludes: notIncludesList,
@@ -1377,6 +1462,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 duration: null,
                 min_people: null,
                 max_people: null,
+                cancellation_policy: null,
+                buyout: null,
+                private_min_type: null,
+                private_min_value: null,
+                fixed_schedule: false,
                 includes: [],
                 notincludes: [],
                 photos: [],
@@ -1421,7 +1511,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-travel-duration-input').value = experiencia.travel_duration || '';
             card.querySelector('.experiencia-min-people-input').value = experiencia.min_people || '';
             card.querySelector('.experiencia-max-people-input').value = experiencia.max_people || '';
-            
+            card.querySelector('.experiencia-cancellation-policy-input').value = experiencia.cancellation_policy || '';
+            card.querySelector('.experiencia-buyout-input').value = (experiencia.buyout !== null && experiencia.buyout !== undefined) ? experiencia.buyout : '';
+            card.querySelector('.experiencia-private-min-type-input').value = experiencia.private_min_type || '';
+            card.querySelector('.experiencia-private-min-value-input').value = (experiencia.private_min_value !== null && experiencia.private_min_value !== undefined) ? experiencia.private_min_value : '';
+            card.querySelector('.experiencia-fixed-schedule-input').checked = !!experiencia.fixed_schedule;
+
             // Populate includes field - convert array back to lines
             const includesText = experiencia.includes && experiencia.includes.length > 0 ? 
                 experiencia.includes.join('\n') : '';
@@ -1504,7 +1599,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             experiencia.travel_duration = card.find('.experiencia-travel-duration-input').val() ? parseInt(card.find('.experiencia-travel-duration-input').val()) : null;
             experiencia.min_people = card.find('.experiencia-min-people-input').val() ? parseInt(card.find('.experiencia-min-people-input').val()) : null;
             experiencia.max_people = card.find('.experiencia-max-people-input').val() ? parseInt(card.find('.experiencia-max-people-input').val()) : null;
-            
+            experiencia.cancellation_policy = card.find('.experiencia-cancellation-policy-input').val().trim() || null;
+            experiencia.buyout = card.find('.experiencia-buyout-input').val() ? parseFloat(card.find('.experiencia-buyout-input').val()) : null;
+            experiencia.private_min_type = card.find('.experiencia-private-min-type-input').val() || null;
+            experiencia.private_min_value = card.find('.experiencia-private-min-value-input').val() ? parseFloat(card.find('.experiencia-private-min-value-input').val()) : null;
+            experiencia.fixed_schedule = card.find('.experiencia-fixed-schedule-input').is(':checked');
+
             // Process includes field - convert lines to array
             const includesText = card.find('.experiencia-includes-input').val().trim();
             experiencia.includes = includesText ? 
@@ -2253,6 +2353,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     travel_duration: card.find('.experiencia-travel-duration-input').val() ? parseInt(card.find('.experiencia-travel-duration-input').val()) : null,
                     min_people: card.find('.experiencia-min-people-input').val() ? parseInt(card.find('.experiencia-min-people-input').val()) : null,
                     max_people: card.find('.experiencia-max-people-input').val() ? parseInt(card.find('.experiencia-max-people-input').val()) : null,
+                    cancellation_policy: card.find('.experiencia-cancellation-policy-input').val().trim() || null,
+                    buyout: card.find('.experiencia-buyout-input').val() ? parseFloat(card.find('.experiencia-buyout-input').val()) : null,
+                    private_min_type: card.find('.experiencia-private-min-type-input').val() || null,
+                    private_min_value: card.find('.experiencia-private-min-value-input').val() ? parseFloat(card.find('.experiencia-private-min-value-input').val()) : null,
+                    fixed_schedule: card.find('.experiencia-fixed-schedule-input').is(':checked'),
                     includes: includesList,
                     languages: languagesList,
                     notincludes: notIncludesList,
@@ -2574,6 +2679,23 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             }
         }
         
+        // Destino del proveedor en edición ({ id, name } o null). Fuente de verdad para
+        // mantener el seleccionado a prueba de timing (las opciones cargan async y el
+        // catálogo activo puede no incluir el POI guardado).
+        let pendingProviderDestino = null;
+
+        // Aplica el destino pendiente: reinyecta su opción si no existe y lo selecciona.
+        function applyProviderDestino() {
+            const $sel = $('#providerDestino');
+            if ($sel.length === 0) return;
+            if (!pendingProviderDestino || !pendingProviderDestino.id) return;
+            const { id, name } = pendingProviderDestino;
+            if ($sel.find(`option[value="${id}"]`).length === 0) {
+                $sel.append($('<option>').val(id).text(name || id));
+            }
+            $sel.val(id);
+        }
+
         // Populate Destino selectbox with POI options
         function populateDestinoSelect(selectId, pois) {
             const select = document.getElementById(selectId);
@@ -2581,10 +2703,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 console.warn('⚠️ Destino select element not found:', selectId);
                 return;
             }
-            
+
+            // Preserva la selección actual (las opciones se pueden repoblar async después).
+            const prevValue = select.value;
+
             // Clear existing options except the first one
             select.innerHTML = '<option value="">Seleccione un destino...</option>';
-            
+
             // Add POI options
             pois.forEach(poi => {
                 const option = document.createElement('option');
@@ -2593,7 +2718,17 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 option.setAttribute('data-service-type', poi.serviceType?.name || '');
                 select.appendChild(option);
             });
-            
+
+            if (prevValue) {
+                select.value = prevValue;
+            }
+
+            // Reaplica el destino del proveedor en edición (reinyecta su opción si el POI
+            // no vino en la lista) → seleccionado a prueba de timing.
+            if (selectId === 'providerDestino') {
+                applyProviderDestino();
+            }
+
             console.log(`✅ Populated ${selectId} with ${pois.length} POI options`);
         }
         
@@ -2614,6 +2749,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
             $('#providerModal').modal('show');
             $('#providerForm')[0].reset();
+            // Limpia el destino pendiente al abrir; el editar lo vuelve a setear tras el GET.
+            pendingProviderDestino = null;
             $('#providerId').val('');
             $('#type').val('Provider');
             $('#providerType').val(''); // No default value - optional field
@@ -2651,13 +2788,19 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#name').val(provider.name);
                         $('#description').val(provider.description || '');
                         
-                        // Populate destinationPOI field
+                        // Populate destinationPOI field — guarda como pendiente y aplica; se
+                        // re-aplica tras cada repoblado (a prueba de timing / POIs no listados).
                         if (provider.destinationPOI && provider.destinationPOI.id) {
-                            $('#providerDestino').val(provider.destinationPOI.id);
-                            console.log('📍 Loaded destinationPOI:', provider.destinationPOI.name || provider.destinationPOI.id);
+                            pendingProviderDestino = {
+                                id: provider.destinationPOI.id,
+                                name: provider.destinationPOI.name || provider.destinationPOI.id,
+                            };
+                            console.log('📍 Loaded destinationPOI:', pendingProviderDestino.name);
                         } else {
+                            pendingProviderDestino = null;
                             $('#providerDestino').val('');
                         }
+                        applyProviderDestino();
                         
                         // Don't set providerType, duration, min_people, or cost for providers
                         
@@ -2696,11 +2839,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             };
             
             // Add destinationPOI if selected
+            // Siempre enviar destinationPOI para poder SETEAR o LIMPIAR el destino
+            // (vacío => el backend hace unset en update; en create lo ignora).
             const destinationPOIId = $('#providerDestino').val();
-            if (destinationPOIId && destinationPOIId.trim() !== '') {
-                providerData.destinationPOI = destinationPOIId.trim();
-                console.log('📍 Including destinationPOI in provider data:', destinationPOIId);
-            }
+            providerData.destinationPOI = (destinationPOIId && destinationPOIId.trim() !== '') ? destinationPOIId.trim() : '';
+            console.log('📍 destinationPOI in provider data:', providerData.destinationPOI || '(none)');
 
             // Don't include providerType anymore - it's now part of individual experiencias
 

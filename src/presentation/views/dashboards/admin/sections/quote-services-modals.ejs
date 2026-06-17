@@ -740,17 +740,38 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 </div>
                             </div>
 
-                            <!-- Guía/Chofer Option -->
+                            <!-- Guía / Greeter Options -->
                             <div class="row mb-3">
-                                <div class="col-md-12">
+                                <div class="col-md-6">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" id="aDisposicionGuide">
                                         <label class="form-check-label" for="aDisposicionGuide">
-                                            <i class="ti ti-user me-1"></i>Incluir Chofer
+                                            <i class="ti ti-user me-1"></i>Incluir Guía
                                         </label>
-                                        <small class="text-muted d-block ms-4">Se agregará el costo del conductor turístico especializado</small>
+                                        <small class="text-muted d-block ms-4">Se agregará el costo de la guía</small>
                                     </div>
                                 </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="aDisposicionGreeter">
+                                        <label class="form-check-label" for="aDisposicionGreeter">
+                                            <i class="ti ti-user-check me-1"></i>Incluir Greeter
+                                        </label>
+                                        <small class="text-muted d-block ms-4">Se agregará el costo del greeter</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Vehículos adicionales (a-disposición; segmento por fila) -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="form-label mb-0"><i class="ti ti-car me-1"></i>Vehículos adicionales</label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="aDisposicionAddVehicleBtn">
+                                        <i class="ti ti-plus me-1"></i>Agregar vehículo
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block mb-2">Cada vehículo adicional usa su tarifa por hora × las horas del servicio.</small>
+                                <div id="aDisposicionAdditionalVehiclesList"></div>
                             </div>
                         </div>
 
@@ -1079,15 +1100,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         <div class="row mb-3">
                             <div class="col-md-4">
                                 <label for="adultsQuantity" class="form-label">Adultos</label>
-                                <input type="number" class="form-control experience-quantity-input" id="adultsQuantity" value="0" min="0" max="50">
+                                <input type="number" class="form-control experience-quantity-input" id="adultsQuantity" placeholder="0" min="0" max="50">
                             </div>
                             <div class="col-md-4">
                                 <label for="childrenQuantity" class="form-label">Niños</label>
-                                <input type="number" class="form-control experience-quantity-input" id="childrenQuantity" value="0" min="0" max="50">
+                                <input type="number" class="form-control experience-quantity-input" id="childrenQuantity" placeholder="0" min="0" max="50">
                             </div>
                             <div class="col-md-4">
                                 <label for="adultsNoAlcoholQuantity" class="form-label">Adultos sin alcohol</label>
-                                <input type="number" class="form-control experience-quantity-input" id="adultsNoAlcoholQuantity" value="0" min="0" max="50">
+                                <input type="number" class="form-control experience-quantity-input" id="adultsNoAlcoholQuantity" placeholder="0" min="0" max="50">
                             </div>
                         </div>
                         

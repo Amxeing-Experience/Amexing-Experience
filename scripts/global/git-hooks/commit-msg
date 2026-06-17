@@ -46,7 +46,7 @@ commit_msg=$(cat "$commit_msg_file")
 # 1. Validate conventional commit format
 log_info "Checking conventional commit format..."
 if command -v yarn >/dev/null 2>&1; then
-    if ! echo "$commit_msg" | yarn --silent commit:validate; then
+    if ! yarn --silent commitlint --config .config/commitlint/.commitlintrc.js --edit "$commit_msg_file" --verbose; then
         log_error "Commit message does not follow conventional commit format"
         echo ""
         echo "Expected format:"
