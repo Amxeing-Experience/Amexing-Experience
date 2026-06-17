@@ -1139,6 +1139,15 @@ class ItineraryBuilder {
       this.serviceModified = true; // Mark as modified when user changes hours
       this.calculateADisposicionPrice();
     });
+    // Mínimo de horas a-disposición: 3. Se fuerza al salir del campo (change) para no
+    // interferir mientras se teclea.
+    document.getElementById('aDisposicionHours')?.addEventListener('change', (e) => {
+      if (e.target.value !== '' && (parseFloat(e.target.value) || 0) < 3) {
+        e.target.value = '3';
+        this.serviceModified = true;
+        this.calculateADisposicionPrice();
+      }
+    });
     document.getElementById('aDisposicionVehicleCount')?.addEventListener('input', () => {
       this.serviceModified = true; // Mark as modified when user changes vehicle count
       this.calculateADisposicionPrice();
