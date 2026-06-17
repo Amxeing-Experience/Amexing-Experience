@@ -37,7 +37,7 @@ redondeo + moneda + IVA) y un nodo suelto (A-Disposición) que ni el front ni el
 | **Experiencias** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ guardado + desglose | **HECHO** (sin duración; ver abajo) |
 | **Walking tours** | ✅ recargo vía `composeServiceNodes` (1 nodo: total base) | ✅ desglose + fallback | **HECHO** (tiers/override en baseTotal) |
 | **Concepto** | ✅ recargo vía `composeServiceNodes` (1 nodo: unitario + por persona) | ✅ guardado + dev prices + desglose | **HECHO** (fix por-persona + C2) |
-| Backend (validar al guardar) | ❌ | — | hoy es passthrough; debe re-correr el motor |
+| Backend (validar al guardar) | 🟡 log-only | `updateServiceItems` verifica con el motor | Observa y loggea divergencias (subtotal vs Σ subconcepts; total = subtotal+IVA; total por-subconcept vs pricesByType[formaPago]); NO cambia ni bloquea. Recálculo autoritativo desde catálogo = capa futura |
 
 ## Transporte — qué se hizo (1er nodo del árbol)
 
