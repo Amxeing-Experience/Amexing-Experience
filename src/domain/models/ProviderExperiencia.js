@@ -210,6 +210,119 @@ class ProviderExperiencia extends BaseModel {
   }
 
   /**
+   * Get cancellation policy text.
+   * @returns {string|null} Cancellation policy or null.
+   * @example
+   */
+  getCancellationPolicy() {
+    return this.get('cancellation_policy') || null;
+  }
+
+  /**
+   * Set cancellation policy text.
+   * @param {string} policy - Cancellation policy text.
+   * @example
+   */
+  setCancellationPolicy(policy) {
+    this.set('cancellation_policy', policy ? String(policy).trim() : null);
+  }
+
+  /**
+   * Get buy-out amount (price to reserve the whole experience).
+   * @returns {number|null} Buy-out amount or null.
+   * @example
+   */
+  getBuyout() {
+    const v = this.get('buyout');
+    return (v === null || v === undefined) ? null : v;
+  }
+
+  /**
+   * Set buy-out amount.
+   * @param {number} buyout - Buy-out amount (>= 0).
+   * @example
+   */
+  setBuyout(buyout) {
+    if (buyout !== null && buyout !== undefined && buyout !== '') {
+      const n = parseFloat(buyout);
+      if (Number.isNaN(n) || n < 0) {
+        throw new Error('Buy-out must be a number >= 0');
+      }
+      this.set('buyout', n);
+    } else {
+      this.set('buyout', null);
+    }
+  }
+
+  /**
+   * Get the "private minimum" type: 'personas' (min people) or 'monto' (fixed amount).
+   * @returns {string|null} 'personas' | 'monto' | null.
+   * @example
+   */
+  getPrivateMinType() {
+    return this.get('private_min_type') || null;
+  }
+
+  /**
+   * Set the "private minimum" type.
+   * @param {string} type - 'personas' | 'monto' | null.
+   * @example
+   */
+  setPrivateMinType(type) {
+    if (type === 'personas' || type === 'monto') {
+      this.set('private_min_type', type);
+    } else {
+      this.set('private_min_type', null);
+    }
+  }
+
+  /**
+   * Get the "private minimum" value (number of people or fixed amount).
+   * @returns {number|null} Value or null.
+   * @example
+   */
+  getPrivateMinValue() {
+    const v = this.get('private_min_value');
+    return (v === null || v === undefined) ? null : v;
+  }
+
+  /**
+   * Set the "private minimum" value.
+   * @param {number} value - Number of people or fixed amount (>= 0).
+   * @example
+   */
+  setPrivateMinValue(value) {
+    if (value !== null && value !== undefined && value !== '') {
+      const n = parseFloat(value);
+      if (Number.isNaN(n) || n < 0) {
+        throw new Error('Private minimum value must be a number >= 0');
+      }
+      this.set('private_min_value', n);
+    } else {
+      this.set('private_min_value', null);
+    }
+  }
+
+  /**
+   * Get whether the schedule is fixed (vs. Suggested).
+   * When true, the detail view shows "Horarios"; otherwise "Horarios sugeridos".
+   * @returns {boolean} True if the schedule is fixed.
+   * @example
+   */
+  getFixedSchedule() {
+    return this.get('fixed_schedule') === true;
+  }
+
+  /**
+   * Set whether the schedule is fixed (vs. Suggested).
+   * @param {boolean} fixedSchedule - True for a fixed schedule.
+   * @example
+   */
+  setFixedSchedule(fixedSchedule) {
+    this.set('fixed_schedule', fixedSchedule === true || fixedSchedule === 'true');
+  }
+
+  /**
    * Get experiencia tipo.
    * @returns {string|null} Tipo or null if not set.
    * @example

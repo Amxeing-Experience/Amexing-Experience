@@ -226,6 +226,10 @@ class ExperienceController {
       cost: experience.get('cost'),
       min_people: experience.get('min_people'),
       max_people: experience.get('max_people') || null,
+      cancellation_policy: experience.get('cancellation_policy') || null,
+      buyout: (experience.get('buyout') !== undefined ? experience.get('buyout') : null),
+      private_min_type: experience.get('private_min_type') || null,
+      private_min_value: (experience.get('private_min_value') !== undefined ? experience.get('private_min_value') : null),
       time_journey: experience.get('time_journey'),
       travel_duration: experience.get('travel_duration') || null,
       advance_minutes: experience.get('advance_minutes') || null,
@@ -253,6 +257,7 @@ class ExperienceController {
       tours: includedTours.map((tour) => tour.id),
       tourDetails: this.formatTourDetails(includedTours),
       availability: experience.get('availability') || null,
+      fixed_schedule: experience.get('fixed_schedule') === true,
       serviceItems: experience.get('serviceItems') || null,
       active: experience.get('active'),
       createdAt: experience.createdAt,
@@ -642,6 +647,10 @@ class ExperienceController {
       cost,
       min_people: minPeople,
       max_people: maxPeople,
+      cancellation_policy: cancellationPolicy,
+      buyout,
+      private_min_type: privateMinType,
+      private_min_value: privateMinValue,
       time_journey: timeJourney,
       travel_duration: travelDuration,
       advance_minutes: advanceMinutes,
@@ -656,6 +665,7 @@ class ExperienceController {
       provider_notes: providerNotes,
       team_notes: teamNotes,
       destinationPOI,
+      fixed_schedule: fixedSchedule,
     } = data;
 
     const Experience = Parse.Object.extend('Experience');
@@ -675,6 +685,21 @@ class ExperienceController {
     }
     if (maxPeople !== undefined && maxPeople !== null && maxPeople !== '') {
       experienceObj.set('max_people', parseInt(maxPeople, 10));
+    }
+    if (cancellationPolicy !== undefined && cancellationPolicy !== null && cancellationPolicy !== '') {
+      experienceObj.set('cancellation_policy', String(cancellationPolicy).trim());
+    }
+    if (buyout !== undefined && buyout !== null && buyout !== '') {
+      experienceObj.set('buyout', parseFloat(buyout));
+    }
+    if (privateMinType !== undefined && privateMinType !== null && privateMinType !== '') {
+      experienceObj.set('private_min_type', privateMinType);
+    }
+    if (privateMinValue !== undefined && privateMinValue !== null && privateMinValue !== '') {
+      experienceObj.set('private_min_value', parseFloat(privateMinValue));
+    }
+    if (fixedSchedule !== undefined) {
+      experienceObj.set('fixed_schedule', fixedSchedule === true || fixedSchedule === 'true');
     }
     if (timeJourney !== undefined && timeJourney !== null && timeJourney !== '') {
       experienceObj.set('time_journey', parseFloat(timeJourney));
@@ -886,6 +911,10 @@ class ExperienceController {
       active,
       min_people: minPeople,
       max_people: maxPeople,
+      cancellation_policy: cancellationPolicy,
+      buyout,
+      private_min_type: privateMinType,
+      private_min_value: privateMinValue,
       time_journey: timeJourney,
       travel_duration: travelDuration,
       advance_minutes: advanceMinutes,
@@ -900,6 +929,7 @@ class ExperienceController {
       provider_notes: providerNotes,
       team_notes: teamNotes,
       destinationPOI,
+      fixed_schedule: fixedSchedule,
     } = data;
 
     if (name !== undefined) {
@@ -1016,6 +1046,60 @@ class ExperienceController {
         }
         experienceObj.set('min_people', parseInt(minPeople, 10));
       }
+    }
+
+    if (cancellationPolicy !== undefined) {
+      if (cancellationPolicy === null || cancellationPolicy === '') {
+        experienceObj.set('cancellation_policy', null);
+      } else {
+        experienceObj.set('cancellation_policy', String(cancellationPolicy).trim());
+      }
+    }
+
+    if (buyout !== undefined) {
+      if (buyout === null || buyout === '') {
+        experienceObj.set('buyout', null);
+      } else {
+        if (Number.isNaN(parseFloat(buyout)) || parseFloat(buyout) < 0) {
+          return {
+            error: 'Buy-out must be greater than or equal to 0',
+            status: 400,
+          };
+        }
+        experienceObj.set('buyout', parseFloat(buyout));
+      }
+    }
+
+    if (privateMinType !== undefined) {
+      if (privateMinType === null || privateMinType === '') {
+        experienceObj.set('private_min_type', null);
+      } else {
+        if (privateMinType !== 'personas' && privateMinType !== 'monto') {
+          return {
+            error: "Private minimum type must be 'personas' or 'monto'",
+            status: 400,
+          };
+        }
+        experienceObj.set('private_min_type', privateMinType);
+      }
+    }
+
+    if (privateMinValue !== undefined) {
+      if (privateMinValue === null || privateMinValue === '') {
+        experienceObj.set('private_min_value', null);
+      } else {
+        if (Number.isNaN(parseFloat(privateMinValue)) || parseFloat(privateMinValue) < 0) {
+          return {
+            error: 'Private minimum value must be greater than or equal to 0',
+            status: 400,
+          };
+        }
+        experienceObj.set('private_min_value', parseFloat(privateMinValue));
+      }
+    }
+
+    if (fixedSchedule !== undefined) {
+      experienceObj.set('fixed_schedule', fixedSchedule === true || fixedSchedule === 'true');
     }
 
     if (timeJourney !== undefined) {
@@ -1840,6 +1924,10 @@ class ExperienceController {
       price_child: experience.get('price_child') || null,
       price_no_alcohol: experience.get('price_no_alcohol') || null,
       min_people: experience.get('min_people'),
+      cancellation_policy: experience.get('cancellation_policy') || null,
+      buyout: (experience.get('buyout') !== undefined ? experience.get('buyout') : null),
+      private_min_type: experience.get('private_min_type') || null,
+      private_min_value: (experience.get('private_min_value') !== undefined ? experience.get('private_min_value') : null),
       experienciasCount,
       time_journey: experience.get('time_journey'),
       vehicleType: vehicleType
@@ -1878,6 +1966,7 @@ class ExperienceController {
       tourCount: includedTours.length,
       totalItemCount: includedExperiences.length + includedProviderExperiences.length + includedTours.length,
       availability: experience.get('availability') || null,
+      fixed_schedule: experience.get('fixed_schedule') === true,
       photos,
       active: experience.get('active'),
       createdAt: experience.createdAt,

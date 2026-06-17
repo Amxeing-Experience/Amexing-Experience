@@ -254,6 +254,7 @@ const PricingEngine = (() => {
    * @param {number} p.basePrice - Tarifa base del greeter.
    * @param {number} p.hourlyRate - Tarifa por hora del greeter.
    * @returns {number} Costo del greeter (sin recargo por forma de pago).
+   * @example
    */
   function calculateGreeterPrice(p) {
     const o = p || {};
@@ -277,6 +278,7 @@ const PricingEngine = (() => {
    * @param {number} [p.minimumCharge] - Cargo minimo.
    * @param {number} [p.componentsCost] - Costo precalculado por el evaluador avanzado.
    * @returns {number} Costo de guia + chofer (sin recargo por forma de pago).
+   * @example
    */
   function calculateGuideTransportCost(p) {
     const o = p || {};
@@ -295,7 +297,7 @@ const PricingEngine = (() => {
   /**
    * Compositor generico de nodos de costo de un servicio (lo usan transporte y tours, y
    * sirve para cualquier tipo con nodos). Cada nodo aporta su costo en efectivo (MXN) y
-   * declara si recibe recargo por forma de pago (p.ej. vehiculo/espera/adicionales si;
+   * declara si recibe recargo por forma de pago (p.ej. Vehiculo/espera/adicionales si;
    * guia/greeter no). Solo conoce la REGLA de recargo, no las tarifas ni que nodos existen
    * (eso lo arma el caller). Devuelve los tres totales (efectivo/transferencia/tarjeta) y el
    * desglose por nodo, para que builder, validacion backend y PDF compartan la misma regla.
@@ -304,6 +306,7 @@ const PricingEngine = (() => {
    * @param {number} [p.agencyRate] - Porcentaje de recargo por tarjeta.
    * @param {Array<{key: string, efectivo: number, surcharge: boolean}>} [p.nodes] - Nodos de costo.
    * @returns {object} Totales y desglose por nodo.
+   * @example
    */
   function composeServiceNodes(p) {
     const o = p || {};

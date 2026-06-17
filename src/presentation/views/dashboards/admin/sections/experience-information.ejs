@@ -113,6 +113,32 @@
                             <input type="number" class="form-control" id="experienceMaxPeople" name="max_people" min="1" step="1" placeholder="10">
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Mínimo para privado</label>
+                            <div class="input-group">
+                                <select class="form-control" id="experiencePrivateMinType" name="private_min_type" style="max-width: 160px;">
+                                    <option value="">N/A</option>
+                                    <option value="personas">Por personas</option>
+                                    <option value="monto">Monto fijo ($)</option>
+                                </select>
+                                <input type="number" class="form-control" id="experiencePrivateMinValue" name="private_min_value" min="0" step="0.01" placeholder="N° personas o monto">
+                            </div>
+                            <div class="form-text">Personas mínimas o monto fijo para hacerlo privado</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceBuyout" class="form-label">Buy-out</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experienceBuyout" name="buyout" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="form-text">Monto para reservar la experiencia completa (buy-out)</div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="experienceCancellationPolicy" class="form-label">Políticas de cancelación</label>
+                        <textarea class="form-control" id="experienceCancellationPolicy" name="cancellation_policy" rows="3" placeholder="Ej. Cancelación gratuita hasta 48h antes; después se cobra el 50%..."></textarea>
+                    </div>
                 </div>
 
                 <!-- Notas -->
@@ -189,9 +215,12 @@
 
                 <!-- Disponibilidad -->
                 <div class="mb-4">
-                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                        <i class="ti ti-calendar-time me-1"></i>
-                        Disponibilidad <span class="text-muted fw-normal">(Opcional)</span>
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span><i class="ti ti-calendar-time me-1"></i>Disponibilidad <span class="text-muted fw-normal">(Opcional)</span></span>
+                        <span class="form-check form-switch mb-0 fw-normal" title='Si se activa, en el detalle se muestra "Horarios" en lugar de "Horarios sugeridos" (ej. viñedos).'>
+                            <input class="form-check-input" type="checkbox" id="experienceFixedSchedule" name="fixed_schedule">
+                            <label class="form-check-label small" for="experienceFixedSchedule">Horario fijo</label>
+                        </span>
                     </h6>
                     <div class="mb-3">
                         <div class="d-flex gap-1 flex-wrap mb-3" id="availableDaysContainer">
@@ -1253,6 +1282,11 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('experienceAdvanceMinutes').value = data.advance_minutes || '';
             document.getElementById('experienceMinPeople').value = data.min_people || '';
             document.getElementById('experienceMaxPeople').value = data.max_people || '';
+            document.getElementById('experienceCancellationPolicy').value = data.cancellation_policy || '';
+            document.getElementById('experienceBuyout').value = (data.buyout !== null && data.buyout !== undefined) ? data.buyout : '';
+            document.getElementById('experiencePrivateMinType').value = data.private_min_type || '';
+            document.getElementById('experiencePrivateMinValue').value = (data.private_min_value !== null && data.private_min_value !== undefined) ? data.private_min_value : '';
+            document.getElementById('experienceFixedSchedule').checked = !!data.fixed_schedule;
 
             // 🔍 LOAD DEBUG - Log complete destinationPOI load details
             console.log('🔍 LOAD DEBUG - Complete API response data:', data);
@@ -1694,6 +1728,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 advance_minutes: parseInt(document.getElementById('experienceAdvanceMinutes').value) || null,
                 min_people: parseInt(document.getElementById('experienceMinPeople').value) || null,
                 max_people: parseInt(document.getElementById('experienceMaxPeople').value) || null,
+                cancellation_policy: document.getElementById('experienceCancellationPolicy').value.trim() || null,
+                buyout: parseFloat(document.getElementById('experienceBuyout').value) || null,
+                private_min_type: document.getElementById('experiencePrivateMinType').value || null,
+                private_min_value: parseFloat(document.getElementById('experiencePrivateMinValue').value) || null,
                 includes: stringToArray(capturedFormValues.includes) || textareaToArray('experienceIncludes'),
                 notincludes: stringToArray(capturedFormValues.notincludes) || textareaToArray('experienceNotIncludes'),
                 languages: stringToArray(capturedFormValues.languages) || textareaToArray('experienceLanguages'),
@@ -1702,6 +1740,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 provider_notes: document.getElementById('experienceProviderNotes').value.trim() || null,
                 team_notes: document.getElementById('experienceTeamNotes').value.trim() || null,
                 availability: availability.length > 0 ? availability : null,
+                fixed_schedule: document.getElementById('experienceFixedSchedule').checked,
                 destinationPOI: document.getElementById('experienceDestino').value || null,
             };
 
