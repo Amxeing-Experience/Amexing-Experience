@@ -151,6 +151,24 @@ columna podía quedar a 1 centavo del Total (que es el autoritativo/cobrado). `r
 absorbe ese residual (solo si es ≤ $1) en el último renglón **positivo** (no toca descuentos), en
 los tres caminos de render (principal, walking, vehicle tour). El Total no cambia; solo cuadra la columna.
 
+## pricesByType: total del breakdown + safeguard de recargo
+
+**Auditoría (todos los tipos):** el `pricesByType` que se persiste sale del **gate final** de
+`collectServiceData` que lo reconcilia desde el **total del texto del desglose**
+(`extractTotalFromBreakdown` de `devBreakdownEfectivo/Transferencia/Tarjeta`). Es decir, guarda el
+**total** (con todos los nodos: guía, greeter, vehículos adicionales, descuentos, recargo), **no un
+costo base** — la base queda aparte en `basePrice`/`basePriceEfectivo`. Verificado para concepto,
+experiencia, walking, vehicle tour, transporte y a-disposición.
+
+**Safeguard `ensurePricesByTypeSurcharge`:** la regla es **recargo uniforme** (transferencia/tarjeta
+> efectivo cuando los rates son > 0). Si por un problema de **timing** (los rates `transferRate`/
+`agencyRate` aún no habían cargado al renderar el desglose) transferencia/tarjeta quedaban
+**faltantes, en 0, o iguales a efectivo**, se persistía un total **sin recargo** (en la lista se ve
+como un precio que no cambia con la forma de pago). El safeguard, corriendo **después** del gate de
+reconciliación, recomputa esos casos desde `efectivo × (1 + rate)`. Solo corrige datos rotos; nunca
+toca un total que ya trae recargo válido. (Datos viejos ya guardados sin recargo se corrigen al
+re-editar/guardar ese servicio.)
+
 ## Pendientes diferidos
 
 - **A-Disposición — precio por-vehículo "baila por centavos" al subir la cantidad:** causado por

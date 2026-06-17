@@ -3946,6 +3946,12 @@ class ItineraryBuilder {
       }
     }
 
+    // SAFEGUARD: garantiza que pricesByType lleve el recargo por forma de pago. Si por timing
+    // (rates aún no cargados al renderar el desglose) transferencia/tarjeta quedaron faltantes,
+    // en 0, o iguales a efectivo, se recomputan desde efectivo. Evita guardar un costo sin
+    // recargo (en la lista se ve como un precio que "no cambia con la forma de pago").
+    this.ensurePricesByTypeSurcharge(pricesByType, type);
+
     // Update debug display for development
     this.updateDebugPriceDisplay(pricesByType);
 
@@ -11520,6 +11526,43 @@ class ItineraryBuilder {
    * @returns {number} Price for current payment type.
    * @example
    */
+  /**
+   * Safeguard de recargo para pricesByType. La regla de negocio es "recargo uniforme":
+   * transferencia/tarjeta siempre son mayores que efectivo cuando los rates son > 0. Si por un
+   * problema de timing (rates aún no cargados al renderar el desglose) transferencia o tarjeta
+   * quedaron faltantes, en 0, o iguales a efectivo, se recomputan desde efectivo con el recargo
+   * configurado. Solo corrige datos rotos: nunca modifica un total que ya trae recargo válido.
+   * @param {{efectivo:number, transferencia:number, tarjeta:number}} prices pricesByType (se muta).
+   * @param {string} type Tipo de servicio (solo para el log).
+   * @example
+   */
+  ensurePricesByTypeSurcharge(prices, type) {
+    if (!prices || typeof prices !== 'object') return;
+    const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const efe = Number(prices.efectivo) || 0;
+    if (efe <= 0) return; // sin base efectivo no hay de dónde derivar el recargo
+    const tRate = Number(this.transferRate) || 0;
+    const aRate = Number(this.agencyRate) || 0;
+    const fixed = [];
+    if (tRate > 0) {
+      const tra = Number(prices.transferencia);
+      if (!(tra > 0) || Math.abs(tra - efe) < 0.01) {
+        prices.transferencia = r2(efe * (1 + (tRate / 100)));
+        fixed.push('transferencia');
+      }
+    }
+    if (aRate > 0) {
+      const tar = Number(prices.tarjeta);
+      if (!(tar > 0) || Math.abs(tar - efe) < 0.01) {
+        prices.tarjeta = r2(efe * (1 + (aRate / 100)));
+        fixed.push('tarjeta');
+      }
+    }
+    if (fixed.length) {
+      console.warn(`⚠️ pricesByType safeguard: recargo recomputado para [${fixed.join(', ')}] en servicio "${type}" (estaban sin recargo). efectivo=${efe}`, prices);
+    }
+  }
+
   getCorrectPriceForPaymentType(subconcept, backendPaymentType = null) {
     // Priority 1: Use backend payment type if provided
     // Priority 2: Use dropdown value
