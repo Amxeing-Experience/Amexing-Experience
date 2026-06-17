@@ -15919,17 +15919,12 @@ class ItineraryBuilder {
 
     // Get the dev breakdown text for the current payment type
     let devBreakdownField;
-    let devPriceField;
-
     if (paymentType === 'efectivo') {
       devBreakdownField = document.getElementById('devBreakdownEfectivo');
-      devPriceField = document.getElementById('devPriceEfectivo');
     } else if (paymentType === 'transferencia') {
       devBreakdownField = document.getElementById('devBreakdownTransferencia');
-      devPriceField = document.getElementById('devPriceTransferencia');
     } else if (paymentType === 'tarjeta') {
       devBreakdownField = document.getElementById('devBreakdownTarjeta');
-      devPriceField = document.getElementById('devPriceTarjeta');
     }
 
     // Find the service breakdown container
@@ -15958,8 +15953,10 @@ class ItineraryBuilder {
       return;
     }
 
-    // If dev breakdown is not available, hide the service breakdown
-    if (!devBreakdownField?.value || !devPriceField?.value) {
+    // If dev breakdown is not available, hide the service breakdown.
+    // (Antes también dependía de devPriceField, que era un campo de debug ya removido; eso
+    // ocultaba el desglose de walking. El total se toma del texto del desglose.)
+    if (!devBreakdownField?.value) {
       qsDevLog('🔍 Dev breakdown not available for walking tour, hiding service breakdown');
       container.classList.add('d-none');
       return;
@@ -15967,7 +15964,7 @@ class ItineraryBuilder {
 
     // Parse dev breakdown text and convert to HTML
     const breakdownText = devBreakdownField.value;
-    const totalPrice = parseFloat(devPriceField.value || 0);
+    const totalPrice = this.extractTotalFromBreakdown(breakdownText);
 
     qsDevLog('📊 WALKING TOUR BREAKDOWN: Using dev breakdown as source', {
       paymentType,
