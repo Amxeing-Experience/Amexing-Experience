@@ -18828,37 +18828,43 @@ class ItineraryBuilder {
     if (!saved) this.serviceModified = true;
   }
 
-  /** Carga los vehículos de un segmento en el select de una fila. */
+  /** Carga los vehículos de un segmento en el select de una fila (con caché por segmento). */
   async loadADisposicionRowVehicles(rateId, vehicleSel) {
     vehicleSel.innerHTML = '<option value="">-- Vehículo --</option>';
     if (!rateId) return;
-    try {
-      const accessToken = this.getAccessToken();
-      const response = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
-        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      });
-      if (response.ok) {
-        const result = await response.json();
-        (result.data || []).forEach((v) => {
-          const opt = document.createElement('option');
-          opt.value = v.value || v.id;
-          opt.textContent = `${v.label} - ${v.capacity} pax`;
-          vehicleSel.appendChild(opt);
+    // Caché por segmento: re-seleccionar el mismo segmento (otra fila o reapertura) no vuelve
+    // a pegarle a la API → el dropdown responde al instante.
+    this._adispVehiclesCache = this._adispVehiclesCache || new Map();
+    let vehicles = this._adispVehiclesCache.get(rateId);
+    if (!vehicles) {
+      try {
+        const accessToken = this.getAccessToken();
+        const response = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         });
+        if (response.ok) {
+          const result = await response.json();
+          vehicles = result.data || [];
+          this._adispVehiclesCache.set(rateId, vehicles);
+        }
+      } catch (error) {
+        console.error('Error loading a-disp additional vehicles:', error);
       }
-    } catch (error) {
-      console.error('Error loading a-disp additional vehicles:', error);
     }
+    (vehicles || []).forEach((v) => {
+      const opt = document.createElement('option');
+      opt.value = v.value || v.id;
+      opt.textContent = `${v.label} - ${v.capacity} pax`;
+      vehicleSel.appendChild(opt);
+    });
   }
 
-  /** Obtiene y guarda la tarifa/hora de una fila en sus data-*. */
-  async refreshADisposicionRowRate(row, rateId, vehicleTypeId, rateLabel) {
-    row.dataset.hourlyRate = '';
-    row.dataset.rateId = rateId || '';
-    row.dataset.vehicleTypeId = vehicleTypeId || '';
-    row.dataset.vehicleLabel = row.querySelector('.adisp-av-vehicle')?.selectedOptions[0]?.textContent || '';
-    row.dataset.segmentLabel = row.querySelector('.adisp-av-segment')?.selectedOptions[0]?.textContent || '';
-    if (!rateId || !vehicleTypeId) { rateLabel.textContent = ''; return; }
+  /** Tarifa/hora de a-disposición por vehículo+segmento, con caché (evita refetch). */
+  async getADisposicionHourlyPriceCached(vehicleTypeId, rateId) {
+    this._adispPriceCache = this._adispPriceCache || new Map();
+    const key = `${vehicleTypeId}_${rateId}`;
+    if (this._adispPriceCache.has(key)) return this._adispPriceCache.get(key);
+    let hourly = 0;
     try {
       const accessToken = this.getAccessToken();
       const response = await fetch(`/api/disposable-prices/price?vehicleTypeId=${vehicleTypeId}&rateId=${rateId}`, {
@@ -18866,13 +18872,26 @@ class ItineraryBuilder {
       });
       if (response.ok) {
         const result = await response.json();
-        const hourly = (result.data || {}).hourlyPrice || 0;
-        row.dataset.hourlyRate = String(hourly);
-        rateLabel.textContent = `${this.formatCurrency(hourly)}/h`;
+        hourly = (result.data || {}).hourlyPrice || 0;
       }
     } catch (error) {
       console.error('Error fetching a-disp additional vehicle price:', error);
     }
+    this._adispPriceCache.set(key, hourly);
+    return hourly;
+  }
+
+  /** Obtiene y guarda la tarifa/hora de una fila en sus data-* (usa caché). */
+  async refreshADisposicionRowRate(row, rateId, vehicleTypeId, rateLabel) {
+    row.dataset.hourlyRate = '';
+    row.dataset.rateId = rateId || '';
+    row.dataset.vehicleTypeId = vehicleTypeId || '';
+    row.dataset.vehicleLabel = row.querySelector('.adisp-av-vehicle')?.selectedOptions[0]?.textContent || '';
+    row.dataset.segmentLabel = row.querySelector('.adisp-av-segment')?.selectedOptions[0]?.textContent || '';
+    if (!rateId || !vehicleTypeId) { rateLabel.textContent = ''; return; }
+    const hourly = await this.getADisposicionHourlyPriceCached(vehicleTypeId, rateId);
+    row.dataset.hourlyRate = String(hourly);
+    rateLabel.textContent = `${this.formatCurrency(hourly)}/h`;
   }
 
   /** Lee todas las filas de vehículos adicionales de a-disposición. */
@@ -18956,29 +18975,34 @@ class ItineraryBuilder {
 
     if (!rateId) return;
 
-    try {
-      const accessToken = this.getAccessToken();
-      const response = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        const vehicles = result.data || [];
-
-        vehicles.forEach((vehicle) => {
-          const option = document.createElement('option');
-          option.value = vehicle.value || vehicle.id;
-          option.textContent = `${vehicle.label} - ${vehicle.capacity} pax`;
-          vehicleSelect.appendChild(option);
+    // Caché por segmento (compartida con las filas de vehículos adicionales): re-seleccionar
+    // el mismo segmento no vuelve a pegarle a la API.
+    this._adispVehiclesCache = this._adispVehiclesCache || new Map();
+    let vehicles = this._adispVehiclesCache.get(rateId);
+    if (!vehicles) {
+      try {
+        const accessToken = this.getAccessToken();
+        const response = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
         });
+        if (response.ok) {
+          const result = await response.json();
+          vehicles = result.data || [];
+          this._adispVehiclesCache.set(rateId, vehicles);
+        }
+      } catch (error) {
+        console.error('Error loading vehicles for A Disposición:', error);
       }
-    } catch (error) {
-      console.error('Error loading vehicles for A Disposición:', error);
     }
+    (vehicles || []).forEach((vehicle) => {
+      const option = document.createElement('option');
+      option.value = vehicle.value || vehicle.id;
+      option.textContent = `${vehicle.label} - ${vehicle.capacity} pax`;
+      vehicleSelect.appendChild(option);
+    });
   }
 
   /**
