@@ -618,6 +618,12 @@ class ItineraryBuilder {
     // the route is local and the pickup/drop-off fields below already capture
     // any specific spots. Skip the row whenever the active transport type is local.
     const isLocalTransport = () => document.querySelector('input[name="transportType"]:checked')?.value === 'local';
+    // El campo "Dirección (Hotel, Airbnb...)" solo aplica para aeropuerto; local y punto-a-punto
+    // usan POIs directamente, así que no se muestra.
+    const usesSpecificLocation = () => {
+      const t = document.querySelector('input[name="transportType"]:checked')?.value;
+      return t !== 'local' && t !== 'punto-a-punto';
+    };
 
     // Show specific location when destination is selected (arrival only — destination is city/hotel)
     document.getElementById('transportDestinationSelect')?.addEventListener('change', (e) => {
@@ -626,7 +632,7 @@ class ItineraryBuilder {
       const specificLocationRow = document.getElementById('specificLocationRow');
       const selectedNames = document.querySelectorAll('.selectedDestinationName');
       if (specificLocationRow) {
-        if (e.target.value && !isLocalTransport()) {
+        if (e.target.value && usesSpecificLocation()) {
           selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
           specificLocationRow.classList.remove('d-none');
         } else {
@@ -642,7 +648,7 @@ class ItineraryBuilder {
       const specificLocationRow = document.getElementById('specificLocationRow');
       const selectedNames = document.querySelectorAll('.selectedDestinationName');
       if (specificLocationRow) {
-        if (e.target.value && !isLocalTransport()) {
+        if (e.target.value && usesSpecificLocation()) {
           selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
           specificLocationRow.classList.remove('d-none');
         } else {
@@ -656,7 +662,7 @@ class ItineraryBuilder {
       const row = document.getElementById('roundTripSpecificLocationIdaRow');
       const selectedNames = document.querySelectorAll('.selectedDestinationName');
       if (row) {
-        if (e.target.value && !isLocalTransport()) {
+        if (e.target.value && usesSpecificLocation()) {
           selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
           row.classList.remove('d-none');
         } else {
@@ -670,7 +676,7 @@ class ItineraryBuilder {
       const row = document.getElementById('roundTripSpecificLocationVueltaRow');
       const selectedNames = document.querySelectorAll('.selectedDestinationName');
       if (row) {
-        if (e.target.value && !isLocalTransport()) {
+        if (e.target.value && usesSpecificLocation()) {
           selectedNames.forEach((el) => { el.textContent = e.target.options[e.target.selectedIndex]?.text || ''; });
           row.classList.remove('d-none');
         } else {
@@ -5831,9 +5837,10 @@ class ItineraryBuilder {
           if (transportChildrenField) transportChildrenField.value = service.transportChildren || '';
           if (transportInfantsField) transportInfantsField.value = service.transportInfants || '';
 
-          // Restore specific location — from explicit field or extracted from origin/destination
+          // Restore specific location — from explicit field or extracted from origin/destination.
+          // Punto a punto no usa este campo, así que no se restaura/muestra para ese tipo.
           const specificToRestore = service.specificLocation || extractedSpecificLocation;
-          if (specificToRestore) {
+          if (specificToRestore && service.transportType !== 'punto-a-punto') {
             const specificLocationField = document.getElementById('transportSpecificLocation');
             if (specificLocationField) specificLocationField.value = specificToRestore;
             const specificLocationRow = document.getElementById('specificLocationRow');
@@ -23226,6 +23233,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const specificLocationRow = document.getElementById('specificLocationRow');
     if (!specificLocationRow) return;
 
+    // Punto a punto (one-way, llegada o salida): no se usa el campo "Dirección (Hotel, Airbnb...)";
+    // origen y destino ya son POIs. Ocultar y limpiar.
+    const transportTypeSel = document.querySelector('input[name="transportType"]:checked')?.value;
+    if (transportTypeSel === 'punto-a-punto') {
+      specificLocationRow.classList.add('d-none');
+      const ptpField = document.getElementById('transportSpecificLocation');
+      if (ptpField) ptpField.value = '';
+      return;
+    }
+
     const originSelect = document.getElementById('transportOriginSelect');
     const destSelect = document.getElementById('transportDestinationSelect');
     const originVal = originSelect?.selectedIndex > 0 ? originSelect.options[originSelect.selectedIndex].text : '';
@@ -23250,9 +23267,14 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   function checkRoundTripSpecificLocationFields() {
     const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
-    if (transportType === 'local') {
+    // Local y punto-a-punto no usan el campo de "Dirección (Hotel, Airbnb...)".
+    if (transportType === 'local' || transportType === 'punto-a-punto') {
       document.getElementById('roundTripSpecificLocationIdaRow')?.classList.add('d-none');
       document.getElementById('roundTripSpecificLocationVueltaRow')?.classList.add('d-none');
+      const idaField = document.getElementById('roundTripSpecificLocationIda');
+      if (idaField) idaField.value = '';
+      const vueltaField = document.getElementById('roundTripSpecificLocationVuelta');
+      if (vueltaField) vueltaField.value = '';
       return;
     }
 
