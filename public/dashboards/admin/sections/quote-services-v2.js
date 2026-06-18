@@ -15058,9 +15058,22 @@ class ItineraryBuilder {
         standardPricingSection.style.display = '';
       }
 
-      // Show the tour vehicle override toggle for admin users
+      // Vehicle tours: the price field is ALWAYS editable — keep the "Editar precio
+      // manualmente" checkbox hidden and force the override ON so the breakdown reads
+      // servicePrice. This runs on new selection AND edit population, so it's the single
+      // source of truth for the toggle state. (Walking tours never reach this branch.)
       if (this.canEditPrices) {
-        document.getElementById('tourVehicleOverridePricesContainer')?.classList.remove('d-none');
+        document.getElementById('tourVehicleOverridePricesContainer')?.classList.add('d-none');
+        const vehicleOverrideCheckbox = document.getElementById('tourVehicleOverridePrices');
+        if (vehicleOverrideCheckbox) vehicleOverrideCheckbox.checked = true;
+        const servicePriceFieldEditable = document.getElementById('servicePrice');
+        if (servicePriceFieldEditable) {
+          servicePriceFieldEditable.readOnly = false;
+          servicePriceFieldEditable.removeAttribute('readonly');
+          servicePriceFieldEditable.removeAttribute('data-readonly');
+          servicePriceFieldEditable.classList.remove('readonly-price');
+          servicePriceFieldEditable.style.backgroundColor = '';
+        }
       }
 
       this.updateVehicleCapacityNote();
