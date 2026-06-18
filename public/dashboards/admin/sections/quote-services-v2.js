@@ -12488,6 +12488,11 @@ class ItineraryBuilder {
     this._transportBreakdownTotals = null;
     this._aDisposicionBreakdownTotals = null;
     this._walkingTourBreakdownTotals = null;
+    // Limpia "Lista: $X" del precio principal para que no se herede entre servicios; se
+    // repuebla al recalcular el servicio que se abre (setMainVehiclePrice).
+    const listEl = document.getElementById('servicePriceListPrice');
+    if (listEl) listEl.textContent = '';
+    this._mainVehicleCatalogPrice = null;
   }
 
   resetServiceModalState() {
