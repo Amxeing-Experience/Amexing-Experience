@@ -3004,6 +3004,18 @@ class ItineraryBuilder {
       if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Recoger';
     }
 
+    // "Hora de salida sugerida" de la vuelta: NO aplica en local (la vuelta es "Recoger");
+    // sí aplica en aeropuerto / punto-a-punto (la vuelta es la salida). Se oculta y limpia en local.
+    const vueltaSuggestedRow = document.getElementById('roundTripDepartureTimeSuggestedVueltaRow');
+    if (vueltaSuggestedRow) {
+      const isLocalRoundTrip = transportType === 'local';
+      vueltaSuggestedRow.classList.toggle('d-none', isLocalRoundTrip);
+      if (isLocalRoundTrip) {
+        const vueltaSuggestedField = document.getElementById('roundTripDepartureTimeSuggestedVuelta');
+        if (vueltaSuggestedField) vueltaSuggestedField.value = '';
+      }
+    }
+
     // Populate dropdowns for both directions
     if (typeof populateDropdownsForTransportType === 'function') {
       populateRoundTripDropdowns(transportType);
