@@ -12409,6 +12409,15 @@ class ItineraryBuilder {
       if (el) el.checked = false;
     });
 
+    // "Editar precio manualmente" (override de precio): desmarcar para que NO se herede entre
+    // servicios. Al editar, el restore lo vuelve a marcar según el servicio guardado, y el
+    // setup de readonly (handleServiceTypeChange) reaplica el estado del campo de precio.
+    ['experienceOverridePrices', 'tourOverridePrices', 'tourVehicleOverridePrices',
+      'transportOverridePrices', 'aDisposicionOverridePrices'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.checked = false;
+    });
+
     // Campos del dev breakdown + totales en memoria (fuente que espeja el desglose del cliente).
     this.clearDevBreakdownFields();
 
