@@ -15466,10 +15466,14 @@ class ItineraryBuilder {
         // Apply payment surcharge to the total (vehicle + guide)
         const finalPricePerHour = this.getDisplayPrice(baseTotalCost);
 
-        // El campo muestra el efectivo base; el recargo se aplica en el desglose.
-        // setMainVehiclePrice autollena/actualiza "Lista: $X" respetando ediciones manuales.
-        this.setMainVehiclePrice(baseTotalCost);
-        this.lastValidTourPrice = baseTotalCost.toFixed(2); // Store for readonly enforcement
+        // El campo muestra SOLO el costo del vehículo principal (efectivo base, por hora);
+        // la guía, vehículos adicionales y el recargo se suman en el desglose. Importante:
+        // con el override siempre activo, el desglose lee servicePrice como costo de
+        // vehículo y vuelve a sumar la guía aparte — escribir baseTotalCost (vehículo + guía)
+        // duplicaba la guía e inflaba el total al editar. setMainVehiclePrice autollena/
+        // actualiza "Lista: $X" respetando ediciones manuales.
+        this.setMainVehiclePrice(baseVehicleCost);
+        this.lastValidTourPrice = baseVehicleCost.toFixed(2); // Store for readonly enforcement
         qsDevLog('✅ Updated tour price field:', {
           baseTotalCost,
           finalPriceWithSurcharge: finalPricePerHour,
