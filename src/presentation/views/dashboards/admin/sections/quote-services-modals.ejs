@@ -702,15 +702,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 </div>
                             </div>
 
-                            <!-- Rate & Vehicle Selection -->
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
+                            <!-- Rate & Vehicle Selection (Segmento + Vehículo + Precio en línea) -->
+                            <div class="row" id="aDisposicionVehicleRow">
+                                <div class="col-md-4 mb-3">
                                     <label for="aDisposicionRate" class="form-label">Segmento <span class="text-danger">*</span></label>
                                     <select class="form-select" id="aDisposicionRate" required>
                                         <option value="">-- Seleccionar segmento --</option>
                                     </select>
                                 </div>
-                                <div class="col-md-6 mb-3">
+                                <div class="col-md-4 mb-3">
                                     <label for="aDisposicionVehicle" class="form-label">Vehículo <span class="text-danger">*</span></label>
                                     <select class="form-select" id="aDisposicionVehicle" required>
                                         <option value="">-- Seleccionar vehículo --</option>

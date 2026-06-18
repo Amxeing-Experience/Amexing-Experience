@@ -2009,8 +2009,9 @@ class ItineraryBuilder {
           priceTypeLabel.innerHTML = 'Pago <span class="text-danger">*</span>';
         }
 
-        // A-disposición sí usa el precio base genérico (standardPricingSection).
-        document.getElementById('standardPricingSection')?.classList.remove('d-none');
+        // A-disposición muestra el Precio en línea (aDisposicionVehicleRow) vía
+        // syncMainVehiclePriceLayout, así que standardPricingSection queda vacío y se oculta.
+        document.getElementById('standardPricingSection')?.classList.add('d-none');
 
         // Populate rate dropdown for A Disposición
         this.populateADisposicionRates();
@@ -13502,14 +13503,21 @@ class ItineraryBuilder {
   // y tour con traslado. Para los demás tipos lo regresa a standardPricingSection. Idempotente.
   syncMainVehiclePriceLayout() {
     const type = document.querySelector('input[name="serviceType"]:checked')?.value;
-    const tourWithTransport = type === 'tour' && document.getElementById('tourRequiresTransport')?.checked;
-    const inline = type === 'transport' || tourWithTransport;
     const priceCol = document.getElementById('servicePriceCol');
     if (!priceCol) return;
-    const transportRow = document.getElementById('transportFieldsRow');
     const stdSection = document.getElementById('standardPricingSection');
-    if (inline) {
-      if (transportRow && priceCol.parentElement !== transportRow) transportRow.appendChild(priceCol);
+    // Fila destino donde el Precio va junto a Segmento + Vehículo:
+    //  - transporte y tour con traslado → transportFieldsRow
+    //  - a-disposición → aDisposicionVehicleRow
+    //  - demás tipos → de vuelta a standardPricingSection
+    let targetRow = null;
+    if (type === 'transport' || (type === 'tour' && document.getElementById('tourRequiresTransport')?.checked)) {
+      targetRow = document.getElementById('transportFieldsRow');
+    } else if (type === 'a-disposicion') {
+      targetRow = document.getElementById('aDisposicionVehicleRow');
+    }
+    if (targetRow) {
+      if (priceCol.parentElement !== targetRow) targetRow.appendChild(priceCol);
       priceCol.className = 'col-md-4 mb-3';
     } else {
       if (stdSection && priceCol.parentElement !== stdSection) stdSection.insertBefore(priceCol, stdSection.firstChild);
