@@ -1941,24 +1941,9 @@ class ItineraryBuilder {
     const priceTypeLabel = document.querySelector('label[for="priceTypeSelect"]');
     const quantityField = document.getElementById('serviceQuantity')?.closest('.col-md-6');
 
-    // Layout del vehículo principal de transporte: Segmento + Vehículo + Precio en una sola
-    // línea. El campo Precio (servicePriceCol) es compartido (vive en standardPricingSection),
-    // así que para transporte se reubica dentro de la fila de transporte (col-md-4) y se regresa
-    // a standardPricingSection (col-md-6) para los demás tipos. Idempotente.
-    {
-      const transportRow = document.getElementById('transportFieldsRow');
-      const stdSection = document.getElementById('standardPricingSection');
-      const priceCol = document.getElementById('servicePriceCol');
-      if (priceCol) {
-        if (type === 'transport') {
-          if (transportRow && priceCol.parentElement !== transportRow) transportRow.appendChild(priceCol);
-          priceCol.className = 'col-md-4 mb-3';
-        } else {
-          if (stdSection && priceCol.parentElement !== stdSection) stdSection.insertBefore(priceCol, stdSection.firstChild);
-          priceCol.className = 'col-md-6 mb-3';
-        }
-      }
-    }
+    // Layout del vehículo principal: Segmento + Vehículo + Precio en una sola línea para
+    // transporte y para tour con traslado. Reubica el campo Precio (compartido). Idempotente.
+    this.syncMainVehiclePriceLayout();
 
     if (type === 'concepto' || type === 'experience' || type === 'a-disposicion') {
       // Hide category, vehicle and guide for Concepto and Experience
@@ -13511,6 +13496,25 @@ class ItineraryBuilder {
 
   // Sum of efectivo prices across all extra additional vehicle rows.
   // Returns the same currency unit as the main vehicle's base price.
+  // Coloca el campo Precio (compartido) junto a Segmento + Vehículo cuando aplica: transporte
+  // y tour con traslado. Para los demás tipos lo regresa a standardPricingSection. Idempotente.
+  syncMainVehiclePriceLayout() {
+    const type = document.querySelector('input[name="serviceType"]:checked')?.value;
+    const tourWithTransport = type === 'tour' && document.getElementById('tourRequiresTransport')?.checked;
+    const inline = type === 'transport' || tourWithTransport;
+    const priceCol = document.getElementById('servicePriceCol');
+    if (!priceCol) return;
+    const transportRow = document.getElementById('transportFieldsRow');
+    const stdSection = document.getElementById('standardPricingSection');
+    if (inline) {
+      if (transportRow && priceCol.parentElement !== transportRow) transportRow.appendChild(priceCol);
+      priceCol.className = 'col-md-4 mb-3';
+    } else {
+      if (stdSection && priceCol.parentElement !== stdSection) stdSection.insertBefore(priceCol, stdSection.firstChild);
+      priceCol.className = 'col-md-6 mb-3';
+    }
+  }
+
   // Habilita el botón "Agregar vehículo" (lista de adicionales) solo cuando hay un vehículo
   // principal seleccionado. No se pueden agregar adicionales sin un principal.
   syncExtraVehiclesButtonEnabled() {
@@ -15065,6 +15069,10 @@ class ItineraryBuilder {
         }
       }
     }
+
+    // Reubica el precio: inline (segmento + vehículo + precio) cuando hay traslado; si no, vuelve
+    // a su lugar.
+    this.syncMainVehiclePriceLayout();
   }
 
   validateTourDuration() {
