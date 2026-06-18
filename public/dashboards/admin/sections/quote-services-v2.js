@@ -1928,9 +1928,9 @@ class ItineraryBuilder {
     }
 
     // Show/hide category, vehicle, guide and quantity fields based on service type
-    const categoryField = document.getElementById('transportCategory')?.closest('.col-md-6');
-    const vehicleField = document.getElementById('vehicleSelect')?.closest('.col-md-4');
-    const guideField = document.getElementById('includeGuide')?.closest('.col-md-2');
+    const categoryField = document.getElementById('transportCategory')?.closest('[class*="col-"]');
+    const vehicleField = document.getElementById('vehicleSelect')?.closest('[class*="col-"]');
+    const guideField = document.getElementById('includeGuide')?.closest('[class*="col-"]');
     const guideLabel = document.getElementById('guideLabel');
     const serviciosLabel = guideField?.querySelector('.form-label');
     const priceField = document.getElementById('servicePrice');
@@ -1940,6 +1940,25 @@ class ItineraryBuilder {
     const currencyLabel = document.querySelector('label[for="currencySelect"]');
     const priceTypeLabel = document.querySelector('label[for="priceTypeSelect"]');
     const quantityField = document.getElementById('serviceQuantity')?.closest('.col-md-6');
+
+    // Layout del vehículo principal de transporte: Segmento + Vehículo + Precio en una sola
+    // línea. El campo Precio (servicePriceCol) es compartido (vive en standardPricingSection),
+    // así que para transporte se reubica dentro de la fila de transporte (col-md-4) y se regresa
+    // a standardPricingSection (col-md-6) para los demás tipos. Idempotente.
+    {
+      const transportRow = document.getElementById('transportFieldsRow');
+      const stdSection = document.getElementById('standardPricingSection');
+      const priceCol = document.getElementById('servicePriceCol');
+      if (priceCol) {
+        if (type === 'transport') {
+          if (transportRow && priceCol.parentElement !== transportRow) transportRow.appendChild(priceCol);
+          priceCol.className = 'col-md-4 mb-3';
+        } else {
+          if (stdSection && priceCol.parentElement !== stdSection) stdSection.insertBefore(priceCol, stdSection.firstChild);
+          priceCol.className = 'col-md-6 mb-3';
+        }
+      }
+    }
 
     if (type === 'concepto' || type === 'experience' || type === 'a-disposicion') {
       // Hide category, vehicle and guide for Concepto and Experience
@@ -2118,7 +2137,7 @@ class ItineraryBuilder {
 
       // Change title and checkbox label for Tour
       if (serviciosLabel) {
-        serviciosLabel.textContent = 'Opcional';
+        serviciosLabel.textContent = 'Opcionales';
       }
       if (guideLabel) {
         guideLabel.textContent = 'Guía + Chofer';
@@ -2148,7 +2167,7 @@ class ItineraryBuilder {
 
       // Reset title and checkbox label for Transport
       if (serviciosLabel) {
-        serviciosLabel.textContent = 'Opcional';
+        serviciosLabel.textContent = 'Opcionales';
       }
       if (guideLabel) {
         guideLabel.textContent = 'Guía';
@@ -14936,9 +14955,9 @@ class ItineraryBuilder {
 
   handleTourTransportToggle(requiresTransport) {
     // Get the transport field elements
-    const categoryField = document.getElementById('transportCategory')?.closest('.col-md-6');
-    const vehicleField = document.getElementById('vehicleSelect')?.closest('.col-md-4');
-    const guideField = document.getElementById('includeGuide')?.closest('.col-md-2');
+    const categoryField = document.getElementById('transportCategory')?.closest('[class*="col-"]');
+    const vehicleField = document.getElementById('vehicleSelect')?.closest('[class*="col-"]');
+    const guideField = document.getElementById('includeGuide')?.closest('[class*="col-"]');
 
     // Get the pricing fields (Precio and Cantidad)
     const transportFieldsRow = document.getElementById('transportFieldsRow');
