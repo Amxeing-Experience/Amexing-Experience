@@ -1895,9 +1895,11 @@ class ItineraryBuilder {
       if (transportPeopleFieldsRow) {
         transportPeopleFieldsRow.style.display = 'none';
       }
-      // Show tour transport checkbox
+      // Checkbox "Se requiere traslado" OCULTO: el traslado se deriva del tipo de tour
+      // (con vehículo siempre requiere; walking no). El input sigue en el DOM y se auto-marca
+      // al seleccionar el tour, que es lo que muestra los campos de transporte.
       if (tourTransportCheckbox) {
-        tourTransportCheckbox.style.display = 'block';
+        tourTransportCheckbox.style.display = 'none';
       }
     } else {
       tiempoEsperaSection?.classList.add('d-none');
@@ -19817,7 +19819,7 @@ class ItineraryBuilder {
       if (tourRequiresTransport && tourTransportContainer) {
         tourRequiresTransport.checked = false;
         tourRequiresTransport.disabled = false;
-        tourTransportContainer.style.display = 'block';
+        tourTransportContainer.style.display = 'none'; // Checkbox oculto; el traslado se deriva del tour
         this.handleTourTransportToggle(false); // Hide transport fields
       }
 
