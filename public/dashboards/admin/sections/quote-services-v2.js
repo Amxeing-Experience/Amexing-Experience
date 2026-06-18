@@ -13495,8 +13495,12 @@ class ItineraryBuilder {
   // Habilita el botón "Agregar vehículo" (lista de adicionales) solo cuando hay un vehículo
   // principal seleccionado. No se pueden agregar adicionales sin un principal.
   syncExtraVehiclesButtonEnabled() {
+    const hasMainVehicle = !!document.getElementById('vehicleSelect')?.value;
     const btn = document.getElementById('addExtraAdditionalVehicleBtn');
-    if (btn) btn.disabled = !document.getElementById('vehicleSelect')?.value;
+    if (btn) btn.disabled = !hasMainVehicle;
+    // Hint "Selecciona primero el vehículo principal": visible solo cuando no hay principal.
+    const hint = document.getElementById('extraVehiclesMainHint');
+    if (hint) hint.classList.toggle('d-none', hasMainVehicle);
   }
 
   getExtraAdditionalVehiclesEfectivoTotal() {
