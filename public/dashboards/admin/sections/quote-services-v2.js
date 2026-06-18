@@ -1952,6 +1952,10 @@ class ItineraryBuilder {
         // Show "Incluir en total" checkbox only for Concepto
         document.getElementById('includeInTotalContainer')?.style.setProperty('display', '');
 
+        // Concepto usa "Precio Unitario" + "Precio por Persona"; el campo genérico "Precio"
+        // (standardPricingSection) sobra y confunde, así que se oculta.
+        document.getElementById('standardPricingSection')?.classList.add('d-none');
+
         // Hide quantity field for Concepto
         quantityField?.classList.add('d-none');
         document.getElementById('serviceQuantity')?.removeAttribute('required');
@@ -1997,10 +2001,15 @@ class ItineraryBuilder {
           priceTypeLabel.innerHTML = 'Pago <span class="text-danger">*</span>';
         }
 
+        // A-disposición sí usa el precio base genérico (standardPricingSection).
+        document.getElementById('standardPricingSection')?.classList.remove('d-none');
+
         // Populate rate dropdown for A Disposición
         this.populateADisposicionRates();
       } else {
         // Hide quantity field for Experience (uses its own quantity fields)
+        // La experiencia usa sus propios precios (adulto/niño/sin alcohol); ocultar el genérico.
+        document.getElementById('standardPricingSection')?.classList.add('d-none');
         quantityField?.classList.add('d-none');
         document.getElementById('serviceQuantity')?.removeAttribute('required');
 
