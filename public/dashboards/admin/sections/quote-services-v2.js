@@ -7855,13 +7855,19 @@ class ItineraryBuilder {
         const hasTourDuration = service.type === 'tour' && service.duration;
         const hasDisposicionHours = service.type === 'a-disposicion' && service.hours !== undefined && service.hours !== null;
 
-        if (!hasSchedule && !hasTourDuration && !hasDisposicionHours) {
+        // Concepto con una sola hora: no repetir la línea gris (ya está el badge "Hora:");
+        // solo se muestra si es un rango (inicio – fin). Otros tipos: comportamiento normal.
+        const scheduleIsRange = (typeof service.selectedSchedule === 'string' && service.selectedSchedule.includes(' - '))
+          || (service.startTime && service.endTime);
+        const showScheduleText = hasSchedule && (service.type !== 'concepto' || scheduleIsRange);
+
+        if (!showScheduleText && !hasTourDuration && !hasDisposicionHours) {
           return ''; // Don't render empty row
         }
 
         return `
                                             <div class="row g-2 text-muted small">
-                                                ${hasSchedule ? `
+                                                ${showScheduleText ? `
                                                     <div class="col-auto">
                                                         <i class="ti ti-clock me-1"></i>
                                                         ${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}
