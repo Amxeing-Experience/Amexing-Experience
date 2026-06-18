@@ -15402,13 +15402,13 @@ class ItineraryBuilder {
       // qsDevLog('🚗 Adding driver tour rate in recalculation:', driverTourRate, 'New total:', totalPrice);
     }
 
-    // Update the price field — ONLY if price override is not active. Vehicle
-    // tours use `tourVehicleOverridePrices`; walking tours use `tourOverridePrices`.
-    // Trust the live checkbox state (not stored data) so that unchecking the
-    // box allows the field to start auto-updating again.
+    // Update the price field. Vehicle tours: the price field is ALWAYS editable
+    // (override forced on, no "Editar precio manualmente" checkbox); setMainVehiclePrice()
+    // guards manual edits, so the auto-recalc should keep running and only be suppressed
+    // by the WALKING override (`tourOverridePrices`, per-group tier prices). Trust the
+    // live checkbox state so unchecking lets the field auto-update again.
     const tourOverrideCheckbox = document.getElementById('tourOverridePrices');
-    const vehicleOverrideCheckbox = document.getElementById('tourVehicleOverridePrices');
-    const isOverrideChecked = (tourOverrideCheckbox?.checked || false) || (vehicleOverrideCheckbox?.checked || false);
+    const isOverrideChecked = (tourOverrideCheckbox?.checked || false);
     const tourOverride = isOverrideChecked;
     // Still pull the stored service so the override branch can restore the
     // saved custom price; not used to decide whether override is active.
@@ -15454,7 +15454,8 @@ class ItineraryBuilder {
         const finalPricePerHour = this.getDisplayPrice(baseTotalCost);
 
         // El campo muestra el efectivo base; el recargo se aplica en el desglose.
-        servicePriceField.value = baseTotalCost.toFixed(2);
+        // setMainVehiclePrice autollena/actualiza "Lista: $X" respetando ediciones manuales.
+        this.setMainVehiclePrice(baseTotalCost);
         this.lastValidTourPrice = baseTotalCost.toFixed(2); // Store for readonly enforcement
         qsDevLog('✅ Updated tour price field:', {
           baseTotalCost,
@@ -20014,20 +20015,25 @@ class ItineraryBuilder {
           this.handleTourTransportToggle(true); // Show transport fields automatically
         }
 
-        // When switching to a different vehicle tour, reset the manual price override
-        // (tourVehicleOverridePrices) so the breakdown uses the recalculated price for
-        // THIS tour/vehicle instead of a stale manual price — recalculateTourPrice skips
-        // updating servicePrice while the override is checked. Skip during edit population.
-        if (!this._populatingForm) {
+        // Vehicle tours: the price field is ALWAYS editable (no "Editar precio
+        // manualmente" checkbox). Force `tourVehicleOverridePrices` ON so the breakdown
+        // reads servicePrice, hide its checkbox, and make the field editable. Reset the
+        // manual-edit flag so a freshly selected tour/vehicle auto-fills (skip during
+        // edit population so the saved custom price is preserved).
+        if (this.canEditPrices) {
           const vehicleOverrideCheckbox = document.getElementById('tourVehicleOverridePrices');
-          if (vehicleOverrideCheckbox?.checked) {
-            vehicleOverrideCheckbox.checked = false;
-            const servicePriceFieldReset = document.getElementById('servicePrice');
-            if (servicePriceFieldReset) {
-              servicePriceFieldReset.readOnly = true;
-              servicePriceFieldReset.setAttribute('readonly', 'readonly');
-              servicePriceFieldReset.classList.remove('price-override-active');
-            }
+          if (vehicleOverrideCheckbox) vehicleOverrideCheckbox.checked = true;
+          document.getElementById('tourVehicleOverridePricesContainer')?.classList.add('d-none');
+          const servicePriceFieldEditable = document.getElementById('servicePrice');
+          if (servicePriceFieldEditable) {
+            servicePriceFieldEditable.readOnly = false;
+            servicePriceFieldEditable.removeAttribute('readonly');
+            servicePriceFieldEditable.removeAttribute('data-readonly');
+            servicePriceFieldEditable.classList.remove('readonly-price');
+            servicePriceFieldEditable.style.backgroundColor = '';
+          }
+          if (!this._populatingForm) {
+            this.resetMainPriceManualEdit();
           }
         }
 
