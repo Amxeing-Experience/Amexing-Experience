@@ -5124,19 +5124,17 @@ class ItineraryBuilder {
       // Check if tour has custom price override
       if (!service.isWalkingTour) {
         // VEHICLE TOUR: the price field holds ONLY the main vehicle base (efectivo, por
-        // hora); the breakdown adds guía/adicionales/recargo. Restore the dedicated saved
-        // base (baseVehiclePrice) so re-editing shows the main-vehicle price, NOT the
-        // service total. Older saves lack baseVehiclePrice (and polluted customPrice with
-        // the total) → fall back to the catalog vehicle cost.
-        const hasSavedBase = service.baseVehiclePrice !== undefined && service.baseVehiclePrice !== null;
-        const savedBase = hasSavedBase ? service.baseVehiclePrice : (this.getVehicleCost(service) || 0);
-        document.getElementById('servicePrice').value = (savedBase || 0).toFixed(2);
-        this.lastValidTourPrice = savedBase;
-        // Explicit saved base → protect it from recalc; otherwise let recalc fill the
+        // hora); the breakdown adds guía/adicionales/recargo. Resolve the base via the
+        // shared helper, which ignores a saved base that equals the service total (older/
+        // buggy saves polluted it) and recomputes from the catalog instead.
+        const { base, isManual } = this.resolveVehicleTourBasePrice(service);
+        document.getElementById('servicePrice').value = (base || 0).toFixed(2);
+        this.lastValidTourPrice = base;
+        // Genuine manual base → protect it from recalc; otherwise let recalc fill the
         // catalog vehicle cost once pricing data is hot.
-        this._mainPriceManuallyEdited = hasSavedBase;
+        this._mainPriceManuallyEdited = isManual;
         qsDevLog('🚗 Vehicle tour base price loaded:', {
-          savedBase, hasSavedBase, customPrice: service.customPrice, price: service.price,
+          base, isManual, baseVehiclePrice: service.baseVehiclePrice, price: service.price,
         });
       } else if (service.priceOverride) {
         // When price override is enabled, use customPrice as the BASE price (not total)
@@ -5314,24 +5312,23 @@ class ItineraryBuilder {
           if (tourPriceField) {
             tourPriceField.readOnly = false;
             tourPriceField.classList.add('price-override-active');
-            // Vehicle tours: restore the dedicated main-vehicle base — NOT customPrice, which
-            // older saves polluted with the service total (re-injecting it here is what made
-            // the total reappear on edit). Only force an explicitly saved base; legacy data
-            // without baseVehiclePrice is left for the populate branch / recalc to fill with
-            // the catalog vehicle cost.
-            if (service.baseVehiclePrice !== undefined && service.baseVehiclePrice !== null) {
-              const savedBase = service.baseVehiclePrice;
-              const target = parseFloat(savedBase || 0).toFixed(2);
+            // Vehicle tours: restore the main-vehicle base via the shared helper — NOT
+            // customPrice (older saves polluted it with the service total; re-injecting it
+            // here is what made the total reappear). Only force/protect a GENUINE manual
+            // base; otherwise leave the catalog value from the populate branch / recalc.
+            const { base, isManual } = this.resolveVehicleTourBasePrice(service);
+            if (isManual) {
+              const target = parseFloat(base || 0).toFixed(2);
               tourPriceField.value = target;
-              this.lastValidTourPrice = savedBase;
-              qsDevLog('🔄 Restored vehicle tour base after override toggle:', savedBase);
+              this.lastValidTourPrice = base;
+              qsDevLog('🔄 Restored vehicle tour manual base after override toggle:', base);
 
               // Force restore after delays in case async population overwrites it
               const reapplyBase = () => {
                 const field = document.getElementById('servicePrice');
                 if (field && field.value !== target) {
                   field.value = target;
-                  this.lastValidTourPrice = savedBase;
+                  this.lastValidTourPrice = base;
                 }
               };
               setTimeout(reapplyBase, 200);
@@ -13524,6 +13521,30 @@ class ItineraryBuilder {
     // Refresh the breakdown after the prices are wired into the options so the totals
     // reflect this row even on initial edit-mode population.
     this.updateServicePriceBreakdown();
+  }
+
+  // Resolve the MAIN VEHICLE base price to show in the servicePrice field when editing a
+  // vehicle tour. The field must show only the vehicle cost (the breakdown adds guía/
+  // adicionales/recargo), never the service total. Returns { base, isManual }:
+  //  - Honors an explicit saved base (baseVehiclePrice) ONLY when it's a real vehicle-level
+  //    base, i.e. it differs from the saved service total. Older/buggy saves stored the TOTAL
+  //    in baseVehiclePrice/customPrice; trusting it blindly is what made the total reappear
+  //    (a pollution loop, since saving re-wrote the polluted field value back).
+  //  - Otherwise recomputes from the catalog vehicle cost (isManual=false), so a later
+  //    recalc can keep it correct.
+  resolveVehicleTourBasePrice(service) {
+    const catalogVehicleCost = this.getVehicleCost(service) || 0;
+    const savedTotal = (service.pricesByType && service.pricesByType.efectivo !== undefined
+      && service.pricesByType.efectivo !== null)
+      ? service.pricesByType.efectivo
+      : (service.price || 0);
+    const savedBase = service.baseVehiclePrice;
+    const hasManualBase = savedBase !== undefined && savedBase !== null
+      && Math.abs(Number(savedBase) - Number(savedTotal)) > 0.01;
+    if (hasManualBase) {
+      return { base: Number(savedBase), isManual: true };
+    }
+    return { base: catalogVehicleCost, isManual: false };
   }
 
   // Reflect the selected vehicle's list (catalog) price on a row and default the
