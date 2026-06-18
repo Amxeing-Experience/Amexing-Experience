@@ -793,18 +793,8 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <input class="form-check-input" type="checkbox" id="conceptoApplySurcharges" checked>
                             </div>
                             
-                            <!-- Schedule Toggle -->
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="conceptoHasSchedule">
-                                    <label class="form-check-label" for="conceptoHasSchedule">
-                                        <i class="ti ti-clock me-1"></i>Incluir horario
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <!-- Schedule Fields (hidden by default) -->
-                            <div id="conceptoScheduleFields" class="d-none">
+                            <!-- Schedule Fields (opcionales: si se llenan se guardan, si no, se ignoran) -->
+                            <div id="conceptoScheduleFields">
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <label for="conceptoStartTime" class="form-label">Hora de inicio</label>

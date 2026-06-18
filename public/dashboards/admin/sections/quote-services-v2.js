@@ -4781,11 +4781,10 @@ class ItineraryBuilder {
           price: data.price,
         });
 
-        // Collect schedule data if checkbox is checked
-        const hasSchedule = document.getElementById('conceptoHasSchedule')?.checked;
+        // Horario opcional (sin checkbox): si hay hora de inicio se guarda; si está vacío se ignora.
         const conceptoStartTime = document.getElementById('conceptoStartTime')?.value;
         const conceptoEndTime = document.getElementById('conceptoEndTime')?.value;
-        if (hasSchedule && conceptoStartTime) {
+        if (conceptoStartTime) {
           data.startTime = conceptoStartTime;
           // Create a schedule string for display
           if (conceptoEndTime) {
