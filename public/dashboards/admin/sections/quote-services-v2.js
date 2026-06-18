@@ -2234,12 +2234,24 @@ class ItineraryBuilder {
         document.getElementById('transportOverridePricesContainer')?.classList.add('d-none');
         const transportOverrideCb = document.getElementById('transportOverridePrices');
         if (transportOverrideCb) transportOverrideCb.checked = true;
-        if (servicePriceField) { servicePriceField.readOnly = false; servicePriceField.removeAttribute('readonly'); }
+        if (servicePriceField) {
+          servicePriceField.readOnly = false;
+          servicePriceField.removeAttribute('readonly');
+          servicePriceField.removeAttribute('data-readonly');
+          servicePriceField.classList.remove('readonly-price');
+          servicePriceField.style.backgroundColor = '';
+        }
       } else if (type === 'a-disposicion') {
         document.getElementById('aDisposicionOverridePricesContainer')?.classList.add('d-none');
         const aDispOverrideCb = document.getElementById('aDisposicionOverridePrices');
         if (aDispOverrideCb) aDispOverrideCb.checked = true;
-        if (servicePriceField) { servicePriceField.readOnly = false; servicePriceField.removeAttribute('readonly'); }
+        if (servicePriceField) {
+          servicePriceField.readOnly = false;
+          servicePriceField.removeAttribute('readonly');
+          servicePriceField.removeAttribute('data-readonly');
+          servicePriceField.classList.remove('readonly-price');
+          servicePriceField.style.backgroundColor = '';
+        }
       }
     } else {
       // Non-admin users cannot edit prices for transport/a-disposicion
@@ -15573,20 +15585,9 @@ class ItineraryBuilder {
     });
 
     if (currentServiceType === 'transport') {
-      // Changing the segment/rate redefines the price, so reset the manual price
-      // override (transportOverridePrices) to keep the breakdown on the recalculated
-      // price instead of a stale manual one. Skip during edit population.
-      if (!this._populatingForm) {
-        const transportOverrideCheckbox = document.getElementById('transportOverridePrices');
-        if (transportOverrideCheckbox?.checked) {
-          transportOverrideCheckbox.checked = false;
-          if (servicePriceField) {
-            servicePriceField.readOnly = true;
-            servicePriceField.setAttribute('readonly', 'readonly');
-            servicePriceField.classList.remove('price-override-active');
-          }
-        }
-      }
+      // El precio es siempre editable (override ON por default). Al cambiar el segmento NO se
+      // re-bloquea el campo; solo se reautollena el precio de catálogo (resetMainPriceManualEdit
+      // ya corre en el listener del segmento), conservando el campo editable.
       this.handleTransportRateSelection(rateId);
       this.updateWaitingTimeRateDisplay();
       return;
@@ -19303,21 +19304,9 @@ class ItineraryBuilder {
     document.getElementById('servicePrice').value = '';
     document.getElementById('aDisposicionDiscountInfo').textContent = '';
 
-    // Changing the rate redefines the price, so reset the manual price override
-    // (aDisposicionOverridePrices) — calculateADisposicionPrice skips updating
-    // servicePrice while it's checked. Skip during edit population.
-    if (!this._populatingForm) {
-      const aDisposicionOverrideCheckbox = document.getElementById('aDisposicionOverridePrices');
-      if (aDisposicionOverrideCheckbox?.checked) {
-        aDisposicionOverrideCheckbox.checked = false;
-        const servicePriceFieldReset = document.getElementById('servicePrice');
-        if (servicePriceFieldReset) {
-          servicePriceFieldReset.readOnly = true;
-          servicePriceFieldReset.setAttribute('readonly', 'readonly');
-          servicePriceFieldReset.classList.remove('price-override-active');
-        }
-      }
-    }
+    // El precio es siempre editable (override ON por default). Al cambiar el segmento NO se
+    // re-bloquea el campo; el reset de "editado a mano" ya corre en el listener del segmento,
+    // así que la tarifa de catálogo se reautollena conservando el campo editable.
 
     if (!rateId) return;
 
