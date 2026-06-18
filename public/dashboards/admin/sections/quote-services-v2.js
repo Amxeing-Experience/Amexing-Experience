@@ -4441,13 +4441,18 @@ class ItineraryBuilder {
           lastCalculated: this.lastValidTourPrice,
         });
 
-        // Vehicle tours: persist the main-vehicle base explicitly so edit can restore the
-        // editable base price without confusing it with the service total. The servicePrice
-        // field holds only the vehicle cost (guía/adicionales/recargo live in the breakdown),
-        // so basePrice is that vehicle base. Mirrors transport's `baseVehiclePrice` and is
-        // robust to customPrice pollution from older saves.
+        // Vehicle tours: persist the main-vehicle base and an explicit manual-override flag.
+        // The servicePrice field holds only the vehicle cost (guía/adicionales/recargo live in
+        // the breakdown), so basePrice is that vehicle base. `vehiclePriceManual` is the single
+        // signal edit uses to decide whether to restore the manual value or recompute from the
+        // catalog: it's true only when the field differs from the auto catalog base
+        // (lastValidTourPrice, set by recalculateTourPrice). The override checkbox is forced on
+        // for vehicle tours, so the generic detection above is skipped — this is independent.
         if (!data.isWalkingTour) {
           data.baseVehiclePrice = basePrice;
+          const autoBase = parseFloat(this.lastValidTourPrice);
+          data.vehiclePriceManual = !Number.isNaN(basePrice) && !Number.isNaN(autoBase)
+            && Math.abs(basePrice - autoBase) > 0.01;
         }
 
         if (data.priceOverride && !data.isWalkingTour) {
@@ -12789,6 +12794,9 @@ class ItineraryBuilder {
             priceOverride: subconcept.priceOverride || false,
             customPrice: subconcept.customPrice || null,
             customPrices: subconcept.customPrices || null,
+            // Vehicle tour: explicit manual-override flag for the main vehicle base price.
+            // Drives restore-vs-recompute on edit (see resolveVehicleTourBasePrice).
+            vehiclePriceManual: subconcept.vehiclePriceManual || false,
             // Walking tour fields (from backend)
             isWalkingTour: subconcept.isWalkingTour || false,
             walkingTourPrice: subconcept.walkingTourPrice || null,
@@ -13524,25 +13532,19 @@ class ItineraryBuilder {
   }
 
   // Resolve the MAIN VEHICLE base price to show in the servicePrice field when editing a
-  // vehicle tour. The field must show only the vehicle cost (the breakdown adds guía/
-  // adicionales/recargo), never the service total. Returns { base, isManual }:
-  //  - Honors an explicit saved base (baseVehiclePrice) ONLY when it's a real vehicle-level
-  //    base, i.e. it differs from the saved service total. Older/buggy saves stored the TOTAL
-  //    in baseVehiclePrice/customPrice; trusting it blindly is what made the total reappear
-  //    (a pollution loop, since saving re-wrote the polluted field value back).
-  //  - Otherwise recomputes from the catalog vehicle cost (isManual=false), so a later
-  //    recalc can keep it correct.
+  // vehicle tour. The field shows ONLY the vehicle cost (the breakdown/engine adds guía/
+  // adicionales/recargo), never the service total. Returns { base, isManual }.
+  //
+  // Single, unambiguous rule: honor a saved manual override ONLY when the service was saved
+  // with the explicit `vehiclePriceManual` flag. Everything else — non-manual saves AND all
+  // legacy data (no flag) — recomputes from the catalog vehicle cost. This avoids trusting a
+  // stored value that older/buggy saves may have polluted with the total, and is NOT a
+  // heuristic comparison against the total.
   resolveVehicleTourBasePrice(service) {
     const catalogVehicleCost = this.getVehicleCost(service) || 0;
-    const savedTotal = (service.pricesByType && service.pricesByType.efectivo !== undefined
-      && service.pricesByType.efectivo !== null)
-      ? service.pricesByType.efectivo
-      : (service.price || 0);
-    const savedBase = service.baseVehiclePrice;
-    const hasManualBase = savedBase !== undefined && savedBase !== null
-      && Math.abs(Number(savedBase) - Number(savedTotal)) > 0.01;
-    if (hasManualBase) {
-      return { base: Number(savedBase), isManual: true };
+    if (service.vehiclePriceManual === true
+      && service.customPrice !== undefined && service.customPrice !== null) {
+      return { base: Number(service.customPrice), isManual: true };
     }
     return { base: catalogVehicleCost, isManual: false };
   }
