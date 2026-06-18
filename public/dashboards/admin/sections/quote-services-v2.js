@@ -843,6 +843,8 @@ class ItineraryBuilder {
     document.getElementById('vehicleSelect')?.addEventListener('change', (e) => {
       this.serviceModified = true; // Mark as modified when user changes vehicle
       this.handleVehicleSelection(e.target.value);
+      // Habilita/inhabilita "Agregar vehículo" según haya vehículo principal.
+      this.syncExtraVehiclesButtonEnabled();
     });
 
     // Include guide checkbox listener for tours (Guía + Chofer)
@@ -2048,11 +2050,12 @@ class ItineraryBuilder {
         quantityField?.classList.add('d-none');
         document.getElementById('serviceQuantity')?.removeAttribute('required');
         document.getElementById('serviceQuantity').value = 1;
-        document.getElementById('additionalVehicleContainer')?.classList.remove('d-none');
+        document.getElementById('extraAdditionalVehiclesContainer')?.classList.remove('d-none');
+        this.syncExtraVehiclesButtonEnabled();
 
         // Only uncheck if not populating form during edit
         if (!this._populatingVehicleTourForm && !this._populatingTransportForm) {
-          document.getElementById('additionalVehicleCheckbox').checked = false;
+          const _avCb = document.getElementById('additionalVehicleCheckbox'); if (_avCb) _avCb.checked = false;
         }
 
         // Ensure additional vehicle containers are hidden by default (until checkbox is checked)
@@ -2130,11 +2133,12 @@ class ItineraryBuilder {
       quantityField?.classList.add('d-none');
       document.getElementById('serviceQuantity')?.removeAttribute('required');
       document.getElementById('serviceQuantity').value = 1;
-      document.getElementById('additionalVehicleContainer')?.classList.remove('d-none');
+      document.getElementById('extraAdditionalVehiclesContainer')?.classList.remove('d-none');
+      this.syncExtraVehiclesButtonEnabled();
 
       // Only uncheck if not populating form during edit
       if (!this._populatingVehicleTourForm && !this._populatingTransportForm) {
-        document.getElementById('additionalVehicleCheckbox').checked = false;
+        const _avCb = document.getElementById('additionalVehicleCheckbox'); if (_avCb) _avCb.checked = false;
       }
 
       // Ensure additional vehicle containers are hidden by default (until checkbox is checked)
@@ -7089,8 +7093,7 @@ class ItineraryBuilder {
     // option's dataset is the efectivo per-hour cost; multiply by tour duration and the
     // payment-type surcharge in the loop below.
     const extraVehicleItemsForTour = (
-      document.getElementById('additionalVehicleCheckbox')?.checked
-      && typeof this.getExtraAdditionalVehiclesBreakdownItems === 'function'
+      typeof this.getExtraAdditionalVehiclesBreakdownItems === 'function'
     ) ? this.getExtraAdditionalVehiclesBreakdownItems() : [];
 
     // Calculate totals for each payment type
@@ -9573,7 +9576,7 @@ class ItineraryBuilder {
       // Extra additional vehicles (beyond the first) — sum their efectivo prices and
       // apply the leg multiplier. El recargo del total lo aplica el motor sobre la suma en
       // efectivo; cada renglón conserva su propio valor con recargo para el texto del desglose.
-      const extraVehicleItems = (additionalVehicleCheckbox?.checked && typeof this.getExtraAdditionalVehiclesBreakdownItems === 'function')
+      const extraVehicleItems = (typeof this.getExtraAdditionalVehiclesBreakdownItems === 'function')
         ? this.getExtraAdditionalVehiclesBreakdownItems()
         : [];
       let extraVehiclesCostEfectivo = 0;
@@ -12753,6 +12756,32 @@ class ItineraryBuilder {
             aDisposicionAdditionalVehicles: subconcept.aDisposicionAdditionalVehicles || [],
           };
 
+          // Migración del modelo viejo: el "vehículo adicional" único se convierte en la PRIMERA
+          // fila de la lista de vehículos adicionales (nuevo modelo), para no perderlo al
+          // editar/guardar. Se limpia el adicional único en memoria para no duplicarlo.
+          if (serviceData.additionalVehicleId
+            && (serviceData.type === 'transport' || serviceData.type === 'tour')) {
+            const migratedRow = {
+              segment: serviceData.additionalVehicleSegment || '',
+              segmentName: serviceData.additionalVehicleSegmentName || '',
+              segmentColor: serviceData.additionalVehicleSegmentColor || '',
+              vehicleId: serviceData.additionalVehicleId,
+              vehicleTypeName: serviceData.additionalVehicleTypeName || '',
+              customPrice: (subconcept.additionalVehiclePrice !== undefined && subconcept.additionalVehiclePrice !== null)
+                ? subconcept.additionalVehiclePrice : null,
+              listPrice: 0,
+            };
+            const existingExtras = Array.isArray(serviceData.extraAdditionalVehicles)
+              ? serviceData.extraAdditionalVehicles : [];
+            serviceData.extraAdditionalVehicles = [migratedRow, ...existingExtras];
+            serviceData.hasAdditionalVehicle = false;
+            serviceData.additionalVehicleId = null;
+            serviceData.additionalVehicleSegment = null;
+            serviceData.additionalVehicleSegmentName = null;
+            serviceData.additionalVehicleSegmentColor = null;
+            serviceData.additionalVehicleTypeName = null;
+          }
+
           this.services.set(serviceId, serviceData);
 
           dayData.services.push(serviceId);
@@ -13463,6 +13492,13 @@ class ItineraryBuilder {
 
   // Sum of efectivo prices across all extra additional vehicle rows.
   // Returns the same currency unit as the main vehicle's base price.
+  // Habilita el botón "Agregar vehículo" (lista de adicionales) solo cuando hay un vehículo
+  // principal seleccionado. No se pueden agregar adicionales sin un principal.
+  syncExtraVehiclesButtonEnabled() {
+    const btn = document.getElementById('addExtraAdditionalVehicleBtn');
+    if (btn) btn.disabled = !document.getElementById('vehicleSelect')?.value;
+  }
+
   getExtraAdditionalVehiclesEfectivoTotal() {
     let total = 0;
     const rows = document.querySelectorAll('#extraAdditionalVehiclesList .extra-additional-vehicle-row');
@@ -14919,11 +14955,12 @@ class ItineraryBuilder {
       const quantityField = document.getElementById('serviceQuantity')?.closest('.col-md-6');
       quantityField?.classList.add('d-none');
       document.getElementById('serviceQuantity').value = 1;
-      document.getElementById('additionalVehicleContainer')?.classList.remove('d-none');
+      document.getElementById('extraAdditionalVehiclesContainer')?.classList.remove('d-none');
+      this.syncExtraVehiclesButtonEnabled();
 
       // Only uncheck additional vehicle if we're NOT populating the form during edit
       if (!this._populatingVehicleTourForm) {
-        document.getElementById('additionalVehicleCheckbox').checked = false;
+        const _avCb = document.getElementById('additionalVehicleCheckbox'); if (_avCb) _avCb.checked = false;
       }
 
       // Show pricing fields — clear any inline display:none left over from
@@ -15730,6 +15767,9 @@ class ItineraryBuilder {
    * @example
    */
   handleVehicleSelection(vehicleType) {
+    // Habilita/inhabilita "Agregar vehículo" (lista de adicionales) según el vehículo principal,
+    // cubriendo también la selección programática al editar.
+    this.syncExtraVehiclesButtonEnabled();
     if (!vehicleType) {
       // Clear price field if no vehicle selected
       const servicePriceField = document.getElementById('servicePrice');
@@ -16579,7 +16619,7 @@ class ItineraryBuilder {
       // Extra additional vehicles — render even if the primary additional vehicle
       // wasn't selected (the user may add extras directly). Gated only by the
       // "Vehículo adicional" checkbox since that's what controls the extras UI.
-      if (additionalVehicleCheckbox?.checked && typeof this.getExtraAdditionalVehiclesBreakdownItems === 'function') {
+      if (typeof this.getExtraAdditionalVehiclesBreakdownItems === 'function') {
         const extraItems = this.getExtraAdditionalVehiclesBreakdownItems();
         const extraPaymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
         extraItems.forEach((item) => {

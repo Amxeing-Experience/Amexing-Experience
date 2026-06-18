@@ -966,49 +966,16 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             <input type="number" class="form-control" id="serviceQuantity" value="1" min="1" required>
                             <small class="text-muted d-none" id="roundTripQuantityHint">Vehículo Ida y Regreso</small>
                         </div>
-                        <div class="col-md-6 mb-3 d-none d-flex align-items-end" id="additionalVehicleContainer">
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="additionalVehicleCheckbox">
-                                <label class="form-check-label" for="additionalVehicleCheckbox">Vehículo adicional</label>
-                            </div>
-                        </div>
-                        
-                        <!-- Additional vehicle selection fields -->
-                        <div class="col-md-6 mb-3 d-none" id="additionalSegmentContainer">
-                            <label for="additionalSegmentSelect" class="form-label">Segmento adicional</label>
-                            <select class="form-select" id="additionalSegmentSelect">
-                                <option value="">Seleccionar segmento</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3 d-none" id="additionalVehicleSelectContainer">
-                            <label for="additionalVehicleSelect" class="form-label">Vehículo adicional</label>
-                            <select class="form-select" id="additionalVehicleSelect" disabled>
-                                <option value="">Primero selecciona un segmento</option>
-                            </select>
-                        </div>
-                        <!-- Per-vehicle custom price for the primary additional vehicle.
-                             Defaults to the list (catalog) price, editable, with the list
-                             price shown below for reference. -->
-                        <div class="col-md-6 mb-3 d-none" id="additionalVehiclePriceContainer">
-                            <label for="additionalVehiclePrice" class="form-label">Precio vehículo adicional <small class="text-muted">(efectivo)</small></label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" min="0" step="0.01" class="form-control" id="additionalVehiclePrice" placeholder="0.00">
-                                <span class="input-group-text">MXN</span>
-                            </div>
-                            <small class="text-muted d-block" id="additionalVehicleListPrice"></small>
-                        </div>
-                        <!-- Extra additional vehicles (beyond the first one) — wired by JS.
-                             Each row gets its own segment + vehicle dropdowns. Hidden until the
-                             "Vehículo adicional" checkbox is checked. Phase 1: data model + UI;
-                             pricing impact lands in Phase 2. -->
+                        <!-- Vehículos adicionales (lista). Reemplaza al antiguo "vehículo adicional"
+                             único. Se muestra para transporte / tour con vehículo; el botón se
+                             habilita solo cuando hay un vehículo principal seleccionado. -->
                         <div class="col-12 d-none mt-2 p-3 border rounded bg-light" id="extraAdditionalVehiclesContainer">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <strong class="text-secondary" style="font-size: 0.9rem;">
-                                    <i class="ti ti-car-suv me-1"></i>Vehículos adicionales (extra)
+                                    <i class="ti ti-car-suv me-1"></i>Vehículos adicionales
                                 </strong>
-                                <button type="button" class="btn btn-sm btn-primary" id="addExtraAdditionalVehicleBtn">
-                                    <i class="ti ti-plus me-1"></i>Agregar otro vehículo
+                                <button type="button" class="btn btn-sm btn-primary" id="addExtraAdditionalVehicleBtn" disabled>
+                                    <i class="ti ti-plus me-1"></i>Agregar vehículo
                                 </button>
                             </div>
                             <div id="extraAdditionalVehiclesList"></div>
