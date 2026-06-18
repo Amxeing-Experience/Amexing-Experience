@@ -778,6 +778,7 @@ class ItineraryBuilder {
     // Tour selection handler
     document.getElementById('tourSelect')?.addEventListener('change', (e) => {
       this.serviceModified = true; // Mark as modified when user changes tour selection
+      this.resetMainPriceManualEdit(); // nuevo tour → reautollenar precio de catálogo
       this.handleTourSelection(e.target.value);
     });
 
@@ -836,12 +837,14 @@ class ItineraryBuilder {
 
     // Rate selection handler for tour vehicles
     document.getElementById('transportCategory')?.addEventListener('change', (e) => {
+      this.resetMainPriceManualEdit(); // nuevo segmento → reautollenar precio de catálogo
       this.handleRateSelection(e.target.value);
     });
 
     // Vehicle selection handler for price update
     document.getElementById('vehicleSelect')?.addEventListener('change', (e) => {
       this.serviceModified = true; // Mark as modified when user changes vehicle
+      this.resetMainPriceManualEdit(); // nuevo vehículo → reautollenar precio de catálogo
       this.handleVehicleSelection(e.target.value);
       // Habilita/inhabilita "Agregar vehículo" según haya vehículo principal.
       this.syncExtraVehiclesButtonEnabled();
@@ -938,6 +941,7 @@ class ItineraryBuilder {
     const servicePriceField = document.getElementById('servicePrice');
     if (servicePriceField) {
       servicePriceField.addEventListener('input', (e) => {
+        this._mainPriceManuallyEdited = true; // el usuario editó el precio → no autollenar de catálogo
         // Check if field should be readonly based on service type and override state
         const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
         if (serviceType === 'tour') {
@@ -1135,12 +1139,14 @@ class ItineraryBuilder {
     // A Disposición - rate, vehicle, hours, vehicle count
     document.getElementById('aDisposicionRate')?.addEventListener('change', (e) => {
       this.serviceModified = true; // Mark as modified when user changes rate
+      this.resetMainPriceManualEdit(); // nuevo segmento → reautollenar tarifa de catálogo
       this.handleADisposicionRateChange(e.target.value);
     });
     // Botón "+ Agregar vehículo" de vehículos adicionales de a-disposición
     this.setupADisposicionAdditionalVehicles();
     document.getElementById('aDisposicionVehicle')?.addEventListener('change', () => {
       this.serviceModified = true; // Mark as modified when user changes vehicle
+      this.resetMainPriceManualEdit(); // nuevo vehículo → reautollenar tarifa de catálogo
       this.calculateADisposicionPrice();
     });
     document.getElementById('aDisposicionHours')?.addEventListener('input', () => {
@@ -2223,17 +2229,17 @@ class ItineraryBuilder {
           }
         }
       } else if (type === 'transport') {
-        document.getElementById('transportOverridePricesContainer')?.classList.remove('d-none');
-        // Transport price should be readonly unless override is checked
-        if (servicePriceField) {
-          servicePriceField.readOnly = !document.getElementById('transportOverridePrices')?.checked;
-        }
+        // "Editar precio manualmente" es ahora el default: campo SIEMPRE editable, checkbox oculto,
+        // y override forzado en ON para que el cálculo use el valor del campo (Lista debajo).
+        document.getElementById('transportOverridePricesContainer')?.classList.add('d-none');
+        const transportOverrideCb = document.getElementById('transportOverridePrices');
+        if (transportOverrideCb) transportOverrideCb.checked = true;
+        if (servicePriceField) { servicePriceField.readOnly = false; servicePriceField.removeAttribute('readonly'); }
       } else if (type === 'a-disposicion') {
-        document.getElementById('aDisposicionOverridePricesContainer')?.classList.remove('d-none');
-        // A disposición price should be readonly unless override is checked
-        if (servicePriceField) {
-          servicePriceField.readOnly = !document.getElementById('aDisposicionOverridePrices')?.checked;
-        }
+        document.getElementById('aDisposicionOverridePricesContainer')?.classList.add('d-none');
+        const aDispOverrideCb = document.getElementById('aDisposicionOverridePrices');
+        if (aDispOverrideCb) aDispOverrideCb.checked = true;
+        if (servicePriceField) { servicePriceField.readOnly = false; servicePriceField.removeAttribute('readonly'); }
       }
     } else {
       // Non-admin users cannot edit prices for transport/a-disposicion
@@ -5050,6 +5056,8 @@ class ItineraryBuilder {
 
       // Set flag to prevent saving fields while populating
       this._populatingForm = true;
+      // Al editar: preservar el precio guardado (no autollenar con el de catálogo).
+      this._mainPriceManuallyEdited = true;
       this.handleServiceTypeChange(service.type);
       this._populatingForm = false;
 
@@ -12402,6 +12410,9 @@ class ItineraryBuilder {
    * @example
    */
   clearServiceOptionState() {
+    // Servicio nuevo por default: el precio se autollena con el de catálogo (no editado a mano).
+    this._mainPriceManuallyEdited = false;
+
     // Vehículo adicional (transporte / vehicle tour)
     const addCheckbox = document.getElementById('additionalVehicleCheckbox');
     if (addCheckbox) addCheckbox.checked = false;
@@ -13499,6 +13510,29 @@ class ItineraryBuilder {
 
   // Sum of efectivo prices across all extra additional vehicle rows.
   // Returns the same currency unit as the main vehicle's base price.
+  // Precio principal SIEMPRE editable (sin checkbox de "editar precio manualmente"): autollena
+  // el precio de CATÁLOGO al elegir segmento/vehículo y muestra "Lista: $X" debajo. Si el usuario
+  // editó el precio (_mainPriceManuallyEdited), NO se sobreescribe en recálculos; se vuelve a
+  // rellenar cuando cambia el vehículo/segmento (que resetea el flag). Lo llaman las funciones de
+  // recálculo (transporte/tour/a-disposición) en vez de escribir el campo directo.
+  setMainVehiclePrice(catalogPrice) {
+    const price = Number(catalogPrice) || 0;
+    this._mainVehicleCatalogPrice = price;
+    const listEl = document.getElementById('servicePriceListPrice');
+    if (listEl) listEl.textContent = price > 0 ? `Lista: ${this.formatCurrency(price)}` : '';
+    const priceField = document.getElementById('servicePrice');
+    if (priceField && !this._mainPriceManuallyEdited) {
+      priceField.value = price.toFixed(2);
+    }
+    this.updateServicePriceBreakdown();
+  }
+
+  // Resetea la marca de "precio editado a mano" para que el siguiente cálculo vuelva a
+  // autollenar el precio de catálogo. Se llama al cambiar segmento/vehículo (catálogo cambia).
+  resetMainPriceManualEdit() {
+    this._mainPriceManuallyEdited = false;
+  }
+
   // Coloca el campo Precio (compartido) junto a Segmento + Vehículo cuando aplica: transporte
   // y tour con traslado. Para los demás tipos lo regresa a standardPricingSection. Idempotente.
   syncMainVehiclePriceLayout() {
@@ -15851,7 +15885,7 @@ class ItineraryBuilder {
       } else {
         // For non-tour services, use vehicle price only
         const finalPrice = this.getVehiclePriceWithPriority(vehicleType, tourId, rateId);
-        this.updatePriceField(finalPrice);
+        this.setMainVehiclePrice(finalPrice);
       }
     } catch (error) {
       console.error('Error handling vehicle selection:', error);
@@ -17993,7 +18027,7 @@ class ItineraryBuilder {
     });
 
     // El campo siempre muestra el efectivo base; el recargo por forma de pago va en el desglose.
-    this.updatePriceField(vehicleEfectivoTotal);
+    this.setMainVehiclePrice(vehicleEfectivoTotal);
 
     // The service breakdown now reads from the dev breakdown, so recompute the dev
     // breakdown FIRST, then render the service breakdown from it.
@@ -19368,11 +19402,10 @@ class ItineraryBuilder {
         note: 'Using unified getDisplayPrice() method for consistency with breakdowns',
       });
 
-      // Only update price field if price override is not active
-      const isOverrideActive = document.getElementById('aDisposicionOverridePrices')?.checked || false;
-      if (priceField && !isOverrideActive) {
-        // El campo muestra el efectivo base (por hora); el recargo se aplica en el desglose.
-        priceField.value = basePrice.toFixed(2);
+      // Campo de precio SIEMPRE editable: autollena la tarifa de catálogo (Lista) por hora,
+      // salvo que el usuario la haya editado a mano. (Antes esto dependía del checkbox de override.)
+      if (priceField) {
+        this.setMainVehiclePrice(basePrice);
         qsDevLog('💰 A Disposición price field set with payment surcharge:', {
           basePrice,
           displayPrice,
