@@ -4441,6 +4441,15 @@ class ItineraryBuilder {
           lastCalculated: this.lastValidTourPrice,
         });
 
+        // Vehicle tours: persist the main-vehicle base explicitly so edit can restore the
+        // editable base price without confusing it with the service total. The servicePrice
+        // field holds only the vehicle cost (guía/adicionales/recargo live in the breakdown),
+        // so basePrice is that vehicle base. Mirrors transport's `baseVehiclePrice` and is
+        // robust to customPrice pollution from older saves.
+        if (!data.isWalkingTour) {
+          data.baseVehiclePrice = basePrice;
+        }
+
         if (data.priceOverride && !data.isWalkingTour) {
           // Store custom tour prices when override is checked
           data.adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
@@ -5113,7 +5122,23 @@ class ItineraryBuilder {
         quantity: service.quantity,
       });
       // Check if tour has custom price override
-      if (service.priceOverride) {
+      if (!service.isWalkingTour) {
+        // VEHICLE TOUR: the price field holds ONLY the main vehicle base (efectivo, por
+        // hora); the breakdown adds guía/adicionales/recargo. Restore the dedicated saved
+        // base (baseVehiclePrice) so re-editing shows the main-vehicle price, NOT the
+        // service total. Older saves lack baseVehiclePrice (and polluted customPrice with
+        // the total) → fall back to the catalog vehicle cost.
+        const hasSavedBase = service.baseVehiclePrice !== undefined && service.baseVehiclePrice !== null;
+        const savedBase = hasSavedBase ? service.baseVehiclePrice : (this.getVehicleCost(service) || 0);
+        document.getElementById('servicePrice').value = (savedBase || 0).toFixed(2);
+        this.lastValidTourPrice = savedBase;
+        // Explicit saved base → protect it from recalc; otherwise let recalc fill the
+        // catalog vehicle cost once pricing data is hot.
+        this._mainPriceManuallyEdited = hasSavedBase;
+        qsDevLog('🚗 Vehicle tour base price loaded:', {
+          savedBase, hasSavedBase, customPrice: service.customPrice, price: service.price,
+        });
+      } else if (service.priceOverride) {
         // When price override is enabled, use customPrice as the BASE price (not total)
         const basePrice = service.customPrice !== undefined && service.customPrice !== null
           ? service.customPrice
