@@ -5307,40 +5307,39 @@ class ItineraryBuilder {
         case 'experience':
           this.handlePriceOverrideToggle('experience', true);
           break;
-        case 'tour':
+        case 'tour': {
           this.handlePriceOverrideToggle('tour', true);
           // Explicitly ensure price field is editable for tours
           const tourPriceField = document.getElementById('servicePrice');
           if (tourPriceField) {
             tourPriceField.readOnly = false;
             tourPriceField.classList.add('price-override-active');
-            // Restore the custom price AFTER handlePriceOverrideToggle
-            if (service.customPrice !== undefined && service.customPrice !== null) {
-              tourPriceField.value = service.customPrice;
-              qsDevLog('🔄 Restored custom price after override toggle:', service.customPrice);
+            // Vehicle tours: restore the dedicated main-vehicle base — NOT customPrice, which
+            // older saves polluted with the service total (re-injecting it here is what made
+            // the total reappear on edit). Only force an explicitly saved base; legacy data
+            // without baseVehiclePrice is left for the populate branch / recalc to fill with
+            // the catalog vehicle cost.
+            if (service.baseVehiclePrice !== undefined && service.baseVehiclePrice !== null) {
+              const savedBase = service.baseVehiclePrice;
+              const target = parseFloat(savedBase || 0).toFixed(2);
+              tourPriceField.value = target;
+              this.lastValidTourPrice = savedBase;
+              qsDevLog('🔄 Restored vehicle tour base after override toggle:', savedBase);
 
-              // Force restore after a delay in case something else overwrites it
-              setTimeout(() => {
+              // Force restore after delays in case async population overwrites it
+              const reapplyBase = () => {
                 const field = document.getElementById('servicePrice');
-                if (field && field.value !== String(service.customPrice)) {
-                  qsDevLog('🔧 Fixing price field - was:', field.value, 'setting to:', service.customPrice);
-                  field.value = service.customPrice;
-                  this.lastValidTourPrice = service.customPrice;
+                if (field && field.value !== target) {
+                  field.value = target;
+                  this.lastValidTourPrice = savedBase;
                 }
-              }, 200);
-
-              // And again after a longer delay
-              setTimeout(() => {
-                const field = document.getElementById('servicePrice');
-                if (field && field.value !== String(service.customPrice)) {
-                  qsDevLog('🔧 Final fix - setting price to:', service.customPrice);
-                  field.value = service.customPrice;
-                  this.lastValidTourPrice = service.customPrice;
-                }
-              }, 500);
+              };
+              setTimeout(reapplyBase, 200);
+              setTimeout(reapplyBase, 500);
             }
           }
           break;
+        }
         case 'transport':
           this.handlePriceOverrideToggle('transport', true);
           break;
