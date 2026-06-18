@@ -969,12 +969,10 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         <!-- Vehículos adicionales (lista). Reemplaza al antiguo "vehículo adicional"
                              único. Se muestra para transporte / tour con vehículo; el botón se
                              habilita solo cuando hay un vehículo principal seleccionado. -->
-                        <div class="col-12 d-none mt-2 p-3 border rounded bg-light" id="extraAdditionalVehiclesContainer">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <strong class="text-secondary" style="font-size: 0.9rem;">
-                                    <i class="ti ti-car-suv me-1"></i>Vehículos adicionales
-                                </strong>
-                                <button type="button" class="btn btn-sm btn-primary" id="addExtraAdditionalVehicleBtn" disabled>
+                        <div class="col-12 d-none mt-2" id="extraAdditionalVehiclesContainer">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label mb-0"><i class="ti ti-car me-1"></i>Vehículos adicionales</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="addExtraAdditionalVehicleBtn" disabled>
                                     <i class="ti ti-plus me-1"></i>Agregar vehículo
                                 </button>
                             </div>
