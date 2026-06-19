@@ -545,7 +545,16 @@
         background-color: #fff3cd !important;
         border-color: #ffc107 !important;
     }
-    
+
+    /* El precio principal (servicePrice) ahora es SIEMPRE editable (sin checkbox de
+       "editar precio manualmente"), así que el resaltado amarillo de override no aplica;
+       se neutraliza para que se vea como un campo normal. El precio manual de walking
+       tours conserva el resaltado porque sí tiene un toggle real. */
+    #servicePrice.price-override-active {
+        background-color: #fff !important;
+        border-color: #dee2e6 !important;
+    }
+
     .price-override-indicator {
         color: #856404;
         font-size: 0.875rem;
