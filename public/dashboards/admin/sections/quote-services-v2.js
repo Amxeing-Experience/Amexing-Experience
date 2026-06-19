@@ -5132,13 +5132,15 @@ class ItineraryBuilder {
         // hora); the breakdown adds guía/adicionales/recargo. Resolve the base via the
         // shared helper, which ignores a saved base that equals the service total (older/
         // buggy saves polluted it) and recomputes from the catalog instead.
-        const { base, isManual } = this.resolveVehicleTourBasePrice(service);
+        const { base, catalog, isManual } = this.resolveVehicleTourBasePrice(service);
         document.getElementById('servicePrice').value = (base || 0).toFixed(2);
-        this.lastValidTourPrice = base;
-        // Mostrar "Lista: $X" debajo del campo (igual que transporte).
-        this.updateMainVehicleListPrice(base);
-        // Genuine manual base → protect it from recalc; otherwise let recalc fill the
-        // catalog vehicle cost once pricing data is hot.
+        // lastValidTourPrice = catálogo (referencia) para que la detección de "editado a mano"
+        // al guardar compare contra el catálogo, no contra el propio valor manual.
+        this.lastValidTourPrice = catalog;
+        // "Lista: $X" SIEMPRE muestra el catálogo, aunque el campo tenga un precio manual.
+        this.updateMainVehicleListPrice(catalog);
+        // Manual override → proteger el campo del recálculo; si no, dejar que el recálculo
+        // rellene el costo de catálogo cuando los precios estén cargados.
         this._mainPriceManuallyEdited = isManual;
         qsDevLog('🚗 Vehicle tour base price loaded:', {
           base, isManual, baseVehiclePrice: service.baseVehiclePrice, price: service.price,
@@ -5327,7 +5329,8 @@ class ItineraryBuilder {
             if (isManual) {
               const target = parseFloat(base || 0).toFixed(2);
               tourPriceField.value = target;
-              this.lastValidTourPrice = base;
+              // NO tocar lastValidTourPrice aquí: debe quedar = catálogo (lo fija el recálculo)
+              // para que al guardar se detecte "editado a mano" comparando campo vs catálogo.
               qsDevLog('🔄 Restored vehicle tour manual base after override toggle:', base);
 
               // Force restore after delays in case async population overwrites it
@@ -5335,7 +5338,6 @@ class ItineraryBuilder {
                 const field = document.getElementById('servicePrice');
                 if (field && field.value !== target) {
                   field.value = target;
-                  this.lastValidTourPrice = base;
                 }
               };
               setTimeout(reapplyBase, 200);
@@ -6729,10 +6731,11 @@ class ItineraryBuilder {
           // the service total stored in pricesByType (vehículo + guía + adicionales + recargo
           // × duración). Re-derive from the catalog so this payment-type sync doesn't overwrite
           // the correct base with the total. THIS was the last writer that re-showed the total.
-          correctPrice = this.resolveVehicleTourBasePrice(service).base;
-          // Mostrar "Lista: $X" debajo del campo (igual que transporte). Este sync corre al
-          // final, así que asegura la Lista aunque el recálculo previo no la haya fijado.
-          this.updateMainVehicleListPrice(correctPrice);
+          const vtResolved = this.resolveVehicleTourBasePrice(service);
+          correctPrice = vtResolved.base; // campo = manual si lo hay, si no catálogo
+          // "Lista: $X" SIEMPRE el catálogo. Este sync corre al final, así que asegura tanto
+          // el valor del campo como la Lista aunque el recálculo previo no los haya fijado.
+          this.updateMainVehicleListPrice(vtResolved.catalog);
           qsDevLog('🚗 Vehicle tour: using catalog vehicle base for Precio field (not total):', {
             correctPrice,
             pricesByType: service.pricesByType,
@@ -13546,18 +13549,21 @@ class ItineraryBuilder {
     this.updateServicePriceBreakdown();
   }
 
-  // Resolve the MAIN VEHICLE base price to show in the servicePrice field when editing a
-  // vehicle tour. The field shows ONLY the per-hour vehicle cost (the breakdown/engine adds
-  // guía/adicionales/recargo and multiplies by duration), never the service total.
-  //
-  // Deterministic rule: ALWAYS recompute from the catalog vehicle cost (getVehicleCost),
-  // exactly like a fresh selection. We intentionally do NOT round-trip a saved per-service
-  // price here: that value was repeatedly polluted with the service total / vehicle-line
-  // total by older saves, and trusting it is what kept showing the total on edit. Manual
-  // in-session edits still work and feed the breakdown; they just re-derive from the catalog
-  // when the modal is reopened. (Returns { base, isManual:false } for a stable call shape.)
+  // Resolve the MAIN VEHICLE base price to show when editing a vehicle tour.
+  // Returns { base, catalog, isManual }:
+  //   - catalog: the per-hour catalog vehicle cost (getVehicleCost) — ALWAYS shown as "Lista: $X".
+  //   - base: what goes IN the editable field. If the operator manually overrode the price
+  //     (explicit `vehiclePriceManual` flag set at save), restore that override (customPrice);
+  //     otherwise use the catalog. The flag is the single unambiguous signal — it's only true
+  //     when the saved field value differed from the catalog, so it can't be confused with a
+  //     plain catalog round-trip. Legacy data without the flag → catalog.
   resolveVehicleTourBasePrice(service) {
-    return { base: this.getVehicleCost(service) || 0, isManual: false };
+    const catalog = this.getVehicleCost(service) || 0;
+    if (service.vehiclePriceManual === true
+      && service.customPrice !== undefined && service.customPrice !== null) {
+      return { base: Number(service.customPrice), catalog, isManual: true };
+    }
+    return { base: catalog, catalog, isManual: false };
   }
 
   // Reflect the selected vehicle's list (catalog) price on a row and default the
