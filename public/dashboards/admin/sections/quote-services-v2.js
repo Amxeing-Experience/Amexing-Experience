@@ -13532,21 +13532,17 @@ class ItineraryBuilder {
   }
 
   // Resolve the MAIN VEHICLE base price to show in the servicePrice field when editing a
-  // vehicle tour. The field shows ONLY the vehicle cost (the breakdown/engine adds guía/
-  // adicionales/recargo), never the service total. Returns { base, isManual }.
+  // vehicle tour. The field shows ONLY the per-hour vehicle cost (the breakdown/engine adds
+  // guía/adicionales/recargo and multiplies by duration), never the service total.
   //
-  // Single, unambiguous rule: honor a saved manual override ONLY when the service was saved
-  // with the explicit `vehiclePriceManual` flag. Everything else — non-manual saves AND all
-  // legacy data (no flag) — recomputes from the catalog vehicle cost. This avoids trusting a
-  // stored value that older/buggy saves may have polluted with the total, and is NOT a
-  // heuristic comparison against the total.
+  // Deterministic rule: ALWAYS recompute from the catalog vehicle cost (getVehicleCost),
+  // exactly like a fresh selection. We intentionally do NOT round-trip a saved per-service
+  // price here: that value was repeatedly polluted with the service total / vehicle-line
+  // total by older saves, and trusting it is what kept showing the total on edit. Manual
+  // in-session edits still work and feed the breakdown; they just re-derive from the catalog
+  // when the modal is reopened. (Returns { base, isManual:false } for a stable call shape.)
   resolveVehicleTourBasePrice(service) {
-    const catalogVehicleCost = this.getVehicleCost(service) || 0;
-    if (service.vehiclePriceManual === true
-      && service.customPrice !== undefined && service.customPrice !== null) {
-      return { base: Number(service.customPrice), isManual: true };
-    }
-    return { base: catalogVehicleCost, isManual: false };
+    return { base: this.getVehicleCost(service) || 0, isManual: false };
   }
 
   // Reflect the selected vehicle's list (catalog) price on a row and default the
