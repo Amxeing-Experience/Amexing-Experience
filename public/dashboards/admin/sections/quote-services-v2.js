@@ -4957,37 +4957,6 @@ class ItineraryBuilder {
   async populateServiceForm(service) {
     if (!service) return;
 
-    // === DEBUG TEMPORAL: espía cada escritura a #servicePrice con su stack trace ===
-    try {
-      const __sp = document.getElementById('servicePrice');
-      if (__sp && !__sp.__priceSpyInstalled) {
-        const __desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-        Object.defineProperty(__sp, 'value', {
-          configurable: true,
-          get() { return __desc.get.call(this); },
-          set(v) {
-            // eslint-disable-next-line no-console
-            console.log('🩸 servicePrice =', v, '\n', new Error().stack);
-            __desc.set.call(this, v);
-          },
-        });
-        __sp.__priceSpyInstalled = true;
-      }
-      // eslint-disable-next-line no-console
-      console.log('🟢 EDIT vehicle-tour DEBUG:', {
-        type: service.type,
-        isWalkingTour: service.isWalkingTour,
-        savedPrice: service.price,
-        customPrice: service.customPrice,
-        baseVehiclePrice: service.baseVehiclePrice,
-        vehiclePriceManual: service.vehiclePriceManual,
-        pricesByType: service.pricesByType,
-        getVehicleCost: this.getVehicleCost(service),
-        resolved: this.resolveVehicleTourBasePrice(service),
-      });
-    } catch (e) { /* no-op */ }
-    // === FIN DEBUG TEMPORAL ===
-
     // Set current service ID for editing
     this.currentServiceId = service.id;
 
@@ -6751,6 +6720,16 @@ class ItineraryBuilder {
           qsDevLog('🚗 A Disposición: Using base (efectivo) price for Precio Base field:', {
             selectedPaymentType: currentPaymentType,
             basePriceUsed: correctPrice,
+            pricesByType: service.pricesByType,
+          });
+        } else if (service.type === 'tour' && !service.isWalkingTour) {
+          // Vehicle tours: the "Precio" field holds ONLY the per-hour MAIN VEHICLE base, not
+          // the service total stored in pricesByType (vehículo + guía + adicionales + recargo
+          // × duración). Re-derive from the catalog so this payment-type sync doesn't overwrite
+          // the correct base with the total. THIS was the last writer that re-showed the total.
+          correctPrice = this.resolveVehicleTourBasePrice(service).base;
+          qsDevLog('🚗 Vehicle tour: using catalog vehicle base for Precio field (not total):', {
+            correctPrice,
             pricesByType: service.pricesByType,
           });
         }
