@@ -5135,6 +5135,8 @@ class ItineraryBuilder {
         const { base, isManual } = this.resolveVehicleTourBasePrice(service);
         document.getElementById('servicePrice').value = (base || 0).toFixed(2);
         this.lastValidTourPrice = base;
+        // Mostrar "Lista: $X" debajo del campo (igual que transporte).
+        this.updateMainVehicleListPrice(base);
         // Genuine manual base → protect it from recalc; otherwise let recalc fill the
         // catalog vehicle cost once pricing data is hot.
         this._mainPriceManuallyEdited = isManual;
@@ -6728,6 +6730,9 @@ class ItineraryBuilder {
           // × duración). Re-derive from the catalog so this payment-type sync doesn't overwrite
           // the correct base with the total. THIS was the last writer that re-showed the total.
           correctPrice = this.resolveVehicleTourBasePrice(service).base;
+          // Mostrar "Lista: $X" debajo del campo (igual que transporte). Este sync corre al
+          // final, así que asegura la Lista aunque el recálculo previo no la haya fijado.
+          this.updateMainVehicleListPrice(correctPrice);
           qsDevLog('🚗 Vehicle tour: using catalog vehicle base for Precio field (not total):', {
             correctPrice,
             pricesByType: service.pricesByType,
@@ -13587,14 +13592,22 @@ class ItineraryBuilder {
   // recálculo (transporte/tour/a-disposición) en vez de escribir el campo directo.
   setMainVehiclePrice(catalogPrice) {
     const price = Number(catalogPrice) || 0;
-    this._mainVehicleCatalogPrice = price;
-    const listEl = document.getElementById('servicePriceListPrice');
-    if (listEl) listEl.textContent = price > 0 ? `Lista: ${this.formatCurrency(price)}` : '';
+    this.updateMainVehicleListPrice(price);
     const priceField = document.getElementById('servicePrice');
     if (priceField && !this._mainPriceManuallyEdited) {
       priceField.value = price.toFixed(2);
     }
     this.updateServicePriceBreakdown();
+  }
+
+  // Muestra "Lista: $X" (precio de catálogo del vehículo principal) debajo del campo de
+  // precio. Centralizado para que los puntos de carga (populate/sync de edición) y el
+  // recálculo muestren la Lista de forma consistente en transporte y tours con vehículo.
+  updateMainVehicleListPrice(catalogPrice) {
+    const price = Number(catalogPrice) || 0;
+    this._mainVehicleCatalogPrice = price;
+    const listEl = document.getElementById('servicePriceListPrice');
+    if (listEl) listEl.textContent = price > 0 ? `Lista: ${this.formatCurrency(price)}` : '';
   }
 
   // Resetea la marca de "precio editado a mano" para que el siguiente cálculo vuelva a
