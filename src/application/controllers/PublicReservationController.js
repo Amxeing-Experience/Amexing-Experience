@@ -10,6 +10,7 @@ const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 const FileStorageService = require('../services/FileStorageService');
 const { renderUrlToPdf } = require('../services/PdfRenderService');
+const { getArponaEmbedCss } = require('../../infrastructure/utils/fontEmbed');
 
 const fileStorageService = new FileStorageService({
   baseFolder: 'general',
@@ -20,6 +21,7 @@ const fileStorageService = new FileStorageService({
 class PublicReservationController {
   constructor() {
     this.viewPublicReservation = this.viewPublicReservation.bind(this);
+    this.viewReservationItinerary = this.viewReservationItinerary.bind(this);
     this.downloadReservationPdf = this.downloadReservationPdf.bind(this);
     this.preparePublicReservationData = this.preparePublicReservationData.bind(this);
 
@@ -46,9 +48,15 @@ class PublicReservationController {
 
       const proto = req.headers['x-forwarded-proto'] || req.protocol;
       const host = req.get('host');
-      const url = `${proto}://${host}/reservations/${encodeURIComponent(folio)}?pdf=1`;
+      const url = `${proto}://${host}/reservations/${encodeURIComponent(folio)}/itinerary?pdf=1`;
 
-      const pdfBuffer = await renderUrlToPdf(url);
+      // Full-bleed: header reaches the page edges; per-page top spacing comes from the template, not the margin.
+      const pdfBuffer = await renderUrlToPdf(url, {
+        footer: false,
+        margin: {
+          top: '0', bottom: '0', left: '0', right: '0',
+        },
+      });
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${folio}.pdf"`);
@@ -88,6 +96,40 @@ class PublicReservationController {
         isPublicView: true,
         isReservationView: true,
         pageTitle: `Reservación ${folio}`,
+      });
+    } catch (error) {
+      return this.handleError(error, folio, req, res);
+    }
+  }
+
+  /**
+   * View reservation as a travel-itinerary page (rendered to PDF via ?pdf=1).
+   * GET /reservations/:folio/itinerary.
+   * @param req
+   * @param res
+   * @example
+   */
+  async viewReservationItinerary(req, res) {
+    const { folio } = req.params;
+    try {
+      const folioError = this.validateFolio(folio, req, res);
+      if (folioError) return folioError;
+
+      const reservation = await this.fetchReservationByFolio(folio, req, res);
+      if (!reservation) return;
+
+      const services = await this.fetchReservationServices(reservation);
+      this.logPublicAccess(reservation, req);
+
+      const quoteShaped = await this.preparePublicReservationData(reservation, services);
+      await this.injectServiceImages(quoteShaped);
+
+      return res.render('dashboards/admin/reservation-itinerary', {
+        quote: quoteShaped,
+        isPublicView: true,
+        isReservationView: true,
+        pageTitle: `Itinerario ${folio}`,
+        arponaEmbedCss: getArponaEmbedCss(),
       });
     } catch (error) {
       return this.handleError(error, folio, req, res);
@@ -138,6 +180,7 @@ class PublicReservationController {
     query.include('quotePtr');
     query.include('clientPtr');
     query.include('serviceCustomer');
+    query.include('createdBy');
     const reservation = await query.first({ useMasterKey: true });
     if (!reservation) {
       logger.warn('Reservation not found for public access', { folio, ip: req.ip });
@@ -547,6 +590,9 @@ class PublicReservationController {
       },
       createdAt: reservation.get('createdAt') || null,
       updatedAt: reservation.get('updatedAt') || null,
+      startDate: reservation.get('startDate') || null,
+      endDate: reservation.get('endDate') || null,
+      travelSpecialist: this.formatPerson(reservation.get('createdBy')),
     };
   }
 

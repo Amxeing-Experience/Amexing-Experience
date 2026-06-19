@@ -444,6 +444,8 @@ class OwnedClientsController {
         preferredLanguage, accessibilityRequirements,
         allergies, dietaryRestrictions,
         notes,
+        // Direct-client category (direct_client | wedding_planner | concierge | home_owner)
+        clientCategory,
         // Legacy address field for backward compatibility
         address,
       } = req.body;
@@ -510,6 +512,8 @@ class OwnedClientsController {
         createdBy: currentUser.id,
         // Mark clients created by admin/superadmin as belonging to Amexing
         clientBelongsTo: userRole === 'admin' || userRole === 'superadmin' ? 'amexing' : undefined,
+        // Default direct clients to 'direct_client' when no category is chosen.
+        clientCategory: clientCategory || 'direct_client',
       };
 
       const client = Client.create(clientData);

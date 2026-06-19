@@ -379,6 +379,18 @@ const currentPath = '/dashboard/admin/clients';
                             </h6>
 
                             <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label" for="directClientCategory">Tipo de Cliente</label>
+                                    <select class="form-select" id="directClientCategory" name="clientCategory">
+                                        <option value="direct_client" selected>Cliente Directo</option>
+                                        <option value="wedding_planner">Wedding Planner</option>
+                                        <option value="concierge">Concierge</option>
+                                        <option value="home_owner">Home Owner</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row">
                                 <div class="col-md-6">
                                     <%- include('../../atoms/common/first-name-input', {
                                         name: 'firstName',

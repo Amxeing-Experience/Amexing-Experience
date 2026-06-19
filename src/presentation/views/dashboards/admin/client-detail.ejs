@@ -54,8 +54,9 @@ const isActive = clientData.active;
 
 const menuItems = [
     { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/admin/clients/${clientId}` },
+    { label: 'Perfil', icon: 'address-book', section: 'profile', href: `/dashboard/admin/clients/${clientId}?section=profile` },
     { label: 'Agentes', icon: 'users', section: 'employees', href: `/dashboard/admin/clients/${clientId}?section=employees` },
-    { label: 'Cotizaciones', icon: 'file-invoice', section: 'quotes', href: `/dashboard/admin/clients/${clientId}?section=quotes` },
+    { label: 'Trips', icon: 'plane', section: 'quotes', href: `/dashboard/admin/clients/${clientId}?section=quotes` },
     { label: 'Tarifario', icon: 'receipt-2', section: 'tarifario', href: `/dashboard/admin/clients/${clientId}?section=tarifario` }
 ];
 
@@ -349,6 +350,45 @@ const tarifarioTabs = [
                     </div>
                 </div>
             </div>
+        <% } else if (activeSection === 'profile') { %>
+            <!-- Profile: passports, addresses, travel preferences, loyalty programs. Loaded via AJAX. -->
+            <div id="profileRoot" data-client-id="<%= clientId %>">
+
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="ti ti-id me-2 text-primary"></i>Pasaportes</h5>
+                        <button type="button" class="btn btn-sm btn-primary" id="addPassportBtn"><i class="ti ti-plus me-1"></i>Agregar Pasaporte</button>
+                    </div>
+                    <div class="card-body"><div id="passportsContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="ti ti-map-pin me-2 text-primary"></i>Direcciones</h5>
+                        <button type="button" class="btn btn-sm btn-primary" id="addAddressBtn"><i class="ti ti-plus me-1"></i>Agregar Dirección</button>
+                    </div>
+                    <div class="card-body"><div id="addressesContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="ti ti-plane me-2 text-primary"></i>Preferencias de Viaje</h5>
+                        <button type="button" class="btn btn-sm btn-primary" id="addPreferenceBtn"><i class="ti ti-plus me-1"></i>Agregar Preferencia</button>
+                    </div>
+                    <div class="card-body"><div id="preferencesContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="ti ti-star me-2 text-primary"></i>Programas de Lealtad</h5>
+                        <button type="button" class="btn btn-sm btn-primary" id="addLoyaltyBtn"><i class="ti ti-plus me-1"></i>Agregar Programa</button>
+                    </div>
+                    <div class="card-body"><div id="loyaltyContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
+                </div>
+
+            </div>
+            <%- include('./sections/client-profile-section') %>
+
         <% } else if (activeSection === 'employees') { %>
             <!-- Employees Management Section -->
             <%- include('../../organisms/datatable/employees-table', {
@@ -359,14 +399,12 @@ const tarifarioTabs = [
                 showActions: true
             }) %>
         <% } else if (activeSection === 'quotes') { %>
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white"><h5 class="mb-0"><i class="ti ti-file-invoice me-2 text-primary"></i>Cotizaciones</h5></div>
-                <div class="card-body text-center py-5">
-                    <i class="ti ti-file-invoice" style="font-size: 4rem; color: #d1d5db;"></i>
-                    <h5 class="mt-3 text-muted">Próximamente</h5>
-                    <p class="text-muted">Gestión de cotizaciones disponible próximamente.</p>
-                </div>
+            <!-- Trips: read-only quotes/reservations linked to this client. Loaded via AJAX. -->
+            <div class="card border-0 shadow-sm" id="tripsRoot" data-client-id="<%= clientId %>">
+                <div class="card-header bg-white"><h5 class="mb-0"><i class="ti ti-plane me-2 text-primary"></i>Trips</h5></div>
+                <div class="card-body"><div id="tripsContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
             </div>
+            <%- include('./sections/client-trips-section') %>
         <% } else if (activeSection === 'tarifario') { %>
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white border-bottom-0">

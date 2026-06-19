@@ -535,10 +535,13 @@ class ClientsController {
       }
 
       // Parse query parameters
+      const Client = require('../../../domain/models/Client');
       const page = Math.max(1, parseInt(req.query.page, 10) || 1);
       const limit = Math.min(this.maxPageSize, parseInt(req.query.limit, 10) || this.defaultPageSize);
       const skip = (page - 1) * limit;
-      const type = req.query.type || 'all'; // all, agencies, clients
+      // all | agencies | clients (= all direct clients) | a specific clientCategory (wedding_planner, etc.)
+      const type = req.query.type || 'all';
+      const isCategoryTab = Client.CATEGORIES.includes(type) && type !== 'agency';
       const search = req.query.search?.trim() || '';
       // Admin views can opt in to see inactive clients too (mirrors tours/experiences).
       // Defaults to false so existing consumers keep getting active-only results.
@@ -584,13 +587,15 @@ class ClientsController {
         totalAgenciesCount = agencyCountResult.pagination?.totalCount || 0;
       }
 
-      if (type === 'all' || type === 'clients') {
+      if (type === 'all' || type === 'clients' || isCategoryTab) {
         const Parse = require('parse/node');
-        const Client = require('../../../domain/models/Client');
 
         const clientCountQuery = new Parse.Query(Client);
         clientCountQuery.equalTo('clientBelongsTo', 'amexing');
         clientCountQuery.equalTo('exists', true);
+        if (isCategoryTab) {
+          clientCountQuery.equalTo('clientCategory', type);
+        }
         // Only active clients unless the caller opts in to inactive ones.
         if (!includeInactive) {
           clientCountQuery.equalTo('active', true);
@@ -627,6 +632,7 @@ class ClientsController {
           const formattedAgencies = agencies.map((user) => ({
             id: user.id,
             type: 'agency',
+            clientCategory: 'agency',
             name: user.contextualData?.companyName || `${user.firstName} ${user.lastName}`,
             firstName: user.firstName,
             lastName: user.lastName,
@@ -642,14 +648,17 @@ class ClientsController {
           allData.push(...formattedAgencies);
         }
 
-        // Fetch direct clients
-        if (type === 'all' || type === 'clients') {
+        // Fetch direct clients (and the direct-client categories: wedding_planner,
+        // concierge, home_owner — all stored as Client records, distinguished by clientCategory).
+        if (type === 'all' || type === 'clients' || isCategoryTab) {
           const Parse = require('parse/node');
-          const Client = require('../../../domain/models/Client');
 
           const clientQuery = new Parse.Query(Client);
           clientQuery.equalTo('clientBelongsTo', 'amexing');
           clientQuery.equalTo('exists', true);
+          if (isCategoryTab) {
+            clientQuery.equalTo('clientCategory', type);
+          }
           // Only active clients unless the caller opts in to inactive ones.
           if (!includeInactive) {
             clientQuery.equalTo('active', true);
@@ -667,6 +676,8 @@ class ClientsController {
           directClients = clientResults.map((client) => ({
             id: client.id,
             type: 'client',
+            // Direct clients default to 'direct_client' when older records have no category yet.
+            clientCategory: client.get('clientCategory') || 'direct_client',
             name: client.get('name'),
             firstName: client.get('firstName'),
             lastName: client.get('lastName'),

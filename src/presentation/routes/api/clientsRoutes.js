@@ -27,6 +27,9 @@ const logger = require('../../../infrastructure/logger');
 const router = express.Router();
 const clientsController = new ClientsController();
 const clientEmployeesController = new ClientEmployeesController();
+const ClientProfileController = require('../../../application/controllers/api/ClientProfileController');
+
+const clientProfileController = new ClientProfileController();
 
 // Rate limiting for client management operations
 const clientApiLimiter = rateLimit({
@@ -1193,6 +1196,32 @@ router.use((error, req, res, _next) => {
 router.post('/:clientId/employees/assign-manager', validateClientAccess, writeOperationsLimiter, async (req, res) => {
   await clientEmployeesController.assignAsManager(req, res);
 });
+
+// ---- Client profile sub-resources: addresses, travel preferences, loyalty programs ----
+
+router.get('/:clientId/addresses', validateClientAccess, clientProfileController.getAddresses);
+router.post('/:clientId/addresses', validateClientAccess, writeOperationsLimiter, clientProfileController.createAddress);
+router.put('/:clientId/addresses/:id', validateClientAccess, writeOperationsLimiter, clientProfileController.updateAddress);
+router.delete('/:clientId/addresses/:id', validateClientAccess, writeOperationsLimiter, clientProfileController.deleteAddress);
+
+router.get('/:clientId/travel-preferences', validateClientAccess, clientProfileController.getTravelPreferences);
+router.post('/:clientId/travel-preferences', validateClientAccess, writeOperationsLimiter, clientProfileController.createTravelPreference);
+router.put('/:clientId/travel-preferences/:id', validateClientAccess, writeOperationsLimiter, clientProfileController.updateTravelPreference);
+router.delete('/:clientId/travel-preferences/:id', validateClientAccess, writeOperationsLimiter, clientProfileController.deleteTravelPreference);
+
+router.get('/:clientId/loyalty-programs', validateClientAccess, clientProfileController.getLoyaltyPrograms);
+// PUT replaces the whole list; POST is accepted as an alias so either verb works.
+router.put('/:clientId/loyalty-programs', validateClientAccess, writeOperationsLimiter, clientProfileController.saveLoyaltyPrograms);
+router.post('/:clientId/loyalty-programs', validateClientAccess, writeOperationsLimiter, clientProfileController.saveLoyaltyPrograms);
+
+router.get('/:clientId/passports', validateClientAccess, clientProfileController.getPassports);
+router.post('/:clientId/passports', validateClientAccess, writeOperationsLimiter, clientProfileController.createPassport);
+router.put('/:clientId/passports/:id', validateClientAccess, writeOperationsLimiter, clientProfileController.updatePassport);
+router.delete('/:clientId/passports/:id', validateClientAccess, writeOperationsLimiter, clientProfileController.deletePassport);
+// Full-number reveal: admin/superadmin only, audited by the vault.
+router.post('/:clientId/passports/:id/reveal', validateClientAccess, writeOperationsLimiter, clientProfileController.revealPassportNumber);
+
+router.get('/:clientId/trips', validateClientAccess, clientProfileController.getTrips);
 
 module.exports = router;
 module.exports.validateClientAccess = validateClientAccess; // Export for testing

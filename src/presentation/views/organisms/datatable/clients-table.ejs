@@ -64,21 +64,24 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         <!-- Client Type Pills Filter -->
         <div class="row mb-3">
             <div class="col-12">
-                <div class="btn-group" role="group" aria-label="Client Type Filter" id="clientTypeFilter">
+                <div class="btn-group flex-wrap" role="group" aria-label="Client Type Filter" id="clientTypeFilter">
                     <input type="radio" class="btn-check" name="filterType" id="filterAll" value="all" checked>
-                    <label class="btn btn-orange-pill" for="filterAll">
-                        Todos
-                    </label>
+                    <label class="btn btn-orange-pill" for="filterAll">Todos</label>
 
                     <input type="radio" class="btn-check" name="filterType" id="filterAgencies" value="agencies">
-                    <label class="btn btn-orange-pill" for="filterAgencies">
-                        Agencias
-                    </label>
+                    <label class="btn btn-orange-pill" for="filterAgencies">Agencias</label>
 
                     <input type="radio" class="btn-check" name="filterType" id="filterClients" value="clients">
-                    <label class="btn btn-orange-pill" for="filterClients">
-                        Clientes
-                    </label>
+                    <label class="btn btn-orange-pill" for="filterClients">Clientes Directos</label>
+
+                    <input type="radio" class="btn-check" name="filterType" id="filterWedding" value="wedding_planner">
+                    <label class="btn btn-orange-pill" for="filterWedding">Wedding Planner</label>
+
+                    <input type="radio" class="btn-check" name="filterType" id="filterConcierge" value="concierge">
+                    <label class="btn btn-orange-pill" for="filterConcierge">Concierge</label>
+
+                    <input type="radio" class="btn-check" name="filterType" id="filterHomeOwner" value="home_owner">
+                    <label class="btn btn-orange-pill" for="filterHomeOwner">Home Owner</label>
                 </div>
             </div>
         </div>
@@ -88,10 +91,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
                 <thead class="table-light">
                     <tr>
-                        <th>Empresa</th>
-                        <th>Email</th>
+                        <th>Cliente</th>
+                        <th>Tipo de Cliente</th>
+                        <th>Dept Manager</th>
+                        <th>Teléfono</th>
                         <th>Estado</th>
-                        <th>Registro</th>
                         <% if (dtShowActions && (canEdit || canDelete)) { %>
                             <th>Acciones</th>
                         <% } %>
@@ -102,10 +106,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 </tbody>
                 <tfoot class="table-light">
                     <tr>
-                        <th>Empresa</th>
-                        <th>Email</th>
+                        <th>Cliente</th>
+                        <th>Tipo de Cliente</th>
+                        <th>Dept Manager</th>
+                        <th>Teléfono</th>
                         <th>Estado</th>
-                        <th>Registro</th>
                         <% if (dtShowActions && (canEdit || canDelete)) { %>
                             <th>Acciones</th>
                         <% } %>
@@ -202,7 +207,18 @@ function initializeClientsDataTable(totalCount) {
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    // Map transient infra failures (rate-limit, session, proxy) to a clear,
+                    // actionable message instead of a raw HTTP code. The filter logic is fine;
+                    // these come from too many rapid requests or an expired session.
+                    const friendly = {
+                        401: 'Tu sesión expiró. Recarga la página para volver a iniciar sesión.',
+                        426: 'Demasiadas peticiones en poco tiempo. Espera unos segundos y reintenta.',
+                        429: 'Demasiadas peticiones en poco tiempo. Espera unos segundos y reintenta.',
+                        503: 'El servicio no está disponible momentáneamente. Reintenta en unos segundos.',
+                    };
+                    const err = new Error(friendly[response.status] || `No se pudieron cargar los datos (código ${response.status}).`);
+                    err.transient = [426, 429, 503].includes(response.status);
+                    throw err;
                 }
                 return response.json();
             })
@@ -211,6 +227,7 @@ function initializeClientsDataTable(totalCount) {
                     throw new Error(json.error || 'Failed to load clients');
                 }
 
+                settings._retried = false; // reset so a later transient error can retry again
 
                 // Update total count display
                 const totalCount = json.pagination?.totalCount || 0;
@@ -228,9 +245,15 @@ function initializeClientsDataTable(totalCount) {
             })
             .catch(error => {
                 console.error('DataTable AJAX error:', error);
-                showErrorAlert('Error al cargar los datos de clientes: ' + error.message);
+                showErrorAlert(error.message || 'No se pudieron cargar los datos de clientes.');
 
-                // Return empty result on error
+                // For transient errors, retry once after a short backoff so a rate-limit
+                // blip recovers on its own instead of leaving the table blank.
+                if (error.transient && !settings._retried) {
+                    settings._retried = true;
+                    setTimeout(() => { window.clientsTable?.ajax.reload(null, false); }, 2500);
+                }
+
                 callback({
                     draw: data.draw,
                     recordsTotal: 0,
@@ -243,63 +266,60 @@ function initializeClientsDataTable(totalCount) {
             {
                 data: 'name',
                 render: function(data, type, row) {
-                    // Handle different data types (agencies vs direct clients)
-                    let displayName = '';
-                    let typeIndicator = '';
-                    
-                    if (row.type === 'agency') {
-                        // For agencies, use company name or personal name
-                        displayName = data || `${row.firstName} ${row.lastName}`.trim() || row.email || 'Agencia';
-                        typeIndicator = '<i class="ti ti-building me-1 text-primary"></i>';
-                    } else {
-                        // For direct clients, use personal name
-                        displayName = data || `${row.firstName} ${row.lastName}`.trim() || row.email || 'Cliente';
-                        typeIndicator = '<i class="ti ti-user me-1 text-success"></i>';
-                    }
-                    
-                    return `${typeIndicator}<strong class="text-dark">${displayName}</strong>`;
+                    const displayName = data
+                        || `${row.firstName || ''} ${row.lastName || ''}`.trim()
+                        || row.email
+                        || (row.type === 'agency' ? 'Agencia' : 'Cliente');
+                    return `<strong class="text-dark">${displayName}</strong>`;
                 }
             },
             {
-                data: 'email',
+                data: 'clientCategory',
+                orderable: false,
+                render: function(data, type, row) {
+                    // category key -> { label, badge class, icon }
+                    const CATS = {
+                        agency:         { label: 'Agencia',         cls: 'bg-primary',   icon: 'ti-building' },
+                        direct_client:  { label: 'Cliente Directo', cls: 'bg-info',      icon: 'ti-user' },
+                        wedding_planner:{ label: 'Wedding Planner',  cls: 'bg-warning',   icon: 'ti-heart' },
+                        concierge:      { label: 'Concierge',       cls: 'bg-secondary', icon: 'ti-bell' },
+                        home_owner:     { label: 'Home Owner',      cls: 'bg-dark',      icon: 'ti-home' },
+                    };
+                    const c = CATS[row.clientCategory] || CATS[row.type === 'agency' ? 'agency' : 'direct_client'];
+                    return `<span class="badge ${c.cls}"><i class="ti ${c.icon} me-1"></i>${c.label}</span>`;
+                }
+            },
+            {
+                data: null,
+                orderable: false,
+                render: function(data, type, row) {
+                    // Agencies show the manager's name; direct clients (and their
+                    // categories) have no manager — they manage themselves.
+                    if (row.type === 'agency') {
+                        const personName = `${row.firstName || ''} ${row.lastName || ''}`.trim();
+                        return personName
+                            ? `<span class="text-dark">${personName}</span>`
+                            : '<span class="text-muted">—</span>';
+                    }
+                    return '<span class="text-muted fst-italic">Sin manager</span>';
+                }
+            },
+            {
+                data: 'phone',
+                orderable: false,
                 defaultContent: '',
                 render: function(data, type, row) {
-                    if (!data) return '';
-                    return `<a href="mailto:${data}" class="text-decoration-none">${data}</a>`;
+                    if (!data) return '<span class="text-muted">—</span>';
+                    return `<a href="tel:${data}" class="text-decoration-none">${data}</a>`;
                 }
             },
             {
                 data: 'active',
                 render: function(data, type, row) {
-                    let statusBadge = '';
-                    
                     if (data) {
-                        statusBadge = '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Activo</span>';
-                    } else {
-                        statusBadge = '<span class="badge bg-danger"><i class="ti ti-x me-1"></i>Inactivo</span>';
+                        return '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Activo</span>';
                     }
-                    
-                    // Add type badge
-                    let typeBadge = '';
-                    if (row.type === 'agency') {
-                        typeBadge = '<span class="badge bg-primary ms-1"><i class="ti ti-building me-1"></i>Agencia</span>';
-                    } else {
-                        typeBadge = '<span class="badge bg-info ms-1"><i class="ti ti-user me-1"></i>Cliente</span>';
-                    }
-                    
-                    return statusBadge + typeBadge;
-                }
-            },
-            {
-                data: 'createdAt',
-                render: function(data, type, row) {
-                    if (!data) return '-';
-                    const date = new Date(data);
-                    return date.toLocaleDateString('es-ES', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                    });
+                    return '<span class="badge bg-danger"><i class="ti ti-x me-1"></i>Inactivo</span>';
                 }
             },
             <% if (dtShowActions && (canEdit || canDelete)) { %>
@@ -311,13 +331,13 @@ function initializeClientsDataTable(totalCount) {
 
                     /* Different actions based on client type */
                     if (row.type === 'agency') {
-                        /* View detail button for agencies */
+                        /* View/edit detail button for agencies */
                         actions += `<a href="/dashboard/admin/clients/${row.id}"
                                     class="btn btn-info"
                                     data-bs-toggle="tooltip"
                                     data-bs-placement="top"
                                     title="Ver Detalle de Agencia">
-                                    <i class="ti ti-eye"></i>
+                                    <i class="ti ti-pencil"></i>
                                 </a>`;
                     } else {
                         /* Edit modal button for direct clients */
@@ -738,6 +758,11 @@ function setupPillFilters() {
     filterButtons.forEach(button => {
         button.addEventListener('change', function() {
             if (this.checked && window.clientsTable) {
+                // "Tipo de Cliente" is useful when rows mix types: "Todos" and "Clientes
+                // Directos" (which lumps all direct categories together). Hide it only in
+                // truly single-type tabs (Agencias, or a specific category).
+                const mixedTypes = this.value === 'all' || this.value === 'clients';
+                window.clientsTable.column(1).visible(mixedTypes, false);
                 // Reload the DataTable with new filter
                 window.clientsTable.ajax.reload();
             }

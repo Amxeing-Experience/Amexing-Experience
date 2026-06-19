@@ -106,8 +106,14 @@ class AdminController extends RoleBasedController {
       const UserManagementService = require('../../services/UserManagementService');
       const userService = new UserManagementService();
 
-      // Get client data from service
-      const client = await userService.getUserById(currentUser, clientId);
+      // Agencies live in AmexingUser; direct clients live in the Client class.
+      // Try the user service first, then fall back to a Client record.
+      let client = await userService.getUserById(currentUser, clientId).catch(() => null);
+
+      if (!client) {
+        const Parse = require('parse/node');
+        client = await new Parse.Query('Client').get(clientId, { useMasterKey: true }).catch(() => null);
+      }
 
       if (!client) {
         return this.handleError(res, new Error('Cliente no encontrado'), 404);
@@ -158,6 +164,9 @@ class AdminController extends RoleBasedController {
           || client.get?.('contextualData')?.notes,
         address: client.address || client.get?.('address') || {},
         contextualData: client.contextualData || client.get?.('contextualData') || {},
+        clientCategory: client.clientCategory || client.get?.('clientCategory') || null,
+        birthDate: client.birthDate || client.get?.('birthDate') || null,
+        anniversary: client.anniversary || client.get?.('anniversary') || null,
         createdAt: client.createdAt || client.get?.('createdAt'),
         updatedAt: client.updatedAt || client.get?.('updatedAt'),
       };

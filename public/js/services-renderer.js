@@ -656,29 +656,17 @@
                 </div>`;
             }
 
-<<<<<<< HEAD
-            // Guide. A-disposición IS the chauffeur service, so it just reads "Incluye Chofer".
-            // Tours bundle a guide AND a chofer, so the label combines both per stakeholder
-            // request: "Incluye Guía + Chofer".
+            // A-disposición is the chauffeur service itself; tours bundle guide + driver.
             if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
                 const guideLabel = service.type === 'a-disposicion' ? 'Incluye Driver' : 'Incluye Guía + Driver';
-=======
-            // Guide ("Incluye Guía" en todos los tipos; a-disposición se renombró de Chofer a Guía)
-            if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
->>>>>>> cdee6818bdec67998c51cba90023a93574f5709e
                 html += `<div class="service-detail-item text-success mt-1">
                     <i class="ti ti-user me-1"></i>
-                    <strong>Incluye Guía</strong>
+                    <strong>${guideLabel}</strong>
                 </div>`;
             }
 
-<<<<<<< HEAD
-            // Greeter — always paired with a chofer: "Incluye Greeter + Chofer".
-            if ((service.type === 'tour' || service.type === 'transport') && service.includeGreeter) {
-=======
             // Greeter (transporte, tours y a-disposición)
             if ((service.type === 'tour' || service.type === 'transport' || service.type === 'a-disposicion') && service.includeGreeter) {
->>>>>>> cdee6818bdec67998c51cba90023a93574f5709e
                 const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
                 html += `<div class="service-detail-item text-info mt-1">
                     <i class="ti ti-users me-1"></i>

@@ -151,6 +151,21 @@ class Client extends BaseModel {
       client.set('clientBelongsTo', clientData.clientBelongsTo);
     }
 
+    // Client category (agency | direct_client | wedding_planner | concierge | home_owner).
+    // Falls back from the legacy clientBelongsTo flag when not provided.
+    if (clientData.clientCategory !== undefined) {
+      client.set('clientCategory', clientData.clientCategory);
+    } else if (clientData.clientBelongsTo === 'amexing') {
+      client.set('clientCategory', 'direct_client');
+    } else if (clientData.clientBelongsTo === 'agency') {
+      client.set('clientCategory', 'agency');
+    }
+
+    // Direct-client profile fields. passportNumberEncrypted is set encrypted by the
+    // controller via the passport service; never assign a raw number here.
+    if (clientData.birthDate !== undefined) client.set('birthDate', clientData.birthDate || null);
+    if (clientData.loyaltyPrograms !== undefined) client.set('loyaltyPrograms', clientData.loyaltyPrograms || []);
+
     // Lifecycle fields - explicitly set defaults since BaseModel doesn't set them automatically
     client.set('active', clientData.active !== undefined ? clientData.active : true);
     client.set('exists', clientData.exists !== undefined ? clientData.exists : true);
@@ -176,6 +191,68 @@ class Client extends BaseModel {
     }
 
     return client;
+  }
+
+  getClientCategory() { return this.get('clientCategory') || ''; }
+  setClientCategory(category) { this.set('clientCategory', category); }
+
+  getBirthDate() { return this.get('birthDate') || null; }
+  setBirthDate(birthDate) { this.set('birthDate', birthDate || null); }
+
+  getLoyaltyPrograms() { return this.get('loyaltyPrograms') || []; }
+  setLoyaltyPrograms(programs) { this.set('loyaltyPrograms', programs || []); }
+
+  getPassportDocument() { return this.get('passportDocument') || null; }
+  setPassportDocument(file) { this.set('passportDocument', file); }
+
+  // ---- Passport number (encrypted at rest via SensitiveDataVault, masked by default) ----
+
+  hasPassport() { return !!this.get('passportNumberEncrypted'); }
+
+  // Encrypt a raw passport number for storage (envelope-encrypted by the vault).
+  // Async because key resolution is async. Never stores the raw value.
+  async setPassportNumber(rawValue) {
+    const vault = require('../../application/services/SensitiveDataVault');
+    if (!rawValue) {
+      this.unset('passportNumberEncrypted');
+      return;
+    }
+    this.set('passportNumberEncrypted', await vault.encryptField('client.passport', rawValue));
+  }
+
+  // Masked passport (last 4). Safe to return anywhere; audited as a masked read.
+  async getPassportMasked(ctx = {}) {
+    const vault = require('../../application/services/SensitiveDataVault');
+    return vault.maskField('client.passport', this.get('passportNumberEncrypted'), { ...ctx, recordId: this.id });
+  }
+
+  // Decrypt the full passport number. Authorized + audited by the vault (default-deny).
+  // Pass ctx.user = requesting AmexingUser (or { id, role }). Returns null if denied.
+  async getPassportNumber(ctx = {}) {
+    const vault = require('../../application/services/SensitiveDataVault');
+    const user = ctx.user || ctx;
+    return vault.decryptField('client.passport', this.get('passportNumberEncrypted'), { user, recordId: this.id });
+  }
+
+  // Raw encrypted value — only for storage/transfer, never exposed to clients.
+  getPassportNumberEncrypted() { return this.get('passportNumberEncrypted') || null; }
+
+  /**
+   * Addresses linked to this client (favorite first).
+   * @returns {Promise<Array>}
+   */
+  async getAddresses() {
+    const ClientAddress = require('./ClientAddress');
+    return ClientAddress.getByClient(this.id);
+  }
+
+  /**
+   * Travel preferences linked to this client.
+   * @returns {Promise<Array>}
+   */
+  async getTravelPreferences() {
+    const TravelPreference = require('./TravelPreference');
+    return TravelPreference.getByClient(this.id);
   }
 
   /**
@@ -609,8 +686,14 @@ class Client extends BaseModel {
       phone: this.get('phone'),
       contactPerson: this.get('contactPerson'),
       companyType: this.get('companyType'),
+      clientCategory: this.get('clientCategory'),
       website: this.get('website'),
       address: this.get('address'),
+      birthDate: this.get('birthDate'),
+      loyaltyPrograms: this.get('loyaltyPrograms') || [],
+      // Only a presence flag here (sync). The masked value is fetched via
+      // getPassportMasked() (async, audited); the raw/encrypted values never leave the server.
+      hasPassport: this.hasPassport(),
       isCorporate: this.get('isCorporate'),
       oauthDomain: this.get('oauthDomain'),
       autoProvisionEmployees: this.get('autoProvisionEmployees'),
@@ -670,6 +753,11 @@ class Client extends BaseModel {
       errors.push('Invalid company type');
     }
 
+    // Client category validation
+    if (clientData.clientCategory && !Client.CATEGORIES.includes(clientData.clientCategory)) {
+      errors.push('Invalid client category');
+    }
+
     // Employee role validation
     const allowedEmployeeRoles = ['employee', 'department_manager'];
     if (clientData.defaultEmployeeRole && !allowedEmployeeRoles.includes(clientData.defaultEmployeeRole)) {
@@ -679,6 +767,9 @@ class Client extends BaseModel {
     return errors;
   }
 }
+
+// Allowed values for the clientCategory field, reused by the controller and table UI.
+Client.CATEGORIES = ['agency', 'direct_client', 'wedding_planner', 'concierge', 'home_owner'];
 
 // Register the class with Parse
 if (typeof Parse !== 'undefined') {
