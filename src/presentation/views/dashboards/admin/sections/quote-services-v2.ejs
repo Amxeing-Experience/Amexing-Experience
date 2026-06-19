@@ -541,18 +541,13 @@
     }
     
     /* Price Override Styles */
+    /* Los precios editables (servicePrice y el precio manual de walking tours) ya no usan
+       el resaltado amarillo de override: el campo es editable y el highlight solo agregaba
+       ruido visual e inconsistencia entre tipos. Se deja la clase como no-op para no romper
+       el JS que la agrega/quita. */
     .price-override-active {
-        background-color: #fff3cd !important;
-        border-color: #ffc107 !important;
-    }
-
-    /* El precio principal (servicePrice) ahora es SIEMPRE editable (sin checkbox de
-       "editar precio manualmente"), así que el resaltado amarillo de override no aplica;
-       se neutraliza para que se vea como un campo normal. El precio manual de walking
-       tours conserva el resaltado porque sí tiene un toggle real. */
-    #servicePrice.price-override-active {
-        background-color: #fff !important;
-        border-color: #dee2e6 !important;
+        background-color: inherit;
+        border-color: inherit;
     }
 
     .price-override-indicator {
