@@ -19312,31 +19312,48 @@ class ItineraryBuilder {
     if (!this.ratesCache || this.ratesCache.length === 0) await this.loadAllRates();
 
     const row = document.createElement('div');
-    row.className = 'adisp-av-row d-flex gap-2 align-items-center mb-2';
+    row.className = 'adisp-av-row d-flex gap-2 align-items-start mb-2';
     const segmentSel = this.buildADisposicionSegmentSelect();
     const vehicleSel = document.createElement('select');
     vehicleSel.className = 'form-select form-select-sm adisp-av-vehicle';
     vehicleSel.innerHTML = '<option value="">-- Vehículo --</option>';
-    const rateLabel = document.createElement('small');
-    rateLabel.className = 'text-muted adisp-av-rate text-nowrap';
+    // Precio personalizado por vehículo (igual que transporte): input editable + "Lista: $X/h"
+    // (la tarifa de catálogo) como referencia. El input se autollena con el catálogo al elegir
+    // vehículo y el usuario puede sobreescribirlo.
+    const priceWrap = document.createElement('div');
+    priceWrap.className = 'd-flex flex-column';
+    priceWrap.innerHTML = `
+      <div class="input-group input-group-sm" style="width: 150px;">
+        <span class="input-group-text">$</span>
+        <input type="number" min="0" step="0.01" class="form-control form-control-sm adisp-av-price" placeholder="0.00">
+        <span class="input-group-text">/h</span>
+      </div>
+      <small class="text-muted adisp-av-list d-block"></small>
+    `;
+    const priceInput = priceWrap.querySelector('.adisp-av-price');
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'btn btn-sm btn-outline-danger';
     removeBtn.innerHTML = '<i class="ti ti-trash"></i>';
     row.appendChild(segmentSel);
     row.appendChild(vehicleSel);
-    row.appendChild(rateLabel);
+    row.appendChild(priceWrap);
     row.appendChild(removeBtn);
     list.appendChild(row);
 
     segmentSel.addEventListener('change', async () => {
       row.dataset.hourlyRate = '';
-      rateLabel.textContent = '';
+      row.querySelector('.adisp-av-list').textContent = '';
       await this.loadADisposicionRowVehicles(segmentSel.value, vehicleSel);
       this.recalcADisposicionWithBreakdown();
     });
     vehicleSel.addEventListener('change', async () => {
-      await this.refreshADisposicionRowRate(row, segmentSel.value, vehicleSel.value, rateLabel);
+      await this.refreshADisposicionRowRate(row, segmentSel.value, vehicleSel.value);
+      this.recalcADisposicionWithBreakdown();
+    });
+    // Editar el precio personalizado recalcula el desglose (sin re-fetch de catálogo).
+    priceInput.addEventListener('input', () => {
+      this.serviceModified = true;
       this.recalcADisposicionWithBreakdown();
     });
     removeBtn.addEventListener('click', () => {
@@ -19351,12 +19368,19 @@ class ItineraryBuilder {
         vehicleSel.value = saved.vehicleTypeId;
         // Restaura los datos directo desde lo guardado (no dependemos del re-fetch de tarifa,
         // que puede fallar/tardar y dejaría la fila sin hourlyRate → excluida del cálculo).
+        // dataset.hourlyRate = CATÁLOGO (para la "Lista"); el input = precio personalizado.
+        const catalog = (saved.catalogHourlyRate !== undefined && saved.catalogHourlyRate !== null)
+          ? saved.catalogHourlyRate : (saved.hourlyRate || 0);
+        const custom = (saved.customPrice !== undefined && saved.customPrice !== null)
+          ? saved.customPrice : (saved.hourlyRate || catalog || 0);
         row.dataset.rateId = saved.rateId;
         row.dataset.vehicleTypeId = saved.vehicleTypeId;
-        row.dataset.hourlyRate = String(saved.hourlyRate || 0);
+        row.dataset.hourlyRate = String(catalog);
         row.dataset.vehicleLabel = saved.vehicleLabel || (vehicleSel.selectedOptions[0]?.textContent || '');
         row.dataset.segmentLabel = saved.segmentLabel || (segmentSel.selectedOptions[0]?.textContent || '');
-        rateLabel.textContent = `${this.formatCurrency(saved.hourlyRate || 0)}/h`;
+        priceInput.value = Number(custom).toFixed(2);
+        row.querySelector('.adisp-av-list').textContent = catalog > 0
+          ? `Lista: ${this.formatCurrency(catalog)}/h` : '';
       }
     }
     // Solo marca modificado cuando lo agrega el usuario; en restauración (saved) no, para no
@@ -19417,17 +19441,25 @@ class ItineraryBuilder {
     return hourly;
   }
 
-  /** Obtiene y guarda la tarifa/hora de una fila en sus data-* (usa caché). */
-  async refreshADisposicionRowRate(row, rateId, vehicleTypeId, rateLabel) {
+  /** Obtiene y guarda la tarifa/hora (CATÁLOGO) de una fila en sus data-*, muestra la "Lista"
+   *  y autollena el input de precio personalizado con el catálogo (el usuario puede editarlo). */
+  async refreshADisposicionRowRate(row, rateId, vehicleTypeId) {
     row.dataset.hourlyRate = '';
     row.dataset.rateId = rateId || '';
     row.dataset.vehicleTypeId = vehicleTypeId || '';
     row.dataset.vehicleLabel = row.querySelector('.adisp-av-vehicle')?.selectedOptions[0]?.textContent || '';
     row.dataset.segmentLabel = row.querySelector('.adisp-av-segment')?.selectedOptions[0]?.textContent || '';
-    if (!rateId || !vehicleTypeId) { rateLabel.textContent = ''; return; }
+    const listEl = row.querySelector('.adisp-av-list');
+    const priceInput = row.querySelector('.adisp-av-price');
+    if (!rateId || !vehicleTypeId) {
+      if (listEl) listEl.textContent = '';
+      return;
+    }
     const hourly = await this.getADisposicionHourlyPriceCached(vehicleTypeId, rateId);
-    row.dataset.hourlyRate = String(hourly);
-    rateLabel.textContent = `${this.formatCurrency(hourly)}/h`;
+    row.dataset.hourlyRate = String(hourly); // catálogo (para "Lista" y fallback del efectivo)
+    if (listEl) listEl.textContent = hourly > 0 ? `Lista: ${this.formatCurrency(hourly)}/h` : '';
+    // Autollenar el precio con el catálogo al elegir/cambiar vehículo.
+    if (priceInput) priceInput.value = Number(hourly).toFixed(2);
   }
 
   /** Lee todas las filas de vehículos adicionales de a-disposición. */
@@ -19435,13 +19467,22 @@ class ItineraryBuilder {
     const rows = document.querySelectorAll('#aDisposicionAdditionalVehiclesList .adisp-av-row');
     const out = [];
     rows.forEach((row) => {
-      const hourlyRate = parseFloat(row.dataset.hourlyRate || 0) || 0;
+      const catalogHourlyRate = parseFloat(row.dataset.hourlyRate || 0) || 0;
       const vehicleTypeId = row.dataset.vehicleTypeId || '';
+      // Precio personalizado del input (si lo escribieron); si no, usa el catálogo.
+      const priceInput = row.querySelector('.adisp-av-price');
+      const raw = priceInput && priceInput.value !== '' ? parseFloat(priceInput.value) : NaN;
+      const customPrice = (!Number.isNaN(raw) && raw >= 0) ? raw : null;
+      // `hourlyRate` es el EFECTIVO que consume el cálculo (8939/10318): custom si lo hay,
+      // si no el catálogo. Se guardan también catalogHourlyRate y customPrice para el round-trip.
+      const hourlyRate = (customPrice !== null) ? customPrice : catalogHourlyRate;
       if (hourlyRate > 0 && vehicleTypeId) {
         out.push({
           vehicleTypeId,
           rateId: row.dataset.rateId || '',
           hourlyRate,
+          catalogHourlyRate,
+          customPrice,
           vehicleLabel: row.dataset.vehicleLabel || 'Vehículo adicional',
           segmentLabel: row.dataset.segmentLabel || '',
         });
