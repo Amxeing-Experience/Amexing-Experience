@@ -1557,6 +1557,17 @@ class ItineraryBuilder {
     }
   }
 
+  // Bloquea/desbloquea los radios de tipo de servicio. Se bloquean al editar (el tipo no debe
+  // cambiarse a medio poblar) y se desbloquean al agregar.
+  setServiceTypeLocked(locked) {
+    document.querySelectorAll('input[name="serviceType"]').forEach((radio) => {
+      radio.disabled = !!locked;
+      // Atenuar la etiqueta asociada para que se vea claramente deshabilitado.
+      const label = radio.closest('label') || document.querySelector(`label[for="${radio.id}"]`);
+      if (label) label.classList.toggle('opacity-50', !!locked);
+    });
+  }
+
   openServiceModal(dayId, serviceId = null) {
     this.editMode = 'service';
     this.currentDayId = dayId;
@@ -1636,6 +1647,9 @@ class ItineraryBuilder {
       }
 
       document.getElementById('serviceModalLabel').innerHTML = `<i class="ti ti-pencil me-2"></i>Editar Servicio${dayLabel}`;
+      // Al editar, bloquear el cambio de tipo de servicio: cambiarlo a medio poblar deja estado
+      // del tipo anterior pegado y causa errores de cálculo/UI. El tipo solo se elige al agregar.
+      this.setServiceTypeLocked(true);
       this.populateServiceForm(service);
 
       // Update dev payment prices and breakdown after populating form with saved data
@@ -1650,6 +1664,9 @@ class ItineraryBuilder {
     } else {
       document.getElementById('serviceModalLabel').innerHTML = `<i class="ti ti-plus-circle me-2"></i>Agregar Servicio${dayLabel}`;
       form.reset();
+      // Al agregar SÍ se puede elegir el tipo de servicio (re-habilitar por si quedó bloqueado
+      // de una edición previa; form.reset() no limpia el atributo disabled).
+      this.setServiceTypeLocked(false);
       // Asistentes — start with a single empty row so the user can begin typing immediately.
       this.clearAttendees();
       // Vuelos adicionales — empty by default; user clicks "Agregar vuelo" to add one.
