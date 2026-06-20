@@ -6720,10 +6720,27 @@ class ItineraryBuilder {
 
         // Special case for A Disposición: always show base (efectivo) price in "Precio Base" field
         if (service.type === 'a-disposicion' && service.pricesByType.efectivo !== undefined) {
-          correctPrice = service.pricesByType.efectivo;
-          qsDevLog('🚗 A Disposición: Using base (efectivo) price for Precio Base field:', {
+          // A-disposición: el campo "Precio base" muestra la TARIFA POR HORA del vehículo, NO el
+          // total (pricesByType.efectivo = total por todas las horas × vehículos). Usar
+          // pricesByType.efectivo directo pisaba la tarifa por hora con el total. Se usa la
+          // tarifa por hora guardada (hourlyPrice); si falta (legacy), se deriva del total.
+          if (service.hourlyPrice !== undefined && service.hourlyPrice !== null && service.hourlyPrice > 0) {
+            correctPrice = service.hourlyPrice;
+          } else {
+            const adHours = service.hours || 4;
+            const adVehicleCount = service.vehicleCount || 1;
+            let hourly = service.pricesByType.efectivo / (adHours * adVehicleCount);
+            if (service.includeGuide && this.driverTourRateCache && this.driverTourRateCache.value > 0) {
+              hourly -= (this.driverTourRateCache.value || 0);
+            }
+            correctPrice = hourly;
+          }
+          // "Lista: $X" = tarifa por hora de catálogo.
+          this.updateMainVehicleListPrice(correctPrice);
+          qsDevLog('🚗 A Disposición: tarifa por hora en Precio base (no el total):', {
             selectedPaymentType: currentPaymentType,
             basePriceUsed: correctPrice,
+            hourlyPrice: service.hourlyPrice,
             pricesByType: service.pricesByType,
           });
         } else if (service.type === 'tour' && !service.isWalkingTour) {
