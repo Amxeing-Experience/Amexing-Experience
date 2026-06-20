@@ -6740,6 +6740,19 @@ class ItineraryBuilder {
             correctPrice,
             pricesByType: service.pricesByType,
           });
+        } else if (service.type === 'transport') {
+          // Transport: el campo "Precio" muestra SOLO la base del vehículo (efectivo), no el
+          // total de pricesByType (que incluye guía/greeter/adicionales/espera/recargo). Usa la
+          // base guardada del vehículo (o el override manual) para que este sync no escriba el
+          // total. Mirrors la lógica del populate de transporte.
+          if (service.priceOverride && service.customPrice !== undefined && service.customPrice !== null) {
+            correctPrice = service.customPrice;
+          } else if (service.baseVehiclePrice !== undefined && service.baseVehiclePrice !== null) {
+            correctPrice = service.baseVehiclePrice;
+          }
+          qsDevLog('🚛 Transport: using vehicle base for Precio field (not total):', {
+            correctPrice, baseVehiclePrice: service.baseVehiclePrice, pricesByType: service.pricesByType,
+          });
         }
 
         // Only update if the price is different to avoid unnecessary changes
