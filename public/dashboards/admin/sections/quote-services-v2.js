@@ -5274,8 +5274,20 @@ class ItineraryBuilder {
     // and repaint the saved rows.
     const extraContainer = document.getElementById('extraAdditionalVehiclesContainer');
     if (extraContainer) {
-      if (service.hasAdditionalVehicle) extraContainer.classList.remove('d-none');
-      else extraContainer.classList.add('d-none');
+      // Mostrar el container si: hay vehículos adicionales guardados (lista nueva), el flag
+      // legacy de vehículo único está activo, o el tipo soporta extras (transporte / tour con
+      // vehículo, donde el botón "Agregar vehículo" siempre está visible). Antes solo miraba
+      // hasAdditionalVehicle (legacy), así que extras guardados sin vehículo legacy quedaban
+      // ocultos en la interfaz aunque sí salían en el desglose.
+      const hasExtras = Array.isArray(service.extraAdditionalVehicles)
+        && service.extraAdditionalVehicles.length > 0;
+      const supportsExtras = service.type === 'transport'
+        || (service.type === 'tour' && !service.isWalkingTour);
+      if (service.hasAdditionalVehicle || hasExtras || supportsExtras) {
+        extraContainer.classList.remove('d-none');
+      } else {
+        extraContainer.classList.add('d-none');
+      }
     }
     this.populateExtraAdditionalVehicles(service.extraAdditionalVehicles || []);
 
