@@ -6750,6 +6750,12 @@ class ItineraryBuilder {
           } else if (service.baseVehiclePrice !== undefined && service.baseVehiclePrice !== null) {
             correctPrice = service.baseVehiclePrice;
           }
+          // "Lista: $X" = base de catálogo del vehículo (baseVehiclePrice), SIEMPRE. En la carga
+          // inicial el recálculo aún no la fija (timing), así que la mostramos aquí desde el dato
+          // guardado, que es confiable; al cambiar de segmento el recálculo la actualiza en vivo.
+          if (service.baseVehiclePrice !== undefined && service.baseVehiclePrice !== null) {
+            this.updateMainVehicleListPrice(service.baseVehiclePrice);
+          }
           qsDevLog('🚛 Transport: using vehicle base for Precio field (not total):', {
             correctPrice, baseVehiclePrice: service.baseVehiclePrice, pricesByType: service.pricesByType,
           });
