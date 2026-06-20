@@ -6078,6 +6078,9 @@ class ItineraryBuilder {
           document.getElementById('servicePrice').value = parseFloat(displayPrice).toFixed(2);
           // Update capacity note now that vehicle is populated
           this.updateVehicleCapacityNote();
+          // El vehículo principal ya está restaurado: habilitar el botón "Agregar vehículo"
+          // (la restauración async no dispara el handler que normalmente lo sincroniza).
+          this.syncExtraVehiclesButtonEnabled();
           // Restore waiting time
           if (service.waitingTimeHours > 0) {
             const wtHoursField = document.getElementById('waitingTimeHours');
@@ -6937,11 +6940,13 @@ class ItineraryBuilder {
       const avCheckbox = document.getElementById('additionalVehicleCheckbox');
       if (avCheckbox) {
         avCheckbox.checked = false;
+        // NO ocultar extraAdditionalVehiclesContainer: la lista de vehículos adicionales
+        // (modelo nuevo) es independiente del vehículo único legacy. Ocultarla aquí escondía
+        // los extras guardados en la interfaz aunque el desglose sí los mostraba.
         this.setOptionContainersVisible('additionalVehicle', false, [
           'additionalSegmentContainer',
           'additionalVehicleSelectContainer',
           'additionalVehiclePriceContainer',
-          'extraAdditionalVehiclesContainer',
         ]);
       }
     }
@@ -6951,6 +6956,8 @@ class ItineraryBuilder {
     if (Array.isArray(service.extraAdditionalVehicles) && service.extraAdditionalVehicles.length > 0) {
       this.populateExtraAdditionalVehicles(service.extraAdditionalVehicles);
     }
+    // El vehículo principal del tour ya está restaurado: habilitar el botón "Agregar vehículo".
+    this.syncExtraVehiclesButtonEnabled();
 
     // Step 11: Restore transport checkbox if needed
     const hasTransport = service.requiresTransport || service.vehicleId || service.vehicleType;
