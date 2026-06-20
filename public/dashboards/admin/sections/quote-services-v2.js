@@ -4453,11 +4453,6 @@ class ItineraryBuilder {
           const autoBase = parseFloat(this.lastValidTourPrice);
           data.vehiclePriceManual = !Number.isNaN(basePrice) && !Number.isNaN(autoBase)
             && Math.abs(basePrice - autoBase) > 0.01;
-          // eslint-disable-next-line no-console
-          console.log('🟠 SAVE vehicle-tour:', {
-            basePrice, autoBase, lastValidTourPrice: this.lastValidTourPrice,
-            vehiclePriceManual: data.vehiclePriceManual, customPriceWillBe: basePrice,
-          });
         }
 
         if (data.priceOverride && !data.isWalkingTour) {
@@ -4961,26 +4956,6 @@ class ItineraryBuilder {
 
   async populateServiceForm(service) {
     if (!service) return;
-
-    // === DEBUG TEMPORAL: espía cada escritura a #servicePrice con su stack trace ===
-    try {
-      const __sp = document.getElementById('servicePrice');
-      if (__sp && !__sp.__priceSpyInstalled) {
-        const __desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-        Object.defineProperty(__sp, 'value', {
-          configurable: true,
-          get() { return __desc.get.call(this); },
-          set(v) {
-            // eslint-disable-next-line no-console
-            console.log('🩸 servicePrice =', v, '| flagManual=', window.__ib?._mainPriceManuallyEdited, '\n', new Error().stack);
-            __desc.set.call(this, v);
-          },
-        });
-        __sp.__priceSpyInstalled = true;
-      }
-      window.__ib = this;
-    } catch (e) { /* no-op */ }
-    // === FIN DEBUG TEMPORAL ===
 
     // Set current service ID for editing
     this.currentServiceId = service.id;
@@ -13584,13 +13559,6 @@ class ItineraryBuilder {
   //     plain catalog round-trip. Legacy data without the flag → catalog.
   resolveVehicleTourBasePrice(service) {
     const catalog = this.getVehicleCost(service) || 0;
-    // eslint-disable-next-line no-console
-    console.log('🔵 RESOLVE vehicle-tour:', {
-      vehiclePriceManual: service.vehiclePriceManual,
-      customPrice: service.customPrice,
-      baseVehiclePrice: service.baseVehiclePrice,
-      catalog,
-    });
     if (service.vehiclePriceManual === true
       && service.customPrice !== undefined && service.customPrice !== null) {
       return { base: Number(service.customPrice), catalog, isManual: true };
@@ -21462,6 +21430,9 @@ class ItineraryBuilder {
             priceOverride: service.priceOverride || false,
             customPrice: service.customPrice || null,
             customPrices: service.customPrices || null,
+            // Vehicle tour: explicit manual-override flag for the main vehicle base price.
+            // Sin esto el backend lo perdía y al recargar el override volvía al catálogo.
+            vehiclePriceManual: service.vehiclePriceManual || false,
             // Payment type prices (for payment switching)
             pricesByType: service.pricesByType || null,
             // Attendees (asistentes) — list of full names per person on the service
