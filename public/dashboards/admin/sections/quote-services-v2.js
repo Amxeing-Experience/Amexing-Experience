@@ -4962,6 +4962,26 @@ class ItineraryBuilder {
   async populateServiceForm(service) {
     if (!service) return;
 
+    // === DEBUG TEMPORAL: espía cada escritura a #servicePrice con su stack trace ===
+    try {
+      const __sp = document.getElementById('servicePrice');
+      if (__sp && !__sp.__priceSpyInstalled) {
+        const __desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        Object.defineProperty(__sp, 'value', {
+          configurable: true,
+          get() { return __desc.get.call(this); },
+          set(v) {
+            // eslint-disable-next-line no-console
+            console.log('🩸 servicePrice =', v, '| flagManual=', window.__ib?._mainPriceManuallyEdited, '\n', new Error().stack);
+            __desc.set.call(this, v);
+          },
+        });
+        __sp.__priceSpyInstalled = true;
+      }
+      window.__ib = this;
+    } catch (e) { /* no-op */ }
+    // === FIN DEBUG TEMPORAL ===
+
     // Set current service ID for editing
     this.currentServiceId = service.id;
 
