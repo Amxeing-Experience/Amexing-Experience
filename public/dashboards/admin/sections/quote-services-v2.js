@@ -6840,18 +6840,6 @@ class ItineraryBuilder {
     // Set flag to prevent unchecking fields during population
     this._populatingVehicleTourForm = true;
 
-    // === DEBUG TEMPORAL: timing del flujo de edición de tour ===
-    const __t = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => 0;
-    const __t0 = __t();
-    let __tPrev = __t0;
-    const __mark = (label) => {
-      const now = __t();
-      // eslint-disable-next-line no-console
-      console.log(`⏱️ tour-edit ${label}: ${(now - __tPrev).toFixed(0)}ms (total ${(now - __t0).toFixed(0)}ms)`);
-      __tPrev = now;
-    };
-    // === FIN DEBUG TEMPORAL ===
-
     // Step 1: Set tour selection
     const tourSelect = document.getElementById('tourSelect');
     if (tourSelect && service.tourId) {
@@ -6859,7 +6847,6 @@ class ItineraryBuilder {
       // Trigger tour selection to load tour-specific data
       await this.handleTourSelection(service.tourId);
     }
-    __mark('handleTourSelection');
 
     // Step 2: Restore vehicle and rate selection
     if (service.rateId) {
@@ -6870,14 +6857,12 @@ class ItineraryBuilder {
         await this.handleRateSelection(service.rateId);
       }
     }
-    __mark('handleRateSelection');
 
     // Step 3: Restore vehicle selection
     const vehicleSelect = document.getElementById('vehicleSelect');
     if (vehicleSelect && (service.vehicleId || service.vehicleType || service.vehicleTypeName)) {
       // Wait for vehicles to load
       await new Promise((resolve) => setTimeout(resolve, 200));
-      __mark('wait 200ms');
 
       // Try to set vehicle by objectId first, then by type name
       const vehicleValue = service.vehicleId || service.vehicleType || service.vehicleTypeName;
@@ -6948,11 +6933,9 @@ class ItineraryBuilder {
       }
     }
 
-    __mark('steps 4-7 (quantities/duration/guide/override)');
 
     // Step 8: Restore prices (dev and service)
     this.restoreVehicleTourPrices(service);
-    __mark('restoreVehicleTourPrices');
 
     // Step 9: Restore service quantity
     const serviceQuantityField = document.getElementById('serviceQuantity');
@@ -7008,7 +6991,6 @@ class ItineraryBuilder {
       }
     }
 
-    __mark('steps 10b-12 (extras/transport/price)');
 
     // Step 13: Trigger final calculations after all fields are set
     setTimeout(() => {
@@ -7019,7 +7001,6 @@ class ItineraryBuilder {
       this._populatingVehicleTourForm = false;
     }, 300);
 
-    __mark('TOTAL populateVehicleTourForm (sin contar el setTimeout 300ms diferido)');
     qsDevLog('✅ populateVehicleTourForm - Complete');
   }
 
@@ -9275,6 +9256,18 @@ class ItineraryBuilder {
    * @example
    */
   updateDevPaymentBreakdown() {
+    // Guarda contra re-entrancia (ver updateServicePriceBreakdown): rompe el ciclo render↔
+    // cálculo que reventaba el stack y bloqueaba el hilo.
+    if (this._inUpdateDevPaymentBreakdown) return;
+    this._inUpdateDevPaymentBreakdown = true;
+    try {
+      this._updateDevPaymentBreakdownImpl();
+    } finally {
+      this._inUpdateDevPaymentBreakdown = false;
+    }
+  }
+
+  _updateDevPaymentBreakdownImpl() {
     qsDevLog('🔥 CRITICAL DEBUG: updateDevPaymentBreakdown() CALLED');
     qsDevLog('📊 ================================');
     qsDevLog('📊 updateDevPaymentBreakdown - ENTRY');
@@ -16599,6 +16592,20 @@ class ItineraryBuilder {
   }
 
   updateServicePriceBreakdown() {
+    // Guarda contra re-entrancia: las funciones de render del desglose se llaman entre sí y
+    // desde setMainVehiclePrice/recalc; sin la guarda se formaba un ciclo que reventaba el
+    // stack (RangeError "Maximum call stack size exceeded") y bloqueaba el hilo ~1-2s al abrir
+    // el modal de editar tour. La llamada externa completa el render; las anidadas se omiten.
+    if (this._inUpdateServicePriceBreakdown) return;
+    this._inUpdateServicePriceBreakdown = true;
+    try {
+      this._updateServicePriceBreakdownImpl();
+    } finally {
+      this._inUpdateServicePriceBreakdown = false;
+    }
+  }
+
+  _updateServicePriceBreakdownImpl() {
     qsDevLog('🔍 updateServicePriceBreakdown called');
 
     const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
