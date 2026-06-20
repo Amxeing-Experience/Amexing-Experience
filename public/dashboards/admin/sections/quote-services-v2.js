@@ -4453,6 +4453,11 @@ class ItineraryBuilder {
           const autoBase = parseFloat(this.lastValidTourPrice);
           data.vehiclePriceManual = !Number.isNaN(basePrice) && !Number.isNaN(autoBase)
             && Math.abs(basePrice - autoBase) > 0.01;
+          // eslint-disable-next-line no-console
+          console.log('🟠 SAVE vehicle-tour:', {
+            basePrice, autoBase, lastValidTourPrice: this.lastValidTourPrice,
+            vehiclePriceManual: data.vehiclePriceManual, customPriceWillBe: basePrice,
+          });
         }
 
         if (data.priceOverride && !data.isWalkingTour) {
@@ -13559,6 +13564,13 @@ class ItineraryBuilder {
   //     plain catalog round-trip. Legacy data without the flag → catalog.
   resolveVehicleTourBasePrice(service) {
     const catalog = this.getVehicleCost(service) || 0;
+    // eslint-disable-next-line no-console
+    console.log('🔵 RESOLVE vehicle-tour:', {
+      vehiclePriceManual: service.vehiclePriceManual,
+      customPrice: service.customPrice,
+      baseVehiclePrice: service.baseVehiclePrice,
+      catalog,
+    });
     if (service.vehiclePriceManual === true
       && service.customPrice !== undefined && service.customPrice !== null) {
       return { base: Number(service.customPrice), catalog, isManual: true };
