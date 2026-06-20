@@ -6431,11 +6431,22 @@ class ItineraryBuilder {
         break;
 
       case 'a-disposicion':
-        // Ensure the "Editar precio manualmente" checkbox is visible when editing.
-        // It lives inside standardPricingSection; make sure both are shown so the
-        // toggle doesn't go missing on the edit flow.
+        // El precio es SIEMPRE editable (sin checkbox "Editar precio manualmente"): mantener
+        // OCULTO el container, forzar el override ON (para que el desglose lea el campo) y dejar
+        // el campo editable — igual que en el modal de agregar y que transporte. Antes el edit
+        // re-mostraba el checkbox.
         if (this.canEditPrices) {
-          document.getElementById('aDisposicionOverridePricesContainer')?.classList.remove('d-none');
+          document.getElementById('aDisposicionOverridePricesContainer')?.classList.add('d-none');
+          const adOverride = document.getElementById('aDisposicionOverridePrices');
+          if (adOverride) adOverride.checked = true;
+          const adPriceField = document.getElementById('servicePrice');
+          if (adPriceField) {
+            adPriceField.readOnly = false;
+            adPriceField.removeAttribute('readonly');
+            adPriceField.removeAttribute('data-readonly');
+            adPriceField.classList.remove('readonly-price');
+            adPriceField.style.backgroundColor = '';
+          }
         }
         {
           const adStandardPricing = document.getElementById('standardPricingSection');
