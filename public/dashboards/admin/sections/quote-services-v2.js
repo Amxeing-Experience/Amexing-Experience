@@ -2221,7 +2221,9 @@ class ItineraryBuilder {
     const servicePriceField = document.getElementById('servicePrice');
     if (this.canEditPrices) {
       if (type === 'experience') {
-        document.getElementById('experienceOverridePrices')?.parentElement?.classList.remove('d-none');
+        // Precios de experiencia SIEMPRE editables (sin checkbox): mantener oculto el checkbox,
+        // forzar el override ON y dejar los campos editables. Consistente con los demás tipos.
+        this.forceExperiencePricesEditable();
       } else if (type === 'tour') {
         // Checkbox de override de tour OCULTO: vehicle tours y walking tours ya manejan el
         // precio siempre editable sin checkbox. Se mantiene oculto aquí.
@@ -2304,6 +2306,27 @@ class ItineraryBuilder {
         this.prefillPeopleFields();
       }, 100); // Increased from 50ms to 100ms for better DOM readiness
     }
+  }
+
+  // Experiencias: precio SIEMPRE editable (sin checkbox). Fuerza el override ON, oculta el
+  // checkbox y deja editables los campos de precio por persona (adulto/niño/sin alcohol).
+  forceExperiencePricesEditable() {
+    if (!this.canEditPrices) return;
+    const cb = document.getElementById('experienceOverridePrices');
+    if (cb) {
+      cb.checked = true;
+      cb.parentElement?.classList.add('d-none');
+    }
+    ['adultPrice', 'childPrice', 'noAlcoholPrice'].forEach((id) => {
+      const f = document.getElementById(id);
+      if (f) {
+        f.readOnly = false;
+        f.removeAttribute('readonly');
+        f.removeAttribute('data-readonly');
+        f.classList.remove('readonly-price');
+        f.style.backgroundColor = '';
+      }
+    });
   }
 
   // Handle price override toggle for admin users
@@ -14767,29 +14790,12 @@ class ItineraryBuilder {
       return;
     }
 
-    // When switching to a DIFFERENT experience, reset the manual price override so the
-    // new experience's prices load instead of stale manual prices from the previous one.
-    // Only on a genuine change of experience: edit-restore and the modal-shown re-dispatch
-    // (Event('change')) call this with the SAME id and must NOT wipe the saved custom
-    // prices. Also skipped during edit population/restore.
-    const isExperienceChange = experienceId !== this._loadedExperienceId;
-    if (isExperienceChange && !this._populatingForm && !this._restoringExperienceData) {
-      const overrideCheckbox = document.getElementById('experienceOverridePrices');
-      if (overrideCheckbox?.checked) {
-        overrideCheckbox.checked = false;
-        // Re-lock the per-person price fields; fillExperienceFields below repopulates
-        // them with the new experience's prices now that the override is off.
-        ['adultPrice', 'childPrice', 'noAlcoholPrice'].forEach((fieldId) => {
-          const field = document.getElementById(fieldId);
-          if (field) {
-            field.readOnly = true;
-            field.setAttribute('readonly', 'readonly');
-            field.classList.remove('price-override-active');
-            field.style.backgroundColor = '#f5f5f5';
-          }
-        });
-      }
-    }
+    // Precios de experiencia SIEMPRE editables (sin checkbox "Editar precios manualmente"):
+    // forzar el override ON, ocultar el checkbox y dejar los campos editables. fillExperienceFields
+    // (más abajo) los autollena con los precios de catálogo de la experiencia seleccionada; en
+    // edición la restauración rellena los precios personalizados guardados. Esto da consistencia
+    // con los demás tipos y elimina el estado pegado del toggle entre servicios.
+    this.forceExperiencePricesEditable();
     // Remember the loaded experience so re-entrant calls with the same id don't reset.
     this._loadedExperienceId = experienceId;
 
