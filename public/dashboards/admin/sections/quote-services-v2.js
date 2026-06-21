@@ -14941,6 +14941,16 @@ class ItineraryBuilder {
       }
     }
 
+    // "Lista: $X" de catálogo bajo cada input (referencia), SIEMPRE — aunque el campo tenga un
+    // precio personalizado. Usa los mismos valores de catálogo que autollenan los inputs.
+    const setExpListPrice = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = (val && Number(val) > 0) ? `Lista: ${this.formatCurrency(val)}` : '';
+    };
+    setExpListPrice('adultPriceListPrice', experience.price);
+    setExpListPrice('childPriceListPrice', experience.price_child);
+    setExpListPrice('noAlcoholPriceListPrice', experience.price_no_alcohol);
+
     // Handle schedule/availability - Horarios Disponibles
     // Get current day info for schedule filtering
     const currentDayInfo = this.getCurrentDayContext();
