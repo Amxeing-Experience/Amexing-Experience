@@ -9687,8 +9687,11 @@ class ItineraryBuilder {
         return;
       }
 
-      // Calculate vehicle efectivo base (el recargo por forma de pago lo aplica el motor abajo)
-      const vehicleTotalEfectivo = efectivoBasePrice; // vehiculo principal siempre 1 (multiples = vehiculos adicionales)
+      // Calculate vehicle efectivo base (el recargo por forma de pago lo aplica el motor abajo).
+      // Round-trip: el vehículo principal cuenta ida + vuelta (×2), igual que los vehículos
+      // adicionales/extra; one-way ×1. (La cantidad de vehículos sigue siendo 1; los múltiples
+      // son vehículos adicionales.)
+      const vehicleTotalEfectivo = efectivoBasePrice * legMultiplier;
 
       // Calculate waiting time costs if applicable
       const waitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
