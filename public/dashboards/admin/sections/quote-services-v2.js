@@ -2223,7 +2223,9 @@ class ItineraryBuilder {
       if (type === 'experience') {
         document.getElementById('experienceOverridePrices')?.parentElement?.classList.remove('d-none');
       } else if (type === 'tour') {
-        document.getElementById('tourOverridePricesContainer')?.classList.remove('d-none');
+        // Checkbox de override de tour OCULTO: vehicle tours y walking tours ya manejan el
+        // precio siempre editable sin checkbox. Se mantiene oculto aquí.
+        document.getElementById('tourOverridePricesContainer')?.classList.add('d-none');
         // Tour price should be readonly unless override is checked
         const tourOverrideCheckbox = document.getElementById('tourOverridePrices');
         if (servicePriceField && tourOverrideCheckbox) {
@@ -19722,19 +19724,10 @@ class ItineraryBuilder {
     // Store tour data for tier re-highlight on quantity change
     this.currentTourData = tour;
 
-    // When the user switches to a different walking tour, reset the "editar precios
-    // manualmente" override so the breakdown uses THIS tour's per-group/tier prices
-    // instead of a stale manual price from the previously selected tour. Skip during
-    // edit/restore so a saved custom price isn't wiped.
-    const isRestoringWalkingOverride = this._restoringWalkingTourData === true || this._populatingForm === true;
-    if (!isRestoringWalkingOverride) {
-      const overrideCheckbox = document.getElementById('tourOverridePrices');
-      if (overrideCheckbox?.checked) {
-        overrideCheckbox.checked = false;
-        // Hides the manual price UI, clears it, and reverts to automatic tier pricing.
-        this.handlePriceOverrideToggle('tour', false);
-      }
-    }
+    // Los precios por grupo de walking tours son SIEMPRE editables (sin checkbox). El forzado
+    // del override + generación de los inputs se hace al final de esta función, una vez que el
+    // conteo de personas está puesto. (Antes aquí se reseteaba el override al cambiar de tour,
+    // lo que dejaba el checkbox/inputs en estado inconsistente entre servicios.)
 
     // Pre-fill individual person counts from quote data (but only for NEW walking tours, not when editing)
     const adultsField = document.getElementById('walkingTourAdultsQuantity');
@@ -19813,6 +19806,21 @@ class ItineraryBuilder {
     // Reflect the (default) duration in the end-time field on selection,
     // not only when the user later edits the duration field.
     this.calculateTourEndTime();
+
+    // Walking tours: precios por grupo SIEMPRE editables (sin checkbox). Forzar el override
+    // activo, ocultar el checkbox, mostrar la sección de precios por grupo y generarlos
+    // (precargados del catálogo). Da consistencia con los otros tipos y elimina el estado
+    // pegado del toggle entre servicios. En edición, la restauración rellena los precios
+    // guardados sobre estos inputs después.
+    if (this.canEditPrices) {
+      const walkingOverride = document.getElementById('tourOverridePrices');
+      if (walkingOverride) walkingOverride.checked = true;
+      document.getElementById('tourOverridePricesContainer')?.classList.add('d-none');
+      document.getElementById('walkingTourManualPriceContainer')?.classList.remove('d-none');
+      const wtPeople = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10) || 1;
+      this.generateWalkingTourGroupInputs(tour, wtPeople);
+    }
+
     // Update the dev breakdown first, then the service breakdown reads from it.
     // This mirrors the duration/people-count handlers; calling them in the
     // reverse order made the price read stale data until a manual edit.

@@ -302,8 +302,10 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <div id="walkingTourGroupBreakdownContent"></div>
                                 </div>
                                 
-                                <!-- Manual Price Field for Walking Tours (Hidden by default) -->
-                                <div id="walkingTourManualPriceContainer" class="d-none">
+                                <!-- Precios por grupo de walking tours: SIEMPRE visibles y editables
+                                     (sin checkbox de "editar precios manualmente"), precargados con el
+                                     catálogo. Consistente con los demás tipos. -->
+                                <div id="walkingTourManualPriceContainer">
                                     <!-- Mode is always "group" (per-tier). The hidden radio keeps the
                                          existing JS query (input[name="walkingPriceMode"]:checked) happy. -->
                                     <input type="radio" name="walkingPriceMode" id="walkingPriceModeGroup" value="group" checked hidden>
@@ -318,9 +320,12 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 </div>
                             </div>
                             
-                            <!-- Tour Price Override Toggle (Admin Only) -->
+                            <!-- Tour Price Override Toggle (Admin Only) — OCULTO: los precios por
+                                 grupo de walking tours ahora son siempre editables (sin checkbox).
+                                 Se mantiene el elemento (d-none) porque el JS aún referencia el
+                                 checkbox #tourOverridePrices y lo fuerza activo. -->
                             <% if (canEditPrices) { %>
-                            <div class="form-check mt-3 mb-3" id="tourOverridePricesContainer">
+                            <div class="form-check mt-3 mb-3 d-none" id="tourOverridePricesContainer">
                                 <input class="form-check-input" type="checkbox" id="tourOverridePrices">
                                 <label class="form-check-label" for="tourOverridePrices">
                                     <i class="ti ti-edit me-1"></i>Editar precios manualmente
