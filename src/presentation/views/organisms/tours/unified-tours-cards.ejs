@@ -647,6 +647,18 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
     margin-bottom: 1rem;
 }
 
+/* Respetar saltos de línea en los campos de texto libre del detalle */
+.content-section p,
+.info-card p,
+.notes-content,
+.requirements-content,
+.recommendations-content,
+.restrictions-content,
+.activities-content,
+.features-content {
+    white-space: pre-line;
+}
+
 .info-card {
     display: flex;
     align-items: center;

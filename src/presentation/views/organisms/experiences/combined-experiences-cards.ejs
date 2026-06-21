@@ -2312,7 +2312,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${experience.description ? `
                     <div class="content-section">
                         <h5><i class="ti ti-file-text me-2"></i>Descripción</h5>
-                        <p>${experience.description}</p>
+                        <p style="white-space: pre-line;">${experience.description}</p>
                     </div>
                 ` : ''}
 
@@ -2705,7 +2705,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ${experience.requirements ? `
                 <div class="content-section">
                     <h5><i class="ti ti-backpack me-2"></i>Requisitos</h5>
-                    <div class="requirements-content">
+                    <div class="requirements-content" style="white-space: pre-line;">
                         ${experience.requirements}
                     </div>
                 </div>
@@ -2714,7 +2714,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ${experience.notes ? `
                 <div class="content-section">
                     <h5><i class="ti ti-note me-2"></i>Notas</h5>
-                    <div class="notes-content">
+                    <div class="notes-content" style="white-space: pre-line;">
                         ${experience.notes}
                     </div>
                 </div>
@@ -2733,7 +2733,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="content-section">
                     <h5 class="text-warning mb-3"><i class="ti ti-file-description me-2"></i>Condiciones</h5>
                     <ul class="list-unstyled mb-0">
-                        ${experience.cancellation_policy ? `<li class="mb-2"><strong><i class="ti ti-calendar-x me-1"></i>Políticas de cancelación:</strong> ${experience.cancellation_policy}</li>` : ''}
+                        ${experience.cancellation_policy ? `<li class="mb-2"><strong><i class="ti ti-calendar-x me-1"></i>Políticas de cancelación:</strong> <span style="white-space: pre-line;">${experience.cancellation_policy}</span></li>` : ''}
                         ${(experience.buyout !== null && experience.buyout !== undefined) ? `<li class="mb-2"><strong><i class="ti ti-cash me-1"></i>Buy-out:</strong> $${Number(experience.buyout).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</li>` : ''}
                         ${(experience.private_min_value !== null && experience.private_min_value !== undefined) ? `<li class="mb-2"><strong><i class="ti ti-lock me-1"></i>Mínimo para hacerlo privado:</strong> ${experience.private_min_type === 'monto' ? '$' + Number(experience.private_min_value).toLocaleString('es-MX', { minimumFractionDigits: 2 }) : Number(experience.private_min_value) + ' personas'}</li>` : ''}
                     </ul>

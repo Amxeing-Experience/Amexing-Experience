@@ -54,17 +54,17 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
         <div class="landing-nav__menu" id="landingNavMenu">
             <ul class="landing-nav__list">
                 <li class="landing-nav__item">
-                    <a href="<%= isEnglish ? '/en/about' : '/nosotros' %>" class="landing-nav__link <%= activePage === 'about' ? 'landing-nav__link--active' : '' %>">
+                    <a href="<%= isEnglish ? '/en/about' : '/nosotros' %>" class="landing-nav__link <%= activePage === 'about' ? 'landing-nav__link--active' : '' %>" data-label="<%= translate('navbar:menu.about') %>">
                         <%= translate('navbar:menu.about') %>
                     </a>
                 </li>
                 <li class="landing-nav__item">
-                    <a href="<%= isEnglish ? '/en/services' : '/servicios' %>" class="landing-nav__link <%= activePage === 'services' ? 'landing-nav__link--active' : '' %>">
+                    <a href="<%= isEnglish ? '/en/services' : '/servicios' %>" class="landing-nav__link <%= activePage === 'services' ? 'landing-nav__link--active' : '' %>" data-label="<%= translate('navbar:menu.services') %>">
                         <%= translate('navbar:menu.services') %>
                     </a>
                 </li>
                 <li class="landing-nav__item">
-                    <a href="<%= isEnglish ? '/en/our-fleet' : '/nuestra-flota' %>" class="landing-nav__link <%= activePage === 'fleet' ? 'landing-nav__link--active' : '' %>">
+                    <a href="<%= isEnglish ? '/en/our-fleet' : '/nuestra-flota' %>" class="landing-nav__link <%= activePage === 'fleet' ? 'landing-nav__link--active' : '' %>" data-label="<%= translate('navbar:menu.fleet') %>">
                         <%= translate('navbar:menu.fleet') %>
                     </a>
                 </li>
@@ -74,7 +74,7 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
                     </a>
                 </li>
                 <li class="landing-nav__item">
-                    <a href="<%= isEnglish ? '/en/contact' : '/contacto' %>" class="landing-nav__link <%= activePage === 'contact' ? 'landing-nav__link--active' : '' %>">
+                    <a href="<%= isEnglish ? '/en/contact' : '/contacto' %>" class="landing-nav__link <%= activePage === 'contact' ? 'landing-nav__link--active' : '' %>" data-label="<%= translate('navbar:menu.contact') %>">
                         <%= translate('navbar:menu.contact') %>
                     </a>
                 </li>
@@ -199,6 +199,8 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
 }
 
 .landing-nav__link {
+    display: inline-block;
+    text-align: center;
     text-decoration: none;
     color: rgba(255, 255, 255, 0.9);
     font-family: var(--font-myriad);
@@ -208,27 +210,23 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
     text-transform: uppercase;
     padding: 0.5rem 0;
     position: relative;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease;
 }
 
+/* Reserva el ancho del texto en negritas para que el hover no recorra los demás */
 .landing-nav__link::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    width: 0;
-    height: 1px;
-    background: #969B81;
-    transition: width 0.3s ease;
+    content: attr(data-label);
+    display: block;
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    font-weight: 700;
+    pointer-events: none;
 }
 
-.landing-nav__link:hover::after,
-.landing-nav__link--active::after {
-    width: 100%;
-}
-
-.landing-nav__link:hover {
-    color: #969B81;
+.landing-nav__link:hover,
+.landing-nav__link--active {
+    font-weight: 700;
 }
 
 .landing-nav__item--actions {

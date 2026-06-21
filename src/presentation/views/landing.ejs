@@ -58,10 +58,8 @@ Created by Denisse Maldonado
     <meta name="twitter:image" content="https://amexing.com/images/og-hero-san-miguel.jpg">
     
     <%# Favicon %>
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/images/heart_black.png">
+    <link rel="apple-touch-icon" href="/images/heart_black.png">
     
     <%# Google Fonts %>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -276,25 +274,416 @@ Created by Denisse Maldonado
                Caps sit high in the line box, leaving ~6px more below, so the top
                margin is a bit larger than the bottom to compensate (total kept). */
             line-height: 1;
-            margin: 1.7rem 0 1.3rem;
+            margin: 0.9rem 0 0.6rem;
         }
         
         .reconocimientos-section__award {
             display: flex;
             justify-content: center;
             align-items: center;
+            gap: 3rem;
+            flex-wrap: wrap;
         }
         
         .reconocimientos-section__image {
             margin-top: 3rem;
-            max-width: 270px;
+            max-width: 190px;
             height: auto;
             border-radius: 50%;
         }
 
         .reconocimientos-section__hr {
-            color: #969b81;
+            border: none;
+            border-top: 1px solid #969b81;
+            height: 0;
             margin: 0;
+        }
+
+        .reconocimientos-section__hr--bottom {
+            margin-top: 3rem;
+        }
+
+        /* Clientes que confían en nosotros Section Styles */
+        .clientes-confian-section {
+            padding: 0.875rem 0;
+            background: #ffffff;
+            text-align: center;
+        }
+
+        .clientes-confian-section__band {
+            padding: 3rem 0 4rem;
+            background: #d6d6d6;
+        }
+
+        .clientes-confian-section__container {
+            max-width: 1200px; /* igual que reconocimientos: alinea el marco con la línea verde */
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .clientes-confian-section__panel {
+            position: relative;
+            padding: 4rem 2.5rem 2.5rem;
+            border: 0.5px solid rgba(51, 51, 51, 0.35);
+            background: #d5d5d5;
+        }
+
+        .clientes-confian-section__panel::before {
+            content: '';
+            position: absolute;
+            top: 0.3rem;
+            left: 0.3rem;
+            right: -0.3rem;
+            bottom: -0.3rem;
+            border: 0.5px solid rgba(51, 51, 51, 0.25);
+            pointer-events: none;
+        }
+
+        .clientes-confian-section__title {
+            position: absolute;
+            left: 50%;
+            top: -0.9rem;
+            transform: translateX(-50%);
+            background: #7f7f7f;
+            color: #f3f3f3;
+            font-family: var(--font-newsreader);
+            font-weight: 400;
+            font-size: clamp(0.8rem, 1.65vw, 1.15rem);
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            padding: 1.0rem 2.75rem 0.5rem;
+            margin: 0;
+            width: calc(100% - 7rem);
+            max-width: 760px;
+            line-height: 1.1;
+            z-index: 1;
+        }
+
+        .clientes-confian-section__title::first-letter {
+            font-size: 1.3em;
+            line-height: 0;
+        }
+
+        /* Carousel (marquee) de logos */
+        .clientes-confian-section__carousel {
+            position: relative;
+            width: 100%;
+            margin-top: 4.5rem;
+            overflow: hidden;
+            -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+            mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+        }
+
+        .clientes-confian-section__track {
+            display: flex;
+            width: max-content;
+            align-items: center;
+            animation: clientes-confian-scroll 30s linear infinite;
+            will-change: transform;
+        }
+
+        .clientes-confian-section__carousel:hover .clientes-confian-section__track,
+        .clientes-confian-section__carousel:focus-within .clientes-confian-section__track {
+            animation-play-state: paused;
+        }
+
+        @keyframes clientes-confian-scroll {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .clientes-confian-section__track {
+                animation: none;
+            }
+        }
+
+        .clientes-confian-section__logo-link {
+            flex: 0 0 auto;
+            text-decoration: none;
+            color: #4b4b4b;
+            min-height: 78px;
+            padding: 0 3.25rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.25s ease, color 0.25s ease;
+        }
+
+        .clientes-confian-section__logo-image {
+            max-width: 180px;
+            max-height: 78px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            transform-origin: center;
+            transition: transform 0.25s ease;
+        }
+
+        .clientes-confian-section__logo-placeholder {
+            font-family: var(--font-newsreader);
+            font-size: clamp(1.8rem, 2.4vw, 2.8rem);
+            font-weight: 400;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            line-height: 1;
+            display: inline-block;
+            transform-origin: center;
+            transition: transform 0.25s ease;
+            white-space: nowrap;
+        }
+
+        .clientes-confian-section__logo-link:hover,
+        .clientes-confian-section__logo-link:focus-visible {
+            color: #1f1f1f;
+        }
+
+        .clientes-confian-section__logo-link:hover .clientes-confian-section__logo-image,
+        .clientes-confian-section__logo-link:focus-visible .clientes-confian-section__logo-image,
+        .clientes-confian-section__logo-link:hover .clientes-confian-section__logo-placeholder,
+        .clientes-confian-section__logo-link:focus-visible .clientes-confian-section__logo-placeholder {
+            transform: scale(1.08);
+        }
+
+        .clientes-confian-section__logo-link:focus-visible {
+            outline: 2px solid #7f7f7f;
+            outline-offset: 6px;
+        }
+
+        .clientes-confian-section__categories {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
+            align-items: start;
+            margin-top: 4.5rem;
+        }
+
+        .clientes-confian-section__category {
+            margin: 0;
+            font-family: var(--font-newsreader);
+            font-size: clamp(1rem, 1.5vw, 1.5rem);
+            font-weight: 400;
+            letter-spacing: 0.08em;
+            color: #464646;
+            font-variant-caps: small-caps;
+            font-feature-settings: "smcp";
+            line-height: 1.2;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        /* Publicaciones Section Styles */
+        .publicaciones-section {
+            padding: 4rem 0;
+            background: #8c9280;
+            overflow: hidden;
+        }
+
+        .publicaciones-section__inner {
+            width: 100%;
+            margin: 0 auto;
+            padding: 0;
+            position: relative;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            column-gap: 0; /* interno toca la portada; externo llega a la orilla */
+        }
+
+        /* Franja blanca tenue continua a todo el ancho, entre las dos líneas.
+           La portada (encima) la corta visualmente en el centro. */
+        .publicaciones-section__inner::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            height: clamp(5rem, 8vw, 6.5rem);
+            background: linear-gradient(
+                180deg,
+                rgba(255, 255, 255, 0.12) 0%,
+                rgba(255, 255, 255, 0.18) 50%,
+                rgba(255, 255, 255, 0.12) 100%
+            );
+            border-top: 1px solid rgba(255, 255, 255, 0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.8);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Banner: banda horizontal con línea arriba y abajo, igual en ambos lados.
+           La portada (centro) es más alta y rompe la banda. */
+        .publicaciones-section__side {
+            position: relative;
+            z-index: 1; /* el texto va sobre la franja blanca */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+            min-height: clamp(5rem, 8vw, 6.5rem);
+            padding: 0.6rem 0;
+        }
+
+        /* (Interno toca la portada por el column-gap:0; externo llega a la orilla
+           porque el contenedor va a todo el ancho. El texto queda centrado.) */
+
+        .publicaciones-section__label {
+            flex: 0 0 auto;
+            font-family: var(--font-newsreader);
+            font-weight: 400;
+            font-size: clamp(1.1rem, 1.8vw, 1.7rem);
+            letter-spacing: 0.32em;
+            text-transform: uppercase;
+            color: #f5f5f0;
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        .publicaciones-section__brand-block {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.4rem;
+            text-align: center;
+        }
+
+        .publicaciones-section__brand-img {
+            display: block;
+            width: clamp(80px, 10vw, 120px);
+            height: auto;
+            filter: brightness(0) invert(1); /* renderiza el logo en blanco */
+        }
+
+        .publicaciones-section__sub {
+            font-family: var(--font-myriad), 'Segoe UI', Tahoma, sans-serif;
+            font-weight: 400;
+            font-size: clamp(1.05rem, 1.6vw, 1.5rem);
+            letter-spacing: 0.12em;
+            font-variant-caps: small-caps;
+            font-feature-settings: "smcp";
+            color: rgba(255, 255, 255, 0.85);
+            line-height: 1.2;
+        }
+
+        /* Portada de la revista (link con animación de apertura) */
+        .publicaciones-section__cover {
+            position: relative;
+            z-index: 1; /* tapa la franja blanca en el centro */
+            flex: 0 0 auto;
+            display: block;
+            padding: 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            background: #8c9280; /* mismo verde: oculta la franja detrás del marco */
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Escenario plano con perspectiva: las capas (portada + páginas) se
+           apilan por z-index y cada una gira como una hoja al hojear */
+        .publicaciones-section__cover-stage {
+            position: relative;
+            display: block;
+            width: clamp(240px, 30vw, 380px);
+            aspect-ratio: 605 / 788; /* proporción de la portada; da altura sin sizer en flujo */
+            perspective: 1700px;
+        }
+
+        /* Todas las capas idénticas (absolutas) para que la animación 3D
+           se vea igual en la imagen y en los PDFs */
+        .publicaciones-section__cover-layer {
+            position: absolute;
+            inset: 0;
+            transform-origin: left center;
+            backface-visibility: hidden; /* al pasar de 90° desaparece y muestra la de atrás */
+            will-change: transform;
+            visibility: hidden; /* solo se ven la de adelante y la que se revela */
+        }
+
+        .publicaciones-section__cover-layer.is-front,
+        .publicaciones-section__cover-layer.is-revealing {
+            visibility: visible;
+        }
+
+        .publicaciones-section__cover-media {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            object-fit: cover;
+            background: #ffffff;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            pointer-events: none; /* los clics van al contenedor para ciclar */
+        }
+
+        /* Brillo + sombra que simulan la curvatura de una hoja flexible */
+        .publicaciones-section__cover-sheen {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            pointer-events: none;
+            opacity: 0;
+            background: linear-gradient(
+                100deg,
+                rgba(0, 0, 0, 0.35) 0%,
+                rgba(0, 0, 0, 0) 18%,
+                rgba(255, 255, 255, 0.45) 48%,
+                rgba(255, 255, 255, 0) 64%,
+                rgba(0, 0, 0, 0.18) 100%
+            );
+            background-size: 220% 100%;
+            background-position: 100% 0;
+        }
+
+        /* Hover: la capa de adelante se inclina un poco y asoma un brillo */
+        .publicaciones-section__cover:hover .publicaciones-section__cover-layer.is-front,
+        .publicaciones-section__cover:focus-visible .publicaciones-section__cover-layer.is-front {
+            transform: rotateY(-14deg) scale(1.02);
+            transition: transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+        }
+
+        .publicaciones-section__cover:hover .publicaciones-section__cover-layer.is-front .publicaciones-section__cover-sheen,
+        .publicaciones-section__cover:focus-visible .publicaciones-section__cover-layer.is-front .publicaciones-section__cover-sheen {
+            opacity: 0.35;
+            transition: opacity 0.35s ease;
+        }
+
+        .publicaciones-section__cover:focus-visible {
+            outline: 2px solid #ffffff;
+            outline-offset: 6px;
+        }
+
+        /* Clic: la capa de adelante gira como hoja y revela la siguiente */
+        .publicaciones-section__cover-layer.is-flipping {
+            animation: publicacion-open 0.95s cubic-bezier(0.45, 0.05, 0.2, 1) forwards;
+        }
+
+        .publicaciones-section__cover-layer.is-flipping .publicaciones-section__cover-sheen {
+            animation: publicacion-sheen 0.95s cubic-bezier(0.45, 0.05, 0.2, 1) forwards;
+        }
+
+        @keyframes publicacion-open {
+            0%   { transform: rotateY(0) scale(1); }
+            14%  { transform: rotateY(-7deg) scale(1.01); }
+            100% { transform: rotateY(-145deg) scale(1.04); }
+        }
+
+        @keyframes publicacion-sheen {
+            0%   { opacity: 0; background-position: 100% 0; }
+            30%  { opacity: 0.85; }
+            100% { opacity: 0.55; background-position: 0% 0; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .publicaciones-section__cover-layer,
+            .publicaciones-section__cover:hover .publicaciones-section__cover-layer.is-front,
+            .publicaciones-section__cover-layer.is-flipping,
+            .publicaciones-section__cover-layer.is-flipping .publicaciones-section__cover-sheen {
+                transition: none;
+                animation: none;
+                transform: none;
+            }
         }
 
         /* Testimonios Section Styles */
@@ -649,7 +1038,99 @@ Created by Denisse Maldonado
             .reconocimientos-section__image {
                 max-width: 200px;
             }
-            
+
+            .clientes-confian-section {
+                padding: 2.5rem 0 3rem;
+            }
+
+            .clientes-confian-section__container {
+                padding: 0 1rem;
+            }
+
+            .clientes-confian-section__panel {
+                padding: 3.5rem 1.25rem 2rem;
+            }
+
+            .clientes-confian-section__title {
+                width: calc(100% - 2.5rem);
+                padding: 0.7rem 1.2rem;
+                letter-spacing: 0.14em;
+                top: -0.75rem;
+            }
+
+            .clientes-confian-section__logo-link {
+                min-height: 64px;
+                padding: 0 2rem;
+            }
+
+            .clientes-confian-section__logo-image {
+                max-width: 135px;
+                max-height: 64px;
+            }
+
+            .clientes-confian-section__logo-placeholder {
+                font-size: clamp(1.2rem, 4vw, 1.7rem);
+            }
+
+            .clientes-confian-section__categories {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 1.25rem 1rem;
+                margin-top: 2rem;
+            }
+
+            .clientes-confian-section__category {
+                font-size: clamp(1rem, 3.6vw, 1.25rem);
+                letter-spacing: 0.05em;
+                white-space: normal;
+            }
+
+            .publicaciones-section {
+                padding: 3rem 0;
+            }
+
+            .publicaciones-section__inner {
+                grid-template-columns: 1fr;
+                justify-items: center;
+                gap: 2rem;
+            }
+
+            /* En móvil (apilado) la franja full-width no aplica: se usa el
+               borde + relleno por banda en cada lado. */
+            .publicaciones-section__inner::before {
+                display: none;
+            }
+
+            .publicaciones-section__side {
+                width: 100%;
+                justify-content: center;
+                text-align: center;
+                background: linear-gradient(
+                    180deg,
+                    rgba(255, 255, 255, 0.12) 0%,
+                    rgba(255, 255, 255, 0.18) 50%,
+                    rgba(255, 255, 255, 0.12) 100%
+                );
+                border-top: 1px solid rgba(255, 255, 255, 0.8);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.8);
+            }
+
+            .publicaciones-section__side--left {
+                order: 1;
+            }
+
+            .publicaciones-section__cover {
+                order: 2;
+            }
+
+            .publicaciones-section__side--right {
+                order: 3;
+                flex-direction: column;
+            }
+
+            .publicaciones-section__brand-block {
+                align-items: center;
+            }
+
             .testimonios-section {
                 padding: 4rem 0;
             }
@@ -749,6 +1230,15 @@ Created by Denisse Maldonado
             .testimonios-section__text {
                 font-size: 1rem;
                 line-height: 1.5;
+            }
+
+            .clientes-confian-section__title {
+                font-size: clamp(0.95rem, 5vw, 1.1rem);
+            }
+
+            .clientes-confian-section__categories {
+                grid-template-columns: 1fr;
+                gap: 0.8rem;
             }
         }
         /* Print Styles */
@@ -854,9 +1344,212 @@ Created by Denisse Maldonado
                     <hr class="reconocimientos-section__hr">
                     <div class="reconocimientos-section__award">
                         <img src="/images/trip_advisor.png" alt="TripAdvisor Travelers' Choice Awards 2025" class="reconocimientos-section__image">
+                        <img src="/images/trip_advisor2026.png" alt="TripAdvisor Travelers' Choice Awards 2026" class="reconocimientos-section__image">
+                    </div>
+                    <hr class="reconocimientos-section__hr reconocimientos-section__hr--bottom">
+                </div>
+            </section>
+
+            <%# Clientes que confían en nosotros Section %>
+            <%
+                // Logos del carrusel. Agrega más empresas aquí y el carrusel crece automáticamente.
+                const logosClientes = [
+                    { name: 'Casa Dragones', url: '#', logo: '/images/casa_dragones.png' },
+                    { name: 'This', url: '#', logo: '/images/this.png' },
+                    { name: 'Avenue', url: '#', logo: '/images/avenue.png' },
+                    { name: 'Maizazul', url: '#', logo: '/images/maiz_azul.png' }
+                ];
+                // Categorías estáticas que se muestran debajo del carrusel.
+                const categoriasClientes = ['Wedding Planners', 'Agencias de Viajes', 'Hoteles', 'DMCs'];
+            %>
+            <section id="clientes-confian" class="clientes-confian-section">
+                <div class="clientes-confian-section__band">
+                <div class="clientes-confian-section__container">
+                    <div class="clientes-confian-section__panel">
+                        <h2 class="clientes-confian-section__title">Clientes que confían en nosotros</h2>
+                        <div class="clientes-confian-section__carousel">
+                            <div class="clientes-confian-section__track">
+                                <%# Lista duplicada (2x) para un desplazamiento continuo sin saltos %>
+                                <% for (let copia = 0; copia < 2; copia++) { %>
+                                    <% logosClientes.forEach(function(cliente) { %>
+                                        <a
+                                            class="clientes-confian-section__logo-link"
+                                            href="<%= cliente.url %>"
+                                            aria-label="Visitar sitio de <%= cliente.name %>"
+                                            <% if (copia === 1) { %>aria-hidden="true" tabindex="-1"<% } %>
+                                        >
+                                            <% if (cliente.logo) { %>
+                                                <img src="<%= cliente.logo %>" alt="<%= cliente.name %>" class="clientes-confian-section__logo-image">
+                                            <% } else { %>
+                                                <span class="clientes-confian-section__logo-placeholder"><%= cliente.name %></span>
+                                            <% } %>
+                                        </a>
+                                    <% }); %>
+                                <% } %>
+                            </div>
+                        </div>
+                        <div class="clientes-confian-section__categories">
+                            <% categoriasClientes.forEach(function(categoria) { %>
+                                <p class="clientes-confian-section__category"><%= categoria %></p>
+                            <% }); %>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </section>
+
+            <%# Publicaciones Section %>
+            <%
+                // URL del artículo (fallback sin JS / SEO).
+                const publicacionThisUrl = 'https://www.thistopdestinos.com/this-that/amexing-experience-ofrece-una-forma-unica-de-recorrer-san-miguel';
+                // El carrusel cicla: portada (imagen) → estos PDFs (en orden) → de nuevo la portada.
+                const publicacionThisPdfs = [
+                    { src: '/docs/This%2066%202026%20PP%2045.pdf', label: 'Revista THIS — página 45' },
+                    { src: '/docs/This%2066%202026%20PP%20228.pdf', label: 'Revista THIS — página 228' },
+                ];
+            %>
+            <section id="publicaciones" class="publicaciones-section">
+                <div class="publicaciones-section__inner">
+                    <div class="publicaciones-section__side publicaciones-section__side--left">
+                        <span class="publicaciones-section__label">Publicaciones</span>
+                    </div>
+
+                    <a
+                        class="publicaciones-section__cover"
+                        href="<%= publicacionThisUrl %>"
+                        rel="noopener"
+                        role="button"
+                        aria-label="Hojear la publicación de la revista THIS donde aparece Amexing Experience"
+                    >
+                        <span class="publicaciones-section__cover-stage">
+                            <%# Capa 1: portada (imagen). Define el tamaño del escenario. %>
+                            <span class="publicaciones-section__cover-layer publicaciones-section__cover-layer--sizer">
+                                <img
+                                    src="/images/revista_this.png"
+                                    alt="Portada de la revista THIS, disponible con nosotros"
+                                    class="publicaciones-section__cover-media"
+                                >
+                                <span class="publicaciones-section__cover-sheen" aria-hidden="true"></span>
+                            </span>
+                            <%# Capas siguientes: páginas del PDF que se van revelando al hojear %>
+                            <% publicacionThisPdfs.forEach(function(pdf) { %>
+                                <span class="publicaciones-section__cover-layer">
+                                    <iframe
+                                        class="publicaciones-section__cover-media"
+                                        data-pdf="<%= pdf.src %>"
+                                        title="<%= pdf.label %>"
+                                        loading="lazy"
+                                    ></iframe>
+                                    <span class="publicaciones-section__cover-sheen" aria-hidden="true"></span>
+                                </span>
+                            <% }); %>
+                        </span>
+                    </a>
+
+                    <div class="publicaciones-section__side publicaciones-section__side--right">
+                        <span class="publicaciones-section__brand-block">
+                            <img src="/images/this.png" alt="THIS" class="publicaciones-section__brand-img">
+                            <span class="publicaciones-section__sub">Disponible con nosotros</span>
+                        </span>
                     </div>
                 </div>
             </section>
+
+            <script>
+                (function () {
+                    var cover = document.querySelector('.publicaciones-section__cover');
+                    if (!cover) return;
+                    var stage = cover.querySelector('.publicaciones-section__cover-stage');
+                    var layers = Array.prototype.slice.call(
+                        stage.querySelectorAll('.publicaciones-section__cover-layer')
+                    );
+                    if (layers.length < 2) return;
+
+                    var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    var order = layers.slice(); // de adelante hacia atrás
+                    var busy = false;
+                    var flipTimer = null;
+
+                    // Carga los PDFs (1 sola vez) para que el hojeo sea instantáneo.
+                    function loadPdfs() {
+                        layers.forEach(function (l) {
+                            var f = l.querySelector('iframe');
+                            if (f && !f.getAttribute('src') && f.getAttribute('data-pdf')) {
+                                f.setAttribute('src', f.getAttribute('data-pdf') + '#toolbar=0&navpanes=0&view=FitH');
+                            }
+                        });
+                    }
+
+                    function applyStack() {
+                        order.forEach(function (l, i) {
+                            l.style.zIndex = String(order.length - i);
+                            l.classList.toggle('is-front', i === 0);
+                        });
+                    }
+                    applyStack();
+
+                    if ('IntersectionObserver' in window) {
+                        var io = new IntersectionObserver(function (entries, obs) {
+                            entries.forEach(function (e) {
+                                if (e.isIntersecting) { loadPdfs(); obs.disconnect(); }
+                            });
+                        }, { rootMargin: '300px' });
+                        io.observe(cover);
+                    } else {
+                        loadPdfs();
+                    }
+                    cover.addEventListener('pointerenter', loadPdfs);
+
+                    var revealTimer = null;
+
+                    // Manda la capa de adelante al fondo y deja lista la siguiente.
+                    function settle(front) {
+                        order.push(order.shift());
+                        front.classList.remove('is-flipping'); // reinicia su giro (ya está al fondo, tapada)
+                        layers.forEach(function (l) { l.classList.remove('is-revealing'); });
+                        applyStack();
+                        busy = false;
+                    }
+
+                    function nextPage() {
+                        if (busy) return;
+                        busy = true;
+                        loadPdfs();
+                        var front = order[0];
+                        var nextLayer = order[1];
+
+                        if (prefersReduced) { settle(front); return; }
+
+                        var finished = false;
+                        function finish() {
+                            if (finished) return;
+                            finished = true;
+                            front.removeEventListener('animationend', onAnim);
+                            window.clearTimeout(flipTimer);
+                            window.clearTimeout(revealTimer);
+                            settle(front);
+                        }
+                        function onAnim(ev) {
+                            if (ev.animationName === 'publicacion-open') finish();
+                        }
+
+                        front.classList.add('is-flipping');
+                        // Revela la siguiente recién cuando la de adelante ya giró >90°
+                        // (así se ve completa la animación de cualquier capa, incluida la imagen).
+                        window.clearTimeout(revealTimer);
+                        revealTimer = window.setTimeout(function () {
+                            nextLayer.classList.add('is-revealing');
+                        }, 600);
+                        front.addEventListener('animationend', onAnim);
+                        flipTimer = window.setTimeout(finish, 1100); // respaldo
+                    }
+
+                    cover.addEventListener('click', function (event) {
+                        event.preventDefault();
+                        nextPage();
+                    });
+                })();
+            </script>
 
             <%# Testimonios Section %>
             <section id="testimonios" class="testimonios-section">
