@@ -302,8 +302,10 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <div id="walkingTourGroupBreakdownContent"></div>
                                 </div>
                                 
-                                <!-- Manual Price Field for Walking Tours (Hidden by default) -->
-                                <div id="walkingTourManualPriceContainer" class="d-none">
+                                <!-- Precios por grupo de walking tours: SIEMPRE visibles y editables
+                                     (sin checkbox de "editar precios manualmente"), precargados con el
+                                     catálogo. Consistente con los demás tipos. -->
+                                <div id="walkingTourManualPriceContainer">
                                     <!-- Mode is always "group" (per-tier). The hidden radio keeps the
                                          existing JS query (input[name="walkingPriceMode"]:checked) happy. -->
                                     <input type="radio" name="walkingPriceMode" id="walkingPriceModeGroup" value="group" checked hidden>
@@ -318,9 +320,12 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 </div>
                             </div>
                             
-                            <!-- Tour Price Override Toggle (Admin Only) -->
+                            <!-- Tour Price Override Toggle (Admin Only) — OCULTO: los precios por
+                                 grupo de walking tours ahora son siempre editables (sin checkbox).
+                                 Se mantiene el elemento (d-none) porque el JS aún referencia el
+                                 checkbox #tourOverridePrices y lo fuerza activo. -->
                             <% if (canEditPrices) { %>
-                            <div class="form-check mt-3 mb-3" id="tourOverridePricesContainer">
+                            <div class="form-check mt-3 mb-3 d-none" id="tourOverridePricesContainer">
                                 <input class="form-check-input" type="checkbox" id="tourOverridePrices">
                                 <label class="form-check-label" for="tourOverridePrices">
                                     <i class="ti ti-edit me-1"></i>Editar precios manualmente
@@ -565,13 +570,6 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="text" class="form-control time-input" id="roundTripTimeIda" placeholder="__:__" maxlength="5">
                                         </div>
                                     </div>
-                                    <div class="row">
-                                        <div class="col-md-12 mb-3">
-                                            <label for="roundTripDepartureTimeSuggestedIda" class="form-label">Hora de salida sugerida</label>
-                                            <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedIda" placeholder="__:__" maxlength="5">
-                                            <small class="text-muted">Se calculará automáticamente al seleccionar un segmento</small>
-                                        </div>
-                                    </div>
 
                                     <!-- Flight Details for Ida (only show if Aeropuerto is selected) -->
                                     <div class="roundtrip-flight-details-ida d-none">
@@ -653,7 +651,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="text" class="form-control time-input" id="roundTripTimeVuelta" placeholder="__:__" maxlength="5">
                                         </div>
                                     </div>
-                                    <div class="row">
+                                    <div class="row" id="roundTripDepartureTimeSuggestedVueltaRow">
                                         <div class="col-md-12 mb-3">
                                             <label for="roundTripDepartureTimeSuggestedVuelta" class="form-label">Hora de salida sugerida</label>
                                             <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedVuelta" placeholder="__:__" maxlength="5">
@@ -709,15 +707,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 </div>
                             </div>
 
-                            <!-- Rate & Vehicle Selection -->
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
+                            <!-- Rate & Vehicle Selection (Segmento + Vehículo + Precio en línea) -->
+                            <div class="row" id="aDisposicionVehicleRow">
+                                <div class="col-md-4 mb-3">
                                     <label for="aDisposicionRate" class="form-label">Segmento <span class="text-danger">*</span></label>
                                     <select class="form-select" id="aDisposicionRate" required>
                                         <option value="">-- Seleccionar segmento --</option>
                                     </select>
                                 </div>
-                                <div class="col-md-6 mb-3">
+                                <div class="col-md-4 mb-3">
                                     <label for="aDisposicionVehicle" class="form-label">Vehículo <span class="text-danger">*</span></label>
                                     <select class="form-select" id="aDisposicionVehicle" required>
                                         <option value="">-- Seleccionar vehículo --</option>
@@ -729,11 +727,11 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             <div class="row">
                                 <div class="col-md-4 mb-3">
                                     <label for="aDisposicionVehicleCount" class="form-label">Cantidad de Vehículos</label>
-                                    <input type="number" class="form-control" id="aDisposicionVehicleCount" min="1" max="10" value="1">
+                                    <input type="number" class="form-control" id="aDisposicionVehicleCount" min="1" value="1">
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="aDisposicionHours" class="form-label">Horas</label>
-                                    <input type="number" class="form-control" id="aDisposicionHours" min="1" max="24" step="0.5" value="4">
+                                    <input type="number" class="form-control" id="aDisposicionHours" min="3" max="24" step="0.5" value="4">
                                 </div>
                                 <div class="col-md-4 mb-3 d-flex align-items-end">
                                     <small class="text-muted" id="aDisposicionDiscountInfo"></small>
@@ -748,7 +746,6 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         <label class="form-check-label" for="aDisposicionGuide">
                                             <i class="ti ti-user me-1"></i>Incluir Guía
                                         </label>
-                                        <small class="text-muted d-block ms-4">Se agregará el costo de la guía</small>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
@@ -757,7 +754,6 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         <label class="form-check-label" for="aDisposicionGreeter">
                                             <i class="ti ti-user-check me-1"></i>Incluir Greeter
                                         </label>
-                                        <small class="text-muted d-block ms-4">Se agregará el costo del greeter</small>
                                     </div>
                                 </div>
                             </div>
@@ -800,18 +796,8 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <input class="form-check-input" type="checkbox" id="conceptoApplySurcharges" checked>
                             </div>
                             
-                            <!-- Schedule Toggle -->
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="conceptoHasSchedule">
-                                    <label class="form-check-label" for="conceptoHasSchedule">
-                                        <i class="ti ti-clock me-1"></i>Incluir horario
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <!-- Schedule Fields (hidden by default) -->
-                            <div id="conceptoScheduleFields" class="d-none">
+                            <!-- Schedule Fields (opcionales: si se llenan se guardan, si no, se ignoran) -->
+                            <div id="conceptoScheduleFields">
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <label for="conceptoStartTime" class="form-label">Hora de inicio</label>
@@ -880,7 +866,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                     </div>
                     
                     <div class="row" id="transportFieldsRow">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="transportCategory" class="form-label">Segmento <span class="text-danger">*</span></label>
                             <select class="form-select" id="transportCategory" required>
                                 <option value="">-- Seleccionar segmento --</option>
@@ -894,31 +880,29 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             </select>
                             <small id="vehicleCapacityNote" class="text-info d-none"><i class="ti ti-info-circle me-1"></i><span id="vehicleCapacityNoteText"></span></small>
                         </div>
-                        <div class="col-md-2 mb-3">
-                            <label class="form-label d-block">Opcional</label>
-                            <div class="d-flex flex-column align-items-start" style="min-height: 38px;">
-                                <div class="form-check mb-1">
+                    </div>
+
+                    <!-- Opcionales (transporte / tour): guía + greeter -->
+                    <div class="row" id="transportOptionsRow">
+                        <div class="col-12 mb-3">
+                            <label class="form-label d-block mb-1">Opcionales</label>
+                            <div class="d-flex flex-wrap align-items-center gap-4">
+                                <div class="form-check">
                                     <input class="form-check-input" type="checkbox" value="" id="includeGuide">
-                                    <label class="form-check-label small" for="includeGuide" id="guideLabel" style="font-size: 0.875rem; line-height: 1.2;">
-                                        Guía + Chofer
-                                    </label>
+                                    <label class="form-check-label small" for="includeGuide" id="guideLabel">Guía + Chofer</label>
                                 </div>
                                 <div class="form-check" id="greeterCheckboxContainer">
                                     <input class="form-check-input" type="checkbox" value="" id="includeGreeter">
-                                    <label class="form-check-label small" for="includeGreeter" id="greeterLabel" style="font-size: 0.875rem; line-height: 1.2;">
-                                        Greeter
-                                    </label>
+                                    <label class="form-check-label small" for="includeGreeter" id="greeterLabel">Greeter</label>
                                 </div>
-                                <div class="form-check ms-3 d-none" id="greeterInVehicleContainer">
+                                <div class="form-check ms-2 d-none" id="greeterInVehicleContainer">
                                     <input class="form-check-input" type="checkbox" value="" id="greeterInVehicle">
-                                    <label class="form-check-label small text-muted" for="greeterInVehicle" style="font-size: 0.75rem; line-height: 1.2;">
-                                        Viaja en el vehículo
-                                    </label>
+                                    <label class="form-check-label small text-muted" for="greeterInVehicle">Viaja en el vehículo</label>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Tiempo de Espera (Transport only) -->
                     <div id="tiempoEsperaSection" class="d-none mb-3">
                         <div class="row align-items-end">
@@ -937,41 +921,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
 
                     <!-- Standard pricing for non-experience services -->
                     <div class="row" id="standardPricingSection">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-6 mb-3" id="servicePriceCol">
                             <label for="servicePrice" class="form-label">Precio <small class="text-muted">(efectivo)</small> <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 <input type="number" class="form-control" id="servicePrice" placeholder="0.00" step="0.01" min="0" required>
                                 <span class="input-group-text">MXN</span>
                             </div>
-                            
-                            <!-- Development Mode: Payment Type Prices Display -->
-                            <div id="devPaymentPrices" class="d-none mt-3">
-                                <div class="row g-2">
-                                    <div class="col-md-4">
-                                        <label class="form-label text-muted small">💰 Precio Efectivo (base)</label>
-                                        <div class="input-group input-group-sm">
-                                            <span class="input-group-text">$</span>
-                                            <input type="text" class="form-control" id="devPriceEfectivo" readonly>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label text-muted small">🏦 Precio Transferencia</label>
-                                        <div class="input-group input-group-sm">
-                                            <span class="input-group-text">$</span>
-                                            <input type="text" class="form-control" id="devPriceTransferencia" readonly>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label text-muted small">💳 Precio Tarjeta</label>
-                                        <div class="input-group input-group-sm">
-                                            <span class="input-group-text">$</span>
-                                            <input type="text" class="form-control" id="devPriceTarjeta" readonly>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
+                            <small class="text-muted d-block" id="servicePriceListPrice"></small>
+
                             <!-- Tour Vehicle Price Override Toggle (Admin Only) -->
                             <% if (canEditPrices) { %>
                             <div class="form-check mt-2 d-none" id="tourVehicleOverridePricesContainer">
@@ -1010,51 +968,19 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             <input type="number" class="form-control" id="serviceQuantity" value="1" min="1" required>
                             <small class="text-muted d-none" id="roundTripQuantityHint">Vehículo Ida y Regreso</small>
                         </div>
-                        <div class="col-md-6 mb-3 d-none d-flex align-items-end" id="additionalVehicleContainer">
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="additionalVehicleCheckbox">
-                                <label class="form-check-label" for="additionalVehicleCheckbox">Vehículo adicional</label>
-                            </div>
-                        </div>
-                        
-                        <!-- Additional vehicle selection fields -->
-                        <div class="col-md-6 mb-3 d-none" id="additionalSegmentContainer">
-                            <label for="additionalSegmentSelect" class="form-label">Segmento adicional</label>
-                            <select class="form-select" id="additionalSegmentSelect">
-                                <option value="">Seleccionar segmento</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3 d-none" id="additionalVehicleSelectContainer">
-                            <label for="additionalVehicleSelect" class="form-label">Vehículo adicional</label>
-                            <select class="form-select" id="additionalVehicleSelect" disabled>
-                                <option value="">Primero selecciona un segmento</option>
-                            </select>
-                        </div>
-                        <!-- Per-vehicle custom price for the primary additional vehicle.
-                             Defaults to the list (catalog) price, editable, with the list
-                             price shown below for reference. -->
-                        <div class="col-md-6 mb-3 d-none" id="additionalVehiclePriceContainer">
-                            <label for="additionalVehiclePrice" class="form-label">Precio vehículo adicional <small class="text-muted">(efectivo)</small></label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" min="0" step="0.01" class="form-control" id="additionalVehiclePrice" placeholder="0.00">
-                                <span class="input-group-text">MXN</span>
-                            </div>
-                            <small class="text-muted d-block" id="additionalVehicleListPrice"></small>
-                        </div>
-                        <!-- Extra additional vehicles (beyond the first one) — wired by JS.
-                             Each row gets its own segment + vehicle dropdowns. Hidden until the
-                             "Vehículo adicional" checkbox is checked. Phase 1: data model + UI;
-                             pricing impact lands in Phase 2. -->
-                        <div class="col-12 d-none mt-2 p-3 border rounded bg-light" id="extraAdditionalVehiclesContainer">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <strong class="text-secondary" style="font-size: 0.9rem;">
-                                    <i class="ti ti-car-suv me-1"></i>Vehículos adicionales (extra)
-                                </strong>
-                                <button type="button" class="btn btn-sm btn-primary" id="addExtraAdditionalVehicleBtn">
-                                    <i class="ti ti-plus me-1"></i>Agregar otro vehículo
+                        <!-- Vehículos adicionales (lista). Reemplaza al antiguo "vehículo adicional"
+                             único. Se muestra para transporte / tour con vehículo; el botón se
+                             habilita solo cuando hay un vehículo principal seleccionado. -->
+                        <div class="col-12 d-none mt-2" id="extraAdditionalVehiclesContainer">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label mb-0"><i class="ti ti-car me-1"></i>Vehículos adicionales</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="addExtraAdditionalVehicleBtn" disabled>
+                                    <i class="ti ti-plus me-1"></i>Agregar vehículo
                                 </button>
                             </div>
+                            <small class="text-muted d-block mb-2" id="extraVehiclesMainHint">
+                                <i class="ti ti-info-circle me-1"></i>Selecciona primero el vehículo principal para agregar adicionales.
+                            </small>
                             <div id="extraAdditionalVehiclesList"></div>
                         </div>
                     </div>
@@ -1118,31 +1044,37 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <label for="adultPrice" class="form-label">Precio Adulto <small class="text-muted">(efectivo)</small> <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" id="adultPrice" placeholder="0.00" step="0.01" min="0" readonly>
+                                    <input type="number" class="form-control" id="adultPrice" placeholder="0.00" step="0.01" min="0">
                                     <span class="input-group-text currency-symbol">MXN</span>
                                 </div>
+                                <small class="text-muted d-block" id="adultPriceListPrice"></small>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="childPrice" class="form-label">Precio Niño <small class="text-muted">(efectivo)</small></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" id="childPrice" placeholder="0.00" step="0.01" min="0" readonly>
+                                    <input type="number" class="form-control" id="childPrice" placeholder="0.00" step="0.01" min="0">
                                     <span class="input-group-text currency-symbol">MXN</span>
                                 </div>
+                                <small class="text-muted d-block" id="childPriceListPrice"></small>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="noAlcoholPrice" class="form-label">Precio sin alcohol <small class="text-muted">(efectivo)</small></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" id="noAlcoholPrice" placeholder="0.00" step="0.01" min="0" readonly>
+                                    <input type="number" class="form-control" id="noAlcoholPrice" placeholder="0.00" step="0.01" min="0">
                                     <span class="input-group-text currency-symbol">MXN</span>
                                 </div>
+                                <small class="text-muted d-block" id="noAlcoholPriceListPrice"></small>
                             </div>
                         </div>
                         
-                        <!-- Price Override Toggle (Admin Only) -->
+                        <!-- Price Override Toggle (Admin Only) — OCULTO: los precios de experiencia
+                             ahora son siempre editables (sin checkbox), consistente con los demás
+                             tipos. Se mantiene el elemento (d-none) porque el JS aún fuerza
+                             #experienceOverridePrices activo. -->
                         <% if (canEditPrices) { %>
-                        <div class="form-check mb-3">
+                        <div class="form-check mb-3 d-none">
                             <input class="form-check-input" type="checkbox" id="experienceOverridePrices">
                             <label class="form-check-label" for="experienceOverridePrices">
                                 <i class="ti ti-edit me-1"></i>Editar precios manualmente

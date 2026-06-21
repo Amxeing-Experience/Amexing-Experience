@@ -1686,7 +1686,7 @@ const e = __isRes ? 'reservación' : 'cotización';
             ? `/quotes/${encodeURIComponent(folio)}/pdf${qParam}`
             : `/reservations/${encodeURIComponent(folio)}/pdf`;
         const docKind = isQuote ? 'Cotizacion' : 'Reservacion';
-        const filename = `${docKind}_${folio.replace(/\s+/g, '_')}.pdf`;
+        const filename = `${folio.replace(/\s+/g, '_')}.pdf`;
 
         const btn = document.getElementById('exportPdfBtn');
         const originalText = btn ? btn.innerHTML : '';
@@ -1732,7 +1732,7 @@ const e = __isRes ? 'reservación' : 'cotización';
         const element = document.getElementById('summaryContent');
         const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
         const docKind = /^QTE-/i.test(folio) ? 'Cotizacion' : 'Reservacion';
-        const filename = `${docKind}_${folio.replace(/\s+/g, '_')}.pdf`;
+        const filename = `${folio.replace(/\s+/g, '_')}.pdf`;
 
         // Check if element exists
         if (!element) {
@@ -2058,7 +2058,7 @@ const e = __isRes ? 'reservación' : 'cotización';
         const loadingElement = document.getElementById('summaryLoading');
         const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
         const docKind = /^QTE-/i.test(folio) ? 'Cotizacion' : 'Reservacion';
-        const filename = `${docKind}_${folio.replace(/\s+/g, '_')}.pdf`;
+        const filename = `${folio.replace(/\s+/g, '_')}.pdf`;
 
         // Check if element exists
         if (!element) {

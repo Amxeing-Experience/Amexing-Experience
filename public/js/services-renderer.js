@@ -554,12 +554,18 @@
             // Service details container - moved inside service-item for proper border positioning
             html += '<div class="service-details">';
 
-            // Schedule
+            // Schedule. Para CONCEPTO con una sola hora no repetimos la línea: ya se muestra
+            // arriba en el badge "Hora: HH:MM". Solo se muestra si es un rango (inicio – fin).
+            // El resto de los tipos conservan el comportamiento previo.
             if (service.selectedSchedule || service.startTime) {
-                html += `<div class="service-detail-item">
-                    <i class="ti ti-clock me-1"></i>
-                    ${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}
-                </div>`;
+                const scheduleIsRange = (typeof service.selectedSchedule === 'string' && service.selectedSchedule.includes(' - '))
+                    || (service.startTime && service.endTime);
+                if (scheduleIsRange || service.type !== 'concepto') {
+                    html += `<div class="service-detail-item">
+                        <i class="ti ti-clock me-1"></i>
+                        ${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}
+                    </div>`;
+                }
             }
 
             // People quantities
