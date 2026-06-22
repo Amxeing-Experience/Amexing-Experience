@@ -710,30 +710,15 @@ class ItineraryBuilder {
       this.addExtraAdditionalVehicleRow({});
     });
 
-    // "Hora de salida sugerida" Edit / Confirm buttons.
-    // The field starts readonly with the auto-suggested time. Edit unlocks it,
-    // Confirm locks it and changes the label to "Horario de salida".
-    const flightDepartureField = document.getElementById('flightDepartureTimeSuggested');
-    const flightDepartureLabel = document.getElementById('flightDepartureTimeSuggestedLabel');
-    const flightDepartureEditBtn = document.getElementById('flightDepartureTimeEditBtn');
-    const flightDepartureConfirmBtn = document.getElementById('flightDepartureTimeConfirmBtn');
-
-    flightDepartureEditBtn?.addEventListener('click', () => {
-      if (!flightDepartureField) return;
-      flightDepartureField.readOnly = false;
-      flightDepartureField.focus();
-      flightDepartureEditBtn.classList.add('d-none');
-      flightDepartureConfirmBtn?.classList.remove('d-none');
-      if (flightDepartureLabel) flightDepartureLabel.textContent = 'Hora de salida sugerida';
-    });
-
-    flightDepartureConfirmBtn?.addEventListener('click', () => {
-      if (!flightDepartureField) return;
-      flightDepartureField.readOnly = true;
-      flightDepartureConfirmBtn.classList.add('d-none');
-      flightDepartureEditBtn?.classList.remove('d-none');
-      if (flightDepartureLabel) flightDepartureLabel.textContent = 'Horario de salida';
-      this.serviceModified = true;
+    // "Hora de salida sugerida": campo editable directo (como los demás horarios). Se autollena
+    // con la hora calculada al elegir segmento/hora de vuelo, pero el usuario puede sobreescribirla.
+    // Al escribir, marcamos `userEdited` para que el auto-cálculo NO pise la edición manual
+    // (updateSuggestedDepartureTime respeta esta marca; se limpia al cambiar la hora de vuelo).
+    ['flightDepartureTimeSuggested', 'roundTripDepartureTimeSuggestedIda', 'roundTripDepartureTimeSuggestedVuelta'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', (e) => {
+        e.target.dataset.userEdited = '1';
+        this.serviceModified = true;
+      });
     });
 
     // Restore persisted currency and payment type selections (scoped per quote)
@@ -1080,19 +1065,28 @@ class ItineraryBuilder {
     tourDurationField?.addEventListener('input', handleTourDurationUpdate);
     tourDurationField?.addEventListener('change', handleTourDurationUpdate);
 
-    // Transport flight time listeners - calculate suggested departure time
+    // Transport flight time listeners - calculate suggested departure time. Al cambiar la hora
+    // de vuelo se descarta la marca de edición manual de la sugerida correspondiente para que
+    // se recalcule con la nueva hora (el usuario puede volver a editarla después).
+    const clearSuggestedEdited = (id) => {
+      const sf = document.getElementById(id);
+      if (sf) delete sf.dataset.userEdited;
+    };
     // One-way flight time
     document.getElementById('flightTime')?.addEventListener('change', () => {
+      clearSuggestedEdited('flightDepartureTimeSuggested');
       this.updateSuggestedDepartureTime();
     });
 
     // Round-trip Ida flight time
     document.getElementById('roundTripTimeIda')?.addEventListener('change', () => {
+      clearSuggestedEdited('roundTripDepartureTimeSuggestedIda');
       this.updateSuggestedDepartureTime();
     });
 
     // Round-trip Vuelta flight time
     document.getElementById('roundTripTimeVuelta')?.addEventListener('change', () => {
+      clearSuggestedEdited('roundTripDepartureTimeSuggestedVuelta');
       this.updateSuggestedDepartureTime();
     });
 
@@ -2693,6 +2687,12 @@ class ItineraryBuilder {
     if (flightTime) flightTime.value = '';
     const flightDepartureTimeSuggested = document.getElementById('flightDepartureTimeSuggested');
     if (flightDepartureTimeSuggested) flightDepartureTimeSuggested.value = '';
+    // Limpia la marca de edición manual de las horas sugeridas (clean slate por servicio, para
+    // que el auto-cálculo vuelva a llenar en un servicio nuevo).
+    ['flightDepartureTimeSuggested', 'roundTripDepartureTimeSuggestedIda', 'roundTripDepartureTimeSuggestedVuelta'].forEach((id) => {
+      const sf = document.getElementById(id);
+      if (sf) delete sf.dataset.userEdited;
+    });
 
     // Clear round trip fields
     const rtFields = [
@@ -5900,7 +5900,7 @@ class ItineraryBuilder {
           document.getElementById('roundTripDateIda').value = service.startDate || '';
           document.getElementById('roundTripTimeIda').value = service.startTime || '';
           // Campo "hora de salida sugerida" del ida (llegada) removido del modal; restaurar solo si existe.
-          { const idaSug = document.getElementById('roundTripDepartureTimeSuggestedIda'); if (idaSug && service.roundTripDepartureTimeSuggestedIda) idaSug.value = service.roundTripDepartureTimeSuggestedIda; }
+          { const idaSug = document.getElementById('roundTripDepartureTimeSuggestedIda'); if (idaSug && service.roundTripDepartureTimeSuggestedIda) { idaSug.value = service.roundTripDepartureTimeSuggestedIda; idaSug.dataset.userEdited = '1'; } }
 
           // Vuelta origin
           const vueltaOriginCombo = document.getElementById('roundTripOriginVueltaCombo');
@@ -5922,7 +5922,7 @@ class ItineraryBuilder {
           }
           document.getElementById('roundTripDateVuelta').value = service.endDate || '';
           document.getElementById('roundTripTimeVuelta').value = service.endTime || '';
-          if (service.roundTripDepartureTimeSuggestedVuelta) document.getElementById('roundTripDepartureTimeSuggestedVuelta').value = service.roundTripDepartureTimeSuggestedVuelta;
+          if (service.roundTripDepartureTimeSuggestedVuelta) { const vSug = document.getElementById('roundTripDepartureTimeSuggestedVuelta'); vSug.value = service.roundTripDepartureTimeSuggestedVuelta; vSug.dataset.userEdited = '1'; }
 
           // Flight details
           if (service.airline) {
@@ -6020,7 +6020,7 @@ class ItineraryBuilder {
             if (service.airline && airlineField) airlineField.value = service.airline;
             if (service.flightNumber && flightNumberField) flightNumberField.value = service.flightNumber;
             if (service.startTime && flightTimeField) flightTimeField.value = service.startTime;
-            if (service.flightDepartureTimeSuggested && flightDepartureField) flightDepartureField.value = service.flightDepartureTimeSuggested;
+            if (service.flightDepartureTimeSuggested && flightDepartureField) { flightDepartureField.value = service.flightDepartureTimeSuggested; flightDepartureField.dataset.userEdited = '1'; }
           } else {
             // Punto a Punto / Local: restore schedule fields
             const startTimeField = document.getElementById('transportStartTime');
@@ -15542,7 +15542,7 @@ class ItineraryBuilder {
         const suggestedTime = this.calculateSuggestedDepartureTime(idaFlightTime, routeDuration);
         const suggestedField = document.getElementById('roundTripDepartureTimeSuggestedIda');
         qsDevLog('📝 Setting Ida suggested time:', { suggestedTime, fieldExists: !!suggestedField });
-        if (suggestedField && suggestedTime) {
+        if (suggestedField && suggestedTime && suggestedField.dataset.userEdited !== '1') {
           suggestedField.value = suggestedTime;
         }
       }
@@ -15554,7 +15554,7 @@ class ItineraryBuilder {
         const suggestedTime = this.calculateSuggestedDepartureTime(vueltaFlightTime, routeDuration);
         const suggestedField = document.getElementById('roundTripDepartureTimeSuggestedVuelta');
         qsDevLog('📝 Setting Vuelta suggested time:', { suggestedTime, fieldExists: !!suggestedField });
-        if (suggestedField && suggestedTime) {
+        if (suggestedField && suggestedTime && suggestedField.dataset.userEdited !== '1') {
           suggestedField.value = suggestedTime;
         }
       }
@@ -15566,7 +15566,7 @@ class ItineraryBuilder {
         const suggestedTime = this.calculateSuggestedDepartureTime(flightTime, routeDuration);
         const suggestedField = document.getElementById('flightDepartureTimeSuggested');
         qsDevLog('📝 Setting one-way suggested time:', { suggestedTime, fieldExists: !!suggestedField });
-        if (suggestedField && suggestedTime) {
+        if (suggestedField && suggestedTime && suggestedField.dataset.userEdited !== '1') {
           suggestedField.value = suggestedTime;
           qsDevLog('✅ Field updated successfully');
         }

@@ -472,16 +472,8 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         </div>
                                         <div class="col-md-6 mb-3" id="flightDepartureTimeSuggestedContainer">
                                             <label for="flightDepartureTimeSuggested" class="form-label" id="flightDepartureTimeSuggestedLabel">Hora de salida sugerida</label>
-                                            <div class="input-group">
-                                                <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" placeholder="__:__" maxlength="5" readonly>
-                                                <button type="button" class="btn btn-outline-secondary" id="flightDepartureTimeEditBtn" title="Editar">
-                                                    <i class="ti ti-pencil"></i>
-                                                </button>
-                                                <button type="button" class="btn btn-outline-success d-none" id="flightDepartureTimeConfirmBtn" title="Confirmar">
-                                                    <i class="ti ti-check"></i>
-                                                </button>
-                                            </div>
-                                            <small class="text-muted">Se calculará automáticamente al seleccionar un segmento</small>
+                                            <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
+                                            <small class="text-muted">Se calcula automáticamente al seleccionar un segmento; puedes editarla.</small>
                                         </div>
                                         <!-- Removed Número de Personas field as requested
                                         <div class="col-md-6 mb-3">
@@ -654,8 +646,8 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <div class="row" id="roundTripDepartureTimeSuggestedVueltaRow">
                                         <div class="col-md-12 mb-3">
                                             <label for="roundTripDepartureTimeSuggestedVuelta" class="form-label">Hora de salida sugerida</label>
-                                            <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedVuelta" placeholder="__:__" maxlength="5">
-                                            <small class="text-muted">Se calculará automáticamente al seleccionar un segmento</small>
+                                            <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedVuelta" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
+                                            <small class="text-muted">Se calcula automáticamente al seleccionar un segmento; puedes editarla.</small>
                                         </div>
                                     </div>
 
