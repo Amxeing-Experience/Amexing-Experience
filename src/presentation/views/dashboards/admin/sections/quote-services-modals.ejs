@@ -413,8 +413,8 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                      y la hora de salida sugerida. Si la ruta no la trae, captúrala aquí. -->
                                 <div class="row">
                                     <div class="col-md-4 mb-3">
-                                        <label for="routeDurationInput" class="form-label">Duración de ruta <small class="text-muted">(min)</small></label>
-                                        <input type="number" min="0" step="1" class="form-control" id="routeDurationInput" placeholder="Ej: 105" autocomplete="off">
+                                        <label for="routeDurationInput" class="form-label">Duración de ruta <small class="text-muted">(horas)</small></label>
+                                        <input type="number" min="0" step="0.25" class="form-control" id="routeDurationInput" placeholder="Ej: 1.75" autocomplete="off">
                                         <small class="text-muted d-block">Se autollena de la ruta; usada para guía/greeter y hora de salida sugerida.</small>
                                     </div>
                                 </div>

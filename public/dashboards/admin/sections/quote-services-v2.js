@@ -6171,7 +6171,7 @@ class ItineraryBuilder {
           this.updateWaitingTimeRateDisplay();
           // Restaurar la duración de ruta guardada en el campo editable (manda sobre el lookup
           // al editar, para conservar un valor capturado a mano).
-          { const rd = document.getElementById('routeDurationInput'); if (rd) rd.value = service.routeDuration || ''; }
+          { const rd = document.getElementById('routeDurationInput'); if (rd) rd.value = this.minutesToHoursInput(service.routeDuration); }
           // Update dev payment breakdown now that transport data is loaded
           this.updateDevPaymentBreakdown();
           // Update service price breakdown now that transport data is loaded
@@ -15548,11 +15548,20 @@ class ItineraryBuilder {
   // Prioridad: el campo editable (#routeDurationInput) → la duración del lookup (cache) → la
   // guardada en el servicio (al editar). Así un valor capturado a mano manda, y las rutas sin
   // duración configurada se pueden completar a mano para que sí calculen.
+  // Convierte minutos (lo que usa el backend/cálculos) a horas para mostrar en el campo.
+  minutesToHoursInput(min) {
+    const m = Number(min);
+    if (!m || Number.isNaN(m) || m <= 0) return '';
+    return String(parseFloat((m / 60).toFixed(2)));
+  }
+
   getRouteDurationMinutes() {
+    // El campo se captura/muestra en HORAS; internamente todo (guía/greeter/hora sugerida,
+    // guardado) usa MINUTOS. Aquí convertimos horas→minutos.
     const fieldEl = document.getElementById('routeDurationInput');
     if (fieldEl && fieldEl.value !== '') {
-      const v = parseInt(fieldEl.value, 10);
-      if (!Number.isNaN(v) && v > 0) return v;
+      const hours = parseFloat(fieldEl.value);
+      if (!Number.isNaN(hours) && hours > 0) return Math.round(hours * 60);
     }
     let rd = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
     if (!rd && this.currentServiceId && this.services.has(this.currentServiceId)) {
@@ -17988,7 +17997,7 @@ class ItineraryBuilder {
       // guardado se pone en el restore.
       if (!this._populatingTransportForm) {
         const rdInput = document.getElementById('routeDurationInput');
-        if (rdInput) rdInput.value = result.data.routeDuration || '';
+        if (rdInput) rdInput.value = this.minutesToHoursInput(result.data.routeDuration);
       }
 
       qsDevLog('🚗 Route duration received:', {
