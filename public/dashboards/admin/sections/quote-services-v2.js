@@ -1072,23 +1072,26 @@ class ItineraryBuilder {
       const sf = document.getElementById(id);
       if (sf) delete sf.dataset.userEdited;
     };
-    // One-way flight time
-    document.getElementById('flightTime')?.addEventListener('change', () => {
-      clearSuggestedEdited('flightDepartureTimeSuggested');
-      this.updateSuggestedDepartureTime();
-    });
-
-    // Round-trip Ida flight time
-    document.getElementById('roundTripTimeIda')?.addEventListener('change', () => {
-      clearSuggestedEdited('roundTripDepartureTimeSuggestedIda');
-      this.updateSuggestedDepartureTime();
-    });
-
-    // Round-trip Vuelta flight time
-    document.getElementById('roundTripTimeVuelta')?.addEventListener('change', () => {
-      clearSuggestedEdited('roundTripDepartureTimeSuggestedVuelta');
-      this.updateSuggestedDepartureTime();
-    });
+    // Al modificar la hora de vuelo se recalcula el horario de salida sugerido (descartando la
+    // edición manual previa de la sugerida). En 'change' (al salir del campo) siempre; y en
+    // 'input' (en vivo) cuando la hora ya es un HH:MM completo, para feedback inmediato.
+    // updateSuggestedDepartureTime sólo actualiza si hay duración de ruta (segmento) → "cuando
+    // aplique".
+    const recalcOnFlightTime = (flightId, suggestedId) => {
+      const el = document.getElementById(flightId);
+      if (!el) return;
+      const handler = () => {
+        // eslint-disable-next-line no-console
+        console.log('🟡 flight-time change:', flightId, '=', el.value);
+        clearSuggestedEdited(suggestedId);
+        this.updateSuggestedDepartureTime();
+      };
+      el.addEventListener('change', handler);
+      el.addEventListener('input', () => { if (/^\d{2}:\d{2}$/.test(el.value)) handler(); });
+    };
+    recalcOnFlightTime('flightTime', 'flightDepartureTimeSuggested');
+    recalcOnFlightTime('roundTripTimeIda', 'roundTripDepartureTimeSuggestedIda');
+    recalcOnFlightTime('roundTripTimeVuelta', 'roundTripDepartureTimeSuggestedVuelta');
 
     // Tour/Experience price inputs - update breakdown when prices change and validate input
     ['tourAdultPrice', 'tourChildPrice', 'tourNoAlcoholPrice',
@@ -15543,6 +15546,16 @@ class ItineraryBuilder {
   updateSuggestedDepartureTime() {
     const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
     let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration;
+    // eslint-disable-next-line no-console
+    console.log('🟠 updateSuggestedDepartureTime:', {
+      tripType,
+      routeDuration,
+      transportRouteDuration: this.transportPriceData?.routeDuration,
+      cachedRouteDuration: this.cachedRouteDuration,
+      flightTime: document.getElementById('flightTime')?.value,
+      directionType: document.querySelector('input[name="directionType"]:checked')?.value,
+      suggestedFieldExists: !!document.getElementById('flightDepartureTimeSuggested'),
+    });
 
     // When editing, use saved route duration if available (same logic as guide pricing)
     if (this.currentServiceId && this.services.has(this.currentServiceId)) {
