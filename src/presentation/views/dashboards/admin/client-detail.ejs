@@ -61,7 +61,8 @@ const isAgency = clientData.clientCategory === 'agency' || clientData.roleName =
 
 const menuItems = [
     { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/admin/clients/${clientId}` },
-    { label: 'Perfil', icon: 'address-book', section: 'profile', href: `/dashboard/admin/clients/${clientId}?section=profile` },
+    // Agencies are entities (no personal profile); people-type clients get Perfil, agencies get Agentes.
+    ...(!isAgency ? [{ label: 'Perfil', icon: 'address-book', section: 'profile', href: `/dashboard/admin/clients/${clientId}?section=profile` }] : []),
     ...(isAgency ? [{ label: 'Agentes', icon: 'users', section: 'employees', href: `/dashboard/admin/clients/${clientId}?section=employees` }] : []),
     { label: 'Trips', icon: 'plane', section: 'quotes', href: `/dashboard/admin/clients/${clientId}?section=quotes` },
     { label: 'Tarifario', icon: 'receipt-2', section: 'tarifario', href: `/dashboard/admin/clients/${clientId}?section=tarifario` }
@@ -358,12 +359,14 @@ const tarifarioTabs = [
                 </div>
             </div>
         <% } else if (activeSection === 'profile') { %>
+            <% /* Agencies are entities — no personal profile. Guard against a forced ?section=profile URL. */ %>
+            <% if (isAgency) { %>
+            <div class="alert alert-info mb-0"><i class="ti ti-info-circle me-2"></i>Las agencias no tienen perfil personal. Usa la pestaña Agentes.</div>
+            <% } else { %>
             <!-- Profile: passports, addresses, travel preferences, loyalty programs. Loaded via AJAX. -->
             <% /* People-type clients are AmexingUser → profile sub-resources live under /api/agents/:id. */ %>
             <div id="profileRoot" data-client-id="<%= clientId %>"<% if (clientData.isAmexingUser) { %> data-owner-base="/api/agents/<%= clientId %>"<% } %>>
 
-                <% /* Agencies are entities, not people — no passport. People-type clients keep it. */ %>
-                <% if (clientData.clientCategory !== 'agency') { %>
                 <div class="card border-0 shadow-sm mb-3">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="ti ti-id me-2 text-primary"></i>Pasaportes</h5>
@@ -371,7 +374,6 @@ const tarifarioTabs = [
                     </div>
                     <div class="card-body"><div id="passportsContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
                 </div>
-                <% } %>
 
                 <div class="card border-0 shadow-sm mb-3">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -399,6 +401,7 @@ const tarifarioTabs = [
 
             </div>
             <%- include('./sections/client-profile-section') %>
+            <% } %>
 
         <% } else if (activeSection === 'employees') { %>
             <!-- Employees Management Section — agencies only -->
@@ -415,7 +418,7 @@ const tarifarioTabs = [
             <% } %>
         <% } else if (activeSection === 'quotes') { %>
             <!-- Trips: read-only quotes/reservations linked to this client. Loaded via AJAX. -->
-            <div class="card border-0 shadow-sm" id="tripsRoot" data-client-id="<%= clientId %>">
+            <div class="card border-0 shadow-sm" id="tripsRoot" data-client-id="<%= clientId %>"<% if (clientData.isAmexingUser) { %> data-owner-base="/api/agents/<%= clientId %>"<% } %>>
                 <div class="card-header bg-white"><h5 class="mb-0"><i class="ti ti-plane me-2 text-primary"></i>Trips</h5></div>
                 <div class="card-body"><div id="tripsContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
             </div>

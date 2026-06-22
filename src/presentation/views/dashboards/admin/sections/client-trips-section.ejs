@@ -3,6 +3,8 @@
     const root = document.getElementById('tripsRoot');
     if (!root) return;
     const clientId = root.dataset.clientId;
+    // People-type clients are AmexingUser → trips live under /api/agents/:id (fallback: client).
+    const base = root.dataset.ownerBase || `/api/clients/${clientId}`;
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const fmt = (v) => { if (!v) return '—'; const d = new Date(v); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-ES', { dateStyle: 'medium' }); };
@@ -15,7 +17,7 @@
     async function load() {
         const box = document.getElementById('tripsContainer');
         try {
-            const res = await fetch(`/api/clients/${clientId}/trips`, {
+            const res = await fetch(`${base}/trips`, {
                 credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' },
             });
             const json = await res.json();

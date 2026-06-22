@@ -35,9 +35,44 @@ window.initProfileSection = function (root) {
         'República Checa', 'República Dominicana', 'Rumania', 'Rusia', 'Singapur', 'Sudáfrica',
         'Suecia', 'Suiza', 'Tailandia', 'Turquía', 'Ucrania', 'Uruguay', 'Venezuela', 'Vietnam'];
 
+    // Maps each country to its Spanish demonym (feminine/neutral form used for "nacionalidad").
+    const COUNTRY_TO_NATIONALITY = {
+        'México': 'Mexicana', 'Estados Unidos': 'Estadounidense', 'Canadá': 'Canadiense',
+        'Alemania': 'Alemana', 'Arabia Saudita': 'Saudí', 'Argentina': 'Argentina',
+        'Australia': 'Australiana', 'Austria': 'Austriaca', 'Bélgica': 'Belga', 'Bolivia': 'Boliviana',
+        'Brasil': 'Brasileña', 'Bulgaria': 'Búlgara', 'Chile': 'Chilena', 'China': 'China',
+        'Chipre': 'Chipriota', 'Colombia': 'Colombiana', 'Corea del Sur': 'Surcoreana',
+        'Costa Rica': 'Costarricense', 'Croacia': 'Croata', 'Cuba': 'Cubana', 'Dinamarca': 'Danesa',
+        'Ecuador': 'Ecuatoriana', 'Egipto': 'Egipcia', 'El Salvador': 'Salvadoreña',
+        'Emiratos Árabes Unidos': 'Emiratí', 'Eslovaquia': 'Eslovaca', 'Eslovenia': 'Eslovena',
+        'España': 'Española', 'Estonia': 'Estonia', 'Filipinas': 'Filipina', 'Finlandia': 'Finlandesa',
+        'Francia': 'Francesa', 'Grecia': 'Griega', 'Guatemala': 'Guatemalteca', 'Honduras': 'Hondureña',
+        'Hungría': 'Húngara', 'India': 'India', 'Indonesia': 'Indonesia', 'Irlanda': 'Irlandesa',
+        'Islandia': 'Islandesa', 'Israel': 'Israelí', 'Italia': 'Italiana', 'Japón': 'Japonesa',
+        'Letonia': 'Letona', 'Lituania': 'Lituana', 'Luxemburgo': 'Luxemburguesa', 'Malasia': 'Malasia',
+        'Malta': 'Maltesa', 'Marruecos': 'Marroquí', 'Nicaragua': 'Nicaragüense', 'Noruega': 'Noruega',
+        'Nueva Zelanda': 'Neozelandesa', 'Países Bajos': 'Neerlandesa', 'Panamá': 'Panameña',
+        'Paraguay': 'Paraguaya', 'Perú': 'Peruana', 'Polonia': 'Polaca', 'Portugal': 'Portuguesa',
+        'Qatar': 'Catarí', 'Reino Unido': 'Británica', 'República Checa': 'Checa',
+        'República Dominicana': 'Dominicana', 'Rumania': 'Rumana', 'Rusia': 'Rusa',
+        'Singapur': 'Singapurense', 'Sudáfrica': 'Sudafricana', 'Suecia': 'Sueca', 'Suiza': 'Suiza',
+        'Tailandia': 'Tailandesa', 'Turquía': 'Turca', 'Ucrania': 'Ucraniana', 'Uruguay': 'Uruguaya',
+        'Venezuela': 'Venezolana', 'Vietnam': 'Vietnamita',
+    };
+
+    // Nationality options, in the same order as COUNTRIES (México/Estados Unidos/Canadá first).
+    const NATIONALITIES = COUNTRIES.map((c) => COUNTRY_TO_NATIONALITY[c]);
+
+    function optionsList(values, current) {
+        return values.map((v) => `<option value="${esc(v)}" ${current === v ? 'selected' : ''}>${esc(v)}</option>`).join('');
+    }
+
     function countrySelect(field, current) {
-        const opts = COUNTRIES.map((c) => `<option value="${esc(c)}" ${current === c ? 'selected' : ''}>${esc(c)}</option>`).join('');
-        return `<select class="form-select" data-f="${field}"><option value="">Selecciona…</option>${opts}</select>`;
+        return `<select class="form-select" data-f="${field}"><option value="">Selecciona…</option>${optionsList(COUNTRIES, current)}</select>`;
+    }
+
+    function nationalitySelect(field, current) {
+        return `<select class="form-select" data-f="${field}"><option value="">Selecciona…</option>${optionsList(NATIONALITIES, current)}</select>`;
     }
 
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
@@ -108,7 +143,7 @@ window.initProfileSection = function (root) {
                 <div class="col-md-6"><label class="form-label small">Etiqueta</label><input class="form-control" data-f="label" value="${esc(p.label)}" placeholder="Passport 1"></div>
                 <div class="col-md-6"><label class="form-label small">Passport Number</label><input class="form-control" data-f="number" placeholder="${p.hasNumber ? 'Dejar vacío para conservar' : ''}"></div>
                 <div class="col-md-6"><label class="form-label small">Country of Issue</label>${countrySelect('countryOfIssue', p.countryOfIssue)}</div>
-                <div class="col-md-6"><label class="form-label small">Nationality</label>${countrySelect('nationality', p.nationality)}</div>
+                <div class="col-md-6"><label class="form-label small">Nationality</label>${nationalitySelect('nationality', p.nationality)}</div>
                 <div class="col-md-6"><label class="form-label small">Date of Issue</label><input type="date" class="form-control" data-f="dateOfIssue" value="${dateInput(p.dateOfIssue)}"></div>
                 <div class="col-md-6"><label class="form-label small">Expiration Date</label><input type="date" class="form-control" data-f="expirationDate" value="${dateInput(p.expirationDate)}"></div>
             </div>`;
@@ -227,6 +262,10 @@ window.initProfileSection = function (root) {
         el.querySelector('[data-modal-icon]').className = `ti ti-${icon} me-2`;
         el.querySelector('[data-modal-title]').textContent = title;
         el.querySelector('.modal-body').innerHTML = bodyHtml;
+        // Country of Issue drives Nationality on every change (user can still override after).
+        const ci = el.querySelector('[data-f="countryOfIssue"]');
+        const nat = el.querySelector('[data-f="nationality"]');
+        if (ci && nat) ci.addEventListener('change', () => { nat.value = COUNTRY_TO_NATIONALITY[ci.value] || ''; });
         const modal = bootstrap.Modal.getOrCreateInstance(el);
         const saveBtn = el.querySelector('#profileModalSave');
         const fresh = saveBtn.cloneNode(true);
@@ -238,17 +277,13 @@ window.initProfileSection = function (root) {
             });
             try { await onSave(values); modal.hide(); } catch (e) { notify(e.message, 'error'); }
         });
+        // When opened over a parent modal (e.g. the agent profile modal), hide the parent so only
+        // this form shows; re-show it once this modal is fully hidden (save or cancel).
+        const parentEl = document.querySelector('.modal.show');
+        const parentModal = (parentEl && parentEl !== el) ? bootstrap.Modal.getOrCreateInstance(parentEl) : null;
+        if (parentModal) parentModal.hide();
         modal.show();
-        // When opened over a parent modal (e.g. the agent profile modal), stack this one and
-        // its backdrop above it so the parent is dimmed instead of peeking through.
-        const stacked = document.querySelectorAll('.modal.show').length > 1;
-        if (stacked) {
-            el.style.zIndex = '1075';
-            requestAnimationFrame(() => {
-                const backdrops = document.querySelectorAll('.modal-backdrop');
-                if (backdrops.length) backdrops[backdrops.length - 1].style.zIndex = '1070';
-            });
-        }
+        if (parentModal) el.addEventListener('hidden.bs.modal', () => parentModal.show(), { once: true });
     }
 
     // ---------- Wiring ----------

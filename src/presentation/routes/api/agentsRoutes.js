@@ -60,4 +60,6 @@ router.delete('/:agentId/passports/:id', requireAdmin, writeOperationsLimiter, c
 // Full-number reveal: admin/superadmin only, audited by the vault.
 router.post('/:agentId/passports/:id/reveal', requireAdmin, writeOperationsLimiter, clientProfileController.revealPassportNumber);
 
+router.get('/:agentId/trips', requireAdmin, clientProfileController.getTrips);
+
 module.exports = router;
