@@ -409,7 +409,16 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         <input type="text" class="form-control d-none" id="transportDestinationText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
                                     </div>
                                 </div>
-                                
+                                <!-- Duración de ruta (min): se autollena de la ruta y es editable. La usan guía/greeter
+                                     y la hora de salida sugerida. Si la ruta no la trae, captúrala aquí. -->
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label for="routeDurationInput" class="form-label">Duración de ruta <small class="text-muted">(min)</small></label>
+                                        <input type="number" min="0" step="1" class="form-control" id="routeDurationInput" placeholder="Ej: 105" autocomplete="off">
+                                        <small class="text-muted d-block">Se autollena de la ruta; usada para guía/greeter y hora de salida sugerida.</small>
+                                    </div>
+                                </div>
+
                                 <!-- Pickup / Drop-off address (Punto a Punto only) -->
                                 <div class="row d-none" id="papAddressesRow">
                                     <div class="col-md-6 mb-3">

@@ -1091,6 +1091,15 @@ class ItineraryBuilder {
     recalcOnFlightTime('roundTripTimeIda', 'roundTripDepartureTimeSuggestedIda');
     recalcOnFlightTime('roundTripTimeVuelta', 'roundTripDepartureTimeSuggestedVuelta');
 
+    // Editar a mano la duración de ruta → recalcular guía/greeter, desglose y hora de salida
+    // sugerida (getRouteDurationMinutes toma este campo como prioridad).
+    document.getElementById('routeDurationInput')?.addEventListener('input', () => {
+      this.serviceModified = true;
+      this.updateDevPaymentBreakdown();
+      this.updateSuggestedDepartureTime();
+      setTimeout(() => this.updateServicePriceBreakdown(), 50);
+    });
+
     // Tour/Experience price inputs - update breakdown when prices change and validate input
     ['tourAdultPrice', 'tourChildPrice', 'tourNoAlcoholPrice',
       'adultPrice', 'childPrice', 'noAlcoholPrice'].forEach((id) => {
@@ -3909,15 +3918,8 @@ class ItineraryBuilder {
       // Add guide costs if applicable
       const includeGuide = document.getElementById('includeGuide')?.checked || false;
       let guideCostEfectivo = 0;
-      let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
-
-      // When editing, use saved route duration if available
-      if (this.currentServiceId && this.services.has(this.currentServiceId)) {
-        const currentService = this.services.get(this.currentServiceId);
-        if (currentService.routeDuration) {
-          routeDuration = currentService.routeDuration;
-        }
-      }
+      // Fuente única: campo editable → lookup → guardado (ver getRouteDurationMinutes).
+      const routeDuration = this.getRouteDurationMinutes();
 
       if (includeGuide && routeDuration) {
         guideCostEfectivo = this.calculateGuideTransportCost(routeDuration);
@@ -4792,7 +4794,7 @@ class ItineraryBuilder {
         data.includeGreeter = document.getElementById('includeGreeter')?.checked || false;
 
         // Persist route duration for pricing calculations (Guía/Greeter surcharges)
-        data.routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
+        data.routeDuration = this.getRouteDurationMinutes();
 
         // Store base vehicle price separately so calculateServicePrice can add surcharges
         // (the price field may already include surcharges from recalculateTransportPrice)
@@ -6167,6 +6169,9 @@ class ItineraryBuilder {
             if (wtHoursField) wtHoursField.value = service.waitingTimeHours;
           }
           this.updateWaitingTimeRateDisplay();
+          // Restaurar la duración de ruta guardada en el campo editable (manda sobre el lookup
+          // al editar, para conservar un valor capturado a mano).
+          { const rd = document.getElementById('routeDurationInput'); if (rd) rd.value = service.routeDuration || ''; }
           // Update dev payment breakdown now that transport data is loaded
           this.updateDevPaymentBreakdown();
           // Update service price breakdown now that transport data is loaded
@@ -9747,15 +9752,8 @@ class ItineraryBuilder {
       // Calculate guide costs if applicable
       const includeGuide = document.getElementById('includeGuide')?.checked || false;
       let guideCostEfectivo = 0;
-      let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
-
-      // When editing, use saved route duration if available
-      if (this.currentServiceId && this.services.has(this.currentServiceId)) {
-        const currentService = this.services.get(this.currentServiceId);
-        if (currentService.routeDuration) {
-          routeDuration = currentService.routeDuration;
-        }
-      }
+      // Fuente única: campo editable → lookup → guardado (ver getRouteDurationMinutes).
+      const routeDuration = this.getRouteDurationMinutes();
 
       if (includeGuide && routeDuration) {
         guideCostEfectivo = this.calculateGuideTransportCost(routeDuration);
@@ -12634,6 +12632,8 @@ class ItineraryBuilder {
     // Limpia la duración de ruta cacheada para que no se herede de otro servicio (afecta guía/
     // greeter/hora de salida sugerida). Se repuebla con el lookup de la ruta de este servicio.
     this.cachedRouteDuration = null;
+    const rdInput = document.getElementById('routeDurationInput');
+    if (rdInput) rdInput.value = '';
 
     // Vehículo adicional (transporte / vehicle tour)
     const addCheckbox = document.getElementById('additionalVehicleCheckbox');
@@ -15544,6 +15544,23 @@ class ItineraryBuilder {
    * Called when flight time is entered or route duration is calculated.
    * @example
    */
+  // Duración de ruta efectiva (min) que usan guía/greeter y la hora de salida sugerida.
+  // Prioridad: el campo editable (#routeDurationInput) → la duración del lookup (cache) → la
+  // guardada en el servicio (al editar). Así un valor capturado a mano manda, y las rutas sin
+  // duración configurada se pueden completar a mano para que sí calculen.
+  getRouteDurationMinutes() {
+    const fieldEl = document.getElementById('routeDurationInput');
+    if (fieldEl && fieldEl.value !== '') {
+      const v = parseInt(fieldEl.value, 10);
+      if (!Number.isNaN(v) && v > 0) return v;
+    }
+    let rd = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
+    if (!rd && this.currentServiceId && this.services.has(this.currentServiceId)) {
+      rd = this.services.get(this.currentServiceId).routeDuration || null;
+    }
+    return rd;
+  }
+
   // Muestra/oculta el aviso "no se encontró la duración de la ruta" bajo la hora de salida
   // sugerida (one-way y round-trip Vuelta). El aviso está dentro de cada container, así que
   // sólo es visible cuando ese campo aplica.
@@ -15555,16 +15572,8 @@ class ItineraryBuilder {
 
   updateSuggestedDepartureTime() {
     const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
-    let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration;
-
-    // When editing, use saved route duration if available (same logic as guide pricing)
-    if (this.currentServiceId && this.services.has(this.currentServiceId)) {
-      const currentService = this.services.get(this.currentServiceId);
-      if (currentService.routeDuration) {
-        routeDuration = currentService.routeDuration;
-        qsDevLog('📝 Using saved route duration from service:', routeDuration);
-      }
-    }
+    // Fuente única: campo editable → lookup → guardado (ver getRouteDurationMinutes).
+    const routeDuration = this.getRouteDurationMinutes();
 
     qsDevLog('🕐 updateSuggestedDepartureTime called:', {
       tripType,
@@ -16861,15 +16870,7 @@ class ItineraryBuilder {
         }
       }
 
-      let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
-
-      // Get route duration - prioritize saved service data when editing
-      if (this.currentServiceId && this.services.has(this.currentServiceId)) {
-        const currentService = this.services.get(this.currentServiceId);
-        if (currentService.routeDuration) {
-          routeDuration = currentService.routeDuration;
-        }
-      }
+      const routeDuration = this.getRouteDurationMinutes();
 
       const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
       const brkLegMultiplier = tripType === 'round-trip' ? 2 : 1;
@@ -17982,6 +17983,13 @@ class ItineraryBuilder {
       this.transportPriceData = result.data;
       // Cache routeDuration separately so it persists even if transportPriceData is cleared
       this.cachedRouteDuration = result.data.routeDuration || null;
+      // Autollenar el campo editable "Duración de ruta" con la duración de ESTA ruta (vacío si
+      // la ruta no la trae → se captura a mano). En restauración de edición NO se pisa: el valor
+      // guardado se pone en el restore.
+      if (!this._populatingTransportForm) {
+        const rdInput = document.getElementById('routeDurationInput');
+        if (rdInput) rdInput.value = result.data.routeDuration || '';
+      }
 
       qsDevLog('🚗 Route duration received:', {
         origin: apiOrigin,
