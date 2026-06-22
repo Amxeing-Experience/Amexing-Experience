@@ -1,0 +1,113 @@
+<%#
+Permiso de Autotransporte Federal Section Organism - Nosotros Page
+Logo de la Secretaría (Comunicaciones / SICT) + título y descripción del permiso.
+
+Created by Denisse Maldonado
+%>
+
+<section class="permiso-section">
+    <div class="permiso-section__container">
+        <div class="permiso-section__inner">
+            <%# Logo de Comunicaciones (SICT) %>
+            <div class="permiso-section__logo">
+                <img src="/images/comunicaciones.png" alt="Secretaría de Infraestructura, Comunicaciones y Transportes" class="permiso-section__logo-img">
+            </div>
+
+            <%# Título + descripción %>
+            <div class="permiso-section__content">
+                <h2 class="permiso-section__title">Permiso de Autotransporte Federal</h2>
+                <p class="permiso-section__text">
+                    Nos permite operar legalmente en carreteras federales y realizar traslados
+                    turísticos con total cumplimiento de la normativa. Esta autorización nos
+                    habilita para ofrecer servicios de lujo, estándar y de excursión, garantizando
+                    viajes seguros, confiables y de alta calidad para sus huéspedes.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+.permiso-section {
+    background: #3a3a38;
+    padding: 3.5rem 0;
+}
+
+.permiso-section__container {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 0 3rem;
+}
+
+.permiso-section__inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+    /* box-sizing fijo: el padding mete el contenido SIN cambiar el ancho de las líneas */
+    box-sizing: border-box;
+    padding: 3.5rem 11rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.35);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* ---- Logo (izquierda) ---- */
+.permiso-section__logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.permiso-section__logo-img {
+    display: block;
+    width: 100%;
+    max-width: 460px;
+    height: auto;
+}
+
+/* ---- Contenido (derecha) ---- */
+.permiso-section__title {
+    font-family: var(--font-newsreader);
+    font-weight: 400;
+    font-size: clamp(1.5rem, 2.4vw, 2.1rem);
+    line-height: 1.2;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #9b9b90;
+    margin: 0 0 1.5rem;
+}
+
+.permiso-section__text {
+    font-family: var(--font-newsreader);
+    font-weight: 400;
+    font-size: clamp(1rem, 1.4vw, 1.25rem);
+    line-height: 1.7;
+    color: #cbcdc0;
+    margin: 0;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 768px) {
+    .permiso-section {
+        padding: 2.5rem 0;
+    }
+
+    .permiso-section__container {
+        padding: 0 1.5rem;
+    }
+
+    .permiso-section__inner {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+        padding: 2.5rem 0;
+    }
+
+    .permiso-section__title {
+        text-align: center;
+    }
+
+    .permiso-section__text {
+        text-align: center;
+    }
+}
+</style>
