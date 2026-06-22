@@ -485,12 +485,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <!-- Additional flights — for when several passengers arrive on different flights -->
                                     <div class="row">
                                         <div class="col-12 mb-3">
-                                            <label class="form-label">Vuelos adicionales</label>
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="form-label mb-0"><i class="ti ti-plane me-1"></i>Vuelos adicionales</label>
+                                                <button type="button" class="btn btn-sm btn-outline-primary" id="addAdditionalFlightBtn">
+                                                    <i class="ti ti-plus me-1"></i>Agregar vuelo
+                                                </button>
+                                            </div>
                                             <small class="form-text text-muted d-block mb-2">Si distintos pasajeros llegan en vuelos distintos, agrégalos aquí.</small>
                                             <div id="additionalFlightsList"></div>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" id="addAdditionalFlightBtn">
-                                                <i class="ti ti-plus me-1"></i>Agregar vuelo
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
