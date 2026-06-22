@@ -195,14 +195,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <label for="tourStartTime" class="form-label">Hora de inicio</label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="ti ti-clock"></i></span>
-                                        <input type="time" class="form-control time-input" id="tourStartTime">
+                                        <select class="form-select time-select" id="tourStartTime"></select>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <label for="tourEndTime" class="form-label">Hora de fin</label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="ti ti-clock"></i></span>
-                                        <input type="time" class="form-control time-input" id="tourEndTime">
+                                        <select class="form-select time-select" id="tourEndTime"></select>
                                     </div>
                                 </div>
                             </div>
@@ -443,11 +443,11 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label for="transportStartTime" class="form-label">Hora de salida</label>
-                                            <input type="time" class="form-control time-input" id="transportStartTime">
+                                            <select class="form-select time-select" id="transportStartTime"></select>
                                         </div>
                                         <div class="col-md-6 mb-3">
                                             <label for="transportEndTime" class="form-label">Hora de fin</label>
-                                            <input type="time" class="form-control time-input" id="transportEndTime">
+                                            <select class="form-select time-select" id="transportEndTime"></select>
                                         </div>
                                     </div>
                                 </div>
@@ -695,14 +695,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <label for="aDisposicionStartTime" class="form-label">Hora de inicio</label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="ti ti-clock"></i></span>
-                                        <input type="time" class="form-control time-input" id="aDisposicionStartTime">
+                                        <select class="form-select time-select" id="aDisposicionStartTime"></select>
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="aDisposicionEndTime" class="form-label">Hora de fin</label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="ti ti-clock"></i></span>
-                                        <input type="time" class="form-control time-input" id="aDisposicionEndTime">
+                                        <select class="form-select time-select" id="aDisposicionEndTime"></select>
                                     </div>
                                 </div>
                             </div>
@@ -803,7 +803,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         <label for="conceptoStartTime" class="form-label">Hora de inicio</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="ti ti-clock"></i></span>
-                                            <input type="time" class="form-control time-input" id="conceptoStartTime">
+                                            <select class="form-select time-select" id="conceptoStartTime"></select>
                                         </div>
                                         <small class="form-text text-muted">Ej: 09:00, 14:30</small>
                                     </div>
@@ -811,7 +811,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         <label for="conceptoEndTime" class="form-label">Hora de fin</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="ti ti-clock"></i></span>
-                                            <input type="time" class="form-control time-input" id="conceptoEndTime">
+                                            <select class="form-select time-select" id="conceptoEndTime"></select>
                                         </div>
                                         <small class="form-text text-muted">Ej: 17:00, 20:30</small>
                                     </div>
@@ -999,14 +999,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <label for="experienceStartTime" class="form-label">Hora de inicio</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="ti ti-clock"></i></span>
-                                    <input type="time" class="form-control time-input" id="experienceStartTime">
+                                    <select class="form-select time-select" id="experienceStartTime"></select>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <label for="experienceEndTime" class="form-label">Hora de fin</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="ti ti-clock"></i></span>
-                                    <input type="time" class="form-control time-input" id="experienceEndTime">
+                                    <select class="form-select time-select" id="experienceEndTime"></select>
                                 </div>
                             </div>
                         </div>

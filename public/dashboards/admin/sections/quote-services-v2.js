@@ -1557,6 +1557,45 @@ class ItineraryBuilder {
     }
   }
 
+  // Llena los <select> de horario (.time-select) con opciones cada 15 min (value HH:MM).
+  // Los <select> disparan 'change' de forma confiable (a diferencia de <input type=time>),
+  // que es lo que usan los listeners de horario. `extraTimes` = horas guardadas fuera de la
+  // malla de 15 min (p.ej. 09:07) que se inyectan como opción para no perderlas al editar.
+  populateTimeSelects(extraTimes = []) {
+    const selects = document.querySelectorAll('select.time-select');
+    if (!selects.length) return;
+    const times = [];
+    for (let h = 0; h < 24; h += 1) {
+      for (let m = 0; m < 60; m += 15) {
+        times.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      }
+    }
+    (extraTimes || []).forEach((t) => {
+      if (t && /^\d{1,2}:\d{2}$/.test(t)) {
+        const norm = t.length === 4 ? `0${t}` : t; // 9:00 → 09:00
+        if (!times.includes(norm)) times.push(norm);
+      }
+    });
+    times.sort();
+    const optionsHtml = ['<option value="">--:--</option>']
+      .concat(times.map((t) => `<option value="${t}">${t}</option>`))
+      .join('');
+    selects.forEach((sel) => {
+      const current = sel.value; // conservar selección actual si la hay
+      sel.innerHTML = optionsHtml;
+      if (current) sel.value = current;
+    });
+  }
+
+  // Asegura que un <select> de horario tenga la opción `value` (la inyecta si falta), para que
+  // valores calculados/guardados fuera de la malla (p.ej. fin auto-calculado 10:06) se muestren.
+  ensureTimeOption(selectEl, value) {
+    if (!selectEl || selectEl.tagName !== 'SELECT') return;
+    if (!value || !/^\d{2}:\d{2}$/.test(value)) return;
+    const exists = Array.from(selectEl.options).some((o) => o.value === value);
+    if (!exists) selectEl.add(new Option(value, value));
+  }
+
   // Bloquea/desbloquea los radios de tipo de servicio. Se bloquean al editar (el tipo no debe
   // cambiarse a medio poblar) y se desbloquean al agregar.
   setServiceTypeLocked(locked) {
@@ -1579,6 +1618,9 @@ class ItineraryBuilder {
     // de vehículo adicional, filas adicionales de a-disp, guía/greeter, totales de desglose).
     // Se hace SIEMPRE al abrir, antes de poblar — luego la restauración pone lo del servicio.
     this.clearServiceOptionState();
+
+    // Llena los <select> de horario con opciones cada 15 min (para agregar y editar).
+    this.populateTimeSelects();
 
     const modal = new bootstrap.Modal(document.getElementById('serviceModal'));
     const form = document.getElementById('serviceForm');
@@ -1650,6 +1692,9 @@ class ItineraryBuilder {
       // Al editar, bloquear el cambio de tipo de servicio: cambiarlo a medio poblar deja estado
       // del tipo anterior pegado y causa errores de cálculo/UI. El tipo solo se elige al agregar.
       this.setServiceTypeLocked(true);
+      // Inyecta las horas guardadas del servicio (por si están fuera de la malla de 15 min)
+      // antes de poblar, para que el <select> pueda mostrarlas.
+      this.populateTimeSelects([service.startTime, service.endTime]);
       this.populateServiceForm(service);
 
       // Update dev payment prices and breakdown after populating form with saved data
@@ -15379,7 +15424,9 @@ class ItineraryBuilder {
     // Format as HH:MM
     const formattedEndTime = `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
 
-    // Set the end time field
+    // Set the end time field. tourEndTime es un <select>: si el fin calculado cae fuera de la
+    // malla de 15 min (duración fraccionaria), inyecta la opción para que se pueda mostrar.
+    this.ensureTimeOption(endTimeField, formattedEndTime);
     endTimeField.value = formattedEndTime;
   }
 
