@@ -1146,11 +1146,11 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
 
                     <!-- Asistentes (participantes / pasajeros) -->
                     <div class="mb-3" id="serviceAttendeesSection">
-                        <label class="form-label">Asistentes</label>
+                        <label class="form-label" id="serviceAttendeesLabel">Asistentes</label>
                         <small class="form-text text-muted d-block mb-2">Nombre completo de cada persona que toma este servicio</small>
                         <div id="serviceAttendeesList"></div>
                         <button type="button" class="btn btn-sm btn-outline-secondary mt-1" id="addAttendeeBtn">
-                            <i class="ti ti-plus me-1"></i>Agregar asistente
+                            <i class="ti ti-plus me-1"></i><span id="addAttendeeBtnText">Agregar asistente</span>
                         </button>
                     </div>
 

@@ -1803,7 +1803,19 @@ class ItineraryBuilder {
     });
   }
 
+  // Etiqueta de la sección de personas según el tipo de servicio: "Pasajeros" para traslados
+  // (transporte y a-disposición), "Clientes" para tours, experiencias y concepto.
+  updateAttendeesLabels(type) {
+    const isPassengers = type === 'transport' || type === 'a-disposicion';
+    const labelEl = document.getElementById('serviceAttendeesLabel');
+    if (labelEl) labelEl.textContent = isPassengers ? 'Pasajeros' : 'Clientes';
+    const btnTextEl = document.getElementById('addAttendeeBtnText');
+    if (btnTextEl) btnTextEl.textContent = isPassengers ? 'Agregar pasajero' : 'Agregar cliente';
+  }
+
   handleServiceTypeChange(type) {
+    // Actualiza la etiqueta de personas (Pasajeros/Clientes) según el tipo de servicio.
+    this.updateAttendeesLabels(type);
     // Clear the previous service's breakdown when the user switches service type.
     // Skip while populating an existing service for edit — it re-renders right after.
     if (!this._populatingForm) {
@@ -8199,7 +8211,7 @@ class ItineraryBuilder {
                                     ${Array.isArray(service.attendees) && service.attendees.filter((n) => String(n).trim()).length > 0 ? `
                                         <div class="text-muted small mt-1">
                                             <div class="mb-1">
-                                                <i class="ti ti-users me-1"></i><span class="text-muted">Asistentes:</span>
+                                                <i class="ti ti-users me-1"></i><span class="text-muted">${(service.type === 'transport' || service.type === 'a-disposicion') ? 'Pasajeros' : 'Clientes'}:</span>
                                             </div>
                                             ${service.attendees.map((n) => String(n).trim()).filter(Boolean).map((name) => `
                                                 <div class="ms-3">
@@ -8552,7 +8564,7 @@ class ItineraryBuilder {
                             ${Array.isArray(service.attendees) && service.attendees.filter((n) => String(n).trim()).length > 0 ? `
                                 <div class="text-muted small mt-1">
                                     <div class="mb-1">
-                                        <i class="ti ti-users me-1"></i><span class="text-muted">Asistentes:</span>
+                                        <i class="ti ti-users me-1"></i><span class="text-muted">${(service.type === 'transport' || service.type === 'a-disposicion') ? 'Pasajeros' : 'Clientes'}:</span>
                                     </div>
                                     ${service.attendees.map((n) => String(n).trim()).filter(Boolean).map((name) => `
                                         <div class="ms-3">

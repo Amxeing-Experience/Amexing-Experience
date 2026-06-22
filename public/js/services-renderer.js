@@ -667,7 +667,7 @@
             if (Array.isArray(service.attendees) && service.attendees.filter((n) => String(n).trim()).length > 0) {
                 html += `<div class="mt-1 text-muted small">
                     <div class="mb-1">
-                        <i class="ti ti-users me-1"></i><span class="text-muted">Asistentes:</span>
+                        <i class="ti ti-users me-1"></i><span class="text-muted">${(service.type === 'transport' || service.type === 'a-disposicion') ? 'Pasajeros' : 'Clientes'}:</span>
                     </div>
                     ${service.attendees.map((n) => String(n).trim()).filter(Boolean).map((name) => `
                         <div class="ms-3"><strong>${name}</strong></div>
@@ -1061,7 +1061,7 @@
             if (Array.isArray(service.attendees) && service.attendees.filter((n) => String(n).trim()).length > 0) {
                 html += `<div class="mt-2 text-muted small">
                     <div class="mb-1">
-                        <i class="ti ti-users me-1"></i><span class="text-muted">Asistentes:</span>
+                        <i class="ti ti-users me-1"></i><span class="text-muted">${(service.type === 'transport' || service.type === 'a-disposicion') ? 'Pasajeros' : 'Clientes'}:</span>
                     </div>
                     ${service.attendees.map((n) => String(n).trim()).filter(Boolean).map((name) => `
                         <div class="ms-3"><strong>${name}</strong></div>
