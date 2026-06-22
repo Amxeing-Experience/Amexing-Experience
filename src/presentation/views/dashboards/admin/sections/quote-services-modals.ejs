@@ -496,7 +496,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <div class="row g-2 mb-1 d-none" id="additionalFlightsHeader">
                                                 <div class="col-md-4"><small class="text-muted fw-semibold">Aerolínea</small></div>
                                                 <div class="col-md-3"><small class="text-muted fw-semibold">N° vuelo</small></div>
-                                                <div class="col-md-3"><small class="text-muted fw-semibold">Hora</small></div>
+                                                <div class="col-md-3"><small class="text-muted fw-semibold">Hora de vuelo</small></div>
                                                 <div class="col-md-2"></div>
                                             </div>
                                             <div id="additionalFlightsList"></div>
@@ -982,6 +982,13 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             <small class="text-muted d-block mb-2" id="extraVehiclesMainHint">
                                 <i class="ti ti-info-circle me-1"></i>Selecciona primero el vehículo principal para agregar adicionales.
                             </small>
+                            <!-- Headers tipo tabla (una sola fila); se muestra solo cuando hay vehículos. -->
+                            <div class="row g-2 mb-1 d-none" id="extraAdditionalVehiclesHeader">
+                                <div class="col-md-4"><small class="text-muted fw-semibold">Segmento</small></div>
+                                <div class="col-md-4"><small class="text-muted fw-semibold">Vehículo</small></div>
+                                <div class="col-md-3"><small class="text-muted fw-semibold">Precio (efectivo)</small></div>
+                                <div class="col-md-1"></div>
+                            </div>
                             <div id="extraAdditionalVehiclesList"></div>
                         </div>
                     </div>

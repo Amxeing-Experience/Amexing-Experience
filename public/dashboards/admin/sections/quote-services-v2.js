@@ -13464,19 +13464,16 @@ class ItineraryBuilder {
     row.dataset.index = String(rowIdx);
     row.innerHTML = `
       <div class="col-md-4">
-        <label class="form-label small text-muted mb-1">Segmento</label>
         <select class="form-select form-select-sm extra-segment-select">
           <option value="">Seleccionar segmento</option>
         </select>
       </div>
       <div class="col-md-4">
-        <label class="form-label small text-muted mb-1">Vehículo</label>
         <select class="form-select form-select-sm extra-vehicle-select" disabled>
           <option value="">Primero selecciona un segmento</option>
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label small text-muted mb-1">Precio (efectivo)</label>
         <div class="input-group input-group-sm">
           <span class="input-group-text">$</span>
           <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-price-input" placeholder="0.00">
@@ -13490,6 +13487,7 @@ class ItineraryBuilder {
       </div>
     `;
     list.appendChild(row);
+    this.updateExtraVehiclesHeaderVisibility();
 
     // Restore a saved custom price into the editable price input (the list price is
     // filled/shown by syncExtraRowPrice once the vehicle options finish loading).
@@ -13541,9 +13539,19 @@ class ItineraryBuilder {
     });
     row.querySelector('.remove-extra-additional-vehicle-btn')?.addEventListener('click', () => {
       row.remove();
+      this.updateExtraVehiclesHeaderVisibility();
       this.serviceModified = true;
       this.updateServicePriceBreakdown();
     });
+  }
+
+  // Muestra la fila de headers (tipo tabla) de vehículos adicionales sólo cuando hay filas.
+  updateExtraVehiclesHeaderVisibility() {
+    const header = document.getElementById('extraAdditionalVehiclesHeader');
+    const list = document.getElementById('extraAdditionalVehiclesList');
+    if (!header || !list) return;
+    const hasRows = list.querySelectorAll('.extra-additional-vehicle-row').length > 0;
+    header.classList.toggle('d-none', !hasRows);
   }
 
   // Load vehicles for a single extra-row's selected segment. Dispatches by service type:
@@ -13865,6 +13873,7 @@ class ItineraryBuilder {
   clearExtraAdditionalVehicles() {
     const list = document.getElementById('extraAdditionalVehiclesList');
     if (list) list.innerHTML = '';
+    this.updateExtraVehiclesHeaderVisibility();
   }
 
   populateExtraAdditionalVehicles(vehicles) {
