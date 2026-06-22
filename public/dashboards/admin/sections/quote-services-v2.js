@@ -13409,13 +13409,25 @@ class ItineraryBuilder {
     `;
     row.querySelector('.remove-additional-flight-btn')?.addEventListener('click', () => {
       row.remove();
+      this.updateAdditionalFlightsHeaderVisibility();
     });
     list.appendChild(row);
+    this.updateAdditionalFlightsHeaderVisibility();
+  }
+
+  // Muestra la fila de headers (tipo tabla) sólo cuando hay al menos un vuelo en la lista.
+  updateAdditionalFlightsHeaderVisibility() {
+    const header = document.getElementById('additionalFlightsHeader');
+    const list = document.getElementById('additionalFlightsList');
+    if (!header || !list) return;
+    const hasRows = list.querySelectorAll('.additional-flight-row').length > 0;
+    header.classList.toggle('d-none', !hasRows);
   }
 
   clearAdditionalFlights() {
     const list = document.getElementById('additionalFlightsList');
     if (list) list.innerHTML = '';
+    this.updateAdditionalFlightsHeaderVisibility();
   }
 
   populateAdditionalFlights(flights) {

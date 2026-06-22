@@ -492,6 +492,13 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                                 </button>
                                             </div>
                                             <small class="form-text text-muted d-block mb-2">Si distintos pasajeros llegan en vuelos distintos, agrégalos aquí.</small>
+                                            <!-- Headers tipo tabla (una sola fila); se muestra solo cuando hay vuelos. -->
+                                            <div class="row g-2 mb-1 d-none" id="additionalFlightsHeader">
+                                                <div class="col-md-4"><small class="text-muted fw-semibold">Aerolínea</small></div>
+                                                <div class="col-md-3"><small class="text-muted fw-semibold">N° vuelo</small></div>
+                                                <div class="col-md-3"><small class="text-muted fw-semibold">Hora</small></div>
+                                                <div class="col-md-2"></div>
+                                            </div>
                                             <div id="additionalFlightsList"></div>
                                         </div>
                                     </div>
