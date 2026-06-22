@@ -1081,8 +1081,6 @@ class ItineraryBuilder {
       const el = document.getElementById(flightId);
       if (!el) return;
       const handler = () => {
-        // eslint-disable-next-line no-console
-        console.log('🟡 flight-time change:', flightId, '=', el.value);
         clearSuggestedEdited(suggestedId);
         this.updateSuggestedDepartureTime();
       };
@@ -15546,16 +15544,6 @@ class ItineraryBuilder {
   updateSuggestedDepartureTime() {
     const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
     let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration;
-    // eslint-disable-next-line no-console
-    console.log('🟠 updateSuggestedDepartureTime:', {
-      tripType,
-      routeDuration,
-      transportRouteDuration: this.transportPriceData?.routeDuration,
-      cachedRouteDuration: this.cachedRouteDuration,
-      flightTime: document.getElementById('flightTime')?.value,
-      directionType: document.querySelector('input[name="directionType"]:checked')?.value,
-      suggestedFieldExists: !!document.getElementById('flightDepartureTimeSuggested'),
-    });
 
     // When editing, use saved route duration if available (same logic as guide pricing)
     if (this.currentServiceId && this.services.has(this.currentServiceId)) {
