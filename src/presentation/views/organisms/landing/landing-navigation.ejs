@@ -34,6 +34,14 @@ const company = typeof companyInfo !== 'undefined' ? companyInfo : {
 const currentLang = (typeof req !== 'undefined' && req.language) || 'es';
 const isEnglish = currentLang === 'en';
 const translate = typeof t !== 'undefined' ? t : (key) => key;
+
+// Submenú de Servicios (dropdown del navbar)
+const serviciosDropdown = [
+    { es: 'Transporte', en: 'Transportation', href: isEnglish ? '/en/services#transportation' : '/servicios#transporte' },
+    { es: 'Tours', en: 'Tours', href: isEnglish ? '/en/services#tours' : '/servicios#tours' },
+    { es: 'Experiencias', en: 'Experiences', href: isEnglish ? '/en/services#experiences' : '/servicios#experiencias' },
+    { es: 'Bodas y Eventos', en: 'Weddings & Events', href: isEnglish ? '/en/services#weddings' : '/servicios#bodas' }
+];
 %>
 
 <nav class="landing-nav <%= isTransparent ? 'landing-nav--transparent' : '' %>" id="landingNav">
@@ -54,17 +62,23 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
         <div class="landing-nav__menu" id="landingNavMenu">
             <ul class="landing-nav__list">
                 <li class="landing-nav__item">
-                    <a href="<%= isEnglish ? '/en/about' : '/nosotros' %>" class="landing-nav__link <%= activePage === 'about' ? 'landing-nav__link--active' : '' %>">
+                    <a href="<%= isEnglish ? '/en/about' : '/nosotros' %>" class="landing-nav__link <%= activePage === 'about' ? 'landing-nav__link--active' : '' %>" data-label="<%= translate('navbar:menu.about') %>">
                         <%= translate('navbar:menu.about') %>
                     </a>
                 </li>
-                <li class="landing-nav__item">
-                    <a href="<%= isEnglish ? '/en/services' : '/servicios' %>" class="landing-nav__link <%= activePage === 'services' ? 'landing-nav__link--active' : '' %>">
+                <li class="landing-nav__item landing-nav__item--has-dropdown">
+                    <a href="<%= isEnglish ? '/en/services' : '/servicios' %>" class="landing-nav__link <%= activePage === 'services' ? 'landing-nav__link--active' : '' %>" data-label="<%= translate('navbar:menu.services') %>">
                         <%= translate('navbar:menu.services') %>
                     </a>
+                    <div class="landing-nav__dropdown" role="menu">
+                        <span class="landing-nav__dropdown-header"><%= translate('navbar:menu.services') %></span>
+                        <% serviciosDropdown.forEach(function(servicio) { %>
+                            <a href="<%= servicio.href %>" class="landing-nav__dropdown-link" role="menuitem"><%= isEnglish ? servicio.en : servicio.es %></a>
+                        <% }); %>
+                    </div>
                 </li>
                 <li class="landing-nav__item">
-                    <a href="<%= isEnglish ? '/en/our-fleet' : '/nuestra-flota' %>" class="landing-nav__link <%= activePage === 'fleet' ? 'landing-nav__link--active' : '' %>">
+                    <a href="<%= isEnglish ? '/en/our-fleet' : '/nuestra-flota' %>" class="landing-nav__link <%= activePage === 'fleet' ? 'landing-nav__link--active' : '' %>" data-label="<%= translate('navbar:menu.fleet') %>">
                         <%= translate('navbar:menu.fleet') %>
                     </a>
                 </li>
@@ -74,7 +88,7 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
                     </a>
                 </li>
                 <li class="landing-nav__item">
-                    <a href="<%= isEnglish ? '/en/contact' : '/contacto' %>" class="landing-nav__link <%= activePage === 'contact' ? 'landing-nav__link--active' : '' %>">
+                    <a href="<%= isEnglish ? '/en/contact' : '/contacto' %>" class="landing-nav__link <%= activePage === 'contact' ? 'landing-nav__link--active' : '' %>" data-label="<%= translate('navbar:menu.contact') %>">
                         <%= translate('navbar:menu.contact') %>
                     </a>
                 </li>
@@ -199,6 +213,8 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
 }
 
 .landing-nav__link {
+    display: inline-block;
+    text-align: center;
     text-decoration: none;
     color: rgba(255, 255, 255, 0.9);
     font-family: var(--font-myriad);
@@ -208,27 +224,88 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
     text-transform: uppercase;
     padding: 0.5rem 0;
     position: relative;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease;
 }
 
+/* Reserva el ancho del texto en negritas para que el hover no recorra los demás */
 .landing-nav__link::after {
+    content: attr(data-label);
+    display: block;
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    font-weight: 700;
+    pointer-events: none;
+}
+
+.landing-nav__link:hover,
+.landing-nav__link--active {
+    font-weight: 700;
+}
+
+/* ---- Dropdown de Servicios ---- */
+.landing-nav__dropdown {
+    position: absolute;
+    top: calc(100% + 1.125rem);
+    left: 50%;
+    transform: translateX(-50%) translateY(-8px);
+    min-width: 190px;
+    background: #2e2e2d;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+    padding: 1rem 1.6rem 1.1rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.28s ease, transform 0.28s ease, visibility 0.28s ease;
+    z-index: 1001;
+}
+
+/* puente invisible para no perder el hover al cruzar el padding del navbar */
+.landing-nav__dropdown::before {
     content: '';
     position: absolute;
-    bottom: -2px;
+    top: -1.125rem;
     left: 0;
-    width: 0;
-    height: 1px;
-    background: #969B81;
-    transition: width 0.3s ease;
+    right: 0;
+    height: 1.125rem;
 }
 
-.landing-nav__link:hover::after,
-.landing-nav__link--active::after {
-    width: 100%;
+.landing-nav__item--has-dropdown:hover .landing-nav__dropdown,
+.landing-nav__item--has-dropdown:focus-within .landing-nav__dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
 }
 
-.landing-nav__link:hover {
-    color: #969B81;
+.landing-nav__dropdown-header {
+    display: block;
+    text-align: center;
+    color: #ffffff;
+    font-family: var(--font-myriad);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    padding-bottom: 0.75rem;
+}
+
+.landing-nav__dropdown-link {
+    display: block;
+    text-align: center;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.88);
+    font-family: var(--font-myriad);
+    font-size: 0.7rem;
+    font-weight: 400;
+    letter-spacing: 1.3px;
+    text-transform: uppercase;
+    padding: 0.6rem 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    transition: color 0.25s ease;
+}
+
+.landing-nav__dropdown-link:hover {
+    font-weight: 700;
+    color: #ffffff;
 }
 
 .landing-nav__item--actions {
@@ -567,7 +644,39 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
         font-size: 1rem;
         padding: 0.5rem 1rem;
     }
-    
+
+    /* En móvil el dropdown se muestra estático bajo Servicios */
+    .landing-nav__item--has-dropdown {
+        text-align: center;
+    }
+
+    .landing-nav__dropdown {
+        position: static;
+        transform: none;
+        opacity: 1;
+        visibility: visible;
+        min-width: 0;
+        background: transparent;
+        box-shadow: none;
+        padding: 0.4rem 0 0;
+        margin-top: 0.4rem;
+    }
+
+    .landing-nav__dropdown::before {
+        display: none;
+    }
+
+    .landing-nav__dropdown-header {
+        display: none;
+    }
+
+    .landing-nav__dropdown-link {
+        border-top: none;
+        padding: 0.45rem 0;
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.7);
+    }
+
     .landing-nav__item--actions,
     .landing-nav__item--user,
     .landing-nav__item--language {

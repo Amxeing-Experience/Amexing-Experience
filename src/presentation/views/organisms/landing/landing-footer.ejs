@@ -137,26 +137,26 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
         <%# Social Media Section %>
         <div class="landing-footer__social-section">
             <div class="landing-footer__social-links">
+                <a href="<%= socialLinks.facebook %>"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="landing-footer__social-link"
+                   aria-label="Facebook">
+                    <img src="/images/facebook.png" alt="Facebook" class="landing-footer__social-icon">
+                </a>
+                <a href="<%= socialLinks.instagram %>"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="landing-footer__social-link"
+                   aria-label="Instagram">
+                    <img src="/images/instagram.png" alt="Instagram" class="landing-footer__social-icon">
+                </a>
                 <a href="<%= socialLinks.tripadvisor %>"
                    target="_blank"
                    rel="noopener noreferrer"
                    class="landing-footer__social-link landing-footer__social-link--tripadvisor"
                    aria-label="TripAdvisor">
                     <i aria-hidden="true"></i>
-                </a>
-                <a href="<%= socialLinks.facebook %>"
-                   target="_blank" 
-                   rel="noopener noreferrer" 
-                   class="landing-footer__social-link"
-                   aria-label="Facebook">
-                    <img src="/images/facebook.png" alt="Facebook" class="landing-footer__social-icon">
-                </a>
-                <a href="<%= socialLinks.instagram %>" 
-                   target="_blank" 
-                   rel="noopener noreferrer" 
-                   class="landing-footer__social-link"
-                   aria-label="Instagram">
-                    <img src="/images/instagram.png" alt="Instagram" class="landing-footer__social-icon">
                 </a>
             </div>
         </div>

@@ -5,38 +5,60 @@ Professional certifications section showcasing tourism and travel industry accre
 Created by Denisse Maldonado
 %>
 
-<section class="certificaciones-section">
+<section class="certificaciones-section" id="certificaciones">
     <div class="certificaciones-section__container">
         <h2 class="certificaciones-section__title">
             Certificaciones
         </h2>
+        <%
+            // Certificaciones: texto y código que aparecen al pasar el mouse.
+            // (Reemplazar los placeholders con la info real de cada certificación.)
+            const certificaciones = [
+                {
+                    img: '/images/gto.png', alt: 'GTO Secretaría de Turismo',
+                    text: 'Instrumento oficial del Estado de Guanajuato que permite consultar y verificar a los prestadores de servicios turísticos registrados, aportando transparencia, formalidad y confianza a la experiencia de viaje.',
+                    label: 'Constancia', codigo: 'RET110353888'
+                },
+                {
+                    img: '/images/iata.png', alt: 'IATA Certification',
+                    text: 'Acreditación internacional que permite gestionar vuelos bajo procesos formales de la industria aérea, aportando mayor eficiencia, control y confianza en la coordinación de itinerarios personalizados y servicios de viaje integrados.',
+                    codigo: '86580756'
+                },
+                {
+                    img: '/images/turismo.png', alt: 'Turismo Secretaría de Turismo',
+                    text: 'Catálogo público oficial de México que permite identificar y verificar a los prestadores de servicios turísticos registrados, fortaleciendo la transparencia, formalidad y confianza en cada experiencia de viaje.',
+                    label: 'Certificado', codigo: '35110032818ae'
+                },
+                {
+                    img: '/images/pcidss.png', alt: 'PCI DSS Compliant',
+                    text: 'Estándar internacional de seguridad para el manejo de datos de pago con tarjeta, diseñado para proteger la información durante el proceso de transacción y fortalecer la confianza en cada operación.',
+                    codigo: null
+                },
+                {
+                    img: '/images/gto_marca.png', alt: 'MARCA GTO Guanajuato',
+                    text: 'Distintivo de origen que representa la calidad, identidad y compromiso empresarial de Guanajuato, fortaleciendo la confianza en servicios locales cuidadosamente alineados con la excelencia del destino.',
+                    codigo: null
+                }
+            ];
+        %>
         <div class="certificaciones-section__grid">
-            <div class="certificaciones-section__logo-column">
-                <div class="certificaciones-section__logo">
-                    <img src="/images/gto.png" alt="GTO Secretaría de Turismo" class="certificaciones-section__image">
+            <% certificaciones.forEach(function(cert) { %>
+                <div class="certificaciones-section__logo-column">
+                    <div class="certificaciones-section__logo">
+                        <img src="<%= cert.img %>" alt="<%= cert.alt %>" class="certificaciones-section__image">
+                    </div>
+                    <div class="certificaciones-section__info">
+                        <span class="certificaciones-section__line"></span>
+                        <p class="certificaciones-section__description">
+                            <%= cert.text %>
+                            <% if (cert.codigo) { %>
+                                <br>
+                                <strong><%= cert.label || 'Código' %>: <%= cert.codigo %></strong>
+                            <% } %>
+                        </p>
+                    </div>
                 </div>
-                <p class="certificaciones-section__description">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.
-                </p>
-            </div>
-            
-            <div class="certificaciones-section__logo-column">
-                <div class="certificaciones-section__logo">
-                    <img src="/images/iata.png" alt="IATA Certification" class="certificaciones-section__image">
-                </div>
-            </div>
-            
-            <div class="certificaciones-section__logo-column">
-                <div class="certificaciones-section__logo">
-                    <img src="/images/turismo.png" alt="Turismo Secretaría de Turismo" class="certificaciones-section__image">
-                </div>
-            </div>
-            
-            <div class="certificaciones-section__logo-column">
-                <div class="certificaciones-section__logo">
-                    <img src="/images/gto_marca.png" alt="MARCA GTO Guanajuato" class="certificaciones-section__image">
-                </div>
-            </div>
+            <% }); %>
         </div>
     </div>
 </section>
@@ -45,18 +67,19 @@ Created by Denisse Maldonado
 .certificaciones-section {
     padding: 0 2rem;
     background: #606060;
+    scroll-margin-top: 90px;
 }
 
 .certificaciones-section__container {
     max-width: 1200px;
-    margin: 2rem auto;
+    margin: 1.5rem auto;
     padding: 3rem;
     background: #606060;
 }
 
 .certificaciones-section__grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-columns: repeat(5, 1fr);
     gap: 2rem;
     align-items: start;
 }
@@ -65,7 +88,7 @@ Created by Denisse Maldonado
     font-family: var(--font-newsreader);
     font-size: 1.8rem;
     font-weight: 300;
-    color: #000000;
+    color: #ffffff;
     letter-spacing: 2px;
     text-transform: uppercase;
     margin: 0 0 3rem 0;
@@ -89,25 +112,59 @@ Created by Denisse Maldonado
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 80px;
+    min-height: 60px;
 }
 
+/* Todos los logos a la MISMA ALTURA (el ancho varía según su proporción) */
 .certificaciones-section__image {
-    max-width: 100%;
-    max-height: 80px;
+    height: clamp(28px, 3.3vw, 44px);
     width: auto;
-    height: auto;
+    max-width: 100%;
     object-fit: contain;
+    transition: transform 0.3s ease;
+}
+
+/* Hover: el logo se agranda */
+.certificaciones-section__logo-column:hover .certificaciones-section__image,
+.certificaciones-section__logo-column:focus-within .certificaciones-section__image {
+    transform: scale(1.4);
+}
+
+/* Info (línea + texto): oculta; se revela al pasar el mouse */
+.certificaciones-section__info {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.3s ease, margin-top 0.3s ease;
+}
+
+.certificaciones-section__logo-column:hover .certificaciones-section__info,
+.certificaciones-section__logo-column:focus-within .certificaciones-section__info {
+    max-height: 420px;
+    opacity: 1;
+    margin-top: 1.4rem;
+}
+
+.certificaciones-section__line {
+    display: block;
+    width: 78%;
+    height: 1px;
+    margin: 0 auto 1.1rem;
+    background: rgba(255, 255, 255, 0.55);
 }
 
 .certificaciones-section__description {
     font-family: var(--font-myriad);
     font-weight: 300;
     font-size: 0.85rem;
-    line-height: 1.4;
-    color: #000000;
+    line-height: 1.55;
+    color: #f2f2ee;
     margin: 0;
-    text-align: left;
+    text-align: center;
+}
+
+.certificaciones-section__description strong {
+    font-weight: 700;
 }
 
 @media (max-width: 768px) {
@@ -147,12 +204,23 @@ Created by Denisse Maldonado
     }
     
     .certificaciones-section__image {
-        max-height: 60px;
+        height: clamp(34px, 9vw, 50px);
     }
-    
+
+    /* En móvil (sin hover) la info se muestra siempre */
+    .certificaciones-section__info {
+        max-height: none;
+        opacity: 1;
+        margin-top: 1.2rem;
+    }
+
+    .certificaciones-section__logo-column:hover .certificaciones-section__image {
+        transform: none;
+    }
+
     .certificaciones-section__description {
-        font-size: 0.8rem;
-        text-align: left;
+        font-size: 0.85rem;
+        text-align: center;
     }
 }
 </style>
