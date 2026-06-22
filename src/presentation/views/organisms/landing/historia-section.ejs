@@ -1,73 +1,88 @@
 <%#
 Historia Section Organism - Landing Page
-Our History section introducing Amexing Experience company background
+Línea del tiempo tipo acordeón: solo un año muestra su texto a la vez.
+Al hacer clic en otro año, el abierto se colapsa y el nuevo se expande.
 
 Created by Denisse Maldonado
+%>
+
+<%
+    // Línea del tiempo. side: 'left' | 'right' | 'center'. open: true = arranca expandido.
+    const historiaItems = [
+        {
+            year: '1996', title: 'Orígenes', subtitle: '', side: 'left', image: true, open: true,
+            text: 'Mi papá, Valente Juárez, tenía un taxi y cada día cuando volvía a casa, compartía historias increíbles de las personas extranjeras que conocía durante su turno. Vio la necesidad de compartir la esencia de nuestro pueblo con ellos, lo que nos inspiró a iniciar un servicio de lujo para traslados al aeropuerto y tours históricos para visitantes. Me uní al proyecto llena de sueños, ya que siempre he sido apasionada por nuestra historia y la idea de compartirla con otros me llenaba de emoción. Me convertí en una guía general certificada. Así es como comenzamos esta hermosa aventura que ha sido increíble porque nos ha permitido conocer a personas de todo el mundo que han compartido sus vidas, historias y experiencias, enriqueciendo nuestras vidas de una manera invaluable. Mi esposo Raúl y mi hermano Lionel se unieron al proyecto como conductores, y a través de nuestra historia, sobrinas, tíos, cuñados se han unido, y ahora nuestros hijos son la segunda generación.'
+        },
+        {
+            year: '2000', title: 'Primeros Años', subtitle: 'Una pasión que toma forma', side: 'right', image: true, open: false,
+            text: 'Impulsado por el entusiasmo de sus primeros clientes, el proyecto creció de manera orgánica.\n\nCon una profunda pasión por la historia y la cultura, la experiencia se fue profesionalizando con la incorporación de Angélica Juárez como guía certificada y el desarrollo de recorridos diseñados para conectar a cada visitante con el alma de la ciudad.\n\nLo que comenzó como un esfuerzo familiar pronto se convirtió en una vocación compartida.'
+        },
+        {
+            year: '2016', title: 'Una Empresa Familiar', subtitle: 'Segunda generación', side: 'right', image: true, open: false,
+            text: 'A lo largo de los años, la empresa ha crecido manteniendo su esencia familiar.\n\nLos hijos se han integrado al proyecto, formando hoy una segunda generación que continúa fortaleciendo la visión de Amexing Experience, con una perspectiva más amplia y una preparación acorde a las nuevas exigencias del mercado.'
+        },
+        {
+            year: '2002', title: 'Expansión y Alianzas', title2: 'Crecimiento', subtitle: 'Un equipo con propósito', side: 'left', image: true, open: false,
+            text: 'Con el paso del tiempo, la empresa consolidó su operación y amplió sus servicios, estableciendo alianzas con hoteles de renombre y agencias de viajes.\n\nEste fue un momento clave en su evolución, ya que se comenzó a atender a un perfil de cliente más exigente, elevando los estándares de servicio y operación.'
+        },
+        {
+            year: '2021', title: 'Evolución', subtitle: 'Hacia una experiencia integral', side: 'left', image: true, open: false,
+            text: 'Con un equipo consolidado de conductores y guías certificados, la empresa dio un paso más en su evolución: convertirse en una compañía capaz de ofrecer una experiencia de viaje más completa.\n\nEl enfoque comenzó a integrar no solo transporte, sino también experiencias personalizadas, adaptadas a cada cliente.'
+        },
+        {
+            year: 'Hoy', title: 'Una Visión en Expansión', subtitle: '', side: 'center', image: true, open: false,
+            text: 'Hoy, como agencia acreditada por IATA, Amexing Experience amplía su capacidad para ofrecer servicios integrales que incluyen vuelos, hospedaje y experiencias diseñadas a la medida.\n\nLa empresa sigue evolucionando, pero conserva la misma esencia que la vio nacer: una profunda conexión con San Miguel de Allende y el deseo genuino de compartirlo con el mundo.'
+        }
+    ];
 %>
 
 <section class="historia-section">
     <div class="historia-section__container">
         <div class="historia-section__content">
             <div class="historia-section__header">
-                <div class="historia-section__icon">
-                    <img src="/images/heart_black.png" alt="Heart Icon" class="historia-section__heart-icon">
-                </div>
-                
                 <div class="historia-section__title-wrapper">
                     <hr class="historia-section__line historia-section__line--left">
-                    <h2 class="historia-section__title">
-                        <span class="large-letter">N</span>uestra <span class="large-letter">H</span>istoria
-                    </h2>
+                    <div class="historia-section__title-banner">
+                        <h2 class="historia-section__title">
+                            <span class="large-letter">N</span>uestra <span class="large-letter">H</span>istoria
+                        </h2>
+                    </div>
                     <hr class="historia-section__line historia-section__line--right">
                 </div>
             </div>
-            
-            <div class="historia-section__timeline">
-                <div class="timeline">
-                    <!-- 1998 Composition -->
-                    <div class="timeline__composition timeline__composition--1998">
-                        <div class="timeline__image-container">
-                            <img src="/images/heart_black.png" alt="1998 Historical Photo 1" class="timeline__image timeline__image--large">
-                            <img src="/images/heart_black.png" alt="1998 Historical Photo 2" class="timeline__image timeline__image--overlay">
-                        </div>
-                        <div class="timeline__year-label">1998</div>
-                        <div class="timeline__text-content">
-                            <p class="timeline__subtitle">LOREM IPSUM DOLOR</p>
-                            <p class="timeline__description">
-                                Sit amet, consectetur adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
-                            </p>
-                        </div>
-                    </div>
 
-                    <!-- 1996 Composition -->
-                    <div class="timeline__composition timeline__composition--1996">
-                        <div class="timeline__image-container">
-                            <img src="/images/heart_black.png" alt="1996 Historical Photo" class="timeline__image timeline__image--portrait">
-                        </div>
-                        <div class="timeline__year-label">1996</div>
-                        <div class="timeline__text-content">
-                            <p class="timeline__subtitle">LOREM IPSUM DOLOR</p>
-                            <p class="timeline__description">
-                                Sit amet, consectetur adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
-                            </p>
+            <div class="historia-timeline" id="historiaTimeline">
+                <img src="/images/heart_green.png" alt="" class="historia-timeline__heart" aria-hidden="true">
+                <% historiaItems.forEach(function(item, idx) { %>
+                    <div class="historia-timeline__item historia-timeline__item--<%= item.side %> <%= item.open ? 'is-open' : '' %>">
+                        <div class="historia-timeline__inner">
+                            <% if (item.side === 'center') { %>
+                                <span class="historia-timeline__connector" aria-hidden="true"></span>
+                            <% } %>
+                            <% if (item.image) { %>
+                                <div class="historia-timeline__image" role="img" aria-label="Foto provisional">
+                                    <i class="fa-solid fa-camera" aria-hidden="true"></i>
+                                </div>
+                            <% } %>
+                            <% if (item.side !== 'center') { %>
+                                <span class="historia-timeline__connector" aria-hidden="true"></span>
+                            <% } %>
+                            <button type="button" class="historia-timeline__head" aria-expanded="<%= item.open ? 'true' : 'false' %>">
+                                <span class="historia-timeline__year"><%= item.year %></span>
+                                <span class="historia-timeline__title"><%= item.title %></span>
+                                <% if (item.title2) { %>
+                                    <span class="historia-timeline__title historia-timeline__title--second"><%= item.title2 %></span>
+                                <% } %>
+                                <% if (item.subtitle) { %>
+                                    <span class="historia-timeline__subtitle"><%= item.subtitle %></span>
+                                <% } %>
+                            </button>
+                            <div class="historia-timeline__body">
+                                <p class="historia-timeline__text"><%= item.text %></p>
+                            </div>
                         </div>
                     </div>
-
-                    <!-- 1985 Composition -->
-                    <div class="timeline__composition timeline__composition--1985">
-                        <div class="timeline__image-container">
-                            <img src="/images/heart_black.png" alt="1985 Group Photo" class="timeline__image timeline__image--wide">
-                            <img src="/images/heart_black.png" alt="1985 Vehicle Photo" class="timeline__image timeline__image--small">
-                        </div>
-                        <div class="timeline__year-label">1985</div>
-                        <div class="timeline__text-content">
-                            <p class="timeline__subtitle">LOREM IPSUM DOLOR</p>
-                            <p class="timeline__description">
-                                Sit amet, consectetur adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                <% }); %>
             </div>
         </div>
     </div>
@@ -81,7 +96,7 @@ Created by Denisse Maldonado
 }
 
 .historia-section__container {
-    max-width: 900px;
+    max-width: 1000px;
     margin: 0 auto;
     padding: 0 3rem;
 }
@@ -90,37 +105,36 @@ Created by Denisse Maldonado
     text-align: center;
 }
 
-.historia-section__icon {
-    margin-bottom: 2rem;
-}
-
-.historia-section__heart-icon {
-    width: 60px;
-    height: auto;
-    opacity: 0.8;
-}
-
+/* ---- Header (banner verde + líneas) ---- */
 .historia-section__title-wrapper {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 2rem;
-    gap: 2rem;
+    margin-bottom: 4rem;
+    gap: 0;
 }
 
 .historia-section__line {
     flex: 1;
     height: 1px;
     border: none;
-    background: #666666;
-    max-width: 200px;
+    background: #9a9b8c;
+    max-width: 220px;
+}
+
+.historia-section__title-banner {
+    background: #969b81;
+    padding: 1rem 3.5rem;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
 }
 
 .historia-section__title {
     font-family: var(--font-newsreader);
-    font-size: 3rem;
+    font-size: 2.5rem;
     font-weight: 300;
-    color: #333333;
+    color: #ffffff;
     letter-spacing: 4px;
     text-transform: uppercase;
     margin: 0;
@@ -128,280 +142,339 @@ Created by Denisse Maldonado
     line-height: 1.2;
 }
 
-.historia-section__title::first-letter {
-    font-size: 4rem;
-    font-weight: 400;
-    line-height: 1;
-}
-
-.large-letter {
-    font-size: 4rem;
+.historia-section__title .large-letter {
+    font-size: 3.6rem;
     font-weight: 400;
     line-height: 1;
     vertical-align: baseline;
 }
 
-.historia-section__header {
-    text-align: center;
-    margin-bottom: 4rem;
-}
-
-.historia-section__timeline {
+/* ---- Línea del tiempo (acordeón) ---- */
+.historia-timeline {
     position: relative;
-    max-width: 1100px;
     margin: 0 auto;
-    padding: 0 2rem;
+    padding-top: 80px; /* espacio para el corazón */
 }
 
-.timeline {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 6rem;
-}
-
-.timeline__composition {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-    align-items: center;
-    min-height: 400px;
-}
-
-.timeline__composition--1998 {
-    grid-template-areas: "images content";
-}
-
-.timeline__composition--1996 {
-    grid-template-areas: "content images";
-}
-
-.timeline__composition--1985 {
-    grid-template-areas: "content images";
-}
-
-.timeline__image-container {
-    position: relative;
-    grid-area: images;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    height: 300px;
-}
-
-.timeline__composition--1998 .timeline__image-container {
-    grid-template-rows: 1fr 1fr;
-}
-
-.timeline__composition--1996 .timeline__image-container {
-    grid-template-columns: 1fr;
-    justify-items: center;
-}
-
-.timeline__composition--1985 .timeline__image-container {
-    grid-template-rows: 2fr 1fr;
-}
-
-.timeline__image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-.timeline__image--large {
-    grid-column: 1 / -1;
-    grid-row: 1;
-}
-
-.timeline__image--overlay {
-    grid-column: 2;
-    grid-row: 2;
-    z-index: 2;
-    transform: translateY(-20px);
-}
-
-.timeline__image--portrait {
-    width: 250px;
-    height: 300px;
-    justify-self: center;
-}
-
-.timeline__image--wide {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    height: 200px;
-}
-
-.timeline__image--small {
-    grid-column: 2;
-    grid-row: 2;
-    height: 120px;
-    transform: translateY(-30px);
-}
-
-.timeline__text-content {
-    grid-area: content;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 2rem;
-}
-
-.timeline__year-label {
-    font-family: var(--font-arpona);
-    font-size: 5rem;
-    font-weight: 300;
-    color: rgba(102, 102, 102, 0.3);
-    line-height: 0.8;
-    margin-bottom: 1rem;
+/* corazón verde en la punta superior de la línea vertical */
+.historia-timeline__heart {
     position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: clamp(54px, 7vw, 78px);
+    height: auto;
+    display: block;
+    z-index: 2;
+}
+
+/* línea vertical central (empieza debajo del corazón) */
+.historia-timeline::before {
+    content: '';
+    position: absolute;
+    top: 52px;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: #c4c5ba;
+    transform: translateX(-50%);
+}
+
+.historia-timeline__item {
+    position: relative;
+    width: 50%;
+    box-sizing: border-box;
+    margin-bottom: 2.5rem;
+    text-align: left;
+}
+
+.historia-timeline__item--left {
+    margin-right: 50%;
+    padding-right: 3rem;
+    text-align: right;
+}
+
+.historia-timeline__item--right {
+    margin-left: 50%;
+    padding-left: 3rem;
+}
+
+.historia-timeline__item--center {
+    width: 100%;
+    margin: 1rem 0 0;
+    padding: 0;
+    text-align: center;
+}
+
+/* línea horizontal conectora (debajo de la imagen) + punto en la línea central */
+.historia-timeline__connector {
+    display: block;
+    position: relative;
+    height: 1px;
+    background: #c4c5ba;
+    margin: 0 0 1.4rem;
+}
+
+.historia-timeline__connector::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #969b81;
+}
+
+/* izquierda: la línea se extiende a la derecha hasta el centro; punto a la derecha */
+.historia-timeline__item--left .historia-timeline__connector {
+    margin-right: -3rem;
+}
+.historia-timeline__item--left .historia-timeline__connector::after {
+    right: -5px;
+}
+
+/* derecha: la línea se extiende a la izquierda hasta el centro; punto a la izquierda */
+.historia-timeline__item--right .historia-timeline__connector {
+    margin-left: -3rem;
+}
+.historia-timeline__item--right .historia-timeline__connector::after {
+    left: -5px;
+}
+
+/* centro: línea horizontal del ancho de la imagen (un poco más), centrada */
+.historia-timeline__item--center .historia-timeline__connector {
+    width: min(480px, 90%);
+    background: #c4c5ba;
+    margin: 0 auto 1.6rem;
+}
+.historia-timeline__item--center .historia-timeline__connector::after {
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* el item HOY tapa la línea vertical para que NO atraviese su texto */
+.historia-timeline__item--center {
+    background: #eff0ec;
     z-index: 1;
 }
 
-.timeline__composition--1998 .timeline__year-label {
-    top: -1rem;
-    left: -2rem;
+/* imagen (placeholder provisional) */
+.historia-timeline__image {
+    background: linear-gradient(135deg, #d4d4cd 0%, #c2c2ba 100%);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    height: 170px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(0, 0, 0, 0.18);
+    font-size: 1.6rem;
+    margin-bottom: 0;
+    cursor: pointer;
 }
 
-.timeline__composition--1996 .timeline__year-label {
-    top: -1rem;
-    right: -2rem;
+/* el item cerrado invita al clic */
+.historia-timeline__item:not(.is-open) .historia-timeline__inner {
+    cursor: pointer;
 }
 
-.timeline__composition--1985 .timeline__year-label {
-    top: -1rem;
-    right: -2rem;
+.historia-timeline__item--center .historia-timeline__image {
+    max-width: 420px;
+    margin: 0 auto 1.4rem;
+    height: 200px;
 }
 
-.timeline__subtitle {
-    font-family: var(--font-myriad);
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #666666;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 1rem;
-}
-
-.timeline__description {
-    font-family: var(--font-myriad);
-    font-size: 1rem;
-    line-height: 1.7;
-    color: #666666;
+/* encabezado clicable (año + título + subtítulo) */
+.historia-timeline__head {
+    display: block;
+    width: 100%;
     margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: inherit;
 }
 
+.historia-timeline__year {
+    display: block;
+    font-family: var(--font-newsreader);
+    font-size: clamp(2.4rem, 4vw, 3.4rem);
+    font-weight: 300;
+    color: #a6a69a;
+    line-height: 1;
+}
+
+.historia-timeline__title {
+    display: block;
+    font-family: var(--font-newsreader);
+    font-size: clamp(1rem, 1.5vw, 1.3rem);
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #7f7f72;
+    margin-top: 0.3rem;
+}
+
+.historia-timeline__title--second {
+    margin-top: 0.45rem;
+}
+
+.historia-timeline__subtitle {
+    display: block;
+    font-family: var(--font-newsreader);
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
+    color: #9a9a8e;
+    margin-top: 0.2rem;
+}
+
+/* cuerpo colapsable */
+.historia-timeline__body {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.45s ease, opacity 0.35s ease, margin-top 0.35s ease;
+}
+
+.historia-timeline__item.is-open .historia-timeline__body {
+    max-height: 1200px;
+    opacity: 1;
+    margin-top: 1rem;
+}
+
+.historia-timeline__text {
+    font-family: var(--font-newsreader);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: #5a5a52;
+    margin: 0;
+    text-align: inherit; /* izquierda → derecha; derecha → izquierda */
+    white-space: pre-line; /* respeta los saltos de párrafo */
+}
+
+.historia-timeline__item--center .historia-timeline__text {
+    text-align: center;
+    max-width: 640px;
+    margin: 0 auto;
+}
+
+/* item activo: año + título(s) en negritas */
+.historia-timeline__item.is-open .historia-timeline__year {
+    color: #8a8a72;
+    font-weight: 600;
+}
+
+.historia-timeline__item.is-open .historia-timeline__title {
+    font-weight: 700;
+}
+
+/* ---- Responsive ---- */
 @media (max-width: 768px) {
     .historia-section {
         padding: 4rem 0;
     }
-    
+
     .historia-section__container {
         padding: 0 1.5rem;
     }
-    
-    .historia-section__icon {
-        margin-bottom: 1.5rem;
-    }
-    
-    .historia-section__heart-icon {
-        width: 45px;
-    }
-    
+
     .historia-section__title-wrapper {
-        gap: 1rem;
         margin-bottom: 3rem;
     }
-    
-    .historia-section__line {
-        max-width: 100px;
-    }
-    
-    .historia-section__title {
-        font-size: 2.2rem;
-        letter-spacing: 2px;
-    }
-    
-    .historia-section__title::first-letter {
-        font-size: 3rem;
-    }
-    
-    .historia-section__timeline {
-        padding: 0 1rem;
-    }
-    
-    .timeline {
-        gap: 4rem;
-    }
-    
-    .timeline__composition {
-        grid-template-columns: 1fr;
-        grid-template-areas: 
-            "content"
-            "images";
-        gap: 2rem;
-        min-height: auto;
-    }
-    
-    .timeline__composition--1998,
-    .timeline__composition--1996,
-    .timeline__composition--1985 {
-        grid-template-areas: 
-            "content"
-            "images";
-    }
-    
-    .timeline__image-container {
-        height: auto;
-        grid-template-columns: 1fr;
-        grid-template-rows: auto;
-        gap: 1rem;
-    }
-    
-    .timeline__image--large,
-    .timeline__image--overlay,
-    .timeline__image--wide,
-    .timeline__image--small {
-        grid-column: 1;
-        grid-row: auto;
-        transform: none;
-        height: 200px;
-    }
-    
-    .timeline__image--portrait {
-        width: 100%;
-        height: 250px;
-        justify-self: stretch;
-    }
-    
-    .timeline__text-content {
-        padding: 1rem 0;
-        text-align: center;
-    }
-    
-    .timeline__year-label {
-        font-size: 3.5rem;
-        position: static;
-        text-align: center;
-        margin-bottom: 1rem;
-        color: rgba(102, 102, 102, 0.5);
-    }
-}
 
-@media (max-width: 480px) {
+    .historia-section__line {
+        max-width: 60px;
+    }
+
     .historia-section__title {
         font-size: 1.8rem;
+        letter-spacing: 2px;
     }
-    
-    .historia-section__title::first-letter {
-        font-size: 2.4rem;
+
+    .historia-section__title .large-letter {
+        font-size: 2.6rem;
     }
-    
-    .historia-section__line {
-        max-width: 50px;
+
+    /* timeline a una sola columna en móvil */
+    .historia-timeline::before {
+        left: 8px;
+    }
+
+    .historia-timeline__heart {
+        left: 8px;
+    }
+
+    .historia-timeline__item,
+    .historia-timeline__item--left,
+    .historia-timeline__item--right,
+    .historia-timeline__item--center {
+        width: 100%;
+        margin: 0 0 2rem;
+        padding-left: 2.2rem;
+        padding-right: 0;
+        text-align: left;
+    }
+
+    .historia-timeline__item--left .historia-timeline__dot,
+    .historia-timeline__item--right .historia-timeline__dot,
+    .historia-timeline__item--center .historia-timeline__dot {
+        left: 3px;
+        right: auto;
+        top: 1.4rem;
+        transform: none;
+    }
+
+    .historia-timeline__item--center .historia-timeline__image {
+        max-width: 100%;
+    }
+
+    .historia-timeline__text,
+    .historia-timeline__item--center .historia-timeline__text {
+        text-align: left;
+    }
+
+    /* conector en móvil: solo el punto, sobre la línea de la izquierda */
+    .historia-timeline__item--left .historia-timeline__connector,
+    .historia-timeline__item--right .historia-timeline__connector,
+    .historia-timeline__item--center .historia-timeline__connector {
+        width: auto;
+        background: transparent;
+        margin: 0.2rem 0 1rem;
+    }
+
+    .historia-timeline__item--left .historia-timeline__connector::after,
+    .historia-timeline__item--right .historia-timeline__connector::after,
+    .historia-timeline__item--center .historia-timeline__connector::after {
+        left: -1.75rem;
+        right: auto;
+        transform: translateY(-50%);
     }
 }
 </style>
+
+<script>
+(function () {
+    var timeline = document.getElementById('historiaTimeline');
+    if (!timeline) return;
+    var items = timeline.querySelectorAll('.historia-timeline__item');
+
+    function openItem(item) {
+        if (item.classList.contains('is-open')) return; // ya abierto: se queda abierto
+        timeline.querySelectorAll('.historia-timeline__item.is-open').forEach(function (open) {
+            open.classList.remove('is-open');
+            var h = open.querySelector('.historia-timeline__head');
+            if (h) h.setAttribute('aria-expanded', 'false');
+        });
+        item.classList.add('is-open');
+        var head = item.querySelector('.historia-timeline__head');
+        if (head) head.setAttribute('aria-expanded', 'true');
+    }
+
+    items.forEach(function (item) {
+        // El clic funciona en toda la tarjeta (imagen, año, título, subtítulo).
+        var inner = item.querySelector('.historia-timeline__inner');
+        (inner || item).addEventListener('click', function () { openItem(item); });
+    });
+})();
+</script>
