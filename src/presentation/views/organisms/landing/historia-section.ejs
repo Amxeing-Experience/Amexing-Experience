@@ -10,27 +10,27 @@ Created by Denisse Maldonado
     // Línea del tiempo. side: 'left' | 'right' | 'center'. open: true = arranca expandido.
     const historiaItems = [
         {
-            year: '1996', title: 'Orígenes', subtitle: '', side: 'left', image: true, open: true,
+            year: '1996', order: 1, title: 'Orígenes', subtitle: '', side: 'left', image: true, open: true,
             text: 'Mi papá, Valente Juárez, tenía un taxi y cada día cuando volvía a casa, compartía historias increíbles de las personas extranjeras que conocía durante su turno. Vio la necesidad de compartir la esencia de nuestro pueblo con ellos, lo que nos inspiró a iniciar un servicio de lujo para traslados al aeropuerto y tours históricos para visitantes. Me uní al proyecto llena de sueños, ya que siempre he sido apasionada por nuestra historia y la idea de compartirla con otros me llenaba de emoción. Me convertí en una guía general certificada. Así es como comenzamos esta hermosa aventura que ha sido increíble porque nos ha permitido conocer a personas de todo el mundo que han compartido sus vidas, historias y experiencias, enriqueciendo nuestras vidas de una manera invaluable. Mi esposo Raúl y mi hermano Lionel se unieron al proyecto como conductores, y a través de nuestra historia, sobrinas, tíos, cuñados se han unido, y ahora nuestros hijos son la segunda generación.'
         },
         {
-            year: '2000', title: 'Primeros Años', subtitle: 'Una pasión que toma forma', side: 'right', image: true, open: false,
+            year: '2000', order: 2, title: 'Primeros Años', subtitle: 'Una pasión que toma forma', side: 'right', image: true, open: false,
             text: 'Impulsado por el entusiasmo de sus primeros clientes, el proyecto creció de manera orgánica.\n\nCon una profunda pasión por la historia y la cultura, la experiencia se fue profesionalizando con la incorporación de Angélica Juárez como guía certificada y el desarrollo de recorridos diseñados para conectar a cada visitante con el alma de la ciudad.\n\nLo que comenzó como un esfuerzo familiar pronto se convirtió en una vocación compartida.'
         },
         {
-            year: '2016', title: 'Una Empresa Familiar', subtitle: 'Segunda generación', side: 'right', image: true, open: false,
+            year: '2016', order: 4, title: 'Una Empresa Familiar', subtitle: 'Segunda generación', side: 'right', image: true, open: false,
             text: 'A lo largo de los años, la empresa ha crecido manteniendo su esencia familiar.\n\nLos hijos se han integrado al proyecto, formando hoy una segunda generación que continúa fortaleciendo la visión de Amexing Experience, con una perspectiva más amplia y una preparación acorde a las nuevas exigencias del mercado.'
         },
         {
-            year: '2002', title: 'Expansión y Alianzas', title2: 'Crecimiento', subtitle: 'Un equipo con propósito', side: 'left', image: true, open: false,
+            year: '2002', order: 3, title: 'Expansión y Alianzas', title2: 'Crecimiento', subtitle: 'Un equipo con propósito', side: 'left', image: true, open: false,
             text: 'Con el paso del tiempo, la empresa consolidó su operación y amplió sus servicios, estableciendo alianzas con hoteles de renombre y agencias de viajes.\n\nEste fue un momento clave en su evolución, ya que se comenzó a atender a un perfil de cliente más exigente, elevando los estándares de servicio y operación.'
         },
         {
-            year: '2021', title: 'Evolución', subtitle: 'Hacia una experiencia integral', side: 'left', image: true, open: false,
+            year: '2021', order: 5, title: 'Evolución', subtitle: 'Hacia una experiencia integral', side: 'left', image: true, open: false,
             text: 'Con un equipo consolidado de conductores y guías certificados, la empresa dio un paso más en su evolución: convertirse en una compañía capaz de ofrecer una experiencia de viaje más completa.\n\nEl enfoque comenzó a integrar no solo transporte, sino también experiencias personalizadas, adaptadas a cada cliente.'
         },
         {
-            year: 'Hoy', title: 'Una Visión en Expansión', subtitle: '', side: 'center', image: true, open: false,
+            year: 'Hoy', order: 6, title: 'Una Visión en Expansión', subtitle: '', side: 'center', image: true, open: false,
             text: 'Hoy, como agencia acreditada por IATA, Amexing Experience amplía su capacidad para ofrecer servicios integrales que incluyen vuelos, hospedaje y experiencias diseñadas a la medida.\n\nLa empresa sigue evolucionando, pero conserva la misma esencia que la vio nacer: una profunda conexión con San Miguel de Allende y el deseo genuino de compartirlo con el mundo.'
         }
     ];
@@ -53,35 +53,24 @@ Created by Denisse Maldonado
 
             <div class="historia-timeline" id="historiaTimeline">
                 <img src="/images/heart_green.png" alt="" class="historia-timeline__heart" aria-hidden="true">
-                <% historiaItems.forEach(function(item, idx) { %>
-                    <div class="historia-timeline__item historia-timeline__item--<%= item.side %> <%= item.open ? 'is-open' : '' %>">
-                        <div class="historia-timeline__inner">
-                            <% if (item.side === 'center') { %>
-                                <span class="historia-timeline__connector" aria-hidden="true"></span>
-                            <% } %>
-                            <% if (item.image) { %>
-                                <div class="historia-timeline__image" role="img" aria-label="Foto provisional">
-                                    <i class="fa-solid fa-camera" aria-hidden="true"></i>
-                                </div>
-                            <% } %>
-                            <% if (item.side !== 'center') { %>
-                                <span class="historia-timeline__connector" aria-hidden="true"></span>
-                            <% } %>
-                            <button type="button" class="historia-timeline__head" aria-expanded="<%= item.open ? 'true' : 'false' %>">
-                                <span class="historia-timeline__year"><%= item.year %></span>
-                                <span class="historia-timeline__title"><%= item.title %></span>
-                                <% if (item.title2) { %>
-                                    <span class="historia-timeline__title historia-timeline__title--second"><%= item.title2 %></span>
-                                <% } %>
-                                <% if (item.subtitle) { %>
-                                    <span class="historia-timeline__subtitle"><%= item.subtitle %></span>
-                                <% } %>
-                            </button>
-                            <div class="historia-timeline__body">
-                                <p class="historia-timeline__text"><%= item.text %></p>
-                            </div>
-                        </div>
+
+                <%# Dos columnas independientes (masonry): cada lado fluye por separado %>
+                <div class="historia-timeline__cols">
+                    <div class="historia-timeline__col historia-timeline__col--left">
+                        <% historiaItems.filter(function(i){ return i.side === 'left'; }).forEach(function(item) { %>
+                            <%- include('_historia-timeline-item', { item: item }) %>
+                        <% }); %>
                     </div>
+                    <div class="historia-timeline__col historia-timeline__col--right">
+                        <% historiaItems.filter(function(i){ return i.side === 'right'; }).forEach(function(item) { %>
+                            <%- include('_historia-timeline-item', { item: item }) %>
+                        <% }); %>
+                    </div>
+                </div>
+
+                <%# Item central (HOY) a todo el ancho, debajo de las columnas %>
+                <% historiaItems.filter(function(i){ return i.side === 'center'; }).forEach(function(item) { %>
+                    <%- include('_historia-timeline-item', { item: item }) %>
                 <% }); %>
             </div>
         </div>
@@ -180,22 +169,35 @@ Created by Denisse Maldonado
     transform: translateX(-50%);
 }
 
+/* dos columnas independientes (masonry) */
+.historia-timeline__cols {
+    display: flex;
+    align-items: flex-start;
+}
+
+.historia-timeline__col {
+    width: 50%;
+    box-sizing: border-box;
+}
+
+/* la columna derecha va escalonada hacia abajo (zigzag, como el diseño) */
+.historia-timeline__col--right {
+    margin-top: 190px;
+}
+
 .historia-timeline__item {
     position: relative;
-    width: 50%;
     box-sizing: border-box;
     margin-bottom: 2.5rem;
     text-align: left;
 }
 
 .historia-timeline__item--left {
-    margin-right: 50%;
     padding-right: 3rem;
     text-align: right;
 }
 
 .historia-timeline__item--right {
-    margin-left: 50%;
     padding-left: 3rem;
 }
 
@@ -396,7 +398,21 @@ Created by Denisse Maldonado
         font-size: 2.6rem;
     }
 
-    /* timeline a una sola columna en móvil */
+    /* timeline a una sola columna en móvil (aplana columnas y ordena cronológico) */
+    .historia-timeline {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .historia-timeline__cols,
+    .historia-timeline__col {
+        display: contents;
+    }
+
+    .historia-timeline__item {
+        order: var(--order, 0);
+    }
+
     .historia-timeline::before {
         left: 8px;
     }
