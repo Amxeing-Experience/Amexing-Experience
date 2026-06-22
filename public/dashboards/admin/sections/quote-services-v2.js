@@ -12631,6 +12631,9 @@ class ItineraryBuilder {
   clearServiceOptionState() {
     // Servicio nuevo por default: el precio se autollena con el de catálogo (no editado a mano).
     this._mainPriceManuallyEdited = false;
+    // Limpia la duración de ruta cacheada para que no se herede de otro servicio (afecta guía/
+    // greeter/hora de salida sugerida). Se repuebla con el lookup de la ruta de este servicio.
+    this.cachedRouteDuration = null;
 
     // Vehículo adicional (transporte / vehicle tour)
     const addCheckbox = document.getElementById('additionalVehicleCheckbox');
@@ -15563,18 +15566,8 @@ class ItineraryBuilder {
       isEditing: !!this.currentServiceId,
     });
 
-    // eslint-disable-next-line no-console
-    console.log('🟠 routeDuration debug:', {
-      currentServiceId: this.currentServiceId,
-      savedRouteDuration: (this.currentServiceId && this.services.has(this.currentServiceId))
-        ? this.services.get(this.currentServiceId).routeDuration : 'n/a (no edit)',
-      transportRouteDuration: this.transportPriceData?.routeDuration,
-      cachedRouteDuration: this.cachedRouteDuration,
-      resolved: routeDuration,
-      tripType,
-    });
     if (!routeDuration) {
-      console.warn('⚠️ No route duration available');
+      qsDevLog('⚠️ No route duration available');
       return;
     }
 
@@ -17816,6 +17809,11 @@ class ItineraryBuilder {
    * @example
    */
   async handleTransportRateSelection(rateId, fallbackOrigin = null, fallbackDestination = null) {
+    // Resetea la duración de ruta cacheada: pertenece a la ruta del lookup ANTERIOR y no debe
+    // filtrarse a otra ruta/servicio (causaba que guía/greeter/hora sugerida usaran la duración
+    // de la ruta previa). Se repuebla abajo con la routeDuration de ESTA ruta, o queda null si
+    // la ruta no tiene duración configurada.
+    this.cachedRouteDuration = null;
     if (!rateId) {
       this.clearVehicleDropdown();
       this.transportPriceData = null;
@@ -17971,10 +17969,6 @@ class ItineraryBuilder {
       this.transportPriceData = result.data;
       // Cache routeDuration separately so it persists even if transportPriceData is cleared
       this.cachedRouteDuration = result.data.routeDuration || null;
-      // eslint-disable-next-line no-console
-      console.log('🔵 prices-by-route lookup:', {
-        apiOrigin, apiDestination, rateId, returnedRouteDuration: result.data.routeDuration,
-      });
 
       qsDevLog('🚗 Route duration received:', {
         origin: apiOrigin,
