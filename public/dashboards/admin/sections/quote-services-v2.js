@@ -13415,7 +13415,7 @@ class ItineraryBuilder {
         <input type="text" class="form-control form-control-sm additional-flight-number" placeholder="N° vuelo" value="${esc(flight.flightNumber)}">
       </div>
       <div class="col-md-3">
-        <input type="text" class="form-control form-control-sm time-input additional-flight-time" placeholder="__:__" maxlength="5" value="${esc(flight.flightTime)}">
+        <input type="text" class="form-control form-control-sm time-input additional-flight-time" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off" value="${esc(flight.flightTime)}">
       </div>
       <div class="col-md-2 text-end">
         <button type="button" class="btn btn-sm btn-outline-danger remove-additional-flight-btn" title="Quitar">

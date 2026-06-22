@@ -468,7 +468,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label for="flightTime" class="form-label">Hora Vuelo</label>
-                                            <input type="text" class="form-control time-input" id="flightTime" placeholder="__:__" maxlength="5">
+                                            <input type="text" class="form-control time-input" id="flightTime" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
                                         </div>
                                         <div class="col-md-6 mb-3" id="flightDepartureTimeSuggestedContainer">
                                             <label for="flightDepartureTimeSuggested" class="form-label" id="flightDepartureTimeSuggestedLabel">Hora de salida sugerida</label>
@@ -569,7 +569,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         </div>
                                         <div class="col-md-6 mb-3">
                                             <label for="roundTripTimeIda" class="form-label" id="roundTripTimeIdaLabel">Hora Vuelo</label>
-                                            <input type="text" class="form-control time-input" id="roundTripTimeIda" placeholder="__:__" maxlength="5">
+                                            <input type="text" class="form-control time-input" id="roundTripTimeIda" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
                                         </div>
                                     </div>
 
@@ -650,7 +650,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         </div>
                                         <div class="col-md-6 mb-3">
                                             <label for="roundTripTimeVuelta" class="form-label" id="roundTripTimeVueltaLabel">Hora Vuelo</label>
-                                            <input type="text" class="form-control time-input" id="roundTripTimeVuelta" placeholder="__:__" maxlength="5">
+                                            <input type="text" class="form-control time-input" id="roundTripTimeVuelta" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
                                         </div>
                                     </div>
                                     <div class="row" id="roundTripDepartureTimeSuggestedVueltaRow">
