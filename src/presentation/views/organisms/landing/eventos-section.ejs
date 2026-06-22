@@ -39,7 +39,7 @@ Created by Denisse Maldonado
                 <!-- Experiencias VIP -->
                 <div class="eventos-section__service">
                     <div class="eventos-section__image-container">
-                        <img src="/images/vip.png" alt="Experiencias VIP" class="eventos-section__image">
+                        <img src="/images/incentivo.png" alt="Experiencias VIP" class="eventos-section__image">
                     </div>
                     <div class="eventos-section__overlay">
                         <h3 class="eventos-section__service-title">
@@ -51,7 +51,7 @@ Created by Denisse Maldonado
                 <!-- Viajes de Incentivo -->
                 <div class="eventos-section__service">
                     <div class="eventos-section__image-container">
-                        <img src="/images/incentivo.png" alt="Viajes de Incentivo" class="eventos-section__image">
+                        <img src="/images/vip.png" alt="Viajes de Incentivo" class="eventos-section__image">
                     </div>
                     <div class="eventos-section__overlay">
                         <h3 class="eventos-section__service-title">
@@ -70,17 +70,18 @@ Created by Denisse Maldonado
                     
                     <div class="eventos-section__description">
                         <p class="eventos-section__paragraph">
-                            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud.
+                            Creamos soluciones integrales para empresas, agencias, wedding planners y organizadores de eventos que buscan un aliado local experto en San Miguel de Allende.<br><br>Nos especializamos en la operación de grupos privados, viajes de incentivo, reuniones ejecutivas, bodas destino y experiencias VIP, diseñando cada servicio de acuerdo con las necesidades del programa. Coordinamos traslados desde aeropuertos, ciudades, hoteles, venues, restaurantes, viñedos y locaciones privadas, asegurando una logística precisa, discreta y perfectamente integrada a la experiencia.
                         </p>
-                        
+
                         <p class="eventos-section__paragraph">
-                            Sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
+                            Con conocimiento local, tarifas especiales para grupos y una red confiable de proveedores, también podemos complementar la operación con vuelos, hospedaje, experiencias privadas y hospitalidad personalizada, ofreciendo un servicio integral para eventos que requieren excelencia, cuidado y atención al detalle.
                         </p>
                     </div>
-                    
-                    <a href="/contacto" class="eventos-section__book-btn">BOOK NOW</a>
                 </div>
             </div>
+
+            <!-- Botón en su propia fila: las tarjetas igualan solo el texto -->
+            <a href="/contacto" class="eventos-section__book-btn">BOOK NOW</a>
         </div>
         <hr>
         <hr>
@@ -121,8 +122,27 @@ Created by Denisse Maldonado
     margin: 2rem 0;
     display: grid;
     grid-template-columns: 1fr 350px;
-    gap: 3rem;
-    align-items: start;
+    column-gap: 3rem;
+    row-gap: 2rem;
+    align-items: stretch;
+}
+
+/* fila 1: tarjetas + texto (igualan altura); fila 2: botón */
+.eventos-section__services {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.eventos-section__sidebar {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.eventos-section__content > .eventos-section__book-btn {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: center;
+    align-self: start;
 }
 
 .eventos-section hr {
@@ -136,11 +156,12 @@ Created by Denisse Maldonado
 .eventos-section__services {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 1fr;
     gap: 1rem;
 }
 
 .eventos-section__service {
-    height: 450px;
+    min-height: 450px;
     /* border: 2px solid #000000; */
     background: #ffffff;
     transition: all 0.3s ease;
@@ -176,7 +197,7 @@ Created by Denisse Maldonado
 }
 
 .eventos-section__service-title {
-    font-family: var(--font-arpona);
+    font-family: var(--font-newsreader);
     font-size: 1rem;
     font-weight: 300;
     color: #ffffff;
@@ -199,10 +220,11 @@ Created by Denisse Maldonado
 
 .eventos-section__sidebar-content {
     /* padding: 3rem 2.5rem; */
+    text-align: center;
 }
 
 .eventos-section__title {
-    font-family: var(--font-arpona);
+    font-family: var(--font-newsreader);
     font-size: 2.5rem;
     font-weight: 300;
     color: #2c3e50;
@@ -213,17 +235,17 @@ Created by Denisse Maldonado
 }
 
 .eventos-section__description {
-    margin-bottom: 2.5rem;
+    margin-bottom: 0;
 }
 
 .eventos-section__paragraph {
     font-family: 'Montserrat', sans-serif;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 400;
-    line-height: 1.7;
+    line-height: 1.65;
     color: #5a6c7d;
     margin-bottom: 1.5rem;
-    text-align: justify;
+    text-align: center;
 }
 
 .eventos-section__paragraph:last-child {
@@ -273,7 +295,15 @@ Created by Denisse Maldonado
         grid-template-columns: 1fr;
         gap: 3rem;
     }
-    
+
+    /* una sola columna: cada elemento vuelve a fluir normal */
+    .eventos-section__services,
+    .eventos-section__sidebar,
+    .eventos-section__content > .eventos-section__book-btn {
+        grid-column: 1;
+        grid-row: auto;
+    }
+
     .eventos-section__sidebar {
         order: -1;
         margin-bottom: 2rem;
