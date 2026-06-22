@@ -106,9 +106,10 @@ class AdminController extends RoleBasedController {
       const UserManagementService = require('../../services/UserManagementService');
       const userService = new UserManagementService();
 
-      // Agencies live in AmexingUser; direct clients live in the Client class.
-      // Try the user service first, then fall back to a Client record.
+      // Agencies and people-type clients (role 'end_client') live in AmexingUser; legacy
+      // direct clients live in the Client class. Try the user service first, then fall back.
       let client = await userService.getUserById(currentUser, clientId).catch(() => null);
+      const isAmexingUser = !!client; // getUserById hit ⇒ this is an AmexingUser
 
       if (!client) {
         const Parse = require('parse/node');
@@ -165,6 +166,8 @@ class AdminController extends RoleBasedController {
         address: client.address || client.get?.('address') || {},
         contextualData: client.contextualData || client.get?.('contextualData') || {},
         clientCategory: client.clientCategory || client.get?.('clientCategory') || null,
+        isAmexingUser, // people-type clients/agents are AmexingUser → profile uses /api/agents/:id
+        roleName: client.role || client.roleName || client.get?.('role') || null, // agencies = department_manager
         birthDate: client.birthDate || client.get?.('birthDate') || null,
         anniversary: client.anniversary || client.get?.('anniversary') || null,
         createdAt: client.createdAt || client.get?.('createdAt'),

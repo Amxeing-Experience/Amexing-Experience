@@ -184,6 +184,18 @@ class AmexingUser extends BaseModel {
       user.set('profilePhotoS3Key', userData.profilePhotoS3Key);
     }
 
+    // People-type client profile fields (direct_client / wedding_planner / concierge /
+    // home_owner). Set only when provided; agencies and agents leave these unset.
+    if (userData.clientCategory !== undefined) user.set('clientCategory', userData.clientCategory);
+    const PERSON_PROFILE_FIELDS = [
+      'contactFirstName', 'contactLastName', 'emergencyContactName', 'emergencyContactPhone',
+      'companyType', 'taxId', 'website', 'preferredLanguage', 'accessibilityRequirements',
+      'allergies', 'dietaryRestrictions', 'address', 'birthDate', 'anniversary', 'loyaltyPrograms',
+    ];
+    PERSON_PROFILE_FIELDS.forEach((f) => {
+      if (userData[f] !== undefined) user.set(f, userData[f]);
+    });
+
     // Audit fields - Handle both User objects and string IDs
     // In test environment, use strings; in production, use Pointers
     const isTestEnvironment = process.env.NODE_ENV === 'test';
@@ -887,6 +899,23 @@ class AmexingUser extends BaseModel {
    */
   setDisplayRole(displayRole) {
     this.set('displayRole', displayRole);
+  }
+
+  /**
+   * Get the people-type client category (direct_client | wedding_planner | concierge |
+   * home_owner), or null for agencies/agents/staff.
+   * @returns {string|null}
+   */
+  getClientCategory() {
+    return this.get('clientCategory') || null;
+  }
+
+  /**
+   * Set the people-type client category.
+   * @param {string} category - One of the people-type client categories.
+   */
+  setClientCategory(category) {
+    this.set('clientCategory', category);
   }
 
   /**

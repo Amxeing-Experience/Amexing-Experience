@@ -56,9 +56,32 @@ router.get('/set-language/:lang', (req, res) => {
   }
 });
 
+/**
+ * Relaja ÚNICAMENTE el directivo `sandbox` del CSP en el landing público, para
+ * que el visor nativo de PDF (sección Publicaciones) pueda mostrarse dentro de
+ * un iframe. Un documento con CSP `sandbox` propaga el sandbox a sus iframes y
+ * Chrome bloquea ahí el visor de PDF. El `sandbox` se mantiene intacto en el
+ * resto del sitio (admin/dashboard); aquí solo se quita ese directivo.
+ * @param req
+ * @param res
+ * @param next
+ * @example
+ */
+const allowLandingPdfFrame = (req, res, next) => {
+  const HEADER = 'Content-Security-Policy';
+  const csp = res.getHeader(HEADER);
+  if (typeof csp === 'string' && /sandbox/i.test(csp)) {
+    res.setHeader(
+      HEADER,
+      csp.replace(/;?\s*sandbox[^;]*/i, '').replace(/^;\s*/, '').trim()
+    );
+  }
+  next();
+};
+
 // Home page - Amexing Experience Landing Page
-router.get('/', homeController.index.bind(homeController));
-router.get('/en', async (req, res, next) => {
+router.get('/', allowLandingPdfFrame, homeController.index.bind(homeController));
+router.get('/en', allowLandingPdfFrame, async (req, res, next) => {
   // Change i18next language for this request
   if (req.i18n) {
     await req.i18n.changeLanguage('en');

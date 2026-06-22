@@ -1,31 +1,83 @@
 <%#
 Team Section Organism - Landing Page
-Nuestro Equipo section showcasing the Amexing Experience team
+Nuestro Equipo: foto del grupo con "hotspots" interactivos.
+Al pasar el mouse (o tocar) sobre una persona se muestra un indicador (anillo)
+y una tarjeta con su nombre y puesto.
+
+MODO CALIBRACIÓN: abre la página con ?calibrar (ej. /nosotros?calibrar).
+Arrastra el cuadro para MOVERLO y arrastra sus bordes/esquinas para REDIMENSIONARLO.
+Luego "Copiar" y pega las coordenadas en el chat.
 
 Created by Denisse Maldonado
 %>
 
-<section class="team-section">
+<%
+    // Equipo: x/y = esquina superior izquierda (en % de la imagen), w/h = tamaño (en %).
+    // Recalibrar con ?calibrar cuando llegue la imagen final.
+    const teamMembers = [
+        { name: 'Colaborador 1', since: 2026, x: 25.3, y: 43.7, w: 6.9, h: 48.0 },
+        { name: 'Colaborador 2', since: 2026, x: 33.4, y: 43.4, w: 5.9, h: 45.4 },
+        { name: 'Colaborador 3', since: 2026, x: 41.1, y: 46.6, w: 5.3, h: 40.4 },
+        { name: 'Colaborador 4', since: 2026, x: 46.9, y: 46.9, w: 5.7, h: 40.1 },
+        { name: 'Colaborador 5', since: 2026, x: 53.3, y: 46.6, w: 5.7, h: 39.9 },
+        { name: 'Colaborador 6', since: 2026, x: 59.8, y: 46.3, w: 5.9, h: 41.3 },
+        { name: 'Colaborador 7', since: 2026, x: 66.6, y: 44.9, w: 6.5, h: 47.1 },
+        { name: 'Colaborador 8', since: 2026, x: 74.6, y: 45.8, w: 7.2, h: 48.1 }
+    ];
+%>
+
+<section class="team-section" id="equipo">
     <div class="team-section__container">
         <div class="team-section__overlay">
             <div class="team-section__title-banner">
                 <h2 class="team-section__title">
-                    <span class="large-letter">N</span>uestro 
+                    <span class="large-letter">N</span>uestro
                     <span class="large-letter">E</span>quipo
                 </h2>
             </div>
         </div>
-        <div class="team-section__image-wrapper">
-            <img src="/images/contacto_header.png" alt="Nuestro Equipo Amexing Experience" class="team-section__image">
+
+        <div class="team-section__viewport">
+            <%# El escenario se escala (zoom) — imagen + indicadores juntos %>
+            <div class="team-section__stage" id="teamStage">
+                <div class="team-section__image-wrapper">
+                    <img src="/images/contacto_header.png" alt="Nuestro Equipo Amexing Experience" class="team-section__image">
+                </div>
+
+                <%# Zonas activas (una por persona) %>
+                <div class="team-section__hotspots">
+                    <% teamMembers.forEach(function(member, idx) { %>
+                        <button
+                            type="button"
+                            class="team-section__hotspot"
+                            style="left: <%= member.x %>%; top: <%= member.y %>%; width: <%= member.w %>%; height: <%= member.h %>%;"
+                            data-index="<%= idx + 1 %>"
+                            data-name="<%= member.name %>"
+                            data-since="<%= member.since %>"
+                            aria-label="<%= member.name %> — Desde <%= member.since %>"
+                        >
+                            <img src="/images/indicador.png" alt="" class="team-section__marker" aria-hidden="true">
+                        </button>
+                    <% }); %>
+                </div>
+            </div>
+
+            <%# Banner con el nombre del colaborador (fuera del zoom, tamaño fijo).
+                El span "reserve" (oculto) fija el ancho al del texto por defecto. %>
+            <div class="team-section__banner" id="teamBanner">
+                <span class="team-section__banner-reserve" aria-hidden="true">Nombre del Colaborador | Desde 2026</span>
+                <span class="team-section__banner-text">Nombre del Colaborador | Desde 2026</span>
+            </div>
         </div>
     </div>
 </section>
 
 <style>
 .team-section {
-    padding: 4rem 0;
+    padding: 1.5rem 0;
     background: #ffffff;
     position: relative;
+    scroll-margin-top: 90px;
 }
 
 .team-section__container {
@@ -35,6 +87,16 @@ Created by Denisse Maldonado
     padding: 0;
     box-sizing: border-box;
     overflow: hidden;
+}
+
+.team-section__viewport {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Imagen completa a todo lo ancho (sin recorte) */
+.team-section__stage {
+    position: relative;
 }
 
 .team-section__image-wrapper {
@@ -66,7 +128,7 @@ Created by Denisse Maldonado
 }
 
 .team-section__title {
-    font-family: var(--font-arpona);
+    font-family: var(--font-newsreader);
     font-size: 3rem;
     font-weight: 300;
     color: #ffffff;
@@ -84,52 +146,367 @@ Created by Denisse Maldonado
     vertical-align: baseline;
 }
 
-@media (max-width: 768px) {
-    .team-section {
-        padding: 3rem 0;
-    }
-    
-    .team-section__overlay {
-        padding: 0 1rem;
-    }
-    
-    .team-section__title-banner {
-        padding: 1rem 2rem;
-    }
-    
-    .team-section__title {
-        font-size: 2.5rem;
-        letter-spacing: 2px;
-    }
-    
-    .large-letter {
-        font-size: 3rem;
-    }
+/* ---- Hotspots ---- */
+.team-section__hotspots {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
 }
 
-/* iPad specific styles */
+.team-section__hotspot {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Indicador: imagen que aparece ARRIBA DE LA CABEZA (borde superior del cuadro) */
+.team-section__marker {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: clamp(1.4rem, 2.8vw, 2.2rem);
+    height: auto;
+    display: block;
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 0.5rem)) scale(0.6);
+    transform-origin: center bottom;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.team-section__hotspot:hover .team-section__marker,
+.team-section__hotspot:focus-visible .team-section__marker,
+.team-section__hotspot.is-selected .team-section__marker {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 0.5rem)) scale(1);
+}
+
+.team-section__hotspot:focus-visible {
+    outline: 2px solid #969b81;
+    outline-offset: 2px;
+}
+
+/* ---- Banner blanco con el nombre del colaborador (abajo de la foto) ---- */
+.team-section__banner {
+    position: absolute;
+    bottom: 3%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    background: rgba(255, 255, 255, 0.94);
+    border-radius: 999px;
+    padding: 0.28rem 3rem;
+    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+    max-width: 92%;
+}
+
+/* Reserva el ancho (oculto) con el texto por defecto: el banner no cambia de ancho */
+.team-section__banner-reserve {
+    display: block;
+    visibility: hidden;
+    white-space: nowrap;
+    font-family: var(--font-newsreader);
+    font-size: clamp(0.85rem, 1.6vw, 1.35rem);
+    letter-spacing: 0.04em;
+}
+
+.team-section__banner-text {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0 0.5rem;
+    font-family: var(--font-newsreader);
+    font-size: clamp(0.85rem, 1.6vw, 1.35rem);
+    letter-spacing: 0.04em;
+    color: #4a4a4a;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- Modo calibración: mover + redimensionar ---- */
+.team-section__stage.is-calibrating .team-section__hotspot {
+    cursor: move;
+    outline: 2px dashed rgba(255, 60, 60, 0.9);
+    background: rgba(255, 60, 60, 0.12);
+    touch-action: none;
+}
+
+.team-section__stage.is-calibrating .team-section__hotspot.is-active-calib {
+    outline-color: #ffd000;
+    background: rgba(255, 208, 0, 0.18);
+    z-index: 9;
+}
+
+.team-section__stage.is-calibrating .team-section__marker {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 0.5rem)) scale(1);
+}
+
+.team-section__stage.is-calibrating .team-section__hotspot::after {
+    content: attr(data-index);
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font: 700 12px/1 monospace;
+    color: #fff;
+    background: rgba(255, 60, 60, 0.9);
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+/* Manijas de redimensión */
+.team-section__handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #ffd000;
+    border: 1px solid #7a5b00;
+    border-radius: 2px;
+    z-index: 3;
+}
+.team-section__handle--n  { top: -6px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.team-section__handle--s  { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.team-section__handle--e  { right: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.team-section__handle--w  { left: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.team-section__handle--ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.team-section__handle--nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.team-section__handle--se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.team-section__handle--sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+
+.team-section__calib {
+    position: fixed;
+    top: 90px;
+    left: 12px;
+    z-index: 9999;
+    background: rgba(20, 20, 20, 0.92);
+    color: #eaeaea;
+    font: 12px/1.5 monospace;
+    padding: 10px 12px;
+    border-radius: 8px;
+    max-width: 360px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.team-section__calib h4 { margin: 0 0 6px; font-size: 12px; color: #ffd000; }
+.team-section__calib-live { color: #8fe08f; margin-bottom: 6px; }
+.team-section__calib-list { white-space: pre; max-height: 230px; overflow: auto; }
+.team-section__calib button {
+    margin-top: 8px;
+    font: 11px monospace;
+    cursor: pointer;
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 4px 10px;
+}
+
+@media (max-width: 768px) {
+    .team-section { padding: 3rem 0; }
+    .team-section__overlay { padding: 0 1rem; }
+    .team-section__title-banner { padding: 1rem 2rem; }
+    .team-section__title { font-size: 2.5rem; letter-spacing: 2px; }
+    .large-letter { font-size: 3rem; }
+    .team-section__banner { padding: 0.6rem 1.4rem; bottom: 2%; }
+    .team-section__banner-text { font-size: clamp(0.8rem, 3.2vw, 1.1rem); }
+}
+
 @media (max-width: 1024px) {
-    .team-section__container {
-        max-width: 100vw;
-    }
+    .team-section__container { max-width: 100vw; }
 }
 
 @media (max-width: 480px) {
-    .team-section__overlay {
-        padding: 0 0.5rem;
-    }
-    
-    .team-section__title-banner {
-        padding: 0.75rem 1.5rem;
-    }
-    
-    .team-section__title {
-        font-size: 2rem;
-        letter-spacing: 1px;
-    }
-    
-    .large-letter {
-        font-size: 2.5rem;
-    }
+    .team-section__overlay { padding: 0 0.5rem; }
+    .team-section__title-banner { padding: 0.75rem 1.5rem; }
+    .team-section__title { font-size: 2rem; letter-spacing: 1px; }
+    .large-letter { font-size: 2.5rem; }
 }
 </style>
+
+<script>
+(function () {
+    var stage = document.getElementById('teamStage');
+    if (!stage) return;
+
+    var bannerText = document.querySelector('#teamBanner .team-section__banner-text');
+    var defaultBanner = bannerText ? bannerText.textContent : '';
+    var hotspots = stage.querySelectorAll('.team-section__hotspot');
+    var img = stage.querySelector('.team-section__image');
+    var calibrar = /[?&]calibrar/i.test(location.search);
+    var current = null;
+
+    /* ============ MODO NORMAL: hover / selección ============ */
+    if (!calibrar) {
+        function show(hotspot) {
+            if (current) current.classList.remove('is-selected');
+            current = hotspot;
+            hotspot.classList.add('is-selected');
+            bannerText.textContent =
+                hotspot.getAttribute('data-name') + ' | Desde ' + hotspot.getAttribute('data-since');
+        }
+        function hide() {
+            if (current) current.classList.remove('is-selected');
+            current = null;
+            bannerText.textContent = defaultBanner;
+        }
+        hotspots.forEach(function (hotspot) {
+            hotspot.addEventListener('mouseenter', function () { show(hotspot); });
+            hotspot.addEventListener('mouseleave', hide);
+            hotspot.addEventListener('focus', function () { show(hotspot); });
+            hotspot.addEventListener('blur', hide);
+            hotspot.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (current === hotspot) { hide(); } else { show(hotspot); }
+            });
+        });
+        document.addEventListener('click', function (e) {
+            if (!stage.contains(e.target)) hide();
+        });
+        return;
+    }
+
+    /* ============ MODO CALIBRACIÓN: mover + redimensionar ============ */
+    stage.classList.add('is-calibrating');
+    var MIN = 3; // tamaño mínimo en %
+
+    var panel = document.createElement('div');
+    panel.className = 'team-section__calib';
+    panel.innerHTML =
+        '<h4>Calibración — arrastra para mover, bordes/esquinas para redimensionar</h4>' +
+        '<div class="team-section__calib-live">listo</div>' +
+        '<div class="team-section__calib-list"></div>' +
+        '<button type="button" data-act="copy">Copiar coordenadas</button>';
+    document.body.appendChild(panel);
+    var live = panel.querySelector('.team-section__calib-live');
+    var list = panel.querySelector('.team-section__calib-list');
+
+    var DIRS = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+    var action = null; // { type: 'move'|'resize', h, dir, startX, startY, box }
+
+    function box(h) {
+        return {
+            x: parseFloat(h.style.left) || 0,
+            y: parseFloat(h.style.top) || 0,
+            w: parseFloat(h.style.width) || 0,
+            h: parseFloat(h.style.height) || 0
+        };
+    }
+    function apply(h, b) {
+        h.style.left = b.x + '%';
+        h.style.top = b.y + '%';
+        h.style.width = b.w + '%';
+        h.style.height = b.h + '%';
+    }
+    function pct(e) {
+        var t = e.touches && e.touches[0] ? e.touches[0] : e;
+        var r = img.getBoundingClientRect();
+        return {
+            x: ((t.clientX - r.left) / r.width) * 100,
+            y: ((t.clientY - r.top) / r.height) * 100
+        };
+    }
+    function renderList() {
+        list.textContent = Array.prototype.map.call(hotspots, function (h, i) {
+            var b = box(h);
+            return (i + 1) + ": { name: '" + h.dataset.name + "', role: '" + h.dataset.role +
+                "', x: " + b.x.toFixed(1) + ", y: " + b.y.toFixed(1) +
+                ", w: " + b.w.toFixed(1) + ", h: " + b.h.toFixed(1) + " },";
+        }).join('\n');
+    }
+
+    // Crea las manijas de redimensión en cada hotspot
+    hotspots.forEach(function (h) {
+        DIRS.forEach(function (dir) {
+            var handle = document.createElement('span');
+            handle.className = 'team-section__handle team-section__handle--' + dir;
+            handle.dataset.dir = dir;
+            handle.addEventListener('mousedown', function (e) {
+                e.stopPropagation();
+                start('resize', h, dir, e);
+            });
+            handle.addEventListener('touchstart', function (e) {
+                e.stopPropagation();
+                start('resize', h, dir, e);
+            }, { passive: false });
+            h.appendChild(handle);
+        });
+        h.addEventListener('mousedown', function (e) { start('move', h, null, e); });
+        h.addEventListener('touchstart', function (e) { start('move', h, null, e); }, { passive: false });
+    });
+
+    function start(type, h, dir, e) {
+        e.preventDefault();
+        var p = pct(e);
+        action = { type: type, h: h, dir: dir, startX: p.x, startY: p.y, box: box(h) };
+        hotspots.forEach(function (x) { x.classList.remove('is-active-calib'); });
+        h.classList.add('is-active-calib');
+    }
+
+    function move(e) {
+        if (!action) return;
+        e.preventDefault();
+        var p = pct(e);
+        var dx = p.x - action.startX;
+        var dy = p.y - action.startY;
+        var b = action.box;
+        var nb = { x: b.x, y: b.y, w: b.w, h: b.h };
+
+        if (action.type === 'move') {
+            nb.x = Math.max(0, Math.min(100 - b.w, b.x + dx));
+            nb.y = Math.max(0, Math.min(100 - b.h, b.y + dy));
+        } else {
+            var dir = action.dir;
+            if (dir.indexOf('e') > -1) nb.w = Math.max(MIN, Math.min(100 - b.x, b.w + dx));
+            if (dir.indexOf('s') > -1) nb.h = Math.max(MIN, Math.min(100 - b.y, b.h + dy));
+            if (dir.indexOf('w') > -1) {
+                var right = b.x + b.w;
+                nb.x = Math.max(0, Math.min(right - MIN, b.x + dx));
+                nb.w = right - nb.x;
+            }
+            if (dir.indexOf('n') > -1) {
+                var bottom = b.y + b.h;
+                nb.y = Math.max(0, Math.min(bottom - MIN, b.y + dy));
+                nb.h = bottom - nb.y;
+            }
+        }
+        apply(action.h, nb);
+        live.textContent = 'x:' + nb.x.toFixed(1) + ' y:' + nb.y.toFixed(1) + ' w:' + nb.w.toFixed(1) + ' h:' + nb.h.toFixed(1);
+        renderList();
+    }
+
+    function end() { action = null; }
+
+    document.addEventListener('mousemove', move);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('mouseup', end);
+    document.addEventListener('touchend', end);
+
+    panel.querySelector('[data-act="copy"]').addEventListener('click', function () {
+        var txt = Array.prototype.map.call(hotspots, function (h) {
+            var b = box(h);
+            return "{ name: '" + h.dataset.name + "', role: '" + h.dataset.role +
+                "', x: " + b.x.toFixed(1) + ", y: " + b.y.toFixed(1) +
+                ", w: " + b.w.toFixed(1) + ", h: " + b.h.toFixed(1) + " },";
+        }).join('\n');
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(txt).then(function () {
+                live.textContent = '¡Copiado! Pégamelo en el chat ✓';
+            }, function () {
+                live.textContent = 'No se pudo copiar; copia manual del recuadro';
+            });
+        }
+    });
+
+    renderList();
+})();
+</script>

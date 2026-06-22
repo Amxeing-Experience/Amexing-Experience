@@ -1325,9 +1325,12 @@ const currentPath = '/dashboard/admin/clients';
                 passwordValidationFeedback.style.display = 'none';
             }
 
-            // Clear validation states
-            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid', 'is-valid'));
-            form.querySelectorAll('.invalid-feedback').forEach(el => el.style.display = 'none');
+            // Clear validation states on whichever forms exist (no bare `form` in this scope)
+            [agencyForm, clientForm].forEach((f) => {
+                if (!f) return;
+                f.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid', 'is-valid'));
+                f.querySelectorAll('.invalid-feedback').forEach(el => el.style.display = 'none');
+            });
         });
     }
 

@@ -38,6 +38,26 @@ class ClientProfileController {
 
   // ---------- helpers ----------
 
+  // Owner is decided by the route family, not the body:
+  //   /api/clients/:clientId/...  → Client owner
+  //   /api/agents/:agentId/...    → AmexingUser owner
+  resolveOwner(req) {
+    if (req.params.agentId) return { ownerType: 'amexingUser', ownerId: req.params.agentId };
+    return { ownerType: 'client', ownerId: req.params.clientId };
+  }
+
+  // Validate the owner exists, branching on type. Returns the Parse object.
+  async validateOwnerExists({ ownerType, ownerId }) {
+    if (ownerType === 'amexingUser') {
+      const query = new Parse.Query('AmexingUser');
+      query.equalTo('exists', true);
+      const user = await query.get(ownerId, { useMasterKey: true });
+      if (!user) throw new Error('User not found');
+      return user;
+    }
+    return this.validateClientExists(ownerId);
+  }
+
   async validateClientExists(clientId) {
     const query = new Parse.Query('Client');
     query.equalTo('exists', true);
@@ -58,12 +78,18 @@ class ClientProfileController {
     });
   }
 
-  // Find a sub-record and confirm it belongs to the client in the path.
-  async findOwnedRecord(className, recordId, clientId) {
+  // Find a sub-record and confirm it belongs to the owner (Client or AmexingUser) in the path.
+  async findOwnedRecord(className, recordId, owner) {
     const record = await new Parse.Query(className).get(recordId, { useMasterKey: true });
-    const owner = record.get('client');
-    if (!owner || owner.id !== clientId) {
-      const err = new Error('Record does not belong to specified client');
+    // Models expose getOwnerId()/getOwnerType(); legacy rows resolve to ('client', client.id).
+    const recordOwnerId = typeof record.getOwnerId === 'function'
+      ? record.getOwnerId()
+      : (record.get('client') ? record.get('client').id : null);
+    const recordOwnerType = typeof record.getOwnerType === 'function'
+      ? record.getOwnerType()
+      : 'client';
+    if (recordOwnerId !== owner.ownerId || recordOwnerType !== owner.ownerType) {
+      const err = new Error('Record does not belong to specified owner');
       err.status = 403;
       throw err;
     }
@@ -73,48 +99,48 @@ class ClientProfileController {
   // ---------- addresses ----------
 
   async getAddresses(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId } = req.params;
-      await this.validateClientExists(clientId);
-      const addresses = await ClientAddress.getByClient(clientId);
+      await this.validateOwnerExists(owner);
+      const addresses = await ClientAddress.getByOwner(owner.ownerType, owner.ownerId);
       this.sendSuccess(res, { addresses: addresses.map((a) => a.toJSON()) }, 'Addresses retrieved successfully');
     } catch (error) {
-      logger.error('Error in ClientProfileController.getAddresses', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.getAddresses', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, 'Failed to retrieve addresses', error.status || 500);
     }
   }
 
   async createAddress(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId } = req.params;
-      await this.validateClientExists(clientId);
+      await this.validateOwnerExists(owner);
 
-      const data = { ...req.body, client: clientId };
+      const data = { ...req.body, ownerType: owner.ownerType, ownerId: owner.ownerId };
       const errors = ClientAddress.validate(data);
       if (errors.length) return this.sendError(res, errors.join(', '), 400);
 
       const address = ClientAddress.create(data);
-      if (data.isFavorite) await this.clearFavoriteAddress(clientId);
+      if (data.isFavorite) await this.clearFavoriteAddress(owner);
       await address.save(null, { useMasterKey: true });
 
-      logger.info('Client address created', { clientId, addressId: address.id, userId: req.user?.id });
+      logger.info('Address created', { ...owner, addressId: address.id, userId: req.user?.id });
       this.sendSuccess(res, { address: address.toJSON() }, 'Dirección creada exitosamente', 201);
     } catch (error) {
-      logger.error('Error in ClientProfileController.createAddress', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.createAddress', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
 
   async updateAddress(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId, id } = req.params;
-      await this.validateClientExists(clientId);
-      const address = await this.findOwnedRecord('ClientAddress', id, clientId);
+      await this.validateOwnerExists(owner);
+      const address = await this.findOwnedRecord('ClientAddress', req.params.id, owner);
 
       const fields = ['label', 'street', 'city', 'state', 'zipCode', 'country'];
       fields.forEach((f) => { if (req.body[f] !== undefined) address.set(f, req.body[f]); });
       if (req.body.isFavorite === true) {
-        await this.clearFavoriteAddress(clientId);
+        await this.clearFavoriteAddress(owner);
         address.set('isFavorite', true);
       } else if (req.body.isFavorite === false) {
         address.set('isFavorite', false);
@@ -123,27 +149,27 @@ class ClientProfileController {
 
       this.sendSuccess(res, { address: address.toJSON() }, 'Dirección actualizada');
     } catch (error) {
-      logger.error('Error in ClientProfileController.updateAddress', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.updateAddress', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
 
   async deleteAddress(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId, id } = req.params;
-      await this.validateClientExists(clientId);
-      const address = await this.findOwnedRecord('ClientAddress', id, clientId);
+      await this.validateOwnerExists(owner);
+      const address = await this.findOwnedRecord('ClientAddress', req.params.id, owner);
       await address.destroy({ useMasterKey: true });
-      this.sendSuccess(res, { id }, 'Dirección eliminada');
+      this.sendSuccess(res, { id: req.params.id }, 'Dirección eliminada');
     } catch (error) {
-      logger.error('Error in ClientProfileController.deleteAddress', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.deleteAddress', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
 
-  // Only one favorite per client: clear the flag on the others before setting a new one.
-  async clearFavoriteAddress(clientId) {
-    const current = await ClientAddress.getByClient(clientId);
+  // Only one favorite per owner: clear the flag on the others before setting a new one.
+  async clearFavoriteAddress(owner) {
+    const current = await ClientAddress.getByOwner(owner.ownerType, owner.ownerId);
     const favorites = current.filter((a) => a.isFavorite());
     if (favorites.length) {
       favorites.forEach((a) => a.set('isFavorite', false));
@@ -154,23 +180,23 @@ class ClientProfileController {
   // ---------- travel preferences ----------
 
   async getTravelPreferences(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId } = req.params;
-      await this.validateClientExists(clientId);
-      const prefs = await TravelPreference.getByClient(clientId);
+      await this.validateOwnerExists(owner);
+      const prefs = await TravelPreference.getByOwner(owner.ownerType, owner.ownerId);
       this.sendSuccess(res, { preferences: prefs.map((p) => p.toJSON()) }, 'Preferences retrieved successfully');
     } catch (error) {
-      logger.error('Error in ClientProfileController.getTravelPreferences', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.getTravelPreferences', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, 'Failed to retrieve preferences', error.status || 500);
     }
   }
 
   async createTravelPreference(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId } = req.params;
-      await this.validateClientExists(clientId);
+      await this.validateOwnerExists(owner);
 
-      const data = { ...req.body, client: clientId };
+      const data = { ...req.body, ownerType: owner.ownerType, ownerId: owner.ownerId };
       const errors = TravelPreference.validate(data);
       if (errors.length) return this.sendError(res, errors.join(', '), 400);
 
@@ -178,68 +204,68 @@ class ClientProfileController {
       await pref.save(null, { useMasterKey: true });
       this.sendSuccess(res, { preference: pref.toJSON() }, 'Preferencia creada exitosamente', 201);
     } catch (error) {
-      logger.error('Error in ClientProfileController.createTravelPreference', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.createTravelPreference', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
 
   async updateTravelPreference(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId, id } = req.params;
-      await this.validateClientExists(clientId);
-      const pref = await this.findOwnedRecord('TravelPreference', id, clientId);
+      await this.validateOwnerExists(owner);
+      const pref = await this.findOwnedRecord('TravelPreference', req.params.id, owner);
 
       ['type', 'option'].forEach((f) => { if (req.body[f] !== undefined) pref.set(f, req.body[f]); });
       await pref.save(null, { useMasterKey: true });
       this.sendSuccess(res, { preference: pref.toJSON() }, 'Preferencia actualizada');
     } catch (error) {
-      logger.error('Error in ClientProfileController.updateTravelPreference', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.updateTravelPreference', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
 
   async deleteTravelPreference(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId, id } = req.params;
-      await this.validateClientExists(clientId);
-      const pref = await this.findOwnedRecord('TravelPreference', id, clientId);
+      await this.validateOwnerExists(owner);
+      const pref = await this.findOwnedRecord('TravelPreference', req.params.id, owner);
       await pref.destroy({ useMasterKey: true });
-      this.sendSuccess(res, { id }, 'Preferencia eliminada');
+      this.sendSuccess(res, { id: req.params.id }, 'Preferencia eliminada');
     } catch (error) {
-      logger.error('Error in ClientProfileController.deleteTravelPreference', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.deleteTravelPreference', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
 
-  // ---------- loyalty programs (Client.loyaltyPrograms array of { type, number }) ----------
+  // ---------- loyalty programs (loyaltyPrograms array of { type, number } on the owner) ----------
 
   async getLoyaltyPrograms(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId } = req.params;
-      const client = await this.validateClientExists(clientId);
-      this.sendSuccess(res, { loyaltyPrograms: client.get('loyaltyPrograms') || [] }, 'Loyalty programs retrieved successfully');
+      const ownerObj = await this.validateOwnerExists(owner);
+      this.sendSuccess(res, { loyaltyPrograms: ownerObj.get('loyaltyPrograms') || [] }, 'Loyalty programs retrieved successfully');
     } catch (error) {
-      logger.error('Error in ClientProfileController.getLoyaltyPrograms', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.getLoyaltyPrograms', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, 'Failed to retrieve loyalty programs', error.status || 500);
     }
   }
 
   // Replaces the whole list (the UI sends the full set after an inline edit/add/delete).
   async saveLoyaltyPrograms(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId } = req.params;
-      const client = await this.validateClientExists(clientId);
+      const ownerObj = await this.validateOwnerExists(owner);
 
       const programs = Array.isArray(req.body.loyaltyPrograms) ? req.body.loyaltyPrograms : [];
       const clean = programs
         .filter((p) => p && typeof p.type === 'string' && p.type.trim())
         .map((p) => ({ type: p.type.trim(), number: (p.number || '').toString().trim() }));
 
-      client.set('loyaltyPrograms', clean);
-      await client.save(null, { useMasterKey: true });
+      ownerObj.set('loyaltyPrograms', clean);
+      await ownerObj.save(null, { useMasterKey: true });
       this.sendSuccess(res, { loyaltyPrograms: clean }, 'Programas de lealtad guardados');
     } catch (error) {
-      logger.error('Error in ClientProfileController.saveLoyaltyPrograms', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.saveLoyaltyPrograms', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
@@ -247,25 +273,25 @@ class ClientProfileController {
   // ---------- passports (ClientPassport; number encrypted, returned masked) ----------
 
   async getPassports(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId } = req.params;
-      await this.validateClientExists(clientId);
-      const passports = await ClientPassport.getByClient(clientId);
+      await this.validateOwnerExists(owner);
+      const passports = await ClientPassport.getByOwner(owner.ownerType, owner.ownerId);
       // toSafeJSON is async (decrypts to mask); never returns the raw/encrypted number.
       const data = await Promise.all(passports.map((p) => p.toSafeJSON()));
       this.sendSuccess(res, { passports: data }, 'Passports retrieved successfully');
     } catch (error) {
-      logger.error('Error in ClientProfileController.getPassports', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.getPassports', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, 'Failed to retrieve passports', error.status || 500);
     }
   }
 
   async createPassport(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId } = req.params;
-      await this.validateClientExists(clientId);
+      await this.validateOwnerExists(owner);
 
-      const data = { ...req.body, client: clientId };
+      const data = { ...req.body, ownerType: owner.ownerType, ownerId: owner.ownerId };
       const errors = ClientPassport.validate(data);
       if (errors.length) return this.sendError(res, errors.join(', '), 400);
 
@@ -273,19 +299,19 @@ class ClientProfileController {
       if (req.body.number) await passport.setNumber(req.body.number);
       await passport.save(null, { useMasterKey: true });
 
-      logger.info('Client passport created', { clientId, passportId: passport.id, userId: req.user?.id });
+      logger.info('Passport created', { ...owner, passportId: passport.id, userId: req.user?.id });
       this.sendSuccess(res, { passport: await passport.toSafeJSON() }, 'Pasaporte creado exitosamente', 201);
     } catch (error) {
-      logger.error('Error in ClientProfileController.createPassport', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.createPassport', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
 
   async updatePassport(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId, id } = req.params;
-      await this.validateClientExists(clientId);
-      const passport = await this.findOwnedRecord('ClientPassport', id, clientId);
+      await this.validateOwnerExists(owner);
+      const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
 
       const setters = {
         label: 'setLabel', countryOfIssue: 'setCountryOfIssue', nationality: 'setNationality',
@@ -297,30 +323,30 @@ class ClientProfileController {
 
       this.sendSuccess(res, { passport: await passport.toSafeJSON() }, 'Pasaporte actualizado');
     } catch (error) {
-      logger.error('Error in ClientProfileController.updatePassport', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.updatePassport', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
 
   async deletePassport(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId, id } = req.params;
-      await this.validateClientExists(clientId);
-      const passport = await this.findOwnedRecord('ClientPassport', id, clientId);
+      await this.validateOwnerExists(owner);
+      const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
       await passport.destroy({ useMasterKey: true });
-      this.sendSuccess(res, { id }, 'Pasaporte eliminado');
+      this.sendSuccess(res, { id: req.params.id }, 'Pasaporte eliminado');
     } catch (error) {
-      logger.error('Error in ClientProfileController.deletePassport', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.deletePassport', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
 
   // Reveal the full number — authorized (admin/superadmin) + audited by the vault.
   async revealPassportNumber(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId, id } = req.params;
-      await this.validateClientExists(clientId);
-      const passport = await this.findOwnedRecord('ClientPassport', id, clientId);
+      await this.validateOwnerExists(owner);
+      const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
 
       const user = { id: req.user?.id, role: req.userRole || req.user?.role };
       const number = await passport.getNumber({ user });
@@ -328,7 +354,7 @@ class ClientProfileController {
 
       this.sendSuccess(res, { number }, 'Número revelado');
     } catch (error) {
-      logger.error('Error in ClientProfileController.revealPassportNumber', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.revealPassportNumber', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
@@ -336,13 +362,37 @@ class ClientProfileController {
   // ---------- trips (read-only: quotes/reservations linked to this client) ----------
 
   async getTrips(req, res) {
+    const owner = this.resolveOwner(req);
     try {
-      const { clientId } = req.params;
-      const client = await this.validateClientExists(clientId);
+      const ownerObj = await this.validateOwnerExists(owner);
 
-      // Direct clients link to quotes via Quote.companyClientPtr (see QuoteController).
-      const query = new Parse.Query('Quote');
-      query.equalTo('companyClientPtr', client);
+      // A migrated person's trips can be linked by either of two pointers:
+      //   new quotes  → Quote.client (Pointer<AmexingUser>) + clientType 'direct'
+      //   old quotes  → Quote.companyClientPtr (Pointer<Client> == legacyClientId)
+      let query;
+      if (owner.ownerType === 'amexingUser') {
+        const AmexingUser = Parse.Object.extend('AmexingUser');
+        const userPtr = AmexingUser.createWithoutData(owner.ownerId);
+        const byClient = new Parse.Query('Quote');
+        byClient.equalTo('client', userPtr);
+        byClient.equalTo('clientType', 'direct');
+
+        const subQueries = [byClient];
+        const legacyClientId = ownerObj.get('legacyClientId');
+        if (legacyClientId) {
+          const Client = Parse.Object.extend('Client');
+          const clientPtr = Client.createWithoutData(legacyClientId);
+          const byLegacy = new Parse.Query('Quote');
+          byLegacy.equalTo('companyClientPtr', clientPtr);
+          subQueries.push(byLegacy);
+        }
+        query = subQueries.length > 1 ? Parse.Query.or(...subQueries) : byClient;
+      } else {
+        // Legacy Client record (may also be an agency-owned sub-client).
+        query = new Parse.Query('Quote');
+        query.equalTo('companyClientPtr', ownerObj);
+      }
+
       query.equalTo('exists', true);
       query.descending('createdAt');
       query.limit(100);
@@ -360,7 +410,7 @@ class ClientProfileController {
 
       this.sendSuccess(res, { trips }, 'Trips retrieved successfully');
     } catch (error) {
-      logger.error('Error in ClientProfileController.getTrips', { error: error.message, clientId: req.params.clientId });
+      logger.error('Error in ClientProfileController.getTrips', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, 'Failed to retrieve trips', error.status || 500);
     }
   }

@@ -27,6 +27,7 @@ const guestName = `${q.leadGuestFirstName || ''} ${q.leadGuestLastName || ''}`.t
   || q.contactPerson
   || `${q.contactFirstName || ''} ${q.contactLastName || ''}`.trim()
   || (q.client && q.client.companyName)
+  || (q.client && `${q.client.firstName || ''} ${q.client.lastName || ''}`.trim())
   || 'Huésped';
 
 const startDate = toDate(q.startDate) || (days[0] && toDate(days[0].date));

@@ -1433,24 +1433,37 @@ class ReservationController {
    * @example
    */
   static formatReservationRow(reservation, serviceCount) {
-    // Cliente mostrado: se resuelve desde la cotización para reflejar el modelo real
-    // (agencia = quotePtr.client / cliente directo = quotePtr.companyClientPtr), con su
-    // tipo. Si la cotización no lo tiene, cae a clientPtr y luego a contactPerson.
+    // Cliente mostrado: se resuelve desde la cotización para reflejar el modelo real.
+    // En una cotización 'direct' la persona es el cliente: nuevas llevan un AmexingUser
+    // end_client en quotePtr.client; las legadas un Client en quotePtr.companyClientPtr.
+    // En agencia, quotePtr.client = AmexingUser de la agencia. Si la cotización no lo
+    // tiene, cae a clientPtr y luego a contactPerson.
     const quotePtr = reservation.get('quotePtr');
-    const quoteAgency = quotePtr ? quotePtr.get('client') : null; // AmexingUser
-    const quoteDirectClient = quotePtr ? quotePtr.get('companyClientPtr') : null; // Client
+    const quoteClient = quotePtr ? quotePtr.get('client') : null; // AmexingUser
+    const quoteCompanyClient = quotePtr ? quotePtr.get('companyClientPtr') : null; // Client
+    const isDirectQuote = quotePtr ? quotePtr.get('clientType') === 'direct' : false;
 
     let clientName = 'N/A';
     let clientType = null; // 'agency' | 'client' | null
-    if (quoteAgency) {
-      const cd = quoteAgency.get('contextualData');
+    if (isDirectQuote) {
+      // Cliente directo: el AmexingUser end_client (nuevas) o el Client legado.
+      if (quoteClient) {
+        clientName = `${quoteClient.get('firstName') || ''} ${quoteClient.get('lastName') || ''}`.trim()
+          || quoteClient.get('email')
+          || quoteClient.get('username') || 'N/A';
+      } else if (quoteCompanyClient) {
+        clientName = quoteCompanyClient.get('name') || 'N/A';
+      }
+      clientType = 'client';
+    } else if (quoteClient) {
+      const cd = quoteClient.get('contextualData');
       clientName = (cd && cd.companyName)
-        || quoteAgency.get('companyName')
-        || `${quoteAgency.get('firstName') || ''} ${quoteAgency.get('lastName') || ''}`.trim()
-        || quoteAgency.get('username') || 'N/A';
+        || quoteClient.get('companyName')
+        || `${quoteClient.get('firstName') || ''} ${quoteClient.get('lastName') || ''}`.trim()
+        || quoteClient.get('username') || 'N/A';
       clientType = 'agency';
-    } else if (quoteDirectClient) {
-      clientName = quoteDirectClient.get('name') || 'N/A';
+    } else if (quoteCompanyClient) {
+      clientName = quoteCompanyClient.get('name') || 'N/A';
       clientType = 'client';
     } else {
       // Fallback: clientPtr (AmexingUser) y luego contactPerson.

@@ -1,0 +1,100 @@
+<%#
+CTA Contacto Section Organism (reutilizable)
+Llamado a la acción: corazón + título (small-caps) + línea + botón.
+Pensada para usarse en varias vistas (no específica de Servicios).
+
+Parámetros opcionales (locals):
+  @param {string} ctaTitle      - Título. Default: '¿No encuentras lo que buscas?'
+  @param {string} ctaButtonText - Texto del botón. Default: 'Contáctanos'
+  @param {string} ctaButtonHref - Destino del botón. Default: '/contacto'
+
+@example
+include('organisms/landing/cta-contacto-section')
+include('organisms/landing/cta-contacto-section', { ctaTitle: '¿Listo para tu viaje?', ctaButtonHref: '/contacto#book' })
+
+Created by Denisse Maldonado
+%>
+<%
+const ctaTitleText = typeof ctaTitle !== 'undefined' ? ctaTitle : '¿No encuentras lo que buscas?';
+const ctaBtnText = typeof ctaButtonText !== 'undefined' ? ctaButtonText : 'Contáctanos';
+const ctaBtnHref = typeof ctaButtonHref !== 'undefined' ? ctaButtonHref : '/contacto';
+%>
+
+<section class="cta-contacto-section">
+    <div class="cta-contacto-section__inner">
+        <img src="/images/heart_black.png" alt="" class="cta-contacto-section__heart" aria-hidden="true">
+        <h2 class="cta-contacto-section__title"><%= ctaTitleText %></h2>
+        <hr class="cta-contacto-section__line">
+        <a href="<%= ctaBtnHref %>" class="cta-contacto-section__btn"><%= ctaBtnText %></a>
+    </div>
+</section>
+
+<style>
+.cta-contacto-section {
+    background: #ffffff; /* bandas blancas arriba/abajo */
+    padding: 1rem 0;
+}
+
+.cta-contacto-section__inner {
+    background: #eff0ec;
+    padding: clamp(3rem, 6vw, 5.5rem) 2rem;
+    text-align: center;
+}
+
+.cta-contacto-section__heart {
+    width: clamp(42px, 5vw, 60px);
+    height: auto;
+    display: block;
+    margin: 0 auto clamp(1.6rem, 3vw, 2.6rem);
+}
+
+.cta-contacto-section__title {
+    font-family: var(--font-arpona);
+    font-variant: small-caps;
+    font-feature-settings: "smcp";
+    font-size: clamp(1.5rem, 3vw, 2.3rem);
+    font-weight: 400; /* Arpona Regular */
+    letter-spacing: 0.12em;
+    color: #585757;
+    margin: 0 auto 1.4rem;
+    line-height: 1.2;
+}
+
+.cta-contacto-section__line {
+    width: min(720px, 85%);
+    height: 1px;
+    background: #9a9a8e;
+    border: none;
+    margin: 0 auto clamp(1.8rem, 3.5vw, 2.6rem);
+}
+
+.cta-contacto-section__btn {
+    display: inline-block;
+    padding: 0.85rem 2.6rem;
+    border: 1px solid #585757;
+    background: #ffffff;
+    color: #2e2e2d;
+    font-family: var(--font-myriad);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: background 0.3s ease, color 0.3s ease;
+}
+
+.cta-contacto-section__btn:hover {
+    background: #585757;
+    color: #ffffff;
+}
+
+@media (max-width: 768px) {
+    .cta-contacto-section__inner {
+        padding: 3rem 1.5rem;
+    }
+
+    .cta-contacto-section__title {
+        letter-spacing: 0.08em;
+    }
+}
+</style>

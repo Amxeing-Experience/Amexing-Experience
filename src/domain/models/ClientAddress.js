@@ -19,7 +19,9 @@ class ClientAddress extends BaseModel {
   static create(data) {
     const address = new ClientAddress();
 
-    if (data.client) {
+    if (data.ownerType && data.ownerId) {
+      address.setOwner(data.ownerType, data.ownerId);
+    } else if (data.client) {
       address.setClient(data.client);
     }
     address.set('label', data.label || '');
@@ -48,6 +50,34 @@ class ClientAddress extends BaseModel {
     }
   }
 
+  // ---- Polymorphic owner (Client or AmexingUser). Legacy rows have no ownerType ⇒ 'client'. ----
+
+  getOwnerType() { return this.get('ownerType') || 'client'; }
+
+  getOwnerId() {
+    if (this.getOwnerType() === 'amexingUser') {
+      const u = this.get('ownerUser');
+      return u ? u.id : null;
+    }
+    const c = this.get('client');
+    return c ? c.id : null;
+  }
+
+  setOwner(ownerType, ownerId) {
+    if (ownerType === 'amexingUser') {
+      const AmexingUser = Parse.Object.extend('AmexingUser');
+      const pointer = new AmexingUser();
+      pointer.id = ownerId;
+      this.set('ownerType', 'amexingUser');
+      this.set('ownerUser', pointer);
+      this.unset('client');
+    } else {
+      this.setClient(ownerId);
+      this.set('ownerType', 'client');
+      this.unset('ownerUser');
+    }
+  }
+
   getLabel() { return this.get('label') || ''; }
   setLabel(label) { this.set('label', label); }
 
@@ -70,10 +100,10 @@ class ClientAddress extends BaseModel {
   setIsFavorite(favorite) { this.set('isFavorite', favorite === true); }
 
   toJSON() {
-    const client = this.get('client');
     return {
       id: this.id,
-      clientId: client ? client.id : null,
+      clientId: this.getOwnerId(),
+      ownerType: this.getOwnerType(),
       label: this.getLabel(),
       street: this.getStreet(),
       city: this.getCity(),
@@ -86,7 +116,7 @@ class ClientAddress extends BaseModel {
 
   static validate(data) {
     const errors = [];
-    if (!data.client) errors.push('Client is required');
+    if (!data.client && !data.ownerId) errors.push('Owner (client or user) is required');
     if (!data.street || data.street.trim() === '') errors.push('Street is required');
     if (!data.city || data.city.trim() === '') errors.push('City is required');
     return errors;
@@ -113,6 +143,25 @@ class ClientAddress extends BaseModel {
       logger.error('Error getting addresses by client', { clientId, error: error.message });
       return [];
     }
+  }
+
+  static async getByOwner(ownerType, ownerId) {
+    if (ownerType === 'amexingUser') {
+      try {
+        const AmexingUser = Parse.Object.extend('AmexingUser');
+        const pointer = new AmexingUser();
+        pointer.id = ownerId;
+        const query = new Parse.Query('ClientAddress');
+        query.equalTo('ownerUser', pointer);
+        query.descending('isFavorite');
+        query.ascending('label');
+        return await query.find({ useMasterKey: true });
+      } catch (error) {
+        logger.error('Error getting addresses by owner user', { ownerId, error: error.message });
+        return [];
+      }
+    }
+    return ClientAddress.getByClient(ownerId);
   }
 }
 

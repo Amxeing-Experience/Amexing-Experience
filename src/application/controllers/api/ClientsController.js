@@ -513,6 +513,29 @@ class ClientsController {
   }
 
   /**
+   * Build the AmexingUser query for people-type clients (role 'end_client'), optionally
+   * narrowed to a single clientCategory. Shared by the count and fetch passes.
+   * @param {object} opts
+   * @param {boolean} opts.isCategoryTab - True when filtering one category tab.
+   * @param {string} opts.type - The category value when isCategoryTab is true.
+   * @param {boolean} opts.includeInactive - Include inactive users when true.
+   * @returns {Parse.Query}
+   */
+  buildEndClientQuery({ isCategoryTab, type, includeInactive }) {
+    const Parse = require('parse/node');
+    const query = new Parse.Query('AmexingUser');
+    query.equalTo('role', 'end_client');
+    query.equalTo('exists', true);
+    if (isCategoryTab) {
+      query.equalTo('clientCategory', type);
+    }
+    if (!includeInactive) {
+      query.equalTo('active', true);
+    }
+    return query;
+  }
+
+  /**
    * GET /api/clients/mixed - Get mixed data (agencies and Amexing direct clients).
    * Only for admin/superadmin roles.
    * @param {object} req - Express request object.
@@ -588,22 +611,8 @@ class ClientsController {
       }
 
       if (type === 'all' || type === 'clients' || isCategoryTab) {
-        const Parse = require('parse/node');
-
-        const clientCountQuery = new Parse.Query(Client);
-        clientCountQuery.equalTo('clientBelongsTo', 'amexing');
-        clientCountQuery.equalTo('exists', true);
-        if (isCategoryTab) {
-          clientCountQuery.equalTo('clientCategory', type);
-        }
-        // Only active clients unless the caller opts in to inactive ones.
-        if (!includeInactive) {
-          clientCountQuery.equalTo('active', true);
-        }
-
-        // NOTE: search is applied in-memory across the merged set (see below), not
-        // here, so this counts all clients of this type — they all get loaded and
-        // then filtered, which lets search match email too (not just name).
+        // People-type clients now live in AmexingUser (role 'end_client') with a clientCategory.
+        const clientCountQuery = this.buildEndClientQuery({ isCategoryTab, type, includeInactive });
         totalDirectClientsCount = await clientCountQuery.count({ useMasterKey: true });
       }
 
@@ -648,46 +657,33 @@ class ClientsController {
           allData.push(...formattedAgencies);
         }
 
-        // Fetch direct clients (and the direct-client categories: wedding_planner,
-        // concierge, home_owner — all stored as Client records, distinguished by clientCategory).
+        // Fetch people-type clients (direct_client/wedding_planner/concierge/home_owner) —
+        // now AmexingUser records (role 'end_client'), distinguished by clientCategory.
         if (type === 'all' || type === 'clients' || isCategoryTab) {
-          const Parse = require('parse/node');
+          const clientQuery = this.buildEndClientQuery({ isCategoryTab, type, includeInactive });
 
-          const clientQuery = new Parse.Query(Client);
-          clientQuery.equalTo('clientBelongsTo', 'amexing');
-          clientQuery.equalTo('exists', true);
-          if (isCategoryTab) {
-            clientQuery.equalTo('clientCategory', type);
-          }
-          // Only active clients unless the caller opts in to inactive ones.
-          if (!includeInactive) {
-            clientQuery.equalTo('active', true);
-          }
-
-          // Parse's find() defaults to 100 results. Agencies + direct clients are
-          // merged, sorted and paginated in memory here, so we must load ALL matching
-          // direct clients (use the count computed above) or rows past 100 would be
-          // invisible to sorting/pagination.
+          // Merged, sorted and paginated in memory below, so load ALL matching rows
+          // (Parse find() defaults to 100) or rows past 100 would be invisible.
           if (totalDirectClientsCount > 0) {
             clientQuery.limit(totalDirectClientsCount);
           }
 
           const clientResults = await clientQuery.find({ useMasterKey: true });
-          directClients = clientResults.map((client) => ({
-            id: client.id,
+          directClients = clientResults.map((user) => ({
+            id: user.id,
             type: 'client',
-            // Direct clients default to 'direct_client' when older records have no category yet.
-            clientCategory: client.get('clientCategory') || 'direct_client',
-            name: client.get('name'),
-            firstName: client.get('firstName'),
-            lastName: client.get('lastName'),
-            email: client.get('email') || '',
-            phone: client.get('phone'),
-            companyType: client.get('companyType'),
-            active: client.get('active'),
-            createdAt: client.get('createdAt'),
-            updatedAt: client.get('updatedAt'),
-            clientBelongsTo: client.get('clientBelongsTo'),
+            // People-type users always carry a clientCategory; default for safety.
+            clientCategory: user.get('clientCategory') || 'direct_client',
+            name: `${user.get('firstName') || ''} ${user.get('lastName') || ''}`.trim() || user.get('name') || user.get('email') || '',
+            firstName: user.get('firstName'),
+            lastName: user.get('lastName'),
+            email: user.get('email') || '',
+            phone: user.get('phone'),
+            companyType: user.get('companyType'),
+            active: user.get('active'),
+            createdAt: user.get('createdAt'),
+            updatedAt: user.get('updatedAt'),
+            loginEnabled: true,
           }));
 
           allData.push(...directClients);
@@ -987,7 +983,8 @@ class ClientsController {
 
   /**
    * GET /api/clients/amexing-direct - Get direct Amexing clients for dropdown/selector
-   * Returns Client records where clientBelongsTo = "amexing".
+   * Returns AmexingUser records with role = "end_client" (people-type clients migrated
+   * out of the Client class).
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
@@ -1014,9 +1011,15 @@ class ClientsController {
       const limit = Math.min(parseInt(req.query.limit, 10) || 100, this.maxPageSize);
       const skip = (page - 1) * limit;
 
-      // Query Client table for records where clientBelongsTo = "amexing"
+      // Optional clientCategory filter — when one of the people-type categories is
+      // provided, narrow the list to that category; otherwise keep all end_clients.
+      const validCategories = ['direct_client', 'wedding_planner', 'concierge', 'home_owner'];
+      const clientCategory = req.query.clientCategory?.trim() || '';
+      const filterByCategory = validCategories.includes(clientCategory);
+
+      // Query AmexingUser for end_client records (people-type clients)
       const Parse = require('parse/node');
-      const Client = Parse.Object.extend('Client');
+      const AmexingUserClass = Parse.Object.extend('AmexingUser');
 
       let query;
 
@@ -1024,37 +1027,41 @@ class ClientsController {
       if (searchTerm) {
         const searchQueries = [];
 
-        // Search in name
-        const nameQuery = new Parse.Query(Client);
+        // Search in firstName
+        const firstNameQuery = new Parse.Query(AmexingUserClass);
+        firstNameQuery.matches('firstName', searchTerm, 'i');
+        searchQueries.push(firstNameQuery);
+
+        // Search in lastName
+        const lastNameQuery = new Parse.Query(AmexingUserClass);
+        lastNameQuery.matches('lastName', searchTerm, 'i');
+        searchQueries.push(lastNameQuery);
+
+        // Search in name (legacy/optional field)
+        const nameQuery = new Parse.Query(AmexingUserClass);
         nameQuery.matches('name', searchTerm, 'i');
         searchQueries.push(nameQuery);
 
-        // Search in companyName (if exists as separate field)
-        const companyQuery = new Parse.Query(Client);
-        companyQuery.matches('companyName', searchTerm, 'i');
-        searchQueries.push(companyQuery);
-
-        // Search in contactPerson
-        const contactQuery = new Parse.Query(Client);
-        contactQuery.matches('contactPerson', searchTerm, 'i');
-        searchQueries.push(contactQuery);
-
         // Search in email
-        const emailQuery = new Parse.Query(Client);
+        const emailQuery = new Parse.Query(AmexingUserClass);
         emailQuery.matches('email', searchTerm, 'i');
         searchQueries.push(emailQuery);
 
         // Combine search queries with OR
         query = Parse.Query.or(...searchQueries);
-        query.equalTo('clientBelongsTo', 'amexing');
+        query.equalTo('role', 'end_client');
         query.equalTo('active', true);
         query.equalTo('exists', true);
       } else {
         // Create basic query without search
-        query = new Parse.Query(Client);
-        query.equalTo('clientBelongsTo', 'amexing');
+        query = new Parse.Query(AmexingUserClass);
+        query.equalTo('role', 'end_client');
         query.equalTo('active', true);
         query.equalTo('exists', true);
+      }
+
+      if (filterByCategory) {
+        query.equalTo('clientCategory', clientCategory);
       }
 
       // Get total count for pagination
@@ -1063,18 +1070,18 @@ class ClientsController {
       // Apply pagination
       query.limit(limit);
       query.skip(skip);
-      query.ascending('name');
+      query.ascending('firstName');
 
-      // Fetch clients
+      // Fetch users
       const clients = await query.find({ useMasterKey: true });
 
       // Transform to Tom Select format
-      const formattedClients = clients.map((client) => {
-        const name = client.get('name') || '';
-        const companyName = client.get('companyName') || '';
-        const contactPerson = client.get('contactPerson') || '';
-        const firstName = client.get('firstName') || '';
-        const lastName = client.get('lastName') || '';
+      const formattedClients = clients.map((user) => {
+        const firstName = user.get('firstName') || '';
+        const lastName = user.get('lastName') || '';
+        const name = user.get('name') || `${firstName} ${lastName}`.trim();
+        const companyName = user.get('companyName') || '';
+        const contactPerson = user.get('contactPerson') || '';
 
         // Build display label - prioritize company name, then constructed name
         let label = companyName || name;
@@ -1084,21 +1091,22 @@ class ClientsController {
         }
 
         return {
-          value: client.id,
+          value: user.id,
           label,
-          email: client.get('email') || '',
+          email: user.get('email') || '',
           contactPerson: contactPerson || `${firstName} ${lastName}`.trim(),
-          phone: client.get('phone') || '',
+          phone: user.get('phone') || '',
           firstName,
           lastName,
           companyName,
-          preferredLanguage: client.get('preferredLanguage') || 'es',
+          preferredLanguage: user.get('preferredLanguage') || 'es',
         };
       });
 
       logger.info('Direct Amexing clients retrieved for selector', {
         count: formattedClients.length,
         searchTerm: searchTerm || 'none',
+        clientCategory: filterByCategory ? clientCategory : 'all',
         page,
         limit,
         totalCount,
@@ -1506,7 +1514,7 @@ class ClientsController {
 
   /**
    * POST /api/clients/amexing-direct/quick - Create quick direct client.
-   * Creates a Client record (not AmexingUser) with clientBelongsTo = "amexing".
+   * Creates an AmexingUser with role = "end_client" (people-type client) so it can log in.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
@@ -1544,59 +1552,47 @@ class ClientsController {
         return this.sendError(res, 'First name and last name are required', 400);
       }
 
-      const Parse = require('parse/node');
-      const Client = Parse.Object.extend('Client');
+      const AmexingUser = require('../../../domain/models/AmexingUser');
 
-      // Create new Client object
-      const newClient = new Client();
+      // Derive username from email, or a placeholder when none is given
+      const normalizedEmail = (email || '').trim().toLowerCase();
+      const username = normalizedEmail || `enduser_${Date.now()}@migrated.amexing`;
 
-      // Set basic info
-      newClient.set('firstName', firstName);
-      newClient.set('lastName', lastName);
-      newClient.set('name', `${firstName} ${lastName}`);
-      newClient.set('fullName', `${firstName} ${lastName}`);
+      // Resolve contact person info (use main client when no separate contact is given)
+      const contactPerson = contactFirstName || contactLastName
+        ? `${contactFirstName || ''} ${contactLastName || ''}`.trim()
+        : `${firstName} ${lastName}`;
+      const resolvedContactFirstName = contactFirstName || firstName;
+      const resolvedContactLastName = contactLastName || lastName;
 
-      // Set contact info
-      if (email) {
-        newClient.set('email', email.toLowerCase());
-      }
-      if (phone) {
-        newClient.set('phone', phone);
-      }
+      // Create the end_client AmexingUser (people-type client)
+      const newUser = AmexingUser.create({
+        username,
+        email: normalizedEmail,
+        firstName,
+        lastName,
+        role: 'end_client',
+        organizationId: 'amexing',
+        clientCategory: 'direct_client',
+        phone,
+        companyName,
+        contactFirstName: resolvedContactFirstName,
+        contactLastName: resolvedContactLastName,
+        preferredLanguage,
+        active: true,
+        exists: true,
+        createdBy: currentUser.id,
+      });
+      newUser.set('contactPerson', contactPerson);
 
-      // Set company info
-      if (companyName) {
-        newClient.set('companyName', companyName);
-      }
+      // Set a random password; these accounts don't log in until invited.
+      // setPassword resets mustChangePassword to false, so set it to true afterward.
+      const crypto = require('crypto');
+      await newUser.setPassword(crypto.randomBytes(24).toString('base64'), false);
+      newUser.set('mustChangePassword', true);
 
-      // Set contact person info (if different from main client)
-      if (contactFirstName || contactLastName) {
-        const contactPerson = `${contactFirstName || ''} ${contactLastName || ''}`.trim();
-        if (contactPerson) {
-          newClient.set('contactPerson', contactPerson);
-          if (contactFirstName) newClient.set('contactFirstName', contactFirstName);
-          if (contactLastName) newClient.set('contactLastName', contactLastName);
-        }
-      } else {
-        // Use main client as contact person
-        newClient.set('contactPerson', `${firstName} ${lastName}`);
-        newClient.set('contactFirstName', firstName);
-        newClient.set('contactLastName', lastName);
-      }
-
-      // Set preferences
-      newClient.set('preferredLanguage', preferredLanguage);
-
-      // Mark as direct Amexing client
-      newClient.set('clientBelongsTo', 'amexing');
-      newClient.set('active', true);
-      newClient.set('exists', true);
-
-      // Set created by - Client model expects String, not Pointer
-      newClient.set('createdBy', currentUser.id);
-
-      // Save the client
-      const savedClient = await newClient.save(null, { useMasterKey: true });
+      // Save the user
+      const savedClient = await newUser.save(null, { useMasterKey: true });
 
       // Log the creation
       logger.info('Quick direct client created successfully', {

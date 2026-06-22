@@ -95,15 +95,15 @@ async function renderUrlToPdf(url, options = {}) {
     // when present, otherwise fall back to the generic fonts.ready. (Runs in the page.)
     try {
       await page.evaluate(async () => {
-        /* eslint-disable no-undef */
+        /* eslint-disable no-undef, no-underscore-dangle */
         await document.fonts.ready;
         if (window.__fontsReady !== undefined) {
           const start = Date.now();
           while (!window.__fontsReady && Date.now() - start < 5000) {
-            await new Promise((r) => setTimeout(r, 50));
+            await new Promise((resolve) => { setTimeout(resolve, 50); });
           }
         }
-        /* eslint-enable no-undef */
+        /* eslint-enable no-undef, no-underscore-dangle */
       });
     } catch (e) { /* noop */ }
     // Running footer on every page: brand link + page numbers. It softens page breaks
@@ -127,7 +127,9 @@ async function renderUrlToPdf(url, options = {}) {
     // the bottom margin matches the rest (no room reserved for the footer).
     const marginObj = typeof margin === 'object'
       ? margin
-      : { top: margin, bottom: footer ? '22mm' : margin, left: margin, right: margin };
+      : {
+        top: margin, bottom: footer ? '22mm' : margin, left: margin, right: margin,
+      };
     const pdfBuffer = await page.pdf({
       format,
       printBackground: true,

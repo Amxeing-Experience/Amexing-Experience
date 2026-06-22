@@ -26,6 +26,65 @@ class OwnedClientsController {
   }
 
   /**
+   * Create a people-type client as an AmexingUser (role 'end_client') so they can log in.
+   * Username derives from email, or a placeholder when none is given; a random password is
+   * set (these accounts don't log in until invited). Mirrors the migration script.
+   * @param {object} data - Profile fields (firstName, lastName, email, clientCategory, ...).
+   * @returns {Promise<AmexingUser>} The saved user.
+   */
+  async createEndClientUser(data) {
+    const email = (data.email || '').trim().toLowerCase();
+    const username = email || `enduser_${Date.now()}@migrated.amexing`;
+
+    const user = AmexingUser.create({
+      username,
+      email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      role: 'end_client',
+      organizationId: 'amexing',
+      phone: data.phone,
+      notes: data.notes,
+      contextualData: {},
+      clientCategory: data.clientCategory,
+      contactFirstName: data.contactFirstName,
+      contactLastName: data.contactLastName,
+      emergencyContactName: data.emergencyContactName,
+      emergencyContactPhone: data.emergencyContactPhone,
+      companyType: data.companyType,
+      taxId: data.taxId,
+      website: data.website,
+      preferredLanguage: data.preferredLanguage,
+      accessibilityRequirements: data.accessibilityRequirements,
+      allergies: data.allergies,
+      dietaryRestrictions: data.dietaryRestrictions,
+      address: data.address,
+      createdBy: data.createdBy,
+    });
+
+    const crypto = require('crypto');
+    await user.setPassword(crypto.randomBytes(24).toString('base64'), false);
+    user.set('mustChangePassword', true);
+
+    await user.save(null, { useMasterKey: true });
+    return user;
+  }
+
+  /**
+   * Resolve an id to either a people-type AmexingUser (role 'end_client') or a legacy Client
+   * record. People-type clients now live in AmexingUser; older/agency-owned ones stay Client.
+   * @param {string} id - The client or user objectId.
+   * @returns {Promise<Parse.Object|null>} The Parse object, or null when not found.
+   */
+  async resolveClientOrUser(id) {
+    const userQuery = new Parse.Query('AmexingUser');
+    userQuery.equalTo('role', 'end_client');
+    const user = await userQuery.get(id, { useMasterKey: true }).catch(() => null);
+    if (user) return user;
+    return this.createClientQuery().get(id, { useMasterKey: true }).catch(() => null);
+  }
+
+  /**
    * Create a Parse.Query for Client class safely.
    * @returns {Parse.Query} - Safe Parse.Query instance for Client.
    * @example
@@ -485,6 +544,28 @@ class OwnedClientsController {
         };
       }
 
+      const isAmexingClient = userRole === 'admin' || userRole === 'superadmin';
+      const finalCategory = clientCategory || 'direct_client';
+
+      // People-type clients owned by Amexing (admin/superadmin) now live in AmexingUser
+      // (role 'end_client') so they can eventually log in. Agency-owned sub-clients stay as
+      // Client records (they don't log into the admin portal).
+      if (isAmexingClient) {
+        const created = await this.createEndClientUser({
+          firstName, lastName, email, phone, contactFirstName, contactLastName,
+          emergencyContactName, emergencyContactPhone, companyType, taxId, website, notes,
+          address: structuredAddress || address, preferredLanguage, accessibilityRequirements,
+          allergies: processedAllergies, dietaryRestrictions: processedDietaryRestrictions,
+          clientCategory: finalCategory, createdBy: currentUser.id,
+        });
+        logger.info('End-client user created', { userId: created.id, category: finalCategory });
+        return res.status(201).json({
+          success: true,
+          message: 'Client created successfully',
+          data: { id: created.id, name: created.getFullName(), email: created.get('email') },
+        });
+      }
+
       // Create client with ownership and all new fields
       const clientData = {
         name,
@@ -508,12 +589,10 @@ class OwnedClientsController {
         allergies: processedAllergies,
         dietaryRestrictions: processedDietaryRestrictions,
         ownedBy: currentUser.id,
-        ownerType: userRole === 'admin' || userRole === 'superadmin' ? 'admin' : userRole,
+        ownerType: userRole,
         createdBy: currentUser.id,
-        // Mark clients created by admin/superadmin as belonging to Amexing
-        clientBelongsTo: userRole === 'admin' || userRole === 'superadmin' ? 'amexing' : undefined,
         // Default direct clients to 'direct_client' when no category is chosen.
-        clientCategory: clientCategory || 'direct_client',
+        clientCategory: finalCategory,
       };
 
       const client = Client.create(clientData);
@@ -741,9 +820,9 @@ class OwnedClientsController {
       const { id } = req.params;
       const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
 
-      // Get the client
-      const query = this.createClientQuery();
-      const client = await query.get(id, { useMasterKey: true });
+      // People-type clients now live in AmexingUser (role 'end_client'); fall back to the
+      // Client class for legacy/agency-owned records. The field setters below work on either.
+      const client = await this.resolveClientOrUser(id);
 
       if (!client) {
         return this.sendError(res, 'Client not found', 404);
@@ -865,6 +944,7 @@ class OwnedClientsController {
       if (accessibilityRequirements !== undefined) client.set('accessibilityRequirements', accessibilityRequirements);
       if (processedAllergies !== undefined) client.set('allergies', processedAllergies);
       if (processedDietaryRestrictions !== undefined) client.set('dietaryRestrictions', processedDietaryRestrictions);
+      if (req.body.clientCategory !== undefined) client.set('clientCategory', req.body.clientCategory);
 
       client.set('modifiedBy', currentUser);
       await client.save(null, { useMasterKey: true });
@@ -906,9 +986,8 @@ class OwnedClientsController {
       const { id } = req.params;
       const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
 
-      // Get the client
-      const query = this.createClientQuery();
-      const client = await query.get(id, { useMasterKey: true });
+      // Resolve people-type AmexingUser ('end_client') or legacy Client record.
+      const client = await this.resolveClientOrUser(id);
 
       if (!client) {
         return this.sendError(res, 'Client not found', 404);
@@ -970,9 +1049,8 @@ class OwnedClientsController {
 
       const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
 
-      // Get the client
-      const query = this.createClientQuery();
-      const client = await query.get(id, { useMasterKey: true });
+      // Resolve people-type AmexingUser ('end_client') or legacy Client record.
+      const client = await this.resolveClientOrUser(id);
 
       if (!client) {
         return this.sendError(res, 'Client not found', 404);

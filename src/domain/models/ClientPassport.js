@@ -31,7 +31,11 @@ class ClientPassport extends BaseModel {
   static create(data) {
     const passport = new ClientPassport();
 
-    if (data.client) passport.setClient(data.client);
+    if (data.ownerType && data.ownerId) {
+      passport.setOwner(data.ownerType, data.ownerId);
+    } else if (data.client) {
+      passport.setClient(data.client);
+    }
     passport.set('label', data.label || '');
     passport.set('countryOfIssue', data.countryOfIssue || '');
     passport.set('nationality', data.nationality || '');
@@ -55,6 +59,54 @@ class ClientPassport extends BaseModel {
     } else {
       this.set('client', client);
     }
+  }
+
+  // ---- Polymorphic owner (Client or AmexingUser). Legacy rows have no ownerType ⇒ 'client'. ----
+
+  getOwnerType() { return this.get('ownerType') || 'client'; }
+
+  getOwnerId() {
+    if (this.getOwnerType() === 'amexingUser') {
+      const u = this.get('ownerUser');
+      return u ? u.id : null;
+    }
+    const c = this.get('client');
+    return c ? c.id : null;
+  }
+
+  // Set the owner as either a Client ('client') or an AmexingUser ('amexingUser').
+  setOwner(ownerType, ownerId) {
+    if (ownerType === 'amexingUser') {
+      // AmexingUser is not a registered Parse subclass — build the pointer via extend().
+      const AmexingUser = Parse.Object.extend('AmexingUser');
+      const pointer = new AmexingUser();
+      pointer.id = ownerId;
+      this.set('ownerType', 'amexingUser');
+      this.set('ownerUser', pointer);
+      this.unset('client');
+    } else {
+      this.setClient(ownerId);
+      this.set('ownerType', 'client');
+      this.unset('ownerUser');
+    }
+  }
+
+  static async getByOwner(ownerType, ownerId) {
+    if (ownerType === 'amexingUser') {
+      try {
+        const AmexingUser = Parse.Object.extend('AmexingUser');
+        const pointer = new AmexingUser();
+        pointer.id = ownerId;
+        const query = new Parse.Query('ClientPassport');
+        query.equalTo('ownerUser', pointer);
+        query.ascending('label');
+        return await query.find({ useMasterKey: true });
+      } catch (error) {
+        logger.error('Error getting passports by owner user', { ownerId, error: error.message });
+        return [];
+      }
+    }
+    return ClientPassport.getByClient(ownerId);
   }
 
   getLabel() { return this.get('label') || ''; }
@@ -104,10 +156,10 @@ class ClientPassport extends BaseModel {
 
   // Safe serialization: masked number only, never the raw/encrypted value.
   async toSafeJSON(ctx = {}) {
-    const client = this.get('client');
     return {
       id: this.id,
-      clientId: client ? client.id : null,
+      clientId: this.getOwnerId(),
+      ownerType: this.getOwnerType(),
       label: this.getLabel(),
       hasNumber: this.hasNumber(),
       numberMasked: await this.getNumberMasked(ctx),
@@ -121,7 +173,7 @@ class ClientPassport extends BaseModel {
 
   static validate(data) {
     const errors = [];
-    if (!data.client) errors.push('Client is required');
+    if (!data.client && !data.ownerId) errors.push('Owner (client or user) is required');
     return errors;
   }
 

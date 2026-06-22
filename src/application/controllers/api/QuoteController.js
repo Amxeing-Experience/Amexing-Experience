@@ -184,34 +184,37 @@ class QuoteController {
             clientId: clientIdNormalized,
             userId: currentUser.id,
           });
-          // Direct Amexing client - only set companyClientPtr, leave client null
+          // People-type clients now live in AmexingUser (role 'end_client'): store them in the
+          // `client` pointer (AmexingUser), no companyClientPtr. Fall back to a legacy Client
+          // record (clientBelongsTo='amexing') for pre-migration ids so old data still works.
           try {
-            // Verify this is actually a direct Amexing client
-            const clientQuery = new Parse.Query('Client');
-            const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
-            const clientBelongsTo = clientRecord.get('clientBelongsTo');
+            const userQuery = new Parse.Query('AmexingUser');
+            const endClient = await userQuery.get(clientIdNormalized, { useMasterKey: true }).catch(() => null);
 
-            if (clientBelongsTo === 'amexing') {
-              // Valid direct Amexing client
-              companyClientObj = {
+            if (endClient && endClient.get('role') === 'end_client') {
+              clientObj = {
                 __type: 'Pointer',
-                className: 'Client',
+                className: 'AmexingUser',
                 objectId: clientIdNormalized,
               };
-
-              // Leave clientObj null for direct clients
-              clientObj = null;
-
-              logger.info('QuoteController.createQuote - Creating quote for direct Amexing client', {
+              companyClientObj = null;
+              logger.info('QuoteController.createQuote - Direct quote for end_client user', {
                 clientId: clientIdNormalized,
-                clientType: 'direct',
               });
             } else {
-              logger.warn('QuoteController.createQuote - Client is not a direct Amexing client', {
-                clientId: clientIdNormalized,
-                clientBelongsTo,
-              });
-              return this.sendError(res, 'El cliente seleccionado no es un cliente directo de Amexing', 400);
+              // Legacy direct Client (pre-migration).
+              const clientQuery = new Parse.Query('Client');
+              const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+              if (clientRecord.get('clientBelongsTo') === 'amexing') {
+                companyClientObj = {
+                  __type: 'Pointer',
+                  className: 'Client',
+                  objectId: clientIdNormalized,
+                };
+                clientObj = null;
+              } else {
+                return this.sendError(res, 'El cliente seleccionado no es un cliente directo de Amexing', 400);
+              }
             }
           } catch (error) {
             logger.error('QuoteController.createQuote - Error verifying direct client', {

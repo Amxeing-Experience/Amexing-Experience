@@ -32,11 +32,14 @@ let arponaCss = null;
 /**
  * Inline @font-face CSS for the Arpona family (base64, no network fetch).
  * @returns {string} CSS string, or '' if the font files cannot be read.
+ * @example
  */
 function getArponaEmbedCss() {
   if (arponaCss !== null) return arponaCss;
   try {
     arponaCss = ARPONA_FACES.map((f) => {
+      // Fixed filenames from a hardcoded list under a fixed dir — not user input.
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
       const b64 = fs.readFileSync(path.join(FONTS_DIR, f.file)).toString('base64');
       return `@font-face{font-family:'ArponaPDF';src:url(data:font/ttf;base64,${b64}) format('${f.format}');font-weight:${f.weight};font-style:normal;font-display:block;}`;
     }).join('');

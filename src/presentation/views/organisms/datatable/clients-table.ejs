@@ -329,28 +329,15 @@ function initializeClientsDataTable(totalCount) {
                 render: function(data, type, row) {
                     let actions = '<div class="btn-group btn-group-sm" role="group">';
 
-                    /* Different actions based on client type */
-                    if (row.type === 'agency') {
-                        /* View/edit detail button for agencies */
-                        actions += `<a href="/dashboard/admin/clients/${row.id}"
-                                    class="btn btn-info"
-                                    data-bs-toggle="tooltip"
-                                    data-bs-placement="top"
-                                    title="Ver Detalle de Agencia">
-                                    <i class="ti ti-pencil"></i>
-                                </a>`;
-                    } else {
-                        /* Edit modal button for direct clients */
-                        actions += `<button type="button"
-                                    class="btn btn-info btn-edit-client"
-                                    data-client-id="${row.id}"
-                                    data-client-type="${row.type}"
-                                    data-bs-toggle="tooltip"
-                                    data-bs-placement="top"
-                                    title="Editar Cliente">
-                                    <i class="ti ti-edit"></i>
-                                </button>`;
-                    }
+                    /* Single button → full detail page (edit, Perfil, passports all live there) */
+                    const detailTitle = row.type === 'agency' ? 'Ver Detalle de Agencia' : 'Ver Detalle';
+                    actions += `<a href="/dashboard/admin/clients/${row.id}"
+                                class="btn btn-info"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="${detailTitle}">
+                                <i class="ti ti-pencil"></i>
+                            </a>`;
 
                     <% if (canEdit) { %>
                     /* Toggle status button */

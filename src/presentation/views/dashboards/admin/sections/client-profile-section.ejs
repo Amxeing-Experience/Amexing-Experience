@@ -2,13 +2,43 @@
 // Travel-preference types mirror the reference design.
 const PREFERENCE_TYPES = ['Activity', 'Bed', 'Hotel', 'Meal', 'Mood', 'Seat'];
 %>
+<style>
+    #profileModal .form-control, #profileModal .form-select,
+    #agentProfileModal .form-control, #agentProfileModal .form-select,
+    #profileRoot .form-control, #profileRoot .form-select { color: #1b1b1b; }
+    #profileModal .form-control::placeholder,
+    #agentProfileModal .form-control::placeholder,
+    #profileRoot .form-control::placeholder { color: #6c757d; }
+</style>
 <script>
-(function () {
-    const root = document.getElementById('profileRoot');
-    if (!root) return;
+// Initialize the profile section for a given root element. Reusable so it can drive both the
+// client detail page (#profileRoot) and an injected agent-profile modal (its own root).
+window.initProfileSection = function (root) {
+    if (!root || root.dataset.profileInit === '1') return;
+    root.dataset.profileInit = '1';
     const clientId = root.dataset.clientId;
-    const base = `/api/clients/${clientId}`;
+    // ownerBase lets this section drive either /api/clients/:id (Client) or /api/agents/:id
+    // (AmexingUser agent). Falls back to the client base for backward compatibility.
+    const base = root.dataset.ownerBase || `/api/clients/${clientId}`;
     const PREFERENCE_TYPES = <%- JSON.stringify(PREFERENCE_TYPES) %>;
+
+    // Country list for passport dropdowns. México/Estados Unidos/Canadá first (Mexican travel
+    // company), then the rest alphabetically.
+    const COUNTRIES = ['México', 'Estados Unidos', 'Canadá', 'Alemania', 'Arabia Saudita', 'Argentina',
+        'Australia', 'Austria', 'Bélgica', 'Bolivia', 'Brasil', 'Bulgaria', 'Chile', 'China', 'Chipre',
+        'Colombia', 'Corea del Sur', 'Costa Rica', 'Croacia', 'Cuba', 'Dinamarca', 'Ecuador', 'Egipto',
+        'El Salvador', 'Emiratos Árabes Unidos', 'Eslovaquia', 'Eslovenia', 'España', 'Estonia',
+        'Filipinas', 'Finlandia', 'Francia', 'Grecia', 'Guatemala', 'Honduras', 'Hungría', 'India',
+        'Indonesia', 'Irlanda', 'Islandia', 'Israel', 'Italia', 'Japón', 'Letonia', 'Lituania',
+        'Luxemburgo', 'Malasia', 'Malta', 'Marruecos', 'Nicaragua', 'Noruega', 'Nueva Zelanda',
+        'Países Bajos', 'Panamá', 'Paraguay', 'Perú', 'Polonia', 'Portugal', 'Qatar', 'Reino Unido',
+        'República Checa', 'República Dominicana', 'Rumania', 'Rusia', 'Singapur', 'Sudáfrica',
+        'Suecia', 'Suiza', 'Tailandia', 'Turquía', 'Ucrania', 'Uruguay', 'Venezuela', 'Vietnam'];
+
+    function countrySelect(field, current) {
+        const opts = COUNTRIES.map((c) => `<option value="${esc(c)}" ${current === c ? 'selected' : ''}>${esc(c)}</option>`).join('');
+        return `<select class="form-select" data-f="${field}"><option value="">Selecciona…</option>${opts}</select>`;
+    }
 
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -34,6 +64,7 @@ const PREFERENCE_TYPES = ['Activity', 'Bed', 'Hotel', 'Meal', 'Mood', 'Seat'];
     // ---------- Passports ----------
     async function loadPassports() {
         const box = document.getElementById('passportsContainer');
+        if (!box) return; // agencies don't render the passports card
         try {
             const { passports } = await api('/passports');
             if (!passports.length) { box.innerHTML = '<p class="text-muted mb-0">Sin pasaportes registrados.</p>'; return; }
@@ -76,8 +107,8 @@ const PREFERENCE_TYPES = ['Activity', 'Bed', 'Hotel', 'Meal', 'Mood', 'Seat'];
             <div class="row g-2">
                 <div class="col-md-6"><label class="form-label small">Etiqueta</label><input class="form-control" data-f="label" value="${esc(p.label)}" placeholder="Passport 1"></div>
                 <div class="col-md-6"><label class="form-label small">Passport Number</label><input class="form-control" data-f="number" placeholder="${p.hasNumber ? 'Dejar vacío para conservar' : ''}"></div>
-                <div class="col-md-6"><label class="form-label small">Country of Issue</label><input class="form-control" data-f="countryOfIssue" value="${esc(p.countryOfIssue)}"></div>
-                <div class="col-md-6"><label class="form-label small">Nationality</label><input class="form-control" data-f="nationality" value="${esc(p.nationality)}"></div>
+                <div class="col-md-6"><label class="form-label small">Country of Issue</label>${countrySelect('countryOfIssue', p.countryOfIssue)}</div>
+                <div class="col-md-6"><label class="form-label small">Nationality</label>${countrySelect('nationality', p.nationality)}</div>
                 <div class="col-md-6"><label class="form-label small">Date of Issue</label><input type="date" class="form-control" data-f="dateOfIssue" value="${dateInput(p.dateOfIssue)}"></div>
                 <div class="col-md-6"><label class="form-label small">Expiration Date</label><input type="date" class="form-control" data-f="expirationDate" value="${dateInput(p.expirationDate)}"></div>
             </div>`;
@@ -148,6 +179,7 @@ const PREFERENCE_TYPES = ['Activity', 'Bed', 'Hotel', 'Meal', 'Mood', 'Seat'];
     // ---------- Loyalty programs (array on the client) ----------
     async function loadLoyalty() {
         const box = document.getElementById('loyaltyContainer');
+        if (!box) return; // agents (and any owner without loyalty) don't render the loyalty card
         try {
             const { loyaltyPrograms } = await api('/loyalty-programs');
             box._data = loyaltyPrograms || [];
@@ -170,19 +202,30 @@ const PREFERENCE_TYPES = ['Activity', 'Bed', 'Hotel', 'Meal', 'Mood', 'Seat'];
         await api('/loyalty-programs', 'PUT', { loyaltyPrograms: list });
     }
 
-    // ---------- Generic modal (reuses Bootstrap) ----------
-    function openModal(title, bodyHtml, onSave) {
+    // ---------- Generic modal (standard dashboard style: bg-primary header + icon) ----------
+    function openModal(title, bodyHtml, onSave, icon = 'edit') {
         let el = document.getElementById('profileModal');
         if (!el) {
             document.body.insertAdjacentHTML('beforeend', `
-                <div class="modal fade" id="profileModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-                    <div class="modal-header"><h5 class="modal-title"></h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-                    <div class="modal-body"></div>
-                    <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" id="profileModalSave">Guardar</button></div>
-                </div></div></div>`);
+                <div class="modal fade" id="profileModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title text-white"><i class="ti ti-edit me-2" data-modal-icon></i><span data-modal-title></span></h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body"></div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="ti ti-x me-1"></i>Cancelar</button>
+                                <button type="button" class="btn btn-primary" id="profileModalSave"><i class="ti ti-check me-1"></i>Guardar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`);
             el = document.getElementById('profileModal');
         }
-        el.querySelector('.modal-title').textContent = title;
+        el.querySelector('[data-modal-icon]').className = `ti ti-${icon} me-2`;
+        el.querySelector('[data-modal-title]').textContent = title;
         el.querySelector('.modal-body').innerHTML = bodyHtml;
         const modal = bootstrap.Modal.getOrCreateInstance(el);
         const saveBtn = el.querySelector('#profileModalSave');
@@ -196,17 +239,27 @@ const PREFERENCE_TYPES = ['Activity', 'Bed', 'Hotel', 'Meal', 'Mood', 'Seat'];
             try { await onSave(values); modal.hide(); } catch (e) { notify(e.message, 'error'); }
         });
         modal.show();
+        // When opened over a parent modal (e.g. the agent profile modal), stack this one and
+        // its backdrop above it so the parent is dimmed instead of peeking through.
+        const stacked = document.querySelectorAll('.modal.show').length > 1;
+        if (stacked) {
+            el.style.zIndex = '1075';
+            requestAnimationFrame(() => {
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                if (backdrops.length) backdrops[backdrops.length - 1].style.zIndex = '1070';
+            });
+        }
     }
 
     // ---------- Wiring ----------
     document.getElementById('addPassportBtn')?.addEventListener('click', () => {
-        openModal('Agregar Pasaporte', passportForm(), async (v) => { await api('/passports', 'POST', v); notify('Pasaporte creado'); loadPassports(); });
+        openModal('Agregar Pasaporte', passportForm(), async (v) => { await api('/passports', 'POST', v); notify('Pasaporte creado'); loadPassports(); }, 'id');
     });
     document.getElementById('addAddressBtn')?.addEventListener('click', () => {
-        openModal('Agregar Dirección', addressForm(), async (v) => { await api('/addresses', 'POST', v); notify('Dirección creada'); loadAddresses(); });
+        openModal('Agregar Dirección', addressForm(), async (v) => { await api('/addresses', 'POST', v); notify('Dirección creada'); loadAddresses(); }, 'map-pin');
     });
     document.getElementById('addPreferenceBtn')?.addEventListener('click', () => {
-        openModal('Agregar Preferencia', preferenceForm(), async (v) => { await api('/travel-preferences', 'POST', v); notify('Preferencia creada'); loadPreferences(); });
+        openModal('Agregar Preferencia', preferenceForm(), async (v) => { await api('/travel-preferences', 'POST', v); notify('Preferencia creada'); loadPreferences(); }, 'plane');
     });
     document.getElementById('addLoyaltyBtn')?.addEventListener('click', () => {
         openModal('Agregar Programa', `
@@ -217,7 +270,7 @@ const PREFERENCE_TYPES = ['Activity', 'Bed', 'Hotel', 'Meal', 'Mood', 'Seat'];
             const box = document.getElementById('loyaltyContainer');
             const list = [...(box._data || []), { type: v.type, number: v.number }];
             await saveLoyalty(list); box._data = list; renderLoyalty(); notify('Programa agregado');
-        });
+        }, 'star');
     });
 
     root.addEventListener('click', async (e) => {
@@ -237,18 +290,18 @@ const PREFERENCE_TYPES = ['Activity', 'Bed', 'Hotel', 'Meal', 'Mood', 'Seat'];
                 }
             } else if (btn.dataset.editPp) {
                 const p = (document.getElementById('passportsContainer')._data || []).find((x) => x.id === btn.dataset.editPp);
-                openModal('Editar Pasaporte', passportForm(p), async (v) => { await api(`/passports/${p.id}`, 'PUT', v); notify('Pasaporte actualizado'); loadPassports(); });
+                openModal('Editar Pasaporte', passportForm(p), async (v) => { await api(`/passports/${p.id}`, 'PUT', v); notify('Pasaporte actualizado'); loadPassports(); }, 'id');
             } else if (btn.dataset.delPp) {
                 if (confirm('¿Eliminar este pasaporte?')) { await api(`/passports/${btn.dataset.delPp}`, 'DELETE'); notify('Pasaporte eliminado'); loadPassports(); }
             } else if (btn.dataset.fav) { await api(`/addresses/${btn.dataset.fav}`, 'PUT', { isFavorite: true }); loadAddresses(); }
             else if (btn.dataset.editAddr) {
                 const a = (document.getElementById('addressesContainer')._data || []).find((x) => x.id === btn.dataset.editAddr);
-                openModal('Editar Dirección', addressForm(a), async (v) => { await api(`/addresses/${a.id}`, 'PUT', v); notify('Dirección actualizada'); loadAddresses(); });
+                openModal('Editar Dirección', addressForm(a), async (v) => { await api(`/addresses/${a.id}`, 'PUT', v); notify('Dirección actualizada'); loadAddresses(); }, 'map-pin');
             } else if (btn.dataset.delAddr) {
                 if (confirm('¿Eliminar esta dirección?')) { await api(`/addresses/${btn.dataset.delAddr}`, 'DELETE'); notify('Dirección eliminada'); loadAddresses(); }
             } else if (btn.dataset.editPref) {
                 const p = (document.getElementById('preferencesContainer')._data || []).find((x) => x.id === btn.dataset.editPref);
-                openModal('Editar Preferencia', preferenceForm(p), async (v) => { await api(`/travel-preferences/${p.id}`, 'PUT', v); notify('Preferencia actualizada'); loadPreferences(); });
+                openModal('Editar Preferencia', preferenceForm(p), async (v) => { await api(`/travel-preferences/${p.id}`, 'PUT', v); notify('Preferencia actualizada'); loadPreferences(); }, 'plane');
             } else if (btn.dataset.delPref) {
                 if (confirm('¿Eliminar esta preferencia?')) { await api(`/travel-preferences/${btn.dataset.delPref}`, 'DELETE'); notify('Preferencia eliminada'); loadPreferences(); }
             } else if (btn.dataset.delLoyalty) {
@@ -263,5 +316,11 @@ const PREFERENCE_TYPES = ['Activity', 'Bed', 'Hotel', 'Meal', 'Mood', 'Seat'];
     loadAddresses();
     loadPreferences();
     loadLoyalty();
+};
+
+// Auto-init for the client detail page (the agent modal calls initProfileSection itself).
+(function () {
+    const root = document.getElementById('profileRoot');
+    if (root) window.initProfileSection(root);
 })();
 </script>

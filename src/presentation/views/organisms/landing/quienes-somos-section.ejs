@@ -1,0 +1,248 @@
+<%#
+Quiénes Somos Section Organism - Nosotros Page
+Intro "Quiénes Somos": heading + texto, galería de fotos (provisionales) y cita destacada.
+
+Created by Denisse Maldonado
+%>
+
+<section class="quienes-somos">
+    <div class="quienes-somos__container">
+        <div class="quienes-somos__top">
+            <%# Columna izquierda: título + texto %>
+            <div class="quienes-somos__intro">
+                <h2 class="quienes-somos__title">
+                    <span>Quiénes</span>
+                    <span>Somos</span>
+                </h2>
+
+                <div class="quienes-somos__text">
+                    <p>
+                        En <strong>Amexing Experience</strong>, creemos que cada llegada a San Miguel
+                        de Allende debe sentirse especial desde el primer momento.
+                    </p>
+                    <p>
+                        Somos una empresa local, 100% mexicana y sanmiguelense, especializada en
+                        transporte terrestre de lujo y experiencias privadas cuidadosamente diseñadas.
+                        Nuestra vocación es recibir a cada cliente con seguridad, confort y una atención
+                        excepcional, cuidando cada detalle para que su viaje sea confiable, fluido y memorable.
+                    </p>
+                    <p>
+                        Nos distingue el conocimiento profundo del destino y una forma de servicio basada
+                        en la hospitalidad, la cercanía y el orgullo de compartir el lugar que llamamos hogar.
+                        Cada traslado, recorrido o experiencia es una oportunidad para mostrar San Miguel de
+                        Allende desde una perspectiva auténtica, cálida y cuidadosamente curada.
+                    </p>
+                    <p>
+                        Más allá de llevar a nuestros clientes de un punto a otro, buscamos hacerlos sentir
+                        verdaderamente bienvenidos, acompañados y atendidos desde el primer contacto hasta el
+                        final de su experiencia.
+                    </p>
+                </div>
+            </div>
+
+            <%# Columna derecha: galería de fotos provisionales (placeholders) %>
+            <div class="quienes-somos__gallery">
+                <span class="quienes-somos__gallery-label">Fotos provisionales</span>
+                <div class="quienes-somos__grid">
+                    <div class="quienes-somos__photo quienes-somos__photo--portrait" role="img" aria-label="Foto provisional">
+                        <i class="fa-solid fa-camera" aria-hidden="true"></i>
+                    </div>
+                    <div class="quienes-somos__photo quienes-somos__photo--small-a" role="img" aria-label="Foto provisional">
+                        <i class="fa-solid fa-camera" aria-hidden="true"></i>
+                    </div>
+                    <div class="quienes-somos__photo quienes-somos__photo--small-b" role="img" aria-label="Foto provisional">
+                        <i class="fa-solid fa-camera" aria-hidden="true"></i>
+                    </div>
+                    <div class="quienes-somos__photo quienes-somos__photo--wide" role="img" aria-label="Foto provisional">
+                        <i class="fa-solid fa-camera" aria-hidden="true"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <%# Cita destacada %>
+        <blockquote class="quienes-somos__quote">
+            <p>
+                Elevamos la experiencia de viaje en San Miguel de Allende a través del transporte,
+                la hospitalidad y el orgullo de compartir nuestro destino con el mundo.
+            </p>
+        </blockquote>
+    </div>
+</section>
+
+<style>
+.quienes-somos {
+    padding: 5rem 0 4rem;
+    background: #eff0ec;
+}
+
+.quienes-somos__container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2.5rem;
+}
+
+.quienes-somos__top {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 3.5rem;
+    align-items: start;
+}
+
+/* ---- Título ---- */
+.quienes-somos__title {
+    font-family: var(--font-newsreader);
+    font-weight: 400;
+    font-size: clamp(2.4rem, 4vw, 3.6rem);
+    line-height: 1.15;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: #585757;
+    margin: 0 0 1.8rem;
+}
+
+.quienes-somos__title span {
+    display: block;
+}
+
+/* ---- Texto ---- */
+.quienes-somos__text p {
+    font-family: var(--font-myriad), 'Segoe UI', Tahoma, sans-serif;
+    font-size: clamp(0.95rem, 1.1vw, 1.05rem);
+    line-height: 1.75;
+    color: #2e2e2d;
+    margin: 0 0 1.1rem;
+}
+
+.quienes-somos__text strong {
+    font-weight: 700;
+    color: #2e2e2d;
+}
+
+/* ---- Galería ---- */
+.quienes-somos__gallery {
+    position: relative;
+}
+
+.quienes-somos__gallery-label {
+    display: block;
+    text-align: right;
+    font-family: var(--font-myriad), 'Segoe UI', Tahoma, sans-serif;
+    font-size: 0.8rem;
+    color: #9a9a9a;
+    margin-bottom: 0.6rem;
+}
+
+.quienes-somos__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr auto;
+    gap: 0.85rem;
+    grid-template-areas:
+        "portrait small-a"
+        "portrait small-b"
+        "wide wide";
+}
+
+.quienes-somos__photo {
+    background: linear-gradient(135deg, #d8d8d3 0%, #c9c9c3 100%);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(0, 0, 0, 0.18);
+    font-size: 1.6rem;
+}
+
+.quienes-somos__photo--portrait {
+    grid-area: portrait;
+    min-height: 360px;
+}
+
+.quienes-somos__photo--small-a {
+    grid-area: small-a;
+    min-height: 174px;
+}
+
+.quienes-somos__photo--small-b {
+    grid-area: small-b;
+    min-height: 174px;
+}
+
+.quienes-somos__photo--wide {
+    grid-area: wide;
+    min-height: 190px;
+}
+
+/* ---- Cita destacada ---- */
+.quienes-somos__quote {
+    margin: 4.5rem auto 0;
+    max-width: 980px;
+    padding: 0 3rem;
+    position: relative;
+}
+
+/* Dos líneas verticales que flanquean la cita */
+.quienes-somos__quote::before,
+.quienes-somos__quote::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: rgba(140, 146, 128, 0.7);
+}
+
+.quienes-somos__quote::before {
+    left: 0;
+}
+
+.quienes-somos__quote::after {
+    right: 0;
+}
+
+.quienes-somos__quote p {
+    margin: 0;
+    text-align: center;
+    font-family: var(--font-newsreader);
+    font-weight: 400;
+    /* Calibrado contra el título (72pt = 3.6rem → 0.05rem/pt):
+       iniciales 70pt ≈ 3.5rem; las versalitas caen a ~0.7× ≈ 49pt */
+    font-size: clamp(2.3rem, 3.9vw, 3.5rem);
+    line-height: 1.02;
+    letter-spacing: 0.01em;
+    color: #8a9078;
+    font-variant-caps: small-caps;
+    font-feature-settings: "smcp";
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 860px) {
+    .quienes-somos__top {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+    }
+
+    .quienes-somos__gallery-label {
+        text-align: left;
+    }
+
+    .quienes-somos__photo--portrait {
+        min-height: 280px;
+    }
+
+    .quienes-somos__quote {
+        margin-top: 3.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .quienes-somos__container {
+        padding: 0 1.5rem;
+    }
+
+    .quienes-somos__grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+</style>

@@ -7,36 +7,33 @@ Created by Denisse Maldonado
 
 <section class="afiliaciones-section">
     <div class="afiliaciones-section__container">
-        <div class="afiliaciones-section__grid">
-            <div class="afiliaciones-section__spacer"></div>
-            
-            <div class="afiliaciones-section__logo-column">
-                <div class="afiliaciones-section__logo">
-                    <img src="/images/canacosma.png" alt="CANACOSMA - Cámara Nacional de Comercio, Servicios y Turismo de San Miguel de Allende" class="afiliaciones-section__image">
-                </div>
+        <div class="afiliaciones-section__inner">
+            <%# Logo CANACOSMA (izquierda) %>
+            <div class="afiliaciones-section__logo">
+                <img src="/images/canacosma.png" alt="CANACOSMA — Cámara Nacional de Comercio, Servicios y Turismo de San Miguel de Allende" class="afiliaciones-section__image">
             </div>
-            
-            <div class="afiliaciones-section__content-column">
-                <hr>
-                <h2 class="afiliaciones-section__title">
-                    Afiliaciones
-                </h2>
-                <hr>
-                <p class="afiliaciones-section__subtitle">
-                    Miembros Patrocinadores
+
+            <%# Contenido (derecha) %>
+            <div class="afiliaciones-section__content">
+                <hr class="afiliaciones-section__line">
+                <h2 class="afiliaciones-section__title">Afiliaciones</h2>
+                <hr class="afiliaciones-section__line">
+                <p class="afiliaciones-section__subtitle">Miembros Patrocinadores</p>
+                <p class="afiliaciones-section__text">
+                    Comprometidos con la excelencia, el fortalecimiento de la comunidad
+                    empresarial, la colaboración local y el desarrollo sostenible de San Miguel
+                    de Allende como destino turístico.
                 </p>
+                <hr class="afiliaciones-section__line">
             </div>
-            
-            <div class="afiliaciones-section__spacer"></div>
         </div>
     </div>
 </section>
 
 <style>
 .afiliaciones-section {
-    padding: 4rem 0;
+    padding: 3.5rem 0;
     background: #2e2e2d;
-    margin-bottom: 2rem;
 }
 
 .afiliaciones-section__container {
@@ -45,20 +42,16 @@ Created by Denisse Maldonado
     padding: 0 3rem;
 }
 
-.afiliaciones-section__grid {
+.afiliaciones-section__inner {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr;
-    gap: 1rem;
+    grid-template-columns: 1fr 1.1fr;
+    gap: 2rem;
     align-items: center;
-    justify-items: center;
+    box-sizing: border-box;
+    padding: 0 10rem;
 }
 
-.afiliaciones-section__logo-column {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
+/* ---- Logo (izquierda) ---- */
 .afiliaciones-section__logo {
     display: flex;
     align-items: center;
@@ -67,71 +60,72 @@ Created by Denisse Maldonado
 
 .afiliaciones-section__image {
     max-width: 100%;
-    max-height: 200px;
+    max-height: 280px;
     width: auto;
     height: auto;
     object-fit: contain;
 }
 
-.afiliaciones-section__content-column {
-    text-align: center;
+/* ---- Contenido (derecha) ---- */
+.afiliaciones-section__line {
+    border: none;
+    border-top: 2px solid rgba(255, 255, 255, 0.4);
+    height: 0;
+    margin: 1.3rem 0;
 }
 
 .afiliaciones-section__title {
-    font-family: var(--font-arpona);
-    font-size: 1.5rem;
-    font-weight: 300;
-    color: #969b81;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin: 0;
-    line-height: 1.2;
-}
-
-.large-letter {
-    font-size: 4rem;
+    font-family: var(--font-newsreader);
     font-weight: 400;
-    line-height: 1;
-    vertical-align: baseline;
+    font-size: clamp(1.4rem, 2.2vw, 2rem);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #d6d6cf;
+    margin: -0.55rem 0;
+    padding-left: 1.25rem;
 }
 
 .afiliaciones-section__subtitle {
-    font-family: var(--font-myriad);
-    font-size: 1.1rem;
-    font-weight: 300;
-    color: #969b81;
-    letter-spacing: 2px;
+    font-family: var(--font-newsreader);
+    font-weight: 400;
+    font-size: clamp(1.05rem, 1.7vw, 1.45rem);
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    margin: 0;
-    line-height: 1.4;
+    color: #cbcdc0;
+    margin: 0 0 1.3rem;
+    padding-left: 1.25rem;
 }
 
+.afiliaciones-section__text {
+    font-family: var(--font-newsreader);
+    font-weight: 400;
+    font-size: clamp(1rem, 1.4vw, 1.2rem);
+    line-height: 1.7;
+    color: #cbcdc0;
+    margin: 0 0 1.3rem;
+    padding-left: 1.25rem;
+}
+
+/* ---- Responsive ---- */
 @media (max-width: 768px) {
     .afiliaciones-section {
-        padding: 3rem 0;
+        padding: 2.5rem 0;
     }
-    
+
     .afiliaciones-section__container {
-        padding: 0 1rem;
+        padding: 0 1.5rem;
     }
-    
-    .afiliaciones-section__grid {
+
+    .afiliaciones-section__inner {
         grid-template-columns: 1fr;
-        gap: 2rem;
+        gap: 2.5rem;
+        padding: 0;
     }
-    
-    .afiliaciones-section__image {
-        max-height: 150px;
-    }
-    
-    .afiliaciones-section__title {
-        font-size: 2rem;
-        letter-spacing: 2px;
-    }
-    
-    .afiliaciones-section__subtitle {
-        font-size: 1rem;
-        letter-spacing: 1px;
+
+    .afiliaciones-section__title,
+    .afiliaciones-section__subtitle,
+    .afiliaciones-section__text {
+        text-align: center;
     }
 }
 </style>

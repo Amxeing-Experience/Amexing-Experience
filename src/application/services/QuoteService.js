@@ -427,51 +427,43 @@ class QuoteService {
 
       if (clientIdNormalized) {
         if (isDirectClient) {
-          // Handle Direct Client (Client table)
+          // People-type clients now live in AmexingUser (role 'end_client'): store them in the
+          // `client` pointer, no companyClientPtr. Fall back to a legacy Client record for
+          // pre-migration ids so old quotes keep working.
           try {
-            console.log('=== DIRECT CLIENT UPDATE ===');
-            console.log('Updating quote with Direct Client ID:', clientIdNormalized);
+            const userQuery = new Parse.Query('AmexingUser');
+            const endClient = await userQuery.get(clientIdNormalized, { useMasterKey: true }).catch(() => null);
 
-            // Verify the Client exists
-            const clientQuery = new Parse.Query('Client');
-            const clientObj = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
-
-            console.log('✅ Direct Client found:', {
-              id: clientObj.id,
-              name: clientObj.get('name'),
-              firstName: clientObj.get('firstName'),
-              lastName: clientObj.get('lastName'),
-              email: clientObj.get('email'),
-            });
-
-            // Set companyClientPtr to the Client object
-            const clientPointer = {
-              __type: 'Pointer',
-              className: 'Client',
-              objectId: clientIdNormalized,
-            };
-            quote.set('companyClientPtr', clientPointer);
-            quote.set('client', null); // Clear AmexingUser field for direct clients
-            quote.set('clientType', 'direct'); // Ensure clientType is set
-
-            appliedUpdates.companyClientPtr = clientIdNormalized;
-            appliedUpdates.client = null;
-            appliedUpdates.clientType = 'direct';
-
-            console.log('✅ DIRECT CLIENT UPDATE SUCCESSFUL:', {
-              quoteId: quote.id,
-              clientId: clientIdNormalized,
-              clientName: clientObj.get('name') || `${clientObj.get('firstName')} ${clientObj.get('lastName')}`,
-              pointer: clientPointer,
-            });
-
-            logger.info('QuoteService.updateQuote - Quote updated with Direct Client', {
-              quoteId: quote.id,
-              clientId: clientIdNormalized,
-              clientType: 'direct',
-            });
+            if (endClient && endClient.get('role') === 'end_client') {
+              quote.set('client', {
+                __type: 'Pointer', className: 'AmexingUser', objectId: clientIdNormalized,
+              });
+              quote.set('companyClientPtr', null);
+              quote.set('clientType', 'direct');
+              appliedUpdates.client = clientIdNormalized;
+              appliedUpdates.companyClientPtr = null;
+              appliedUpdates.clientType = 'direct';
+              logger.info('QuoteService.updateQuote - Direct quote updated with end_client user', {
+                quoteId: quote.id, clientId: clientIdNormalized,
+              });
+            } else {
+              // Legacy direct Client (pre-migration).
+              const clientQuery = new Parse.Query('Client');
+              await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+              quote.set('companyClientPtr', {
+                __type: 'Pointer', className: 'Client', objectId: clientIdNormalized,
+              });
+              quote.set('client', null);
+              quote.set('clientType', 'direct');
+              appliedUpdates.companyClientPtr = clientIdNormalized;
+              appliedUpdates.client = null;
+              appliedUpdates.clientType = 'direct';
+              logger.info('QuoteService.updateQuote - Direct quote updated with legacy Client', {
+                quoteId: quote.id, clientId: clientIdNormalized,
+              });
+            }
           } catch (clientError) {
-            logger.error('QuoteService.updateQuote - Direct Client not found', {
+            logger.error('QuoteService.updateQuote - Direct client not found', {
               quoteId: quote.id,
               clientId: clientIdNormalized,
               error: clientError.message,

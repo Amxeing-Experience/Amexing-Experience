@@ -841,7 +841,7 @@ function registerCloudFunctions() {
       }
 
       // Validate role
-      const validRoles = ['user', 'client', 'employee', 'admin', 'superadmin'];
+      const validRoles = ['user', 'client', 'employee', 'admin', 'superadmin', 'end_client'];
       const role = user.get('role');
       if (role && !validRoles.includes(role)) {
         throw new Parse.Error(Parse.Error.VALIDATION_ERROR, `Invalid role. Must be one of: ${validRoles.join(', ')}`);

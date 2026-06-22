@@ -471,6 +471,7 @@ router.use(jwtMiddleware.authenticateToken);
 const userManagementRoutes = require('./api/userManagementRoutes');
 const amexingUsersRoutes = require('./api/amexingUsersRoutes');
 const clientsRoutes = require('./api/clientsRoutes');
+const agentsRoutes = require('./api/agentsRoutes');
 const ownedClientsRoutes = require('./api/ownedClientsRoutes');
 const employeesRoutes = require('./api/employeesRoutes');
 const rolesRoutes = require('./api/rolesRoutes');
@@ -526,6 +527,7 @@ router.use('/profile', require('./api/profileImageRoutes'));
 // Profile image endpoints
 router.use('/amexingusers', amexingUsersRoutes);
 router.use('/clients', clientsRoutes);
+router.use('/agents', agentsRoutes);
 router.use('/owned-clients', ownedClientsRoutes);
 router.use('/employees', employeesRoutes);
 router.use('/roles', rolesRoutes);
