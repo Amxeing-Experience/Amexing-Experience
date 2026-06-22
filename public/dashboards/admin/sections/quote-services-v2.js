@@ -15563,6 +15563,16 @@ class ItineraryBuilder {
       isEditing: !!this.currentServiceId,
     });
 
+    // eslint-disable-next-line no-console
+    console.log('🟠 routeDuration debug:', {
+      currentServiceId: this.currentServiceId,
+      savedRouteDuration: (this.currentServiceId && this.services.has(this.currentServiceId))
+        ? this.services.get(this.currentServiceId).routeDuration : 'n/a (no edit)',
+      transportRouteDuration: this.transportPriceData?.routeDuration,
+      cachedRouteDuration: this.cachedRouteDuration,
+      resolved: routeDuration,
+      tripType,
+    });
     if (!routeDuration) {
       console.warn('⚠️ No route duration available');
       return;
@@ -17961,6 +17971,10 @@ class ItineraryBuilder {
       this.transportPriceData = result.data;
       // Cache routeDuration separately so it persists even if transportPriceData is cleared
       this.cachedRouteDuration = result.data.routeDuration || null;
+      // eslint-disable-next-line no-console
+      console.log('🔵 prices-by-route lookup:', {
+        apiOrigin, apiDestination, rateId, returnedRouteDuration: result.data.routeDuration,
+      });
 
       qsDevLog('🚗 Route duration received:', {
         origin: apiOrigin,
