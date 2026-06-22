@@ -474,6 +474,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <label for="flightDepartureTimeSuggested" class="form-label" id="flightDepartureTimeSuggestedLabel">Hora de salida sugerida</label>
                                             <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
                                             <small class="text-muted">Se calcula automáticamente al seleccionar un segmento; puedes editarla.</small>
+                                            <small class="text-warning d-none d-block mt-1" id="flightDepartureNoRouteWarning"><i class="ti ti-alert-triangle me-1"></i>No se encontró la duración de esta ruta; captura la hora de salida manualmente.</small>
                                         </div>
                                         <!-- Removed Número de Personas field as requested
                                         <div class="col-md-6 mb-3">
@@ -657,6 +658,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <label for="roundTripDepartureTimeSuggestedVuelta" class="form-label">Hora de salida sugerida</label>
                                             <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedVuelta" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
                                             <small class="text-muted">Se calcula automáticamente al seleccionar un segmento; puedes editarla.</small>
+                                            <small class="text-warning d-none d-block mt-1" id="roundTripDepartureNoRouteWarningVuelta"><i class="ti ti-alert-triangle me-1"></i>No se encontró la duración de esta ruta; captura la hora de salida manualmente.</small>
                                         </div>
                                     </div>
 

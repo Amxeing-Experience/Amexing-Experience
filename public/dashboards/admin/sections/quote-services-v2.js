@@ -15544,6 +15544,15 @@ class ItineraryBuilder {
    * Called when flight time is entered or route duration is calculated.
    * @example
    */
+  // Muestra/oculta el aviso "no se encontró la duración de la ruta" bajo la hora de salida
+  // sugerida (one-way y round-trip Vuelta). El aviso está dentro de cada container, así que
+  // sólo es visible cuando ese campo aplica.
+  setNoRouteDurationWarning(show) {
+    ['flightDepartureNoRouteWarning', 'roundTripDepartureNoRouteWarningVuelta'].forEach((id) => {
+      document.getElementById(id)?.classList.toggle('d-none', !show);
+    });
+  }
+
   updateSuggestedDepartureTime() {
     const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
     let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration;
@@ -15566,6 +15575,10 @@ class ItineraryBuilder {
       isEditing: !!this.currentServiceId,
     });
 
+    // Aviso visible: si no hay duración de ruta, no se puede sugerir la hora → avisar para
+    // capturarla a mano. (El aviso vive dentro del container de la sugerida, así que sólo se ve
+    // cuando ese campo aplica.) Si sí hay duración, se oculta.
+    this.setNoRouteDurationWarning(!routeDuration);
     if (!routeDuration) {
       qsDevLog('⚠️ No route duration available');
       return;
