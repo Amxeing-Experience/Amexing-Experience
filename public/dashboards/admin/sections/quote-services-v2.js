@@ -710,30 +710,15 @@ class ItineraryBuilder {
       this.addExtraAdditionalVehicleRow({});
     });
 
-    // "Hora de salida sugerida" Edit / Confirm buttons.
-    // The field starts readonly with the auto-suggested time. Edit unlocks it,
-    // Confirm locks it and changes the label to "Horario de salida".
-    const flightDepartureField = document.getElementById('flightDepartureTimeSuggested');
-    const flightDepartureLabel = document.getElementById('flightDepartureTimeSuggestedLabel');
-    const flightDepartureEditBtn = document.getElementById('flightDepartureTimeEditBtn');
-    const flightDepartureConfirmBtn = document.getElementById('flightDepartureTimeConfirmBtn');
-
-    flightDepartureEditBtn?.addEventListener('click', () => {
-      if (!flightDepartureField) return;
-      flightDepartureField.readOnly = false;
-      flightDepartureField.focus();
-      flightDepartureEditBtn.classList.add('d-none');
-      flightDepartureConfirmBtn?.classList.remove('d-none');
-      if (flightDepartureLabel) flightDepartureLabel.textContent = 'Hora de salida sugerida';
-    });
-
-    flightDepartureConfirmBtn?.addEventListener('click', () => {
-      if (!flightDepartureField) return;
-      flightDepartureField.readOnly = true;
-      flightDepartureConfirmBtn.classList.add('d-none');
-      flightDepartureEditBtn?.classList.remove('d-none');
-      if (flightDepartureLabel) flightDepartureLabel.textContent = 'Horario de salida';
-      this.serviceModified = true;
+    // "Hora de salida sugerida": campo editable directo (como los demás horarios). Se autollena
+    // con la hora calculada al elegir segmento/hora de vuelo, pero el usuario puede sobreescribirla.
+    // Al escribir, marcamos `userEdited` para que el auto-cálculo NO pise la edición manual
+    // (updateSuggestedDepartureTime respeta esta marca; se limpia al cambiar la hora de vuelo).
+    ['flightDepartureTimeSuggested', 'roundTripDepartureTimeSuggestedIda', 'roundTripDepartureTimeSuggestedVuelta'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', (e) => {
+        e.target.dataset.userEdited = '1';
+        this.serviceModified = true;
+      });
     });
 
     // Restore persisted currency and payment type selections (scoped per quote)
@@ -1080,20 +1065,39 @@ class ItineraryBuilder {
     tourDurationField?.addEventListener('input', handleTourDurationUpdate);
     tourDurationField?.addEventListener('change', handleTourDurationUpdate);
 
-    // Transport flight time listeners - calculate suggested departure time
-    // One-way flight time
-    document.getElementById('flightTime')?.addEventListener('change', () => {
-      this.updateSuggestedDepartureTime();
-    });
+    // Transport flight time listeners - calculate suggested departure time. Al cambiar la hora
+    // de vuelo se descarta la marca de edición manual de la sugerida correspondiente para que
+    // se recalcule con la nueva hora (el usuario puede volver a editarla después).
+    const clearSuggestedEdited = (id) => {
+      const sf = document.getElementById(id);
+      if (sf) delete sf.dataset.userEdited;
+    };
+    // Al modificar la hora de vuelo se recalcula el horario de salida sugerido (descartando la
+    // edición manual previa de la sugerida). En 'change' (al salir del campo) siempre; y en
+    // 'input' (en vivo) cuando la hora ya es un HH:MM completo, para feedback inmediato.
+    // updateSuggestedDepartureTime sólo actualiza si hay duración de ruta (segmento) → "cuando
+    // aplique".
+    const recalcOnFlightTime = (flightId, suggestedId) => {
+      const el = document.getElementById(flightId);
+      if (!el) return;
+      const handler = () => {
+        clearSuggestedEdited(suggestedId);
+        this.updateSuggestedDepartureTime();
+      };
+      el.addEventListener('change', handler);
+      el.addEventListener('input', () => { if (/^\d{2}:\d{2}$/.test(el.value)) handler(); });
+    };
+    recalcOnFlightTime('flightTime', 'flightDepartureTimeSuggested');
+    recalcOnFlightTime('roundTripTimeIda', 'roundTripDepartureTimeSuggestedIda');
+    recalcOnFlightTime('roundTripTimeVuelta', 'roundTripDepartureTimeSuggestedVuelta');
 
-    // Round-trip Ida flight time
-    document.getElementById('roundTripTimeIda')?.addEventListener('change', () => {
+    // Editar a mano la duración de ruta → recalcular guía/greeter, desglose y hora de salida
+    // sugerida (getRouteDurationMinutes toma este campo como prioridad).
+    document.getElementById('routeDurationInput')?.addEventListener('input', () => {
+      this.serviceModified = true;
+      this.updateDevPaymentBreakdown();
       this.updateSuggestedDepartureTime();
-    });
-
-    // Round-trip Vuelta flight time
-    document.getElementById('roundTripTimeVuelta')?.addEventListener('change', () => {
-      this.updateSuggestedDepartureTime();
+      setTimeout(() => this.updateServicePriceBreakdown(), 50);
     });
 
     // Tour/Experience price inputs - update breakdown when prices change and validate input
@@ -1557,6 +1561,28 @@ class ItineraryBuilder {
     }
   }
 
+  // Llena el <datalist id="quoteTimeOptions"> con sugerencias de hora cada 15 min. Los campos
+  // de horario (.time-input con list="quoteTimeOptions") son inputs de TEXTO: aceptan cualquier
+  // hora (ej. 10:07, alineada a un vuelo) y disparan 'change' de forma confiable (el <input
+  // type=time> nativo daba problemas de detección); el datalist solo ofrece sugerencias rápidas.
+  populateTimeDatalist() {
+    let dl = document.getElementById('quoteTimeOptions');
+    if (!dl) {
+      dl = document.createElement('datalist');
+      dl.id = 'quoteTimeOptions';
+      document.body.appendChild(dl);
+    }
+    if (dl.options && dl.options.length) return; // ya poblado
+    let html = '';
+    for (let h = 0; h < 24; h += 1) {
+      for (let m = 0; m < 60; m += 15) {
+        const t = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        html += `<option value="${t}"></option>`;
+      }
+    }
+    dl.innerHTML = html;
+  }
+
   // Bloquea/desbloquea los radios de tipo de servicio. Se bloquean al editar (el tipo no debe
   // cambiarse a medio poblar) y se desbloquean al agregar.
   setServiceTypeLocked(locked) {
@@ -1579,6 +1605,9 @@ class ItineraryBuilder {
     // de vehículo adicional, filas adicionales de a-disp, guía/greeter, totales de desglose).
     // Se hace SIEMPRE al abrir, antes de poblar — luego la restauración pone lo del servicio.
     this.clearServiceOptionState();
+
+    // Llena el datalist de sugerencias de hora (para agregar y editar).
+    this.populateTimeDatalist();
 
     const modal = new bootstrap.Modal(document.getElementById('serviceModal'));
     const form = document.getElementById('serviceForm');
@@ -1784,7 +1813,19 @@ class ItineraryBuilder {
     });
   }
 
+  // Etiqueta de la sección de personas según el tipo de servicio: "Pasajeros" para traslados
+  // (transporte y a-disposición), "Clientes" para tours, experiencias y concepto.
+  updateAttendeesLabels(type) {
+    const isPassengers = type === 'transport' || type === 'a-disposicion';
+    const labelEl = document.getElementById('serviceAttendeesLabel');
+    if (labelEl) labelEl.textContent = isPassengers ? 'Pasajeros' : 'Clientes';
+    const btnTextEl = document.getElementById('addAttendeeBtnText');
+    if (btnTextEl) btnTextEl.textContent = isPassengers ? 'Agregar pasajero' : 'Agregar cliente';
+  }
+
   handleServiceTypeChange(type) {
+    // Actualiza la etiqueta de personas (Pasajeros/Clientes) según el tipo de servicio.
+    this.updateAttendeesLabels(type);
     // Clear the previous service's breakdown when the user switches service type.
     // Skip while populating an existing service for edit — it re-renders right after.
     if (!this._populatingForm) {
@@ -2668,6 +2709,12 @@ class ItineraryBuilder {
     if (flightTime) flightTime.value = '';
     const flightDepartureTimeSuggested = document.getElementById('flightDepartureTimeSuggested');
     if (flightDepartureTimeSuggested) flightDepartureTimeSuggested.value = '';
+    // Limpia la marca de edición manual de las horas sugeridas (clean slate por servicio, para
+    // que el auto-cálculo vuelva a llenar en un servicio nuevo).
+    ['flightDepartureTimeSuggested', 'roundTripDepartureTimeSuggestedIda', 'roundTripDepartureTimeSuggestedVuelta'].forEach((id) => {
+      const sf = document.getElementById(id);
+      if (sf) delete sf.dataset.userEdited;
+    });
 
     // Clear round trip fields
     const rtFields = [
@@ -3871,15 +3918,8 @@ class ItineraryBuilder {
       // Add guide costs if applicable
       const includeGuide = document.getElementById('includeGuide')?.checked || false;
       let guideCostEfectivo = 0;
-      let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
-
-      // When editing, use saved route duration if available
-      if (this.currentServiceId && this.services.has(this.currentServiceId)) {
-        const currentService = this.services.get(this.currentServiceId);
-        if (currentService.routeDuration) {
-          routeDuration = currentService.routeDuration;
-        }
-      }
+      // Fuente única: campo editable → lookup → guardado (ver getRouteDurationMinutes).
+      const routeDuration = this.getRouteDurationMinutes();
 
       if (includeGuide && routeDuration) {
         guideCostEfectivo = this.calculateGuideTransportCost(routeDuration);
@@ -4754,7 +4794,7 @@ class ItineraryBuilder {
         data.includeGreeter = document.getElementById('includeGreeter')?.checked || false;
 
         // Persist route duration for pricing calculations (Guía/Greeter surcharges)
-        data.routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
+        data.routeDuration = this.getRouteDurationMinutes();
 
         // Store base vehicle price separately so calculateServicePrice can add surcharges
         // (the price field may already include surcharges from recalculateTransportPrice)
@@ -5875,7 +5915,7 @@ class ItineraryBuilder {
           document.getElementById('roundTripDateIda').value = service.startDate || '';
           document.getElementById('roundTripTimeIda').value = service.startTime || '';
           // Campo "hora de salida sugerida" del ida (llegada) removido del modal; restaurar solo si existe.
-          { const idaSug = document.getElementById('roundTripDepartureTimeSuggestedIda'); if (idaSug && service.roundTripDepartureTimeSuggestedIda) idaSug.value = service.roundTripDepartureTimeSuggestedIda; }
+          { const idaSug = document.getElementById('roundTripDepartureTimeSuggestedIda'); if (idaSug && service.roundTripDepartureTimeSuggestedIda) { idaSug.value = service.roundTripDepartureTimeSuggestedIda; idaSug.dataset.userEdited = '1'; } }
 
           // Vuelta origin
           const vueltaOriginCombo = document.getElementById('roundTripOriginVueltaCombo');
@@ -5897,7 +5937,7 @@ class ItineraryBuilder {
           }
           document.getElementById('roundTripDateVuelta').value = service.endDate || '';
           document.getElementById('roundTripTimeVuelta').value = service.endTime || '';
-          if (service.roundTripDepartureTimeSuggestedVuelta) document.getElementById('roundTripDepartureTimeSuggestedVuelta').value = service.roundTripDepartureTimeSuggestedVuelta;
+          if (service.roundTripDepartureTimeSuggestedVuelta) { const vSug = document.getElementById('roundTripDepartureTimeSuggestedVuelta'); vSug.value = service.roundTripDepartureTimeSuggestedVuelta; vSug.dataset.userEdited = '1'; }
 
           // Flight details
           if (service.airline) {
@@ -5995,7 +6035,7 @@ class ItineraryBuilder {
             if (service.airline && airlineField) airlineField.value = service.airline;
             if (service.flightNumber && flightNumberField) flightNumberField.value = service.flightNumber;
             if (service.startTime && flightTimeField) flightTimeField.value = service.startTime;
-            if (service.flightDepartureTimeSuggested && flightDepartureField) flightDepartureField.value = service.flightDepartureTimeSuggested;
+            if (service.flightDepartureTimeSuggested && flightDepartureField) { flightDepartureField.value = service.flightDepartureTimeSuggested; flightDepartureField.dataset.userEdited = '1'; }
           } else {
             // Punto a Punto / Local: restore schedule fields
             const startTimeField = document.getElementById('transportStartTime');
@@ -6129,6 +6169,9 @@ class ItineraryBuilder {
             if (wtHoursField) wtHoursField.value = service.waitingTimeHours;
           }
           this.updateWaitingTimeRateDisplay();
+          // Restaurar la duración de ruta guardada en el campo editable (manda sobre el lookup
+          // al editar, para conservar un valor capturado a mano).
+          { const rd = document.getElementById('routeDurationInput'); if (rd) rd.value = this.minutesToHoursInput(service.routeDuration); }
           // Update dev payment breakdown now that transport data is loaded
           this.updateDevPaymentBreakdown();
           // Update service price breakdown now that transport data is loaded
@@ -8174,7 +8217,7 @@ class ItineraryBuilder {
                                     ${Array.isArray(service.attendees) && service.attendees.filter((n) => String(n).trim()).length > 0 ? `
                                         <div class="text-muted small mt-1">
                                             <div class="mb-1">
-                                                <i class="ti ti-users me-1"></i><span class="text-muted">Asistentes:</span>
+                                                <i class="ti ti-users me-1"></i><span class="text-muted">${(service.type === 'transport' || service.type === 'a-disposicion') ? 'Pasajeros' : 'Clientes'}:</span>
                                             </div>
                                             ${service.attendees.map((n) => String(n).trim()).filter(Boolean).map((name) => `
                                                 <div class="ms-3">
@@ -8527,7 +8570,7 @@ class ItineraryBuilder {
                             ${Array.isArray(service.attendees) && service.attendees.filter((n) => String(n).trim()).length > 0 ? `
                                 <div class="text-muted small mt-1">
                                     <div class="mb-1">
-                                        <i class="ti ti-users me-1"></i><span class="text-muted">Asistentes:</span>
+                                        <i class="ti ti-users me-1"></i><span class="text-muted">${(service.type === 'transport' || service.type === 'a-disposicion') ? 'Pasajeros' : 'Clientes'}:</span>
                                     </div>
                                     ${service.attendees.map((n) => String(n).trim()).filter(Boolean).map((name) => `
                                         <div class="ms-3">
@@ -9687,8 +9730,11 @@ class ItineraryBuilder {
         return;
       }
 
-      // Calculate vehicle efectivo base (el recargo por forma de pago lo aplica el motor abajo)
-      const vehicleTotalEfectivo = efectivoBasePrice; // vehiculo principal siempre 1 (multiples = vehiculos adicionales)
+      // Calculate vehicle efectivo base (el recargo por forma de pago lo aplica el motor abajo).
+      // Round-trip: el vehículo principal cuenta ida + vuelta (×2), igual que los vehículos
+      // adicionales/extra; one-way ×1. (La cantidad de vehículos sigue siendo 1; los múltiples
+      // son vehículos adicionales.)
+      const vehicleTotalEfectivo = efectivoBasePrice * legMultiplier;
 
       // Calculate waiting time costs if applicable
       const waitingHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
@@ -9706,15 +9752,8 @@ class ItineraryBuilder {
       // Calculate guide costs if applicable
       const includeGuide = document.getElementById('includeGuide')?.checked || false;
       let guideCostEfectivo = 0;
-      let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
-
-      // When editing, use saved route duration if available
-      if (this.currentServiceId && this.services.has(this.currentServiceId)) {
-        const currentService = this.services.get(this.currentServiceId);
-        if (currentService.routeDuration) {
-          routeDuration = currentService.routeDuration;
-        }
-      }
+      // Fuente única: campo editable → lookup → guardado (ver getRouteDurationMinutes).
+      const routeDuration = this.getRouteDurationMinutes();
 
       if (includeGuide && routeDuration) {
         guideCostEfectivo = this.calculateGuideTransportCost(routeDuration);
@@ -12590,6 +12629,11 @@ class ItineraryBuilder {
   clearServiceOptionState() {
     // Servicio nuevo por default: el precio se autollena con el de catálogo (no editado a mano).
     this._mainPriceManuallyEdited = false;
+    // Limpia la duración de ruta cacheada para que no se herede de otro servicio (afecta guía/
+    // greeter/hora de salida sugerida). Se repuebla con el lookup de la ruta de este servicio.
+    this.cachedRouteDuration = null;
+    const rdInput = document.getElementById('routeDurationInput');
+    if (rdInput) rdInput.value = '';
 
     // Vehículo adicional (transporte / vehicle tour)
     const addCheckbox = document.getElementById('additionalVehicleCheckbox');
@@ -13371,7 +13415,7 @@ class ItineraryBuilder {
         <input type="text" class="form-control form-control-sm additional-flight-number" placeholder="N° vuelo" value="${esc(flight.flightNumber)}">
       </div>
       <div class="col-md-3">
-        <input type="text" class="form-control form-control-sm time-input additional-flight-time" placeholder="__:__" maxlength="5" value="${esc(flight.flightTime)}">
+        <input type="text" class="form-control form-control-sm time-input additional-flight-time" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off" value="${esc(flight.flightTime)}">
       </div>
       <div class="col-md-2 text-end">
         <button type="button" class="btn btn-sm btn-outline-danger remove-additional-flight-btn" title="Quitar">
@@ -13381,13 +13425,25 @@ class ItineraryBuilder {
     `;
     row.querySelector('.remove-additional-flight-btn')?.addEventListener('click', () => {
       row.remove();
+      this.updateAdditionalFlightsHeaderVisibility();
     });
     list.appendChild(row);
+    this.updateAdditionalFlightsHeaderVisibility();
+  }
+
+  // Muestra la fila de headers (tipo tabla) sólo cuando hay al menos un vuelo en la lista.
+  updateAdditionalFlightsHeaderVisibility() {
+    const header = document.getElementById('additionalFlightsHeader');
+    const list = document.getElementById('additionalFlightsList');
+    if (!header || !list) return;
+    const hasRows = list.querySelectorAll('.additional-flight-row').length > 0;
+    header.classList.toggle('d-none', !hasRows);
   }
 
   clearAdditionalFlights() {
     const list = document.getElementById('additionalFlightsList');
     if (list) list.innerHTML = '';
+    this.updateAdditionalFlightsHeaderVisibility();
   }
 
   populateAdditionalFlights(flights) {
@@ -13424,19 +13480,16 @@ class ItineraryBuilder {
     row.dataset.index = String(rowIdx);
     row.innerHTML = `
       <div class="col-md-4">
-        <label class="form-label small text-muted mb-1">Segmento</label>
         <select class="form-select form-select-sm extra-segment-select">
           <option value="">Seleccionar segmento</option>
         </select>
       </div>
       <div class="col-md-4">
-        <label class="form-label small text-muted mb-1">Vehículo</label>
         <select class="form-select form-select-sm extra-vehicle-select" disabled>
           <option value="">Primero selecciona un segmento</option>
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label small text-muted mb-1">Precio (efectivo)</label>
         <div class="input-group input-group-sm">
           <span class="input-group-text">$</span>
           <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-price-input" placeholder="0.00">
@@ -13450,6 +13503,7 @@ class ItineraryBuilder {
       </div>
     `;
     list.appendChild(row);
+    this.updateExtraVehiclesHeaderVisibility();
 
     // Restore a saved custom price into the editable price input (the list price is
     // filled/shown by syncExtraRowPrice once the vehicle options finish loading).
@@ -13501,9 +13555,19 @@ class ItineraryBuilder {
     });
     row.querySelector('.remove-extra-additional-vehicle-btn')?.addEventListener('click', () => {
       row.remove();
+      this.updateExtraVehiclesHeaderVisibility();
       this.serviceModified = true;
       this.updateServicePriceBreakdown();
     });
+  }
+
+  // Muestra la fila de headers (tipo tabla) de vehículos adicionales sólo cuando hay filas.
+  updateExtraVehiclesHeaderVisibility() {
+    const header = document.getElementById('extraAdditionalVehiclesHeader');
+    const list = document.getElementById('extraAdditionalVehiclesList');
+    if (!header || !list) return;
+    const hasRows = list.querySelectorAll('.extra-additional-vehicle-row').length > 0;
+    header.classList.toggle('d-none', !hasRows);
   }
 
   // Load vehicles for a single extra-row's selected segment. Dispatches by service type:
@@ -13825,6 +13889,7 @@ class ItineraryBuilder {
   clearExtraAdditionalVehicles() {
     const list = document.getElementById('extraAdditionalVehiclesList');
     if (list) list.innerHTML = '';
+    this.updateExtraVehiclesHeaderVisibility();
   }
 
   populateExtraAdditionalVehicles(vehicles) {
@@ -15376,7 +15441,7 @@ class ItineraryBuilder {
     // Format as HH:MM
     const formattedEndTime = `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
 
-    // Set the end time field
+    // Set the end time field (input de texto: acepta cualquier HH:MM).
     endTimeField.value = formattedEndTime;
   }
 
@@ -15479,18 +15544,45 @@ class ItineraryBuilder {
    * Called when flight time is entered or route duration is calculated.
    * @example
    */
+  // Duración de ruta efectiva (min) que usan guía/greeter y la hora de salida sugerida.
+  // Prioridad: el campo editable (#routeDurationInput) → la duración del lookup (cache) → la
+  // guardada en el servicio (al editar). Así un valor capturado a mano manda, y las rutas sin
+  // duración configurada se pueden completar a mano para que sí calculen.
+  // Convierte minutos (lo que usa el backend/cálculos) a horas para mostrar en el campo.
+  minutesToHoursInput(min) {
+    const m = Number(min);
+    if (!m || Number.isNaN(m) || m <= 0) return '';
+    return String(parseFloat((m / 60).toFixed(2)));
+  }
+
+  getRouteDurationMinutes() {
+    // El campo se captura/muestra en HORAS; internamente todo (guía/greeter/hora sugerida,
+    // guardado) usa MINUTOS. Aquí convertimos horas→minutos.
+    const fieldEl = document.getElementById('routeDurationInput');
+    if (fieldEl && fieldEl.value !== '') {
+      const hours = parseFloat(fieldEl.value);
+      if (!Number.isNaN(hours) && hours > 0) return Math.round(hours * 60);
+    }
+    let rd = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
+    if (!rd && this.currentServiceId && this.services.has(this.currentServiceId)) {
+      rd = this.services.get(this.currentServiceId).routeDuration || null;
+    }
+    return rd;
+  }
+
+  // Muestra/oculta el aviso "no se encontró la duración de la ruta" bajo la hora de salida
+  // sugerida (one-way y round-trip Vuelta). El aviso está dentro de cada container, así que
+  // sólo es visible cuando ese campo aplica.
+  setNoRouteDurationWarning(show) {
+    ['flightDepartureNoRouteWarning', 'roundTripDepartureNoRouteWarningVuelta'].forEach((id) => {
+      document.getElementById(id)?.classList.toggle('d-none', !show);
+    });
+  }
+
   updateSuggestedDepartureTime() {
     const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
-    let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration;
-
-    // When editing, use saved route duration if available (same logic as guide pricing)
-    if (this.currentServiceId && this.services.has(this.currentServiceId)) {
-      const currentService = this.services.get(this.currentServiceId);
-      if (currentService.routeDuration) {
-        routeDuration = currentService.routeDuration;
-        qsDevLog('📝 Using saved route duration from service:', routeDuration);
-      }
-    }
+    // Fuente única: campo editable → lookup → guardado (ver getRouteDurationMinutes).
+    const routeDuration = this.getRouteDurationMinutes();
 
     qsDevLog('🕐 updateSuggestedDepartureTime called:', {
       tripType,
@@ -15501,8 +15593,12 @@ class ItineraryBuilder {
       isEditing: !!this.currentServiceId,
     });
 
+    // Aviso visible: si no hay duración de ruta, no se puede sugerir la hora → avisar para
+    // capturarla a mano. (El aviso vive dentro del container de la sugerida, así que sólo se ve
+    // cuando ese campo aplica.) Si sí hay duración, se oculta.
+    this.setNoRouteDurationWarning(!routeDuration);
     if (!routeDuration) {
-      console.warn('⚠️ No route duration available');
+      qsDevLog('⚠️ No route duration available');
       return;
     }
 
@@ -15514,7 +15610,7 @@ class ItineraryBuilder {
         const suggestedTime = this.calculateSuggestedDepartureTime(idaFlightTime, routeDuration);
         const suggestedField = document.getElementById('roundTripDepartureTimeSuggestedIda');
         qsDevLog('📝 Setting Ida suggested time:', { suggestedTime, fieldExists: !!suggestedField });
-        if (suggestedField && suggestedTime) {
+        if (suggestedField && suggestedTime && suggestedField.dataset.userEdited !== '1') {
           suggestedField.value = suggestedTime;
         }
       }
@@ -15526,7 +15622,7 @@ class ItineraryBuilder {
         const suggestedTime = this.calculateSuggestedDepartureTime(vueltaFlightTime, routeDuration);
         const suggestedField = document.getElementById('roundTripDepartureTimeSuggestedVuelta');
         qsDevLog('📝 Setting Vuelta suggested time:', { suggestedTime, fieldExists: !!suggestedField });
-        if (suggestedField && suggestedTime) {
+        if (suggestedField && suggestedTime && suggestedField.dataset.userEdited !== '1') {
           suggestedField.value = suggestedTime;
         }
       }
@@ -15538,7 +15634,7 @@ class ItineraryBuilder {
         const suggestedTime = this.calculateSuggestedDepartureTime(flightTime, routeDuration);
         const suggestedField = document.getElementById('flightDepartureTimeSuggested');
         qsDevLog('📝 Setting one-way suggested time:', { suggestedTime, fieldExists: !!suggestedField });
-        if (suggestedField && suggestedTime) {
+        if (suggestedField && suggestedTime && suggestedField.dataset.userEdited !== '1') {
           suggestedField.value = suggestedTime;
           qsDevLog('✅ Field updated successfully');
         }
@@ -15965,21 +16061,25 @@ class ItineraryBuilder {
    * @example
    */
   setupTimeInputs() {
-    // Setup time input formatting for all time-input fields
+    // Máscara para los inputs de horario de TEXTO (.time-input). Sólo auto-formatea al ESCRIBIR
+    // hacia adelante; al BORRAR (backspace/delete) no reformatea, para que limpiar la hora no
+    // brinque el cursor al minuto (se sentía raro). Los <input type="time"> nativos se saltan.
     document.addEventListener('input', (e) => {
-      if (e.target.classList.contains('time-input')) {
+      if (e.target.classList.contains('time-input') && e.target.type !== 'time') {
+        // No reformatear en borrado: deja editar/limpiar de forma natural.
+        if (e.inputType && e.inputType.startsWith('delete')) return;
         this.formatTimeInput(e.target);
       }
     });
 
     document.addEventListener('keypress', (e) => {
-      if (e.target.classList.contains('time-input')) {
+      if (e.target.classList.contains('time-input') && e.target.type !== 'time') {
         this.restrictTimeInputKeys(e);
       }
     });
 
     document.addEventListener('focus', (e) => {
-      if (e.target.classList.contains('time-input') && !e.target.value) {
+      if (e.target.classList.contains('time-input') && e.target.type !== 'time' && !e.target.value) {
         // Show placeholder hint on focus
         e.target.placeholder = e.target.dataset.placeholder || '__:__';
       }
@@ -16779,15 +16879,7 @@ class ItineraryBuilder {
         }
       }
 
-      let routeDuration = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
-
-      // Get route duration - prioritize saved service data when editing
-      if (this.currentServiceId && this.services.has(this.currentServiceId)) {
-        const currentService = this.services.get(this.currentServiceId);
-        if (currentService.routeDuration) {
-          routeDuration = currentService.routeDuration;
-        }
-      }
+      const routeDuration = this.getRouteDurationMinutes();
 
       const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
       const brkLegMultiplier = tripType === 'round-trip' ? 2 : 1;
@@ -17740,6 +17832,11 @@ class ItineraryBuilder {
    * @example
    */
   async handleTransportRateSelection(rateId, fallbackOrigin = null, fallbackDestination = null) {
+    // Resetea la duración de ruta cacheada: pertenece a la ruta del lookup ANTERIOR y no debe
+    // filtrarse a otra ruta/servicio (causaba que guía/greeter/hora sugerida usaran la duración
+    // de la ruta previa). Se repuebla abajo con la routeDuration de ESTA ruta, o queda null si
+    // la ruta no tiene duración configurada.
+    this.cachedRouteDuration = null;
     if (!rateId) {
       this.clearVehicleDropdown();
       this.transportPriceData = null;
@@ -17895,6 +17992,13 @@ class ItineraryBuilder {
       this.transportPriceData = result.data;
       // Cache routeDuration separately so it persists even if transportPriceData is cleared
       this.cachedRouteDuration = result.data.routeDuration || null;
+      // Autollenar el campo editable "Duración de ruta" con la duración de ESTA ruta (vacío si
+      // la ruta no la trae → se captura a mano). En restauración de edición NO se pisa: el valor
+      // guardado se pone en el restore.
+      if (!this._populatingTransportForm) {
+        const rdInput = document.getElementById('routeDurationInput');
+        if (rdInput) rdInput.value = this.minutesToHoursInput(result.data.routeDuration);
+      }
 
       qsDevLog('🚗 Route duration received:', {
         origin: apiOrigin,
@@ -19341,40 +19445,67 @@ class ItineraryBuilder {
   }
 
   /** Agrega una fila de vehículo adicional (segmento + vehículo + tarifa/h + quitar). */
+  // Muestra la fila de headers (tipo tabla) de vehículos adicionales de a-disposición sólo
+  // cuando hay filas.
+  updateADisposicionVehiclesHeaderVisibility() {
+    const header = document.getElementById('aDisposicionAdditionalVehiclesHeader');
+    const list = document.getElementById('aDisposicionAdditionalVehiclesList');
+    if (!header || !list) return;
+    const hasRows = list.querySelectorAll('.adisp-av-row').length > 0;
+    header.classList.toggle('d-none', !hasRows);
+  }
+
   async addADisposicionAdditionalVehicleRow(saved = null) {
     const list = document.getElementById('aDisposicionAdditionalVehiclesList');
     if (!list) return;
     if (!this.ratesCache || this.ratesCache.length === 0) await this.loadAllRates();
 
+    // Layout en grid (mismas columnas que transporte: Segmento / Vehículo / Precio / quitar)
+    // para que alineen con la fila de headers tipo tabla.
     const row = document.createElement('div');
-    row.className = 'adisp-av-row d-flex gap-2 align-items-start mb-2';
+    row.className = 'adisp-av-row row g-2 mb-2 align-items-start';
+
+    const segCol = document.createElement('div');
+    segCol.className = 'col-md-4';
     const segmentSel = this.buildADisposicionSegmentSelect();
+    segCol.appendChild(segmentSel);
+
+    const vehCol = document.createElement('div');
+    vehCol.className = 'col-md-4';
     const vehicleSel = document.createElement('select');
     vehicleSel.className = 'form-select form-select-sm adisp-av-vehicle';
     vehicleSel.innerHTML = '<option value="">-- Vehículo --</option>';
+    vehCol.appendChild(vehicleSel);
+
     // Precio personalizado por vehículo (igual que transporte): input editable + "Lista: $X/h"
     // (la tarifa de catálogo) como referencia. El input se autollena con el catálogo al elegir
     // vehículo y el usuario puede sobreescribirlo.
-    const priceWrap = document.createElement('div');
-    priceWrap.className = 'd-flex flex-column';
-    priceWrap.innerHTML = `
-      <div class="input-group input-group-sm" style="width: 150px;">
+    const priceCol = document.createElement('div');
+    priceCol.className = 'col-md-3';
+    priceCol.innerHTML = `
+      <div class="input-group input-group-sm">
         <span class="input-group-text">$</span>
         <input type="number" min="0" step="0.01" class="form-control form-control-sm adisp-av-price" placeholder="0.00">
         <span class="input-group-text">/h</span>
       </div>
       <small class="text-muted adisp-av-list d-block"></small>
     `;
-    const priceInput = priceWrap.querySelector('.adisp-av-price');
+    const priceInput = priceCol.querySelector('.adisp-av-price');
+
+    const remCol = document.createElement('div');
+    remCol.className = 'col-md-1 text-end';
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'btn btn-sm btn-outline-danger';
     removeBtn.innerHTML = '<i class="ti ti-trash"></i>';
-    row.appendChild(segmentSel);
-    row.appendChild(vehicleSel);
-    row.appendChild(priceWrap);
-    row.appendChild(removeBtn);
+    remCol.appendChild(removeBtn);
+
+    row.appendChild(segCol);
+    row.appendChild(vehCol);
+    row.appendChild(priceCol);
+    row.appendChild(remCol);
     list.appendChild(row);
+    this.updateADisposicionVehiclesHeaderVisibility();
 
     segmentSel.addEventListener('change', async () => {
       row.dataset.hourlyRate = '';
@@ -19393,6 +19524,7 @@ class ItineraryBuilder {
     });
     removeBtn.addEventListener('click', () => {
       row.remove();
+      this.updateADisposicionVehiclesHeaderVisibility();
       this.recalcADisposicionWithBreakdown();
     });
 
@@ -19530,6 +19662,7 @@ class ItineraryBuilder {
   async restoreADisposicionAdditionalVehicles(savedList) {
     const list = document.getElementById('aDisposicionAdditionalVehiclesList');
     if (list) list.innerHTML = '';
+    this.updateADisposicionVehiclesHeaderVisibility();
     if (!Array.isArray(savedList) || savedList.length === 0) return;
     for (const saved of savedList) {
       // eslint-disable-next-line no-await-in-loop
