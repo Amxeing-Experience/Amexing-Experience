@@ -768,6 +768,13 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     </button>
                                 </div>
                                 <small class="text-muted d-block mb-2">Cada vehículo adicional usa su tarifa por hora × las horas del servicio.</small>
+                                <!-- Headers tipo tabla (una sola fila); se muestra solo cuando hay vehículos. -->
+                                <div class="row g-2 mb-1 d-none" id="aDisposicionAdditionalVehiclesHeader">
+                                    <div class="col-md-4"><small class="text-muted fw-semibold">Segmento</small></div>
+                                    <div class="col-md-4"><small class="text-muted fw-semibold">Vehículo</small></div>
+                                    <div class="col-md-3"><small class="text-muted fw-semibold">Precio (efectivo)</small></div>
+                                    <div class="col-md-1"></div>
+                                </div>
                                 <div id="aDisposicionAdditionalVehiclesList"></div>
                             </div>
                         </div>

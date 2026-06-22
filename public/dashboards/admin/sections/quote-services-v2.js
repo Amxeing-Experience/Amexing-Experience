@@ -19394,40 +19394,67 @@ class ItineraryBuilder {
   }
 
   /** Agrega una fila de vehículo adicional (segmento + vehículo + tarifa/h + quitar). */
+  // Muestra la fila de headers (tipo tabla) de vehículos adicionales de a-disposición sólo
+  // cuando hay filas.
+  updateADisposicionVehiclesHeaderVisibility() {
+    const header = document.getElementById('aDisposicionAdditionalVehiclesHeader');
+    const list = document.getElementById('aDisposicionAdditionalVehiclesList');
+    if (!header || !list) return;
+    const hasRows = list.querySelectorAll('.adisp-av-row').length > 0;
+    header.classList.toggle('d-none', !hasRows);
+  }
+
   async addADisposicionAdditionalVehicleRow(saved = null) {
     const list = document.getElementById('aDisposicionAdditionalVehiclesList');
     if (!list) return;
     if (!this.ratesCache || this.ratesCache.length === 0) await this.loadAllRates();
 
+    // Layout en grid (mismas columnas que transporte: Segmento / Vehículo / Precio / quitar)
+    // para que alineen con la fila de headers tipo tabla.
     const row = document.createElement('div');
-    row.className = 'adisp-av-row d-flex gap-2 align-items-start mb-2';
+    row.className = 'adisp-av-row row g-2 mb-2 align-items-start';
+
+    const segCol = document.createElement('div');
+    segCol.className = 'col-md-4';
     const segmentSel = this.buildADisposicionSegmentSelect();
+    segCol.appendChild(segmentSel);
+
+    const vehCol = document.createElement('div');
+    vehCol.className = 'col-md-4';
     const vehicleSel = document.createElement('select');
     vehicleSel.className = 'form-select form-select-sm adisp-av-vehicle';
     vehicleSel.innerHTML = '<option value="">-- Vehículo --</option>';
+    vehCol.appendChild(vehicleSel);
+
     // Precio personalizado por vehículo (igual que transporte): input editable + "Lista: $X/h"
     // (la tarifa de catálogo) como referencia. El input se autollena con el catálogo al elegir
     // vehículo y el usuario puede sobreescribirlo.
-    const priceWrap = document.createElement('div');
-    priceWrap.className = 'd-flex flex-column';
-    priceWrap.innerHTML = `
-      <div class="input-group input-group-sm" style="width: 150px;">
+    const priceCol = document.createElement('div');
+    priceCol.className = 'col-md-3';
+    priceCol.innerHTML = `
+      <div class="input-group input-group-sm">
         <span class="input-group-text">$</span>
         <input type="number" min="0" step="0.01" class="form-control form-control-sm adisp-av-price" placeholder="0.00">
         <span class="input-group-text">/h</span>
       </div>
       <small class="text-muted adisp-av-list d-block"></small>
     `;
-    const priceInput = priceWrap.querySelector('.adisp-av-price');
+    const priceInput = priceCol.querySelector('.adisp-av-price');
+
+    const remCol = document.createElement('div');
+    remCol.className = 'col-md-1 text-end';
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'btn btn-sm btn-outline-danger';
     removeBtn.innerHTML = '<i class="ti ti-trash"></i>';
-    row.appendChild(segmentSel);
-    row.appendChild(vehicleSel);
-    row.appendChild(priceWrap);
-    row.appendChild(removeBtn);
+    remCol.appendChild(removeBtn);
+
+    row.appendChild(segCol);
+    row.appendChild(vehCol);
+    row.appendChild(priceCol);
+    row.appendChild(remCol);
     list.appendChild(row);
+    this.updateADisposicionVehiclesHeaderVisibility();
 
     segmentSel.addEventListener('change', async () => {
       row.dataset.hourlyRate = '';
@@ -19446,6 +19473,7 @@ class ItineraryBuilder {
     });
     removeBtn.addEventListener('click', () => {
       row.remove();
+      this.updateADisposicionVehiclesHeaderVisibility();
       this.recalcADisposicionWithBreakdown();
     });
 
@@ -19583,6 +19611,7 @@ class ItineraryBuilder {
   async restoreADisposicionAdditionalVehicles(savedList) {
     const list = document.getElementById('aDisposicionAdditionalVehiclesList');
     if (list) list.innerHTML = '';
+    this.updateADisposicionVehiclesHeaderVisibility();
     if (!Array.isArray(savedList) || savedList.length === 0) return;
     for (const saved of savedList) {
       // eslint-disable-next-line no-await-in-loop
