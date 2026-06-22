@@ -24,6 +24,13 @@ const writeOperationsLimiter = rateLimit({
 });
 
 // Admin/superadmin only (Phase 1). Agent self-access is deferred to a later phase.
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ * @example
+ */
 function requireAdmin(req, res, next) {
   const { user, userRole } = req;
   if (!user || !userRole) {

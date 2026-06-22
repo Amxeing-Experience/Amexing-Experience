@@ -16,6 +16,12 @@ const dkm = require('../../infrastructure/crypto/DataKeyManager');
 const { maskByRule } = require('../../infrastructure/crypto/fieldMasking');
 const { getPolicy } = require('./SensitiveDataPolicy');
 
+/**
+ *
+ * @param fieldKey
+ * @param recordId
+ * @example
+ */
 function auditResource(fieldKey, recordId) {
   return recordId ? `${fieldKey}:${recordId}` : fieldKey;
 }
@@ -23,9 +29,10 @@ function auditResource(fieldKey, recordId) {
 /**
  * Encrypt a plaintext value for storage. Returns the versioned ciphertext to put on
  * the business row (encrypt-mode). Refuses forbidden SAD via the policy resolver.
- * @param {string} fieldKey - e.g. 'client.passport'.
+ * @param {string} fieldKey - E.g. 'client.passport'.
  * @param {string} plaintext - Raw value.
  * @returns {Promise<string>} Versioned ciphertext.
+ * @example
  */
 async function encryptField(fieldKey, plaintext) {
   const policy = getPolicy(fieldKey);
@@ -42,6 +49,7 @@ async function encryptField(fieldKey, plaintext) {
  * @param {object} policy
  * @param {object} requestingUser
  * @returns {Promise<boolean>}
+ * @example
  */
 async function canReveal(policy, requestingUser) {
   if (!requestingUser) return false;
@@ -64,12 +72,13 @@ async function canReveal(policy, requestingUser) {
  * @param {string} ciphertext - The stored versioned ciphertext.
  * @param {object} ctx - { user, recordId } — user requesting, record being read.
  * @returns {Promise<string|null>} Cleartext, or null if denied / empty.
+ * @example
  */
 async function decryptField(fieldKey, ciphertext, ctx = {}) {
   const policy = getPolicy(fieldKey);
   const { user, recordId } = ctx;
 
-  const userId = user && (user.id || (user.get && user.get('id'))) || 'unknown';
+  const userId = (user && (user.id || (user.get && user.get('id')))) || 'unknown';
   const allowed = await canReveal(policy, user);
 
   logger.logDataAccess(userId, auditResource(fieldKey, recordId), 'REVEAL', allowed);
@@ -92,6 +101,7 @@ async function decryptField(fieldKey, ciphertext, ctx = {}) {
  * @param {string} ciphertext
  * @param {object} ctx - { user, recordId } (optional, for audit).
  * @returns {Promise<string>}
+ * @example
  */
 async function maskField(fieldKey, ciphertext, ctx = {}) {
   const policy = getPolicy(fieldKey);

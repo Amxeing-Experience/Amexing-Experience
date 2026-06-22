@@ -31,6 +31,7 @@ class OwnedClientsController {
    * set (these accounts don't log in until invited). Mirrors the migration script.
    * @param {object} data - Profile fields (firstName, lastName, email, clientCategory, ...).
    * @returns {Promise<AmexingUser>} The saved user.
+   * @example
    */
   async createEndClientUser(data) {
     const email = (data.email || '').trim().toLowerCase();
@@ -75,6 +76,7 @@ class OwnedClientsController {
    * record. People-type clients now live in AmexingUser; older/agency-owned ones stay Client.
    * @param {string} id - The client or user objectId.
    * @returns {Promise<Parse.Object|null>} The Parse object, or null when not found.
+   * @example
    */
   async resolveClientOrUser(id) {
     const userQuery = new Parse.Query('AmexingUser');
@@ -552,11 +554,25 @@ class OwnedClientsController {
       // Client records (they don't log into the admin portal).
       if (isAmexingClient) {
         const created = await this.createEndClientUser({
-          firstName, lastName, email, phone, contactFirstName, contactLastName,
-          emergencyContactName, emergencyContactPhone, companyType, taxId, website, notes,
-          address: structuredAddress || address, preferredLanguage, accessibilityRequirements,
-          allergies: processedAllergies, dietaryRestrictions: processedDietaryRestrictions,
-          clientCategory: finalCategory, createdBy: currentUser.id,
+          firstName,
+          lastName,
+          email,
+          phone,
+          contactFirstName,
+          contactLastName,
+          emergencyContactName,
+          emergencyContactPhone,
+          companyType,
+          taxId,
+          website,
+          notes,
+          address: structuredAddress || address,
+          preferredLanguage,
+          accessibilityRequirements,
+          allergies: processedAllergies,
+          dietaryRestrictions: processedDietaryRestrictions,
+          clientCategory: finalCategory,
+          createdBy: currentUser.id,
         });
         logger.info('End-client user created', { userId: created.id, category: finalCategory });
         return res.status(201).json({

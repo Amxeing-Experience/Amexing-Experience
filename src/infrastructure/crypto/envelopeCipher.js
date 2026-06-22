@@ -1,5 +1,5 @@
 /**
- * envelopeCipher - Low-level AES-256-GCM with a versioned, self-describing format.
+ * EnvelopeCipher - Low-level AES-256-GCM with a versioned, self-describing format.
  *
  * Ciphertext layout: "v1:<keyId>:<ivHex>:<authTagHex>:<ctHex>".
  * Embedding the keyId lets multiple DEK versions coexist, which is what makes
@@ -19,6 +19,7 @@ const VERSION = 'v1';
  * @param {string} keyId - Identifier of the DEK (embedded in the output).
  * @param {string} aad - Context string bound into the ciphertext (e.g. 'client.passport').
  * @returns {string} Versioned ciphertext.
+ * @example
  */
 function encryptWithDek(plaintext, dek, keyId, aad) {
   if (typeof plaintext !== 'string') throw new Error('Plaintext must be a string');
@@ -42,6 +43,7 @@ function encryptWithDek(plaintext, dek, keyId, aad) {
  * @param {Buffer} dek - 32-byte DEK matching the embedded keyId.
  * @param {string} aad - Same AAD used at encryption time.
  * @returns {string} Plaintext.
+ * @example
  */
 function decryptEnvelope(envelope, dek, aad) {
   const parts = String(envelope).split(':');
@@ -62,7 +64,8 @@ function decryptEnvelope(envelope, dek, aad) {
 /**
  * Extract the keyId from a versioned ciphertext (used to pick the right DEK).
  * @param {string} envelope
- * @returns {string|null} keyId or null if the format is not recognized.
+ * @returns {string|null} KeyId or null if the format is not recognized.
+ * @example
  */
 function parseKeyId(envelope) {
   const parts = String(envelope).split(':');
@@ -71,9 +74,10 @@ function parseKeyId(envelope) {
 }
 
 /**
- * Whether a value is in the current versioned format (vs. a legacy ciphertext).
+ * Whether a value is in the current versioned format (vs. A legacy ciphertext).
  * @param {string} value
  * @returns {boolean}
+ * @example
  */
 function isVersioned(value) {
   return typeof value === 'string' && value.startsWith(`${VERSION}:`);

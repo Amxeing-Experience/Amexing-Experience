@@ -29,6 +29,7 @@ class EnvKekProvider {
    * Wrap (encrypt) a raw DEK under the KEK.
    * @param {Buffer} dek - 32-byte DEK.
    * @returns {Promise<string>} "ivHex:authTagHex:ctHex".
+   * @example
    */
   async wrap(dek) {
     if (!Buffer.isBuffer(dek) || dek.length !== 32) throw new Error('DEK must be a 32-byte Buffer');
@@ -44,6 +45,7 @@ class EnvKekProvider {
    * Unwrap (decrypt) a wrapped DEK back to its raw bytes.
    * @param {string} wrapped - "ivHex:authTagHex:ctHex".
    * @returns {Promise<Buffer>} 32-byte DEK.
+   * @example
    */
   async unwrap(wrapped) {
     const [ivHex, authTagHex, ctHex] = String(wrapped).split(':');

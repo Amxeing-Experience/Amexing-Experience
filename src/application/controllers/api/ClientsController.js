@@ -520,6 +520,7 @@ class ClientsController {
    * @param {string} opts.type - The category value when isCategoryTab is true.
    * @param {boolean} opts.includeInactive - Include inactive users when true.
    * @returns {Parse.Query}
+   * @example
    */
   buildEndClientQuery({ isCategoryTab, type, includeInactive }) {
     const Parse = require('parse/node');

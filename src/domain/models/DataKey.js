@@ -4,9 +4,9 @@
  * Holds the KEK-WRAPPED DEK only (never cleartext), in a collection separate from
  * the data it protects (satisfies PCI DSS 3.6.1.2 — DEK stored apart from the data,
  * wrapped by a separately-stored KEK). Lifecycle:
- *   active   - used to encrypt new data and to decrypt
- *   retiring - decrypt-only; rotation re-encrypts records off this key
- *   retired  - no record references it anymore
+ * active   - used to encrypt new data and to decrypt
+ * retiring - decrypt-only; rotation re-encrypts records off this key
+ * retired  - no record references it anymore
  * Invariant: exactly one active DEK per dataClass.
  *
  * This class must have master-key-only CLP so it is never readable via REST/LiveQuery.
@@ -19,7 +19,9 @@ class DataKey extends Parse.Object {
     super('DataKey');
   }
 
-  static create({ keyId, dataClass, wrappedDek, kekRef, status = 'active' }) {
+  static create({
+    keyId, dataClass, wrappedDek, kekRef, status = 'active',
+  }) {
     const dk = new DataKey();
     dk.set('keyId', keyId);
     dk.set('dataClass', dataClass);
@@ -30,10 +32,15 @@ class DataKey extends Parse.Object {
   }
 
   getKeyId() { return this.get('keyId'); }
+
   getDataClass() { return this.get('dataClass'); }
+
   getWrappedDek() { return this.get('wrappedDek'); }
+
   getKekRef() { return this.get('kekRef'); }
+
   getStatus() { return this.get('status'); }
+
   setStatus(status) { this.set('status', status); }
 
   static async findActive(dataClass) {

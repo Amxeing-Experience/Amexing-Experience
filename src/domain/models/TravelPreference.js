@@ -1,7 +1,7 @@
 /**
  * TravelPreference - A single travel preference for a Client.
  *
- * Each record is one (type, option) pair, e.g. type "tour_interest" option "viñedos"
+ * Each record is one (type, option) pair, e.g. Type "tour_interest" option "viñedos"
  * or type "transport_category" option "Sprinter". A client has many.
  * Schema (Parse class TravelPreference): client (Pointer<Client>), type, option (String).
  * @augments BaseModel
@@ -74,9 +74,11 @@ class TravelPreference extends BaseModel {
   }
 
   getType() { return this.get('type') || ''; }
+
   setType(type) { this.set('type', type); }
 
   getOption() { return this.get('option') || ''; }
+
   setOption(option) { this.set('option', option); }
 
   toJSON() {
@@ -101,6 +103,7 @@ class TravelPreference extends BaseModel {
    * All preferences for a client, grouped-friendly (ordered by type then option).
    * @param {string} clientId - Client objectId.
    * @returns {Promise<TravelPreference[]>}
+   * @example
    */
   static async getByClient(clientId) {
     try {

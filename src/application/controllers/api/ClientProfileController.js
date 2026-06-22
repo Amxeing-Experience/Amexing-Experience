@@ -82,9 +82,12 @@ class ClientProfileController {
   async findOwnedRecord(className, recordId, owner) {
     const record = await new Parse.Query(className).get(recordId, { useMasterKey: true });
     // Models expose getOwnerId()/getOwnerType(); legacy rows resolve to ('client', client.id).
-    const recordOwnerId = typeof record.getOwnerId === 'function'
-      ? record.getOwnerId()
-      : (record.get('client') ? record.get('client').id : null);
+    let recordOwnerId;
+    if (typeof record.getOwnerId === 'function') {
+      recordOwnerId = record.getOwnerId();
+    } else {
+      recordOwnerId = record.get('client') ? record.get('client').id : null;
+    }
     const recordOwnerType = typeof record.getOwnerType === 'function'
       ? record.getOwnerType()
       : 'client';
@@ -314,10 +317,15 @@ class ClientProfileController {
       const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
 
       const setters = {
-        label: 'setLabel', countryOfIssue: 'setCountryOfIssue', nationality: 'setNationality',
-        dateOfIssue: 'setDateOfIssue', expirationDate: 'setExpirationDate',
+        label: 'setLabel',
+        countryOfIssue: 'setCountryOfIssue',
+        nationality: 'setNationality',
+        dateOfIssue: 'setDateOfIssue',
+        expirationDate: 'setExpirationDate',
       };
-      Object.entries(setters).forEach(([f, setter]) => { if (req.body[f] !== undefined) passport[setter](req.body[f]); });
+      Object.entries(setters).forEach(([f, setter]) => {
+        if (req.body[f] !== undefined) passport[setter](req.body[f]);
+      });
       if (req.body.number !== undefined) await passport.setNumber(req.body.number);
       await passport.save(null, { useMasterKey: true });
 

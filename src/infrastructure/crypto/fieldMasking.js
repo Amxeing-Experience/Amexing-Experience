@@ -1,13 +1,18 @@
 /**
- * fieldMasking - Field-type-aware masking for sensitive values.
+ * FieldMasking - Field-type-aware masking for sensitive values.
  *
  * Replaces a fixed last-4 rule so each data type masks per its own policy:
- *   - last4 (passport): bullet all but the last 4 chars.
- *   - pan (card): show at most first 6 + last 4 (PCI DSS 3.4.1), bullet the middle.
+ * - last4 (passport): bullet all but the last 4 chars.
+ * - pan (card): show at most first 6 + last 4 (PCI DSS 3.4.1), bullet the middle.
  */
 
 const BULLET = '•';
 
+/**
+ *
+ * @param value
+ * @example
+ */
 function maskLast4(value) {
   if (!value) return '';
   const v = String(value).trim();
@@ -15,6 +20,11 @@ function maskLast4(value) {
   return BULLET.repeat(v.length - 4) + v.slice(-4);
 }
 
+/**
+ *
+ * @param value
+ * @example
+ */
 function maskPan(value) {
   if (!value) return '';
   const v = String(value).replace(/\s+/g, '');
@@ -29,6 +39,7 @@ function maskPan(value) {
  * @param {string} rule - 'last4' | 'pan'.
  * @param {string} value - Raw value.
  * @returns {string} Masked value.
+ * @example
  */
 function maskByRule(rule, value) {
   switch (rule) {

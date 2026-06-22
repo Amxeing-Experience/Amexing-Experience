@@ -905,6 +905,7 @@ class AmexingUser extends BaseModel {
    * Get the people-type client category (direct_client | wedding_planner | concierge |
    * home_owner), or null for agencies/agents/staff.
    * @returns {string|null}
+   * @example
    */
   getClientCategory() {
     return this.get('clientCategory') || null;
@@ -913,6 +914,7 @@ class AmexingUser extends BaseModel {
   /**
    * Set the people-type client category.
    * @param {string} category - One of the people-type client categories.
+   * @example
    */
   setClientCategory(category) {
     this.set('clientCategory', category);

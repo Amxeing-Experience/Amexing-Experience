@@ -45,6 +45,7 @@ const FORBIDDEN_FIELD_KEYS = new Set([
  * Resolve a field policy, refusing forbidden SAD fields outright.
  * @param {string} fieldKey
  * @returns {object} The policy for the field.
+ * @example
  */
 function getPolicy(fieldKey) {
   if (FORBIDDEN_FIELD_KEYS.has(fieldKey)) {
@@ -55,6 +56,11 @@ function getPolicy(fieldKey) {
   return policy;
 }
 
+/**
+ *
+ * @param fieldKey
+ * @example
+ */
 function isForbidden(fieldKey) {
   return FORBIDDEN_FIELD_KEYS.has(fieldKey);
 }

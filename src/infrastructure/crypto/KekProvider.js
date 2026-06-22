@@ -6,9 +6,9 @@
  * (KEK_PROVIDER), with no change to ciphertext or stored DEKs.
  *
  * Contract:
- *   wrap(dek: Buffer) -> Promise<string>   wrapped DEK, base64/opaque
- *   unwrap(wrapped: string) -> Promise<Buffer>   the 32-byte DEK
- *   kekRef() -> string   identifier of the KEK in use (e.g. 'env:v1', a CMK ARN)
+ * wrap(dek: Buffer) -> Promise<string>   wrapped DEK, base64/opaque
+ * unwrap(wrapped: string) -> Promise<Buffer>   the 32-byte DEK
+ * kekRef() -> string   identifier of the KEK in use (e.g. 'env:v1', a CMK ARN).
  */
 
 let cached = null;
@@ -17,6 +17,7 @@ let cached = null;
  * Resolve the configured KEK provider (singleton). Defaults to the env-backed
  * provider; set KEK_PROVIDER=aws-kms once AwsKmsKekProvider is implemented.
  * @returns {object} A KEK provider.
+ * @example
  */
 function getKekProvider() {
   if (cached) return cached;
@@ -36,6 +37,10 @@ function getKekProvider() {
 }
 
 // Test/rotation hook to force re-resolution after env changes.
+/**
+ *
+ * @example
+ */
 function resetKekProvider() {
   cached = null;
 }

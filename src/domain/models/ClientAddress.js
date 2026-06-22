@@ -79,24 +79,31 @@ class ClientAddress extends BaseModel {
   }
 
   getLabel() { return this.get('label') || ''; }
+
   setLabel(label) { this.set('label', label); }
 
   getStreet() { return this.get('street') || ''; }
+
   setStreet(street) { this.set('street', street); }
 
   getCity() { return this.get('city') || ''; }
+
   setCity(city) { this.set('city', city); }
 
   getState() { return this.get('state') || ''; }
+
   setState(state) { this.set('state', state); }
 
   getZipCode() { return this.get('zipCode') || ''; }
+
   setZipCode(zipCode) { this.set('zipCode', zipCode); }
 
   getCountry() { return this.get('country') || 'MX'; }
+
   setCountry(country) { this.set('country', country); }
 
   isFavorite() { return this.get('isFavorite') === true; }
+
   setIsFavorite(favorite) { this.set('isFavorite', favorite === true); }
 
   toJSON() {
@@ -126,6 +133,7 @@ class ClientAddress extends BaseModel {
    * All addresses for a client, favorite first.
    * @param {string} clientId - Client objectId.
    * @returns {Promise<ClientAddress[]>}
+   * @example
    */
   static async getByClient(clientId) {
     try {

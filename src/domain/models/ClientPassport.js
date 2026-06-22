@@ -110,21 +110,27 @@ class ClientPassport extends BaseModel {
   }
 
   getLabel() { return this.get('label') || ''; }
+
   setLabel(label) { this.set('label', label); }
 
   getCountryOfIssue() { return this.get('countryOfIssue') || ''; }
+
   setCountryOfIssue(v) { this.set('countryOfIssue', v); }
 
   getNationality() { return this.get('nationality') || ''; }
+
   setNationality(v) { this.set('nationality', v); }
 
   getDateOfIssue() { return this.get('dateOfIssue') || null; }
+
   setDateOfIssue(v) { this.set('dateOfIssue', ClientPassport.toDate(v)); }
 
   getExpirationDate() { return this.get('expirationDate') || null; }
+
   setExpirationDate(v) { this.set('expirationDate', ClientPassport.toDate(v)); }
 
   getPassportDocument() { return this.get('passportDocument') || null; }
+
   setPassportDocument(file) { this.set('passportDocument', file); }
 
   // ---- Passport number (encrypted at rest via SensitiveDataVault, masked by default) ----
@@ -181,6 +187,7 @@ class ClientPassport extends BaseModel {
    * All passports for a client.
    * @param {string} clientId - Client objectId.
    * @returns {Promise<ClientPassport[]>}
+   * @example
    */
   static async getByClient(clientId) {
     try {

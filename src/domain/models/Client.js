@@ -194,15 +194,19 @@ class Client extends BaseModel {
   }
 
   getClientCategory() { return this.get('clientCategory') || ''; }
+
   setClientCategory(category) { this.set('clientCategory', category); }
 
   getBirthDate() { return this.get('birthDate') || null; }
+
   setBirthDate(birthDate) { this.set('birthDate', birthDate || null); }
 
   getLoyaltyPrograms() { return this.get('loyaltyPrograms') || []; }
+
   setLoyaltyPrograms(programs) { this.set('loyaltyPrograms', programs || []); }
 
   getPassportDocument() { return this.get('passportDocument') || null; }
+
   setPassportDocument(file) { this.set('passportDocument', file); }
 
   // ---- Passport number (encrypted at rest via SensitiveDataVault, masked by default) ----
@@ -240,6 +244,7 @@ class Client extends BaseModel {
   /**
    * Addresses linked to this client (favorite first).
    * @returns {Promise<Array>}
+   * @example
    */
   async getAddresses() {
     const ClientAddress = require('./ClientAddress');
@@ -249,6 +254,7 @@ class Client extends BaseModel {
   /**
    * Travel preferences linked to this client.
    * @returns {Promise<Array>}
+   * @example
    */
   async getTravelPreferences() {
     const TravelPreference = require('./TravelPreference');
