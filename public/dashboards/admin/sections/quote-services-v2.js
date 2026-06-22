@@ -15968,21 +15968,23 @@ class ItineraryBuilder {
    * @example
    */
   setupTimeInputs() {
-    // Setup time input formatting for all time-input fields
+    // Setup time input formatting for time-input fields de TEXTO. Los inputs nativos
+    // (type="time") NO necesitan máscara/restricción: el navegador ya valida HH:MM, así que
+    // se saltan (aplicarles formatTimeInput movería el cursor y pelearía con el picker).
     document.addEventListener('input', (e) => {
-      if (e.target.classList.contains('time-input')) {
+      if (e.target.classList.contains('time-input') && e.target.type !== 'time') {
         this.formatTimeInput(e.target);
       }
     });
 
     document.addEventListener('keypress', (e) => {
-      if (e.target.classList.contains('time-input')) {
+      if (e.target.classList.contains('time-input') && e.target.type !== 'time') {
         this.restrictTimeInputKeys(e);
       }
     });
 
     document.addEventListener('focus', (e) => {
-      if (e.target.classList.contains('time-input') && !e.target.value) {
+      if (e.target.classList.contains('time-input') && e.target.type !== 'time' && !e.target.value) {
         // Show placeholder hint on focus
         e.target.placeholder = e.target.dataset.placeholder || '__:__';
       }
