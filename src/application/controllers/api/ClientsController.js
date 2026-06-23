@@ -524,11 +524,15 @@ class ClientsController {
    */
   buildEndClientQuery({ isCategoryTab, type, includeInactive }) {
     const Parse = require('parse/node');
+    // TEMP: hidden per direction; empty this array to re-activate these client types.
+    const HIDDEN_CATEGORIES = ['wedding_planner', 'concierge', 'home_owner'];
     const query = new Parse.Query('AmexingUser');
     query.equalTo('role', 'end_client');
     query.equalTo('exists', true);
     if (isCategoryTab) {
       query.equalTo('clientCategory', type);
+    } else if (HIDDEN_CATEGORIES.length) {
+      query.notContainedIn('clientCategory', HIDDEN_CATEGORIES);
     }
     if (!includeInactive) {
       query.equalTo('active', true);
