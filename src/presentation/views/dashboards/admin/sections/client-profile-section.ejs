@@ -1,0 +1,547 @@
+<%
+// Travel-preference types mirror the reference design.
+const PREFERENCE_TYPES = ['Activity', 'Bed', 'Hotel', 'Meal', 'Mood', 'Seat'];
+%>
+<style>
+    #profileModal .form-control, #profileModal .form-select,
+    #agentProfileModal .form-control, #agentProfileModal .form-select,
+    #profileRoot .form-control, #profileRoot .form-select { color: #1b1b1b; }
+    #profileModal .form-control::placeholder,
+    #agentProfileModal .form-control::placeholder,
+    #profileRoot .form-control::placeholder { color: #6c757d; }
+</style>
+<script>
+// Initialize the profile section for a given root element. Reusable so it can drive both the
+// client detail page (#profileRoot) and an injected agent-profile modal (its own root).
+window.initProfileSection = function (root) {
+    if (!root || root.dataset.profileInit === '1') return;
+    root.dataset.profileInit = '1';
+    const clientId = root.dataset.clientId;
+    // ownerBase lets this section drive either /api/clients/:id (Client) or /api/agents/:id
+    // (AmexingUser agent). Falls back to the client base for backward compatibility.
+    const base = root.dataset.ownerBase || `/api/clients/${clientId}`;
+    const PREFERENCE_TYPES = <%- JSON.stringify(PREFERENCE_TYPES) %>;
+
+    // Country list for passport dropdowns. México/Estados Unidos/Canadá first (Mexican travel
+    // company), then the rest alphabetically.
+    const COUNTRIES = ['México', 'Estados Unidos', 'Canadá', 'Alemania', 'Arabia Saudita', 'Argentina',
+        'Australia', 'Austria', 'Bélgica', 'Bolivia', 'Brasil', 'Bulgaria', 'Chile', 'China', 'Chipre',
+        'Colombia', 'Corea del Sur', 'Costa Rica', 'Croacia', 'Cuba', 'Dinamarca', 'Ecuador', 'Egipto',
+        'El Salvador', 'Emiratos Árabes Unidos', 'Eslovaquia', 'Eslovenia', 'España', 'Estonia',
+        'Filipinas', 'Finlandia', 'Francia', 'Grecia', 'Guatemala', 'Honduras', 'Hungría', 'India',
+        'Indonesia', 'Irlanda', 'Islandia', 'Israel', 'Italia', 'Japón', 'Letonia', 'Lituania',
+        'Luxemburgo', 'Malasia', 'Malta', 'Marruecos', 'Nicaragua', 'Noruega', 'Nueva Zelanda',
+        'Países Bajos', 'Panamá', 'Paraguay', 'Perú', 'Polonia', 'Portugal', 'Qatar', 'Reino Unido',
+        'República Checa', 'República Dominicana', 'Rumania', 'Rusia', 'Singapur', 'Sudáfrica',
+        'Suecia', 'Suiza', 'Tailandia', 'Turquía', 'Ucrania', 'Uruguay', 'Venezuela', 'Vietnam'];
+
+    // Maps each country to its Spanish demonym (feminine/neutral form used for "nacionalidad").
+    const COUNTRY_TO_NATIONALITY = {
+        'México': 'Mexicana', 'Estados Unidos': 'Estadounidense', 'Canadá': 'Canadiense',
+        'Alemania': 'Alemana', 'Arabia Saudita': 'Saudí', 'Argentina': 'Argentina',
+        'Australia': 'Australiana', 'Austria': 'Austriaca', 'Bélgica': 'Belga', 'Bolivia': 'Boliviana',
+        'Brasil': 'Brasileña', 'Bulgaria': 'Búlgara', 'Chile': 'Chilena', 'China': 'China',
+        'Chipre': 'Chipriota', 'Colombia': 'Colombiana', 'Corea del Sur': 'Surcoreana',
+        'Costa Rica': 'Costarricense', 'Croacia': 'Croata', 'Cuba': 'Cubana', 'Dinamarca': 'Danesa',
+        'Ecuador': 'Ecuatoriana', 'Egipto': 'Egipcia', 'El Salvador': 'Salvadoreña',
+        'Emiratos Árabes Unidos': 'Emiratí', 'Eslovaquia': 'Eslovaca', 'Eslovenia': 'Eslovena',
+        'España': 'Española', 'Estonia': 'Estonia', 'Filipinas': 'Filipina', 'Finlandia': 'Finlandesa',
+        'Francia': 'Francesa', 'Grecia': 'Griega', 'Guatemala': 'Guatemalteca', 'Honduras': 'Hondureña',
+        'Hungría': 'Húngara', 'India': 'India', 'Indonesia': 'Indonesia', 'Irlanda': 'Irlandesa',
+        'Islandia': 'Islandesa', 'Israel': 'Israelí', 'Italia': 'Italiana', 'Japón': 'Japonesa',
+        'Letonia': 'Letona', 'Lituania': 'Lituana', 'Luxemburgo': 'Luxemburguesa', 'Malasia': 'Malasia',
+        'Malta': 'Maltesa', 'Marruecos': 'Marroquí', 'Nicaragua': 'Nicaragüense', 'Noruega': 'Noruega',
+        'Nueva Zelanda': 'Neozelandesa', 'Países Bajos': 'Neerlandesa', 'Panamá': 'Panameña',
+        'Paraguay': 'Paraguaya', 'Perú': 'Peruana', 'Polonia': 'Polaca', 'Portugal': 'Portuguesa',
+        'Qatar': 'Catarí', 'Reino Unido': 'Británica', 'República Checa': 'Checa',
+        'República Dominicana': 'Dominicana', 'Rumania': 'Rumana', 'Rusia': 'Rusa',
+        'Singapur': 'Singapurense', 'Sudáfrica': 'Sudafricana', 'Suecia': 'Sueca', 'Suiza': 'Suiza',
+        'Tailandia': 'Tailandesa', 'Turquía': 'Turca', 'Ucrania': 'Ucraniana', 'Uruguay': 'Uruguaya',
+        'Venezuela': 'Venezolana', 'Vietnam': 'Vietnamita',
+    };
+
+    // Nationality options, in the same order as COUNTRIES (México/Estados Unidos/Canadá first).
+    const NATIONALITIES = COUNTRIES.map((c) => COUNTRY_TO_NATIONALITY[c]);
+
+    function optionsList(values, current) {
+        return values.map((v) => `<option value="${esc(v)}" ${current === v ? 'selected' : ''}>${esc(v)}</option>`).join('');
+    }
+
+    function countrySelect(field, current) {
+        return `<select class="form-select" data-f="${field}"><option value="">Selecciona…</option>${optionsList(COUNTRIES, current)}</select>`;
+    }
+
+    function nationalitySelect(field, current) {
+        return `<select class="form-select" data-f="${field}"><option value="">Selecciona…</option>${optionsList(NATIONALITIES, current)}</select>`;
+    }
+
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    // Country → ISO code for the postal-code lookup. Only MX/US/CA are covered by the backend proxy.
+    const COUNTRY_ISO = { 'México': 'mx', 'Estados Unidos': 'us', 'Canadá': 'ca' };
+    const ISO_TO_COUNTRY = { mx: 'México', us: 'Estados Unidos', ca: 'Canadá' };
+
+    function isoFor(country) {
+        if (COUNTRY_ISO[country]) return COUNTRY_ISO[country];
+        const c = String(country || '').toLowerCase().trim();
+        if (/^(m[eé]xico|mx|mex)$/.test(c)) return 'mx';
+        if (/^(estados unidos|usa|us|ee\.?\s*uu\.?)$/.test(c)) return 'us';
+        if (/^(canad[áa]|ca|can)$/.test(c)) return 'ca';
+        return '';
+    }
+
+    // Normalize a stored country value to a COUNTRIES option so the <select> preselects it.
+    function countryDisplay(c) {
+        if (!c) return 'México';
+        if (COUNTRIES.includes(c)) return c;
+        return ISO_TO_COUNTRY[isoFor(c)] || c;
+    }
+
+    // Postal-code rule per supported country: digits-only + exact length (MX/US) or alphanumeric (CA).
+    function postalRule(iso) {
+        if (iso === 'mx' || iso === 'us') return { numeric: true, length: 5 };
+        if (iso === 'ca') return { numeric: false, length: 6 };
+        return { numeric: false, length: null };
+    }
+
+    // Resolve a postal code to { state, city } via our backend proxy (Zippopotam.us); null if unknown.
+    async function lookupPostal(iso, code) {
+        if (!iso || !code) return null;
+        try {
+            const res = await fetch(`/api/geo/postal/${iso}/${encodeURIComponent(code)}`, {
+                credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!res.ok) return null;
+            const json = await res.json();
+            return json && json.data ? json.data : null;
+        } catch (e) { return null; }
+    }
+
+    async function api(path, method = 'GET', body) {
+        const res = await fetch(base + path, {
+            method,
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: body ? JSON.stringify(body) : undefined,
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json.success === false) throw new Error(json.error || `Error ${res.status}`);
+        return json.data;
+    }
+
+    function notify(msg, kind = 'success') {
+        if (typeof window.showSuccessAlert === 'function' && kind === 'success') return window.showSuccessAlert(msg);
+        if (typeof window.showErrorAlert === 'function' && kind !== 'success') return window.showErrorAlert(msg);
+        alert(msg);
+    }
+
+    // Reusable RED danger confirmation modal. Returns a Promise<boolean> (true = confirmed).
+    // Built once and reused by id; the confirm button is cloned each open to avoid stacked listeners.
+    function confirmDanger(message, confirmLabel = 'Eliminar') {
+        let el = document.getElementById('profileConfirmModal');
+        if (!el) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="profileConfirmModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title text-white"><i class="ti ti-alert-triangle me-2"></i>Confirmar eliminación</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body" data-confirm-body></div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="ti ti-x me-1"></i>Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="profileConfirmBtn"><i class="ti ti-trash me-1"></i><span data-confirm-label></span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`);
+            el = document.getElementById('profileConfirmModal');
+        }
+        el.querySelector('[data-confirm-body]').textContent = message;
+        el.querySelector('[data-confirm-label]').textContent = confirmLabel;
+        const modal = bootstrap.Modal.getOrCreateInstance(el);
+        const confirmBtn = el.querySelector('#profileConfirmBtn');
+        const fresh = confirmBtn.cloneNode(true);
+        confirmBtn.replaceWith(fresh);
+        return new Promise((resolve) => {
+            let confirmed = false;
+            fresh.addEventListener('click', () => { confirmed = true; modal.hide(); });
+            el.addEventListener('hidden.bs.modal', () => resolve(confirmed), { once: true });
+            modal.show();
+        });
+    }
+
+    // ---------- Passports ----------
+    async function loadPassports() {
+        const box = document.getElementById('passportsContainer');
+        if (!box) return; // agencies don't render the passports card
+        try {
+            const { passports } = await api('/passports');
+            if (!passports.length) { box.innerHTML = '<p class="text-muted mb-0">Sin pasaportes registrados.</p>'; return; }
+            box.innerHTML = passports.map((p) => `
+                <div class="border-bottom py-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="fw-semibold">${esc(p.label) || 'Pasaporte'}${p.verified ? '<span class="badge bg-success ms-2"><i class="ti ti-circle-check me-1"></i>Verificado</span>' : '<span class="badge bg-secondary ms-2">Sin verificar</span>'}</div>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-light" title="Editar" data-edit-pp="${p.id}"><i class="ti ti-pencil"></i></button>
+                            <button class="btn btn-light text-danger" title="Eliminar" data-del-pp="${p.id}"><i class="ti ti-trash"></i></button>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label text-muted small mb-0">Passport Number</label>
+                            <div><span data-pp-mask="${p.id}">${esc(p.numberMasked) || '—'}</span>
+                                ${p.hasNumber ? `<button class="btn btn-sm btn-light ms-1" title="Mostrar" data-reveal-pp="${p.id}"><i class="ti ti-eye-off"></i></button>` : ''}
+                            </div>
+                        </div>
+                        ${p.passportDocument ? `<div class="col-md-6 mb-2"><label class="form-label text-muted small mb-0">Copia del Pasaporte</label><div><a href="${esc(p.passportDocument)}" target="_blank"><i class="ti ti-file me-1"></i>Ver documento</a></div></div>` : ''}
+                        <div class="col-md-6 mb-2"><label class="form-label text-muted small mb-0">Country of Issue</label><div class="text-muted">${esc(p.countryOfIssue) || '—'}</div></div>
+                        <div class="col-md-6 mb-2"><label class="form-label text-muted small mb-0">Nationality</label><div class="text-muted">${esc(p.nationality) || '—'}</div></div>
+                        <div class="col-md-6 mb-2"><label class="form-label text-muted small mb-0">Date of Issue</label><div class="text-muted">${fmtDate(p.dateOfIssue)}</div></div>
+                        <div class="col-md-6 mb-2"><label class="form-label text-muted small mb-0">Expiration Date</label><div class="text-muted">${fmtDate(p.expirationDate)}</div></div>
+                    </div>
+                </div>`).join('');
+            box._data = passports;
+        } catch (e) { box.innerHTML = `<p class="text-danger mb-0">${esc(e.message)}</p>`; }
+    }
+
+    function fmtDate(v) {
+        if (!v) return '—';
+        const d = new Date(v); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { dateStyle: 'medium' });
+    }
+
+    function dateInput(v) { return v ? new Date(v).toISOString().slice(0, 10) : ''; }
+
+    function passportForm(p = {}) {
+        return `
+            <div class="row g-2">
+                <div class="col-md-6"><label class="form-label small">Etiqueta</label><input class="form-control" data-f="label" value="${esc(p.label)}" placeholder="Passport 1"></div>
+                <div class="col-md-6"><label class="form-label small">Passport Number</label><input class="form-control" data-f="number" maxlength="14" placeholder="${p.hasNumber ? 'Dejar vacío para conservar' : ''}"></div>
+                <div class="col-md-6"><label class="form-label small">Country of Issue</label>${countrySelect('countryOfIssue', p.countryOfIssue)}</div>
+                <div class="col-md-6"><label class="form-label small">Nationality</label>${nationalitySelect('nationality', p.nationality)}</div>
+                <div class="col-md-6"><label class="form-label small">Date of Issue</label><input type="date" class="form-control" data-f="dateOfIssue" value="${dateInput(p.dateOfIssue)}"></div>
+                <div class="col-md-6"><label class="form-label small">Expiration Date</label><input type="date" class="form-control" data-f="expirationDate" value="${dateInput(p.expirationDate)}"></div>
+                <div class="col-12"><label class="form-label small">Copia del Pasaporte (foto o PDF)</label><input type="file" class="form-control" data-f-file="passportDocument" accept="image/*,application/pdf">${p.passportDocument ? ` <a href="${esc(p.passportDocument)}" target="_blank" class="small d-inline-block mt-1"><i class="ti ti-file me-1"></i>Ver documento actual</a>` : ''}</div>
+                <div class="col-12 form-check ms-1 mt-1"><input class="form-check-input" type="checkbox" data-f="verified" id="ppVerified" ${p.verified ? 'checked' : ''}><label class="form-check-label small" for="ppVerified">Documento verificado (es un pasaporte válido)</label></div>
+            </div>`;
+    }
+
+    // Second step after create/update: upload the document file via multipart to the S3 endpoint.
+    // Client-side validation mirrors the server (image/PDF, ≤5MB); returns true on success.
+    async function uploadPassportDocument(passportId, file) {
+        if (!file) return true;
+        if (file.size > 5 * 1024 * 1024) { notify('El archivo supera el límite de 5MB', 'error'); return false; }
+        if (!/^image\//.test(file.type) && file.type !== 'application/pdf') {
+            notify('Tipo de archivo no permitido. Solo imágenes o PDF.', 'error'); return false;
+        }
+        const fd = new FormData();
+        fd.append('document', file);
+        // No Content-Type header — the browser sets the multipart boundary itself.
+        const res = await fetch(`${base}/passports/${passportId}/document`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: fd,
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json.success === false) throw new Error(json.error || `Error ${res.status}`);
+        return true;
+    }
+
+    // ---------- Addresses ----------
+    async function loadAddresses() {
+        const box = document.getElementById('addressesContainer');
+        try {
+            const { addresses } = await api('/addresses');
+            if (!addresses.length) { box.innerHTML = '<p class="text-muted mb-0">Sin direcciones registradas.</p>'; return; }
+            box.innerHTML = addresses.map((a) => `
+                <div class="d-flex justify-content-between align-items-start border-bottom py-2">
+                    <div>
+                        <div class="fw-semibold">${esc(a.label) || 'Dirección'} ${a.isFavorite ? '<span class="badge bg-warning ms-1"><i class="ti ti-star me-1"></i>Favorita</span>' : ''}</div>
+                        <div class="text-muted small">${esc(a.street)}${a.colonia ? `, Col. ${esc(a.colonia)}` : ''}, ${esc(a.city)}, ${esc(a.state)} ${esc(a.zipCode)}, ${esc(a.country)}</div>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        ${a.isFavorite ? '' : `<button class="btn btn-light" title="Marcar favorita" data-fav="${a.id}"><i class="ti ti-star"></i></button>`}
+                        <button class="btn btn-light" title="Editar" data-edit-addr="${a.id}"><i class="ti ti-pencil"></i></button>
+                        <button class="btn btn-light text-danger" title="Eliminar" data-del-addr="${a.id}"><i class="ti ti-trash"></i></button>
+                    </div>
+                </div>`).join('');
+            box._data = addresses;
+        } catch (e) { box.innerHTML = `<p class="text-danger mb-0">${esc(e.message)}</p>`; }
+    }
+
+    function addressForm(a = {}) {
+        return `
+            <div class="row g-2">
+                <div class="col-md-6"><label class="form-label small">Etiqueta</label><input class="form-control" data-f="label" value="${esc(a.label)}"></div>
+                <div class="col-md-6"><label class="form-label small">País</label>${countrySelect('country', countryDisplay(a.country))}</div>
+                <div class="col-12"><label class="form-label small">Calle</label><input class="form-control" data-f="street" value="${esc(a.street)}"></div>
+                <div class="col-md-4"><label class="form-label small">CP</label><input class="form-control" data-f="zipCode" inputmode="numeric" autocomplete="off" value="${esc(a.zipCode)}"><small class="d-block mt-1" data-cp-feedback></small></div>
+                <div class="col-md-4"><label class="form-label small">Estado</label><input class="form-control" data-f="state" value="${esc(a.state)}"></div>
+                <div class="col-md-4"><label class="form-label small">Ciudad</label><input class="form-control" data-f="city" value="${esc(a.city)}"></div>
+                <div class="col-12"><label class="form-label small">Colonia</label><input class="form-control" data-f="colonia" list="coloniaOptions" autocomplete="off" value="${esc(a.colonia)}"><datalist id="coloniaOptions"></datalist></div>
+                <div class="col-12 form-check ms-2 mt-2"><input class="form-check-input" type="checkbox" data-f="isFavorite" id="favChk" ${a.isFavorite ? 'checked' : ''}><label class="form-check-label small" for="favChk">Marcar como favorita</label></div>
+            </div>`;
+    }
+
+    // ---------- Travel preferences ----------
+    async function loadPreferences() {
+        const box = document.getElementById('preferencesContainer');
+        try {
+            const { preferences } = await api('/travel-preferences');
+            if (!preferences.length) { box.innerHTML = '<p class="text-muted mb-0">Sin preferencias registradas.</p>'; return; }
+            box.innerHTML = preferences.map((p) => `
+                <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                    <div><span class="fw-semibold">${esc(p.type)}</span><span class="text-muted ms-2">${esc(p.option)}</span></div>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-light" title="Editar" data-edit-pref="${p.id}"><i class="ti ti-pencil"></i></button>
+                        <button class="btn btn-light text-danger" title="Eliminar" data-del-pref="${p.id}"><i class="ti ti-trash"></i></button>
+                    </div>
+                </div>`).join('');
+            box._data = preferences;
+        } catch (e) { box.innerHTML = `<p class="text-danger mb-0">${esc(e.message)}</p>`; }
+    }
+
+    function preferenceForm(p = {}) {
+        const opts = PREFERENCE_TYPES.map((t) => `<option value="${t}" ${p.type === t ? 'selected' : ''}>${t}</option>`).join('');
+        return `
+            <div class="row g-2">
+                <div class="col-md-6"><label class="form-label small">Tipo</label><select class="form-select" data-f="type"><option value="">Selecciona…</option>${opts}</select></div>
+                <div class="col-md-6"><label class="form-label small">Opción</label><input class="form-control" data-f="option" value="${esc(p.option)}"></div>
+            </div>`;
+    }
+
+    // ---------- Loyalty programs (array on the client) ----------
+    async function loadLoyalty() {
+        const box = document.getElementById('loyaltyContainer');
+        if (!box) return; // agents (and any owner without loyalty) don't render the loyalty card
+        try {
+            const { loyaltyPrograms } = await api('/loyalty-programs');
+            box._data = loyaltyPrograms || [];
+            renderLoyalty();
+        } catch (e) { box.innerHTML = `<p class="text-danger mb-0">${esc(e.message)}</p>`; }
+    }
+
+    function renderLoyalty() {
+        const box = document.getElementById('loyaltyContainer');
+        const list = box._data || [];
+        if (!list.length) { box.innerHTML = '<p class="text-muted mb-0">Sin programas registrados.</p>'; return; }
+        box.innerHTML = list.map((p, i) => `
+            <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                <div><span class="fw-semibold">${esc(p.type)}</span><span class="text-muted ms-2">${esc(p.number)}</span></div>
+                <button class="btn btn-light btn-sm text-danger" title="Eliminar" data-del-loyalty="${i}"><i class="ti ti-trash"></i></button>
+            </div>`).join('');
+    }
+
+    async function saveLoyalty(list) {
+        await api('/loyalty-programs', 'PUT', { loyaltyPrograms: list });
+    }
+
+    // ---------- Generic modal (standard dashboard style: bg-primary header + icon) ----------
+    function openModal(title, bodyHtml, onSave, icon = 'edit') {
+        let el = document.getElementById('profileModal');
+        if (!el) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="profileModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title text-white"><i class="ti ti-edit me-2" data-modal-icon></i><span data-modal-title></span></h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body"></div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="ti ti-x me-1"></i>Cancelar</button>
+                                <button type="button" class="btn btn-primary" id="profileModalSave"><i class="ti ti-check me-1"></i>Guardar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`);
+            el = document.getElementById('profileModal');
+        }
+        el.querySelector('[data-modal-icon]').className = `ti ti-${icon} me-2`;
+        el.querySelector('[data-modal-title]').textContent = title;
+        el.querySelector('.modal-body').innerHTML = bodyHtml;
+        // Country of Issue drives Nationality on every change (user can still override after).
+        const ci = el.querySelector('[data-f="countryOfIssue"]');
+        const nat = el.querySelector('[data-f="nationality"]');
+        if (ci && nat) ci.addEventListener('change', () => { nat.value = COUNTRY_TO_NATIONALITY[ci.value] || ''; });
+        // Address: typing the CP looks up Estado + Ciudad (MX/US/CA) via the backend proxy.
+        const addrCountry = el.querySelector('[data-f="country"]');
+        const addrCp = el.querySelector('[data-f="zipCode"]');
+        const cpFeedback = el.querySelector('[data-cp-feedback]');
+        if (addrCountry && addrCp) {
+            const setFeedback = (msg, cls) => {
+                if (cpFeedback) { cpFeedback.textContent = msg; cpFeedback.className = `d-block mt-1 small ${cls}`; }
+            };
+            const runLookup = async () => {
+                const iso = isoFor(addrCountry.value);
+                const code = addrCp.value.trim();
+                if (!iso || !code) { setFeedback('', ''); return; }
+                setFeedback('Buscando…', 'text-muted');
+                const data = await lookupPostal(iso, code);
+                if (data && (data.state || data.city)) {
+                    const st = el.querySelector('[data-f="state"]');
+                    const cy = el.querySelector('[data-f="city"]');
+                    if (data.state && st) st.value = data.state;
+                    if (data.city && cy) cy.value = data.city;
+                    // Mexico (SEPOMEX) returns the colonias for the CP → offer them in the datalist.
+                    const dl = el.querySelector('#coloniaOptions');
+                    const colonias = data.colonias || [];
+                    if (dl) dl.innerHTML = colonias.map((co) => `<option value="${esc(co)}"></option>`).join('');
+                    const extra = colonias.length ? ` · ${colonias.length} colonia${colonias.length > 1 ? 's' : ''}` : '';
+                    setFeedback(`✓ ${[data.city, data.state].filter(Boolean).join(', ')}${extra}`, 'text-success');
+                } else {
+                    setFeedback('Código postal no encontrado', 'text-warning');
+                }
+            };
+            addrCp.addEventListener('input', () => {
+                const rule = postalRule(isoFor(addrCountry.value));
+                if (rule.numeric) {
+                    const cleaned = addrCp.value.replace(/\D/g, '').slice(0, rule.length || 10);
+                    if (cleaned !== addrCp.value) addrCp.value = cleaned;
+                    if (cleaned.length === rule.length) runLookup();
+                }
+            });
+            addrCp.addEventListener('change', runLookup);
+            addrCountry.addEventListener('change', () => setFeedback('', ''));
+        }
+        const modal = bootstrap.Modal.getOrCreateInstance(el);
+        const saveBtn = el.querySelector('#profileModalSave');
+        const fresh = saveBtn.cloneNode(true);
+        saveBtn.replaceWith(fresh);
+        fresh.addEventListener('click', async () => {
+            const values = {};
+            el.querySelectorAll('[data-f]').forEach((input) => {
+                values[input.dataset.f] = input.type === 'checkbox' ? input.checked : input.value;
+            });
+            // Address CP validation: only numbers + exact length where the country requires it.
+            if (addrCountry && addrCp) {
+                const rule = postalRule(isoFor(addrCountry.value));
+                const cp = String(values.zipCode || '').trim();
+                if (cp && rule.length) {
+                    if (rule.numeric && !/^\d+$/.test(cp)) {
+                        notify('El código postal solo debe contener números', 'error'); return;
+                    }
+                    const len = rule.numeric ? cp.length : cp.replace(/\s/g, '').length;
+                    if (len !== rule.length) {
+                        notify(`El código postal debe tener exactamente ${rule.length} ${rule.numeric ? 'dígitos' : 'caracteres'}`, 'error'); return;
+                    }
+                }
+            }
+            // The selected file (if any) is handed to onSave so it can do the second S3 upload step;
+            // the create/update request itself stays JSON (no file in the body).
+            const fileInput = el.querySelector('[data-f-file]');
+            const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+            // Lock the button while saving so it can't be submitted twice (no duplicate records).
+            const label = fresh.innerHTML;
+            fresh.disabled = true;
+            fresh.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+            try {
+                await onSave(values, file);
+                modal.hide();
+            } catch (e) {
+                notify(e.message, 'error');
+            } finally {
+                fresh.disabled = false;
+                fresh.innerHTML = label;
+            }
+        });
+        // When opened over a parent modal (e.g. the agent profile modal), hide the parent so only
+        // this form shows; re-show it once this modal is fully hidden (save or cancel).
+        const parentEl = document.querySelector('.modal.show');
+        const parentModal = (parentEl && parentEl !== el) ? bootstrap.Modal.getOrCreateInstance(parentEl) : null;
+        if (parentModal) parentModal.hide();
+        modal.show();
+        if (parentModal) el.addEventListener('hidden.bs.modal', () => parentModal.show(), { once: true });
+    }
+
+    // ---------- Wiring ----------
+    document.getElementById('addPassportBtn')?.addEventListener('click', () => {
+        openModal('Agregar Pasaporte', passportForm(), async (v, file) => {
+            const { passport } = await api('/passports', 'POST', v);
+            // Document is uploaded as a second multipart step against the new passport's id.
+            if (file) await uploadPassportDocument(passport.id, file);
+            notify('Pasaporte creado'); loadPassports();
+        }, 'id');
+    });
+    document.getElementById('addAddressBtn')?.addEventListener('click', () => {
+        openModal('Agregar Dirección', addressForm(), async (v) => { await api('/addresses', 'POST', v); notify('Dirección creada'); loadAddresses(); }, 'map-pin');
+    });
+    document.getElementById('addPreferenceBtn')?.addEventListener('click', () => {
+        openModal('Agregar Preferencia', preferenceForm(), async (v) => { await api('/travel-preferences', 'POST', v); notify('Preferencia creada'); loadPreferences(); }, 'plane');
+    });
+    document.getElementById('addLoyaltyBtn')?.addEventListener('click', () => {
+        openModal('Agregar Programa', `
+            <div class="row g-2">
+                <div class="col-md-6"><label class="form-label small">Programa</label><input class="form-control" data-f="type"></div>
+                <div class="col-md-6"><label class="form-label small">N° de Membresía</label><input class="form-control" data-f="number"></div>
+            </div>`, async (v) => {
+            const box = document.getElementById('loyaltyContainer');
+            const list = [...(box._data || []), { type: v.type, number: v.number }];
+            await saveLoyalty(list); box._data = list; renderLoyalty(); notify('Programa agregado');
+        }, 'star');
+    });
+
+    root.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button'); if (!btn) return;
+        try {
+            if (btn.dataset.revealPp) {
+                const span = document.querySelector(`[data-pp-mask="${btn.dataset.revealPp}"]`);
+                const icon = btn.querySelector('i');
+                // Toggle on an explicit flag (not the icon class, which can desync).
+                if (btn.dataset.revealed === '1') {
+                    span.textContent = span.dataset.masked;
+                    icon.className = 'ti ti-eye-off';
+                    btn.dataset.revealed = '0';
+                } else {
+                    if (!span.dataset.masked) span.dataset.masked = span.textContent;
+                    const { number } = await api(`/passports/${btn.dataset.revealPp}/reveal`, 'POST');
+                    span.textContent = number;
+                    icon.className = 'ti ti-eye';
+                    btn.dataset.revealed = '1';
+                }
+            } else if (btn.dataset.editPp) {
+                const p = (document.getElementById('passportsContainer')._data || []).find((x) => x.id === btn.dataset.editPp);
+                openModal('Editar Pasaporte', passportForm(p), async (v, file) => {
+                    await api(`/passports/${p.id}`, 'PUT', v);
+                    if (file) await uploadPassportDocument(p.id, file);
+                    notify('Pasaporte actualizado'); loadPassports();
+                }, 'id');
+            } else if (btn.dataset.delPp) {
+                if (await confirmDanger('¿Eliminar este pasaporte? Esta acción no se puede deshacer.')) { await api(`/passports/${btn.dataset.delPp}`, 'DELETE'); notify('Pasaporte eliminado correctamente'); loadPassports(); }
+            } else if (btn.dataset.fav) { await api(`/addresses/${btn.dataset.fav}`, 'PUT', { isFavorite: true }); loadAddresses(); }
+            else if (btn.dataset.editAddr) {
+                const a = (document.getElementById('addressesContainer')._data || []).find((x) => x.id === btn.dataset.editAddr);
+                openModal('Editar Dirección', addressForm(a), async (v) => { await api(`/addresses/${a.id}`, 'PUT', v); notify('Dirección actualizada'); loadAddresses(); }, 'map-pin');
+            } else if (btn.dataset.delAddr) {
+                if (await confirmDanger('¿Eliminar esta dirección?')) { await api(`/addresses/${btn.dataset.delAddr}`, 'DELETE'); notify('Dirección eliminada correctamente'); loadAddresses(); }
+            } else if (btn.dataset.editPref) {
+                const p = (document.getElementById('preferencesContainer')._data || []).find((x) => x.id === btn.dataset.editPref);
+                openModal('Editar Preferencia', preferenceForm(p), async (v) => { await api(`/travel-preferences/${p.id}`, 'PUT', v); notify('Preferencia actualizada'); loadPreferences(); }, 'plane');
+            } else if (btn.dataset.delPref) {
+                if (await confirmDanger('¿Eliminar esta preferencia?')) { await api(`/travel-preferences/${btn.dataset.delPref}`, 'DELETE'); notify('Preferencia eliminada correctamente'); loadPreferences(); }
+            } else if (btn.dataset.delLoyalty) {
+                if (await confirmDanger('¿Eliminar este programa?')) {
+                    const box = document.getElementById('loyaltyContainer');
+                    const list = (box._data || []).filter((_, i) => i !== Number(btn.dataset.delLoyalty));
+                    await saveLoyalty(list); box._data = list; renderLoyalty(); notify('Programa eliminado correctamente');
+                }
+            }
+        } catch (err) { notify(err.message, 'error'); }
+    });
+
+    loadPassports();
+    loadAddresses();
+    loadPreferences();
+    loadLoyalty();
+};
+
+// Auto-init for the client detail page (the agent modal calls initProfileSection itself).
+(function () {
+    const root = document.getElementById('profileRoot');
+    if (root) window.initProfileSection(root);
+})();
+</script>

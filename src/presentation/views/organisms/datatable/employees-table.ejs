@@ -359,6 +359,19 @@ function initializeEmployeesDataTable() {
                                 </button>`;
                     }
 
+                    /* Passport / profile button - agents are people, so they get a profile */
+                    if (roleName !== 'department_manager' && ['superadmin', 'admin'].includes('<%= dtUserRole %>')) {
+                        actions += `<button type="button"
+                                    class="btn btn-info btn-agent-profile"
+                                    data-agent-id="${row.id}"
+                                    data-agent-name="${employeeName}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Pasaporte / Perfil">
+                                    <i class="ti ti-id"></i>
+                                </button>`;
+                    }
+
                     /* Assign as Manager button - only for agents (not current user or managers) */
                     const userRole = '<%= dtUserRole %>';
                     if (roleName === 'client' && !isCurrentUser && ['superadmin', 'admin'].includes(userRole)) {
@@ -649,6 +662,65 @@ async function executeToggleEmployeeStatus(employeeId, newStatus) {
 }
 
 /**
+ * Open the agent's passport/profile in a modal. Reuses the shared profile section JS
+ * (window.initProfileSection) pointed at /api/agents/:agentId.
+ * @param {string} agentId - AmexingUser id of the agent
+ * @param {string} agentName - Agent display name
+ */
+function openAgentProfile(agentId, agentName) {
+    let el = document.getElementById('agentProfileModal');
+    if (!el) {
+        document.body.insertAdjacentHTML('beforeend', `
+            <div class="modal fade" id="agentProfileModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title text-white"><i class="ti ti-id me-2"></i><span id="agentProfileTitle"></span></h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="agentProfileRoot">
+                                <div class="card border-0 shadow-sm mb-3">
+                                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="ti ti-id me-2 text-primary"></i>Pasaportes</h5>
+                                        <button type="button" class="btn btn-sm btn-primary" id="addPassportBtn"><i class="ti ti-plus me-1"></i>Agregar Pasaporte</button>
+                                    </div>
+                                    <div class="card-body"><div id="passportsContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
+                                </div>
+                                <div class="card border-0 shadow-sm mb-3">
+                                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="ti ti-map-pin me-2 text-primary"></i>Direcciones</h5>
+                                        <button type="button" class="btn btn-sm btn-primary" id="addAddressBtn"><i class="ti ti-plus me-1"></i>Agregar Dirección</button>
+                                    </div>
+                                    <div class="card-body"><div id="addressesContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
+                                </div>
+                                <div class="card border-0 shadow-sm mb-3">
+                                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="ti ti-plane me-2 text-primary"></i>Preferencias de Viaje</h5>
+                                        <button type="button" class="btn btn-sm btn-primary" id="addPreferenceBtn"><i class="ti ti-plus me-1"></i>Agregar Preferencia</button>
+                                    </div>
+                                    <div class="card-body"><div id="preferencesContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`);
+        el = document.getElementById('agentProfileModal');
+    }
+    document.getElementById('agentProfileTitle').textContent = `Perfil — ${agentName}`;
+    const root = document.getElementById('agentProfileRoot');
+    // Re-init each open: clear the init guard and point at this agent.
+    root.dataset.profileInit = '';
+    root.dataset.ownerBase = `/api/agents/${agentId}`;
+    root.dataset.clientId = agentId;
+    if (typeof window.initProfileSection === 'function') {
+        window.initProfileSection(root);
+    }
+    bootstrap.Modal.getOrCreateInstance(el).show();
+}
+
+/**
  * Assign agent as department manager
  * @param {string} agentId - Agent ID to promote
  * @param {string} agentName - Agent name for confirmation
@@ -934,6 +1006,14 @@ function setupEventDelegation() {
             return;
         }
 
+        // Passport / profile button
+        if (target.classList.contains('btn-agent-profile')) {
+            const agentId = target.getAttribute('data-agent-id');
+            const agentName = target.getAttribute('data-agent-name');
+            openAgentProfile(agentId, agentName);
+            return;
+        }
+
         // Assign as Manager button
         if (target.classList.contains('btn-assign-manager')) {
             const agentId = target.getAttribute('data-agent-id');
@@ -1020,3 +1100,9 @@ document.addEventListener('DOMContentLoaded', function() {
     border-color: #5a6a85;
 }
 </style>
+
+<%
+// Provide window.initProfileSection for the agent passport/profile modal (openAgentProfile).
+// The partial auto-inits #profileRoot if present; here there is none, so it only defines the fn.
+%>
+<%- include('../../dashboards/admin/sections/client-profile-section') %>

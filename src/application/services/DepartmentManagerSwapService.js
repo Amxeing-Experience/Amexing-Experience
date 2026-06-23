@@ -13,6 +13,14 @@ const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 const AuditLog = require('../../domain/models/AuditLog');
 
+/**
+ * Service that swaps the department_manager "seat" between two users by moving
+ * personal data while keeping the account ID and organizational relationships
+ * stable, so the manager role can change hands without breaking references.
+ * @example
+ *   const service = new DepartmentManagerSwapService();
+ *   await service.swapManager(currentManagerId, newPersonData);
+ */
 class DepartmentManagerSwapService {
   /**
    * Fields that get swapped between users (personal data).

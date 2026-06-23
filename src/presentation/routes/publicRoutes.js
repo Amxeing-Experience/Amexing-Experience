@@ -69,6 +69,12 @@ router.get('/quotes/:folio/pdf', PublicQuoteController.downloadQuotePdf);
 router.get('/reservations/:folio', PublicReservationController.viewPublicReservation);
 
 /**
+ * Reservation travel-itinerary view (rendered to PDF via ?pdf=1).
+ * GET /reservations/:folio/itinerary.
+ */
+router.get('/reservations/:folio/itinerary', PublicReservationController.viewReservationItinerary);
+
+/**
  * Public reservation PDF download (server-side, puppeteer-rendered).
  * GET /reservations/:folio/pdf.
  */

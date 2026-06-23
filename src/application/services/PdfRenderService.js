@@ -57,6 +57,7 @@ async function renderUrlToPdf(url, options = {}) {
     format = 'Letter',
     margin = '8mm',
     cookies = null,
+    footer = true,
   } = options;
 
   const browser = await getBrowser();
@@ -88,13 +89,55 @@ async function renderUrlToPdf(url, options = {}) {
     // page-break behavior is still respected via the CSS `page-break-inside: avoid` rules in
     // `.pdf-export-mode` (which we toggle on via the `?pdf=1` query param).
     await page.emulateMediaType('screen');
+    // Wait for @font-face fonts to finish loading so the PDF embeds them instead of
+    // substituting a system font. Templates that embed fonts (e.g. the itinerary, with
+    // base64 Arpona) set window.__fontsReady after explicitly loading them; wait for that
+    // when present, otherwise fall back to the generic fonts.ready. (Runs in the page.)
+    try {
+      await page.evaluate(async () => {
+        /* eslint-disable no-undef, no-underscore-dangle */
+        await document.fonts.ready;
+        if (window.__fontsReady !== undefined) {
+          const start = Date.now();
+          while (!window.__fontsReady && Date.now() - start < 5000) {
+            await new Promise((resolve) => { setTimeout(resolve, 50); });
+          }
+        }
+        /* eslint-enable no-undef, no-underscore-dangle */
+      });
+    } catch (e) { /* noop */ }
+    // Running footer on every page: brand link + page numbers. It softens page breaks
+    // (each page reads as intentional rather than an arbitrary chop) and surfaces
+    // amexingexperience.com in the PDF, matching the on-screen public view. Puppeteer
+    // needs `displayHeaderFooter` plus room in the bottom margin, so we widen `bottom`
+    // past the body `margin`. The empty header template suppresses Puppeteer's default
+    // date/title header. Inline font-size is required — the default is 0.
+    // Per-page letterhead footer: brand + website + page number. Needs a taller bottom margin.
+    const footerTemplate = `
+      <div style="width:100%; box-sizing:border-box; padding:0 ${margin}; font-family:'Segoe UI',Tahoma,Geneva,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+        <div style="border-top:1px solid #d8dac9; padding-top:6px; display:flex; justify-content:space-between; align-items:flex-end;">
+          <div style="text-align:left; line-height:1.35;">
+            <div style="font-size:11px; font-weight:600; letter-spacing:2.5px; color:#969b81; text-transform:uppercase;">Amexing Experience</div>
+            <div style="font-size:7.5px; color:#9aa0a6; letter-spacing:0.5px; margin-top:2px;">amexingexperience.com</div>
+          </div>
+          <div style="font-size:8px; color:#9aa0a6; text-align:right; padding-bottom:1px;">Página <span class="pageNumber"></span> de <span class="totalPages"></span></div>
+        </div>
+      </div>`;
+    // `margin` may be a string (all sides) or a per-side object. With the footer off,
+    // the bottom margin matches the rest (no room reserved for the footer).
+    const marginObj = typeof margin === 'object'
+      ? margin
+      : {
+        top: margin, bottom: footer ? '22mm' : margin, left: margin, right: margin,
+      };
     const pdfBuffer = await page.pdf({
       format,
       printBackground: true,
       preferCSSPageSize: false,
-      margin: {
-        top: margin, bottom: margin, left: margin, right: margin,
-      },
+      displayHeaderFooter: footer,
+      headerTemplate: '<span></span>',
+      footerTemplate: footer ? footerTemplate : '<span></span>',
+      margin: marginObj,
     });
     return pdfBuffer;
   } finally {

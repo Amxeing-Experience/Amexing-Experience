@@ -50,6 +50,7 @@ class UserManagementService {
       'driver',
       'guest',
       'employee_amexing',
+      'end_client',
     ];
     this.roleHierarchy = {
       superadmin: 7,
@@ -1601,6 +1602,22 @@ class UserManagementService {
       address: user.get('address'), // Include address data for client details
       phone: user.get('phone'), // Include phone number
       notes: user.get('notes'), // Include notes field
+      // People-type client profile (direct_client/wedding_planner/concierge/home_owner)
+      clientCategory: user.get('clientCategory') || null,
+      contactFirstName: user.get('contactFirstName'),
+      contactLastName: user.get('contactLastName'),
+      emergencyContactName: user.get('emergencyContactName'),
+      emergencyContactPhone: user.get('emergencyContactPhone'),
+      companyType: user.get('companyType'),
+      taxId: user.get('taxId'),
+      website: user.get('website'),
+      preferredLanguage: user.get('preferredLanguage'),
+      accessibilityRequirements: user.get('accessibilityRequirements'),
+      allergies: user.get('allergies'),
+      dietaryRestrictions: user.get('dietaryRestrictions'),
+      birthDate: user.get('birthDate'),
+      anniversary: user.get('anniversary'),
+      loyaltyPrograms: user.get('loyaltyPrograms') || [],
     };
   }
 
