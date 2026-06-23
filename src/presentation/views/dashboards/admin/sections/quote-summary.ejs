@@ -302,7 +302,7 @@ const e = __isRes ? 'reservación' : 'cotización';
         margin-bottom: 0;
     }
     .sm-totals-meta-item {
-        font-size: 0.85rem;
+        font-size: 1.1rem;
         color: #6c757d;
     }
     .sm-totals-meta-item strong {
@@ -695,14 +695,14 @@ const e = __isRes ? 'reservación' : 'cotización';
 
             <!-- Quote Info -->
             <div class="sm-quote-info">
-                <div class="sm-quote-info-row" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="sm-quote-info-row" id="summaryTopInfoRow" style="grid-template-columns: repeat(2, 1fr);">
                     <div class="sm-quote-info-item">
                         <span class="sm-quote-info-label">Folio</span>
                         <span class="sm-quote-info-value" id="summaryFolio">-</span>
                     </div>
-                    <div class="sm-quote-info-item">
-                        <span class="sm-quote-info-label">Fecha de Creación</span>
-                        <span class="sm-quote-info-value" id="summaryGenerationDate">-</span>
+                    <div class="sm-quote-info-item d-none" id="summaryPreferredLanguageRow">
+                        <span class="sm-quote-info-label">Idioma de Preferencia</span>
+                        <span class="sm-quote-info-value" id="summaryPreferredLanguage">-</span>
                     </div>
                     <div class="sm-quote-info-item">
                         <span class="sm-quote-info-label">Última actualización</span>
@@ -1203,19 +1203,20 @@ const e = __isRes ? 'reservación' : 'cotización';
                 ? window.__reservationFolio
                 : (quote.folio || quote.id || 'N/A');
             document.getElementById('summaryFolio').textContent = __folioLabel;
+            // Green banner shows the document type word (the folio is already
+            // displayed in its own "Folio" row below).
             document.getElementById('summaryFolioHeader').textContent = __isReservationView
-                ? `Reservación ${__folioLabel}`
-                : __folioLabel;
-            document.getElementById('summaryGenerationDate').textContent = formatDateSpanish(quote.createdAt);
+                ? 'Reservación'
+                : 'Cotización';
             document.getElementById('summaryLastUpdated').textContent = formatDateSpanish(quote.updatedAt);
             // Atención a — defaults to the quote owner's full name. When the
             // owner is an admin/superadmin the owner identity isn't meaningful
             // to the client, so fall back to the contact person instead.
+            // "Atención a" = the quote OWNER (propietario / a quién pertenece la cotización).
+            // Falls back to the contact person only when the owner has no name.
             const summaryContactPersonElement = document.getElementById('summaryContactPerson');
             if (summaryContactPersonElement) {
                 const owner = quote.owner || {};
-                const ownerRole = String(owner.role || '').toLowerCase();
-                const ownerIsAdmin = ownerRole === 'admin' || ownerRole === 'superadmin';
                 const ownerFullName = [owner.firstName, owner.lastName]
                     .map((s) => String(s || '').trim())
                     .filter(Boolean)
@@ -1225,15 +1226,7 @@ const e = __isRes ? 'reservación' : 'cotización';
                 const contactValue = contactPerson && contactPerson.toLowerCase() !== 'no especificado'
                     ? contactPerson
                     : '';
-                let atencionA = '';
-                if (ownerIsAdmin) {
-                    atencionA = contactValue;
-                } else if (ownerFullName) {
-                    atencionA = ownerFullName;
-                } else {
-                    atencionA = contactValue;
-                }
-                summaryContactPersonElement.textContent = atencionA || '-';
+                summaryContactPersonElement.textContent = ownerFullName || contactValue || '-';
             }
 
             // Quote details — omit the "Motivo de viaje" row entirely when no event type was provided
@@ -1248,6 +1241,27 @@ const e = __isRes ? 'reservación' : 'cotización';
             }
             document.getElementById('summaryNumberOfPeople').textContent = quote.numberOfPeople || '0';
 
+            // Idioma de preferencia — show only when set (maps the 2-letter code to a label).
+            // Sits between Folio and Última actualización; widen the row to 3 columns
+            // when present, otherwise keep 2.
+            const summaryPreferredLanguageRow = document.getElementById('summaryPreferredLanguageRow');
+            const summaryPreferredLanguageEl = document.getElementById('summaryPreferredLanguage');
+            const summaryTopInfoRow = document.getElementById('summaryTopInfoRow');
+            const preferredLanguage = quote.preferredLanguage && String(quote.preferredLanguage).trim();
+            if (preferredLanguage) {
+                const languageLabels = {
+                    es: 'Español', en: 'English', fr: 'Français', de: 'Deutsch', it: 'Italiano',
+                    pt: 'Português', zh: '中文', ja: '日本語', ru: 'Русский', ar: 'العربية',
+                };
+                summaryPreferredLanguageEl.textContent = languageLabels[preferredLanguage] || preferredLanguage;
+                summaryPreferredLanguageRow?.classList.remove('d-none');
+                if (summaryTopInfoRow) summaryTopInfoRow.style.gridTemplateColumns = 'repeat(3, 1fr)';
+            } else {
+                summaryPreferredLanguageEl.textContent = '';
+                summaryPreferredLanguageRow?.classList.add('d-none');
+                if (summaryTopInfoRow) summaryTopInfoRow.style.gridTemplateColumns = 'repeat(2, 1fr)';
+            }
+
             // Quote-level notes — show the callout above SERVICIOS only when set
             const quoteNotesBlock = document.getElementById('summaryQuoteNotesBlock');
             const quoteNotesEl = document.getElementById('summaryQuoteNotes');
@@ -1259,18 +1273,25 @@ const e = __isRes ? 'reservación' : 'cotización';
                 quoteNotesBlock?.classList.add('d-none');
             }
 
-            // Lead Guest row — use ONLY the explicit leadGuestFirstName/leadGuestLastName
-            // fields. No fallback to the contact name; when not set the row stays hidden.
+            // Lead Guest row — prefer the explicit leadGuestFirstName/leadGuestLastName
+            // fields; when there's no lead guest, fall back to the final client
+            // (cliente final). Hidden when neither is set.
             const buildName = (first, last) => [first, last]
                 .map(part => (part || '').trim())
                 .filter(Boolean)
                 .join(' ');
             const leadGuestName = buildName(quote.leadGuestFirstName, quote.leadGuestLastName);
+            const clientFinal = quote.clientFinal || {};
+            const clientFinalName = (clientFinal.fullName || '').trim()
+                || buildName(clientFinal.firstName, clientFinal.lastName)
+                || (clientFinal.name || '').trim()
+                || (clientFinal.companyName || '').trim();
+            const leadGuestDisplay = leadGuestName || clientFinalName;
             const leadGuestRow = document.getElementById('summaryLeadGuestRow');
             const leadGuestEl = document.getElementById('summaryLeadGuest');
             if (leadGuestEl && leadGuestRow) {
-                if (leadGuestName) {
-                    leadGuestEl.textContent = leadGuestName;
+                if (leadGuestDisplay) {
+                    leadGuestEl.textContent = leadGuestDisplay;
                     leadGuestRow.classList.remove('d-none');
                 } else {
                     leadGuestEl.textContent = '';
@@ -1424,12 +1445,14 @@ const e = __isRes ? 'reservación' : 'cotización';
                     } else {
                         d = new Date(date);
                     }
-                    return new Intl.DateTimeFormat('es-MX', {
+                    // es-MX returns the weekday in lowercase ("lunes"); capitalize it.
+                    const formatted = new Intl.DateTimeFormat('es-MX', {
                         weekday: 'long',
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'
                     }).format(d);
+                    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
                 },
                 segmentMappings: segmentMappings, // Pass segment mappings for ObjectId to name conversion
                 ratesCache: ratesCache // Full rates so the renderer can resolve segment colors (rate.color)

@@ -494,11 +494,22 @@ class ItineraryBuilder {
       if (input.value !== cleaned) input.value = cleaned;
     };
 
-    // Day Management
-    document.getElementById('addNewDayBtn')?.addEventListener('click', () => this.openDayModal());
-    document.getElementById('addDaySidebarBtn')?.addEventListener('click', () => this.openDayModal());
-    document.getElementById('emptyStateAddDayBtn')?.addEventListener('click', () => this.openDayModal());
+    // Day Management — "Nuevo Día" / sidebar / empty-state buttons all open the
+    // inline add-day row (editable date + optional title). The modal is reserved
+    // for editing an existing day.
+    document.getElementById('addNewDayBtn')?.addEventListener('click', () => this.toggleAddDayInline());
+    document.getElementById('addDaySidebarBtn')?.addEventListener('click', () => this.openAddDayInline());
+    document.getElementById('emptyStateAddDayBtn')?.addEventListener('click', () => this.openAddDayInline());
+    document.getElementById('addDayConfirmBtn')?.addEventListener('click', () => this.quickAddDay());
+    document.getElementById('addDayCancelBtn')?.addEventListener('click', () => this.closeAddDayInline());
+    ['quickDayTitle', 'quickDayDate'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); this.quickAddDay(); }
+        if (e.key === 'Escape') { this.closeAddDayInline(); }
+      });
+    });
     document.getElementById('saveDayBtn')?.addEventListener('click', () => this.saveDay());
+    this.initDatePickers();
 
     // Service Management
     document.getElementById('saveServiceBtn')?.addEventListener('click', () => this.saveService());
@@ -687,7 +698,11 @@ class ItineraryBuilder {
 
     // Trip Type Toggle
     document.querySelectorAll('input[name="tripType"]').forEach((radio) => {
-      radio.addEventListener('change', () => this.handleTripTypeChange());
+      radio.addEventListener('change', () => {
+        this.handleTripTypeChange();
+        // Round trip doubles the route time → re-estimate local arrival.
+        this.updateTransferArrivalEstimate();
+      });
     });
 
     // Direction Type Toggle (Arrival/Departure)
@@ -1097,7 +1112,14 @@ class ItineraryBuilder {
       this.serviceModified = true;
       this.updateDevPaymentBreakdown();
       this.updateSuggestedDepartureTime();
+      // Route time feeds the local estimated-arrival calc.
+      this.updateTransferArrivalEstimate();
       setTimeout(() => this.updateServicePriceBreakdown(), 50);
+    });
+
+    // Local transfers: recompute the estimated arrival when the pick-up time changes.
+    document.getElementById('transportStartTime')?.addEventListener('input', () => {
+      this.updateTransferArrivalEstimate();
     });
 
     // Tour/Experience price inputs - update breakdown when prices change and validate input
@@ -1169,6 +1191,11 @@ class ItineraryBuilder {
     document.getElementById('aDisposicionVehicleCount')?.addEventListener('input', () => {
       this.serviceModified = true; // Mark as modified when user changes vehicle count
       this.calculateADisposicionPrice();
+    });
+
+    // A-disposición: auto-calculate "Horas" from the start/end schedule.
+    ['aDisposicionStartTime', 'aDisposicionEndTime'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => this.updateADisposicionHoursFromSchedule());
     });
 
     // Waiting time hours listener (Transport)
@@ -1361,6 +1388,127 @@ class ItineraryBuilder {
     }
 
     modal.show();
+  }
+
+  // Enhances date inputs with flatpickr (localized, consistent cross-browser UX).
+  // Falls back gracefully to the native input if flatpickr isn't loaded.
+  initDatePickers() {
+    if (!window.flatpickr) return;
+    const locale = (window.flatpickr.l10ns && window.flatpickr.l10ns.es) || 'es';
+    const dateInput = document.getElementById('quickDayDate');
+    if (dateInput && !dateInput._flatpickr) {
+      window.flatpickr(dateInput, {
+        dateFormat: 'Y-m-d', // value kept machine-readable
+        altInput: true, // show a friendly, localized label
+        altFormat: 'l j M Y', // e.g. "lunes 22 jun 2026"
+        locale,
+        disableMobile: true, // consistent picker even on mobile
+      });
+    }
+  }
+
+  // Sets a date input's value, going through flatpickr when present so the
+  // displayed (alt) field stays in sync; otherwise sets the native value.
+  setDateValue(input, value) {
+    if (!input) return;
+    if (input._flatpickr) input._flatpickr.setDate(value, false);
+    else input.value = value;
+  }
+
+  // Opens the inline add-day row: reveals it, prefills the date, scrolls it into
+  // view and focuses the date field.
+  openAddDayInline() {
+    const row = document.getElementById('addDayInline');
+    if (!row) return;
+    row.classList.remove('d-none');
+    this.refreshQuickAddDayDate();
+    row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const dateInput = document.getElementById('quickDayDate');
+    if (dateInput?._flatpickr) dateInput._flatpickr.altInput?.focus();
+    else dateInput?.focus();
+  }
+
+  // Hides the inline add-day row and clears the title field.
+  closeAddDayInline() {
+    const row = document.getElementById('addDayInline');
+    if (row) row.classList.add('d-none');
+    const titleInput = document.getElementById('quickDayTitle');
+    if (titleInput) titleInput.value = '';
+  }
+
+  // Toggles the inline add-day row (used by the prominent "Nuevo Día" button).
+  toggleAddDayInline() {
+    const row = document.getElementById('addDayInline');
+    if (row && row.classList.contains('d-none')) {
+      this.openAddDayInline();
+    } else {
+      this.closeAddDayInline();
+    }
+  }
+
+  // Keeps the inline quick-add date defaulted to the next sequential date,
+  // without clobbering a value the user is currently editing.
+  refreshQuickAddDayDate() {
+    const dateInput = document.getElementById('quickDayDate');
+    if (dateInput && !dateInput.value) {
+      this.setDateValue(dateInput, this.getNextSequentialDate());
+    }
+  }
+
+  // Inline "add day": reads the optional title + editable date from the sidebar
+  // quick-add row and appends the day. The date is editable so itineraries can
+  // skip days / use non-sequential dates. Edit later via the day modal.
+  async quickAddDay() {
+    if (this._addingDay) return; // guard against rapid double-clicks
+    this._addingDay = true;
+
+    const titleInput = document.getElementById('quickDayTitle');
+    const dateInput = document.getElementById('quickDayDate');
+    const rawTitle = (titleInput?.value || '').trim();
+    const date = (dateInput?.value || '').trim() || this.getNextSequentialDate();
+    const title = rawTitle || `Día ${this.days.length + 1}`;
+
+    const newDay = {
+      id: this.generateId('day'),
+      number: this.days.length + 1,
+      title,
+      date,
+      description: '',
+      services: [],
+    };
+
+    try {
+      this.days.push(newDay);
+
+      // Sort days by date and reassign numbers (same rule as saveDay)
+      this.days.sort((a, b) => {
+        if (!a.date && !b.date) return 0;
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return a.date.localeCompare(b.date);
+      });
+      this.days.forEach((d, i) => { d.number = i + 1; });
+
+      // Focus the newly created day (highlights it in the sidebar)
+      this.currentDayId = newDay.id;
+
+      await this.saveToBackend();
+      this.renderItinerary();
+
+      // Reset the inline row for the next entry
+      if (titleInput) titleInput.value = '';
+      this.setDateValue(dateInput, this.getNextSequentialDate());
+      this.showAlert('Día agregado', 'success');
+    } catch (error) {
+      // Roll back the optimistic insert if the save failed
+      this.days = this.days.filter((d) => d.id !== newDay.id);
+      this.days.forEach((d, i) => { d.number = i + 1; });
+      this.renderItinerary();
+      console.error('Error adding day:', error);
+      this.showAlert(`Error al agregar el día: ${error.message}`, 'danger');
+    } finally {
+      this._addingDay = false;
+    }
   }
 
   async saveDay() {
@@ -2753,6 +2901,80 @@ class ItineraryBuilder {
     // if (breakdown) breakdown.classList.add('d-none'); // Commented out - always show breakdown when editing
   }
 
+  // Adds `minutes` to an "HH:MM" (24h) string, wrapping past midnight.
+  // Returns "HH:MM" or null when the input isn't a valid time.
+  addMinutesToTime(timeStr, minutes) {
+    const m = String(timeStr || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!m || !minutes) return null;
+    const total = (((parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + Math.round(minutes)) % 1440) + 1440) % 1440;
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  }
+
+  isRoundTrip() {
+    const t = document.querySelector('input[name="tripType"]:checked')?.value;
+    return t === 'round-trip' || t === 'roundtrip';
+  }
+
+  // Point-transfer schedule (local & punto a punto): the end time is the
+  // ESTIMATED ARRIVAL (computed, read-only). Local uses "Hora de pick-up" for the
+  // start; punto a punto keeps "Hora de salida". Aeropuerto (flight) keeps the
+  // generic "Hora de salida" / "Hora de fin" editable labels.
+  updateTransferScheduleLabels() {
+    const type = document.querySelector('input[name="transportType"]:checked')?.value;
+    const isLocal = type === 'local';
+    const isTransfer = isLocal || type === 'punto-a-punto';
+    const startLabel = document.querySelector('label[for="transportStartTime"]');
+    const endLabel = document.querySelector('label[for="transportEndTime"]');
+    const endInput = document.getElementById('transportEndTime');
+    if (startLabel) startLabel.textContent = isLocal ? 'Hora de pick-up' : 'Hora de salida';
+    if (endLabel) endLabel.textContent = isTransfer ? 'Hora estimada de llegada' : 'Hora de fin';
+    if (endInput) {
+      endInput.readOnly = isTransfer;
+      endInput.classList.toggle('bg-light', isTransfer);
+    }
+  }
+
+  // For point transfers (local & punto a punto), recompute the estimated arrival
+  // = start + route duration (x2 when round trip). No-op for other types.
+  updateTransferArrivalEstimate() {
+    const type = document.querySelector('input[name="transportType"]:checked')?.value;
+    if (type !== 'local' && type !== 'punto-a-punto') return;
+    const startInput = document.getElementById('transportStartTime');
+    const endInput = document.getElementById('transportEndTime');
+    if (!startInput || !endInput) return;
+    const routeMinutes = this.getRouteDurationMinutes();
+    const totalMinutes = routeMinutes ? routeMinutes * (this.isRoundTrip() ? 2 : 1) : 0;
+    const arrival = this.addMinutesToTime(startInput.value, totalMinutes);
+    if (arrival) endInput.value = arrival;
+  }
+
+  // Parses an "HH:MM" (24h) string into minutes since midnight, or null.
+  parseTimeToMinutes(str) {
+    const m = String(str || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    const h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    if (h > 23 || min > 59) return null;
+    return h * 60 + min;
+  }
+
+  // A-disposición: when both start and end times are set, derive the "Horas" field
+  // (end - start, crossing midnight if needed), rounded to 0.5 and clamped to the
+  // field's 3–24 range. Recalculates the price like a manual hours change.
+  updateADisposicionHoursFromSchedule() {
+    const start = this.parseTimeToMinutes(document.getElementById('aDisposicionStartTime')?.value);
+    const end = this.parseTimeToMinutes(document.getElementById('aDisposicionEndTime')?.value);
+    const hoursInput = document.getElementById('aDisposicionHours');
+    if (start === null || end === null || !hoursInput) return;
+    let diff = end - start;
+    if (diff <= 0) diff += 1440; // schedule crosses midnight
+    let hours = Math.round((diff / 60) * 2) / 2; // nearest 0.5
+    hours = Math.min(24, Math.max(3, hours)); // respect the field's min/max
+    hoursInput.value = String(hours);
+    this.serviceModified = true;
+    this.calculateADisposicionPrice();
+  }
+
   handleTransportTypeChange() {
     this.clearTransportFormFields();
     const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
@@ -2809,6 +3031,11 @@ class ItineraryBuilder {
       roundTripFlightDetailsVuelta?.classList.add('d-none');
       transportScheduleSection?.classList.remove('d-none');
     }
+
+    // Local transfers: relabel schedule to pick-up / estimated arrival and
+    // auto-compute the arrival from pick-up + route duration.
+    this.updateTransferScheduleLabels();
+    this.updateTransferArrivalEstimate();
 
     // Pickup / drop-off address fields are shown for Punto a Punto and Local (one-way + round-trip)
     const usesPickupDropoff = transportType === 'punto-a-punto' || transportType === 'local';
@@ -7867,6 +8094,7 @@ class ItineraryBuilder {
     this.renderDaysContent(); // This will be skipped internally if _editModalOpen is true
     this.updateTotals();
     this.updateEmptyState();
+    this.refreshQuickAddDayDate();
   }
 
   renderDaysSidebar() {
@@ -8181,7 +8409,7 @@ class ItineraryBuilder {
                                         <div class="row g-2 text-success small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-user me-1"></i>
-                                                <strong>Incluye Guía</strong>
+                                                <strong>${service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía'}</strong>
                                             </div>
                                         </div>
                                     ` : ''}
@@ -8189,7 +8417,7 @@ class ItineraryBuilder {
                                         <div class="row g-2 text-info small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-users me-1"></i>
-                                                <strong>Incluye Greeter</strong>
+                                                <strong>Incluye Greeter + Driver</strong>
                                             </div>
                                         </div>
                                     ` : ''}
@@ -8208,6 +8436,24 @@ class ItineraryBuilder {
                                             </span>
                                         </div>
                                     ` : ''}
+                                    ${(service.type === 'tour' || service.type === 'experience') ? (() => {
+        const { includes, notIncludes } = this.getServiceIncludesInfo(service);
+        if (!includes && !notIncludes) return '';
+        const col = (icon, label, value) => (value ? `
+                                            <div class="col-12 col-md-6">
+                                                <div class="text-muted small d-flex align-items-start">
+                                                    <i class="ti ti-${icon} me-1 mt-1"></i>
+                                                    <span><span class="fw-semibold d-block">${label}</span><span style="white-space: pre-wrap;">${value}</span></span>
+                                                </div>
+                                            </div>
+                                        ` : '');
+        return `
+                                        <div class="row g-2 mt-1">
+                                            ${col('circle-check', 'Incluye', includes)}
+                                            ${col('circle-x', 'No incluye', notIncludes)}
+                                        </div>
+                                    `;
+      })() : ''}
                                     ${service.notes ? `
                                         <div class="service-notes mt-1 text-muted small d-flex align-items-start">
                                             <i class="ti ti-notes me-1"></i>
@@ -8428,27 +8674,49 @@ class ItineraryBuilder {
                             ` : ''}
                             <!-- Arrival/Departure Time — aeropuerto involves a flight,
                                  punto-a-punto and local are just scheduled departures. -->
-                            ${service.selectedSchedule || service.startTime ? `
+                            ${service.selectedSchedule || service.startTime ? (() => {
+        const parts = String(service.selectedSchedule || '').split(/\s*-\s*/);
+        const startT = service.startTime || parts[0] || '';
+        const endT = service.endTime || (parts.length > 1 ? parts[1] : '');
+        const overlapBadge = (service.hasOverlap && !service.overlapAccepted) ? `
+                                    <span class="overlap-warning-badge ms-2" title="${this.getOverlapTooltip(service)}">
+                                        <i class="ti ti-alert-triangle"></i>
+                                        <span>Conflicto de horario</span>
+                                        <button type="button" class="accept-overlap-btn" data-service-id="${service.id}" title="Aceptar este conflicto y ocultar el aviso">
+                                            Aceptar
+                                        </button>
+                                    </span>` : '';
+        // Point transfers (local & punto a punto): split into start ("Hora de
+        // pick-up" for local, "Hora de salida" for punto a punto) + estimated arrival.
+        if (service.transportType === 'local' || service.transportType === 'punto-a-punto') {
+          const startLabel = service.transportType === 'local' ? 'Hora de pick-up:' : 'Hora de salida:';
+          return `
                                 <div class="d-flex align-items-center text-muted small mb-1">
                                     <i class="ti ti-clock me-1"></i>
-                                    <span class="me-1">${(service.transportType === 'punto-a-punto' || service.transportType === 'local') ? 'Horario de salida:' : 'Horario de vuelo:'}</span>
-                                    ${service.selectedSchedule || (service.startTime + (service.endTime ? ` - ${service.endTime}` : ''))}
-                                    ${service.hasOverlap && !service.overlapAccepted ? `
-                                        <span class="overlap-warning-badge ms-2" title="${this.getOverlapTooltip(service)}">
-                                            <i class="ti ti-alert-triangle"></i>
-                                            <span>Conflicto de horario</span>
-                                            <button type="button" class="accept-overlap-btn" data-service-id="${service.id}" title="Aceptar este conflicto y ocultar el aviso">
-                                                Aceptar
-                                            </button>
-                                        </span>
-                                    ` : ''}
+                                    <span class="me-1">${startLabel}</span>
+                                    ${startT}
+                                    ${overlapBadge}
                                 </div>
-                            ` : ''}
-                            <!-- Arrival Address -->
+                                ${endT ? `
+                                <div class="d-flex align-items-center text-muted small mb-1">
+                                    <i class="ti ti-flag me-1"></i>
+                                    <span class="me-1">Hora estimada de llegada:</span>
+                                    ${endT}
+                                </div>` : ''}`;
+        }
+        return `
+                                <div class="d-flex align-items-center text-muted small mb-1">
+                                    <i class="ti ti-clock me-1"></i>
+                                    <span class="me-1">Horario de vuelo:</span>
+                                    ${service.selectedSchedule || (startT + (endT ? ` - ${endT}` : ''))}
+                                    ${overlapBadge}
+                                </div>`;
+      })() : ''}
+                            <!-- Specific address: label depends on direction (departure → salida, arrival → llegada) -->
                             ${specificLocation ? `
                                 <div class="d-flex align-items-center text-muted small mb-1">
                                     <i class="ti ti-map-pin me-1"></i>
-                                    <span class="text-muted me-1">Dirección de llegada:</span>
+                                    <span class="text-muted me-1">${service.directionType === 'departure' ? 'Dirección de salida:' : 'Dirección de llegada:'}</span>
                                     ${specificLocation}
                                 </div>
                             ` : ''}
@@ -8526,13 +8794,13 @@ class ItineraryBuilder {
                             ${service.includeGuide ? `
                                 <div class="d-flex align-items-center text-success small mt-1">
                                     <i class="ti ti-user me-1"></i>
-                                    <strong>${service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía'}</strong>
+                                    <strong>${service.type === 'a-disposicion' ? 'Incluye Chofer' : (service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía')}</strong>
                                 </div>
                             ` : ''}
                             ${service.includeGreeter ? `
                                 <div class="d-flex align-items-center text-info small mt-1">
                                     <i class="ti ti-users me-1"></i>
-                                    <strong>Incluye Greeter</strong>
+                                    <strong>Incluye Greeter + Driver</strong>
                                 </div>
                             ` : ''}
                             ${service.waitingTimeHours > 0 ? `
@@ -12120,7 +12388,7 @@ class ItineraryBuilder {
 
     const infoLine = (icon, label, value) => {
       if (!value) return '';
-      return `<div class="small py-1"><i class="ti ti-${icon} me-1 text-muted"></i><span class="text-muted">${label}:</span> ${value}</div>`;
+      return `<div class="small py-1"><i class="ti ti-${icon} me-1 text-muted"></i><span class="text-muted">${label}:</span> <span style="white-space: pre-wrap;">${value}</span></div>`;
     };
 
     body.innerHTML = `
@@ -12154,25 +12422,31 @@ class ItineraryBuilder {
   formatDate(dateString) {
     if (!dateString) return '';
 
+    // Include the weekday, capitalized (e.g. "Lunes, 22 jun 2026") on day dates.
+    const options = {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    };
+
     // Handle date string properly to avoid timezone issues
     // If it's in YYYY-MM-DD format, parse it as local date
     if (dateString.includes('-') && dateString.length === 10) {
       const [year, month, day] = dateString.split('-').map((num) => parseInt(num, 10));
       const date = new Date(year, month - 1, day); // month is 0-based
-      return date.toLocaleDateString('es-MX', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
+      return this.capitalizeFirst(date.toLocaleDateString('es-MX', options));
     }
 
     // Fallback for other date formats
     const date = new Date(dateString);
-    return date.toLocaleDateString('es-MX', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    return this.capitalizeFirst(date.toLocaleDateString('es-MX', options));
+  }
+
+  // es-MX returns the weekday in lowercase ("lunes"); capitalize the first letter.
+  capitalizeFirst(text) {
+    if (!text) return text;
+    return text.charAt(0).toUpperCase() + text.slice(1);
   }
 
   generateDefaultDate(dayNumber) {
@@ -12181,11 +12455,12 @@ class ItineraryBuilder {
     const targetDate = new Date(today);
     targetDate.setDate(today.getDate() + (dayNumber - 1));
 
-    return targetDate.toLocaleDateString('es-MX', {
+    return this.capitalizeFirst(targetDate.toLocaleDateString('es-MX', {
+      weekday: 'long',
       day: 'numeric',
       month: 'short',
       year: 'numeric',
-    });
+    }));
   }
 
   truncateText(text, maxLength) {
@@ -12406,6 +12681,46 @@ class ItineraryBuilder {
     }
 
     return 'Experiencia';
+  }
+
+  // Resolves "incluye" / "no incluye" text for a saved tour/experience service.
+  // These fields live on the tour/experience catalog (not on the service itself),
+  // so we look them up from the cache by id. Returns normalized strings preserving
+  // line breaks (arrays are joined with newlines), or null when there's nothing to show.
+  getServiceIncludesInfo(service) {
+    const empty = { includes: null, notIncludes: null };
+    if (!service) return empty;
+
+    const normalize = (val) => {
+      if (Array.isArray(val)) {
+        return val.map((v) => String(v).trim()).filter(Boolean).join('\n') || null;
+      }
+      if (typeof val === 'string') {
+        return val.trim() || null;
+      }
+      return null;
+    };
+
+    let source = null;
+    if (service.type === 'experience') {
+      if (this.experiencesCache.has('all')) {
+        source = this.experiencesCache.get('all').find((e) => e.id === service.experienceId || e.objectId === service.experienceId);
+      }
+      if (!source && Array.isArray(this.providerExperiencesCache)) {
+        source = this.providerExperiencesCache.find((e) => e.id === service.experienceId || e.objectId === service.experienceId);
+      }
+    } else if (service.type === 'tour') {
+      if (this.toursCache.has('all')) {
+        source = this.toursCache.get('all').find((t) => t.id === service.tourId || t.objectId === service.tourId);
+      }
+    }
+
+    if (!source) return empty;
+
+    return {
+      includes: normalize(source.includes),
+      notIncludes: normalize(source.notincludes),
+    };
   }
 
   isExperienceFromEstablishment(experienceId) {
@@ -16002,8 +16317,6 @@ class ItineraryBuilder {
     const includeGreeter = document.getElementById('includeGreeter')?.checked;
     const greeterInVehicle = document.getElementById('greeterInVehicle')?.checked;
     const tourRequiresTransport = document.getElementById('tourRequiresTransport')?.checked;
-    const vehicleSelect = document.getElementById('vehicleSelect');
-    const selectedVehicleId = vehicleSelect?.value;
 
     // For tours: guide always occupies 1 seat when transport is required
     // For tours with Guía + Chofer: 2 seats occupied
@@ -16034,25 +16347,9 @@ class ItineraryBuilder {
       return;
     }
 
-    // Get vehicle capacity if a vehicle is selected
-    let capacity = 0;
-    if (selectedVehicleId) {
-      if (this.transportPriceData?.vehicles) {
-        const vehicle = this.transportPriceData.vehicles.find((v) => v.vehicleTypeId === selectedVehicleId);
-        if (vehicle) capacity = vehicle.capacity || 0;
-      }
-      if (!capacity) {
-        const vehicleInfo = this.getVehicleTypeInfo(selectedVehicleId);
-        if (vehicleInfo) capacity = vehicleInfo.capacity || vehicleInfo.defaultCapacity || 0;
-      }
-    }
-
-    if (capacity > 0) {
-      const effectiveCapacity = capacity - seatsOccupied;
-      noteTextEl.textContent = `${occupantLabel}. Capacidad disponible: ${effectiveCapacity} de ${capacity} pax`;
-    } else {
-      noteTextEl.textContent = `${occupantLabel} del vehículo`;
-    }
+    // Show only who occupies seats; the "Capacidad disponible: X de Y pax" detail
+    // was removed per request.
+    noteTextEl.textContent = occupantLabel;
     noteEl.classList.remove('d-none');
   }
 
@@ -18013,6 +18310,8 @@ class ItineraryBuilder {
       // Update suggested departure time now that we have route duration
       qsDevLog('🔄 Calling updateSuggestedDepartureTime after route lookup');
       this.updateSuggestedDepartureTime();
+      // Route duration just changed → re-estimate local arrival time.
+      this.updateTransferArrivalEstimate();
     } catch (error) {
       console.error('Error looking up transport prices:', error);
       this.clearVehicleDropdown();
@@ -20967,12 +21266,12 @@ class ItineraryBuilder {
                         </div>
                         ${includes ? `
                         <div class="mt-2">
-                            <small class="text-muted d-block"><strong>Incluye:</strong> ${includes}</small>
+                            <small class="text-muted d-block"><strong>Incluye:</strong> <span style="white-space: pre-wrap;">${includes}</span></small>
                         </div>
                         ` : ''}
                         ${notIncludes ? `
                         <div class="mt-1">
-                            <small class="text-muted d-block"><strong>No incluye:</strong> ${notIncludes}</small>
+                            <small class="text-muted d-block"><strong>No incluye:</strong> <span style="white-space: pre-wrap;">${notIncludes}</span></small>
                         </div>
                         ` : ''}
                         ${languages ? `
