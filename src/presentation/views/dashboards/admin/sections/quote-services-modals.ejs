@@ -13,6 +13,31 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : '';
 const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
 %>
 
+<style>
+    /* Dynamically-added rows (vehículos / pasajeros-clientes / vuelos) used the
+       Bootstrap "-sm" controls, which the client found too small. Bump font and
+       padding back to the standard control size for readability. */
+    #extraAdditionalVehiclesList .form-select,
+    #extraAdditionalVehiclesList .form-control,
+    #extraAdditionalVehiclesList .input-group-text,
+    #aDisposicionAdditionalVehiclesList .form-select,
+    #aDisposicionAdditionalVehiclesList .form-control,
+    #aDisposicionAdditionalVehiclesList .input-group-text,
+    #additionalFlightsList .form-control,
+    #serviceAttendeesList .form-control {
+        font-size: 1rem;
+        padding-top: 0.375rem;
+        padding-bottom: 0.375rem;
+        min-height: calc(1.5em + 0.75rem + 2px);
+    }
+    /* Match the column headers (Segmento / Vehículo / Precio, etc.) to the larger rows. */
+    #additionalFlightsHeader small,
+    #aDisposicionAdditionalVehiclesHeader small,
+    #extraAdditionalVehiclesHeader small {
+        font-size: 0.9rem;
+    }
+</style>
+
 <!-- Day Modal -->
 <div class="modal fade" id="dayModal" tabindex="-1" aria-labelledby="dayModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -497,7 +522,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         <div class="col-12 mb-3">
                                             <div class="d-flex justify-content-between align-items-center mb-1">
                                                 <label class="form-label mb-0"><i class="ti ti-plane me-1"></i>Vuelos adicionales</label>
-                                                <button type="button" class="btn btn-sm btn-outline-primary" id="addAdditionalFlightBtn">
+                                                <button type="button" class="btn btn-outline-primary" id="addAdditionalFlightBtn">
                                                     <i class="ti ti-plus me-1"></i>Agregar vuelo
                                                 </button>
                                             </div>
@@ -774,7 +799,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <label class="form-label mb-0"><i class="ti ti-car me-1"></i>Vehículos adicionales</label>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" id="aDisposicionAddVehicleBtn">
+                                    <button type="button" class="btn btn-outline-primary" id="aDisposicionAddVehicleBtn">
                                         <i class="ti ti-plus me-1"></i>Agregar vehículo
                                     </button>
                                 </div>
@@ -993,7 +1018,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         <div class="col-12 d-none mt-2" id="extraAdditionalVehiclesContainer">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <label class="form-label mb-0"><i class="ti ti-car me-1"></i>Vehículos adicionales</label>
-                                <button type="button" class="btn btn-sm btn-outline-primary" id="addExtraAdditionalVehicleBtn" disabled>
+                                <button type="button" class="btn btn-outline-primary" id="addExtraAdditionalVehicleBtn" disabled>
                                     <i class="ti ti-plus me-1"></i>Agregar vehículo
                                 </button>
                             </div>
@@ -1159,7 +1184,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                     <div class="mb-3" id="serviceAttendeesSection">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <label class="form-label mb-0" id="serviceAttendeesLabel">Asistentes</label>
-                            <button type="button" class="btn btn-sm btn-outline-primary" id="addAttendeeBtn">
+                            <button type="button" class="btn btn-outline-primary" id="addAttendeeBtn">
                                 <i class="ti ti-plus me-1"></i><span id="addAttendeeBtnText">Agregar asistente</span>
                             </button>
                         </div>
