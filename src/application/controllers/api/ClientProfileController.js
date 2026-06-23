@@ -16,6 +16,11 @@ const ClientAddress = require('../../../domain/models/ClientAddress');
 const TravelPreference = require('../../../domain/models/TravelPreference');
 const ClientPassport = require('../../../domain/models/ClientPassport');
 
+/**
+ * Controller exposing RESTful handlers for a Client/AmexingUser profile's
+ * sub-resources: addresses, travel preferences, loyalty programs, passports and trips.
+ * @example
+ */
 class ClientProfileController {
   constructor() {
     this.getAddresses = this.getAddresses.bind(this);
@@ -41,12 +46,24 @@ class ClientProfileController {
   // Owner is decided by the route family, not the body:
   //   /api/clients/:clientId/...  → Client owner
   //   /api/agents/:agentId/...    → AmexingUser owner
+  /**
+   * Derive the owner (type and id) from the request route params.
+   * @param {object} req - Express request.
+   * @returns {{ownerType: string, ownerId: string}} The resolved owner descriptor.
+   * @example
+   */
   resolveOwner(req) {
     if (req.params.agentId) return { ownerType: 'amexingUser', ownerId: req.params.agentId };
     return { ownerType: 'client', ownerId: req.params.clientId };
   }
 
   // Validate the owner exists, branching on type. Returns the Parse object.
+  /**
+   * Validate that the owner exists, branching on owner type.
+   * @param {{ownerType: string, ownerId: string}} owner - The owner descriptor.
+   * @returns {Promise<Parse.Object>} The resolved owner Parse object.
+   * @example
+   */
   async validateOwnerExists({ ownerType, ownerId }) {
     if (ownerType === 'amexingUser') {
       const query = new Parse.Query('AmexingUser');
@@ -58,6 +75,12 @@ class ClientProfileController {
     return this.validateClientExists(ownerId);
   }
 
+  /**
+   * Validate that a Client record exists and is not soft-deleted.
+   * @param {string} clientId - The Client objectId.
+   * @returns {Promise<Parse.Object>} The resolved Client Parse object.
+   * @example
+   */
   async validateClientExists(clientId) {
     const query = new Parse.Query('Client');
     query.equalTo('exists', true);
@@ -66,12 +89,29 @@ class ClientProfileController {
     return client;
   }
 
+  /**
+   * Send a standardized success JSON response.
+   * @param {object} res - Express response.
+   * @param {*} data - Payload to return under the data key.
+   * @param {string} [message] - Human-readable success message.
+   * @param {number} [statusCode] - HTTP status code.
+   * @returns {void}
+   * @example
+   */
   sendSuccess(res, data, message = 'Success', statusCode = 200) {
     res.status(statusCode).json({
       success: true, data, message, timestamp: new Date().toISOString(),
     });
   }
 
+  /**
+   * Send a standardized error JSON response.
+   * @param {object} res - Express response.
+   * @param {string} message - Error message to return.
+   * @param {number} [statusCode] - HTTP status code.
+   * @returns {void}
+   * @example
+   */
   sendError(res, message, statusCode = 500) {
     res.status(statusCode).json({
       success: false, error: message, timestamp: new Date().toISOString(),
@@ -79,6 +119,14 @@ class ClientProfileController {
   }
 
   // Find a sub-record and confirm it belongs to the owner (Client or AmexingUser) in the path.
+  /**
+   * Fetch a sub-record and confirm it belongs to the given owner, else throw 403.
+   * @param {string} className - The Parse class name of the sub-record.
+   * @param {string} recordId - The objectId of the sub-record.
+   * @param {{ownerType: string, ownerId: string}} owner - The expected owner descriptor.
+   * @returns {Promise<Parse.Object>} The owned record Parse object.
+   * @example
+   */
   async findOwnedRecord(className, recordId, owner) {
     const record = await new Parse.Query(className).get(recordId, { useMasterKey: true });
     // Models expose getOwnerId()/getOwnerType(); legacy rows resolve to ('client', client.id).
@@ -113,6 +161,13 @@ class ClientProfileController {
     }
   }
 
+  /**
+   * Create a new address for the owner, enforcing single-favorite invariant.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
   async createAddress(req, res) {
     const owner = this.resolveOwner(req);
     try {
@@ -157,6 +212,13 @@ class ClientProfileController {
     }
   }
 
+  /**
+   * Delete an address owned by the request owner.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
   async deleteAddress(req, res) {
     const owner = this.resolveOwner(req);
     try {
@@ -194,6 +256,13 @@ class ClientProfileController {
     }
   }
 
+  /**
+   * Create a new travel preference for the owner.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
   async createTravelPreference(req, res) {
     const owner = this.resolveOwner(req);
     try {
@@ -227,6 +296,13 @@ class ClientProfileController {
     }
   }
 
+  /**
+   * Delete a travel preference owned by the request owner.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
   async deleteTravelPreference(req, res) {
     const owner = this.resolveOwner(req);
     try {
@@ -254,6 +330,13 @@ class ClientProfileController {
   }
 
   // Replaces the whole list (the UI sends the full set after an inline edit/add/delete).
+  /**
+   * Replace the owner's full loyalty programs list with a sanitized set.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
   async saveLoyaltyPrograms(req, res) {
     const owner = this.resolveOwner(req);
     try {
@@ -289,6 +372,13 @@ class ClientProfileController {
     }
   }
 
+  /**
+   * Create a passport for the owner, encrypting the number, returning masked JSON.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
   async createPassport(req, res) {
     const owner = this.resolveOwner(req);
     try {
@@ -336,6 +426,13 @@ class ClientProfileController {
     }
   }
 
+  /**
+   * Delete a passport owned by the request owner.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
   async deletePassport(req, res) {
     const owner = this.resolveOwner(req);
     try {
@@ -350,6 +447,13 @@ class ClientProfileController {
   }
 
   // Reveal the full number — authorized (admin/superadmin) + audited by the vault.
+  /**
+   * Reveal the full decrypted passport number for an authorized, audited user.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
   async revealPassportNumber(req, res) {
     const owner = this.resolveOwner(req);
     try {

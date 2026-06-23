@@ -13,6 +13,15 @@ const crypto = require('crypto');
 const ALGORITHM = 'aes-256-gcm';
 const AAD = Buffer.from('kek-wrap');
 
+/**
+ * Interim KEK provider backed by an environment variable (KEK_MASTER, falling back to
+ * ENCRYPTION_KEY). Wraps and unwraps DEKs with AES-256-GCM using a base64-encoded
+ * 32-byte key, achieving DEK/KEK separation pending the AWS KMS migration.
+ * @example
+ * const provider = new EnvKekProvider();
+ * const wrapped = await provider.wrap(dek);
+ * const dek = await provider.unwrap(wrapped);
+ */
 class EnvKekProvider {
   constructor() {
     const raw = process.env.KEK_MASTER || process.env.ENCRYPTION_KEY;
@@ -56,6 +65,12 @@ class EnvKekProvider {
     return Buffer.concat([decipher.update(Buffer.from(ctHex, 'hex')), decipher.final()]);
   }
 
+  /**
+   * Identifier for the KEK in use, recorded alongside wrapped DEKs.
+   * @returns {string} 'env:v1' when a dedicated KEK_MASTER is set, or 'env:legacy' when falling back to ENCRYPTION_KEY.
+   * @example
+   * const ref = provider.kekRef(); // 'env:v1'
+   */
   kekRef() {
     return this.ref;
   }

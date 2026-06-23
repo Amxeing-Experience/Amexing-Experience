@@ -11,6 +11,15 @@ const Parse = require('parse/node');
 const BaseModel = require('./BaseModel');
 const logger = require('../../infrastructure/logger');
 
+/**
+ * Parse subclass modeling a single postal address belonging to a Client (or AmexingUser).
+ * Wraps the `ClientAddress` Parse class with typed getters/setters, polymorphic owner
+ * handling, and query helpers.
+ * @augments BaseModel
+ * @example
+ * const address = ClientAddress.create({ client: 'abc123', street: 'Av. Reforma 1', city: 'CDMX' });
+ * await address.save(null, { useMasterKey: true });
+ */
 class ClientAddress extends BaseModel {
   constructor() {
     super('ClientAddress');
@@ -106,6 +115,13 @@ class ClientAddress extends BaseModel {
 
   setIsFavorite(favorite) { this.set('isFavorite', favorite === true); }
 
+  /**
+   * Serialize this address to a plain object for API responses.
+   * @returns {object} Plain object with id, clientId, ownerType, label, street, city, state, zipCode, country and isFavorite.
+   * @example
+   * const json = address.toJSON();
+   * // { id: '...', clientId: '...', ownerType: 'client', street: '...', ... }
+   */
   toJSON() {
     return {
       id: this.id,

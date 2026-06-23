@@ -597,6 +597,17 @@ class QuoteController {
       // Empty type = no filter; with type but no id, filter by type. With id, by entity.
       const clientTypeFilter = req.query.clientTypeFilter || ''; // '', 'agency', 'client'
       const clientIdFilter = req.query.clientIdFilter || '';
+      /**
+       * Apply the agency/client filter to a quotes query based on the request's
+       * clientTypeFilter and clientIdFilter. For 'agency' it filters on the
+       * AmexingUser pointer (quote.client); for 'client' it filters on the Client
+       * pointer (quote.companyClientPtr). With no ID, filters by type presence.
+       * Mutates the query in place; no-op when no valid type filter is set.
+       * @param {Parse.Query} q - The quotes query to constrain.
+       * @returns {void}
+       * @example
+       *   applyQuoteClientFilter(query); // narrows query to the selected agency/client
+       */
       const applyQuoteClientFilter = (q) => {
         if (clientTypeFilter !== 'agency' && clientTypeFilter !== 'client') return;
         if (clientTypeFilter === 'client') {
@@ -1369,6 +1380,30 @@ class QuoteController {
       // If status is being updated, always use the reliable status update method (same as admin)
       // This ensures consistent reservation creation logic between admin and department manager flows
       if (updates.status) {
+        // updateQuoteStatus only changes the status, so any general-info fields
+        // sent alongside it (contact, lead guest, people, notes, eventType, etc.)
+        // would be dropped. Persist them first via updateQuote — which also syncs
+        // the linked reservation's info. Isolated so it never blocks the status change.
+        const infoUpdates = { ...updates };
+        delete infoUpdates.status;
+        delete infoUpdates.reason;
+        if (Object.keys(infoUpdates).length > 0) {
+          try {
+            await this.quoteService.updateQuote(
+              currentUser,
+              quoteId,
+              infoUpdates,
+              updates.reason || 'Quote info updated',
+              req.userRole
+            );
+          } catch (infoError) {
+            logger.error('Failed to persist general info alongside status change', {
+              quoteId,
+              error: infoError.message,
+            });
+          }
+        }
+
         logger.info('🔄 Status change detected, delegating to updateQuoteStatus', {
           quoteId,
           status: updates.status,
