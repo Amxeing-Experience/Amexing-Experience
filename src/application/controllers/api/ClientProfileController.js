@@ -10,14 +10,35 @@
  * @version 1.0.0
  */
 
+const multer = require('multer');
 const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
 const ClientAddress = require('../../../domain/models/ClientAddress');
 const TravelPreference = require('../../../domain/models/TravelPreference');
 const ClientPassport = require('../../../domain/models/ClientPassport');
+const FileStorageService = require('../../services/FileStorageService');
+const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
+
+// Accepted document types for a passport copy (image or PDF) and the upload size cap.
+const PASSPORT_DOC_MAX_BYTES = 5 * 1024 * 1024; // 5MB
+const PASSPORT_DOC_MIME = /^(image\/|application\/pdf$)/;
+
+// Multer (memory storage) for the passport document upload — mirrors ProfileImageController.
+const passportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: PASSPORT_DOC_MAX_BYTES },
+  fileFilter: (req, file, cb) => {
+    if (PASSPORT_DOC_MIME.test(file.mimetype)) cb(null, true);
+    else cb(new Error('Tipo de archivo no permitido. Solo imágenes o PDF.'));
+  },
+});
 
 class ClientProfileController {
   constructor() {
+    // Image variants go through the optimizer; PDFs use FileStorageService's direct S3 upload.
+    this.serverOptimizationService = new ServerImageOptimizationService();
+    this.fileStorageService = new FileStorageService();
+
     this.getAddresses = this.getAddresses.bind(this);
     this.createAddress = this.createAddress.bind(this);
     this.updateAddress = this.updateAddress.bind(this);
@@ -31,6 +52,7 @@ class ClientProfileController {
     this.getPassports = this.getPassports.bind(this);
     this.createPassport = this.createPassport.bind(this);
     this.updatePassport = this.updatePassport.bind(this);
+    this.uploadPassportDocument = this.uploadPassportDocument.bind(this);
     this.deletePassport = this.deletePassport.bind(this);
     this.revealPassportNumber = this.revealPassportNumber.bind(this);
     this.getTrips = this.getTrips.bind(this);
@@ -275,13 +297,28 @@ class ClientProfileController {
 
   // ---------- passports (ClientPassport; number encrypted, returned masked) ----------
 
+  // Multer middleware for the passport document upload (single file, field 'document').
+  static documentUploadMiddleware() {
+    return passportUpload.single('document');
+  }
+
+  // Serialize a passport, resolving the presigned passportDocument URL from its S3 key when set.
+  async serializePassport(passport, ctx = {}) {
+    const json = await passport.toSafeJSON(ctx);
+    if (json.passportDocumentS3Key) {
+      json.passportDocument = await this.fileStorageService.getPresignedUrl(json.passportDocumentS3Key);
+    }
+    return json;
+  }
+
   async getPassports(req, res) {
     const owner = this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const passports = await ClientPassport.getByOwner(owner.ownerType, owner.ownerId);
       // toSafeJSON is async (decrypts to mask); never returns the raw/encrypted number.
-      const data = await Promise.all(passports.map((p) => p.toSafeJSON()));
+      // serializePassport additionally resolves the presigned document URL from the S3 key.
+      const data = await Promise.all(passports.map((p) => this.serializePassport(p)));
       this.sendSuccess(res, { passports: data }, 'Passports retrieved successfully');
     } catch (error) {
       logger.error('Error in ClientProfileController.getPassports', { error: error.message, ownerId: owner.ownerId });
@@ -303,7 +340,8 @@ class ClientProfileController {
       await passport.save(null, { useMasterKey: true });
 
       logger.info('Passport created', { ...owner, passportId: passport.id, userId: req.user?.id });
-      this.sendSuccess(res, { passport: await passport.toSafeJSON() }, 'Pasaporte creado exitosamente', 201);
+      // Document is uploaded separately via POST /passports/:id/document (S3 pipeline).
+      this.sendSuccess(res, { passport: await this.serializePassport(passport) }, 'Pasaporte creado exitosamente', 201);
     } catch (error) {
       logger.error('Error in ClientProfileController.createPassport', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
@@ -326,12 +364,95 @@ class ClientProfileController {
       Object.entries(setters).forEach(([f, setter]) => {
         if (req.body[f] !== undefined) passport[setter](req.body[f]);
       });
-      if (req.body.number !== undefined) await passport.setNumber(req.body.number);
+      if (req.body.verified !== undefined) passport.setVerified(req.body.verified);
+      // Empty means "keep the existing number" (the edit form shows "Dejar vacío para conservar");
+      // only re-encrypt when a new number was actually typed, so saving doesn't wipe it.
+      if (typeof req.body.number === 'string' && req.body.number.trim() !== '') {
+        await passport.setNumber(req.body.number.trim());
+      }
       await passport.save(null, { useMasterKey: true });
 
-      this.sendSuccess(res, { passport: await passport.toSafeJSON() }, 'Pasaporte actualizado');
+      this.sendSuccess(res, { passport: await this.serializePassport(passport) }, 'Pasaporte actualizado');
     } catch (error) {
       logger.error('Error in ClientProfileController.updatePassport', { error: error.message, ownerId: owner.ownerId });
+      this.sendError(res, error.message, error.status || 500);
+    }
+  }
+
+  // Upload the passport copy via the S3 pipeline: images → optimizer, PDFs → direct S3 upload.
+  async uploadPassportDocument(req, res) {
+    const owner = this.resolveOwner(req);
+    try {
+      await this.validateOwnerExists(owner);
+      const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
+
+      const { file } = req;
+      if (!file) return this.sendError(res, 'No se recibió ningún archivo', 400);
+      // Multer already guards type/size; re-check here for a clear 400 (e.g. direct API calls).
+      if (!PASSPORT_DOC_MIME.test(file.mimetype)) {
+        return this.sendError(res, 'Tipo de archivo no permitido. Solo imágenes o PDF.', 400);
+      }
+      if (file.size > PASSPORT_DOC_MAX_BYTES) {
+        return this.sendError(res, 'El archivo supera el límite de 5MB', 400);
+      }
+
+      // The mimetype the browser sends can lie: a macOS AppleDouble "._" metadata file (magic
+      // 0x00051607) gets picked instead of the real PDF and uploaded as application/pdf, producing an
+      // unreadable document. Verify the actual content by magic bytes before storing anything.
+      const sig = file.buffer.slice(0, 16);
+      const isPdf = file.buffer.slice(0, 1024).includes('%PDF');
+      const isImage = (sig[0] === 0xFF && sig[1] === 0xD8) // JPEG
+        || (sig[0] === 0x89 && sig[1] === 0x50 && sig[2] === 0x4E && sig[3] === 0x47) // PNG
+        || (sig[0] === 0x47 && sig[1] === 0x49 && sig[2] === 0x46) // GIF
+        || (sig.slice(0, 4).toString('latin1') === 'RIFF' && sig.slice(8, 12).toString('latin1') === 'WEBP')
+        || (sig.slice(4, 8).toString('latin1') === 'ftyp') // AVIF/HEIC
+        || (sig[0] === 0x42 && sig[1] === 0x4D); // BMP
+      if ((file.mimetype === 'application/pdf' && !isPdf) || (file.mimetype.startsWith('image/') && !isImage)) {
+        logger.warn('Rejected passport document with mismatched content', {
+          mimetype: file.mimetype, first8Hex: sig.slice(0, 8).toString('hex'), originalname: file.originalname,
+        });
+        return this.sendError(
+          res,
+          'El archivo no es un PDF o imagen válido. Si proviene de una Mac, sube el PDF real, '
+          + 'no el archivo de metadatos "._" que macOS crea junto a él.',
+          400
+        );
+      }
+
+      const entityPath = `passports/${owner.ownerId}`;
+      const uniqueName = `passport-${passport.id}-${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+      let s3Key;
+      if (file.mimetype.startsWith('image/')) {
+        const result = await this.serverOptimizationService.uploadOptimizedImage(
+          file.buffer,
+          uniqueName,
+          file.mimetype,
+          { entityPath, entityId: passport.id }
+        );
+        s3Key = result && result.originalS3Key;
+      } else {
+        // PDF: no image optimization — store directly via FileStorageService.uploadFile.
+        const result = await this.fileStorageService.uploadFile(
+          file.buffer,
+          uniqueName,
+          file.mimetype,
+          { entityId: entityPath }
+        );
+        s3Key = result && result.s3Key;
+      }
+      if (!s3Key) throw new Error('Error al subir el documento');
+
+      passport.setPassportDocumentS3Key(s3Key);
+      await passport.save(null, { useMasterKey: true });
+
+      const url = await this.fileStorageService.getPresignedUrl(s3Key);
+      logger.info('Passport document uploaded', {
+        ...owner, passportId: passport.id, s3Key, userId: req.user?.id,
+      });
+      this.sendSuccess(res, { passportDocument: url, passportDocumentS3Key: s3Key }, 'Documento subido exitosamente');
+    } catch (error) {
+      logger.error('Error in ClientProfileController.uploadPassportDocument', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }

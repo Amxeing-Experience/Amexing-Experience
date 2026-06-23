@@ -96,6 +96,43 @@ window.initProfileSection = function (root) {
         alert(msg);
     }
 
+    // Reusable RED danger confirmation modal. Returns a Promise<boolean> (true = confirmed).
+    // Built once and reused by id; the confirm button is cloned each open to avoid stacked listeners.
+    function confirmDanger(message, confirmLabel = 'Eliminar') {
+        let el = document.getElementById('profileConfirmModal');
+        if (!el) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="profileConfirmModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title text-white"><i class="ti ti-alert-triangle me-2"></i>Confirmar eliminación</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body" data-confirm-body></div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="ti ti-x me-1"></i>Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="profileConfirmBtn"><i class="ti ti-trash me-1"></i><span data-confirm-label></span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`);
+            el = document.getElementById('profileConfirmModal');
+        }
+        el.querySelector('[data-confirm-body]').textContent = message;
+        el.querySelector('[data-confirm-label]').textContent = confirmLabel;
+        const modal = bootstrap.Modal.getOrCreateInstance(el);
+        const confirmBtn = el.querySelector('#profileConfirmBtn');
+        const fresh = confirmBtn.cloneNode(true);
+        confirmBtn.replaceWith(fresh);
+        return new Promise((resolve) => {
+            let confirmed = false;
+            fresh.addEventListener('click', () => { confirmed = true; modal.hide(); });
+            el.addEventListener('hidden.bs.modal', () => resolve(confirmed), { once: true });
+            modal.show();
+        });
+    }
+
     // ---------- Passports ----------
     async function loadPassports() {
         const box = document.getElementById('passportsContainer');
@@ -106,7 +143,7 @@ window.initProfileSection = function (root) {
             box.innerHTML = passports.map((p) => `
                 <div class="border-bottom py-3">
                     <div class="d-flex justify-content-between align-items-start">
-                        <div class="fw-semibold">${esc(p.label) || 'Pasaporte'}</div>
+                        <div class="fw-semibold">${esc(p.label) || 'Pasaporte'}${p.verified ? '<span class="badge bg-success ms-2"><i class="ti ti-circle-check me-1"></i>Verificado</span>' : '<span class="badge bg-secondary ms-2">Sin verificar</span>'}</div>
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-light" title="Editar" data-edit-pp="${p.id}"><i class="ti ti-pencil"></i></button>
                             <button class="btn btn-light text-danger" title="Eliminar" data-del-pp="${p.id}"><i class="ti ti-trash"></i></button>
@@ -119,7 +156,7 @@ window.initProfileSection = function (root) {
                                 ${p.hasNumber ? `<button class="btn btn-sm btn-light ms-1" title="Mostrar" data-reveal-pp="${p.id}"><i class="ti ti-eye-off"></i></button>` : ''}
                             </div>
                         </div>
-                        <div class="col-md-6 mb-2"><label class="form-label text-muted small mb-0">Passport Copy</label><div>${p.passportDocument ? `<a href="${esc(p.passportDocument)}" target="_blank"><i class="ti ti-file me-1"></i>Ver documento</a>` : '<span class="text-muted">—</span>'}</div></div>
+                        ${p.passportDocument ? `<div class="col-md-6 mb-2"><label class="form-label text-muted small mb-0">Copia del Pasaporte</label><div><a href="${esc(p.passportDocument)}" target="_blank"><i class="ti ti-file me-1"></i>Ver documento</a></div></div>` : ''}
                         <div class="col-md-6 mb-2"><label class="form-label text-muted small mb-0">Country of Issue</label><div class="text-muted">${esc(p.countryOfIssue) || '—'}</div></div>
                         <div class="col-md-6 mb-2"><label class="form-label text-muted small mb-0">Nationality</label><div class="text-muted">${esc(p.nationality) || '—'}</div></div>
                         <div class="col-md-6 mb-2"><label class="form-label text-muted small mb-0">Date of Issue</label><div class="text-muted">${fmtDate(p.dateOfIssue)}</div></div>
@@ -141,12 +178,36 @@ window.initProfileSection = function (root) {
         return `
             <div class="row g-2">
                 <div class="col-md-6"><label class="form-label small">Etiqueta</label><input class="form-control" data-f="label" value="${esc(p.label)}" placeholder="Passport 1"></div>
-                <div class="col-md-6"><label class="form-label small">Passport Number</label><input class="form-control" data-f="number" placeholder="${p.hasNumber ? 'Dejar vacío para conservar' : ''}"></div>
+                <div class="col-md-6"><label class="form-label small">Passport Number</label><input class="form-control" data-f="number" maxlength="14" placeholder="${p.hasNumber ? 'Dejar vacío para conservar' : ''}"></div>
                 <div class="col-md-6"><label class="form-label small">Country of Issue</label>${countrySelect('countryOfIssue', p.countryOfIssue)}</div>
                 <div class="col-md-6"><label class="form-label small">Nationality</label>${nationalitySelect('nationality', p.nationality)}</div>
                 <div class="col-md-6"><label class="form-label small">Date of Issue</label><input type="date" class="form-control" data-f="dateOfIssue" value="${dateInput(p.dateOfIssue)}"></div>
                 <div class="col-md-6"><label class="form-label small">Expiration Date</label><input type="date" class="form-control" data-f="expirationDate" value="${dateInput(p.expirationDate)}"></div>
+                <div class="col-12"><label class="form-label small">Copia del Pasaporte (foto o PDF)</label><input type="file" class="form-control" data-f-file="passportDocument" accept="image/*,application/pdf">${p.passportDocument ? ` <a href="${esc(p.passportDocument)}" target="_blank" class="small d-inline-block mt-1"><i class="ti ti-file me-1"></i>Ver documento actual</a>` : ''}</div>
+                <div class="col-12 form-check ms-1 mt-1"><input class="form-check-input" type="checkbox" data-f="verified" id="ppVerified" ${p.verified ? 'checked' : ''}><label class="form-check-label small" for="ppVerified">Documento verificado (es un pasaporte válido)</label></div>
             </div>`;
+    }
+
+    // Second step after create/update: upload the document file via multipart to the S3 endpoint.
+    // Client-side validation mirrors the server (image/PDF, ≤5MB); returns true on success.
+    async function uploadPassportDocument(passportId, file) {
+        if (!file) return true;
+        if (file.size > 5 * 1024 * 1024) { notify('El archivo supera el límite de 5MB', 'error'); return false; }
+        if (!/^image\//.test(file.type) && file.type !== 'application/pdf') {
+            notify('Tipo de archivo no permitido. Solo imágenes o PDF.', 'error'); return false;
+        }
+        const fd = new FormData();
+        fd.append('document', file);
+        // No Content-Type header — the browser sets the multipart boundary itself.
+        const res = await fetch(`${base}/passports/${passportId}/document`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: fd,
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json.success === false) throw new Error(json.error || `Error ${res.status}`);
+        return true;
     }
 
     // ---------- Addresses ----------
@@ -275,7 +336,23 @@ window.initProfileSection = function (root) {
             el.querySelectorAll('[data-f]').forEach((input) => {
                 values[input.dataset.f] = input.type === 'checkbox' ? input.checked : input.value;
             });
-            try { await onSave(values); modal.hide(); } catch (e) { notify(e.message, 'error'); }
+            // The selected file (if any) is handed to onSave so it can do the second S3 upload step;
+            // the create/update request itself stays JSON (no file in the body).
+            const fileInput = el.querySelector('[data-f-file]');
+            const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+            // Lock the button while saving so it can't be submitted twice (no duplicate records).
+            const label = fresh.innerHTML;
+            fresh.disabled = true;
+            fresh.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+            try {
+                await onSave(values, file);
+                modal.hide();
+            } catch (e) {
+                notify(e.message, 'error');
+            } finally {
+                fresh.disabled = false;
+                fresh.innerHTML = label;
+            }
         });
         // When opened over a parent modal (e.g. the agent profile modal), hide the parent so only
         // this form shows; re-show it once this modal is fully hidden (save or cancel).
@@ -288,7 +365,12 @@ window.initProfileSection = function (root) {
 
     // ---------- Wiring ----------
     document.getElementById('addPassportBtn')?.addEventListener('click', () => {
-        openModal('Agregar Pasaporte', passportForm(), async (v) => { await api('/passports', 'POST', v); notify('Pasaporte creado'); loadPassports(); }, 'id');
+        openModal('Agregar Pasaporte', passportForm(), async (v, file) => {
+            const { passport } = await api('/passports', 'POST', v);
+            // Document is uploaded as a second multipart step against the new passport's id.
+            if (file) await uploadPassportDocument(passport.id, file);
+            notify('Pasaporte creado'); loadPassports();
+        }, 'id');
     });
     document.getElementById('addAddressBtn')?.addEventListener('click', () => {
         openModal('Agregar Dirección', addressForm(), async (v) => { await api('/addresses', 'POST', v); notify('Dirección creada'); loadAddresses(); }, 'map-pin');
@@ -314,35 +396,44 @@ window.initProfileSection = function (root) {
             if (btn.dataset.revealPp) {
                 const span = document.querySelector(`[data-pp-mask="${btn.dataset.revealPp}"]`);
                 const icon = btn.querySelector('i');
-                if (icon.classList.contains('ti-eye-off')) {
+                // Toggle on an explicit flag (not the icon class, which can desync).
+                if (btn.dataset.revealed === '1') {
+                    span.textContent = span.dataset.masked;
+                    icon.className = 'ti ti-eye-off';
+                    btn.dataset.revealed = '0';
+                } else {
+                    if (!span.dataset.masked) span.dataset.masked = span.textContent;
                     const { number } = await api(`/passports/${btn.dataset.revealPp}/reveal`, 'POST');
-                    span.dataset.masked = span.textContent;
                     span.textContent = number;
                     icon.className = 'ti ti-eye';
-                } else {
-                    span.textContent = span.dataset.masked || span.textContent;
-                    icon.className = 'ti ti-eye-off';
+                    btn.dataset.revealed = '1';
                 }
             } else if (btn.dataset.editPp) {
                 const p = (document.getElementById('passportsContainer')._data || []).find((x) => x.id === btn.dataset.editPp);
-                openModal('Editar Pasaporte', passportForm(p), async (v) => { await api(`/passports/${p.id}`, 'PUT', v); notify('Pasaporte actualizado'); loadPassports(); }, 'id');
+                openModal('Editar Pasaporte', passportForm(p), async (v, file) => {
+                    await api(`/passports/${p.id}`, 'PUT', v);
+                    if (file) await uploadPassportDocument(p.id, file);
+                    notify('Pasaporte actualizado'); loadPassports();
+                }, 'id');
             } else if (btn.dataset.delPp) {
-                if (confirm('¿Eliminar este pasaporte?')) { await api(`/passports/${btn.dataset.delPp}`, 'DELETE'); notify('Pasaporte eliminado'); loadPassports(); }
+                if (await confirmDanger('¿Eliminar este pasaporte? Esta acción no se puede deshacer.')) { await api(`/passports/${btn.dataset.delPp}`, 'DELETE'); notify('Pasaporte eliminado correctamente'); loadPassports(); }
             } else if (btn.dataset.fav) { await api(`/addresses/${btn.dataset.fav}`, 'PUT', { isFavorite: true }); loadAddresses(); }
             else if (btn.dataset.editAddr) {
                 const a = (document.getElementById('addressesContainer')._data || []).find((x) => x.id === btn.dataset.editAddr);
                 openModal('Editar Dirección', addressForm(a), async (v) => { await api(`/addresses/${a.id}`, 'PUT', v); notify('Dirección actualizada'); loadAddresses(); }, 'map-pin');
             } else if (btn.dataset.delAddr) {
-                if (confirm('¿Eliminar esta dirección?')) { await api(`/addresses/${btn.dataset.delAddr}`, 'DELETE'); notify('Dirección eliminada'); loadAddresses(); }
+                if (await confirmDanger('¿Eliminar esta dirección?')) { await api(`/addresses/${btn.dataset.delAddr}`, 'DELETE'); notify('Dirección eliminada correctamente'); loadAddresses(); }
             } else if (btn.dataset.editPref) {
                 const p = (document.getElementById('preferencesContainer')._data || []).find((x) => x.id === btn.dataset.editPref);
                 openModal('Editar Preferencia', preferenceForm(p), async (v) => { await api(`/travel-preferences/${p.id}`, 'PUT', v); notify('Preferencia actualizada'); loadPreferences(); }, 'plane');
             } else if (btn.dataset.delPref) {
-                if (confirm('¿Eliminar esta preferencia?')) { await api(`/travel-preferences/${btn.dataset.delPref}`, 'DELETE'); notify('Preferencia eliminada'); loadPreferences(); }
+                if (await confirmDanger('¿Eliminar esta preferencia?')) { await api(`/travel-preferences/${btn.dataset.delPref}`, 'DELETE'); notify('Preferencia eliminada correctamente'); loadPreferences(); }
             } else if (btn.dataset.delLoyalty) {
-                const box = document.getElementById('loyaltyContainer');
-                const list = (box._data || []).filter((_, i) => i !== Number(btn.dataset.delLoyalty));
-                await saveLoyalty(list); box._data = list; renderLoyalty(); notify('Programa eliminado');
+                if (await confirmDanger('¿Eliminar este programa?')) {
+                    const box = document.getElementById('loyaltyContainer');
+                    const list = (box._data || []).filter((_, i) => i !== Number(btn.dataset.delLoyalty));
+                    await saveLoyalty(list); box._data = list; renderLoyalty(); notify('Programa eliminado correctamente');
+                }
             }
         } catch (err) { notify(err.message, 'error'); }
     });

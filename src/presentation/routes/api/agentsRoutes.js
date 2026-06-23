@@ -17,6 +17,21 @@ const ClientProfileController = require('../../../application/controllers/api/Cl
 const router = express.Router();
 const clientProfileController = new ClientProfileController();
 
+// Run the passport document multer middleware and translate its errors (type/size) into 400s.
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ * @example
+ */
+function handlePassportUpload(req, res, next) {
+  ClientProfileController.documentUploadMiddleware()(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, error: err.message });
+    return next();
+  });
+}
+
 const writeOperationsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,
@@ -64,6 +79,8 @@ router.get('/:agentId/passports', requireAdmin, clientProfileController.getPassp
 router.post('/:agentId/passports', requireAdmin, writeOperationsLimiter, clientProfileController.createPassport);
 router.put('/:agentId/passports/:id', requireAdmin, writeOperationsLimiter, clientProfileController.updatePassport);
 router.delete('/:agentId/passports/:id', requireAdmin, writeOperationsLimiter, clientProfileController.deletePassport);
+// Document upload (image or PDF) via the S3 pipeline; multer parses the multipart body.
+router.post('/:agentId/passports/:id/document', requireAdmin, writeOperationsLimiter, handlePassportUpload, clientProfileController.uploadPassportDocument);
 // Full-number reveal: admin/superadmin only, audited by the vault.
 router.post('/:agentId/passports/:id/reveal', requireAdmin, writeOperationsLimiter, clientProfileController.revealPassportNumber);
 

@@ -42,6 +42,8 @@ class ClientPassport extends BaseModel {
     if (data.dateOfIssue !== undefined) passport.set('dateOfIssue', ClientPassport.toDate(data.dateOfIssue));
     if (data.expirationDate !== undefined) passport.set('expirationDate', ClientPassport.toDate(data.expirationDate));
     if (data.passportDocument !== undefined) passport.set('passportDocument', data.passportDocument);
+    if (data.passportDocumentS3Key !== undefined) passport.set('passportDocumentS3Key', data.passportDocumentS3Key);
+    passport.set('verified', data.verified === true);
 
     return passport;
   }
@@ -133,6 +135,16 @@ class ClientPassport extends BaseModel {
 
   setPassportDocument(file) { this.set('passportDocument', file); }
 
+  // S3 key of the document uploaded via the S3 pipeline (the controller resolves a presigned URL).
+  getPassportDocumentS3Key() { return this.get('passportDocumentS3Key') || null; }
+
+  setPassportDocumentS3Key(key) { this.set('passportDocumentS3Key', key); }
+
+  // Admin-confirmed that the uploaded document is a valid passport.
+  isVerified() { return this.get('verified') === true; }
+
+  setVerified(v) { this.set('verified', v === true); }
+
   // ---- Passport number (encrypted at rest via SensitiveDataVault, masked by default) ----
 
   hasNumber() { return !!this.get('passportNumberEncrypted'); }
@@ -173,6 +185,10 @@ class ClientPassport extends BaseModel {
       nationality: this.getNationality(),
       dateOfIssue: this.getDateOfIssue(),
       expirationDate: this.getExpirationDate(),
+      verified: this.isVerified(),
+      // Raw S3 key (controller resolves the presigned passportDocument URL when set). Falls back
+      // to the legacy Parse.File URL for backward compat with rows stored before the S3 pipeline.
+      passportDocumentS3Key: this.getPassportDocumentS3Key(),
       passportDocument: this.getPassportDocument() ? this.getPassportDocument().url() : null,
     };
   }
