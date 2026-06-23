@@ -597,15 +597,34 @@ class QuoteOwnership extends BaseModel {
    * @example
    */
   static async isOwner(quote, user) {
-    const ownership = await this.getCurrentOwnership(quote);
-    if (!ownership) {
-      return false;
-    }
-
-    const ownerId = ownership.getOwner()?.id;
     const userId = typeof user === 'string' ? user : user.id;
 
-    return ownerId === userId;
+    const ownership = await this.getCurrentOwnership(quote);
+    if (ownership) {
+      return ownership.getOwner()?.id === userId;
+    }
+
+    // No formal QuoteOwnership record yet (e.g. quotes never transferred): fall
+    // back to the Quote.owner field and then the original creator, mirroring
+    // getCurrentOwner so the real owner/creator is still recognized and can,
+    // for instance, transfer ownership.
+    let quoteObj = quote;
+    if (typeof quote === 'string') {
+      const Quote = Parse.Object.extend('Quote');
+      quoteObj = await new Parse.Query(Quote).get(quote, { useMasterKey: true });
+    }
+
+    const ownerId = quoteObj.get('owner')?.id;
+    if (ownerId) {
+      return ownerId === userId;
+    }
+
+    const createdById = quoteObj.get('createdBy')?.id;
+    if (createdById) {
+      return createdById === userId;
+    }
+
+    return false;
   }
 }
 

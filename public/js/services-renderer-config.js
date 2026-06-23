@@ -155,12 +155,14 @@
                 } else {
                     date = new Date(dateString);
                 }
-                return new Intl.DateTimeFormat('es-MX', {
+                // es-MX returns the weekday in lowercase ("lunes"); capitalize it.
+                const formatted = new Intl.DateTimeFormat('es-MX', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric'
                 }).format(date);
+                return formatted.charAt(0).toUpperCase() + formatted.slice(1);
             },
 
             time: (timeString) => {
