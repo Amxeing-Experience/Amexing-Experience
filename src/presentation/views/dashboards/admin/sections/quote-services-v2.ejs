@@ -54,7 +54,7 @@
                             <!-- Days will be dynamically loaded here -->
                         </div>
                         
-                        <!-- Add Day Button at Bottom -->
+                        <!-- Add Day Button at Bottom (opens the inline add-day row) -->
                         <button type="button" class="btn btn-light w-100 mt-2" id="addDaySidebarBtn">
                             <i class="ti ti-plus me-1"></i>Agregar Día
                         </button>
@@ -115,6 +115,29 @@
 
         <!-- Itinerary Content Area -->
         <div class="col-md-9">
+            <!-- Inline add-day row (toggled by "Nuevo Día"); date is editable so
+                 itineraries can use non-sequential dates. -->
+            <div id="addDayInline" class="card border-0 shadow-sm mb-3 d-none">
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-sm-4">
+                            <label for="quickDayDate" class="form-label small mb-1">Fecha</label>
+                            <input type="date" class="form-control" id="quickDayDate">
+                        </div>
+                        <div class="col-sm-5">
+                            <label for="quickDayTitle" class="form-label small mb-1">Título <span class="text-muted">(opcional)</span></label>
+                            <input type="text" class="form-control" id="quickDayTitle" placeholder="Ej: Llegada y City Tour">
+                        </div>
+                        <div class="col-sm-3 d-flex gap-2">
+                            <button type="button" class="btn btn-primary flex-grow-1" id="addDayConfirmBtn">
+                                <i class="ti ti-plus me-1"></i>Agregar
+                            </button>
+                            <button type="button" class="btn btn-light" id="addDayCancelBtn">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Empty State -->
             <div id="emptyStateContainer" class="text-center py-5 d-none">
                 <div class="empty-state-icon mb-3">
@@ -541,11 +564,15 @@
     }
     
     /* Price Override Styles */
+    /* Los precios editables (servicePrice y el precio manual de walking tours) ya no usan
+       el resaltado amarillo de override: el campo es editable y el highlight solo agregaba
+       ruido visual e inconsistencia entre tipos. Se deja la clase como no-op para no romper
+       el JS que la agrega/quita. */
     .price-override-active {
-        background-color: #fff3cd !important;
-        border-color: #ffc107 !important;
+        background-color: inherit;
+        border-color: inherit;
     }
-    
+
     .price-override-indicator {
         color: #856404;
         font-size: 0.875rem;
@@ -568,6 +595,10 @@
     window.userRole = '<%= typeof userRole !== "undefined" ? userRole : "" %>';
 </script>
 <link rel="stylesheet" href="/dashboards/admin/sections/quote-services/quote-catalog-drag.css">
+<!-- Flatpickr: date picker localizado y consistente entre navegadores (debe cargar ANTES del builder) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Motor de cálculo único (isomórfico): debe cargar ANTES de pricing-utils y del builder -->
 <script src="/shared/pricing/pricingEngine.js"></script>
 <script src="/dashboard/js/utils/pricing-utils.js"></script>

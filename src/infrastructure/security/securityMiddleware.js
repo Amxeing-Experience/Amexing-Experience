@@ -132,7 +132,7 @@ class SecurityMiddleware {
           ],
           objectSrc: ["'none'"],
           mediaSrc: ["'self'"],
-          frameSrc: ["'none'"],
+          frameSrc: ["'self'"], // Permite mostrar PDFs propios (publicaciones) en iframe
           sandbox: [
             'allow-forms',
             'allow-scripts',

@@ -1385,6 +1385,267 @@ class QuoteService {
   }
 
   /**
+   * Stable matching key for a subconcept/ReservationService. Prefers the stable
+   * per-service `id` carried on the subconcept; falls back to a composite of
+   * dayNumber/concept/type/time for legacy records created before ids existed.
+   * @param {object} sub - Subconcept blob.
+   * @param {number} dayNumber - Day number the service belongs to.
+   * @returns {string} Match key.
+   * @private
+   * @example
+   * const key = this.reservationServiceMatchKey(sub, day.dayNumber);
+   */
+  reservationServiceMatchKey(sub, dayNumber) {
+    const id = sub && sub.id;
+    if (id) return `id:${id}`;
+    return `c:${dayNumber || ''}|${String(sub?.concept || '').trim()}|${sub?.type || ''}|${sub?.time || ''}`;
+  }
+
+  /**
+   * Builds (unsaved) a ReservationService from a quote subconcept, mirroring the
+   * per-service creation in createReservationFromQuote (assignment slots,
+   * additional vehicles, suggested times). Used when syncing newly-added services
+   * into an existing reservation.
+   * @param {object} reservation - Parse Reservation object.
+   * @param {object} day - Day blob from serviceItems.
+   * @param {object} sub - Subconcept (service) blob.
+   * @returns {object} Unsaved ReservationService Parse object.
+   * @private
+   * @example
+   * const resSvc = this.buildReservationServiceRecord(reservation, day, sub);
+   */
+  buildReservationServiceRecord(reservation, day, sub) {
+    // Work on a copy so the assignment-slot quantity can be adjusted without
+    // mutating the caller's subconcept (no-param-reassign).
+    const subData = { ...sub };
+    const resSvc = new ReservationService();
+    resSvc.set('reservationPtr', reservation);
+    resSvc.set('dayNumber', day.dayNumber || 1);
+    resSvc.set('dayTitle', day.concept || day.dayTitle || `Día ${day.dayNumber || 1}`);
+    resSvc.set('type', sub.type || 'concepto');
+    resSvc.set('concept', sub.concept || sub.name || '');
+    resSvc.set('time', sub.time || '');
+    resSvc.set('status', 'pending');
+    resSvc.set('price', sub.unitPrice || sub.price || 0);
+    resSvc.set('total', sub.total || sub.unitPrice || 0);
+    resSvc.set('originName', sub.originName || sub.origin || '');
+    resSvc.set('destinationName', sub.destinationName || sub.destination || '');
+    resSvc.set('vehicleTypeName', sub.vehicleTypeName || sub.vehicleType || '');
+    resSvc.set('notes', sub.notes || '');
+    resSvc.set('subconcept', subData);
+    resSvc.set('active', true);
+    resSvc.set('exists', true);
+
+    const serviceType = sub.type || 'concepto';
+    const hasAdditionalVehicle = sub.hasAdditionalVehicle || false;
+
+    const setAdditionalVehicleFields = () => {
+      if (sub.additionalVehicleId) resSvc.set('additionalVehicleId', sub.additionalVehicleId);
+      if (sub.additionalVehicleTypeName) resSvc.set('additionalVehicleTypeName', sub.additionalVehicleTypeName);
+      if (sub.additionalVehicleSegment) resSvc.set('additionalVehicleSegment', sub.additionalVehicleSegment);
+      if (sub.additionalVehicleSegmentName) resSvc.set('additionalVehicleSegmentName', sub.additionalVehicleSegmentName);
+    };
+    const seedExtraAssignments = (extras) => resSvc.set('extraAssignments', extras.map((v) => ({
+      vehicleTypeId: v.vehicleId || '',
+      vehicleName: v.vehicleTypeName || '',
+      segmentId: v.segment || '',
+      segmentName: v.segmentName || '',
+      segmentColor: v.segmentColor || '',
+      driverId: null,
+      driverName: '',
+      vehicleId: null,
+      vehicleImageUrl: '',
+    })));
+
+    if (serviceType === 'transport') {
+      if (sub.assignedServiceCustomer) resSvc.set('assignedServiceCustomer', sub.assignedServiceCustomer);
+      const extras = Array.isArray(sub.extraAdditionalVehicles) ? sub.extraAdditionalVehicles : [];
+      if (hasAdditionalVehicle || extras.length > 0) {
+        subData.quantity = 1 + (hasAdditionalVehicle ? 1 : 0) + extras.length;
+        setAdditionalVehicleFields();
+        if (extras.length > 0) seedExtraAssignments(extras);
+      }
+      if (sub.flightDepartureTimeSuggested) resSvc.set('flightDepartureTimeSuggested', sub.flightDepartureTimeSuggested);
+      if (sub.roundTripDepartureTimeSuggestedIda) resSvc.set('roundTripDepartureTimeSuggestedIda', sub.roundTripDepartureTimeSuggestedIda);
+      if (sub.roundTripDepartureTimeSuggestedVuelta) resSvc.set('roundTripDepartureTimeSuggestedVuelta', sub.roundTripDepartureTimeSuggestedVuelta);
+    } else if (serviceType === 'tour') {
+      if (sub.assignedServiceCustomer) resSvc.set('assignedServiceCustomer', sub.assignedServiceCustomer);
+      if (sub.requiresTransport || sub.vehicleType || sub.vehicleTypeName) {
+        const extras = Array.isArray(sub.extraAdditionalVehicles) ? sub.extraAdditionalVehicles : [];
+        if (hasAdditionalVehicle || extras.length > 0) {
+          subData.quantity = 1 + (hasAdditionalVehicle ? 1 : 0) + extras.length;
+          setAdditionalVehicleFields();
+          if (extras.length > 0) seedExtraAssignments(extras);
+        }
+      }
+    } else if (serviceType === 'experience' || serviceType === 'concepto') {
+      if (sub.assignedServiceCustomer) resSvc.set('assignedServiceCustomer', sub.assignedServiceCustomer);
+    }
+
+    if (day.date) {
+      try {
+        resSvc.set('serviceDate', new Date(`${day.date}T12:00:00`));
+      } catch (dateError) {
+        logger.warn('⚠️ Invalid date format for service (build)', { dayNumber: day.dayNumber, originalDate: day.date, error: dateError.message });
+      }
+    }
+
+    return resSvc;
+  }
+
+  /**
+   * Refreshes display/descriptive fields of an existing ReservationService from
+   * an updated subconcept WITHOUT touching operational data (status, assigned
+   * driver/vehicle, assignedServiceCustomer, extraAssignments, adjustments). The
+   * subconcept blob is refreshed but its `quantity` (assignment slot count) is
+   * preserved so existing assignment slots stay intact.
+   * @param {object} resSvc - Existing Parse ReservationService object.
+   * @param {object} day - Day blob.
+   * @param {object} sub - Updated subconcept blob.
+   * @private
+   * @example
+   * this.applyReservationServiceDescriptiveFields(resSvc, day, sub);
+   */
+  applyReservationServiceDescriptiveFields(resSvc, day, sub) {
+    resSvc.set('dayNumber', day.dayNumber || 1);
+    resSvc.set('dayTitle', day.concept || day.dayTitle || `Día ${day.dayNumber || 1}`);
+    resSvc.set('type', sub.type || 'concepto');
+    resSvc.set('concept', sub.concept || sub.name || '');
+    resSvc.set('time', sub.time || '');
+    resSvc.set('price', sub.unitPrice || sub.price || 0);
+    resSvc.set('total', sub.total || sub.unitPrice || 0);
+    resSvc.set('originName', sub.originName || sub.origin || '');
+    resSvc.set('destinationName', sub.destinationName || sub.destination || '');
+    resSvc.set('vehicleTypeName', sub.vehicleTypeName || sub.vehicleType || '');
+    resSvc.set('notes', sub.notes || '');
+
+    // Refresh the subconcept blob but keep the existing assignment slot count.
+    const prevSub = resSvc.get('subconcept') || {};
+    const mergedSub = { ...sub };
+    if (prevSub.quantity !== undefined) mergedSub.quantity = prevSub.quantity;
+    resSvc.set('subconcept', mergedSub);
+
+    if (day.date) {
+      try {
+        resSvc.set('serviceDate', new Date(`${day.date}T12:00:00`));
+      } catch (dateError) {
+        logger.warn('⚠️ Invalid date format for service (sync)', { dayNumber: day.dayNumber, originalDate: day.date, error: dateError.message });
+      }
+    }
+  }
+
+  /**
+   * Keeps an existing reservation in sync when its source quote's serviceItems
+   * change. No-op when the quote has no active reservation (reservations are only
+   * created on a status change). Updates the Reservation snapshot/totals/dates,
+   * then reconciles ReservationService records by stable subconcept key. Matched
+   * services refresh descriptive fields and preserve assignments/status; new
+   * services create a ReservationService; removed services are soft-deleted.
+   * @param {object} quote - Parse Quote object.
+   * @param {object} serviceItems - The updated serviceItems object.
+   * @returns {Promise<object>} Sync result summary.
+   * @example
+   * await this.syncReservationFromQuote(quote, serviceItems);
+   */
+  async syncReservationFromQuote(quote, serviceItems) {
+    const reservationQuery = new Parse.Query('Reservation');
+    reservationQuery.equalTo('quotePtr', quote);
+    reservationQuery.equalTo('active', true);
+    reservationQuery.equalTo('exists', true);
+    const reservation = await reservationQuery.first({ useMasterKey: true });
+    if (!reservation) {
+      return { synced: false, reason: 'no-active-reservation' };
+    }
+
+    const days = (serviceItems && Array.isArray(serviceItems.days)) ? serviceItems.days : [];
+
+    // 1) Reservation-level fields (snapshot + totals + dates)
+    reservation.set('serviceItemsSnapshot', serviceItems);
+    const total = serviceItems?.total || 0;
+    reservation.set('totalAmount', total);
+    reservation.set('servicesSubtotal', serviceItems?.subtotal ?? total);
+    if (serviceItems?.currency) reservation.set('currency', serviceItems.currency);
+    if (serviceItems?.paymentType) reservation.set('paymentType', serviceItems.paymentType);
+
+    let startDate = null;
+    let endDate = null;
+    for (const day of days) {
+      if (day.date) {
+        const d = new Date(`${day.date}T12:00:00`);
+        if (!Number.isNaN(d.getTime())) {
+          if (!startDate || d < startDate) startDate = d;
+          if (!endDate || d > endDate) endDate = d;
+        }
+      }
+    }
+    if (startDate) reservation.set('startDate', startDate);
+    if (endDate) reservation.set('endDate', endDate);
+    await reservation.save(null, { useMasterKey: true });
+
+    // 2) Index existing (active) ReservationService records by match key
+    const existingQuery = new Parse.Query('ReservationService');
+    existingQuery.equalTo('reservationPtr', reservation);
+    existingQuery.equalTo('exists', true);
+    existingQuery.limit(1000);
+    const existing = await existingQuery.find({ useMasterKey: true });
+
+    const existingByKey = new Map();
+    existing.forEach((rs) => {
+      const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
+      if (!existingByKey.has(key)) existingByKey.set(key, rs);
+    });
+
+    // 3) Reconcile: update matched, create new
+    const seen = new Set();
+    const toSave = [];
+    for (const day of days) {
+      const subconcepts = Array.isArray(day.subconcepts) ? day.subconcepts : [];
+      for (const sub of subconcepts) {
+        const key = this.reservationServiceMatchKey(sub, day.dayNumber);
+        const match = existingByKey.get(key);
+        if (match && !seen.has(key)) {
+          seen.add(key);
+          this.applyReservationServiceDescriptiveFields(match, day, sub);
+          toSave.push(match);
+        } else {
+          toSave.push(this.buildReservationServiceRecord(reservation, day, sub));
+          seen.add(key);
+        }
+      }
+    }
+
+    // 4) Soft-delete records whose service is no longer present
+    const toRemove = existing.filter((rs) => {
+      const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
+      return !seen.has(key);
+    });
+    toRemove.forEach((rs) => {
+      rs.set('active', false);
+      rs.set('exists', false);
+    });
+
+    const all = toSave.concat(toRemove);
+    if (all.length > 0) {
+      await Parse.Object.saveAll(all, { useMasterKey: true });
+    }
+
+    logger.info('Synced reservation from quote', {
+      quoteId: quote.id,
+      reservationId: reservation.id,
+      reservationFolio: reservation.get('folio'),
+      updatedOrCreated: toSave.length,
+      removed: toRemove.length,
+    });
+
+    return {
+      synced: true,
+      reservationId: reservation.id,
+      updatedOrCreated: toSave.length,
+      removed: toRemove.length,
+    };
+  }
+
+  /**
    * Create Reservation + ReservationService records from a confirmed quote.
    * Idempotent: skips if a reservation already exists for this quote.
    * @param {object} quote - Parse Quote object (with client included).
