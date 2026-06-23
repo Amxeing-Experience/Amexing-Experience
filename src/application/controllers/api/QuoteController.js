@@ -597,6 +597,17 @@ class QuoteController {
       // Empty type = no filter; with type but no id, filter by type. With id, by entity.
       const clientTypeFilter = req.query.clientTypeFilter || ''; // '', 'agency', 'client'
       const clientIdFilter = req.query.clientIdFilter || '';
+      /**
+       * Apply the agency/client filter to a quotes query based on the request's
+       * clientTypeFilter and clientIdFilter. For 'agency' it filters on the
+       * AmexingUser pointer (quote.client); for 'client' it filters on the Client
+       * pointer (quote.companyClientPtr). With no ID, filters by type presence.
+       * Mutates the query in place; no-op when no valid type filter is set.
+       * @param {Parse.Query} q - The quotes query to constrain.
+       * @returns {void}
+       * @example
+       *   applyQuoteClientFilter(query); // narrows query to the selected agency/client
+       */
       const applyQuoteClientFilter = (q) => {
         if (clientTypeFilter !== 'agency' && clientTypeFilter !== 'client') return;
         if (clientTypeFilter === 'client') {

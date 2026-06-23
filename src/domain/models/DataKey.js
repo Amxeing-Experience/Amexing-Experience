@@ -14,6 +14,15 @@
 
 const Parse = require('parse/node');
 
+/**
+ * Parse subclass for the key store: one row per KEK-wrapped DEK version per data class.
+ * Stores only the wrapped DEK (never cleartext) and tracks its lifecycle status
+ * (active, retiring, retired), with exactly one active DEK per dataClass.
+ * @augments Parse.Object
+ * @example
+ * const dk = DataKey.create({ keyId: 'k1', dataClass: 'client.passport', wrappedDek, kekRef: 'env:v1' });
+ * await dk.save(null, { useMasterKey: true });
+ */
 class DataKey extends Parse.Object {
   constructor() {
     super('DataKey');

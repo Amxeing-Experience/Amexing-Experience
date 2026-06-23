@@ -1444,12 +1444,27 @@ class QuoteService {
     const serviceType = sub.type || 'concepto';
     const hasAdditionalVehicle = sub.hasAdditionalVehicle || false;
 
+    /**
+     * Copy the single additional-vehicle fields from the subconcept onto the
+     * ReservationService record when present. Mutates resSvc in place.
+     * @returns {void}
+     * @example
+     *   setAdditionalVehicleFields(); // sets additionalVehicleId, etc. when defined on sub
+     */
     const setAdditionalVehicleFields = () => {
       if (sub.additionalVehicleId) resSvc.set('additionalVehicleId', sub.additionalVehicleId);
       if (sub.additionalVehicleTypeName) resSvc.set('additionalVehicleTypeName', sub.additionalVehicleTypeName);
       if (sub.additionalVehicleSegment) resSvc.set('additionalVehicleSegment', sub.additionalVehicleSegment);
       if (sub.additionalVehicleSegmentName) resSvc.set('additionalVehicleSegmentName', sub.additionalVehicleSegmentName);
     };
+    /**
+     * Seed the 'extraAssignments' field from a list of extra additional vehicles,
+     * normalizing each into an assignment shape with empty driver/vehicle slots.
+     * @param {Array<object>} extras - Extra additional vehicles from the subconcept.
+     * @returns {void}
+     * @example
+     *   seedExtraAssignments([{ vehicleId: 'v1', vehicleTypeName: 'Van', segment: 's1' }]);
+     */
     const seedExtraAssignments = (extras) => resSvc.set('extraAssignments', extras.map((v) => ({
       vehicleTypeId: v.vehicleId || '',
       vehicleName: v.vehicleTypeName || '',

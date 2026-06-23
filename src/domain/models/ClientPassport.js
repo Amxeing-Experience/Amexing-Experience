@@ -15,6 +15,16 @@ const logger = require('../../infrastructure/logger');
 
 const FIELD_KEY = 'client.passport';
 
+/**
+ * Parse subclass modeling a single passport belonging to a Client (or AmexingUser).
+ * The passport number is envelope-encrypted via SensitiveDataVault and only ever
+ * exposed masked unless an authorized, audited reveal is performed.
+ * @augments BaseModel
+ * @example
+ * const passport = ClientPassport.create({ client: 'abc123', countryOfIssue: 'MX' });
+ * await passport.setNumber('G12345678');
+ * await passport.save(null, { useMasterKey: true });
+ */
 class ClientPassport extends BaseModel {
   constructor() {
     super('ClientPassport');
@@ -160,7 +170,15 @@ class ClientPassport extends BaseModel {
     return vault.decryptField(FIELD_KEY, this.get('passportNumberEncrypted'), { user, recordId: this.id });
   }
 
-  // Safe serialization: masked number only, never the raw/encrypted value.
+  /**
+   * Safe serialization for API responses: the passport number is returned masked only,
+   * never the raw or encrypted value.
+   * @param {object} [ctx] - Context forwarded to the vault for the masked read (e.g. user, audit info).
+   * @returns {Promise<object>} Plain object with id, clientId, ownerType, label, hasNumber, numberMasked, countryOfIssue, nationality, dateOfIssue, expirationDate and passportDocument URL.
+   * @example
+   * const json = await passport.toSafeJSON({ user });
+   * // { id: '...', numberMasked: '****5678', ... }
+   */
   async toSafeJSON(ctx = {}) {
     return {
       id: this.id,

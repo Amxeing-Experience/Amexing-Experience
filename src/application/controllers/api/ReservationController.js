@@ -222,6 +222,14 @@ class ReservationController {
           if (!b) return a;
           return a > b ? a : b;
         };
+        /**
+         * Return the earlier of two dates, treating a falsy value as unbounded.
+         * @param {Date|null} a - First date, or null if unbounded.
+         * @param {Date|null} b - Second date, or null if unbounded.
+         * @returns {Date|null} The earlier date, or the other operand if one is falsy.
+         * @example
+         *   minDate(new Date('2026-05-01'), new Date('2026-06-01')); // 2026-05-01
+         */
         const minDate = (a, b) => {
           if (!a) return b;
           if (!b) return a;
