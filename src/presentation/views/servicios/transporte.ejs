@@ -1,0 +1,109 @@
+<%#
+Transporte (subpágina de Servicios) — versión PROVISIONAL.
+Se irá editando con el contenido real.
+
+Created by Denisse Maldonado
+%>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/fonts.css">
+    <link rel="icon" type="image/png" href="/images/heart_black.png">
+
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #fff;
+            color: #333;
+            padding-top: 80px; /* navbar fijo */
+        }
+
+        .subpage-hero {
+            background: #2e2e2d;
+            color: #ffffff;
+            text-align: center;
+            padding: clamp(4rem, 10vw, 7rem) 2rem;
+        }
+
+        .subpage-hero__crumb {
+            font-family: var(--font-myriad);
+            font-size: 0.8rem;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: #969b81;
+            margin: 0 0 1rem;
+        }
+
+        .subpage-hero__title {
+            font-family: var(--font-newsreader);
+            font-weight: 300;
+            font-size: clamp(2rem, 5vw, 3.4rem);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin: 0;
+        }
+
+        .subpage-placeholder {
+            background: #eff0ec;
+            text-align: center;
+            padding: clamp(3rem, 8vw, 6rem) 2rem;
+            color: #585757;
+        }
+
+        .subpage-placeholder__icon {
+            font-size: 2rem;
+            color: #969b81;
+            margin-bottom: 1rem;
+        }
+
+        .subpage-placeholder__text {
+            font-family: var(--font-newsreader);
+            font-size: clamp(1.1rem, 2vw, 1.5rem);
+            margin: 0 auto;
+            max-width: 640px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <%# Navigation %>
+    <%- include('../organisms/landing/landing-navigation', {
+        user: typeof user !== 'undefined' ? user : null,
+        currentPage: typeof currentPage !== 'undefined' ? currentPage : 'services',
+        transparent: false,
+        companyInfo: typeof company !== 'undefined' ? company : null,
+        req: typeof req !== 'undefined' ? req : null,
+        t: typeof t !== 'undefined' ? t : ((key) => key)
+    }) %>
+
+    <%# Hero de la subpágina %>
+    <section class="subpage-hero">
+        <p class="subpage-hero__crumb">Servicios</p>
+        <h1 class="subpage-hero__title">Transporte</h1>
+    </section>
+
+    <%# Placeholder provisional %>
+    <section class="subpage-placeholder">
+        <div class="subpage-placeholder__icon"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i></div>
+        <p class="subpage-placeholder__text">Página en construcción — aquí irá el contenido de Transporte.</p>
+    </section>
+
+    <%# CTA Contacto (reutilizable) %>
+    <%- include('../organisms/landing/cta-contacto-section') %>
+
+    <%# Footer %>
+    <%- include('../organisms/landing/landing-footer', {
+        companyInfo: typeof company !== 'undefined' ? company : null
+    }) %>
+</body>
+</html>
