@@ -19,6 +19,14 @@ const AmexingUser = require('../../../domain/models/AmexingUser');
 const logger = require('../../../infrastructure/logger');
 const { logBulkReadAccess } = require('../../utils/auditHelper');
 
+/**
+ * RESTful controller for hierarchical, ownership-scoped client management.
+ * Lets department_manager and end_client roles create and manage their own
+ * Client entities with ownership-based access control and audit logging.
+ * @example
+ *   const controller = new OwnedClientsController();
+ *   router.get('/owned-clients', (req, res) => controller.list(req, res));
+ */
 class OwnedClientsController {
   constructor() {
     this.maxPageSize = 100;

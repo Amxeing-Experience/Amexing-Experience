@@ -1120,6 +1120,21 @@ class QuoteOwnershipService {
     }
   }
 
+  /**
+   * Persist an audit log entry for an ownership-related action. Failures are
+   * swallowed and logged so auditing never blocks the calling operation.
+   * @param {object} data - Audit fields.
+   * @param {string} data.action - Action performed (e.g. 'TRANSFER_OWNERSHIP').
+   * @param {string} data.objectClass - Parse class name of the affected object.
+   * @param {string} data.objectId - Object ID of the affected record.
+   * @param {string} data.userId - User who performed the action.
+   * @param {object} data.details - Arbitrary action-specific details.
+   * @param {string} [data.ipAddress] - Originating IP address (defaults to 'system').
+   * @param {string} [data.userAgent] - Originating user agent (defaults to 'system').
+   * @returns {Promise<void>}
+   * @example
+   *   await service.createAuditLog({ action: 'TRANSFER_OWNERSHIP', objectClass: 'Quote', objectId: 'abc', userId: 'u1', details: {} });
+   */
   async createAuditLog(data) {
     try {
       const auditLog = new AuditLog();

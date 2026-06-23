@@ -10,7 +10,7 @@ const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 const FileStorageService = require('../services/FileStorageService');
 const { renderUrlToPdf } = require('../services/PdfRenderService');
-const { getArponaEmbedCss } = require('../../infrastructure/utils/fontEmbed');
+const { getArponaEmbedCss, getMyriadEmbedCss } = require('../../infrastructure/utils/fontEmbed');
 
 const fileStorageService = new FileStorageService({
   baseFolder: 'general',
@@ -18,6 +18,15 @@ const fileStorageService = new FileStorageService({
   presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
 });
 
+/**
+ * Controller for viewing reservations publicly without authentication, where the
+ * folio (e.g. MAY-2605-001) acts as the access token. Mirrors PublicQuoteController
+ * but operates on Reservation and ReservationService records, including itinerary
+ * rendering and PDF export.
+ * @example
+ *   const controller = new PublicReservationController();
+ *   router.get('/reservations/:folio', controller.viewPublicReservation);
+ */
 class PublicReservationController {
   constructor() {
     this.viewPublicReservation = this.viewPublicReservation.bind(this);
@@ -130,6 +139,7 @@ class PublicReservationController {
         isReservationView: true,
         pageTitle: `Itinerario ${folio}`,
         arponaEmbedCss: getArponaEmbedCss(),
+        myriadEmbedCss: getMyriadEmbedCss(),
       });
     } catch (error) {
       return this.handleError(error, folio, req, res);
@@ -846,6 +856,17 @@ class PublicReservationController {
       const uniqueExpIds = [...new Set(experienceIds.filter(Boolean))];
       const formatPriority = ['avif', 'webp', 'jpeg'];
 
+      /**
+       * Fetch primary (or first-ordered fallback) image URLs for a set of parent
+       * records, keyed by parent ID. Prefers optimized variants by format priority.
+       * @param {string} className - Image Parse class to query (e.g. 'TourImage').
+       * @param {string} pointerField - Pointer field on the image referencing the parent.
+       * @param {string} parentClass - Parent Parse class name (e.g. 'Tour').
+       * @param {Array<string>} ids - Parent object IDs to resolve images for.
+       * @returns {Promise<object>} Map of parent ID to image URL.
+       * @example
+       *   const map = await fetchImages('TourImage', 'tour', 'Tour', ['t1', 't2']);
+       */
       const fetchImages = async (className, pointerField, parentClass, ids) => {
         const map = {};
         if (ids.length === 0) return map;

@@ -11,6 +11,15 @@ const Parse = require('parse/node');
 const BaseModel = require('./BaseModel');
 const logger = require('../../infrastructure/logger');
 
+/**
+ * Parse subclass modeling a single (type, option) travel preference for a Client
+ * (or AmexingUser), e.g. type "tour_interest" with option "viñedos". A client may
+ * have many such records.
+ * @augments BaseModel
+ * @example
+ * const pref = TravelPreference.create({ client: 'abc123', type: 'tour_interest', option: 'viñedos' });
+ * await pref.save(null, { useMasterKey: true });
+ */
 class TravelPreference extends BaseModel {
   constructor() {
     super('TravelPreference');
@@ -81,6 +90,13 @@ class TravelPreference extends BaseModel {
 
   setOption(option) { this.set('option', option); }
 
+  /**
+   * Serialize this preference to a plain object for API responses.
+   * @returns {object} Plain object with id, clientId, ownerType, type and option.
+   * @example
+   * const json = pref.toJSON();
+   * // { id: '...', clientId: '...', ownerType: 'client', type: 'tour_interest', option: 'viñedos' }
+   */
   toJSON() {
     return {
       id: this.id,
