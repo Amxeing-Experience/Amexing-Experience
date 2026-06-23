@@ -38,6 +38,7 @@ class ClientAddress extends BaseModel {
     address.set('city', data.city || '');
     address.set('state', data.state || '');
     address.set('zipCode', data.zipCode || '');
+    address.set('colonia', data.colonia || '');
     address.set('country', data.country || 'MX');
     address.set('isFavorite', data.isFavorite === true);
 
@@ -111,6 +112,10 @@ class ClientAddress extends BaseModel {
 
   setCountry(country) { this.set('country', country); }
 
+  getColonia() { return this.get('colonia') || ''; }
+
+  setColonia(colonia) { this.set('colonia', colonia); }
+
   isFavorite() { return this.get('isFavorite') === true; }
 
   setIsFavorite(favorite) { this.set('isFavorite', favorite === true); }
@@ -132,6 +137,7 @@ class ClientAddress extends BaseModel {
       city: this.getCity(),
       state: this.getState(),
       zipCode: this.getZipCode(),
+      colonia: this.getColonia(),
       country: this.getCountry(),
       isFavorite: this.isFavorite(),
     };

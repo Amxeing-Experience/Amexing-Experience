@@ -217,7 +217,7 @@ class ClientProfileController {
       await this.validateOwnerExists(owner);
       const address = await this.findOwnedRecord('ClientAddress', req.params.id, owner);
 
-      const fields = ['label', 'street', 'city', 'state', 'zipCode', 'country'];
+      const fields = ['label', 'street', 'city', 'state', 'zipCode', 'colonia', 'country'];
       fields.forEach((f) => { if (req.body[f] !== undefined) address.set(f, req.body[f]); });
       if (req.body.isFavorite === true) {
         await this.clearFavoriteAddress(owner);

@@ -78,6 +78,46 @@ window.initProfileSection = function (root) {
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+    // Country → ISO code for the postal-code lookup. Only MX/US/CA are covered by the backend proxy.
+    const COUNTRY_ISO = { 'México': 'mx', 'Estados Unidos': 'us', 'Canadá': 'ca' };
+    const ISO_TO_COUNTRY = { mx: 'México', us: 'Estados Unidos', ca: 'Canadá' };
+
+    function isoFor(country) {
+        if (COUNTRY_ISO[country]) return COUNTRY_ISO[country];
+        const c = String(country || '').toLowerCase().trim();
+        if (/^(m[eé]xico|mx|mex)$/.test(c)) return 'mx';
+        if (/^(estados unidos|usa|us|ee\.?\s*uu\.?)$/.test(c)) return 'us';
+        if (/^(canad[áa]|ca|can)$/.test(c)) return 'ca';
+        return '';
+    }
+
+    // Normalize a stored country value to a COUNTRIES option so the <select> preselects it.
+    function countryDisplay(c) {
+        if (!c) return 'México';
+        if (COUNTRIES.includes(c)) return c;
+        return ISO_TO_COUNTRY[isoFor(c)] || c;
+    }
+
+    // Postal-code rule per supported country: digits-only + exact length (MX/US) or alphanumeric (CA).
+    function postalRule(iso) {
+        if (iso === 'mx' || iso === 'us') return { numeric: true, length: 5 };
+        if (iso === 'ca') return { numeric: false, length: 6 };
+        return { numeric: false, length: null };
+    }
+
+    // Resolve a postal code to { state, city } via our backend proxy (Zippopotam.us); null if unknown.
+    async function lookupPostal(iso, code) {
+        if (!iso || !code) return null;
+        try {
+            const res = await fetch(`/api/geo/postal/${iso}/${encodeURIComponent(code)}`, {
+                credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!res.ok) return null;
+            const json = await res.json();
+            return json && json.data ? json.data : null;
+        } catch (e) { return null; }
+    }
+
     async function api(path, method = 'GET', body) {
         const res = await fetch(base + path, {
             method,
@@ -220,7 +260,7 @@ window.initProfileSection = function (root) {
                 <div class="d-flex justify-content-between align-items-start border-bottom py-2">
                     <div>
                         <div class="fw-semibold">${esc(a.label) || 'Dirección'} ${a.isFavorite ? '<span class="badge bg-warning ms-1"><i class="ti ti-star me-1"></i>Favorita</span>' : ''}</div>
-                        <div class="text-muted small">${esc(a.street)}, ${esc(a.city)}, ${esc(a.state)} ${esc(a.zipCode)}, ${esc(a.country)}</div>
+                        <div class="text-muted small">${esc(a.street)}${a.colonia ? `, Col. ${esc(a.colonia)}` : ''}, ${esc(a.city)}, ${esc(a.state)} ${esc(a.zipCode)}, ${esc(a.country)}</div>
                     </div>
                     <div class="btn-group btn-group-sm">
                         ${a.isFavorite ? '' : `<button class="btn btn-light" title="Marcar favorita" data-fav="${a.id}"><i class="ti ti-star"></i></button>`}
@@ -236,11 +276,12 @@ window.initProfileSection = function (root) {
         return `
             <div class="row g-2">
                 <div class="col-md-6"><label class="form-label small">Etiqueta</label><input class="form-control" data-f="label" value="${esc(a.label)}"></div>
-                <div class="col-md-6"><label class="form-label small">País</label><input class="form-control" data-f="country" value="${esc(a.country || 'MX')}"></div>
+                <div class="col-md-6"><label class="form-label small">País</label>${countrySelect('country', countryDisplay(a.country))}</div>
                 <div class="col-12"><label class="form-label small">Calle</label><input class="form-control" data-f="street" value="${esc(a.street)}"></div>
-                <div class="col-md-4"><label class="form-label small">Ciudad</label><input class="form-control" data-f="city" value="${esc(a.city)}"></div>
+                <div class="col-md-4"><label class="form-label small">CP</label><input class="form-control" data-f="zipCode" inputmode="numeric" autocomplete="off" value="${esc(a.zipCode)}"><small class="d-block mt-1" data-cp-feedback></small></div>
                 <div class="col-md-4"><label class="form-label small">Estado</label><input class="form-control" data-f="state" value="${esc(a.state)}"></div>
-                <div class="col-md-4"><label class="form-label small">CP</label><input class="form-control" data-f="zipCode" value="${esc(a.zipCode)}"></div>
+                <div class="col-md-4"><label class="form-label small">Ciudad</label><input class="form-control" data-f="city" value="${esc(a.city)}"></div>
+                <div class="col-12"><label class="form-label small">Colonia</label><input class="form-control" data-f="colonia" list="coloniaOptions" autocomplete="off" value="${esc(a.colonia)}"><datalist id="coloniaOptions"></datalist></div>
                 <div class="col-12 form-check ms-2 mt-2"><input class="form-check-input" type="checkbox" data-f="isFavorite" id="favChk" ${a.isFavorite ? 'checked' : ''}><label class="form-check-label small" for="favChk">Marcar como favorita</label></div>
             </div>`;
     }
@@ -327,6 +368,46 @@ window.initProfileSection = function (root) {
         const ci = el.querySelector('[data-f="countryOfIssue"]');
         const nat = el.querySelector('[data-f="nationality"]');
         if (ci && nat) ci.addEventListener('change', () => { nat.value = COUNTRY_TO_NATIONALITY[ci.value] || ''; });
+        // Address: typing the CP looks up Estado + Ciudad (MX/US/CA) via the backend proxy.
+        const addrCountry = el.querySelector('[data-f="country"]');
+        const addrCp = el.querySelector('[data-f="zipCode"]');
+        const cpFeedback = el.querySelector('[data-cp-feedback]');
+        if (addrCountry && addrCp) {
+            const setFeedback = (msg, cls) => {
+                if (cpFeedback) { cpFeedback.textContent = msg; cpFeedback.className = `d-block mt-1 small ${cls}`; }
+            };
+            const runLookup = async () => {
+                const iso = isoFor(addrCountry.value);
+                const code = addrCp.value.trim();
+                if (!iso || !code) { setFeedback('', ''); return; }
+                setFeedback('Buscando…', 'text-muted');
+                const data = await lookupPostal(iso, code);
+                if (data && (data.state || data.city)) {
+                    const st = el.querySelector('[data-f="state"]');
+                    const cy = el.querySelector('[data-f="city"]');
+                    if (data.state && st) st.value = data.state;
+                    if (data.city && cy) cy.value = data.city;
+                    // Mexico (SEPOMEX) returns the colonias for the CP → offer them in the datalist.
+                    const dl = el.querySelector('#coloniaOptions');
+                    const colonias = data.colonias || [];
+                    if (dl) dl.innerHTML = colonias.map((co) => `<option value="${esc(co)}"></option>`).join('');
+                    const extra = colonias.length ? ` · ${colonias.length} colonia${colonias.length > 1 ? 's' : ''}` : '';
+                    setFeedback(`✓ ${[data.city, data.state].filter(Boolean).join(', ')}${extra}`, 'text-success');
+                } else {
+                    setFeedback('Código postal no encontrado', 'text-warning');
+                }
+            };
+            addrCp.addEventListener('input', () => {
+                const rule = postalRule(isoFor(addrCountry.value));
+                if (rule.numeric) {
+                    const cleaned = addrCp.value.replace(/\D/g, '').slice(0, rule.length || 10);
+                    if (cleaned !== addrCp.value) addrCp.value = cleaned;
+                    if (cleaned.length === rule.length) runLookup();
+                }
+            });
+            addrCp.addEventListener('change', runLookup);
+            addrCountry.addEventListener('change', () => setFeedback('', ''));
+        }
         const modal = bootstrap.Modal.getOrCreateInstance(el);
         const saveBtn = el.querySelector('#profileModalSave');
         const fresh = saveBtn.cloneNode(true);
@@ -336,6 +417,20 @@ window.initProfileSection = function (root) {
             el.querySelectorAll('[data-f]').forEach((input) => {
                 values[input.dataset.f] = input.type === 'checkbox' ? input.checked : input.value;
             });
+            // Address CP validation: only numbers + exact length where the country requires it.
+            if (addrCountry && addrCp) {
+                const rule = postalRule(isoFor(addrCountry.value));
+                const cp = String(values.zipCode || '').trim();
+                if (cp && rule.length) {
+                    if (rule.numeric && !/^\d+$/.test(cp)) {
+                        notify('El código postal solo debe contener números', 'error'); return;
+                    }
+                    const len = rule.numeric ? cp.length : cp.replace(/\s/g, '').length;
+                    if (len !== rule.length) {
+                        notify(`El código postal debe tener exactamente ${rule.length} ${rule.numeric ? 'dígitos' : 'caracteres'}`, 'error'); return;
+                    }
+                }
+            }
             // The selected file (if any) is handed to onSave so it can do the second S3 upload step;
             // the create/update request itself stays JSON (no file in the body).
             const fileInput = el.querySelector('[data-f-file]');
