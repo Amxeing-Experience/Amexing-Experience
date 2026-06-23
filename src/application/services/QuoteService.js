@@ -640,6 +640,19 @@ class QuoteService {
 
       await quote.save(null, { useMasterKey: true });
 
+      // If this quote is already a reservation, propagate the general-info changes
+      // (people, contact, lead guest, event type, notes) to it. Info-only sync —
+      // services are synced separately on the service-items save. Isolated so a
+      // sync failure never blocks the quote update.
+      try {
+        await this.syncReservationFromQuote(quote);
+      } catch (syncError) {
+        logger.error('Failed to sync reservation info after quote update', {
+          quoteId: quote.id,
+          error: syncError.message,
+        });
+      }
+
       console.log('🔍 DEBUGGING: Checking reservation creation conditions', {
         quoteId: quote.id,
         appliedStatus: appliedUpdates.status,
@@ -1529,17 +1542,18 @@ class QuoteService {
   /**
    * Keeps an existing reservation in sync when its source quote's serviceItems
    * change. No-op when the quote has no active reservation (reservations are only
-   * created on a status change). Updates the Reservation snapshot/totals/dates,
-   * then reconciles ReservationService records by stable subconcept key. Matched
-   * services refresh descriptive fields and preserve assignments/status; new
-   * services create a ReservationService; removed services are soft-deleted.
+   * created on a status change). Always syncs the denormalized general info
+   * (people, contact, lead guest, event type, notes). When serviceItems are
+   * provided it also updates the snapshot/totals/dates and reconciles the
+   * ReservationService records by stable subconcept key (matched services keep
+   * their assignments/status; new ones are created; removed ones soft-deleted).
    * @param {object} quote - Parse Quote object.
-   * @param {object} serviceItems - The updated serviceItems object.
+   * @param {object} [serviceItems] - Updated serviceItems; omit for info-only sync.
    * @returns {Promise<object>} Sync result summary.
    * @example
    * await this.syncReservationFromQuote(quote, serviceItems);
    */
-  async syncReservationFromQuote(quote, serviceItems) {
+  async syncReservationFromQuote(quote, serviceItems = null) {
     const reservationQuery = new Parse.Query('Reservation');
     reservationQuery.equalTo('quotePtr', quote);
     reservationQuery.equalTo('active', true);
@@ -1551,89 +1565,112 @@ class QuoteService {
 
     const days = (serviceItems && Array.isArray(serviceItems.days)) ? serviceItems.days : [];
 
-    // 1) Reservation-level fields (snapshot + totals + dates)
-    reservation.set('serviceItemsSnapshot', serviceItems);
-    const total = serviceItems?.total || 0;
-    reservation.set('totalAmount', total);
-    reservation.set('servicesSubtotal', serviceItems?.subtotal ?? total);
-    if (serviceItems?.currency) reservation.set('currency', serviceItems.currency);
-    if (serviceItems?.paymentType) reservation.set('paymentType', serviceItems.paymentType);
+    // 1) General info — always kept in sync (same fields createReservationFromQuote
+    // denormalizes onto the reservation).
+    reservation.set('numberOfPeople', quote.get('numberOfPeople') || 1);
+    reservation.set('eventType', quote.get('eventType') || '');
+    reservation.set('contactPerson', quote.get('contactPerson') || '');
+    reservation.set('contactEmail', quote.get('contactEmail') || '');
+    reservation.set('contactPhone', quote.get('contactPhone') || '');
+    reservation.set('leadGuestFirstName', quote.get('leadGuestFirstName') || '');
+    reservation.set('leadGuestLastName', quote.get('leadGuestLastName') || '');
+    reservation.set('notes', quote.get('notes') || '');
 
-    let startDate = null;
-    let endDate = null;
-    for (const day of days) {
-      if (day.date) {
-        const d = new Date(`${day.date}T12:00:00`);
-        if (!Number.isNaN(d.getTime())) {
-          if (!startDate || d < startDate) startDate = d;
-          if (!endDate || d > endDate) endDate = d;
+    // 2) Service-level fields (snapshot + totals + dates) — only when serviceItems
+    // are provided (i.e. called from the service-items save).
+    if (serviceItems) {
+      reservation.set('serviceItemsSnapshot', serviceItems);
+      const total = serviceItems.total || 0;
+      reservation.set('totalAmount', total);
+      reservation.set('servicesSubtotal', serviceItems.subtotal ?? total);
+      if (serviceItems.currency) reservation.set('currency', serviceItems.currency);
+      if (serviceItems.paymentType) reservation.set('paymentType', serviceItems.paymentType);
+
+      let startDate = null;
+      let endDate = null;
+      for (const day of days) {
+        if (day.date) {
+          const d = new Date(`${day.date}T12:00:00`);
+          if (!Number.isNaN(d.getTime())) {
+            if (!startDate || d < startDate) startDate = d;
+            if (!endDate || d > endDate) endDate = d;
+          }
         }
       }
+      if (startDate) reservation.set('startDate', startDate);
+      if (endDate) reservation.set('endDate', endDate);
     }
-    if (startDate) reservation.set('startDate', startDate);
-    if (endDate) reservation.set('endDate', endDate);
     await reservation.save(null, { useMasterKey: true });
 
-    // 2) Index existing (active) ReservationService records by match key
-    const existingQuery = new Parse.Query('ReservationService');
-    existingQuery.equalTo('reservationPtr', reservation);
-    existingQuery.equalTo('exists', true);
-    existingQuery.limit(1000);
-    const existing = await existingQuery.find({ useMasterKey: true });
+    // 3) Reconcile ReservationService records — ONLY when serviceItems were
+    // provided. Skipping this on an info-only sync is critical: with no days the
+    // reconciliation would soft-delete every existing service.
+    let updatedOrCreated = 0;
+    let removed = 0;
+    if (serviceItems) {
+      const existingQuery = new Parse.Query('ReservationService');
+      existingQuery.equalTo('reservationPtr', reservation);
+      existingQuery.equalTo('exists', true);
+      existingQuery.limit(1000);
+      const existing = await existingQuery.find({ useMasterKey: true });
 
-    const existingByKey = new Map();
-    existing.forEach((rs) => {
-      const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
-      if (!existingByKey.has(key)) existingByKey.set(key, rs);
-    });
+      const existingByKey = new Map();
+      existing.forEach((rs) => {
+        const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
+        if (!existingByKey.has(key)) existingByKey.set(key, rs);
+      });
 
-    // 3) Reconcile: update matched, create new
-    const seen = new Set();
-    const toSave = [];
-    for (const day of days) {
-      const subconcepts = Array.isArray(day.subconcepts) ? day.subconcepts : [];
-      for (const sub of subconcepts) {
-        const key = this.reservationServiceMatchKey(sub, day.dayNumber);
-        const match = existingByKey.get(key);
-        if (match && !seen.has(key)) {
-          seen.add(key);
-          this.applyReservationServiceDescriptiveFields(match, day, sub);
-          toSave.push(match);
-        } else {
-          toSave.push(this.buildReservationServiceRecord(reservation, day, sub));
-          seen.add(key);
+      // Reconcile: update matched, create new
+      const seen = new Set();
+      const toSave = [];
+      for (const day of days) {
+        const subconcepts = Array.isArray(day.subconcepts) ? day.subconcepts : [];
+        for (const sub of subconcepts) {
+          const key = this.reservationServiceMatchKey(sub, day.dayNumber);
+          const match = existingByKey.get(key);
+          if (match && !seen.has(key)) {
+            seen.add(key);
+            this.applyReservationServiceDescriptiveFields(match, day, sub);
+            toSave.push(match);
+          } else {
+            toSave.push(this.buildReservationServiceRecord(reservation, day, sub));
+            seen.add(key);
+          }
         }
       }
-    }
 
-    // 4) Soft-delete records whose service is no longer present
-    const toRemove = existing.filter((rs) => {
-      const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
-      return !seen.has(key);
-    });
-    toRemove.forEach((rs) => {
-      rs.set('active', false);
-      rs.set('exists', false);
-    });
+      // Soft-delete records whose service is no longer present
+      const toRemove = existing.filter((rs) => {
+        const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
+        return !seen.has(key);
+      });
+      toRemove.forEach((rs) => {
+        rs.set('active', false);
+        rs.set('exists', false);
+      });
 
-    const all = toSave.concat(toRemove);
-    if (all.length > 0) {
-      await Parse.Object.saveAll(all, { useMasterKey: true });
+      const all = toSave.concat(toRemove);
+      if (all.length > 0) {
+        await Parse.Object.saveAll(all, { useMasterKey: true });
+      }
+      updatedOrCreated = toSave.length;
+      removed = toRemove.length;
     }
 
     logger.info('Synced reservation from quote', {
       quoteId: quote.id,
       reservationId: reservation.id,
       reservationFolio: reservation.get('folio'),
-      updatedOrCreated: toSave.length,
-      removed: toRemove.length,
+      syncedServices: !!serviceItems,
+      updatedOrCreated,
+      removed,
     });
 
     return {
       synced: true,
       reservationId: reservation.id,
-      updatedOrCreated: toSave.length,
-      removed: toRemove.length,
+      updatedOrCreated,
+      removed,
     };
   }
 
