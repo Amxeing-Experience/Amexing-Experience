@@ -10,7 +10,7 @@ const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 const FileStorageService = require('../services/FileStorageService');
 const { renderUrlToPdf } = require('../services/PdfRenderService');
-const { getArponaEmbedCss } = require('../../infrastructure/utils/fontEmbed');
+const { getArponaEmbedCss, getMyriadEmbedCss } = require('../../infrastructure/utils/fontEmbed');
 
 const fileStorageService = new FileStorageService({
   baseFolder: 'general',
@@ -130,6 +130,7 @@ class PublicReservationController {
         isReservationView: true,
         pageTitle: `Itinerario ${folio}`,
         arponaEmbedCss: getArponaEmbedCss(),
+        myriadEmbedCss: getMyriadEmbedCss(),
       });
     } catch (error) {
       return this.handleError(error, folio, req, res);

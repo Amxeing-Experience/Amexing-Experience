@@ -1369,6 +1369,30 @@ class QuoteController {
       // If status is being updated, always use the reliable status update method (same as admin)
       // This ensures consistent reservation creation logic between admin and department manager flows
       if (updates.status) {
+        // updateQuoteStatus only changes the status, so any general-info fields
+        // sent alongside it (contact, lead guest, people, notes, eventType, etc.)
+        // would be dropped. Persist them first via updateQuote — which also syncs
+        // the linked reservation's info. Isolated so it never blocks the status change.
+        const infoUpdates = { ...updates };
+        delete infoUpdates.status;
+        delete infoUpdates.reason;
+        if (Object.keys(infoUpdates).length > 0) {
+          try {
+            await this.quoteService.updateQuote(
+              currentUser,
+              quoteId,
+              infoUpdates,
+              updates.reason || 'Quote info updated',
+              req.userRole
+            );
+          } catch (infoError) {
+            logger.error('Failed to persist general info alongside status change', {
+              quoteId,
+              error: infoError.message,
+            });
+          }
+        }
+
         logger.info('🔄 Status change detected, delegating to updateQuoteStatus', {
           quoteId,
           status: updates.status,

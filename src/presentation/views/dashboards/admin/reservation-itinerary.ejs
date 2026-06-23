@@ -103,12 +103,13 @@ const COMPANY = {
 };
 
 const LOGO_URL = q.logoUrl || '/images/logos/light_white_amexing.png';
-const HEADER_BG = q.headerBg || '/images/header_bg.png';
+const HEADER_BG = q.headerBg || '/images/header_bg_pdf.png';
 const ICON_BASE = '/images/icons';
 
 // Arpona embedded inline (base64) by the controller so the cover renders correctly even
 // when a proxy/WAF blocks the .otf network requests (HTTP 426) — no network fetch needed.
 const ARPONA_EMBED_CSS = typeof arponaEmbedCss === 'string' ? arponaEmbedCss : '';
+const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '';
 const iconKey = (sc) => {
   if (sc.type === 'traslado' || sc.type === 'transport') {
     if (sc.transportType === 'aeropuerto') return sc.directionType === 'departure' ? 'departure' : 'arrival';
@@ -132,12 +133,17 @@ const iconKey = (sc) => {
   <% if (ARPONA_EMBED_CSS) { %><style id="arpona-embedded">
     <%- ARPONA_EMBED_CSS %>
     /* Cover headings use the embedded TTF family directly so Chrome embeds it in the PDF. */
-    .itin-guest, .itin-dates, .itin-resnum { font-family: 'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif) !important; }
+    .itin-guest, .itin-dates { font-family: 'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif) !important; }
+  </style><% } %>
+  <% if (MYRIAD_EMBED_CSS) { %><style id="myriad-embedded">
+    <%- MYRIAD_EMBED_CSS %>
+    /* @font-face only; body / .itin-resnum reference 'MyriadPDF' in the main stylesheet
+       below so Chrome embeds the TTF in the PDF (the .otf faces from fonts.css are dropped). */
   </style><% } %>
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: var(--font-myriad, 'Segoe UI', Tahoma, sans-serif);
+      font-family: 'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif);
       color: #2b2b2b;
       margin: 0;
       background: #fff;
@@ -148,7 +154,7 @@ const iconKey = (sc) => {
     /* Header */
     .itin-header { color: #fff; }
     .itin-logo-img { max-width: 230px; height: auto; }
-    .itin-icon img { width: 26px; height: 26px; object-fit: contain; }
+    .itin-icon img { width: 50px; height: 50px; object-fit: contain; }
     .itin-place .thumb img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 
     /* Solid sage top bar: left logo (vertically centered) + travel specialist on the right */
@@ -163,12 +169,7 @@ const iconKey = (sc) => {
       background: #6f7459 url('<%= HEADER_BG %>') center/cover no-repeat;
       padding: 24px 28px 8px;
     }
-    .itin-hero::before {
-      content: ''; position: absolute; inset: 0;
-      /* Whiter wash overall, fading to fully opaque white at the base so the hero blends
-         into the white page with no visible seam where the first day begins. */
-      background: linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(255,255,255,0.92) 55%, rgba(255,255,255,1) 100%);
-    }
+    /* No CSS white overlay — header_bg_pdf.png already has the white wash/fade baked in. */
     .itin-hero > * { position: relative; z-index: 1; }
     .itin-specialist { text-align: right; font-size: 1rem; line-height: 1.55; opacity: 0.95; }
     .itin-specialist .name { font-size: 1.35rem; font-weight: 400; }
@@ -177,23 +178,27 @@ const iconKey = (sc) => {
     /* Cover headings use Arpona (matches the approved VF), not the body Myriad. */
     .itin-guest {
       font-family: var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);
-      margin: 14px auto 8px;
+      margin: 8px auto 0;
       text-align: center;
-      font-size: 2.4rem;
-      font-weight: 700;
+      font-size: 3.2rem;
+      font-weight: 500;
+      line-height: 1;
       letter-spacing: 1px;
       color: #2b2b2b;
     }
-    .itin-dates { font-family: var(--font-arpona, 'Helvetica Neue', Arial, sans-serif); text-align: center; line-height: 1.05; color: #555555; max-width: 360px; margin: 12px auto 0; padding: 12px 0; border-top: 1px solid #b8b8a8; border-bottom: 1px solid #b8b8a8; }
+    .itin-dates { font-family: var(--font-arpona, 'Helvetica Neue', Arial, sans-serif); text-align: center; line-height: 0.9; color: #555555; max-width: 360px; margin: 4px auto 0; padding: 8px 0; border-top: 1px solid #b8b8a8; border-bottom: 1px solid #b8b8a8; }
     .itin-dates .month { font-size: 2.1rem; font-weight: 400; letter-spacing: 8px; text-transform: capitalize; }
-    .itin-dates .range { font-size: 3.6rem; font-weight: 300; letter-spacing: 6px; margin: 2px 0; }
-    .itin-dates .year { font-size: 1.05rem; font-weight: 300; letter-spacing: 6px; opacity: 0.85; }
-    .itin-resnum { font-family: var(--font-arpona, 'Helvetica Neue', Arial, sans-serif); text-align: center; margin-top: 12px; font-size: 0.85rem; letter-spacing: 1px; }
+    .itin-dates .range { font-size: 3.6rem; font-weight: 300; letter-spacing: 6px; margin: -2px 0; }
+    .itin-dates .year { font-size: 1.3rem; font-weight: 400; letter-spacing: 6px; opacity: 0.85; }
+    .itin-resnum { font-family: 'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif); font-weight: 300; text-align: center; margin-top: 12px; font-size: 0.85rem; letter-spacing: 1px; }
+    .itin-resnum strong { font-weight: 700; }
 
     /* Day bar */
     .itin-day-bar {
-      background: #888888; color: #fff; font-weight: 700; font-size: 0.8rem;
-      letter-spacing: 1px; text-transform: uppercase; padding: 8px 28px; margin-top: 18px;
+      background: #888888; color: #fff;
+      font-family: 'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);
+      font-weight: 500; font-size: 0.8rem;
+      letter-spacing: 1px; padding: 0 28px; margin-top: 18px;
       break-after: avoid; page-break-after: avoid;
     }
     .itin-day-bar + .itin-entry { padding-top: 16px; }
@@ -202,14 +207,14 @@ const iconKey = (sc) => {
     .itin-entry { display: flex; gap: 16px; padding: 0 28px; break-inside: avoid; page-break-inside: avoid; }
     .itin-rail { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
     .itin-icon {
-      width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid #c9ccba;
+      width: 56px; height: 56px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center; color: #6f7459; font-size: 1.3rem;
       background: #fff;
     }
     /* box-decoration-break:clone re-applies padding-top + the gradient line on each page
        fragment, so pages 2+ get top breathing room while the line runs through the break. */
     .itin-timeline {
-      background: linear-gradient(#d8dac9, #d8dac9) no-repeat 50px 0 / 1.5px 100%;
+      background: linear-gradient(#d8dac9, #d8dac9) no-repeat 56px 0 / 1.5px 100%;
       padding-top: 12mm;
       -webkit-box-decoration-break: clone;
       box-decoration-break: clone;
@@ -350,7 +355,8 @@ const iconKey = (sc) => {
     // rasterized before the PDF snapshot. font-display:block + fonts.ready alone can resolve
     // before the face is actually applied; PdfRenderService waits for window.__fontsReady.
     (function () {
-      var faces = ["300 1em ArponaPDF", "400 1em ArponaPDF", "700 1em ArponaPDF"];
+      var faces = ["300 1em ArponaPDF", "400 1em ArponaPDF", "500 1em ArponaPDF", "700 1em ArponaPDF",
+        "300 1em MyriadPDF", "400 1em MyriadPDF", "600 1em MyriadPDF", "700 1em MyriadPDF"];
       var done = function () { window.__fontsReady = true; };
       if (document.fonts && document.fonts.load) {
         Promise.all(faces.map(function (f) { return document.fonts.load(f).catch(function () {}); }))

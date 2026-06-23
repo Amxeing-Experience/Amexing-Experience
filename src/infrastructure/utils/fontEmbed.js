@@ -27,7 +27,15 @@ const ARPONA_FACES = [
   { file: 'Arpona Bold.ttf', weight: 700, format: 'truetype' },
 ];
 
+const MYRIAD_FACES = [
+  { file: 'MyriadPro-Light.ttf', weight: 300, format: 'truetype' },
+  { file: 'MyriadPro-Regular.ttf', weight: 400, format: 'truetype' },
+  { file: 'MyriadPro-Semibold.ttf', weight: 600, format: 'truetype' },
+  { file: 'MyriadPro-Bold.ttf', weight: 700, format: 'truetype' },
+];
+
 let arponaCss = null;
+let myriadCss = null;
 
 /**
  * Inline @font-face CSS for the Arpona family (base64, no network fetch).
@@ -50,4 +58,28 @@ function getArponaEmbedCss() {
   return arponaCss;
 }
 
-module.exports = { getArponaEmbedCss };
+/**
+ * Inline @font-face CSS for the Myriad Pro family (base64, no network fetch).
+ * Declared as 'MyriadPDF' (TTF) so it embeds in generated PDFs, where the .otf
+ * faces from fonts.css are dropped by headless Chrome.
+ * @returns {string} CSS string, or '' if the font files cannot be read.
+ * @example
+ * const css = getMyriadEmbedCss();
+ */
+function getMyriadEmbedCss() {
+  if (myriadCss !== null) return myriadCss;
+  try {
+    myriadCss = MYRIAD_FACES.map((f) => {
+      // Fixed filenames from a hardcoded list under a fixed dir — not user input.
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      const b64 = fs.readFileSync(path.join(FONTS_DIR, f.file)).toString('base64');
+      return `@font-face{font-family:'MyriadPDF';src:url(data:font/ttf;base64,${b64}) format('${f.format}');font-weight:${f.weight};font-style:normal;font-display:block;}`;
+    }).join('');
+  } catch (error) {
+    logger.warn('Could not embed Myriad fonts; PDF will fall back to fonts.css', { error: error.message });
+    myriadCss = '';
+  }
+  return myriadCss;
+}
+
+module.exports = { getArponaEmbedCss, getMyriadEmbedCss };
