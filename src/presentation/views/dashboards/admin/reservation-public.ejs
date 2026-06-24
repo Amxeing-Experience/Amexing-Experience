@@ -1,3 +1,9 @@
+<%
+// Brand fonts embedded inline (base64) the same way the itinerary PDF does, so the preview uses
+// Arpona (banner/headings) + Myriad (body) consistently with the exported PDF.
+const ARPONA_EMBED_CSS = typeof arponaEmbedCss === 'string' ? arponaEmbedCss : '';
+const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '';
+%>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,105 +12,377 @@
     <meta name="robots" content="noindex, nofollow">
     <title><%= pageTitle || 'Reservación' %></title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/dashboard/css/icons/tabler-icons/tabler-icons.css">
     <link rel="icon" type="image/png" href="/images/heart_black.png">
+    <link rel="stylesheet" href="/css/fonts.css">
+    <% if (ARPONA_EMBED_CSS) { %><style id="arpona-embedded">
+    <%- ARPONA_EMBED_CSS %>
+    /* Banner uses the embedded Arpona family, same as the PDF cover headings. */
+    .resv-conf .rc-banner-title, .resv-conf .rc-banner-sub { font-family: 'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif) !important; }
+    </style><% } %>
+    <% if (MYRIAD_EMBED_CSS) { %><style id="myriad-embedded">
+    <%- MYRIAD_EMBED_CSS %>
+    </style><% } %>
 
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-            padding: 2rem 0;
-        }
+        body { background:#f5f5f5; margin:0; padding:2rem 0; font-family:'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif); }
+        .rc-actions { max-width:820px; margin:0 auto 12px; display:flex; justify-content:flex-end; padding:0 8px; }
+        .rc-export-btn { background:#4b5bdc; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:14px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+        .rc-export-btn:hover { background:#3f4dc0; }
+        .rc-export-btn:disabled { opacity:.6; cursor:default; }
+        @media print { body { background:#fff; padding:0; } .rc-actions { display:none; } }
 
-        .public-quote-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: #fff;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
-            border-radius: 8px;
-            padding: 2rem;
-        }
+        /* ===== Confirmation card (page-1 section) ===== */
+        .resv-conf{max-width:820px;margin:0 auto;background:#fff;padding:24px;box-sizing:border-box;font-family:'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif);color:#2b2b2b;box-shadow:0 0 20px rgba(0,0,0,.08);border-radius:8px}
+        .resv-conf *{box-sizing:border-box}
+        .resv-conf .rc-logo{text-align:center;margin-bottom:18px}
+        .resv-conf .rc-banner{background:#8a8c6e;color:#fff;text-align:center;padding:7px 16px;margin:0 0 8px}
+        .resv-conf .rc-banner-title{font-size:15px;font-weight:300;text-transform:none;letter-spacing:1px;margin:0}
+        .resv-conf .rc-banner-sub{font-size:18px;font-weight:300;text-transform:uppercase;letter-spacing:2px;margin:3px 0 0}
+        .resv-conf .rc-folio{text-align:center;color:#8a8a8a;font-size:11px;letter-spacing:.5px;margin-bottom:28px}
+        .resv-conf .rc-section-title{color:#111;font-family:'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);font-weight:700;text-transform:uppercase;font-size:16px;letter-spacing:2px;text-align:left;max-width:640px;margin:22px auto 4px}
+        .resv-conf .rc-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid #a9a79a;border-bottom:none}
+        /* Info recuadros narrower than the green banner (left-aligned). */
+        .resv-conf .rc-grid, .resv-conf .rc-service { max-width: 640px; margin-left: auto; margin-right: auto; }
+        .resv-conf .rc-upper { text-transform: uppercase; }
+        .resv-conf .rc-cell{padding:3px 12px;border-bottom:1px solid #a9a79a}
+        .resv-conf .rc-cell:nth-child(odd){border-right:1px solid #a9a79a}
+        /* Odd cell count: the last one spans the full row instead of leaving an empty half-cell. */
+        .resv-conf .rc-grid > .rc-cell:last-child:nth-child(odd){grid-column:1 / -1;border-right:none}
+        .resv-conf .rc-cell.rc-full{grid-column:1 / -1;border-right:none}
+        .resv-conf .rc-label{display:block;color:#8a8a8a;font-size:10px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:1px}
+        .resv-conf .rc-value{display:block;color:#2b2b2b;font-size:14px;word-break:break-word}
+        .resv-conf .rc-service{margin-bottom:18px}
+        .resv-conf .rc-badge{width:26px;height:26px;background:#8a8c6e;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:6px}
+        .resv-conf .rc-card{flex:1 1 auto;min-width:0}
+        .resv-conf .rc-tbl{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid #a9a79a;border-left:1px solid #a9a79a}
+        .resv-conf .rc-tc{padding:3px 12px;border-right:1px solid #a9a79a;border-bottom:1px solid #a9a79a;min-width:0}
+        .resv-conf .rc-c6{grid-column:span 6}
+        .resv-conf .rc-c3{grid-column:span 3}
+        .resv-conf .rc-c2{grid-column:span 2}
+        .resv-conf .rc-pay{max-width:640px;margin:4px auto 0;border:1px solid #a9a79a}
+        .resv-conf .rc-pay-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:5px 12px;border-bottom:1px solid #a9a79a}
+        .resv-conf .rc-pay-row:last-child{border-bottom:none}
+        .resv-conf .rc-pay-row .l{color:#8a8a8a;font-size:10px;text-transform:uppercase;letter-spacing:.8px}
+        .resv-conf .rc-pay-row .v{font-size:14px;color:#2b2b2b;text-align:right}
+        .resv-conf .rc-pay-row.rc-pay-total{background:#f3f3ee}
+        .resv-conf .rc-pay-row.rc-pay-total .l{color:#111}
+        .resv-conf .rc-pay-row.rc-pay-total .v{font-weight:700;font-size:16px;color:#111}
+        @media (max-width:560px){.resv-conf .rc-grid{grid-template-columns:1fr}.resv-conf .rc-cell:nth-child(odd){border-right:none}.resv-conf .rc-c6,.resv-conf .rc-c3,.resv-conf .rc-c2{grid-column:span 6}}
 
-        .public-header {
-            text-align: center;
-            padding-bottom: 1rem;
-        }
-
-        .header-logo { margin-bottom: 1.5rem; }
-        .header-folio { margin-top: 1rem; }
-
-        .public-header h1 {
-            background: #969b81;
-            color: white;
-            font-size: 1.2rem;
-            font-weight: 400;
-            letter-spacing: 0.3rem;
-            text-transform: uppercase;
-            padding: 0.75rem;
-            margin: 0;
-            display: block;
-            border-radius: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            width: 100%;
-            text-align: center;
-        }
-
-        .public-header p {
-            color: #6c757d;
-            font-size: 1rem;
-            margin: 0;
-        }
-
-        .public-footer {
-            text-align: center;
-            padding-top: 2rem;
-            color: #6c757d;
-            font-size: 1.1rem;
-        }
-
-        .public-footer a { color: black; text-decoration: none; }
-        .public-footer a:hover { text-decoration: underline; }
-
-        @media print {
-            body { background: #fff; padding: 0; }
-            .public-quote-container { box-shadow: none; border-radius: 0; padding: 0; }
-            .public-header, .public-footer { display: none; }
-        }
-
-        /* PDF mode (puppeteer adds body.pdf-export-mode when ?pdf=1 is set): remove the gray
-           outer page background, padding, max-width cap, shadow and rounded corners so the
-           document uses the full page width. */
-        body.pdf-export-mode { background: #fff !important; padding: 0 !important; }
-        body.pdf-export-mode .public-quote-container {
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 0.5rem !important;
-            box-shadow: none !important;
-            border-radius: 0 !important;
-        }
-        /* Only hide the wrapper footer link — the .public-header inside quote-summary is
-           the AMEXING + folio banner and must stay visible in the PDF. */
-        body.pdf-export-mode > .public-quote-container > .public-footer { display: none !important; }
+        /* ===== Experiences / tours (page-2 section) ===== */
+        .resv-conf .resv-exp{font-family:'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif);color:#2b2b2b;background:#fff;text-align:center;padding:32px 24px 8px}
+        .resv-conf .resv-exp-divider{border:0;border-top:1px solid #a9a79a;margin:0 0 28px}
+        .resv-conf .resv-exp-icons{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:22px;margin-bottom:22px}
+        .resv-conf .resv-exp-icons img{width:56px;height:56px;object-fit:contain;opacity:.65;filter:grayscale(35%)}
+        .resv-conf .resv-exp-lead{max-width:560px;margin:0 auto 24px;color:#8a8a8a;font-size:.95rem;line-height:1.6}
+        .resv-conf .resv-exp-lead strong{color:#2b2b2b;font-weight:700}
+        .resv-conf .resv-exp-cta{display:inline-block;background:#8a8c6e;color:#fff;text-decoration:none;text-transform:uppercase;letter-spacing:2px;font-size:.8rem;font-weight:600;padding:14px 34px;border-radius:2px;margin-bottom:26px}
+        .resv-conf .resv-exp-cta:hover{background:#797b5f}
+        .resv-conf .resv-exp-social{display:flex;justify-content:center;gap:14px;margin-bottom:18px}
+        .resv-conf .resv-exp-social a{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid #a9a79a;border-radius:50%;color:#8a8a8a;font-size:1.05rem;text-decoration:none}
+        .resv-conf .resv-exp-social a:hover{color:#8a8c6e;border-color:#8a8c6e}
+        .resv-conf .resv-exp-site{margin:0 0 12px;font-size:.9rem}
+        .resv-conf .resv-exp-site a{color:#2b2b2b;text-decoration:none;font-weight:600}
+        .resv-conf .resv-exp-agent{color:#8a8a8a;font-size:.85rem;line-height:1.55;margin:0}
     </style>
 </head>
 <body>
-    <div class="public-quote-container">
-        <%- include('./sections/quote-summary', {
-            quote: quote,
-            isPublicView: true,
-            isReservationView: typeof isReservationView !== 'undefined' ? isReservationView : true
-        }) %>
+    <div class="rc-actions">
+        <button id="exportPdfBtn" class="rc-export-btn"><i class="ti ti-download"></i> Exportar a PDF</button>
+    </div>
 
-        <div class="public-footer">
-            <p>
+    <div class="resv-conf">
+        <div class="rc-logo">
+            <img src="/images/logos/light_amexing.png" alt="Amexing" style="height:70px">
+        </div>
+
+        <div class="rc-banner">
+            <p class="rc-banner-title">¡Gracias por su reservación!</p>
+            <p class="rc-banner-sub">Tu viaje está confirmado</p>
+        </div>
+
+        <%
+            var contactFirst = quote.leadGuestFirstName || quote.contactFirstName || (quote.reservationServiceCustomer && quote.reservationServiceCustomer.fullName) || (quote.client && quote.client.firstName) || '';
+            var contactLast = quote.leadGuestLastName || quote.contactLastName || '';
+            var contactEmail = quote.contactEmail || (quote.reservationServiceCustomer && quote.reservationServiceCustomer.email) || (quote.client && quote.client.email) || '';
+            var contactPhone = quote.contactPhone || (quote.reservationServiceCustomer && quote.reservationServiceCustomer.phone) || (quote.client && quote.client.phone) || '';
+        %>
+
+        <div class="rc-section-title">Datos de contacto:</div>
+        <div class="rc-grid">
+            <% if (contactFirst) { %>
+            <div class="rc-cell"><span class="rc-label">Nombres</span><span class="rc-value rc-upper"><%= contactFirst %></span></div>
+            <% } %>
+            <% if (contactLast) { %>
+            <div class="rc-cell"><span class="rc-label">Apellido</span><span class="rc-value rc-upper"><%= contactLast %></span></div>
+            <% } %>
+            <% if (contactEmail) { %>
+            <div class="rc-cell"><span class="rc-label">Email</span><span class="rc-value"><%= contactEmail %></span></div>
+            <% } %>
+            <% if (contactPhone) { %>
+            <div class="rc-cell"><span class="rc-label">Teléfono</span><span class="rc-value"><%= contactPhone %></span></div>
+            <% } %>
+        </div>
+
+        <div class="rc-section-title">Información de los servicios:</div>
+        <%
+            var svc = quote.serviceItems || {};
+            var paymentType = svc.paymentType;
+            var currency = svc.currency || '';
+            var counter = 0;
+            var days = svc.days || [];
+            var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+            var DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+            function fmtFecha(v) {
+                if (!v) return '';
+                var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+                if (!m) return v;
+                var dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+                if (isNaN(dt.getTime())) return v;
+                var dia = DIAS_SEM[dt.getDay()];
+                return dia.charAt(0).toUpperCase() + dia.slice(1) + ' ' + Number(m[3]) + ' de ' + MESES[Number(m[2]) - 1] + ' de ' + m[1];
+            }
+            var PAY_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
+            var paymentLabel = PAY_LABELS[paymentType] || (paymentType ? (paymentType.charAt(0).toUpperCase() + paymentType.slice(1)) : '');
+            var sumSubtotal = svc.subtotal;
+            var sumIva = svc.iva;
+            var sumTotal = svc.total;
+            function fmtMoney(n) {
+                if (n === null || n === undefined || n === '') return '';
+                var num = Number(n);
+                if (!isFinite(num)) return '';
+                var s = num.toFixed(2).replace(/\.00$/, '');
+                var parts = s.split('.');
+                parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                return '$' + parts.join('.') + (currency ? ' ' + currency : '');
+            }
+        %>
+        <% days.forEach(function(day){ %>
+            <% (day.subconcepts || []).forEach(function(sc){ %>
+                <% counter++; %>
+                <%
+                    var payTotal = (sc.pricesByType && paymentType && sc.pricesByType[paymentType]) || sc.total;
+                    var includes = (sc.includedExperiences && sc.includedExperiences.length) ? sc.includedExperiences.join(', ') : '';
+                    var payDisplay;
+                    if (payTotal === 0) { payDisplay = 'Sin costo'; }
+                    else if (payTotal) { payDisplay = fmtMoney(payTotal); }
+                    else { payDisplay = '$'; }
+                    var paxAdults = (Number(sc.adultsQuantity) || 0) + (Number(sc.adultsNoAlcoholQuantity) || 0) + (Number(sc.transportAdults) || 0);
+                    var paxChildren = (Number(sc.childrenQuantity) || 0) + (Number(sc.transportChildren) || 0);
+                    var paxInfants = (Number(sc.infantsQuantity) || 0) + (Number(sc.transportInfants) || 0);
+                    var paxParts = [];
+                    if (paxAdults) { paxParts.push(paxAdults + (paxAdults === 1 ? ' adulto' : ' adultos')); }
+                    if (paxChildren) { paxParts.push(paxChildren + (paxChildren === 1 ? ' niño' : ' niños')); }
+                    if (paxInfants) { paxParts.push(paxInfants + (paxInfants === 1 ? ' infante' : ' infantes')); }
+                    var paxStr = paxParts.join(', ');
+                    if (!paxStr) { var paxN = Number(sc.numberOfPeople) || 0; if (paxN) { paxStr = paxN + (paxN === 1 ? ' persona' : ' personas'); } }
+                %>
+                <div class="rc-service">
+                    <div class="rc-badge"><%= counter %></div>
+                    <div class="rc-card">
+                        <% if (sc.type === 'transport') { %>
+                            <%
+                                var tType = sc.transportType || '';
+                                var isAirport = tType === 'aeropuerto';
+                                var isDeparture = sc.directionType === 'departure';
+                                var ptpLabel = tType === 'local' ? 'Traslado local' : 'Punto a punto';
+                                var svcName = isAirport
+                                    ? (isDeparture ? 'Transportación — Salida a aeropuerto' : 'Transportación — Llegada de aeropuerto')
+                                    : ('Transportación — ' + ptpLabel);
+                                var ptOrigin = sc.pickupAddress || sc.originName || '';
+                                var ptDest = sc.dropoffAddress || sc.destination || '';
+                                var vehName = sc.vehicleTypeName || 'Por asignar';
+                                var hasFlightInfo = sc.airline || sc.flightNumber;
+                                var horaLabel = isAirport ? (isDeparture ? 'Hora de recolección' : 'Hora de llegada del vuelo') : 'Hora';
+                            %>
+                            <div class="rc-tbl">
+                                <div class="rc-tc rc-c6"><span class="rc-label">Nombre del servicio</span><span class="rc-value"><%= svcName %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Vehículo</span><span class="rc-value"><%= vehName %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Clase</span><span class="rc-value"><%= sc.categoryName || '—' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label"><%= horaLabel %></span><span class="rc-value"><%= sc.time || '—' %></span></div>
+                                <% if (isAirport && !isDeparture) { %>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Aeropuerto</span><span class="rc-value"><%= sc.originName || '' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Lugar de llegada</span><span class="rc-value"><%= sc.destination || sc.dropoffAddress || '' %></span></div>
+                                <% } else if (isAirport && isDeparture) { %>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Origen</span><span class="rc-value"><%= sc.originName || sc.pickupAddress || '' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Aeropuerto</span><span class="rc-value"><%= sc.destination || '' %></span></div>
+                                <% } else { %>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Origen</span><span class="rc-value"><%= ptOrigin %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Destino</span><span class="rc-value"><%= ptDest %></span></div>
+                                <% } %>
+                                <% if (isAirport && !isDeparture && hasFlightInfo) { %>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Aerolínea</span><span class="rc-value"><%= sc.airline || '' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Vuelo #</span><span class="rc-value"><%= sc.flightNumber || '' %></span></div>
+                                <% } else if (isAirport && isDeparture && (hasFlightInfo || sc.flightDepartureTimeSuggested)) { %>
+                                <div class="rc-tc rc-c2"><span class="rc-label">Aerolínea</span><span class="rc-value"><%= sc.airline || '' %></span></div>
+                                <div class="rc-tc rc-c2"><span class="rc-label">Vuelo #</span><span class="rc-value"><%= sc.flightNumber || '' %></span></div>
+                                <div class="rc-tc rc-c2"><span class="rc-label">Hora del vuelo</span><span class="rc-value"><%= sc.flightDepartureTimeSuggested || '' %></span></div>
+                                <% } %>
+                                <% if (paxStr) { %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
+                                <% } %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                            </div>
+                        <% } else if (sc.type === 'tour') { %>
+                            <% var duracion = sc.duration || sc.hours; %>
+                            <div class="rc-tbl">
+                                <div class="rc-tc rc-c6"><span class="rc-label">Tour</span><span class="rc-value"><%= sc.concept || 'Tour' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Hora</span><span class="rc-value"><%= sc.time || '' %></span></div>
+                                <% if (duracion) { %>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Duración</span><span class="rc-value"><%= duracion %> hrs</span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Clase</span><span class="rc-value"><%= sc.categoryName || '—' %></span></div>
+                                <% } else if (sc.categoryName) { %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Clase</span><span class="rc-value"><%= sc.categoryName %></span></div>
+                                <% } %>
+                                <% if (includes) { %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Incluye</span><span class="rc-value"><%= includes %></span></div>
+                                <% } %>
+                                <% if (paxStr) { %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
+                                <% } %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                            </div>
+                        <% } else if (sc.type === 'experience' || sc.type === 'experiencia') { %>
+                            <div class="rc-tbl">
+                                <div class="rc-tc rc-c6"><span class="rc-label">Experiencia</span><span class="rc-value"><%= sc.concept || 'Experiencia' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Hora</span><span class="rc-value"><%= sc.time || '' %></span></div>
+                                <% if (includes) { %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Incluye</span><span class="rc-value"><%= includes %></span></div>
+                                <% } %>
+                                <% if (paxStr) { %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
+                                <% } %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                            </div>
+                        <% } else if (sc.type === 'a-disposicion') { %>
+                            <div class="rc-tbl">
+                                <div class="rc-tc rc-c6"><span class="rc-label">Nombre del servicio</span><span class="rc-value">Servicio a disposición</span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Vehículo</span><span class="rc-value"><%= sc.vehicleTypeName || '' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Clase</span><span class="rc-value"><%= sc.categoryName || '—' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Hora</span><span class="rc-value"><%= sc.time || '' %></span></div>
+                                <% if (sc.hours) { %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Horas contratadas</span><span class="rc-value"><%= sc.hours %> hrs</span></div>
+                                <% } %>
+                                <% if (paxStr) { %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
+                                <% } %>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                            </div>
+                        <% } else if (sc.type === 'concepto') { %>
+                            <div class="rc-tbl">
+                                <div class="rc-tc rc-c6"><span class="rc-label">Concepto</span><span class="rc-value"><%= sc.concept || 'Concepto' %></span></div>
+                                <% if (paxStr) { %>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <% } else { %>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <% } %>
+                            </div>
+                        <% } else { %>
+                            <% var genName = sc.concept || sc.serviceType || 'Servicio'; %>
+                            <div class="rc-tbl">
+                                <div class="rc-tc rc-c6"><span class="rc-label">Nombre del servicio</span><span class="rc-value"><%= genName %></span></div>
+                                <% if (paxStr) { %>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <% } else { %>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <% } %>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            <% }); %>
+        <% }); %>
+
+        <% if (paymentLabel || sumTotal) { %>
+        <div class="rc-section-title">Resumen de pago:</div>
+        <div class="rc-pay">
+            <% if (sumSubtotal) { %>
+            <div class="rc-pay-row"><span class="l">Subtotal</span><span class="v"><%= fmtMoney(sumSubtotal) %></span></div>
+            <% } %>
+            <% if (sumIva) { %>
+            <div class="rc-pay-row"><span class="l">IVA (16%)</span><span class="v"><%= fmtMoney(sumIva) %></span></div>
+            <% } %>
+            <% if (sumTotal) { %>
+            <div class="rc-pay-row rc-pay-total"><span class="l">Total</span><span class="v"><%= fmtMoney(sumTotal) %></span></div>
+            <% } %>
+            <% if (paymentLabel) { %>
+            <div class="rc-pay-row"><span class="l">Tipo de pago</span><span class="v"><%= paymentLabel %></span></div>
+            <% } %>
+        </div>
+        <% } %>
+
+        <div class="resv-exp">
+            <hr class="resv-exp-divider">
+
+            <div class="resv-exp-icons">
+                <img src="/images/icons/wine.png" alt="" onerror="this.style.display='none'">
+                <img src="/images/icons/harvest.png" alt="" onerror="this.style.display='none'">
+                <img src="/images/icons/paint.png" alt="" onerror="this.style.display='none'">
+                <img src="/images/icons/sesion.png" alt="" onerror="this.style.display='none'">
+                <img src="/images/icons/city.png" alt="" onerror="this.style.display='none'">
+            </div>
+
+            <p class="resv-exp-lead">
+                No se pierda nuestras <strong>experiencias</strong> exclusivas diseñadas especialmente para su visita: desde recorridos a pie hasta mercados de artesanía, clases de cocina, visitas a viñedos y mucho más.
+            </p>
+
+            <a class="resv-exp-cta" href="https://www.amexingexperience.com" target="_blank" rel="noopener">Explora tus tours</a>
+
+            <div class="resv-exp-social">
+                <a href="https://www.amexingexperience.com" target="_blank" rel="noopener" aria-label="Facebook"><i class="ti ti-brand-facebook"></i></a>
+                <a href="https://www.amexingexperience.com" target="_blank" rel="noopener" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>
+                <a href="https://www.amexingexperience.com" target="_blank" rel="noopener" aria-label="TripAdvisor"><i class="ti ti-brand-tripadvisor"></i></a>
+            </div>
+
+            <p class="resv-exp-site">
                 <a href="https://www.amexingexperience.com" target="_blank" rel="noopener">amexingexperience.com</a>
             </p>
+
+            <% var ts = quote.travelSpecialist || {}; var tsName = ts.fullName || ((ts.firstName || '') + ' ' + (ts.lastName || '')).trim(); %>
+            <% if (tsName) { %>
+            <div class="resv-exp-agent">
+                <div>Datos de <%= tsName %></div>
+                <% if (ts.phone) { %><div><%= ts.phone %></div><% } %>
+            </div>
+            <% } %>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/js/services-renderer-config.js"></script>
-    <script src="/js/services-renderer.js"></script>
+    <script>
+        document.getElementById('exportPdfBtn').addEventListener('click', async function () {
+            const btn = this;
+            const folio = <%- JSON.stringify(quote.folio || '') %>;
+            if (!folio) return;
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader"></i> Generando…';
+            try {
+                const res = await fetch('/reservations/' + encodeURIComponent(folio) + '/pdf', { credentials: 'same-origin' });
+                if (!res.ok) throw new Error('No se pudo generar el PDF');
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = folio + '.pdf';
+                document.body.appendChild(a); a.click(); a.remove();
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                alert(e.message || 'Error al exportar el PDF');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = original;
+            }
+        });
+    </script>
 </body>
 </html>
