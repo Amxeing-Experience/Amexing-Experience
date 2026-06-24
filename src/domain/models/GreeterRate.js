@@ -5,6 +5,11 @@
  */
 
 const Parse = require('parse/node');
+const { TtlCache } = require('../../infrastructure/cache/ttlCache');
+
+// Caché del rate "actual" (cambia rara vez, se consulta en cada carga; cubre /current y /formula
+// porque getFormulaConfiguration lee de getCurrentRate). Invalida en create/update.
+const currentRateCache = new TtlCache();
 
 /**
  * GreeterRate class for managing greeter pricing.
@@ -22,6 +27,9 @@ class GreeterRate extends Parse.Object {
    */
   static async getCurrentRate() {
     try {
+      const cached = currentRateCache.get();
+      if (cached !== undefined) return cached;
+
       const query = new Parse.Query(GreeterRate);
       query.equalTo('active', true);
       query.equalTo('exists', true);
@@ -42,7 +50,7 @@ class GreeterRate extends Parse.Object {
         });
       }
 
-      return result;
+      return currentRateCache.set(result || null);
     } catch (error) {
       const logger = require('../../infrastructure/logger');
       logger.error('Error getting current greeter rate:', error);
@@ -92,6 +100,7 @@ class GreeterRate extends Parse.Object {
       newRate.set('hasSpecialRounding', true);
 
       const savedRate = await newRate.save(null, { useMasterKey: true });
+      currentRateCache.clear(); // el rate actual cambió -> invalidar caché
       return savedRate;
     } catch (error) {
       const logger = require('../../infrastructure/logger');
@@ -291,6 +300,7 @@ class GreeterRate extends Parse.Object {
       newRate.set('notes', 'Formula configuration updated');
 
       const savedNewRate = await newRate.save(null, { useMasterKey: true });
+      currentRateCache.clear(); // la fórmula/rate actual cambió -> invalidar caché
 
       console.log('updateFormulaConfiguration - Created new rate:', {
         newId: savedNewRate.id,
