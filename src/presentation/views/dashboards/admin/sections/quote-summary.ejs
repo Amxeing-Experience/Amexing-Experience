@@ -523,11 +523,6 @@ const e = __isRes ? 'reservación' : 'cotización';
         page-break-inside: avoid;
     }
 
-    .pdf-export-mode .sm-day-card {
-        page-break-inside: avoid;
-        margin-bottom: 10px !important;
-    }
-
     .pdf-export-mode .sm-section-title {
         font-size: 1rem !important;
         margin-bottom: 10px !important;
@@ -604,27 +599,20 @@ const e = __isRes ? 'reservación' : 'cotización';
         -moz-osx-font-smoothing: grayscale;
     }
 
-    /* PDF export for new card layout */
-    .pdf-export-mode .sm-day-card { page-break-inside: avoid; margin-bottom: 1rem; border-color: #ccc; }
-    .pdf-export-mode .sm-service { padding: 0.5rem; font-size: 0.85rem; }
-    .pdf-export-mode .sm-day-badge { width: 24px; height: 24px; font-size: 0.75rem; }
-    .pdf-export-mode .sm-day-title { font-size: 0.95rem; }
-    .pdf-export-mode .sm-badge { font-size: 0.6rem; }
-    .pdf-export-mode .sm-price { font-size: 0.8rem; }
-    /* Prevent splitting of services + assignment cards across pages */
-    .pdf-export-mode .service-item,
-    .pdf-export-mode .assignments-block,
-    .pdf-export-mode .assignment-card,
+    /* Keep this view's own blocks (totals card, banner, table rows) intact across
+       page breaks. Service-level atoms (.assignment-card, detail rows) and their
+       headers are handled in services-renderer.js's own <style>, next to the markup
+       that produces them. Do NOT re-add .service-item / .assignments-block here:
+       those containers can be taller than a page, so break-inside:avoid on them is
+       physically impossible — Chrome ignores it and cuts at an arbitrary point,
+       which was the original mid-card-cut bug. */
     .pdf-export-mode .sm-totals-card,
     .pdf-export-mode .summary-banner,
     .pdf-export-mode tr {
         page-break-inside: avoid;
         break-inside: avoid;
     }
-    /* Keep section / day headers attached to the content that follows them */
-    .pdf-export-mode .sm-day-title,
-    .pdf-export-mode .summary-section-title,
-    .pdf-export-mode .assignments-header {
+    .pdf-export-mode .summary-section-title {
         page-break-after: avoid;
         break-after: avoid;
     }

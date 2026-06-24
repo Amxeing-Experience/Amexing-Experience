@@ -98,6 +98,23 @@ const e = __isRes ? 'reservación' : 'cotización';
                 
                 <!-- Direct Client Selection (moved up when in direct mode) -->
                 <div class="row" id="directClientRow" style="display: none;">
+                    <!-- Category sub-filter: narrows the direct-client list by clientCategory -->
+                    <div class="col-md-12 mb-2">
+                        <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Categoría de cliente directo" id="directClientCategoryGroup">
+                            <input type="radio" class="btn-check" name="directClientCategory" id="directCategoryAll" value="" checked>
+                            <label class="btn btn-outline-secondary" for="directCategoryAll">Todos</label>
+                            <input type="radio" class="btn-check" name="directClientCategory" id="directCategoryDirect" value="direct_client">
+                            <label class="btn btn-outline-secondary" for="directCategoryDirect">Cliente Directo</label>
+                            <!-- TEMP: hidden per direction — uncomment to re-activate these client types
+                            <input type="radio" class="btn-check" name="directClientCategory" id="directCategoryWedding" value="wedding_planner">
+                            <label class="btn btn-outline-secondary" for="directCategoryWedding">Wedding Planner</label>
+                            <input type="radio" class="btn-check" name="directClientCategory" id="directCategoryConcierge" value="concierge">
+                            <label class="btn btn-outline-secondary" for="directCategoryConcierge">Concierge</label>
+                            <input type="radio" class="btn-check" name="directClientCategory" id="directCategoryHomeOwner" value="home_owner">
+                            <label class="btn btn-outline-secondary" for="directCategoryHomeOwner">Home Owner</label>
+                            -->
+                        </div>
+                    </div>
                     <div class="col-md-10">
                         <%- include('../../../atoms/common/tom-select', {
                             id: 'directClientId',
@@ -1030,15 +1047,18 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
 
     // Track current client type (agency or direct)
     let currentClientType = 'agency';
-    
-    // Load direct Amexing clients into the direct client dropdown  
-    window.loadDirectClients = async function loadDirectClients(searchTerm = '', page = 1) {
+    // Track the active direct-client category sub-filter ('' = all categories)
+    let currentDirectClientCategory = '';
+
+    // Load direct Amexing clients into the direct client dropdown
+    window.loadDirectClients = async function loadDirectClients(searchTerm = '', page = 1, clientCategory = currentDirectClientCategory) {
         try {
             const endpoint = '/api/clients/amexing-direct';
-            
+
             // Build query parameters
             const params = new URLSearchParams();
             if (searchTerm) params.append('search', searchTerm);
+            if (clientCategory) params.append('clientCategory', clientCategory);
             params.append('page', page.toString());
             params.append('limit', '100');
             
@@ -2777,7 +2797,14 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                     agencyClientRow.style.display = 'none';
                     directClientRow.style.display = 'flex';
                     finalClientRow.style.display = 'none';
-                    
+
+                    // Reset the category sub-filter to "Todos" when entering direct mode
+                    currentDirectClientCategory = '';
+                    const allCategoryRadio = document.getElementById('directCategoryAll');
+                    if (allCategoryRadio) {
+                        allCategoryRadio.checked = true;
+                    }
+
                     // Make clientId not required, directClientId required
                     const clientSelect = document.getElementById('clientId');
                     if (clientSelect) {
@@ -2866,6 +2893,34 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 const languageSelect = document.getElementById('preferredLanguage');
                 if (languageSelect) {
                     languageSelect.value = 'es';
+                }
+            });
+        });
+
+        // Handle direct-client category sub-filter changes: re-filter the
+        // directClientId picker by clientCategory without touching submission.
+        document.querySelectorAll('input[name="directClientCategory"]').forEach(radio => {
+            radio.addEventListener('change', async (e) => {
+                if (!e.target.checked) return;
+
+                const newCategory = e.target.value;
+                if (newCategory === currentDirectClientCategory) return;
+
+                currentDirectClientCategory = newCategory;
+
+                try {
+                    const directClientTS = await waitForTomSelect('directClientId');
+                    if (directClientTS.clear) {
+                        directClientTS.clear();
+                    } else if (directClientTS.setValue) {
+                        directClientTS.setValue('');
+                    }
+                    directClientTS.clearOptions();
+
+                    // Reload the picker filtered by the selected category
+                    await loadDirectClients('', 1, newCategory);
+                } catch (err) {
+                    console.log('Direct client dropdown not ready for category filter:', err);
                 }
             });
         });

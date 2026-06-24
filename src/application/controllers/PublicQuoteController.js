@@ -707,6 +707,15 @@ class PublicQuoteController {
         });
       });
 
+      /**
+       * Fetch the 'includes'/'notincludes' text for a set of parent records,
+       * keyed by record ID. Deduplicates and ignores falsy IDs.
+       * @param {string} parentClass - Parent Parse class name (e.g. 'Tour').
+       * @param {Array<string>} ids - Parent object IDs to resolve.
+       * @returns {Promise<object>} Map of parent ID to { includes, notincludes }.
+       * @example
+       *   const tourMap = await fetchIncludes('Tour', ['t1', 't2']);
+       */
       const fetchIncludes = async (parentClass, ids) => {
         const map = {};
         const uniqueIds = [...new Set(ids.filter(Boolean))];

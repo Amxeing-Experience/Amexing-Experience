@@ -251,34 +251,37 @@ class QuoteController {
             clientId: clientIdNormalized,
             userId: currentUser.id,
           });
-          // Direct Amexing client - only set companyClientPtr, leave client null
+          // People-type clients now live in AmexingUser (role 'end_client'): store them in the
+          // `client` pointer (AmexingUser), no companyClientPtr. Fall back to a legacy Client
+          // record (clientBelongsTo='amexing') for pre-migration ids so old data still works.
           try {
-            // Verify this is actually a direct Amexing client
-            const clientQuery = new Parse.Query('Client');
-            const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
-            const clientBelongsTo = clientRecord.get('clientBelongsTo');
+            const userQuery = new Parse.Query('AmexingUser');
+            const endClient = await userQuery.get(clientIdNormalized, { useMasterKey: true }).catch(() => null);
 
-            if (clientBelongsTo === 'amexing') {
-              // Valid direct Amexing client
-              companyClientObj = {
+            if (endClient && endClient.get('role') === 'end_client') {
+              clientObj = {
                 __type: 'Pointer',
-                className: 'Client',
+                className: 'AmexingUser',
                 objectId: clientIdNormalized,
               };
-
-              // Leave clientObj null for direct clients
-              clientObj = null;
-
-              logger.info('QuoteController.createQuote - Creating quote for direct Amexing client', {
+              companyClientObj = null;
+              logger.info('QuoteController.createQuote - Direct quote for end_client user', {
                 clientId: clientIdNormalized,
-                clientType: 'direct',
               });
             } else {
-              logger.warn('QuoteController.createQuote - Client is not a direct Amexing client', {
-                clientId: clientIdNormalized,
-                clientBelongsTo,
-              });
-              return this.sendError(res, 'El cliente seleccionado no es un cliente directo de Amexing', 400);
+              // Legacy direct Client (pre-migration).
+              const clientQuery = new Parse.Query('Client');
+              const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+              if (clientRecord.get('clientBelongsTo') === 'amexing') {
+                companyClientObj = {
+                  __type: 'Pointer',
+                  className: 'Client',
+                  objectId: clientIdNormalized,
+                };
+                clientObj = null;
+              } else {
+                return this.sendError(res, 'El cliente seleccionado no es un cliente directo de Amexing', 400);
+              }
             }
           } catch (error) {
             logger.error('QuoteController.createQuote - Error verifying direct client', {
@@ -594,6 +597,17 @@ class QuoteController {
       // Empty type = no filter; with type but no id, filter by type. With id, by entity.
       const clientTypeFilter = req.query.clientTypeFilter || ''; // '', 'agency', 'client'
       const clientIdFilter = req.query.clientIdFilter || '';
+      /**
+       * Apply the agency/client filter to a quotes query based on the request's
+       * clientTypeFilter and clientIdFilter. For 'agency' it filters on the
+       * AmexingUser pointer (quote.client); for 'client' it filters on the Client
+       * pointer (quote.companyClientPtr). With no ID, filters by type presence.
+       * Mutates the query in place; no-op when no valid type filter is set.
+       * @param {Parse.Query} q - The quotes query to constrain.
+       * @returns {void}
+       * @example
+       *   applyQuoteClientFilter(query); // narrows query to the selected agency/client
+       */
       const applyQuoteClientFilter = (q) => {
         if (clientTypeFilter !== 'agency' && clientTypeFilter !== 'client') return;
         if (clientTypeFilter === 'client') {
@@ -1366,6 +1380,30 @@ class QuoteController {
       // If status is being updated, always use the reliable status update method (same as admin)
       // This ensures consistent reservation creation logic between admin and department manager flows
       if (updates.status) {
+        // updateQuoteStatus only changes the status, so any general-info fields
+        // sent alongside it (contact, lead guest, people, notes, eventType, etc.)
+        // would be dropped. Persist them first via updateQuote — which also syncs
+        // the linked reservation's info. Isolated so it never blocks the status change.
+        const infoUpdates = { ...updates };
+        delete infoUpdates.status;
+        delete infoUpdates.reason;
+        if (Object.keys(infoUpdates).length > 0) {
+          try {
+            await this.quoteService.updateQuote(
+              currentUser,
+              quoteId,
+              infoUpdates,
+              updates.reason || 'Quote info updated',
+              req.userRole
+            );
+          } catch (infoError) {
+            logger.error('Failed to persist general info alongside status change', {
+              quoteId,
+              error: infoError.message,
+            });
+          }
+        }
+
         logger.info('🔄 Status change detected, delegating to updateQuoteStatus', {
           quoteId,
           status: updates.status,

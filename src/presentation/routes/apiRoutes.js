@@ -471,6 +471,7 @@ router.use(jwtMiddleware.authenticateToken);
 const userManagementRoutes = require('./api/userManagementRoutes');
 const amexingUsersRoutes = require('./api/amexingUsersRoutes');
 const clientsRoutes = require('./api/clientsRoutes');
+const agentsRoutes = require('./api/agentsRoutes');
 const ownedClientsRoutes = require('./api/ownedClientsRoutes');
 const employeesRoutes = require('./api/employeesRoutes');
 const rolesRoutes = require('./api/rolesRoutes');
@@ -526,6 +527,7 @@ router.use('/profile', require('./api/profileImageRoutes'));
 // Profile image endpoints
 router.use('/amexingusers', amexingUsersRoutes);
 router.use('/clients', clientsRoutes);
+router.use('/agents', agentsRoutes);
 router.use('/owned-clients', ownedClientsRoutes);
 router.use('/employees', employeesRoutes);
 router.use('/roles', rolesRoutes);
@@ -1334,6 +1336,36 @@ router.get('/reviews/tripadvisor', async (req, res) => {
       error: 'Failed to fetch reviews',
       message: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
+  }
+});
+
+/**
+ * Postal code → state/city lookup for the client address form. Mexico uses the official SEPOMEX
+ * dataset bundled in the repo (estado + municipio + colonias); US/CA proxy the free Zippopotam.us
+ * API server-side (cached). Limited to MX/US/CA. Authenticated (above).
+ */
+const postalLookupService = require('../../application/services/postalLookupService');
+const sepomexService = require('../../application/services/sepomexService');
+
+router.get('/geo/postal/:country/:code', async (req, res) => {
+  try {
+    const iso = String(req.params.country || '').toLowerCase();
+    if (iso === 'mx') {
+      const r = sepomexService.lookup(req.params.code);
+      if (!r) return res.status(404).json({ success: false, error: 'Código postal no encontrado' });
+      return res.json({
+        success: true,
+        data: { state: r.estado, city: r.municipio, colonias: r.colonias },
+      });
+    }
+    const result = await postalLookupService.lookup(iso, req.params.code);
+    if (!result || (!result.state && !result.city)) {
+      return res.status(404).json({ success: false, error: 'Código postal no encontrado' });
+    }
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('Postal lookup endpoint error:', error);
+    res.status(500).json({ success: false, error: 'Error al consultar el código postal' });
   }
 });
 

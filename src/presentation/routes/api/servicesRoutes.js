@@ -111,6 +111,20 @@ router.get(
 );
 
 /**
+ * GET /api/services/route-duration - Get the route travel duration for an origin/destination pair.
+ *
+ * Access: Authenticated users (department manager and above)
+ * Query: originPOI (name, required), destinationPOI (name, required)
+ * Returns: { routeDuration } (minutes) for the matching route, bidirectional; null if none.
+ */
+router.get(
+  '/route-duration',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => ServicesController.getRouteDuration(req, res)
+);
+
+/**
  * GET /api/services/:id/all-rate-prices - Get all rate prices for a specific service.
  *
  * Access: Authenticated users (department manager and above)

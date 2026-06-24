@@ -437,12 +437,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 orderable: false,
                 responsivePriority: 1,  // High priority for actions
                 render: function(data, type, row) {
-                    let actions = `<a href="/dashboard/<%= basePath %>/bookings/${row.id}" class="btn btn-sm btn-outline-primary me-1" title="Ver detalle"><i class="ti ti-eye"></i></a>`;
+                    let actions = `<a href="/dashboard/<%= basePath %>/bookings/${row.id}" class="btn btn-sm btn-outline-primary me-1" title="Ver detalle"><i class="ti ti-list-details"></i></a>`;
                     if (row.quoteFolio) {
                         <% if (canManageReservations) { %>
                         actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}?context=reservation" class="btn btn-sm btn-outline-secondary me-1" title="Editar reservación"><i class="ti ti-edit"></i></a>`;
                         <% } else { %>
-                        actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-invoice"></i></a>`;
+                        actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-text"></i></a>`;
                         <% } %>
                     }
                     if (row.status !== 'cancelled' && row.status !== 'completed') {
