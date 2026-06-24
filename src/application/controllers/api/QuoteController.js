@@ -1007,8 +1007,16 @@ class QuoteController {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
 
+      // Acceso + ownership: las 3 consultas solo dependen de quoteId y son independientes entre
+      // sí, así que se piden EN PARALELO en vez de en serie (antes sumaban ~0.6-1.2 s al request
+      // más lento). El fallback legacy (que necesita el objeto quote) queda condicional debajo.
+      const [hasAccess, userAccess, owner] = await Promise.all([
+        this.collaborationService.hasAccess(quoteId, currentUser.id),
+        this.collaborationService.getUserAccess(quoteId, currentUser.id),
+        this.ownershipService.getCurrentOwner(quoteId),
+      ]);
+
       // Check access permissions after getting the quote using collaboration service
-      const hasAccess = await this.collaborationService.hasAccess(quoteId, currentUser.id);
       if (!hasAccess) {
         // Fallback to original check for backward compatibility
         const hasLegacyAccess = await this.checkQuoteAccess(currentUser, quote, req.userRole);
@@ -1016,12 +1024,6 @@ class QuoteController {
           return this.sendError(res, 'No tienes permisos para acceder a esta cotización', 403);
         }
       }
-
-      // Get user's access details
-      const userAccess = await this.collaborationService.getUserAccess(quoteId, currentUser.id);
-
-      // Get current owner
-      const owner = await this.ownershipService.getCurrentOwner(quoteId);
 
       const client = quote.get('client');
       const companyClientPtr = quote.get('companyClientPtr');

@@ -285,11 +285,11 @@ DevTools → Network, filtro `/api/`, caché desactivada.
 - **Efecto:** reduce escaneos en todas las consultas filtradas; transversal.
 - **Riesgo:** muy bajo (aditivo). Verificar que no existan ya.
 
-### IL-3 — Acelerar `getQuoteById` (bajo-medio)
-- **Qué:** (a) **paralelizar** las 4 consultas de acceso/ownership (`Promise.all`); (b) revisar/quitar `.include()` no usados en la respuesta; (c) proyección de campos.
-- **Dónde:** `QuoteController.js` (~líneas 998-1024).
-- **Efecto:** ~0.5–1 s menos en la request más bloqueante.
-- **Riesgo:** bajo (lecturas); auditar que la respuesta no dependa de los includes que se quiten.
+### IL-3 — Acelerar `getQuoteById` — ✅ parcial (paralelizar accesos)
+- **Hecho:** las 3 consultas independientes (`collaborationService.hasAccess`, `getUserAccess`, `ownershipService.getCurrentOwner`) pasan de **secuenciales a `Promise.all`** en `QuoteController.getQuoteById`. El fallback legacy `checkQuoteAccess` (que necesita el objeto `quote`) queda condicional debajo.
+- **Efecto:** ~0.5–1 s menos en la request más bloqueante (común: acceso concedido).
+- **Riesgo:** bajo (son lecturas). En el caso denegado se hacen 2 lecturas extra antes del 403 — raro y sin impacto de seguridad.
+- **Pendiente (opcional):** revisar/quitar `.include()` no usados + proyección de campos en el quote (no hecho — requiere auditar dependencias del front).
 
 ### IL-4 — Adelgazar payloads (bajo-medio)
 - **Qué:** proyección/DTO ligero en `vehicle-rate-prices/all` (solo `{id, rateId, vehicleTypeId, pricePerHour, currency}`) y, si aplica, en catálogos.
