@@ -291,11 +291,11 @@ DevTools → Network, filtro `/api/`, caché desactivada.
 - **Riesgo:** bajo (son lecturas). En el caso denegado se hacen 2 lecturas extra antes del 403 — raro y sin impacto de seguridad.
 - **Pendiente (opcional):** revisar/quitar `.include()` no usados + proyección de campos en el quote (no hecho — requiere auditar dependencias del front).
 
-### IL-4 — Adelgazar payloads (bajo-medio)
-- **Qué:** proyección/DTO ligero en `vehicle-rate-prices/all` (solo `{id, rateId, vehicleTypeId, pricePerHour, currency}`) y, si aplica, en catálogos.
-- **Dónde:** `vehicleRatePricesController.js` (~86-107).
-- **Efecto:** 71.6 KB → ~5 KB; menos parse + transferencia.
-- **Riesgo:** bajo-medio (verificar que el frontend tenga los nombres de rate/vehículo por otra vía — ya los carga en paralelo).
+### IL-4 — Adelgazar `vehicle-rate-prices/all` — ✅ vía modo `?lite=1`
+- **Hallazgo:** el endpoint ya devolvía un DTO (no objetos completos); el peso es por la **cantidad** de registros. Y NO se podía recortar a secas porque `experience-services.js` usa `vehicleTypeName`/`vehicleTypeCode` del cache (dropdown de vehículos).
+- **Hecho:** modo **`?lite=1`** que devuelve solo `{rateId, vehicleTypeId, pricePerHour, currency}` y **omite las 2 consultas extra** a Rate/VehicleType + el mapa `rateColors`. La vista de cotización (`loadVehicleRatePrices`) lo pide lite (solo usa eso en `getWaitingTimePrice`); `experience-services` sigue con el modo completo.
+- **Efecto:** payload ~55% menor en la cotización + 2 consultas menos en el backend para ese request.
+- **Riesgo:** bajo (aditivo; el modo completo no cambia). Verificado: v2.js solo lee `vehicleTypeId/rateId/pricePerHour/currency` del cache.
 
 ### IL-5 — Lazy-load de lo no crítico (medio)
 - **Qué:** cargar `loadClientSpecificPricing` y catálogos pesados **bajo demanda** (al abrir el modal / seleccionar item) en vez de en `init`. Quitar `?_t=Date.now()` de datos sesión-estática.

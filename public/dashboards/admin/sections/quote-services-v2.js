@@ -18679,7 +18679,9 @@ class ItineraryBuilder {
       const accessToken = this.getAccessToken();
       if (!accessToken) return;
 
-      const response = await fetch('/api/vehicle-rate-prices/all', {
+      // Lite: esta vista solo usa pricePerHour por (vehicleTypeId, rateId) en getWaitingTimePrice,
+      // así el backend omite las consultas a Rate/VehicleType y manda un payload mucho menor.
+      const response = await fetch('/api/vehicle-rate-prices/all?lite=1', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
