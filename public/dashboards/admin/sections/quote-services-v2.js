@@ -13153,7 +13153,9 @@ class ItineraryBuilder {
         return;
       }
 
-      const response = await fetch(`/api/quotes/${this.quoteId}`, {
+      // Dedup in-flight: ownership y la página piden el mismo /api/quotes/:id a la vez; esto
+      // reusa el request en vuelo en vez de duplicarlo (fallback a fetch si el helper no está).
+      const response = await (window.amxDedupFetch || fetch)(`/api/quotes/${this.quoteId}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
