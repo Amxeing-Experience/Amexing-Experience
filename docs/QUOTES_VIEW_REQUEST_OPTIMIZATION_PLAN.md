@@ -81,19 +81,18 @@ Al revisar el código (2026-06-24) resultó que **ya está hecho** (el análisis
 
 ---
 
-## Fase 3 — Deduplicar `prices-by-route` (bajo-medio)
+## Fase 3 — Deduplicar `prices-by-route` — ✅ parcial (in-flight dedup)
 
-`/api/services/prices-by-route` se llama en varios flujos (selección de segmento/origen/destino y de nuevo al guardar el servicio), repetido para la misma ruta.
+**Corrección de la premisa (2026-06-24):** el plan asumía que `prices-by-route` se "re-pide al guardar" para la misma ruta. Al revisar el código eso **no ocurre**: ya hay cache por segmento y los 3 sitios consultan rutas/segmentos **distintos**:
+- `handleTransportRateSelection` (~18384): segmento principal → guarda `this.transportPriceData`.
+- Vehículo adicional (~19029): segmento adicional → guarda `this.additionalTransportPriceData`.
+- Vehículos extra (~14077): **ya reutilizan** `transportPriceData`/`additionalTransportPriceData` y solo hacen fetch si el segmento no está en cache.
 
-**Acción:**
-1. Centralizar la llamada en una función única cacheada por la clave `origen|destino|rateId|clientId`.
-2. Reusar el resultado entre el lookup de selección y el guardado, en vez de volver a pedir.
-3. Encauzarla por `fetchWithDedup` para que clics rápidos no disparen llamadas paralelas idénticas.
+**Lo que sí se hizo (seguro):** encauzar los 3 `fetch` por `(window.amxDedupFetch || fetch)` → **dedup in-flight** (colapsa disparos concurrentes idénticos: restauración de edición que setea varios campos, o varias filas extra del mismo segmento). **Sin cache de resultados** → cero riesgo de staleness o de tocar fórmulas/precios.
 
-> Nota: ya existe `this.cachedRouteDuration` y `this.transportPriceData` — extender esa idea a un cache por-ruta consistente.
+**No se hizo** (a propósito): un cache de resultados por `origen|destino|rateId|clientId`. No hay evidencia (medición) de re-fetch redundante de la misma ruta en una acción deliberada, y un cache de precios en el path frágil añade riesgo sin beneficio demostrado. Si en una medición por-acción aparece duplicación real, se reconsidera.
 
-**Verificación:** seleccionar segmento y luego guardar el servicio NO debe generar dos `prices-by-route` para la misma ruta; alternar rápido entre rutas no dispara duplicados paralelos.
-**Riesgo:** medio (no romper el flujo de precio/duración). **Esfuerzo:** bajo-medio.
+**Riesgo:** bajo (solo in-flight, fallback a `fetch`). **Esfuerzo:** bajo.
 
 ---
 
