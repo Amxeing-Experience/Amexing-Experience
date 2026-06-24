@@ -297,6 +297,12 @@ DevTools → Network, filtro `/api/`, caché desactivada.
 - **Efecto:** payload ~55% menor en la cotización + 2 consultas menos en el backend para ese request.
 - **Riesgo:** bajo (aditivo; el modo completo no cambia). Verificado: v2.js solo lee `vehicleTypeId/rateId/pricePerHour/currency` del cache.
 
+### B — Caché de servidor para `/rates/active` y `/vehicle-types/active` — ✅ IMPLEMENTADO
+- **Hallazgo:** estos endpoints hacen su propia `Parse.Query` en el **controlador** (no usan el método del modelo), así que el caché va en el controlador.
+- **Hecho:** `TtlCache` (15 min) sobre el `options` formateado en `RateController.getActiveRates` y `VehicleTypeController.getActiveVehicleTypes`. Se cachean **objetos planos** (sin Parse.Object → sin riesgo de mutación). **Invalidación** en todas las escrituras del mismo controlador: rates (create/update/toggle/delete) y vehicle-types (create/update/delete/toggle).
+- **Efecto:** `/rates/active` y `/vehicle-types/active` (~1 s c/u) → ~ms desde la 2ª carga.
+- **Riesgo:** bajo. Si alguna escritura ocurriera por otra vía no contemplada, el TTL (15 min) es la red de seguridad. Rates/tipos cambian rara vez.
+
 ### IL-5 — Lazy-load de lo no crítico (medio)
 - **Qué:** cargar `loadClientSpecificPricing` y catálogos pesados **bajo demanda** (al abrir el modal / seleccionar item) en vez de en `init`. Quitar `?_t=Date.now()` de datos sesión-estática.
 - **Riesgo:** medio (timing: verificar dependencias en init).
