@@ -24,62 +24,70 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
                     <!-- Form Status Messages -->
                     <div class="contact-form__status" id="contactFormStatus" style="display: none;"></div>
                     
+                    <%# Nombre (fila completa) %>
+                    <div class="contact-section__form-group contact-section__form-group--full">
+                        <input type="text"
+                               name="firstName"
+                               class="contact-section__input"
+                               placeholder="<%= translate('pages:contactSection.form.firstName') %>"
+                               required>
+                    </div>
+
+                    <%# Apellido (fila completa) %>
+                    <div class="contact-section__form-group contact-section__form-group--full">
+                        <input type="text"
+                               name="lastName"
+                               class="contact-section__input"
+                               placeholder="<%= translate('pages:contactSection.form.lastName') %>"
+                               required>
+                    </div>
+
+                    <%# Correo electrónico | Teléfono %>
                     <div class="contact-section__form-row">
                         <div class="contact-section__form-group">
-                            <input type="email" 
-                                   name="email" 
-                                   class="contact-section__input" 
-                                   placeholder="<%= translate('pages:contactSection.form.email') %>" 
+                            <input type="email"
+                                   name="email"
+                                   class="contact-section__input"
+                                   placeholder="<%= translate('pages:contactSection.form.email') %>"
                                    required>
                         </div>
                         <div class="contact-section__form-group">
-                            <input type="tel" 
-                                   name="phone" 
-                                   class="contact-section__input" 
+                            <input type="tel"
+                                   name="phone"
+                                   class="contact-section__input"
                                    placeholder="<%= translate('pages:contactSection.form.phone') %>"
                                    pattern="[0-9]*"
                                    inputmode="numeric"
                                    id="phoneInput">
                         </div>
                     </div>
-                    
+
+                    <%# Título del mensaje | Idioma de preferencia %>
                     <div class="contact-section__form-row">
                         <div class="contact-section__form-group">
-                            <input type="text" 
-                                   name="firstName" 
-                                   class="contact-section__input" 
-                                   placeholder="<%= translate('pages:contactSection.form.firstName') %>" 
-                                   required>
+                            <input type="text"
+                                   name="subject"
+                                   class="contact-section__input"
+                                   placeholder="<%= translate('pages:contactSection.form.subject') %>">
                         </div>
                         <div class="contact-section__form-group">
-                            <input type="text" 
-                                   name="lastName" 
-                                   class="contact-section__input" 
-                                   placeholder="<%= translate('pages:contactSection.form.lastName') %>" 
-                                   required>
+                            <div class="contact-section__select-wrap">
+                                <select name="language" class="contact-section__input contact-section__select" required>
+                                    <option value="" disabled selected>Idioma de preferencia</option>
+                                    <option value="es">Español</option>
+                                    <option value="en">English</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div class="contact-section__form-group contact-section__form-group--full">
-                        <input type="text" 
-                               name="company" 
-                               class="contact-section__input" 
-                               placeholder="<%= translate('pages:contactSection.form.company') %>">
-                    </div>
-                    
-                    <div class="contact-section__form-group contact-section__form-group--full">
-                        <input type="text" 
-                               name="subject" 
-                               class="contact-section__input" 
-                               placeholder="<%= translate('pages:contactSection.form.subject') %>">
-                    </div>
-                    
-                    <div class="contact-section__form-group contact-section__form-group--full">
-                        <textarea name="message" 
-                                  class="contact-section__textarea" 
-                                  placeholder="<%= translate('pages:contactSection.form.message') %>" 
-                                  rows="5" 
-                                  required 
+
+                    <%# Mensaje (fila completa) %>
+                    <div class="contact-section__form-group contact-section__form-group--full contact-section__form-group--message">
+                        <textarea name="message"
+                                  class="contact-section__textarea"
+                                  placeholder="<%= translate('pages:contactSection.form.message') %>"
+                                  rows="6"
+                                  required
                                   minlength="10"
                                   maxlength="2000"></textarea>
                     </div>
@@ -140,7 +148,7 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
 <style>
 .contact-section {
     padding: 4rem 0;
-    background: #f8f9fa;
+    background: #eff0ec;
 }
 
 .contact-section__container {
@@ -153,15 +161,33 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 4rem;
-    align-items: start;
+    align-items: stretch;
 }
 
 /* Left Side - Contact Form */
 .contact-section__form-container {
-    /* background: white; */
-    /* padding: 2rem; */
     border-radius: 16px;
-    /* box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); */
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.contact-section__form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+/* el grupo del Mensaje crece para llenar; su textarea se estira */
+.contact-section__form-group--message {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.contact-section__form-group--message .contact-section__textarea {
+    flex: 1;
 }
 
 .contact-section__form-title {
@@ -175,13 +201,13 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
 
 .contact-section__form-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.5fr 1fr;
     gap: 1rem;
-    margin-bottom: 1rem;
+    margin-bottom: 0;
 }
 
 .contact-section__form-group {
-    margin-bottom: 1rem;
+    margin-bottom: 0.85rem;
 }
 
 .contact-section__form-group--full {
@@ -191,27 +217,65 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
 .contact-section__input,
 .contact-section__textarea {
     width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ddd;
-    border-radius: 12px;
-    font-family: 'Montserrat', sans-serif;
+    padding: 0.7rem 1.4rem;
+    border: none;
+    border-radius: 26px;
+    font-family: var(--font-myriad), 'Montserrat', sans-serif;
     font-size: 0.9rem;
-    background: #f5f5f2;
-    transition: border-color 0.3s ease;
+    color: #333;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3s ease;
     box-sizing: border-box;
+}
+
+/* Select "Idioma de preferencia" como píldora (igual que los inputs) */
+.contact-section__select-wrap {
+    position: relative;
+}
+
+.contact-section__select {
+    cursor: pointer;
+    padding-right: 2.8rem;
+    color: #333;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.contact-section__select::-ms-expand {
+    display: none; /* quita la flecha nativa en Edge/IE */
+}
+
+.contact-section__select:invalid {
+    color: #a3a3a0; /* gris tipo placeholder cuando no se ha elegido */
+}
+
+/* chevron propio, mismo gris que el placeholder */
+.contact-section__select-wrap::after {
+    content: '';
+    position: absolute;
+    right: 1.4rem;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid #a3a3a0;
+    border-bottom: 2px solid #a3a3a0;
+    transform: translateY(-65%) rotate(45deg);
+    pointer-events: none;
 }
 
 /* Placeholder text styling */
 .contact-section__input::placeholder,
 .contact-section__textarea::placeholder {
-    color: #969b81;
+    color: #a3a3a0;
     opacity: 1; /* Firefox compatibility */
 }
 
 /* Browser-specific placeholder support */
 .contact-section__input::-webkit-input-placeholder,
 .contact-section__textarea::-webkit-input-placeholder {
-    color: #969b81;
+    color: #a3a3a0;
 }
 
 .contact-section__input::-moz-placeholder,
@@ -228,23 +292,25 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
 .contact-section__input:focus,
 .contact-section__textarea:focus {
     outline: none;
-    border-color: #969b81;
     background: #ffffff;
-    transition: all 0.3s ease;
+    box-shadow: 0 0 0 2px rgba(150, 155, 129, 0.45);
 }
 
 .contact-section__textarea {
-    resize: vertical;
-    min-height: 100px;
+    resize: none;
+    min-height: 90px;
+    border-radius: 20px;
+    padding: 0.9rem 1.4rem;
 }
 
 .contact-section__submit {
+    align-self: flex-start;
     background: #333;
     color: white;
     border: none;
     padding: 0.75rem 2rem;
-    border-radius: 4px;
-    font-family: 'Montserrat', sans-serif;
+    border-radius: 0;
+    font-family: var(--font-myriad), 'Montserrat', sans-serif;
     font-size: 0.9rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -308,22 +374,27 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
 .contact-section__info {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1.1rem;
+    /* el top de las tarjetas baja al nivel del input "Nombre" (debajo del título);
+       el padding-bottom reserva el espacio del contador + botón para alinear el
+       bottom de la última tarjeta con el bottom del "Mensaje" */
+    padding-top: 3.7rem;
+    padding-bottom: 5.5rem;
 }
 
 .contact-section__info-card {
     display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 1.5rem;
-    background: white;
-    border-radius: 12px;
-    border: 1px solid #e9ecef;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.25rem 1.6rem;
+    background: transparent;
+    border-radius: 0;
+    border: 1px solid #bdbdb0;
 }
 
 .contact-section__info-icon {
-    width: 40px;
-    height: 40px;
+    width: 34px;
+    height: 34px;
     flex-shrink: 0;
     object-fit: contain;
 }
@@ -335,16 +406,16 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
 .contact-section__info-label {
     font-family: 'Montserrat', sans-serif;
     font-size: 1rem;
-    font-weight: 600;
-    color: #333;
-    margin: 0 0 0.5rem 0;
+    font-weight: 700;
+    color: #2e2e2d;
+    margin: 0 0 0.3rem 0;
 }
 
 .contact-section__info-value {
     font-family: 'Montserrat', sans-serif;
     font-size: 0.95rem;
     font-weight: 400;
-    color: #666;
+    color: #5a5a52;
     margin: 0;
     line-height: 1.4;
 }
@@ -354,7 +425,28 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
         grid-template-columns: 1fr;
         gap: 2rem;
     }
-    
+
+    .contact-section__info {
+        padding-top: 0;
+        padding-bottom: 0;
+        justify-content: flex-start;
+        gap: 1rem;
+    }
+
+    /* en móvil el textarea no necesita crecer por flex */
+    .contact-section__form-container {
+        height: auto;
+    }
+
+    .contact-section__form-group--message {
+        flex: none;
+    }
+
+    .contact-section__form-group--message .contact-section__textarea {
+        flex: none;
+        min-height: 140px;
+    }
+
     .contact-section__form-row {
         grid-template-columns: 1fr;
         gap: 1rem;
@@ -440,6 +532,7 @@ document.addEventListener('DOMContentLoaded', function() {
             phone: formData.get('phone') || null,
             company: formData.get('company') || null,
             subject: formData.get('subject') || null,
+            language: formData.get('language') || null,
             message: formData.get('message')
         };
 

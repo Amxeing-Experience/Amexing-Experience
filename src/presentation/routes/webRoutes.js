@@ -33,6 +33,8 @@ router.get('/set-language/:lang', (req, res) => {
       '/en/services/tours': lang === 'es' ? '/servicios/tours' : '/en/services/tours',
       '/en/services/experiences': lang === 'es' ? '/servicios/experiencias' : '/en/services/experiences',
       '/en/services/weddings': lang === 'es' ? '/servicios/bodas-eventos' : '/en/services/weddings',
+      '/recursos/faq': lang === 'en' ? '/en/resources/faq' : '/recursos/faq',
+      '/en/resources/faq': lang === 'es' ? '/recursos/faq' : '/en/resources/faq',
       '/nosotros': lang === 'en' ? '/en/about' : '/nosotros',
       '/servicios': lang === 'en' ? '/en/services' : '/servicios',
       '/nuestra-flota': lang === 'en' ? '/en/our-fleet' : '/nuestra-flota',
@@ -109,6 +111,7 @@ router.get('/servicios/experiencias', (req, res, next) => homeController.service
 router.get('/servicios/bodas-eventos', (req, res, next) => homeController.servicePage(req, res, next, 'servicios/bodas-eventos', 'Bodas'));
 router.get('/nuestra-flota', homeController.fleet.bind(homeController));
 router.get('/contacto', homeController.contacto.bind(homeController));
+router.get('/recursos/faq', homeController.recursosFaq.bind(homeController));
 
 // English routes
 router.get('/en/about', async (req, res, next) => {
@@ -140,6 +143,13 @@ enServiceSubpages.forEach(({ path, view, title }) => {
     req.language = 'en';
     homeController.servicePage(req, res, next, view, title);
   });
+});
+router.get('/en/resources/faq', async (req, res, next) => {
+  if (req.i18n) {
+    await req.i18n.changeLanguage('en');
+  }
+  req.language = 'en';
+  homeController.recursosFaq(req, res, next);
 });
 router.get('/en/our-fleet', async (req, res, next) => {
   if (req.i18n) {

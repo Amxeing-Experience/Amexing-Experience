@@ -181,6 +181,42 @@ class HomeController {
   }
 
   /**
+   * Renders the FAQ page (Preguntas Frecuentes) at /recursos/faq.
+   * Two-level accordion: categories -> questions -> answers.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware.
+   * @returns {Promise<void>} Resolves once the view is rendered.
+   * @example
+   * router.get('/recursos/faq', homeController.recursosFaq.bind(homeController));
+   */
+  async recursosFaq(req, res, next) {
+    try {
+      const currentLang = req.language || 'es';
+
+      const data = {
+        title: `${currentLang === 'en' ? 'FAQ' : 'Preguntas Frecuentes'} - Amexing Experience`,
+        user: req.session?.user || null,
+        currentPage: 'faq',
+        seo: {
+          description: 'Preguntas frecuentes sobre los servicios de Amexing Experience.',
+          keywords: 'faq, preguntas frecuentes, ayuda, amexing',
+          author: 'Amexing Experience',
+        },
+        company: this.getCompanyData(),
+        req,
+        t: req.t || ((key) => key),
+        currentLang,
+      };
+
+      res.render('recursos/faq', data);
+    } catch (error) {
+      logger.error('Error rendering FAQ page:', error);
+      next(error);
+    }
+  }
+
+  /**
    * Renders the fleet page (Nuestra Flota).
    * Displays vehicle fleet information and specifications.
    * @param req

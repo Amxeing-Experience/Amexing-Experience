@@ -45,7 +45,7 @@
   "contactSection": {
     "formTitle": "Ponte en contacto",
     "form": {
-      "email": "Email",
+      "email": "Correo electrónico",
       "phone": "Teléfono",
       "firstName": "Nombre",
       "lastName": "Apellido",
@@ -62,7 +62,7 @@
       "emergencyPhone": "+52 (415) 153 50 67",
       "hours": "Horarios de Oficina:",
       "hoursText": "Lunes a Sábado<br>de las 08:00 hrs a las 15:00 hrs (CDT)",
-      "emailLabel": "Email:",
+      "emailLabel": "Correo electrónico:",
       "emailAddress": "contact@amexing.com"
     },
     "validation": {
