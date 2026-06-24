@@ -14784,8 +14784,10 @@ class ItineraryBuilder {
         return;
       }
 
-      // Load provider experiences using the dedicated provider-experiencias API
-      const response = await fetch('/api/provider-experiencias/all', {
+      // Load provider experiences using the dedicated provider-experiencias API.
+      // Lite: esta vista NO usa las fotos, así el backend omite el procesamiento de fotos (S3) y
+      // manda un payload mucho menor (era ~71KB, el más pesado de la carga inicial).
+      const response = await fetch('/api/provider-experiencias/all?lite=1', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',

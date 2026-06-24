@@ -297,6 +297,12 @@ DevTools → Network, filtro `/api/`, caché desactivada.
 - **Efecto:** payload ~55% menor en la cotización + 2 consultas menos en el backend para ese request.
 - **Riesgo:** bajo (aditivo; el modo completo no cambia). Verificado: v2.js solo lee `vehicleTypeId/rateId/pricePerHour/currency` del cache.
 
+### IL-4b — `provider-experiencias/all` era el verdadero 71 KB — ✅ vía `?lite=1`
+- **Hallazgo (con captura del usuario):** había **dos** endpoints `/all`. `vehicle-rate-prices/all` ya bajó (~2.78 KB). El de **71.6 KB era `/api/provider-experiencias/all`** (`loadProviderExperiences`), que devuelve **todas las fotos** y además las **procesa una por una** (URLs firmadas de S3) → grueso del payload Y de la latencia.
+- **Hecho:** `?lite=1` en `getAllProviderExperiencias` que **omite el procesamiento de fotos** (itera sobre `[]` → `photos: []`); el resto de campos queda **idéntico**. La cotización lo pide lite (no usa fotos). `experience-services` sigue con el modo completo.
+- **Efecto:** payload ~71 KB → pequeño + se evitan N×M llamadas a S3 por foto (gran ahorro de latencia en backend).
+- **Riesgo:** bajo (aditivo; solo cambia con `?lite=1`). Verificado: v2.js no lee `.photos` de `providerExperiencesCache`.
+
 ### B — Caché de servidor para `/rates/active` y `/vehicle-types/active` — ✅ IMPLEMENTADO
 - **Hallazgo:** estos endpoints hacen su propia `Parse.Query` en el **controlador** (no usan el método del modelo), así que el caché va en el controlador.
 - **Hecho:** `TtlCache` (15 min) sobre el `options` formateado en `RateController.getActiveRates` y `VehicleTypeController.getActiveVehicleTypes`. Se cachean **objetos planos** (sin Parse.Object → sin riesgo de mutación). **Invalidación** en todas las escrituras del mismo controlador: rates (create/update/toggle/delete) y vehicle-types (create/update/delete/toggle).
