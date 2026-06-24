@@ -248,3 +248,68 @@ DevTools → Network, filtro `/api/`, caché desactivada.
 > **Reprioritización tras medir:** el mayor retorno inmediato y de bajo riesgo es **deduplicar `/api/quotes/:id` (3×→1×)** y revisar el módulo de ownership, antes que el N+1.
 
 > Por acción: pendiente de medir con el snippet (`__reqReset()` → acción → `__reqReport()`).
+
+---
+
+# Plan de carga inicial (latencia) — análisis 2026-06-24
+
+> **Estado:** PLAN (no implementado). El foco aquí no es el #requests sino el **tiempo**: cada endpoint tarda **2–5 s** y la carga **se serializa** en partes.
+> Mide siempre el **tiempo por endpoint** (DevTools → columna Tiempo) antes/después, no solo el conteo.
+
+## Diagnóstico (dónde se va el tiempo)
+
+**Frontend — el critical path se serializa** (`public/dashboards/admin/sections/quote-services-v2.js`, `init()` ~línea 299):
+- `await this.loadQuoteData()` (~línea 305) corre **solo y bloqueando** ANTES del `Promise.all` del resto → la request más lenta (`/api/quotes/:id`, ~4–5 s) va por delante de todo.
+- Tras el batch paralelo hay **más etapas en serie**: `await loadPricingRates()` (~339) y `await loadClientSpecificPricing()` (~349).
+
+**Backend — latencia alta por request:**
+- `QuoteController.getQuoteById` (~src/application/controllers/api/QuoteController.js:984): `useMasterKey` + `.include(client, companyClientPtr, rate, createdBy)` + **4 consultas secuenciales** de acceso/ownership tras el quote (`hasAccess`, `checkQuoteAccess`, `getUserAccess`, `getCurrentOwner`).
+- `*-rate/current` y `/formula`: 1–3 s para **un solo registro**, **sin caché de servidor** (se reconsulta cada request).
+- `vehicle-rate-prices/all`: **71.6 KB** (objetos completos rate+vehicleType, sin proyección).
+- Catálogos completos (`tours`/`experiences` con `length=1000`) en cada carga.
+- Probables **índices Mongo faltantes** en `{active, exists}` de las clases consultadas.
+
+> Nota: el "~15 s total" de algún análisis es **extrapolación**; lo medible real es requests de 2–5 s y waterfall hasta ~12 s. La conclusión firme: hay segundos que hoy corren en serie y podrían solaparse, + latencias de backend que bajan mucho con caché/índices/proyección.
+
+## Fases (de menor a mayor riesgo)
+
+### IL-1 — Caché de servidor para rates/formulas (bajo riesgo, alto valor)
+- **Qué:** caché en memoria con TTL (p. ej. 15–30 min) en `getCurrent*` de `ExchangeRate`/`TransferRate`/`AgencyRate`/`GuideTransportRate`/`GreeterRate` y las `/formula`. Invalidar al guardar cada rate.
+- **Dónde:** `src/domain/models/*Rate*.js` (métodos `getCurrent*`).
+- **Efecto:** 5–8 requests de 1–3 s → ~ms (cache hit).
+- **Riesgo:** bajo (invalidar en el save correspondiente).
+
+### IL-2 — Índices Mongo `{active, exists}` (riesgo muy bajo)
+- **Qué:** índices en las clases consultadas con `active`/`exists` (+ `createdAt` donde se ordena): Quote, Tour, Experience, VehicleRatePrices, *Rate*.
+- **Efecto:** reduce escaneos en todas las consultas filtradas; transversal.
+- **Riesgo:** muy bajo (aditivo). Verificar que no existan ya.
+
+### IL-3 — Acelerar `getQuoteById` (bajo-medio)
+- **Qué:** (a) **paralelizar** las 4 consultas de acceso/ownership (`Promise.all`); (b) revisar/quitar `.include()` no usados en la respuesta; (c) proyección de campos.
+- **Dónde:** `QuoteController.js` (~líneas 998-1024).
+- **Efecto:** ~0.5–1 s menos en la request más bloqueante.
+- **Riesgo:** bajo (lecturas); auditar que la respuesta no dependa de los includes que se quiten.
+
+### IL-4 — Adelgazar payloads (bajo-medio)
+- **Qué:** proyección/DTO ligero en `vehicle-rate-prices/all` (solo `{id, rateId, vehicleTypeId, pricePerHour, currency}`) y, si aplica, en catálogos.
+- **Dónde:** `vehicleRatePricesController.js` (~86-107).
+- **Efecto:** 71.6 KB → ~5 KB; menos parse + transferencia.
+- **Riesgo:** bajo-medio (verificar que el frontend tenga los nombres de rate/vehículo por otra vía — ya los carga en paralelo).
+
+### IL-5 — Lazy-load de lo no crítico (medio)
+- **Qué:** cargar `loadClientSpecificPricing` y catálogos pesados **bajo demanda** (al abrir el modal / seleccionar item) en vez de en `init`. Quitar `?_t=Date.now()` de datos sesión-estática.
+- **Riesgo:** medio (timing: verificar dependencias en init).
+
+### IL-6 — No bloquear con el quote (mayor valor single, mayor cuidado)
+- **Qué:** mover `loadQuoteData()` al `Promise.all` para que NO bloquee (~líneas 305 vs 322).
+- **Pre-requisito (auditar):** qué usa el quote temprano — `this.numberOfPeople`, `this.clientId` (`getClientId`, línea ~308), `GuideFormulaEvaluator.ready()` (~311), y el render inicial. Hay que asegurar defaults / re-binding tras resolver el quote.
+- **Efecto:** ~4–5 s que dejan de ir en serie.
+- **Riesgo:** medio-alto (puede romper el render si algo asume el quote ya cargado). **Dejar al final**, con verificación cuidadosa.
+
+## Orden sugerido
+IL-2 (índices) → IL-1 (caché rates) → IL-3 (getQuoteById) → IL-4 (payload) → IL-5 (lazy) → IL-6 (paralelizar quote, con auditoría).
+Una fase por PR, midiendo **tiempos por endpoint** y el tiempo total ("Finalizar"/Load) antes/después.
+
+## Verificación
+- Capturar tiempos por endpoint (DevTools) y el total antes/después de cada fase.
+- Sin regresiones funcionales (precios, fórmulas, render, guardado).
