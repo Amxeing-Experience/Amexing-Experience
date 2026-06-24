@@ -242,7 +242,7 @@ DevTools → Network, filtro `/api/`, caché desactivada.
 
 ### E) Hallazgos observados (de la captura real)
 
-1. **`GET /api/quotes/:id` se pide 3 veces** (8.71 KB c/u, ~4–5 s). Iniciadores: `quote-services`, `quote-owners` y la página. → **dedup ⇒ −2 requests** (y de las más lentas/pesadas). **Quick-win #1.**
+1. **`GET /api/quotes/:id` se pedía 3 veces** (8.71 KB c/u, ~4–5 s). Iniciadores: `quote-services`, `quote-owners` y la página. → **RESUELTO** con `window.amxDedupFetch` (dedup in-flight, definido en parse-time en `quote-detail.ejs`). Verificado en runtime: ahora **1×** (25 → ~23 requests).
 2. **Módulo de ownership** (`quote-owners`): `…/ownership`, `…/collaborators`, `…/access` + 2 de las re-cargas del quote. Overhead no contemplado en el `init`; revisar si puede compartir el quote ya cargado.
 3. **`vehicle-rate-prices/all` ≈ 71.6 KB** — el payload más pesado; ver si se puede adelgazar/cachear.
 4. Repetidos esperables: `current` ×5 (exchange/transfer/agency + driver + guide), `formula` ×3, `tours` ×2, `all` ×2, `active` ×4.
