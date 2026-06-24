@@ -9,7 +9,13 @@ Created by Denisse Maldonado
         <% if (item.side === 'center') { %>
             <span class="historia-timeline__connector" aria-hidden="true"></span>
         <% } %>
-        <% if (item.image) { %>
+        <% if (item.images && item.images.length) { %>
+            <div class="historia-timeline__images" data-count="<%= item.images.length %>">
+                <% item.images.forEach(function(src) { %>
+                    <img src="<%= src %>" alt="" class="historia-timeline__photo" loading="lazy">
+                <% }); %>
+            </div>
+        <% } else if (item.image) { %>
             <div class="historia-timeline__image" role="img" aria-label="Foto provisional">
                 <i class="fa-solid fa-camera" aria-hidden="true"></i>
             </div>

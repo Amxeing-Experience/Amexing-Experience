@@ -3917,6 +3917,75 @@ class ServicesController {
    * // Usage example documented above
    */
   /**
+   * GET /api/services/route-duration - Get the route travel duration for an origin/destination
+   * pair, independent of the rate/segmento. Duration lives on the Service (route) record, so
+   * this resolves it from origin+destination alone. Bidirectional: matches the route regardless
+   * of the stored origin/destination order.
+   * @param {object} req - Express request with query: originPOI, destinationPOI.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   * // GET /api/services/route-duration?originPOI=San Miguel de Allende&destinationPOI=Aguascalientes
+   */
+  async getRouteDuration(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const { originPOI: originPOIName, destinationPOI: destinationPOIName } = req.query;
+      if (!originPOIName || !destinationPOIName) {
+        return this.sendError(res, 'originPOI y destinationPOI son requeridos', 400);
+      }
+
+      const resolvePOIs = async (name) => {
+        const q = new Parse.Query('POI');
+        q.matches('name', `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        q.equalTo('exists', true);
+        return q.find({ useMasterKey: true });
+      };
+
+      const originPOIs = await resolvePOIs(originPOIName);
+      const destinationPOIs = await resolvePOIs(destinationPOIName);
+      if (originPOIs.length === 0 || destinationPOIs.length === 0) {
+        return res.json({ success: true, data: { routeDuration: null } });
+      }
+
+      // Match the route in EITHER direction (origin→dest OR dest→origin) — the duration
+      // is the same for the leg regardless of how it was stored.
+      const buildDirQuery = (originSet, destSet) => {
+        const q = new Parse.Query('Services');
+        q.equalTo('exists', true);
+        q.equalTo('active', true);
+        q.greaterThan('routeDuration', 0);
+        q.containedIn('originPOI', originSet);
+        q.containedIn('destinationPOI', destSet);
+        return q;
+      };
+
+      const query = Parse.Query.or(
+        buildDirQuery(originPOIs, destinationPOIs),
+        buildDirQuery(destinationPOIs, originPOIs)
+      );
+      query.limit(10);
+      const services = await query.find({ useMasterKey: true });
+      const routeDuration = services
+        .map((s) => s.get('routeDuration'))
+        .find((d) => d != null && d > 0) || null;
+
+      return res.json({ success: true, data: { routeDuration } });
+    } catch (error) {
+      logger.error('Error in getRouteDuration', {
+        error: error.message,
+        query: req.query,
+        userId: req.user?.id,
+      });
+      return this.sendError(res, 'Error al obtener la duración de la ruta', 500);
+    }
+  }
+
+  /**
    * GET /api/services/prices-by-route - Get vehicle prices for a route (origin + destination + rate).
    * Finds services matching the origin/destination POI pair, then returns all vehicle
    * options with prices (base and client-specific overrides).
@@ -4121,8 +4190,20 @@ class ServicesController {
         vehiclesFound: vehicles.length,
       });
 
-      // Get routeDuration from the first service (all services for same route share duration)
-      const routeDuration = ratePrices[0]?.get('service')?.get('routeDuration') || null;
+      // Route duration is stored per service/direction. The price can match on a
+      // service record that doesn't carry the duration (e.g. the route was saved in
+      // the DB in the opposite origin/destination order). Look for the first service
+      // with a duration in the matched set and, failing that, in BOTH directions —
+      // so the duration is found regardless of how the route was entered.
+      const durationFrom = (rps) => rps
+        .map((rp) => rp.get('service')?.get('routeDuration'))
+        .find((d) => d != null && d > 0) || null;
+
+      let routeDuration = durationFrom(ratePrices);
+      if (!routeDuration && originPOIs.length > 0 && destinationPOIs.length > 0) {
+        routeDuration = durationFrom(filterRatePricesByDirection(originPOIs, destinationPOIs))
+          || durationFrom(filterRatePricesByDirection(destinationPOIs, originPOIs));
+      }
 
       return res.json({
         success: true,

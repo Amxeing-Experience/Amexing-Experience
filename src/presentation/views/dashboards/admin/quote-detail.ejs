@@ -31,6 +31,8 @@ window.__quoteId = '<%= typeof quoteId !== "undefined" ? quoteId : "" %>';
 window.__isReservation = <%= isReservationView ? 'true' : 'false' %>;
 // When it's a reservation, show the reservation folio instead of the quote folio.
 window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reservationFolio : "" %>';
+// Nota: window.amxDedupFetch (dedup in-flight de /api/quotes/:id) se define en el .js compartido
+// quote-ownership.js, que cargan los 3 roles antes que el resto de módulos.
 </script>
 
 <!-- Page Header -->
@@ -467,7 +469,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .find(row => row.startsWith('accessToken='))
                 ?.split('=')[1];
 
-            const response = await fetch(`/api/quotes/${quoteId}`, {
+            const response = await (window.amxDedupFetch || fetch)(`/api/quotes/${quoteId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
