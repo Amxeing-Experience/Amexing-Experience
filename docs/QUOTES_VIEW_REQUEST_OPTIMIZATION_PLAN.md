@@ -303,6 +303,11 @@ DevTools → Network, filtro `/api/`, caché desactivada.
 - **Efecto:** payload ~71 KB → pequeño + se evitan N×M llamadas a S3 por foto (gran ahorro de latencia en backend).
 - **Riesgo:** bajo (aditivo; solo cambia con `?lite=1`). Verificado: v2.js no lee `.photos` de `providerExperiencesCache`.
 
+### IL-4c — `tours` y `vehicles` también cargaban imágenes — ✅ vía `?lite=1`
+- **Hallazgo:** `ToursController.getTours` traía imágenes **por cada tour** (`TourImage.getImagesForTour(tour.id)` → **N+1**) + optimización/S3 — explica por qué `tours` tardaba 2–5 s aunque el payload fuera chico. `VehicleController.getVehicles` traía la imagen primaria por vehículo (batch) + URL S3.
+- **Hecho:** `?lite=1` en ambos: tours omite la consulta de imágenes por tour (`photos: []`), vehicles omite el batch de imágenes (`imageUrl: ''`). La cotización pide ambos lite. **Verificado: v2.js no usa `.photos`/`.imageUrl` de tours ni vehículos.** Los paneles admin siguen con el modo completo.
+- **Efecto:** elimina el **N+1 de imágenes de tours** (gran ahorro de latencia) y el trabajo S3 de vehículos. Riesgo bajo (aditivo).
+
 ### B — Caché de servidor para `/rates/active` y `/vehicle-types/active` — ✅ IMPLEMENTADO
 - **Hallazgo:** estos endpoints hacen su propia `Parse.Query` en el **controlador** (no usan el método del modelo), así que el caché va en el controlador.
 - **Hecho:** `TtlCache` (15 min) sobre el `options` formateado en `RateController.getActiveRates` y `VehicleTypeController.getActiveVehicleTypes`. Se cachean **objetos planos** (sin Parse.Object → sin riesgo de mutación). **Invalidación** en todas las escrituras del mismo controlador: rates (create/update/toggle/delete) y vehicle-types (create/update/delete/toggle).

@@ -14382,7 +14382,8 @@ class ItineraryBuilder {
         return;
       }
 
-      const response = await fetch('/api/vehicles', {
+      // lite=1: esta vista no usa imágenes de vehículos -> el backend omite el batch de imágenes + S3.
+      const response = await fetch('/api/vehicles?lite=1', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -14725,7 +14726,8 @@ class ItineraryBuilder {
       }
 
       // Use DataTables format to get all tours
-      const url = '/api/tours?draw=1&start=0&length=1000&search[value]=';
+      // lite=1: esta vista no usa fotos de tours -> el backend omite el N+1 de imágenes por tour.
+      const url = '/api/tours?draw=1&start=0&length=1000&search[value]=&lite=1';
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
