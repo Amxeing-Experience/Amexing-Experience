@@ -273,11 +273,12 @@ DevTools → Network, filtro `/api/`, caché desactivada.
 
 ## Fases (de menor a mayor riesgo)
 
-### IL-1 — Caché de servidor para rates/formulas (bajo riesgo, alto valor)
-- **Qué:** caché en memoria con TTL (p. ej. 15–30 min) en `getCurrent*` de `ExchangeRate`/`TransferRate`/`AgencyRate`/`GuideTransportRate`/`GreeterRate` y las `/formula`. Invalidar al guardar cada rate.
-- **Dónde:** `src/domain/models/*Rate*.js` (métodos `getCurrent*`).
-- **Efecto:** 5–8 requests de 1–3 s → ~ms (cache hit).
-- **Riesgo:** bajo (invalidar en el save correspondiente).
+### IL-1 — Caché de servidor para rates/formulas — ✅ IMPLEMENTADO
+- **Qué:** caché en memoria con TTL (15 min) en `getCurrent*` de `ExchangeRate`/`TransferRate`/`AgencyRate`/`DriverTourRate`/`GuideTransportRate`/`GreeterRate`. Las `/formula` (Guide/Greeter) se benefician automáticamente porque `getFormulaConfiguration` lee de `getCurrentRate`.
+- **Cómo:** helper reutilizable `src/infrastructure/cache/ttlCache.js` (`TtlCache`); cada modelo cachea su `getCurrent*` e **invalida** (`clear()`) en todos los writes (create / softDelete / updateFormulaConfiguration).
+- **Efecto:** 5–8 requests de 1–3 s → ~ms (cache hit) tras la primera consulta.
+- **Riesgo:** bajo. Instancia única → invalidación completa. Multi-instancia → consistencia eventual ≤ TTL (rates cambian rara vez).
+- **Verificar:** recargar la vista 2 veces; los `*-rate/current` y `/formula` deben tardar ~ms en la 2ª. Tras editar un rate, debe reflejarse de inmediato (invalidación).
 
 ### IL-2 — Índices Mongo `{active, exists}` (riesgo muy bajo)
 - **Qué:** índices en las clases consultadas con `active`/`exists` (+ `createdAt` donde se ordena): Quote, Tour, Experience, VehicleRatePrices, *Rate*.

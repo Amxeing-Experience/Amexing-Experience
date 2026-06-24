@@ -5,6 +5,11 @@
  */
 
 const Parse = require('parse/node');
+const { TtlCache } = require('../../infrastructure/cache/ttlCache');
+
+// Caché del rate "actual" (cambia rara vez, se consulta en cada carga; cubre /current y /formula
+// porque getFormulaConfiguration lee de getCurrentRate). Invalida en create/update.
+const currentRateCache = new TtlCache();
 
 /**
  * GuideTransportRate class for managing guide transport pricing.
@@ -22,6 +27,9 @@ class GuideTransportRate extends Parse.Object {
    */
   static async getCurrentRate() {
     try {
+      const cached = currentRateCache.get();
+      if (cached !== undefined) return cached;
+
       const query = new Parse.Query(GuideTransportRate);
       query.equalTo('active', true);
       query.equalTo('exists', true);
@@ -43,7 +51,7 @@ class GuideTransportRate extends Parse.Object {
         });
       }
 
-      return result;
+      return currentRateCache.set(result || null);
     } catch (error) {
       // Use logger instead of console for production
       const logger = require('../../infrastructure/logger');
@@ -93,6 +101,7 @@ class GuideTransportRate extends Parse.Object {
       newRate.set('formulaVersion', '1.0');
 
       const savedRate = await newRate.save(null, { useMasterKey: true });
+      currentRateCache.clear(); // el rate actual cambió -> invalidar caché
       return savedRate;
     } catch (error) {
       // Use logger instead of console for production
@@ -274,6 +283,7 @@ class GuideTransportRate extends Parse.Object {
       currentRate.set('lastUpdatedBy', updatedBy);
 
       const updatedRate = await currentRate.save(null, { useMasterKey: true });
+      currentRateCache.clear(); // la fórmula del rate actual cambió -> invalidar caché
 
       // Debug logging to confirm save
       console.log('updateFormulaConfiguration - Saved formula:', {
