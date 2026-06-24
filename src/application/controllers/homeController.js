@@ -143,6 +143,80 @@ class HomeController {
   }
 
   /**
+   * Renders a provisional Services subpage (Transporte, Tours, Experiencias, Bodas y Eventos).
+   * The view name is injected so a single handler serves every subpage.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware.
+   * @param {string} view - View path to render (e.g. 'servicios/transporte').
+   * @param {string} pageTitle - Title shown in the browser tab.
+   * @returns {Promise<void>} Resolves once the view is rendered.
+   * @example
+   * homeController.servicePage(req, res, next, 'servicios/tours', 'Tours');
+   */
+  async servicePage(req, res, next, view, pageTitle) {
+    try {
+      const currentLang = req.language || 'es';
+
+      const data = {
+        title: `${pageTitle} - Amexing Experience`,
+        user: req.session?.user || null,
+        currentPage: 'services',
+        seo: {
+          description: req.t ? req.t('pages:services.description') : 'Premium transportation services',
+          keywords: req.t ? req.t('pages:services.keywords') : 'services, premium transport',
+          author: 'Amexing Experience',
+        },
+        company: this.getCompanyData(),
+        req,
+        t: req.t || ((key) => key),
+        currentLang,
+      };
+
+      res.render(view, data);
+    } catch (error) {
+      logger.error(`Error rendering service subpage (${view}):`, error);
+      next(error);
+    }
+  }
+
+  /**
+   * Renders the FAQ page (Preguntas Frecuentes) at /recursos/faq.
+   * Two-level accordion: categories -> questions -> answers.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware.
+   * @returns {Promise<void>} Resolves once the view is rendered.
+   * @example
+   * router.get('/recursos/faq', homeController.recursosFaq.bind(homeController));
+   */
+  async recursosFaq(req, res, next) {
+    try {
+      const currentLang = req.language || 'es';
+
+      const data = {
+        title: `${currentLang === 'en' ? 'FAQ' : 'Preguntas Frecuentes'} - Amexing Experience`,
+        user: req.session?.user || null,
+        currentPage: 'faq',
+        seo: {
+          description: 'Preguntas frecuentes sobre los servicios de Amexing Experience.',
+          keywords: 'faq, preguntas frecuentes, ayuda, amexing',
+          author: 'Amexing Experience',
+        },
+        company: this.getCompanyData(),
+        req,
+        t: req.t || ((key) => key),
+        currentLang,
+      };
+
+      res.render('recursos/faq', data);
+    } catch (error) {
+      logger.error('Error rendering FAQ page:', error);
+      next(error);
+    }
+  }
+
+  /**
    * Renders the fleet page (Nuestra Flota).
    * Displays vehicle fleet information and specifications.
    * @param req

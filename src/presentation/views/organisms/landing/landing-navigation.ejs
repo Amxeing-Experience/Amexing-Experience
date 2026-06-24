@@ -37,10 +37,10 @@ const translate = typeof t !== 'undefined' ? t : (key) => key;
 
 // Submenú de Servicios (dropdown del navbar)
 const serviciosDropdown = [
-    { es: 'Transporte', en: 'Transportation', href: isEnglish ? '/en/services#transportation' : '/servicios#transporte' },
-    { es: 'Tours', en: 'Tours', href: isEnglish ? '/en/services#tours' : '/servicios#tours' },
-    { es: 'Experiencias', en: 'Experiences', href: isEnglish ? '/en/services#experiences' : '/servicios#experiencias' },
-    { es: 'Bodas y Eventos', en: 'Weddings & Events', href: isEnglish ? '/en/services#weddings' : '/servicios#bodas' }
+    { es: 'Transporte', en: 'Transportation', href: isEnglish ? '/en/services/transportation' : '/servicios/transporte' },
+    { es: 'Tours', en: 'Tours', href: isEnglish ? '/en/services/tours' : '/servicios/tours' },
+    { es: 'Experiencias', en: 'Experiences', href: isEnglish ? '/en/services/experiences' : '/servicios/experiencias' },
+    { es: 'Bodas', en: 'Weddings', href: isEnglish ? '/en/services/weddings' : '/servicios/bodas-eventos' }
 ];
 %>
 
@@ -71,7 +71,6 @@ const serviciosDropdown = [
                         <%= translate('navbar:menu.services') %>
                     </a>
                     <div class="landing-nav__dropdown" role="menu">
-                        <span class="landing-nav__dropdown-header"><%= translate('navbar:menu.services') %></span>
                         <% serviciosDropdown.forEach(function(servicio) { %>
                             <a href="<%= servicio.href %>" class="landing-nav__dropdown-link" role="menuitem"><%= isEnglish ? servicio.en : servicio.es %></a>
                         <% }); %>
@@ -301,6 +300,10 @@ const serviciosDropdown = [
     padding: 0.6rem 0;
     border-top: 1px solid rgba(255, 255, 255, 0.18);
     transition: color 0.25s ease;
+}
+
+.landing-nav__dropdown-link:first-child {
+    border-top: none;
 }
 
 .landing-nav__dropdown-link:hover {
