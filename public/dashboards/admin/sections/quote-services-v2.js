@@ -3810,6 +3810,44 @@ class ItineraryBuilder {
     }
   }
 
+  // Display-only flag: is ANY price on this service different from its catalog/list price?
+  // (main item + primary additional vehicle + extra additional vehicles). Computed at save
+  // time where all the list references are available. Does NOT affect pricing/formulas — it
+  // only drives the admin-only "Precio personalizado" label in the services list.
+  computeServiceIsCustomPrice(data, basePrice) {
+    const diff = (a, b) => a != null && b != null && Math.abs(Number(a) - Number(b)) > 0.01;
+
+    // Primary additional vehicle (only when a custom price was entered)
+    if (data.additionalVehiclePrice != null && diff(data.additionalVehiclePrice, data.additionalVehicleListPrice)) {
+      return true;
+    }
+    // Extra additional vehicles (each carries its own customPrice + listPrice)
+    if (Array.isArray(data.extraAdditionalVehicles)
+      && data.extraAdditionalVehicles.some((v) => v && v.customPrice != null && diff(v.customPrice, v.listPrice))) {
+      return true;
+    }
+
+    // Main item vs its catalog/list price, per type
+    switch (data.type) {
+      case 'transport':
+        return diff(basePrice, this._mainVehicleCatalogPrice);
+      case 'a-disposicion':
+        return diff(basePrice, this._disposicionHourlyRate);
+      case 'tour':
+        // Walking tours use tier-based pricing (no manual override possible).
+        if (data.isWalkingTour) return false;
+        return diff(basePrice, this.lastValidTourPrice);
+      case 'experience': {
+        const cat = (this.calculatedPrices && this.calculatedPrices.experience) || {};
+        return diff(data.adultPrice, cat.adult)
+          || diff(data.childPrice, cat.child)
+          || diff(data.noAlcoholPrice, cat.noAlcohol);
+      }
+      default:
+        return false;
+    }
+  }
+
   collectServiceData() {
     const type = document.querySelector('input[name="serviceType"]:checked')?.value;
     const vehicleSelectValue = document.getElementById('vehicleSelect')?.value;
@@ -5179,6 +5217,9 @@ class ItineraryBuilder {
         data.categoryName = this.getSegmentNameById(mainSegmentId);
       }
     }
+
+    // Display-only flag for the admin "Precio personalizado" label (does not affect pricing).
+    data.isCustomPrice = this.computeServiceIsCustomPrice(data, basePrice);
 
     return data;
   }
@@ -6835,6 +6876,13 @@ class ItineraryBuilder {
             qsDevLog('✅ Immediate custom price restoration:', customPrice);
           }
 
+          // Aun con precio personalizado, traemos la tarifa de catálogo para que "Lista: $X" se
+          // muestre (y para que hourlyPrice se persista bien en el siguiente guardado). Se marca
+          // _mainPriceManuallyEdited para que calculateADisposicionPrice actualice SOLO la Lista
+          // y el desglose, sin sobreescribir el precio editado del campo.
+          this._mainPriceManuallyEdited = true;
+          setTimeout(() => { this.calculateADisposicionPrice(); }, 120);
+
           // Additional restoration attempts with timeouts to handle timing issues
           [50, 100, 250, 500].forEach((delay, index) => {
             setTimeout(() => {
@@ -7073,8 +7121,15 @@ class ItineraryBuilder {
             }
             correctPrice = hourly;
           }
-          // "Lista: $X" = tarifa por hora de catálogo.
-          this.updateMainVehicleListPrice(correctPrice);
+          // "Lista: $X" = tarifa por hora de CATÁLOGO. Nunca derivarla del total guardado:
+          // si hourlyPrice no se guardó (legacy), el total ya refleja el precio editado, así que
+          // derivar de él mostraba el precio personalizado como si fuera la lista. Se usa el
+          // hourlyPrice guardado o, en su defecto, la tarifa de catálogo ya consultada; si aún no
+          // existe, se deja que calculateADisposicionPrice la fije al traerla de la API.
+          const catalogHourly = (service.hourlyPrice > 0)
+            ? service.hourlyPrice
+            : (this._disposicionHourlyRate > 0 ? this._disposicionHourlyRate : 0);
+          if (catalogHourly > 0) this.updateMainVehicleListPrice(catalogHourly);
           qsDevLog('🚗 A Disposición: tarifa por hora en Precio base (no el total):', {
             selectedPaymentType: currentPaymentType,
             basePriceUsed: correctPrice,
@@ -8436,6 +8491,12 @@ class ItineraryBuilder {
                                             </span>
                                         </div>
                                     ` : ''}
+                                    ${service.isCustomPrice && this.canEditPrices ? `
+                                        <div class="d-flex align-items-center text-info small mt-1">
+                                            <i class="ti ti-edit me-1"></i>
+                                            <strong>Precio personalizado</strong>
+                                        </div>
+                                    ` : ''}
                                     ${(service.type === 'tour' || service.type === 'experience') ? (() => {
         const { includes, notIncludes } = this.getServiceIncludesInfo(service);
         if (!includes && !notIncludes) return '';
@@ -8812,13 +8873,10 @@ class ItineraryBuilder {
                                     ` : ''}
                                 </div>
                             ` : ''}
-                            ${service.priceOverride ? `
+                            ${service.isCustomPrice && this.canEditPrices ? `
                                 <div class="d-flex align-items-center text-info small mt-1">
                                     <i class="ti ti-edit me-1"></i>
                                     <strong>Precio personalizado</strong>
-                                    ${service.customPrice && service.customPrice !== service.price ? `
-                                        <small class="text-muted ms-2">(Original: ${this.formatCurrency(service.customPrice)})</small>
-                                    ` : ''}
                                 </div>
                             ` : ''}
                             ${service.availabilityPending ? `
@@ -13317,6 +13375,8 @@ class ItineraryBuilder {
             hourlyPrice: subconcept.hourlyPrice || null,
             discountPercent: subconcept.discountPercent || null,
             aDisposicionAdditionalVehicles: subconcept.aDisposicionAdditionalVehicles || [],
+            // Display-only flag for the admin "Precio personalizado" label.
+            isCustomPrice: subconcept.isCustomPrice || false,
           };
 
           // Migración del modelo viejo: el "vehículo adicional" único se convierte en la PRIMERA
@@ -18128,6 +18188,76 @@ class ItineraryBuilder {
    * @param fallbackDestination
    * @example
    */
+  // Resolves the current transport route's origin/destination display names from the form
+  // (handles one-way / round-trip, local / airport / punto-a-punto, and slug mapping). Order is
+  // NOT swapped — the route-duration lookup is bidirectional so order doesn't matter there.
+  getTransportRouteNames() {
+    const direction = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
+    const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
+    const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+
+    let originName = '';
+    let destinationName = '';
+
+    if (tripType === 'round-trip') {
+      if (transportType === 'local') {
+        originName = document.getElementById('roundTripOriginIdaText')?.value || '';
+        const destSlug = document.getElementById('roundTripDestinationIdaSelect')?.value;
+        destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
+      } else {
+        const originSlug = document.getElementById('roundTripOriginIdaSelect')?.value;
+        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
+        const destSlug = document.getElementById('roundTripDestinationIdaSelect')?.value;
+        destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
+      }
+    } else {
+      const resolveDestSelect = () => {
+        const destSlug = document.getElementById('transportDestinationSelect')?.value;
+        return window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
+      };
+      if (direction === 'arrival' && transportType === 'local') {
+        originName = document.getElementById('transportOriginText')?.value || '';
+        destinationName = resolveDestSelect();
+      } else if (direction === 'departure' && transportType === 'local') {
+        const slug = document.getElementById('transportOriginSelect')?.value;
+        originName = window.slugToOriginalMapping?.get(slug) || slug || '';
+        destinationName = document.getElementById('transportDestinationText')?.value || '';
+      } else {
+        const originSlug = document.getElementById('transportOriginSelect')?.value;
+        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
+        destinationName = resolveDestSelect();
+      }
+    }
+    return { originName, destinationName };
+  }
+
+  // Fetches the route travel duration for the current origin+destination (no segmento needed)
+  // and fills the editable "Duración estimada de viaje" field. Bidirectional via the backend.
+  // Skipped while restoring an edit (the saved value is applied separately).
+  async updateRouteDurationFromRoute() {
+    if (this._populatingTransportForm) return;
+    const { originName, destinationName } = this.getTransportRouteNames();
+    if (!originName || !destinationName) return;
+    try {
+      const params = new URLSearchParams({ originPOI: originName, destinationPOI: destinationName });
+      const accessToken = this.getAccessToken();
+      const res = await fetch(`/api/services/route-duration?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken || ''}` },
+      });
+      if (!res.ok) return;
+      const result = await res.json();
+      const minutes = result?.data?.routeDuration;
+      if (minutes) {
+        this.cachedRouteDuration = minutes;
+        const rdInput = document.getElementById('routeDurationInput');
+        if (rdInput) rdInput.value = this.minutesToHoursInput(minutes);
+        if (typeof this.updateTransferArrivalEstimate === 'function') this.updateTransferArrivalEstimate();
+      }
+    } catch (e) {
+      // Silent — duration stays as-is; the field can be captured manually.
+    }
+  }
+
   async handleTransportRateSelection(rateId, fallbackOrigin = null, fallbackDestination = null) {
     // Resetea la duración de ruta cacheada: pertenece a la ruta del lookup ANTERIOR y no debe
     // filtrarse a otra ruta/servicio (causaba que guía/greeter/hora sugerida usaran la duración
@@ -22050,6 +22180,8 @@ class ItineraryBuilder {
             // Extra additional vehicles beyond the first `additionalVehicleId` (Phase 1 — data only;
             // pricing impact lands in Phase 2 of the multi-vehicle support work).
             extraAdditionalVehicles: Array.isArray(service.extraAdditionalVehicles) ? service.extraAdditionalVehicles : [],
+            // Display-only flag: any price differs from its catalog/list price (admin label).
+            isCustomPrice: !!service.isCustomPrice,
             // Concepto: precio por persona (efectivo) — informational, persisted alongside unit price
             conceptoPricePerPerson: service.conceptoPricePerPerson !== undefined ? service.conceptoPricePerPerson : null,
             // Persisted user decision to dismiss the overlap warning for this service
@@ -23977,6 +24109,8 @@ document.addEventListener('DOMContentLoaded', () => {
           if (window.itineraryBuilder && currentRateId) {
             window.itineraryBuilder.handleTransportRateSelection(currentRateId);
           }
+          // Route duration is per origin+destination — refresh it even without a segmento.
+          if (window.itineraryBuilder) window.itineraryBuilder.updateRouteDurationFromRoute();
 
           // Auto-sync Ida → Vuelta (swapped) for round trip
           if (window.itineraryBuilder) window.itineraryBuilder.syncIdaToVuelta();
@@ -24013,6 +24147,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.itineraryBuilder && currentRateId) {
           window.itineraryBuilder.handleTransportRateSelection(currentRateId);
         }
+        // Route duration is per origin+destination — refresh it even without a segmento.
+        if (window.itineraryBuilder) window.itineraryBuilder.updateRouteDurationFromRoute();
       });
     }
 
@@ -24024,6 +24160,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.itineraryBuilder && currentRateId) {
           window.itineraryBuilder.handleTransportRateSelection(currentRateId);
         }
+        // Route duration is per origin+destination — refresh it even without a segmento.
+        if (window.itineraryBuilder) window.itineraryBuilder.updateRouteDurationFromRoute();
       });
     }
 
@@ -24036,6 +24174,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.itineraryBuilder && currentRateId) {
           window.itineraryBuilder.handleTransportRateSelection(currentRateId);
         }
+        // Route duration is per origin+destination — refresh it even without a segmento.
+        if (window.itineraryBuilder) window.itineraryBuilder.updateRouteDurationFromRoute();
       });
     }
   }, 100);
@@ -24166,6 +24306,8 @@ document.addEventListener('DOMContentLoaded', () => {
           if (window.itineraryBuilder && currentRateId && e.target.value) {
             window.itineraryBuilder.handleTransportRateSelection(currentRateId);
           }
+          // Route duration is per origin+destination — refresh it even without a segmento.
+          if (window.itineraryBuilder) window.itineraryBuilder.updateRouteDurationFromRoute();
           // Auto-sync Ida → Vuelta (swapped) for round trip
           if (window.itineraryBuilder) window.itineraryBuilder.syncIdaToVuelta();
         });
@@ -24182,6 +24324,8 @@ document.addEventListener('DOMContentLoaded', () => {
           window.itineraryBuilder.syncIdaToVuelta();
           const currentRateId = document.getElementById('transportCategory')?.value;
           if (currentRateId) window.itineraryBuilder.handleTransportRateSelection(currentRateId);
+          // Route duration is per origin+destination — refresh it even without a segmento.
+          window.itineraryBuilder.updateRouteDurationFromRoute();
         }
       });
     }
@@ -24192,6 +24336,8 @@ document.addEventListener('DOMContentLoaded', () => {
           window.itineraryBuilder.syncIdaToVuelta();
           const currentRateId = document.getElementById('transportCategory')?.value;
           if (currentRateId) window.itineraryBuilder.handleTransportRateSelection(currentRateId);
+          // Route duration is per origin+destination — refresh it even without a segmento.
+          window.itineraryBuilder.updateRouteDurationFromRoute();
         }
       });
     }
