@@ -31,6 +31,24 @@ window.__quoteId = '<%= typeof quoteId !== "undefined" ? quoteId : "" %>';
 window.__isReservation = <%= isReservationView ? 'true' : 'false' %>;
 // When it's a reservation, show the reservation folio instead of the quote folio.
 window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reservationFolio : "" %>';
+
+// Dedup in-flight de GETs idénticos: varios módulos (builder de servicios, ownership y esta
+// vista) piden /api/quotes/:id a la vez; esto colapsa esas cargas concurrentes en UN request.
+// Se define aquí (parse temprano) para que ya esté disponible cuando los módulos inicien.
+// Solo in-flight (se limpia al terminar) -> refetches posteriores siguen trayendo datos frescos.
+// Cada consumidor recibe su propio clone() para conservar su .json()/.text().
+window.amxDedupFetch = window.amxDedupFetch || (function () {
+    const inflight = new Map();
+    return function amxDedupFetch(url, opts) {
+        const o = opts || {};
+        const key = `${o.method || 'GET'}:${url}:${o.body || ''}`;
+        if (!inflight.has(key)) {
+            const p = fetch(url, o).finally(() => inflight.delete(key));
+            inflight.set(key, p);
+        }
+        return inflight.get(key).then((r) => r.clone());
+    };
+})();
 </script>
 
 <!-- Page Header -->
@@ -457,23 +475,6 @@ document.addEventListener('DOMContentLoaded', function() {
             boundary: 'window'
         });
     });
-
-    // Dedup in-flight de GETs idénticos. Varios módulos de esta página (builder de servicios,
-    // ownership y esta misma vista) piden /api/quotes/:id a la vez; esto colapsa esas cargas
-    // concurrentes en UN solo request. Solo in-flight: se limpia al terminar, así que cualquier
-    // refetch posterior sigue trayendo datos frescos. Cada consumidor recibe su propio clone().
-    window.amxDedupFetch = window.amxDedupFetch || (function () {
-        const inflight = new Map();
-        return function amxDedupFetch(url, opts) {
-            const o = opts || {};
-            const key = `${o.method || 'GET'}:${url}:${o.body || ''}`;
-            if (!inflight.has(key)) {
-                const p = fetch(url, o).finally(() => inflight.delete(key));
-                inflight.set(key, p);
-            }
-            return inflight.get(key).then((r) => r.clone());
-        };
-    })();
 
     // Load quote folio for title display
     <% if (!isNewQuote) { %>
