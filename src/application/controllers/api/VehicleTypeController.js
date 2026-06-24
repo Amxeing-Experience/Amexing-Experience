@@ -25,6 +25,11 @@
 const Parse = require('parse/node');
 const VehicleTypeService = require('../../services/VehicleTypeService');
 const logger = require('../../../infrastructure/logger');
+const { TtlCache } = require('../../../infrastructure/cache/ttlCache');
+
+// Caché del endpoint /vehicle-types/active (cambia rara vez, se consulta en cada carga). Se
+// invalida en create/update/delete/toggle. TTL como red de seguridad. Ver ttlCache.js.
+const activeTypesCache = new TtlCache();
 
 /**
  * VehicleTypeController class implementing RESTful API.
@@ -191,6 +196,11 @@ class VehicleTypeController {
    */
   async getActiveVehicleTypes(req, res) {
     try {
+      const cached = activeTypesCache.get();
+      if (cached) {
+        return this.sendSuccess(res, cached, 'Active vehicle types retrieved successfully');
+      }
+
       // Get active vehicle types manually
       const query = new Parse.Query('VehicleType');
       query.equalTo('active', true);
@@ -210,6 +220,7 @@ class VehicleTypeController {
         icon: type.get('icon') || 'car',
       }));
 
+      activeTypesCache.set(options);
       return this.sendSuccess(res, options, 'Active vehicle types retrieved successfully');
     } catch (error) {
       logger.error('Error in VehicleTypeController.getActiveVehicleTypes', {
@@ -371,6 +382,7 @@ class VehicleTypeController {
         sortOrder: vehicleType.get('sortOrder'),
       };
 
+      activeTypesCache.clear(); // se creó un tipo -> invalidar caché de /vehicle-types/active
       return this.sendSuccess(res, data, 'Tipo de vehículo creado exitosamente', 201);
     } catch (error) {
       logger.error('Error in VehicleTypeController.createVehicleType', {
@@ -482,6 +494,7 @@ class VehicleTypeController {
         active: vehicleType.get('active'),
       };
 
+      activeTypesCache.clear(); // se actualizó un tipo -> invalidar caché de /vehicle-types/active
       return this.sendSuccess(res, data, 'Tipo de vehículo actualizado exitosamente');
     } catch (error) {
       logger.error('Error in VehicleTypeController.updateVehicleType', {
@@ -558,6 +571,7 @@ class VehicleTypeController {
         deletedBy: currentUser.id,
       });
 
+      activeTypesCache.clear(); // se eliminó un tipo -> invalidar caché de /vehicle-types/active
       return this.sendSuccess(res, null, 'Tipo de vehículo eliminado exitosamente');
     } catch (error) {
       logger.error('Error in VehicleTypeController.deleteVehicleType', {
@@ -614,6 +628,7 @@ class VehicleTypeController {
         return this.sendError(res, result.message, 400);
       }
 
+      activeTypesCache.clear(); // cambió el estado de un tipo -> invalidar caché de /vehicle-types/active
       return this.sendSuccess(
         res,
         result.vehicleType,
