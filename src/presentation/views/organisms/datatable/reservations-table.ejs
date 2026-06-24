@@ -36,7 +36,7 @@ const canManageReservations = !!(locals && locals.canManageReservations);
     <div class="row">
         <div class="col-12">
             <div class="card border-0 shadow-sm">
-                <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
+                <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
                     <div class="row align-items-center">
                         <div class="col">
                             <h5 class="card-title mb-0 text-white">
@@ -59,12 +59,12 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                                     </label>
                                     
                                     <input type="radio" class="btn-check" name="dateFilter" id="filterOngoing" value="ongoing">
-                                    <label class="btn btn-outline-info" for="filterOngoing">
+                                    <label class="btn btn-outline-primary" for="filterOngoing">
                                         <i class="ti ti-calendar-event me-1"></i>EN CURSO
                                     </label>
                                     
                                     <input type="radio" class="btn-check" name="dateFilter" id="filterPast" value="past">
-                                    <label class="btn btn-outline-secondary" for="filterPast">
+                                    <label class="btn btn-outline-primary" for="filterPast">
                                         <i class="ti ti-calendar-time me-1"></i>PASADAS
                                     </label>
                                 </div>
