@@ -307,11 +307,11 @@ DevTools → Network, filtro `/api/`, caché desactivada.
 - **Qué:** cargar `loadClientSpecificPricing` y catálogos pesados **bajo demanda** (al abrir el modal / seleccionar item) en vez de en `init`. Quitar `?_t=Date.now()` de datos sesión-estática.
 - **Riesgo:** medio (timing: verificar dependencias en init).
 
-### IL-6 — No bloquear con el quote (mayor valor single, mayor cuidado)
-- **Qué:** mover `loadQuoteData()` al `Promise.all` para que NO bloquee (~líneas 305 vs 322).
-- **Pre-requisito (auditar):** qué usa el quote temprano — `this.numberOfPeople`, `this.clientId` (`getClientId`, línea ~308), `GuideFormulaEvaluator.ready()` (~311), y el render inicial. Hay que asegurar defaults / re-binding tras resolver el quote.
-- **Efecto:** ~4–5 s que dejan de ir en serie.
-- **Riesgo:** medio-alto (puede romper el render si algo asume el quote ya cargado). **Dejar al final**, con verificación cuidadosa.
+### IL-6 — No bloquear con el quote — ✅ IMPLEMENTADO (solape)
+- **Auditoría:** `this.clientId` viene del DOM (`getClientId`), no del quote. `processServiceItems` se auto-carga lo que necesita (`await ensureToursCache()`), así que **no depende** de que el batch termine. El batch no usa resultados del quote. El re-render final ya existía tras cargar rates.
+- **Hecho:** en `init()`, `loadQuoteData()` se dispara **sin `await`** (`const quoteReady = ...`) para **solapar** su red+proceso con el `Promise.all` del batch; se hace `await quoteReady` **después del batch**, antes del re-render/pricing (que sí dependen de los servicios). `clientId` se fija antes del disparo.
+- **Efecto:** ~4–5 s que antes iban en serie ahora se solapan con el batch (carga inicial total ≈ max en vez de suma).
+- **Riesgo:** bajo-medio. Posible flash de render incompleto (lo corrige el re-render post-batch) y, en el peor caso, un fetch de tours duplicado si `ensureToursCache` corre antes que `loadAllTours` (tours queda cacheado igual). `loadQuoteData` tiene su propio try/catch → `quoteReady` no rechaza en el hueco.
 
 ## Orden sugerido
 IL-2 (índices) → IL-1 (caché rates) → IL-3 (getQuoteById) → IL-4 (payload) → IL-5 (lazy) → IL-6 (paralelizar quote, con auditoría).
