@@ -235,6 +235,21 @@
                         color: inherit !important;
                     }
 
+                    /* "Incluye" / "No incluye" — always two columns (even in the
+                       PDF export, where Bootstrap's md breakpoint isn't reliable).
+                       Collapses to a single column only on very narrow screens. */
+                    .service-includes-grid {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 0.5rem 1rem;
+                        margin-top: 0.5rem;
+                    }
+                    @media (max-width: 575.98px) {
+                        .service-includes-grid {
+                            grid-template-columns: 1fr;
+                        }
+                    }
+
                     .service-price {
                         font-weight: normal;
                         font-size: 1.075rem;
@@ -311,6 +326,37 @@
                     /* Hide prices in preview mode if requested */
                     .services-renderer-preview.hide-prices .service-price,
                     .services-renderer-preview.hide-prices .day-footer {
+                        display: none !important;
+                    }
+
+                    /* ===== PDF pagination (section-per-day strategy) =====
+                       Per stakeholder request: prefer whole, readable sections over
+                       compact pages — even if that leaves blank space at the bottom of a
+                       page, that reads better than an arbitrary mid-content cut.
+                       - Each day starts on a fresh page (except the first, which flows
+                         right under the header / client info).
+                       - A single service is never split across pages. Assignments are
+                         hidden from the PDF (below), so services stay short enough that
+                         break-inside:avoid is always physically honorable.
+                       Scoped to .pdf-export-mode (added to <body> by PdfRenderService)
+                       so on-screen rendering is untouched. */
+                    .pdf-export-mode .day-card + .day-card {
+                        break-before: page;
+                        page-break-before: always;
+                    }
+                    .pdf-export-mode .service-item,
+                    .pdf-export-mode .day-footer {
+                        break-inside: avoid;
+                        page-break-inside: avoid;
+                    }
+                    .pdf-export-mode .day-header {
+                        break-after: avoid;
+                        page-break-after: avoid;
+                    }
+                    /* Internal assignments (drivers, vehicles, guides, greeters) are
+                       operational data — hidden from the exported PDF. The on-screen
+                       public view still renders them. */
+                    .pdf-export-mode .assignments-block {
                         display: none !important;
                     }
                 </style>
@@ -631,11 +677,13 @@
                 </div>`;
             }
 
-            // Guide ("Incluye Guía" en todos los tipos; a-disposición se renombró de Chofer a Guía)
+            // Guide. Tours bundle guide + driver, so the tag reads "Incluye Guía + Driver";
+            // a-disposición keeps just "Incluye Guía".
             if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
+                const guideLabel = service.type === 'a-disposicion' ? 'Incluye Driver' : 'Incluye Guía + Driver';
                 html += `<div class="service-detail-item text-success mt-1">
                     <i class="ti ti-user me-1"></i>
-                    <strong>Incluye Guía</strong>
+                    <strong>${service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía'}</strong>
                 </div>`;
             }
 
@@ -644,13 +692,40 @@
                 const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
                 html += `<div class="service-detail-item text-info mt-1">
                     <i class="ti ti-users me-1"></i>
-                    <strong>Incluye Greeter${greeterLocation}</strong>
+                    <strong>Incluye Greeter + Driver${greeterLocation}</strong>
                 </div>`;
             }
 
             // Note: "Verificar disponibilidad" warning is intentionally NOT rendered here.
             // It belongs only to the internal cotización (services edit) view; the summary /
             // public quote should never expose it to clients.
+
+            // "Incluye" / "No incluye" for tours and experiences, shown in two columns.
+            // The backend enriches each subconcept with these fields (no client cache
+            // needed). Line breaks are preserved via white-space: pre-wrap.
+            if (service.type === 'tour' || service.type === 'experience') {
+                const normalizeIncludes = (val) => {
+                    if (Array.isArray(val)) return val.map((v) => String(v).trim()).filter(Boolean).join('\n');
+                    if (typeof val === 'string') return val.trim();
+                    return '';
+                };
+                const includesText = normalizeIncludes(service.includes);
+                const notIncludesText = normalizeIncludes(service.notincludes);
+                if (includesText || notIncludesText) {
+                    const includesCol = (icon, color, label, value) => (value ? `
+                        <div class="d-flex align-items-start">
+                            <i class="ti ti-${icon} me-1 mt-1" style="color: ${color};"></i>
+                            <span>
+                                <span class="fw-semibold d-block" style="color: ${color};">${label}</span>
+                                <span style="white-space: pre-wrap; word-break: break-word;">${value}</span>
+                            </span>
+                        </div>` : '');
+                    html += `<div class="service-includes-grid">
+                        ${includesCol('circle-check', '#198754', 'Incluye', includesText)}
+                        ${includesCol('circle-x', '#dc3545', 'No incluye', notIncludesText)}
+                    </div>`;
+                }
+            }
 
             // Notes (callout style — full-width gray background, text inside flows naturally).
             if (service.notes) {
@@ -894,12 +969,32 @@
 
             // Schedule time
             if (service.selectedSchedule || service.startTime || service.time) {
-                const timeLabel = this.config.displayRules.getScheduleLabel(service);
-                const timeValue = service.selectedSchedule || service.startTime || service.time;
-                html += `<div class="service-detail-item">
-                    <i class="ti ti-clock me-1"></i>
-                    ${timeLabel} ${timeValue}
-                </div>`;
+                const parts = String(service.selectedSchedule || '').split(/\s*-\s*/);
+                const startT = service.startTime || service.time || parts[0] || '';
+                const endT = service.endTime || (parts.length > 1 ? parts[1] : '');
+                // Point transfers (local & punto a punto): split into start
+                // ("Hora de pick-up" for local, "Hora de salida" for punto a punto)
+                // + estimated arrival.
+                if (service.transportType === 'local' || service.transportType === 'punto-a-punto') {
+                    const startLabel = service.transportType === 'local' ? 'Hora de pick-up:' : 'Hora de salida:';
+                    html += `<div class="service-detail-item">
+                        <i class="ti ti-clock me-1"></i>
+                        <span class="me-1">${startLabel}</span> ${startT}
+                    </div>`;
+                    if (endT) {
+                        html += `<div class="service-detail-item">
+                            <i class="ti ti-flag me-1"></i>
+                            <span class="me-1">Hora estimada de llegada:</span> ${endT}
+                        </div>`;
+                    }
+                } else {
+                    const timeLabel = this.config.displayRules.getScheduleLabel(service);
+                    const timeValue = service.selectedSchedule || service.startTime || service.time;
+                    html += `<div class="service-detail-item">
+                        <i class="ti ti-clock me-1"></i>
+                        ${timeLabel} ${timeValue}
+                    </div>`;
+                }
             }
 
             // Departure time suggestions - only show for departure services (not arrivals)
@@ -947,11 +1042,12 @@
 
             // Route duration is kept in data for pricing calculations but not displayed in UI
 
-            // Specific location
+            // Specific location — label depends on direction (departure → salida, arrival → llegada)
             if (specificLocation) {
+                const addressLabel = service.directionType === 'departure' ? 'Dirección de salida:' : 'Dirección de llegada:';
                 html += `<div class="service-detail-item">
                     <i class="ti ti-map-pin me-1"></i>
-                    <span class="text-muted me-1">Dirección de llegada:</span>
+                    <span class="text-muted me-1">${addressLabel}</span>
                     ${specificLocation}
                 </div>`;
             }
@@ -1004,7 +1100,9 @@
 
             // Guide (label differs: a-disposicion → Chofer, tours/experiences → Guía)
             if (service.includeGuide) {
-                const guideLabel = service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía';
+                const guideLabel = service.type === 'a-disposicion'
+                    ? 'Incluye Chofer'
+                    : (service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía');
                 html += `<div class="service-detail-item text-success mt-1">
                     <i class="ti ti-user me-1"></i>
                     <strong>${guideLabel}</strong>
@@ -1016,7 +1114,7 @@
                 const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
                 html += `<div class="service-detail-item text-info mt-1">
                     <i class="ti ti-users me-1"></i>
-                    <strong>Incluye Greeter${greeterLocation}</strong>
+                    <strong>Incluye Greeter + Driver${greeterLocation}</strong>
                 </div>`;
             }
 
@@ -1139,7 +1237,9 @@
 
             // Guide (label differs: a-disposicion → Chofer, tours/experiences → Guía)
             if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
-                const guideLabel = service.type === 'a-disposicion' ? 'Incluye Chofer' : 'Incluye Guía';
+                const guideLabel = service.type === 'a-disposicion'
+                    ? 'Incluye Chofer'
+                    : (service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía');
                 html += `<div class="service-detail-item text-success">
                     <i class="ti ti-user me-1"></i>
                     <strong>${guideLabel}</strong>
@@ -1150,7 +1250,7 @@
             if ((service.type === 'tour' || service.type === 'transport') && service.includeGreeter) {
                 html += `<div class="service-detail-item text-info">
                     <i class="ti ti-users me-1"></i>
-                    <strong>Incluye Greeter</strong>
+                    <strong>Incluye Greeter + Driver</strong>
                 </div>`;
             }
 

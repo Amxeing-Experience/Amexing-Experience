@@ -105,6 +105,73 @@ async function batchFetchPrimaryImages(imageClass, pointerField, parentClass, id
 }
 
 /**
+ * Batch fetch "incluye" / "no incluye" text for tours or experiences.
+ * These fields live on the Tour/Experience catalog records, not on the
+ * quote's serviceItems, so we resolve them by id to enrich each subconcept.
+ * @param {string} parentClass - Parse class name ('Tour' or 'Experience').
+ * @param {Array<string>} ids - Array of parent object IDs.
+ * @returns {Promise<object>} Map of parentId to { includes, notincludes }.
+ */
+async function batchFetchIncludes(parentClass, ids) {
+  const map = {};
+  const uniqueIds = [...new Set((ids || []).filter(Boolean))];
+  if (uniqueIds.length === 0) return map;
+
+  try {
+    const query = new Parse.Query(parentClass);
+    query.containedIn('objectId', uniqueIds);
+    query.select('includes', 'notincludes');
+    const records = await query.find({ useMasterKey: true });
+    records.forEach((rec) => {
+      map[rec.id] = {
+        includes: rec.get('includes') ?? null,
+        notincludes: rec.get('notincludes') ?? null,
+      };
+    });
+  } catch (err) {
+    logger.warn('Failed to batch fetch includes/notincludes', { parentClass, error: err.message });
+  }
+
+  return map;
+}
+
+/**
+ * Enrich each tour/experience subconcept with its catalog "incluye" / "no incluye"
+ * text so the unified renderer (summary + public quote) can display it without
+ * needing client-side catalog caches. Mutates the provided serviceItems in place.
+ * @param {object} serviceItems - serviceItems object with days[].subconcepts[].
+ * @returns {Promise<void>}
+ */
+async function injectServiceIncludes(serviceItems) {
+  if (!serviceItems || !Array.isArray(serviceItems.days)) return;
+
+  const tourIds = [];
+  const experienceIds = [];
+  serviceItems.days.forEach((day) => {
+    (day.subconcepts || []).forEach((sc) => {
+      if (sc.tourId) tourIds.push(sc.tourId);
+      if (sc.experienceId) experienceIds.push(sc.experienceId);
+    });
+  });
+
+  const [tourMap, expMap] = await Promise.all([
+    batchFetchIncludes('Tour', tourIds),
+    batchFetchIncludes('Experience', experienceIds),
+  ]);
+
+  serviceItems.days.forEach((day) => {
+    (day.subconcepts || []).forEach((sc) => {
+      const info = (sc.tourId && tourMap[sc.tourId])
+        || (sc.experienceId && expMap[sc.experienceId])
+        || null;
+      if (info) {
+        Object.assign(sc, { includes: info.includes, notincludes: info.notincludes });
+      }
+    });
+  });
+}
+
+/**
  * Quote Controller - Manages quote/cotización CRUD operations
  * Handles creation, retrieval, update, and deletion of quotes with rate assignments.
  * @class QuoteController
@@ -184,34 +251,37 @@ class QuoteController {
             clientId: clientIdNormalized,
             userId: currentUser.id,
           });
-          // Direct Amexing client - only set companyClientPtr, leave client null
+          // People-type clients now live in AmexingUser (role 'end_client'): store them in the
+          // `client` pointer (AmexingUser), no companyClientPtr. Fall back to a legacy Client
+          // record (clientBelongsTo='amexing') for pre-migration ids so old data still works.
           try {
-            // Verify this is actually a direct Amexing client
-            const clientQuery = new Parse.Query('Client');
-            const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
-            const clientBelongsTo = clientRecord.get('clientBelongsTo');
+            const userQuery = new Parse.Query('AmexingUser');
+            const endClient = await userQuery.get(clientIdNormalized, { useMasterKey: true }).catch(() => null);
 
-            if (clientBelongsTo === 'amexing') {
-              // Valid direct Amexing client
-              companyClientObj = {
+            if (endClient && endClient.get('role') === 'end_client') {
+              clientObj = {
                 __type: 'Pointer',
-                className: 'Client',
+                className: 'AmexingUser',
                 objectId: clientIdNormalized,
               };
-
-              // Leave clientObj null for direct clients
-              clientObj = null;
-
-              logger.info('QuoteController.createQuote - Creating quote for direct Amexing client', {
+              companyClientObj = null;
+              logger.info('QuoteController.createQuote - Direct quote for end_client user', {
                 clientId: clientIdNormalized,
-                clientType: 'direct',
               });
             } else {
-              logger.warn('QuoteController.createQuote - Client is not a direct Amexing client', {
-                clientId: clientIdNormalized,
-                clientBelongsTo,
-              });
-              return this.sendError(res, 'El cliente seleccionado no es un cliente directo de Amexing', 400);
+              // Legacy direct Client (pre-migration).
+              const clientQuery = new Parse.Query('Client');
+              const clientRecord = await clientQuery.get(clientIdNormalized, { useMasterKey: true });
+              if (clientRecord.get('clientBelongsTo') === 'amexing') {
+                companyClientObj = {
+                  __type: 'Pointer',
+                  className: 'Client',
+                  objectId: clientIdNormalized,
+                };
+                clientObj = null;
+              } else {
+                return this.sendError(res, 'El cliente seleccionado no es un cliente directo de Amexing', 400);
+              }
             }
           } catch (error) {
             logger.error('QuoteController.createQuote - Error verifying direct client', {
@@ -527,6 +597,17 @@ class QuoteController {
       // Empty type = no filter; with type but no id, filter by type. With id, by entity.
       const clientTypeFilter = req.query.clientTypeFilter || ''; // '', 'agency', 'client'
       const clientIdFilter = req.query.clientIdFilter || '';
+      /**
+       * Apply the agency/client filter to a quotes query based on the request's
+       * clientTypeFilter and clientIdFilter. For 'agency' it filters on the
+       * AmexingUser pointer (quote.client); for 'client' it filters on the Client
+       * pointer (quote.companyClientPtr). With no ID, filters by type presence.
+       * Mutates the query in place; no-op when no valid type filter is set.
+       * @param {Parse.Query} q - The quotes query to constrain.
+       * @returns {void}
+       * @example
+       *   applyQuoteClientFilter(query); // narrows query to the selected agency/client
+       */
       const applyQuoteClientFilter = (q) => {
         if (clientTypeFilter !== 'agency' && clientTypeFilter !== 'client') return;
         if (clientTypeFilter === 'client') {
@@ -1063,8 +1144,38 @@ class QuoteController {
         });
       });
 
+      // Enrich tour/experience subconcepts with "incluye" / "no incluye" text
+      await injectServiceIncludes(data.serviceItems);
+
       // Fetch and merge suggested departure times from ReservationService records
       await this.mergeSuggestedDepartureTimes(data);
+
+      // Resolve the final client's name (Lead Guest falls back to it when no
+      // explicit lead guest is set).
+      data.clientFinal = null;
+      if (data.clientFinalId) {
+        try {
+          const cf = await new Parse.Query('Client').get(data.clientFinalId, { useMasterKey: true });
+          const companyName = cf.get('contextualData')?.companyName || '';
+          const firstName = cf.get('firstName') || cf.get('contactFirstName') || '';
+          const lastName = cf.get('lastName') || cf.get('contactLastName') || '';
+          const name = cf.get('name') || '';
+          data.clientFinal = {
+            id: cf.id,
+            firstName,
+            lastName,
+            name,
+            companyName,
+            fullName: companyName || name || `${firstName} ${lastName}`.trim(),
+          };
+        } catch (cfError) {
+          logger.warn('Failed to resolve clientFinal name', {
+            quoteId: quote.id,
+            clientFinalId: data.clientFinalId,
+            error: cfError.message,
+          });
+        }
+      }
 
       return res.json({
         success: true,
@@ -1269,6 +1380,30 @@ class QuoteController {
       // If status is being updated, always use the reliable status update method (same as admin)
       // This ensures consistent reservation creation logic between admin and department manager flows
       if (updates.status) {
+        // updateQuoteStatus only changes the status, so any general-info fields
+        // sent alongside it (contact, lead guest, people, notes, eventType, etc.)
+        // would be dropped. Persist them first via updateQuote — which also syncs
+        // the linked reservation's info. Isolated so it never blocks the status change.
+        const infoUpdates = { ...updates };
+        delete infoUpdates.status;
+        delete infoUpdates.reason;
+        if (Object.keys(infoUpdates).length > 0) {
+          try {
+            await this.quoteService.updateQuote(
+              currentUser,
+              quoteId,
+              infoUpdates,
+              updates.reason || 'Quote info updated',
+              req.userRole
+            );
+          } catch (infoError) {
+            logger.error('Failed to persist general info alongside status change', {
+              quoteId,
+              error: infoError.message,
+            });
+          }
+        }
+
         logger.info('🔄 Status change detected, delegating to updateQuoteStatus', {
           quoteId,
           status: updates.status,
@@ -2066,6 +2201,19 @@ class QuoteController {
 
       // Create or update ReservationService records for transport services with suggested departure times
       await this.persistSuggestedDepartureTimes(quote.id, sortedAndCleanedDays, currentUser);
+
+      // If this quote is already a reservation, keep the reservation in sync with
+      // the edited service items (preserving driver/vehicle assignments). Isolated
+      // so a sync failure never blocks the quote save.
+      try {
+        await this.quoteService.syncReservationFromQuote(quote, serviceItems);
+      } catch (syncError) {
+        logger.error('Failed to sync reservation after service items update', {
+          quoteId: quote.id,
+          error: syncError.message,
+          stack: syncError.stack,
+        });
+      }
 
       logger.info('Service items updated successfully', {
         quoteId: quote.id,

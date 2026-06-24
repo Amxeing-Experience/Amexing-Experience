@@ -1,0 +1,371 @@
+<%
+/**
+ * Reservation itinerary — travel-itinerary style PDF, rendered by
+ * PublicReservationController.viewReservationItinerary and exported via puppeteer (?pdf=1).
+ */
+const q = quote || {};
+const si = q.serviceItems || {};
+const days = Array.isArray(si.days) ? si.days : [];
+const specialist = q.travelSpecialist || null;
+
+const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const DOW = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+const DOW_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+const toDate = (v) => {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const [y, m, d] = v.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const guestName = `${q.leadGuestFirstName || ''} ${q.leadGuestLastName || ''}`.trim()
+  || q.contactPerson
+  || `${q.contactFirstName || ''} ${q.contactLastName || ''}`.trim()
+  || (q.client && q.client.companyName)
+  || (q.client && `${q.client.firstName || ''} ${q.client.lastName || ''}`.trim())
+  || 'Huésped';
+
+const startDate = toDate(q.startDate) || (days[0] && toDate(days[0].date));
+const endDate = toDate(q.endDate) || (days.length && toDate(days[days.length - 1].date));
+
+let headerMonth = '';
+let headerRange = '';
+let headerYear = '';
+if (startDate) {
+  headerMonth = MONTHS[startDate.getMonth()];
+  headerYear = String(startDate.getFullYear());
+  const startDay = startDate.getDate();
+  const endDay = endDate ? endDate.getDate() : startDay;
+  headerRange = endDate && endDay !== startDay ? `${startDay}-${endDay}` : String(startDay);
+}
+
+const titleFor = (sc) => {
+  if (sc.concept && sc.concept.trim()) return sc.concept;
+  if (sc.destinationPOI) return sc.destinationPOI;
+  if (sc.originName && sc.destinationName) return `${sc.originName} → ${sc.destinationName}`;
+  if (sc.type === 'a-disposicion') {
+    const h = Number(sc.duration || sc.hours || 0);
+    return h ? `A Disposición - ${h} hora${h === 1 ? '' : 's'}` : 'A Disposición';
+  }
+  return sc.serviceType || 'Servicio';
+};
+
+const peopleLabel = (sc) => {
+  const parts = [];
+  const adults = Number(sc.adultsQuantity || 0) + Number(sc.adultsNoAlcoholQuantity || 0);
+  const children = Number(sc.childrenQuantity || 0);
+  const infants = Number(sc.infantsQuantity || 0);
+  if (adults) parts.push(`${adults} ${adults === 1 ? 'adulto' : 'adultos'}`);
+  if (children) parts.push(`${children} ${children === 1 ? 'niño' : 'niños'}`);
+  if (infants) parts.push(`${infants} ${infants === 1 ? 'infante' : 'infantes'}`);
+  if (!parts.length && sc.numberOfPeople) {
+    const n = Number(sc.numberOfPeople);
+    return `${n} ${n === 1 ? 'persona' : 'personas'}`;
+  }
+  return parts.join(', ');
+};
+
+// Lines starting with "-" render as a bullet list; everything else stays plain text.
+const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const renderNotes = (text) => {
+  const lines = String(text).split('\n');
+  if (!lines.some((l) => l.trim().startsWith('-'))) return escapeHtml(text);
+  let html = ''; let inList = false;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line.startsWith('-')) {
+      if (!inList) { html += '<ul class="itin-notes-list">'; inList = true; }
+      html += `<li>${escapeHtml(line.replace(/^-\s*/, ''))}</li>`;
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      if (line) html += `<div>${escapeHtml(line)}</div>`;
+    }
+  }
+  if (inList) html += '</ul>';
+  return html;
+};
+
+const dayLabel = (day) => {
+  const d = toDate(day.date);
+  if (!d) return day.title || day.dayTitle || `Día ${day.dayNumber}`;
+  return `${DOW[d.getDay()]}. ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
+};
+
+const COMPANY = {
+  name: 'Amexing Experience',
+  address: '5 Vicente Suárez, San Miguel de Allende, Guanajuato, MX, 37732',
+  url: 'https://www.amexingexperience.com/en',
+};
+
+const LOGO_URL = q.logoUrl || '/images/logos/light_white_amexing.png';
+const HEADER_BG = q.headerBg || '/images/header_bg_pdf.png';
+const ICON_BASE = '/images/icons';
+
+// Arpona embedded inline (base64) by the controller so the cover renders correctly even
+// when a proxy/WAF blocks the .otf network requests (HTTP 426) — no network fetch needed.
+const ARPONA_EMBED_CSS = typeof arponaEmbedCss === 'string' ? arponaEmbedCss : '';
+const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '';
+const iconKey = (sc) => {
+  if (sc.type === 'traslado' || sc.type === 'transport') {
+    if (sc.transportType === 'aeropuerto') return sc.directionType === 'departure' ? 'departure' : 'arrival';
+    return 'transfer';
+  }
+  if (sc.type === 'tour') return 'city';
+  if (sc.type === 'experiencia') return 'experience';
+  return 'experience';
+};
+%>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title><%= pageTitle || 'Itinerario' %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/dashboard/css/icons/tabler-icons/tabler-icons.css">
+  <link rel="stylesheet" href="/css/fonts.css">
+  <% if (ARPONA_EMBED_CSS) { %><style id="arpona-embedded">
+    <%- ARPONA_EMBED_CSS %>
+    /* Cover headings use the embedded TTF family directly so Chrome embeds it in the PDF. */
+    .itin-guest, .itin-dates { font-family: 'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif) !important; }
+  </style><% } %>
+  <% if (MYRIAD_EMBED_CSS) { %><style id="myriad-embedded">
+    <%- MYRIAD_EMBED_CSS %>
+    /* @font-face only; body / .itin-resnum reference 'MyriadPDF' in the main stylesheet
+       below so Chrome embeds the TTF in the PDF (the .otf faces from fonts.css are dropped). */
+  </style><% } %>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif);
+      color: #2b2b2b;
+      margin: 0;
+      background: #fff;
+      font-size: 13px;
+    }
+    .itin { max-width: none; width: 100%; margin: 0; }
+
+    /* Header */
+    .itin-header { color: #fff; }
+    .itin-logo-img { max-width: 230px; height: auto; }
+    .itin-icon img { width: 50px; height: 50px; object-fit: contain; }
+    .itin-place .thumb img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+
+    /* Solid sage top bar: left logo (vertically centered) + travel specialist on the right */
+    .itin-topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #8a8c6e; padding: 22px 28px;
+    }
+
+    /* Photo hero with white fade: guest name + dates + reservation number */
+    .itin-hero {
+      position: relative; text-align: center; color: #2b2b2b;
+      background: #6f7459 url('<%= HEADER_BG %>') center/cover no-repeat;
+      padding: 24px 28px 8px;
+    }
+    /* No CSS white overlay — header_bg_pdf.png already has the white wash/fade baked in. */
+    .itin-hero > * { position: relative; z-index: 1; }
+    .itin-specialist { text-align: right; font-size: 1rem; line-height: 1.55; opacity: 0.95; }
+    .itin-specialist .name { font-size: 1.35rem; font-weight: 400; }
+    .itin-specialist .name strong { font-weight: 700; }
+
+    /* Cover headings use Arpona (matches the approved VF), not the body Myriad. */
+    .itin-guest {
+      font-family: var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);
+      margin: 8px auto 0;
+      text-align: center;
+      font-size: 3.2rem;
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: 1px;
+      color: #2b2b2b;
+    }
+    .itin-dates { font-family: var(--font-arpona, 'Helvetica Neue', Arial, sans-serif); text-align: center; line-height: 0.9; color: #555555; max-width: 360px; margin: 4px auto 0; padding: 8px 0; border-top: 1px solid #b8b8a8; border-bottom: 1px solid #b8b8a8; }
+    .itin-dates .month { font-size: 2.1rem; font-weight: 400; letter-spacing: 8px; text-transform: capitalize; }
+    .itin-dates .range { font-size: 3.6rem; font-weight: 300; letter-spacing: 6px; margin: -2px 0; }
+    .itin-dates .year { font-size: 1.3rem; font-weight: 400; letter-spacing: 6px; opacity: 0.85; }
+    .itin-resnum { font-family: 'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif); font-weight: 300; text-align: center; margin-top: 12px; font-size: 0.85rem; letter-spacing: 1px; }
+    .itin-resnum strong { font-weight: 700; }
+
+    /* Day bar */
+    .itin-day-bar {
+      background: #888888; color: #fff;
+      font-family: 'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);
+      font-weight: 500; font-size: 0.8rem;
+      letter-spacing: 1px; padding: 0 28px; margin-top: 18px;
+      break-after: avoid; page-break-after: avoid;
+    }
+    .itin-day-bar + .itin-entry { padding-top: 16px; }
+
+    /* Timeline entry */
+    .itin-entry { display: flex; gap: 16px; padding: 0 28px; break-inside: avoid; page-break-inside: avoid; }
+    .itin-rail { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+    .itin-icon {
+      width: 56px; height: 56px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; color: #6f7459; font-size: 1.3rem;
+      background: #fff;
+    }
+    /* box-decoration-break:clone re-applies padding-top + the gradient line on each page
+       fragment, so pages 2+ get top breathing room while the line runs through the break. */
+    .itin-timeline {
+      background: linear-gradient(#d8dac9, #d8dac9) no-repeat 56px 0 / 1.5px 100%;
+      padding-top: 12mm;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
+    }
+    /* First day sits flush against the hero photo (cancels the timeline's top padding
+       on page 1 only; pages 2+ keep their 12mm breathing room). */
+    .itin-day-bar:first-child { margin-top: -12mm; }
+    .itin-body { flex: 1; min-width: 0; padding-bottom: 18px; }
+
+    .itin-time { font-size: 0.95rem; font-weight: 700; color: #1b1b1b; }
+    .itin-time .tz { font-weight: 400; color: #8a8a8a; }
+    .itin-svc-title { font-size: 1.05rem; font-weight: 700; color: #1b1b1b; margin-top: 1px; }
+    .itin-sub { color: #6c757d; margin-top: 2px; }
+
+    /* Flight detail table */
+    .itin-flight { display: grid; grid-template-columns: repeat(4, auto); gap: 2px 28px; margin-top: 8px; }
+    .itin-flight .h { font-size: 0.7rem; color: #8a8a8a; }
+    .itin-flight .v { font-size: 0.9rem; color: #1b1b1b; font-weight: 600; }
+
+    .itin-desc { margin-top: 8px; color: #555; line-height: 1.55; white-space: pre-line; text-align: justify; }
+
+    /* Per-service location / company footer */
+    .itin-place { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+    .itin-place .thumb {
+      width: 54px; height: 54px; border-radius: 50%; background: #eef0e8; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; color: #b6bda0;
+    }
+    .itin-place .meta { font-size: 0.78rem; line-height: 1.45; color: #555; }
+    .itin-place .meta .t { font-weight: 700; color: #1b1b1b; }
+    .itin-place .meta a { color: #6f7459; text-decoration: none; }
+
+    @media print { body { font-size: 12px; } }
+    .itin-notes-list { margin: 6px 0 0; padding-left: 1.2em; }
+    .itin-notes-list li { list-style: disc; margin: 2px 0; }
+    .itin-specialist .itin-contact { margin-top: 12px; font-weight: 600; font-size: 0.95rem; }
+    .itin-closing { text-align: center; padding: 26px 28px 30px; color: #8a8c6e; margin: 28px 28px 0; border-top: 1px solid #e2e2d8; }
+    .itin-thanks { letter-spacing: 4px; font-size: 0.95rem; }
+    .itin-closing a { color: #8a8c6e; text-decoration: none; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="itin" id="summaryContent">
+
+    <header class="itin-header">
+      <div class="itin-topbar">
+        <img class="itin-logo-img" src="<%= LOGO_URL %>" alt="<%= COMPANY.name %>" onerror="this.style.display='none'">
+        <% if (specialist) { %>
+        <div class="itin-specialist">
+          <div class="name">I'm <strong><%= specialist.firstName || specialist.fullName || '' %></strong> <%= specialist.lastName || '' %></div>
+          <div>Travel Specialist</div>
+          <% if (specialist.email) { %><div><%= specialist.email %></div><% } %>
+          <div class="itin-contact"><%= specialist.phone ? specialist.phone + ' | ' : '' %>amexingexperience.com</div>
+        </div>
+        <% } %>
+      </div>
+
+      <div class="itin-hero">
+        <div class="itin-guest"><%= guestName %></div>
+
+        <% if (headerMonth) { %>
+        <div class="itin-dates">
+          <div class="month"><%= headerMonth %></div>
+          <div class="range"><%= headerRange %></div>
+          <div class="year">- <%= headerYear %> -</div>
+        </div>
+        <% } %>
+
+        <div class="itin-resnum">N° de reservación: <strong><%= q.folio || '' %></strong></div>
+      </div>
+    </header>
+
+    <div class="itin-timeline">
+    <% days.forEach((day) => { %>
+      <div class="itin-day-bar"><%= dayLabel(day) %></div>
+
+      <% (day.subconcepts || []).forEach((sc) => { %>
+        <div class="itin-entry">
+          <div class="itin-rail">
+            <div class="itin-icon"><img src="<%= ICON_BASE %>/<%= iconKey(sc) %>.png" alt="" onerror="this.style.display='none'"></div>
+          </div>
+          <div class="itin-body">
+
+            <% if (sc.time || sc.duration || sc.hours) { %>
+              <div class="itin-time">
+                <% if (sc.time) { %><%= sc.time %><% } %><% if ((sc.time) && (sc.duration || sc.hours)) { %> - <% } %><% if (sc.duration || sc.hours) { const _h = Number(sc.duration || sc.hours); %><%= _h %> hour<%= _h === 1 ? '' : 's' %><% } %>
+              </div>
+            <% } %>
+
+            <div class="itin-svc-title"><%= titleFor(sc) %></div>
+
+            <% if (sc.originName || sc.destinationName) { %>
+              <div class="itin-sub">
+                <% if (sc.originName) { %>Desde: <strong><%= sc.originName %></strong><% } %>
+                <% if (sc.destinationName) { %><br>Hacia: <strong><%= sc.destinationName %></strong><% } %>
+              </div>
+            <% } %>
+
+            <% if (sc.airline || sc.flightNumber) { %>
+              <div class="itin-flight">
+                <div class="h">Airline</div><div class="h">Flight Number</div><div class="h">Terminal</div><div class="h">Gate</div>
+                <div class="v"><%= sc.airline || '—' %></div>
+                <div class="v"><%= sc.flightNumber || '—' %></div>
+                <div class="v">—</div>
+                <div class="v">—</div>
+              </div>
+            <% } %>
+
+            <% if (peopleLabel(sc)) { %><div class="itin-sub" style="margin-top:6px;"><strong><%= peopleLabel(sc) %></strong></div><% } %>
+
+            <% const desc = sc.clientNotes || sc.notes || ''; if (desc) { %>
+              <div class="itin-desc"><%- renderNotes(desc) %></div>
+            <% } %>
+
+            <!-- Thumbnail is a placeholder until per-service photos are provided -->
+            <div class="itin-place">
+              <div class="thumb"><i class="ti ti-photo"></i></div>
+              <div class="meta">
+                <div class="t"><%= COMPANY.name %></div>
+                <div><%= COMPANY.address %></div>
+                <a href="<%= COMPANY.url %>"><%= COMPANY.url %></a>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      <% }) %>
+    <% }) %>
+    </div>
+
+    <div class="itin-closing">
+      <div class="itin-thanks">THANK YOU FOR YOUR PREFERENCE!</div>
+      <a href="<%= COMPANY.url %>">amexingexperience.com</a>
+    </div>
+
+  </div>
+  <script>
+    // Explicitly load the Arpona weights used on the cover so the (embedded base64) font is
+    // rasterized before the PDF snapshot. font-display:block + fonts.ready alone can resolve
+    // before the face is actually applied; PdfRenderService waits for window.__fontsReady.
+    (function () {
+      var faces = ["300 1em ArponaPDF", "400 1em ArponaPDF", "500 1em ArponaPDF", "700 1em ArponaPDF",
+        "300 1em MyriadPDF", "400 1em MyriadPDF", "600 1em MyriadPDF", "700 1em MyriadPDF"];
+      var done = function () { window.__fontsReady = true; };
+      if (document.fonts && document.fonts.load) {
+        Promise.all(faces.map(function (f) { return document.fonts.load(f).catch(function () {}); }))
+          .then(function () { return document.fonts.ready; })
+          .then(done, done);
+      } else {
+        done();
+      }
+    })();
+  </script>
+</body>
+</html>

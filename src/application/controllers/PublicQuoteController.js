@@ -71,6 +71,9 @@ class PublicQuoteController {
       // Fetch primary images for tours and experiences
       await this.injectServiceImages(quoteData);
 
+      // Enrich tour/experience subconcepts with "incluye" / "no incluye" text
+      await this.injectServiceIncludes(quoteData);
+
       return res.render('dashboards/admin/quote-public', {
         quote: quoteData,
         isPublicView: true,
@@ -251,6 +254,8 @@ class PublicQuoteController {
     // so the public/PDF value matches exactly.
     const owner = await this.ownershipService.getCurrentOwner(quote.id);
     const serviceItems = quote.getServiceItems() || {};
+    // Final client name — used as the Lead Guest fallback when no explicit lead guest.
+    const clientFinal = await this.resolveClientFinalName(quote.get('clientFinalId'));
 
     return {
       id: quote.id,
@@ -283,6 +288,7 @@ class PublicQuoteController {
       leadGuestFirstName: quote.get('leadGuestFirstName') || '',
       leadGuestLastName: quote.get('leadGuestLastName') || '',
       clientFinalId: quote.get('clientFinalId') || null,
+      clientFinal,
       validUntil: quote.get('validUntil') || null,
       rate: this.formatRateData(rate),
       // Pass raw serviceItems (same as /api/quotes/:id) so the unified renderer
@@ -302,6 +308,36 @@ class PublicQuoteController {
       createdAt: quote.get('createdAt') || null,
       updatedAt: quote.get('updatedAt') || null,
     };
+  }
+
+  /**
+   * Resolves the final client's name from its id (Client class). Returns null
+   * when there's no clientFinalId or it can't be fetched.
+   * @param {string} clientFinalId - The Client objectId.
+   * @returns {Promise<object|null>} { id, firstName, lastName, name, companyName, fullName }.
+   * @example
+   * const clientFinal = await this.resolveClientFinalName(quote.get('clientFinalId'));
+   */
+  async resolveClientFinalName(clientFinalId) {
+    if (!clientFinalId) return null;
+    try {
+      const cf = await new Parse.Query('Client').get(clientFinalId, { useMasterKey: true });
+      const companyName = cf.get('contextualData')?.companyName || '';
+      const firstName = cf.get('firstName') || cf.get('contactFirstName') || '';
+      const lastName = cf.get('lastName') || cf.get('contactLastName') || '';
+      const name = cf.get('name') || '';
+      return {
+        id: cf.id,
+        firstName,
+        lastName,
+        name,
+        companyName,
+        fullName: companyName || name || `${firstName} ${lastName}`.trim(),
+      };
+    } catch (err) {
+      logger.warn('Failed to resolve clientFinal name (public)', { clientFinalId, error: err.message });
+      return null;
+    }
   }
 
   /**
@@ -650,6 +686,71 @@ class PublicQuoteController {
       });
     } catch (err) {
       logger.warn('Failed to inject service images for public quote', { error: err.message });
+    }
+  }
+
+  /**
+   * Enrich tour/experience subconcepts with their catalog "incluye" / "no incluye"
+   * text so the public unified renderer can display it (no client-side caches are
+   * available on the public view). Mutates quoteData.serviceItems in place.
+   * @param {object} quoteData - Prepared quote data with serviceItems.
+   * @returns {Promise<void>}
+   */
+  async injectServiceIncludes(quoteData) {
+    try {
+      const tourIds = [];
+      const experienceIds = [];
+      (quoteData.serviceItems?.days || []).forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          if (sc.tourId) tourIds.push(sc.tourId);
+          if (sc.experienceId) experienceIds.push(sc.experienceId);
+        });
+      });
+
+      /**
+       * Fetch the 'includes'/'notincludes' text for a set of parent records,
+       * keyed by record ID. Deduplicates and ignores falsy IDs.
+       * @param {string} parentClass - Parent Parse class name (e.g. 'Tour').
+       * @param {Array<string>} ids - Parent object IDs to resolve.
+       * @returns {Promise<object>} Map of parent ID to { includes, notincludes }.
+       * @example
+       *   const tourMap = await fetchIncludes('Tour', ['t1', 't2']);
+       */
+      const fetchIncludes = async (parentClass, ids) => {
+        const map = {};
+        const uniqueIds = [...new Set(ids.filter(Boolean))];
+        if (uniqueIds.length === 0) return map;
+
+        const query = new Parse.Query(parentClass);
+        query.containedIn('objectId', uniqueIds);
+        query.select('includes', 'notincludes');
+        const records = await query.find({ useMasterKey: true });
+        records.forEach((rec) => {
+          map[rec.id] = {
+            includes: rec.get('includes') ?? null,
+            notincludes: rec.get('notincludes') ?? null,
+          };
+        });
+        return map;
+      };
+
+      const [tourMap, expMap] = await Promise.all([
+        fetchIncludes('Tour', tourIds),
+        fetchIncludes('Experience', experienceIds),
+      ]);
+
+      (quoteData.serviceItems?.days || []).forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          const info = (sc.tourId && tourMap[sc.tourId])
+            || (sc.experienceId && expMap[sc.experienceId])
+            || null;
+          if (info) {
+            Object.assign(sc, { includes: info.includes, notincludes: info.notincludes });
+          }
+        });
+      });
+    } catch (err) {
+      logger.warn('Failed to inject service includes for public quote', { error: err.message });
     }
   }
 

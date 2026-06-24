@@ -1,0 +1,44 @@
+<script>
+(function () {
+    const root = document.getElementById('tripsRoot');
+    if (!root) return;
+    const clientId = root.dataset.clientId;
+    // People-type clients are AmexingUser → trips live under /api/agents/:id (fallback: client).
+    const base = root.dataset.ownerBase || `/api/clients/${clientId}`;
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const fmt = (v) => { if (!v) return '—'; const d = new Date(v); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-ES', { dateStyle: 'medium' }); };
+
+    const STATUS = {
+        quoted: 'bg-secondary', requested: 'bg-info', blocked: 'bg-warning',
+        scheduled: 'bg-success', rejected: 'bg-danger', cancelled: 'bg-danger',
+    };
+
+    async function load() {
+        const box = document.getElementById('tripsContainer');
+        try {
+            const res = await fetch(`${base}/trips`, {
+                credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const json = await res.json();
+            if (!res.ok || json.success === false) throw new Error(json.error || `Error ${res.status}`);
+            const trips = json.data.trips || [];
+            if (!trips.length) { box.innerHTML = '<p class="text-muted mb-0">Este cliente no tiene cotizaciones ni reservaciones.</p>'; return; }
+            box.innerHTML = `
+                <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                    <thead class="table-light"><tr><th>Folio</th><th>Evento</th><th>Fechas</th><th>Estado</th><th></th></tr></thead>
+                    <tbody>${trips.map((t) => `
+                        <tr>
+                            <td class="fw-semibold">${esc(t.folio) || '—'}</td>
+                            <td>${esc(t.eventType) || '—'}</td>
+                            <td class="text-muted small">${fmt(t.startDate)} – ${fmt(t.endDate)}</td>
+                            <td><span class="badge ${STATUS[t.status] || 'bg-secondary'}">${esc(t.status) || '—'}</span></td>
+                            <td class="text-end"><a class="btn btn-sm btn-light" href="/dashboard/admin/quotes/${t.id}" title="Ver"><i class="ti ti-eye"></i></a></td>
+                        </tr>`).join('')}</tbody>
+                </table></div>`;
+        } catch (e) { box.innerHTML = `<p class="text-danger mb-0">${esc(e.message)}</p>`; }
+    }
+
+    load();
+})();
+</script>
