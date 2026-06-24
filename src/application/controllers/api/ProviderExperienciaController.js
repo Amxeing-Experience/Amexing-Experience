@@ -131,8 +131,11 @@ class ProviderExperienciaController {
         const photos = exp.get('photos') || [];
         const processedPhotos = [];
 
-        // Process each photo to generate optimized URLs
-        for (const photo of photos) {
+        // Process each photo to generate optimized URLs.
+        // Modo lite (vista de cotización): se omite el procesamiento de fotos (genera URLs
+        // firmadas de S3 por cada foto) — es el grueso del payload (~71KB) y de la latencia, y la
+        // cotización no usa las fotos. Iterar sobre [] deja processedPhotos vacío.
+        for (const photo of (req.query.lite ? [] : photos)) {
           try {
             const processedPhoto = { ...photo };
 

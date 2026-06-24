@@ -435,6 +435,9 @@ class ToursController {
         notincludes: tour.get('notincludes') || [],
         languages: tour.get('languages') || [],
         photos: await (async () => {
+          // Modo lite (vista de cotización): no usa fotos de tours -> se omite la consulta de
+          // imágenes por tour (era N+1: una query por cada tour) + su optimización/S3.
+          if (req.query.lite) return [];
           // First, try to get images from TourImage table (new approach)
           const tourImages = await TourImage.getImagesForTour(tour.id);
 
