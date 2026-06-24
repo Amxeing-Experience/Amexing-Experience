@@ -14072,7 +14072,9 @@ class ItineraryBuilder {
         });
         if (this.clientId) params.append('clientId', this.clientId);
 
-        const res = await fetch(`/api/services/prices-by-route?${params.toString()}`, {
+        // Dedup in-flight: varias filas de vehículo extra del MISMO segmento nuevo cargan a la
+        // vez -> un solo request en vuelo (además del cache transportPriceData/additional ya usado).
+        const res = await (window.amxDedupFetch || fetch)(`/api/services/prices-by-route?${params.toString()}`, {
           headers: { Authorization: `Bearer ${this.getAccessToken() || ''}` },
         });
         if (!res.ok) {
@@ -18377,7 +18379,9 @@ class ItineraryBuilder {
       }
 
       const accessToken = this.getAccessToken();
-      const response = await fetch(`/api/services/prices-by-route?${params.toString()}`, {
+      // Dedup in-flight: colapsa disparos concurrentes idénticos (mismos origen/destino/rate),
+      // p. ej. al restaurar una edición que setea varios campos a la vez. Solo in-flight.
+      const response = await (window.amxDedupFetch || fetch)(`/api/services/prices-by-route?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${accessToken || ''}`,
         },
@@ -19021,7 +19025,8 @@ class ItineraryBuilder {
 
         qsDevLog('📡 Fetching from:', apiUrl);
 
-        const response = await fetch(apiUrl, {
+        // Dedup in-flight: colapsa disparos concurrentes idénticos para el mismo segmento/ruta.
+        const response = await (window.amxDedupFetch || fetch)(apiUrl, {
           headers: {
             Authorization: `Bearer ${accessToken || ''}`,
             'Content-Type': 'application/json',
