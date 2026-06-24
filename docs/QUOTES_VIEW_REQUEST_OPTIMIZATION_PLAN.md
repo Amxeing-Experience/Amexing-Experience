@@ -154,3 +154,100 @@ Hacer **una fase por PR**, midiendo contra el baseline de Fase 0 en cada una.
 - **Invalidación de cache:** el mayor riesgo. Al cambiar cliente, # personas, fechas o segmentos, asegurarse de invalidar lo que corresponda (`quote-data-cache` ya tiene `invalidate*`). Probar explícitamente cambiar de cliente y ver que precios cliente se recalculen.
 - **Timing en init:** si algo asume que ciertos datos ya están en init (Fase 4-C), validar dependencias antes de hacerlos lazy.
 - **No tocar** el path de precio de transporte sin reconfirmar (es frágil y muy usado).
+
+---
+
+## Resultados — Baseline (Fase 0)
+
+> Rama: `feature/quotes-perf-2`. Fecha: 2026-06-24.
+> El **baseline estático** sale del código (qué requests dispara cada flujo). Los **números reales** requieren una sesión autenticada en el navegador; usar el medidor de consola de abajo y anotarlos.
+
+### A) Baseline estático — requests EN CARGA INICIAL (`init()`)
+
+Secuencial (bloquea) → luego un `Promise.all` grande → luego rates → luego N+1:
+
+| # | Endpoint | Función | Cuándo |
+|---|---|---|---|
+| 1 | `GET /api/quotes/:id` | `loadQuoteData()` | secuencial (bloquea el resto) |
+| 2 | `GET /api/vehicles` | `loadVehicles()` | paralelo |
+| 3 | `GET /api/rates/active` | `loadAllRates()` | paralelo |
+| 4 | `GET /api/experiences?...length=1000` | `loadAllExperiences()` | paralelo |
+| 5 | `GET /api/tours/all` | `loadAllTours()` | paralelo |
+| 6 | `GET /api/tour-prices` (+ fallback `parse/functions/getTourPrices`) | `loadAllTourPrices()` | paralelo |
+| 7 | `GET /api/client-prices` (+ fallback `parse/functions/getClientPrices`) | `loadAllClientPrices()` | paralelo |
+| 8 | `GET /api/vehicle-types/active` | `loadVehicleTypes()` | paralelo |
+| 9 | `GET /api/provider-experiencias/all` | `loadProviderExperiences()` | paralelo |
+| 10 | `GET /api/driver-tour-rate/current` | `loadDriverTourRate()` | paralelo |
+| 11 | `GET /api/guide-transport-rate/current` | `loadGuideTransportRate()` | paralelo |
+| 12 | `GET /api/guide-transport-rate/formula` | `loadGuideFormulaConfiguration()` | paralelo |
+| 13 | `GET /api/greeter-rate/formula` | `loadGreeterRateConfiguration()` | paralelo |
+| 14 | `GET /api/vehicle-rate-prices/all` | `loadVehicleRatePrices()` | paralelo |
+| 15 | `GET /api/exchange-rate/current` | `loadPricingRates()` | paralelo (sub-`Promise.all`) |
+| 16 | `GET /api/transfer-rate/current` | `loadPricingRates()` | paralelo |
+| 17 | `GET /api/agency-rate/current` | `loadPricingRates()` | paralelo |
+| 18..18+N | `GET /api/services/:id/all-rate-prices-with-client-prices` | `loadClientSpecificPricing()` | **N+1, 1 por experiencia (secuencial `await`)** |
+| ..+M | `GET /api/tours/:id/all-rate-prices-with-client-prices` | `loadClientSpecificPricing()` | **N+1, 1 por tour (secuencial `await`)** |
+
+**Fijos ≈ 17** + **N+1 = (#experiencias + #tours)**. Con ~30 exp + ~20 tours ⇒ **~67 requests** en carga. El N+1 (filas 18+) es el grueso y es secuencial (waterfall).
+
+### B) Baseline estático — requests POR ACCIÓN
+
+| Acción del usuario | Request(s) | Nota |
+|---|---|---|
+| Transporte: elegir/cambiar **segmento** | `GET /api/services/prices-by-route` | precios+vehículos de la ruta |
+| Transporte: cambiar **origen/destino** | `GET /api/services/route-duration` (+ `prices-by-route` si ya hay segmento) | duración por ruta (nuevo) |
+| Transporte: **guardar** servicio | `prices-by-route` otra vez + `PUT .../service-items` | ruta re-consultada al guardar |
+| A-disposición: elegir **segmento** | `GET /api/disposable-prices/vehicles-for-rate` | |
+| A-disposición: elegir **vehículo/horas** | `GET /api/disposable-prices/price` | cacheado por `vehículo_segmento` |
+| Agregar **experiencia/tour a un día** | `loadDayExperiences/loadDayTours` (catálogo de nuevo) | refetch de catálogo ya cargado |
+| **Guardar** (cualquier cambio) | `PUT /api/quotes/:id/service-items` | manda **todo** el documento |
+
+### C) Medidor de consola (para los números REALES)
+
+Pegar en la consola del navegador estando en la vista (sesión iniciada). Cuenta requests por endpoint (normaliza ids/queries):
+
+```js
+(() => {
+  const norm = (u) => { try { u = new URL(u, location.origin).pathname; } catch (e) {}
+    return u.replace(/\/[0-9a-zA-Z_-]{8,}(?=\/|$)/g, '/:id'); };
+  const counts = {}; const order = [];
+  const bump = (u) => { const k = norm(u); if (!(k in counts)) { counts[k] = 0; order.push(k); } counts[k]++; };
+  const of = window.fetch;
+  window.fetch = function (input) { const u = typeof input === 'string' ? input : input && input.url; if (u) bump(u); return of.apply(this, arguments); };
+  const oo = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (m, u) { if (u) bump(u); return oo.apply(this, arguments); };
+  window.__reqReset = () => { Object.keys(counts).forEach((k) => delete counts[k]); order.length = 0; console.log('[req-meter] reset'); };
+  window.__reqReport = () => { const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    console.table(order.map((k) => ({ endpoint: k, count: counts[k] }))); console.log('TOTAL:', total); return { total, counts: { ...counts } }; };
+  console.log('[req-meter] activo. __reqReport() = resumen, __reqReset() = reiniciar.');
+})();
+```
+
+**Cómo medir:**
+- **Carga inicial:** DevTools → Network, deshabilitar caché, recargar, filtrar `/api/` y leer el conteo (o pegar el snippet apenas cargue y `__reqReport()`).
+- **Por acción:** pegar el snippet → `__reqReset()` → hacer UNA acción → `__reqReport()`. Anotar abajo.
+
+### D) Números reales (medidos — cotización `hUGtMzhcDp`, 2026-06-24)
+
+DevTools → Network, filtro `/api/`, caché desactivada.
+
+| Escenario | # requests | Peso | Notas |
+|---|---|---|---|
+| **Carga inicial** | **25** | **851.6 KB** | El N+1 (`all-rate-prices-with-client-prices`) **NO apareció** en esta carga → es condicional (sin cliente/ítems que lo activen). |
+| Elegir segmento transporte | _pend._ | | |
+| Cambiar origen/destino | _pend._ | | |
+| Agregar experiencia a un día | _pend._ | | |
+| Agregar tour a un día | _pend._ | | |
+| Guardar | _pend._ | | |
+
+### E) Hallazgos observados (de la captura real)
+
+1. **`GET /api/quotes/:id` se pedía 3 veces** (8.71 KB c/u, ~4–5 s). Iniciadores: `quote-services`, `quote-owners` y la página. → **RESUELTO** con `window.amxDedupFetch` (dedup in-flight, definido en parse-time en `quote-detail.ejs`). Verificado en runtime: ahora **1×** (25 → ~23 requests).
+2. **Módulo de ownership** (`quote-owners`): `…/ownership`, `…/collaborators`, `…/access` + 2 de las re-cargas del quote. Overhead no contemplado en el `init`; revisar si puede compartir el quote ya cargado.
+3. **`vehicle-rate-prices/all` ≈ 71.6 KB** — el payload más pesado; ver si se puede adelgazar/cachear.
+4. Repetidos esperables: `current` ×5 (exchange/transfer/agency + driver + guide), `formula` ×3, `tours` ×2, `all` ×2, `active` ×4.
+5. **El N+1 (Fase 4) no se observó** aquí → bajar su prioridad hasta reproducirlo (cotización con cliente + ítems). Subir prioridad del **dedup del quote** (Fase 1).
+
+> **Reprioritización tras medir:** el mayor retorno inmediato y de bajo riesgo es **deduplicar `/api/quotes/:id` (3×→1×)** y revisar el módulo de ownership, antes que el N+1.
+
+> Por acción: pendiente de medir con el snippet (`__reqReset()` → acción → `__reqReport()`).

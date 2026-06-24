@@ -177,7 +177,9 @@ class QuoteOwnershipManager {
     async loadQuoteData() {
         try {
             console.log('📊 Loading quote data for clientType check:', this.quoteId);
-            const response = await fetch(`/api/quotes/${this.quoteId}`, {
+            // Dedup in-flight: el builder y la página piden el mismo /api/quotes/:id a la vez;
+            // se reusa el request en vuelo en lugar de duplicarlo (fallback a fetch si no está).
+            const response = await (window.amxDedupFetch || fetch)(`/api/quotes/${this.quoteId}`, {
                 headers: {
                     'Authorization': `Bearer ${this.getAccessToken()}`
                 }
