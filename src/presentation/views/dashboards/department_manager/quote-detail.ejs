@@ -1257,7 +1257,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .find(row => row.startsWith('accessToken='))
                 ?.split('=')[1];
 
-            const response = await fetch(`/api/quotes/${quoteId}`, {
+            const response = await (window.amxDedupFetch || fetch)(`/api/quotes/${quoteId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,

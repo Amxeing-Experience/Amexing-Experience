@@ -31,24 +31,8 @@ window.__quoteId = '<%= typeof quoteId !== "undefined" ? quoteId : "" %>';
 window.__isReservation = <%= isReservationView ? 'true' : 'false' %>;
 // When it's a reservation, show the reservation folio instead of the quote folio.
 window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reservationFolio : "" %>';
-
-// Dedup in-flight de GETs idénticos: varios módulos (builder de servicios, ownership y esta
-// vista) piden /api/quotes/:id a la vez; esto colapsa esas cargas concurrentes en UN request.
-// Se define aquí (parse temprano) para que ya esté disponible cuando los módulos inicien.
-// Solo in-flight (se limpia al terminar) -> refetches posteriores siguen trayendo datos frescos.
-// Cada consumidor recibe su propio clone() para conservar su .json()/.text().
-window.amxDedupFetch = window.amxDedupFetch || (function () {
-    const inflight = new Map();
-    return function amxDedupFetch(url, opts) {
-        const o = opts || {};
-        const key = `${o.method || 'GET'}:${url}:${o.body || ''}`;
-        if (!inflight.has(key)) {
-            const p = fetch(url, o).finally(() => inflight.delete(key));
-            inflight.set(key, p);
-        }
-        return inflight.get(key).then((r) => r.clone());
-    };
-})();
+// Nota: window.amxDedupFetch (dedup in-flight de /api/quotes/:id) se define en el .js compartido
+// quote-ownership.js, que cargan los 3 roles antes que el resto de módulos.
 </script>
 
 <!-- Page Header -->
@@ -485,7 +469,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .find(row => row.startsWith('accessToken='))
                 ?.split('=')[1];
 
-            const response = await window.amxDedupFetch(`/api/quotes/${quoteId}`, {
+            const response = await (window.amxDedupFetch || fetch)(`/api/quotes/${quoteId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,

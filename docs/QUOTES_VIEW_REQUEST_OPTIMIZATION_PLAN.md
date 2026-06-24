@@ -71,15 +71,13 @@ Datos que **no cambian durante la sesión** y hoy se piden con `fetch()` crudo (
 
 ---
 
-## Fase 2 — No re-pedir catálogos por día (bajo riesgo)
+## Fase 2 — No re-pedir catálogos por día — ✅ YA OPTIMIZADO (no-op)
 
-Hoy el catálogo completo se carga en init y luego se **vuelve a pedir por día**:
-- `loadDayExperiences(dayId)` y `loadDayTours(dayId)` (reconfirmar líneas) re-fetchean en vez de filtrar del catálogo ya en memoria (`experiencesCache` / `toursCache`).
+Al revisar el código (2026-06-24) resultó que **ya está hecho** (el análisis inicial lo sobre-estimó):
+- `loadDayExperiences(dayId)` (v2.js ~21513): arma el dropdown desde `this.experiencesCache.get('all')` + `this.providerExperiencesCache` (memoria). **Cero fetch.**
+- `loadDayTours(dayId)` (v2.js ~21926): usa `this.toursCache.get('all')` y solo llama a `loadAllTours()` **si el cache está vacío** (`if (!this.toursCache.has('all'))`), que en una carga normal ya está poblado por `init`. **Cero refetch en la práctica.**
 
-**Acción:** que `loadDayExperiences/loadDayTours` **filtren del cache ya cargado** (cliente-side) en lugar de hacer una nueva llamada. Si necesitan un filtro server-side específico, validar que aporte algo que el cache no tenga.
-
-**Verificación:** al agregar experiencia/tour a un día NO debe aparecer un nuevo request de catálogo en Network.
-**Riesgo:** bajo. **Esfuerzo:** bajo.
+**Conclusión:** no hay cambios que hacer en esta fase.
 
 ---
 
@@ -242,7 +240,7 @@ DevTools → Network, filtro `/api/`, caché desactivada.
 
 ### E) Hallazgos observados (de la captura real)
 
-1. **`GET /api/quotes/:id` se pedía 3 veces** (8.71 KB c/u, ~4–5 s). Iniciadores: `quote-services`, `quote-owners` y la página. → **RESUELTO** con `window.amxDedupFetch` (dedup in-flight, definido en parse-time en `quote-detail.ejs`). Verificado en runtime: ahora **1×** (25 → ~23 requests).
+1. **`GET /api/quotes/:id` se pedía 3 veces** (8.71 KB c/u, ~4–5 s). Iniciadores: `quote-services`, `quote-owners` y la página. → **RESUELTO** con `window.amxDedupFetch` (dedup in-flight, `clone()` por consumidor). Verificado en runtime: ahora **1×** (25 → ~23 requests). El helper se **centralizó** en el `.js` compartido `quote-ownership.js` (lo cargan los 3 roles antes que el resto), así que aplica a **admin, department_manager y client** sin duplicar el shell; los 3 `loadQuoteFolio` y los `.js` (v2 + ownership) usan `(window.amxDedupFetch || fetch)`.
 2. **Módulo de ownership** (`quote-owners`): `…/ownership`, `…/collaborators`, `…/access` + 2 de las re-cargas del quote. Overhead no contemplado en el `init`; revisar si puede compartir el quote ya cargado.
 3. **`vehicle-rate-prices/all` ≈ 71.6 KB** — el payload más pesado; ver si se puede adelgazar/cachear.
 4. Repetidos esperables: `current` ×5 (exchange/transfer/agency + driver + guide), `formula` ×3, `tours` ×2, `all` ×2, `active` ×4.
