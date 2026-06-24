@@ -227,15 +227,27 @@ Pegar en la consola del navegador estando en la vista (sesión iniciada). Cuenta
 - **Carga inicial:** DevTools → Network, deshabilitar caché, recargar, filtrar `/api/` y leer el conteo (o pegar el snippet apenas cargue y `__reqReport()`).
 - **Por acción:** pegar el snippet → `__reqReset()` → hacer UNA acción → `__reqReport()`. Anotar abajo.
 
-### D) Números reales (PENDIENTE — llenar con el medidor)
+### D) Números reales (medidos — cotización `hUGtMzhcDp`, 2026-06-24)
 
-| Escenario | # requests | Tiempo aprox. | Notas |
+DevTools → Network, filtro `/api/`, caché desactivada.
+
+| Escenario | # requests | Peso | Notas |
 |---|---|---|---|
-| Carga inicial (cotización con N exp / M tours) | _pend._ | _pend._ | anotar N y M |
+| **Carga inicial** | **25** | **851.6 KB** | El N+1 (`all-rate-prices-with-client-prices`) **NO apareció** en esta carga → es condicional (sin cliente/ítems que lo activen). |
 | Elegir segmento transporte | _pend._ | | |
 | Cambiar origen/destino | _pend._ | | |
 | Agregar experiencia a un día | _pend._ | | |
 | Agregar tour a un día | _pend._ | | |
 | Guardar | _pend._ | | |
 
-> Con estos números se compara cada fase. Objetivo (Fases 1-4): −40% a −60% en carga inicial (sobre todo eliminando el N+1 de la fila 18+).
+### E) Hallazgos observados (de la captura real)
+
+1. **`GET /api/quotes/:id` se pide 3 veces** (8.71 KB c/u, ~4–5 s). Iniciadores: `quote-services`, `quote-owners` y la página. → **dedup ⇒ −2 requests** (y de las más lentas/pesadas). **Quick-win #1.**
+2. **Módulo de ownership** (`quote-owners`): `…/ownership`, `…/collaborators`, `…/access` + 2 de las re-cargas del quote. Overhead no contemplado en el `init`; revisar si puede compartir el quote ya cargado.
+3. **`vehicle-rate-prices/all` ≈ 71.6 KB** — el payload más pesado; ver si se puede adelgazar/cachear.
+4. Repetidos esperables: `current` ×5 (exchange/transfer/agency + driver + guide), `formula` ×3, `tours` ×2, `all` ×2, `active` ×4.
+5. **El N+1 (Fase 4) no se observó** aquí → bajar su prioridad hasta reproducirlo (cotización con cliente + ítems). Subir prioridad del **dedup del quote** (Fase 1).
+
+> **Reprioritización tras medir:** el mayor retorno inmediato y de bajo riesgo es **deduplicar `/api/quotes/:id` (3×→1×)** y revisar el módulo de ownership, antes que el N+1.
+
+> Por acción: pendiente de medir con el snippet (`__reqReset()` → acción → `__reqReport()`).
