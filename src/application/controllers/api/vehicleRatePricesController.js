@@ -57,6 +57,24 @@ class VehicleRatePricesController {
 
       const prices = await query.find({ useMasterKey: true });
 
+      // Modo lite (vista de cotización): solo necesita pricePerHour por (vehicleTypeId, rateId).
+      // Evita las 2 consultas extra a Rate/VehicleType y recorta el payload (~55% menos). El modo
+      // completo (con nombres/colores) lo sigue usando experience-services.
+      if (req.query.lite) {
+        return res.json({
+          success: true,
+          result: {
+            count: prices.length,
+            prices: prices.map((p) => ({
+              rateId: p.get('rateId'),
+              vehicleTypeId: p.get('vehicleTypeId'),
+              pricePerHour: p.get('pricePerHour'),
+              currency: p.get('currency'),
+            })),
+          },
+        });
+      }
+
       // Fetch rates and vehicle types separately if includes didn't work
       const rateIds = [...new Set(prices.map((p) => p.get('rateId')).filter((id) => id))];
       const vehicleTypeIds = [...new Set(prices.map((p) => p.get('vehicleTypeId')).filter((id) => id))];

@@ -25,6 +25,11 @@
 const Parse = require('parse/node');
 const RateService = require('../../services/RateService');
 const logger = require('../../../infrastructure/logger');
+const { TtlCache } = require('../../../infrastructure/cache/ttlCache');
+
+// Caché del endpoint /rates/active (cambia rara vez, se consulta en cada carga de cotización).
+// Se invalida en create/update/toggle/delete. TTL como red de seguridad. Ver ttlCache.js.
+const activeRatesCache = new TtlCache();
 
 /**
  * RateController class implementing RESTful API.
@@ -154,6 +159,11 @@ class RateController {
    */
   async getActiveRates(req, res) {
     try {
+      const cached = activeRatesCache.get();
+      if (cached) {
+        return this.sendSuccess(res, cached, 'Active Rates retrieved successfully');
+      }
+
       const query = new Parse.Query('Rate');
       query.equalTo('active', true);
       query.equalTo('exists', true);
@@ -169,6 +179,7 @@ class RateController {
         color: rate.get('color') || '#6366F1',
       }));
 
+      activeRatesCache.set(options);
       return this.sendSuccess(res, options, 'Active Rates retrieved successfully');
     } catch (error) {
       logger.error('Error in RateController.getActiveRates', {
@@ -313,6 +324,7 @@ class RateController {
         active: rate.get('active'),
       };
 
+      activeRatesCache.clear(); // se creó un rate -> invalidar caché de /rates/active
       return this.sendSuccess(res, data, 'Tarifa creada exitosamente', 201);
     } catch (error) {
       logger.error('Error in RateController.createRate', {
@@ -422,6 +434,7 @@ class RateController {
         updatedAt: rate.updatedAt,
       };
 
+      activeRatesCache.clear(); // se actualizó un rate -> invalidar caché de /rates/active
       return this.sendSuccess(res, data, 'Tarifa actualizada exitosamente');
     } catch (error) {
       logger.error('Error in RateController.updateRate', {
@@ -470,6 +483,7 @@ class RateController {
         req.userRole // Pass userRole from JWT middleware
       );
 
+      activeRatesCache.clear(); // cambió el estado de un rate -> invalidar caché de /rates/active
       return this.sendSuccess(res, result.rate, result.message || 'Estado actualizado exitosamente');
     } catch (error) {
       logger.error('Error in RateController.toggleRateStatus', {
@@ -511,6 +525,7 @@ class RateController {
         req.userRole // Pass userRole from JWT middleware
       );
 
+      activeRatesCache.clear(); // se eliminó un rate -> invalidar caché de /rates/active
       return this.sendSuccess(res, null, 'Tarifa eliminada exitosamente');
     } catch (error) {
       logger.error('Error in RateController.deleteRate', {

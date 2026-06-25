@@ -248,3 +248,86 @@ DevTools → Network, filtro `/api/`, caché desactivada.
 > **Reprioritización tras medir:** el mayor retorno inmediato y de bajo riesgo es **deduplicar `/api/quotes/:id` (3×→1×)** y revisar el módulo de ownership, antes que el N+1.
 
 > Por acción: pendiente de medir con el snippet (`__reqReset()` → acción → `__reqReport()`).
+
+---
+
+# Plan de carga inicial (latencia) — análisis 2026-06-24
+
+> **Estado:** PLAN (no implementado). El foco aquí no es el #requests sino el **tiempo**: cada endpoint tarda **2–5 s** y la carga **se serializa** en partes.
+> Mide siempre el **tiempo por endpoint** (DevTools → columna Tiempo) antes/después, no solo el conteo.
+
+## Diagnóstico (dónde se va el tiempo)
+
+**Frontend — el critical path se serializa** (`public/dashboards/admin/sections/quote-services-v2.js`, `init()` ~línea 299):
+- `await this.loadQuoteData()` (~línea 305) corre **solo y bloqueando** ANTES del `Promise.all` del resto → la request más lenta (`/api/quotes/:id`, ~4–5 s) va por delante de todo.
+- Tras el batch paralelo hay **más etapas en serie**: `await loadPricingRates()` (~339) y `await loadClientSpecificPricing()` (~349).
+
+**Backend — latencia alta por request:**
+- `QuoteController.getQuoteById` (~src/application/controllers/api/QuoteController.js:984): `useMasterKey` + `.include(client, companyClientPtr, rate, createdBy)` + **4 consultas secuenciales** de acceso/ownership tras el quote (`hasAccess`, `checkQuoteAccess`, `getUserAccess`, `getCurrentOwner`).
+- `*-rate/current` y `/formula`: 1–3 s para **un solo registro**, **sin caché de servidor** (se reconsulta cada request).
+- `vehicle-rate-prices/all`: **71.6 KB** (objetos completos rate+vehicleType, sin proyección).
+- Catálogos completos (`tours`/`experiences` con `length=1000`) en cada carga.
+- Probables **índices Mongo faltantes** en `{active, exists}` de las clases consultadas.
+
+> Nota: el "~15 s total" de algún análisis es **extrapolación**; lo medible real es requests de 2–5 s y waterfall hasta ~12 s. La conclusión firme: hay segundos que hoy corren en serie y podrían solaparse, + latencias de backend que bajan mucho con caché/índices/proyección.
+
+## Fases (de menor a mayor riesgo)
+
+### IL-1 — Caché de servidor para rates/formulas — ✅ IMPLEMENTADO
+- **Qué:** caché en memoria con TTL (15 min) en `getCurrent*` de `ExchangeRate`/`TransferRate`/`AgencyRate`/`DriverTourRate`/`GuideTransportRate`/`GreeterRate`. Las `/formula` (Guide/Greeter) se benefician automáticamente porque `getFormulaConfiguration` lee de `getCurrentRate`.
+- **Cómo:** helper reutilizable `src/infrastructure/cache/ttlCache.js` (`TtlCache`); cada modelo cachea su `getCurrent*` e **invalida** (`clear()`) en todos los writes (create / softDelete / updateFormulaConfiguration).
+- **Efecto:** 5–8 requests de 1–3 s → ~ms (cache hit) tras la primera consulta.
+- **Riesgo:** bajo. Instancia única → invalidación completa. Multi-instancia → consistencia eventual ≤ TTL (rates cambian rara vez).
+- **Verificar:** recargar la vista 2 veces; los `*-rate/current` y `/formula` deben tardar ~ms en la 2ª. Tras editar un rate, debe reflejarse de inmediato (invalidación).
+
+### IL-2 — Índices Mongo `{active, exists}` (riesgo muy bajo)
+- **Qué:** índices en las clases consultadas con `active`/`exists` (+ `createdAt` donde se ordena): Quote, Tour, Experience, VehicleRatePrices, *Rate*.
+- **Efecto:** reduce escaneos en todas las consultas filtradas; transversal.
+- **Riesgo:** muy bajo (aditivo). Verificar que no existan ya.
+
+### IL-3 — Acelerar `getQuoteById` — ✅ parcial (paralelizar accesos)
+- **Hecho:** las 3 consultas independientes (`collaborationService.hasAccess`, `getUserAccess`, `ownershipService.getCurrentOwner`) pasan de **secuenciales a `Promise.all`** en `QuoteController.getQuoteById`. El fallback legacy `checkQuoteAccess` (que necesita el objeto `quote`) queda condicional debajo.
+- **Efecto:** ~0.5–1 s menos en la request más bloqueante (común: acceso concedido).
+- **Riesgo:** bajo (son lecturas). En el caso denegado se hacen 2 lecturas extra antes del 403 — raro y sin impacto de seguridad.
+- **Pendiente (opcional):** revisar/quitar `.include()` no usados + proyección de campos en el quote (no hecho — requiere auditar dependencias del front).
+
+### IL-4 — Adelgazar `vehicle-rate-prices/all` — ✅ vía modo `?lite=1`
+- **Hallazgo:** el endpoint ya devolvía un DTO (no objetos completos); el peso es por la **cantidad** de registros. Y NO se podía recortar a secas porque `experience-services.js` usa `vehicleTypeName`/`vehicleTypeCode` del cache (dropdown de vehículos).
+- **Hecho:** modo **`?lite=1`** que devuelve solo `{rateId, vehicleTypeId, pricePerHour, currency}` y **omite las 2 consultas extra** a Rate/VehicleType + el mapa `rateColors`. La vista de cotización (`loadVehicleRatePrices`) lo pide lite (solo usa eso en `getWaitingTimePrice`); `experience-services` sigue con el modo completo.
+- **Efecto:** payload ~55% menor en la cotización + 2 consultas menos en el backend para ese request.
+- **Riesgo:** bajo (aditivo; el modo completo no cambia). Verificado: v2.js solo lee `vehicleTypeId/rateId/pricePerHour/currency` del cache.
+
+### IL-4b — `provider-experiencias/all` era el verdadero 71 KB — ✅ vía `?lite=1`
+- **Hallazgo (con captura del usuario):** había **dos** endpoints `/all`. `vehicle-rate-prices/all` ya bajó (~2.78 KB). El de **71.6 KB era `/api/provider-experiencias/all`** (`loadProviderExperiences`), que devuelve **todas las fotos** y además las **procesa una por una** (URLs firmadas de S3) → grueso del payload Y de la latencia.
+- **Hecho:** `?lite=1` en `getAllProviderExperiencias` que **omite el procesamiento de fotos** (itera sobre `[]` → `photos: []`); el resto de campos queda **idéntico**. La cotización lo pide lite (no usa fotos). `experience-services` sigue con el modo completo.
+- **Efecto:** payload ~71 KB → pequeño + se evitan N×M llamadas a S3 por foto (gran ahorro de latencia en backend).
+- **Riesgo:** bajo (aditivo; solo cambia con `?lite=1`). Verificado: v2.js no lee `.photos` de `providerExperiencesCache`.
+
+### IL-4c — `tours` y `vehicles` también cargaban imágenes — ✅ vía `?lite=1`
+- **Hallazgo:** `ToursController.getTours` traía imágenes **por cada tour** (`TourImage.getImagesForTour(tour.id)` → **N+1**) + optimización/S3 — explica por qué `tours` tardaba 2–5 s aunque el payload fuera chico. `VehicleController.getVehicles` traía la imagen primaria por vehículo (batch) + URL S3.
+- **Hecho:** `?lite=1` en ambos: tours omite la consulta de imágenes por tour (`photos: []`), vehicles omite el batch de imágenes (`imageUrl: ''`). La cotización pide ambos lite. **Verificado: v2.js no usa `.photos`/`.imageUrl` de tours ni vehículos.** Los paneles admin siguen con el modo completo.
+- **Efecto:** elimina el **N+1 de imágenes de tours** (gran ahorro de latencia) y el trabajo S3 de vehículos. Riesgo bajo (aditivo).
+
+### B — Caché de servidor para `/rates/active` y `/vehicle-types/active` — ✅ IMPLEMENTADO
+- **Hallazgo:** estos endpoints hacen su propia `Parse.Query` en el **controlador** (no usan el método del modelo), así que el caché va en el controlador.
+- **Hecho:** `TtlCache` (15 min) sobre el `options` formateado en `RateController.getActiveRates` y `VehicleTypeController.getActiveVehicleTypes`. Se cachean **objetos planos** (sin Parse.Object → sin riesgo de mutación). **Invalidación** en todas las escrituras del mismo controlador: rates (create/update/toggle/delete) y vehicle-types (create/update/delete/toggle).
+- **Efecto:** `/rates/active` y `/vehicle-types/active` (~1 s c/u) → ~ms desde la 2ª carga.
+- **Riesgo:** bajo. Si alguna escritura ocurriera por otra vía no contemplada, el TTL (15 min) es la red de seguridad. Rates/tipos cambian rara vez.
+
+### IL-5 — Lazy-load de lo no crítico (medio)
+- **Qué:** cargar `loadClientSpecificPricing` y catálogos pesados **bajo demanda** (al abrir el modal / seleccionar item) en vez de en `init`. Quitar `?_t=Date.now()` de datos sesión-estática.
+- **Riesgo:** medio (timing: verificar dependencias en init).
+
+### IL-6 — No bloquear con el quote — ✅ IMPLEMENTADO (solape)
+- **Auditoría:** `this.clientId` viene del DOM (`getClientId`), no del quote. `processServiceItems` se auto-carga lo que necesita (`await ensureToursCache()`), así que **no depende** de que el batch termine. El batch no usa resultados del quote. El re-render final ya existía tras cargar rates.
+- **Hecho:** en `init()`, `loadQuoteData()` se dispara **sin `await`** (`const quoteReady = ...`) para **solapar** su red+proceso con el `Promise.all` del batch; se hace `await quoteReady` **después del batch**, antes del re-render/pricing (que sí dependen de los servicios). `clientId` se fija antes del disparo.
+- **Efecto:** ~4–5 s que antes iban en serie ahora se solapan con el batch (carga inicial total ≈ max en vez de suma).
+- **Riesgo:** bajo-medio. Posible flash de render incompleto (lo corrige el re-render post-batch) y, en el peor caso, un fetch de tours duplicado si `ensureToursCache` corre antes que `loadAllTours` (tours queda cacheado igual). `loadQuoteData` tiene su propio try/catch → `quoteReady` no rechaza en el hueco.
+
+## Orden sugerido
+IL-2 (índices) → IL-1 (caché rates) → IL-3 (getQuoteById) → IL-4 (payload) → IL-5 (lazy) → IL-6 (paralelizar quote, con auditoría).
+Una fase por PR, midiendo **tiempos por endpoint** y el tiempo total ("Finalizar"/Load) antes/después.
+
+## Verificación
+- Capturar tiempos por endpoint (DevTools) y el total antes/después de cada fase.
+- Sin regresiones funcionales (precios, fórmulas, render, guardado).
