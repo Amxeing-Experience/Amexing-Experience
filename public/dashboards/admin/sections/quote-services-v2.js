@@ -709,6 +709,8 @@ class ItineraryBuilder {
         this.handleTripTypeChange();
         // Round trip doubles the route time → re-estimate local arrival.
         this.updateTransferArrivalEstimate();
+        // Mostrar/ocultar el total ida y vuelta (×2) según el tipo de viaje.
+        this.updateRouteDurationRoundTripHint();
       });
     });
 
@@ -1122,6 +1124,7 @@ class ItineraryBuilder {
         this.updateSuggestedDepartureTime();
         // Route time feeds the local estimated-arrival calc.
         this.updateTransferArrivalEstimate();
+        this.updateRouteDurationRoundTripHint();
         setTimeout(() => this.updateServicePriceBreakdown(), 50);
       });
     });
@@ -15969,10 +15972,27 @@ class ItineraryBuilder {
     if (!m || Number.isNaN(m) || m <= 0) {
       if (hoursEl) hoursEl.value = '';
       if (minsEl) minsEl.value = '';
-      return;
+    } else {
+      if (hoursEl) hoursEl.value = Math.floor(m / 60);
+      if (minsEl) minsEl.value = Math.round(m % 60);
     }
-    if (hoursEl) hoursEl.value = Math.floor(m / 60);
-    if (minsEl) minsEl.value = Math.round(m % 60);
+    this.updateRouteDurationRoundTripHint();
+  }
+
+  // Muestra (solo en round-trip) el total ida y vuelta = duración del trayecto × 2. El campo
+  // captura UN trayecto (la ida); el ×2 se aplica en los cálculos (guía/greeter/hora sugerida).
+  updateRouteDurationRoundTripHint() {
+    const hintEl = document.getElementById('routeDurationRoundTripHint');
+    if (!hintEl) return;
+    const h = parseInt(document.getElementById('routeDurationHours')?.value || 0, 10) || 0;
+    const mm = parseInt(document.getElementById('routeDurationMinutes')?.value || 0, 10) || 0;
+    const oneLeg = (h * 60) + mm;
+    if (this.isRoundTrip() && oneLeg > 0) {
+      hintEl.textContent = `Ida y vuelta (×2): total ${this.formatMinutesToHoursAndMinutes(oneLeg * 2)}`;
+      hintEl.classList.remove('d-none');
+    } else {
+      hintEl.classList.add('d-none');
+    }
   }
 
   getRouteDurationMinutes() {
