@@ -1,0 +1,412 @@
+<%#
+Sección interactiva de Servicios (compartida por Experiencias y Tours).
+Mismo diseño; los datos se reciben por parámetro.
+
+Parámetros:
+  @param {string} pageTitle    - Texto del banner verde (ej. "Experiencias" / "Tours")
+  @param {string} intro        - Párrafo introductorio
+  @param {array}  categories   - [{ label, img }] para el acordeón horizontal
+  @param {array}  detailCards  - [{ title, img, bookHref, items: [{label, value, block}] }]
+                                 (placeholder; luego se conecta al backend por categoría)
+
+Created by Denisse Maldonado
+%>
+<%
+    // Defaults defensivos (las páginas pasan su propia data)
+    var _pageTitle = (typeof pageTitle !== 'undefined' && pageTitle) ? pageTitle : 'Experiencias';
+    var _intro = (typeof intro !== 'undefined' && intro) ? intro
+        : 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud.';
+    var _categories = (typeof categories !== 'undefined' && Array.isArray(categories) && categories.length) ? categories : [
+        { label: 'Catas', img: '/images/7.png' },
+        { label: 'Arte', img: '/images/4.png' },
+        { label: 'Historia y Arquitectura', img: '/images/3.png' },
+        { label: 'Gastronómicas', img: '/images/6.png' },
+        { label: 'Aventura', img: '/images/5.png' },
+        { label: 'Naturaleza', img: '/images/2.png' },
+        { label: 'De Temporada', img: '/images/1.png' }
+    ];
+    var _placeholderCard = {
+        title: 'Recorridos en Viñedos',
+        img: '/images/7.png',
+        bookHref: '/contacto#book',
+        items: [
+            { label: 'Duración:', value: '6 hrs.' },
+            { label: 'Mínimo de personas:', value: '8' },
+            { label: 'Días disponibles:', value: 'lunes, martes, jueves y sábado.', block: true },
+            { label: 'Horarios disponibles:', value: '9:00 am, 1:00 pm y 4:00 pm', block: true }
+        ]
+    };
+    var _detailCards = (typeof detailCards !== 'undefined' && Array.isArray(detailCards) && detailCards.length)
+        ? detailCards : [_placeholderCard, _placeholderCard, _placeholderCard];
+%>
+
+<style>
+    /* ---- Header (banner verde + corazones y líneas a los lados) ---- */
+    .exp-hero {
+        background: #eff0ec;
+        text-align: center;
+        padding: clamp(3rem, 7vw, 5.5rem) 0 clamp(2.5rem, 6vw, 4.5rem);
+    }
+
+    .exp-hero__header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .exp-hero__line {
+        flex: 1 1 auto;
+        height: 1px;
+        background: #9a9b8c;
+    }
+
+    .exp-hero__heart {
+        flex: 0 0 auto;
+        width: clamp(46px, 5vw, 70px);
+        height: auto;
+        display: block;
+    }
+
+    .exp-hero__banner {
+        flex: 0 0 auto;
+        background: #969b81;
+        padding: clamp(0.4rem, 1.3vw, 0.9rem) clamp(4.5rem, 13vw, 11rem);
+        margin: 0 clamp(1.8rem, 4vw, 3.5rem);
+    }
+
+    .exp-hero__title {
+        font-family: var(--font-newsreader), serif;
+        font-variant: small-caps;
+        font-feature-settings: "smcp";
+        font-size: clamp(2rem, 5vw, 3.5rem);
+        font-weight: 400;
+        letter-spacing: 0.05em;
+        color: #ffffff;
+        margin: 0;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .exp-hero__intro {
+        font-family: var(--font-myriad), 'Montserrat', sans-serif;
+        font-weight: 300;
+        font-size: clamp(1rem, 1.6vw, 1.25rem);
+        line-height: 1.7;
+        color: #4a4a44;
+        max-width: 660px;
+        margin: clamp(1.8rem, 4vw, 2.8rem) auto 0;
+        padding: 0 clamp(0.75rem, 1.5vw, 1.25rem);
+        box-sizing: border-box;
+    }
+
+    @media (max-width: 640px) {
+        .exp-hero__banner {
+            padding: 0.8rem 1.6rem;
+            margin: 0 0.8rem;
+        }
+        .exp-hero__heart {
+            width: 38px;
+        }
+    }
+
+    /* ---- Categorías interactivas (acordeón horizontal) ---- */
+    .exp-cats {
+        --rail: clamp(1.6rem, 3vw, 2.6rem); /* espacio arriba donde la línea sobresale */
+        display: flex;
+        height: clamp(360px, 42vw, 470px);
+        background: #eff0ec;
+        padding: 0 clamp(2rem, 9vw, 7rem);
+        box-sizing: border-box;
+    }
+
+    .exp-cat {
+        flex: 1;
+        position: relative;
+        cursor: pointer;
+        border-right: 2px solid #c4c4bb;
+        outline: none;
+    }
+
+    .exp-cat:first-child {
+        border-left: 2px solid #c4c4bb;
+    }
+
+    .exp-cat__image {
+        position: absolute;
+        top: var(--rail);
+        left: 0;
+        right: 0;
+        height: 42%;
+        background-size: cover;
+        background-position: center;
+        transition: height 0.45s ease;
+    }
+
+    .exp-cat__overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to bottom,
+            rgba(0, 0, 0, 0) 20%,
+            rgba(0, 0, 0, 0.9) 58%,
+            rgba(0, 0, 0, 0.9) 72%,
+            rgba(239, 240, 236, 1) 100%);
+        opacity: 0;
+        transition: opacity 0.45s ease;
+    }
+
+    .exp-cat__label {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(var(--rail) + 42%);
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.4rem 0.5rem;
+        transition: opacity 0.3s ease;
+    }
+
+    .exp-cat__label span {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        max-height: 100%;
+        font-family: var(--font-newsreader), serif;
+        font-variant: small-caps;
+        font-feature-settings: "smcp";
+        font-size: clamp(1.1rem, 1.6vw, 1.5rem);
+        letter-spacing: 0.18em;
+        color: #6e6e64;
+        text-align: center;
+        line-height: 1.35;
+    }
+
+    /* estado activo: la imagen llena el panel (desde el riel) + degradado oscuro, sin label */
+    .exp-cat.is-active .exp-cat__image {
+        height: calc(100% - var(--rail));
+    }
+
+    .exp-cat.is-active .exp-cat__overlay {
+        opacity: 1;
+    }
+
+    .exp-cat.is-active .exp-cat__label {
+        opacity: 0;
+    }
+
+    /* ---- Nombre de la categoría seleccionada ---- */
+    .exp-selected {
+        background: #eff0ec;
+        padding: clamp(3.5rem, 8vw, 6.5rem) clamp(3rem, 15vw, 12rem) clamp(2.5rem, 6vw, 4.5rem);
+        text-align: center;
+    }
+
+    .exp-selected__rule {
+        display: block;
+        height: 5px; /* separación entre las dos líneas */
+        border-top: 1px solid #9a9b8c;
+        border-bottom: 1px solid #9a9b8c;
+    }
+
+    .exp-selected__name {
+        font-family: var(--font-newsreader), serif;
+        font-variant: small-caps;
+        font-feature-settings: "smcp";
+        font-size: clamp(1.5rem, 3.2vw, 2.5rem);
+        font-weight: 400;
+        letter-spacing: 0.1em;
+        color: #3a3a38;
+        margin: clamp(1rem, 2.4vw, 1.7rem) 0;
+        line-height: 1;
+    }
+
+    /* ---- Celda de detalle (placeholder) ---- */
+    .exp-detail {
+        background: #eff0ec;
+        padding: 0 clamp(3rem, 15vw, 12rem) clamp(6rem, 14vw, 12rem);
+    }
+
+    .exp-detail__card {
+        background: #2e2e2d;
+        padding: clamp(1.0rem, 3.5vw, 1.2rem);
+    }
+
+    .exp-detail__card:not(:last-child) {
+        margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
+    }
+
+    .exp-detail__title {
+        font-family: var(--font-arpona), serif;
+        font-variant: small-caps;
+        font-feature-settings: "smcp";
+        font-size: clamp(1.5rem, 3.5vw, 2.8rem);
+        font-weight: 400;
+        color: #ffffff;
+        text-align: center;
+        letter-spacing: 0.06em;
+        margin: 0 0 clamp(0.7rem, 1.6vw, 1.2rem);
+    }
+
+    .exp-detail__grid {
+        display: grid;
+        grid-template-columns: 1.9fr 1fr;
+        gap: clamp(1.5rem, 4vw, 3.5rem);
+        align-items: stretch;
+    }
+
+    .exp-detail__image {
+        width: 100%;
+        min-height: clamp(230px, 28vw, 400px);
+        background-size: cover;
+        background-position: center;
+    }
+
+    .exp-detail__info {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding-right: 1em;
+    }
+
+    .exp-detail__item {
+        font-family: var(--font-myriad), 'Montserrat', sans-serif;
+        font-size: clamp(0.95rem, 1.2vw, 1.1rem);
+        color: #d8d8d2;
+        line-height: 1.2;
+        padding: clamp(0.85rem, 1.7vw, 1.25rem) 0;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.28);
+    }
+
+    .exp-detail__item:first-child {
+        padding-top: 0;
+    }
+
+    .exp-detail__item strong {
+        color: #ffffff;
+        font-weight: 700;
+    }
+
+    .exp-detail__book {
+        display: inline-block;
+        align-self: center;
+        margin-top: clamp(1.5rem, 3vw, 2.5rem);
+        text-align: center;
+        background: #ffffff;
+        color: #969b81;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        padding: 0.85rem 2.5rem;
+        font-family: var(--font-myriad), 'Montserrat', sans-serif;
+        font-size: 0.85rem;
+        font-weight: 600;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        text-decoration: none;
+        transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    .exp-detail__book:hover {
+        background: transparent;
+        color: #ffffff;
+    }
+
+    @media (max-width: 768px) {
+        .exp-detail__grid {
+            grid-template-columns: 1fr;
+        }
+        .exp-detail__book {
+            margin-top: 1.5rem;
+        }
+        .exp-cats {
+            height: clamp(280px, 60vw, 380px);
+        }
+        .exp-cat__label span {
+            font-size: 0.8rem;
+            letter-spacing: 0.1em;
+        }
+    }
+</style>
+
+<%# Header: banner verde con corazones y líneas a los lados %>
+<section class="exp-hero">
+    <div class="exp-hero__header">
+        <span class="exp-hero__line"></span>
+        <img src="/images/heart_black.png" alt="" class="exp-hero__heart" aria-hidden="true">
+        <div class="exp-hero__banner">
+            <h1 class="exp-hero__title"><%= _pageTitle %></h1>
+        </div>
+        <img src="/images/heart_black.png" alt="" class="exp-hero__heart" aria-hidden="true">
+        <span class="exp-hero__line"></span>
+    </div>
+
+    <p class="exp-hero__intro"><%= _intro %></p>
+</section>
+
+<%# Categorías interactivas (acordeón horizontal) %>
+<section class="exp-cats" id="expCats">
+    <% _categories.forEach(function(cat, i) { %>
+        <div class="exp-cat <%= i === 0 ? 'is-active' : '' %>" data-index="<%= i %>" role="button" tabindex="0" aria-label="<%= cat.label %>">
+            <div class="exp-cat__image" style="background-image: url('<%= cat.img %>')">
+                <span class="exp-cat__overlay" aria-hidden="true"></span>
+            </div>
+            <div class="exp-cat__label"><span><%= cat.label %></span></div>
+        </div>
+    <% }); %>
+</section>
+
+<%# Nombre de la categoría seleccionada (se actualiza al elegir/hover) %>
+<div class="exp-selected">
+    <span class="exp-selected__rule" aria-hidden="true"></span>
+    <h3 class="exp-selected__name" id="expSelectedName"><%= _categories[0].label %></h3>
+    <span class="exp-selected__rule" aria-hidden="true"></span>
+</div>
+
+<%# Celda de detalle (PLACEHOLDER; luego se conecta al backend por categoría) %>
+<section class="exp-detail">
+    <% _detailCards.forEach(function(card) { %>
+        <div class="exp-detail__card">
+            <h2 class="exp-detail__title"><%= card.title %></h2>
+            <div class="exp-detail__grid">
+                <div class="exp-detail__image" style="background-image: url('<%= card.img %>')" role="img" aria-label="<%= card.title %>"></div>
+                <div class="exp-detail__info">
+                    <% (card.items || []).forEach(function(it) { %>
+                        <div class="exp-detail__item"><strong><%= it.label %></strong><% if (it.block) { %><br><%= it.value %><% } else { %> <%= it.value %><% } %></div>
+                    <% }); %>
+                    <a href="<%= card.bookHref || '/contacto#book' %>" class="exp-detail__book">Book Now</a>
+                </div>
+            </div>
+        </div>
+    <% }); %>
+</section>
+
+<script>
+(function () {
+    var section = document.getElementById('expCats');
+    if (!section) return;
+    var cats = section.querySelectorAll('.exp-cat');
+    var selectedName = document.getElementById('expSelectedName');
+    var selected = cats[0]; // categoría seleccionada (cambia solo con clic)
+
+    // Expansión visual del panel (hover): NO cambia el nombre
+    function setActive(el) {
+        cats.forEach(function (c) { c.classList.remove('is-active'); });
+        el.classList.add('is-active');
+    }
+
+    // Clic: selecciona la categoría y actualiza el nombre
+    function select(el) {
+        selected = el;
+        setActive(el);
+        if (selectedName) selectedName.textContent = el.getAttribute('aria-label');
+    }
+
+    cats.forEach(function (cat) {
+        cat.addEventListener('mouseenter', function () { setActive(cat); });
+        cat.addEventListener('focus', function () { setActive(cat); });
+        cat.addEventListener('click', function () { select(cat); });
+    });
+
+    // Al salir de la sección, regresa a la categoría seleccionada (no al hover)
+    section.addEventListener('mouseleave', function () { setActive(selected); });
+})();
+</script>
