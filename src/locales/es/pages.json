@@ -17,7 +17,18 @@
   "fleet": {
     "title": "Nuestra Flota - Amexing Experience",
     "description": "Conoce nuestra flota premium de vehículos Tesla y otros vehículos de lujo para transporte ejecutivo en San Miguel de Allende.",
-    "keywords": "flota, tesla, vehículos premium, transporte ejecutivo, san miguel de allende"
+    "keywords": "flota, tesla, vehículos premium, transporte ejecutivo, san miguel de allende",
+    "brand1": "Nuestra",
+    "brand2": "Flota",
+    "aria": {
+      "categories": "Categorías de la flota",
+      "openGallery": "Ver galería del vehículo",
+      "gallery": "Galería del vehículo",
+      "close": "Cerrar galería",
+      "prev": "Anterior",
+      "next": "Siguiente"
+    },
+    "photoWord": "foto"
   },
   "contact": {
     "title": "Contacto - Amexing Experience",

@@ -17,7 +17,18 @@
   "fleet": {
     "title": "Our Fleet - Amexing Experience",
     "description": "Discover our premium fleet featuring Tesla vehicles and other luxury automobiles for executive transportation in San Miguel de Allende. Comfort, elegance, and sustainability combined.",
-    "keywords": "fleet, tesla, luxury vehicles, executive transport, san miguel de allende, sustainable transportation"
+    "keywords": "fleet, tesla, luxury vehicles, executive transport, san miguel de allende, sustainable transportation",
+    "brand1": "Our",
+    "brand2": "Fleet",
+    "aria": {
+      "categories": "Fleet categories",
+      "openGallery": "View vehicle gallery",
+      "gallery": "Vehicle gallery",
+      "close": "Close gallery",
+      "prev": "Previous",
+      "next": "Next"
+    },
+    "photoWord": "photo"
   },
   "contact": {
     "title": "Contact - Amexing Experience",
