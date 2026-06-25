@@ -1583,7 +1583,8 @@ Created by Denisse Maldonado
 
         <%# Footer %>
         <%- include('organisms/landing/landing-footer', {
-            companyInfo: typeof company !== 'undefined' ? company : null
+            companyInfo: typeof company !== 'undefined' ? company : null,
+        req: typeof req !== 'undefined' ? req : null
         }) %>
 
         <%# Scroll to Top Button %>

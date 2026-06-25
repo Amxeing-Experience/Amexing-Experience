@@ -279,7 +279,8 @@ const bodyClass = typeof pageClass !== 'undefined' ? pageClass : '';
 
         <%# Footer %>
         <%- include('../organisms/landing/landing-footer', {
-            companyInfo: companyInfo
+            companyInfo: companyInfo,
+            req: typeof req !== 'undefined' ? req : null
         }) %>
 
         <%# Scroll to Top Button %>
