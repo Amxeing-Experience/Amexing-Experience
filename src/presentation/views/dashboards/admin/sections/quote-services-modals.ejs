@@ -434,21 +434,6 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         <input type="text" class="form-control d-none" id="transportDestinationText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
                                     </div>
                                 </div>
-                                <!-- Duración de ruta (min): se autollena de la ruta y es editable. La usan guía/greeter
-                                     y la hora de salida sugerida. Si la ruta no la trae, captúrala aquí. -->
-                                <div class="row">
-                                    <div class="col-md-5 mb-3">
-                                        <label class="form-label">Duración estimada de viaje <small class="text-muted">(horas y minutos)</small></label>
-                                        <div class="input-group">
-                                            <input type="number" min="0" step="1" class="form-control" id="routeDurationHours" placeholder="0" autocomplete="off" aria-label="Horas">
-                                            <span class="input-group-text">h</span>
-                                            <input type="number" min="0" max="59" step="5" class="form-control" id="routeDurationMinutes" placeholder="0" autocomplete="off" aria-label="Minutos">
-                                            <span class="input-group-text">min</span>
-                                        </div>
-                                        <small class="text-muted d-block">Se autollena de la ruta; usada para guía/greeter y hora de salida sugerida.</small>
-                                    </div>
-                                </div>
-
                                 <!-- Pickup / Drop-off address (Punto a Punto only) -->
                                 <div class="row d-none" id="papAddressesRow">
                                     <div class="col-md-6 mb-3">
@@ -914,6 +899,22 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         </div>
                     </div>
                     
+                    <!-- Duración estimada de viaje (horas/minutos): común a one-way y round-trip. Se
+                         autollena de la ruta y es editable. La usan guía/greeter y la hora de salida
+                         sugerida. Si la ruta no la trae, captúrala aquí. -->
+                    <div class="row" id="routeDurationRow">
+                        <div class="col-md-5 mb-3">
+                            <label class="form-label">Duración estimada de viaje <small class="text-muted">(horas y minutos)</small></label>
+                            <div class="input-group">
+                                <input type="number" min="0" step="1" class="form-control" id="routeDurationHours" placeholder="0" autocomplete="off" aria-label="Horas">
+                                <span class="input-group-text">h</span>
+                                <input type="number" min="0" max="59" step="5" class="form-control" id="routeDurationMinutes" placeholder="0" autocomplete="off" aria-label="Minutos">
+                                <span class="input-group-text">min</span>
+                            </div>
+                            <small class="text-muted d-block">Se autollena de la ruta; usada para guía/greeter y hora de salida sugerida.</small>
+                        </div>
+                    </div>
+
                     <div class="row" id="transportFieldsRow">
                         <div class="col-md-4 mb-3">
                             <label for="transportCategory" class="form-label">Segmento <span class="text-danger">*</span></label>

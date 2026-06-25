@@ -2089,6 +2089,8 @@ class ItineraryBuilder {
     const tripTypeSelector = document.getElementById('tripTypeSelector');
     const tourTransportCheckbox = document.getElementById('tourTransportCheckboxContainer');
     const transportPeopleFieldsRow = document.getElementById('transportPeopleFieldsRow');
+    // Duración estimada de viaje: solo aplica a transporte (one-way y round-trip).
+    const routeDurationRow = document.getElementById('routeDurationRow');
 
     // Show/hide Tiempo de espera section
     const tiempoEsperaSection = document.getElementById('tiempoEsperaSection');
@@ -2101,6 +2103,7 @@ class ItineraryBuilder {
       if (transportPeopleFieldsRow) {
         transportPeopleFieldsRow.style.display = 'flex';
       }
+      if (routeDurationRow) routeDurationRow.style.display = 'flex';
       // Initialize transport form based on current selections
       this.handleTransportTypeChange();
       this.handleTripTypeChange();
@@ -2116,6 +2119,7 @@ class ItineraryBuilder {
       if (transportPeopleFieldsRow) {
         transportPeopleFieldsRow.style.display = 'none';
       }
+      if (routeDurationRow) routeDurationRow.style.display = 'none';
       // Checkbox "Se requiere traslado" OCULTO: el traslado se deriva del tipo de tour
       // (con vehículo siempre requiere; walking no). El input sigue en el DOM y se auto-marca
       // al seleccionar el tour, que es lo que muestra los campos de transporte.
@@ -2130,6 +2134,7 @@ class ItineraryBuilder {
       if (transportPeopleFieldsRow) {
         transportPeopleFieldsRow.style.display = 'none';
       }
+      if (routeDurationRow) routeDurationRow.style.display = 'none';
       // Hide tour transport checkbox
       if (tourTransportCheckbox) {
         tourTransportCheckbox.style.display = 'none';
