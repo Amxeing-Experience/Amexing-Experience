@@ -10121,6 +10121,8 @@ class ItineraryBuilder {
       if (includeGreeter && routeDuration) {
         // Round-trip: el greeter atiende ida + vuelta (×2), igual que el transporte (legMultiplier).
         // Antes quedaba en ×1 y se sub-cobraba el greeter en viajes redondos.
+        // TODO(cliente): pendiente de confirmación — ver docs/backlog/TODO-roundtrip-greeter-duracion.md
+        // (greeter ×2, guía en one-way, y regreso con duración distinta). Rama sin mergear hasta validar.
         greeterCostEfectivo = this.calculateGreeterPrice(routeDuration) * legMultiplier;
       }
 
