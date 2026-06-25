@@ -1126,6 +1126,11 @@ class ItineraryBuilder {
       });
     });
 
+    // Duración de experiencia (editable): solo marca el servicio como modificado (no afecta precio).
+    document.getElementById('experienceDuration')?.addEventListener('input', () => {
+      this.serviceModified = true;
+    });
+
     // Local transfers: recompute the estimated arrival when the pick-up time changes.
     document.getElementById('transportStartTime')?.addEventListener('input', () => {
       this.updateTransferArrivalEstimate();
@@ -4593,6 +4598,9 @@ class ItineraryBuilder {
     switch (type) {
       case 'experience': {
         data.experienceId = document.getElementById('experienceSelect')?.value;
+        // Duración editable de la experiencia (autollenada del catálogo, modificable). Se guarda en
+        // data.duration (ya persistido) — informativa; no afecta el precio (que es por persona).
+        data.duration = parseFloat(document.getElementById('experienceDuration')?.value) || null;
         data.adultsQuantity = parseInt(document.getElementById('adultsQuantity')?.value || 0);
         data.childrenQuantity = parseInt(document.getElementById('childrenQuantity')?.value || 0);
         data.adultsNoAlcoholQuantity = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
@@ -5847,6 +5855,10 @@ class ItineraryBuilder {
             const expEndTimeField = document.getElementById('experienceEndTime');
             if (expStartTimeField && service.startTime) expStartTimeField.value = service.startTime;
             if (expEndTimeField && service.endTime) expEndTimeField.value = service.endTime;
+            const expDurationField = document.getElementById('experienceDuration');
+            if (expDurationField && service.duration !== undefined && service.duration !== null) {
+              expDurationField.value = service.duration;
+            }
           } else if (attempt < 5) {
             // Retry with longer delay
 
@@ -15340,6 +15352,10 @@ class ItineraryBuilder {
         adultsNoAlcoholQuantityField.value = experience.defaultAdultsNoAlcohol || '';
         adultsNoAlcoholQuantityField.placeholder = '0';
       }
+      // Duración: autollenar del catálogo de la experiencia (editable). Solo NEW; en edición la
+      // restauración pone la guardada.
+      const expDurationField = document.getElementById('experienceDuration');
+      if (expDurationField) expDurationField.value = experience.duration || '';
     } else {
 
     }
