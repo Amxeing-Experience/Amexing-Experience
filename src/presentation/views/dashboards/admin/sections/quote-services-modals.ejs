@@ -295,33 +295,8 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <!-- Hidden field for total people count (used by tier pricing logic) -->
                                 <input type="hidden" id="walkingTourPeopleCount" value="1">
                                 <input type="hidden" id="walkingTourCurrency" value="MXN">
-                                <label class="form-label mb-2">Precios por Grupo <small class="text-muted">(efectivo)</small></label>
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <div class="card walking-tier-card" id="walkingTierSmall">
-                                            <div class="card-body text-center p-2">
-                                                <small class="text-muted d-block" id="walkingRangeSmallLabel">—</small>
-                                                <h5 class="mb-0" id="walkingPriceSmallLabel">$0.00</h5>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="card walking-tier-card" id="walkingTierMedium">
-                                            <div class="card-body text-center p-2">
-                                                <small class="text-muted d-block" id="walkingRangeMediumLabel">—</small>
-                                                <h5 class="mb-0" id="walkingPriceMediumLabel">$0.00</h5>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="card walking-tier-card" id="walkingTierLarge">
-                                            <div class="card-body text-center p-2">
-                                                <small class="text-muted d-block" id="walkingRangeLargeLabel">—</small>
-                                                <h5 class="mb-0" id="walkingPriceLargeLabel">$0.00</h5>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <!-- Tarjetas de tramos (read-only) removidas: eran redundantes con los inputs
+                                     editables de abajo. El tramo que aplica ahora se resalta en el grupo editable. -->
                                 <!-- Group breakdown when people exceed max tier -->
                                 <div id="walkingTourGroupBreakdown" class="alert alert-info py-2 mt-3 d-none">
                                     <div id="walkingTourGroupBreakdownContent"></div>

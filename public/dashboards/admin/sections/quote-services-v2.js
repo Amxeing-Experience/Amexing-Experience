@@ -20385,10 +20385,7 @@ class ItineraryBuilder {
     const tourTransportCheckbox = document.getElementById('tourTransportCheckboxContainer');
     if (tourTransportCheckbox) tourTransportCheckbox.style.display = 'none';
 
-    // Populate tier cards
-    document.getElementById('walkingRangeSmallLabel').textContent = tour.walkingRangeSmall || '—';
-    document.getElementById('walkingRangeMediumLabel').textContent = tour.walkingRangeMedium || '—';
-    document.getElementById('walkingRangeLargeLabel').textContent = tour.walkingRangeLarge || '—';
+    // (Tarjetas de tramos removidas; los rangos se muestran en los inputs editables por grupo.)
 
     const currency = tour.walkingPriceCurrency || 'MXN';
     document.getElementById('walkingTourCurrency').value = currency;
@@ -20537,36 +20534,10 @@ class ItineraryBuilder {
   highlightWalkingTourTier(tour) {
     const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 0, 10);
 
-    const tierCards = {
-      Small: document.getElementById('walkingTierSmall'),
-      Medium: document.getElementById('walkingTierMedium'),
-      Large: document.getElementById('walkingTierLarge'),
-    };
-
-    // Remove all highlights
-    Object.values(tierCards).forEach((card) => {
-      if (card) {
-        card.style.border = '';
-        card.style.backgroundColor = '';
-      }
-    });
+    // Resaltado del tramo activo sobre los inputs editables por grupo.
+    this.applyWalkingTourGroupHighlight(tour);
 
     if (peopleCount <= 0) return;
-
-    const groups = this.calculateWalkingTourGroups(tour, peopleCount);
-
-    // Highlight all used tiers (keep visual feedback)
-    const usedTiers = new Set();
-    groups.forEach((g) => usedTiers.add(g.tier.name));
-    usedTiers.forEach((name) => {
-      const card = tierCards[name];
-      if (card) {
-        card.style.border = '2px solid #0d6efd';
-        card.style.backgroundColor = '#e7f1ff';
-      }
-    });
-
-    qsDevLog('🎯 Walking tour tiers highlighted for', peopleCount, 'people - breakdown will be handled by standard service breakdown');
 
     // Set service price using getWalkingTourPrice (normalizes to MXN)
     const servicePriceField = document.getElementById('servicePrice');
@@ -20575,6 +20546,41 @@ class ItineraryBuilder {
       const mxnPrice = this.getWalkingTourPrice(tour, peopleCount, duration);
       servicePriceField.value = mxnPrice.toFixed(2);
     }
+  }
+
+  /**
+   * Resalta, sobre los inputs editables por grupo (.walking-group-row), el/los tramo(s)
+   * que aplican según el número de personas. Reemplaza a las tarjetas read-only removidas.
+   * Sin efectos sobre el precio (lo maneja highlightWalkingTourTier).
+   * @param tour
+   */
+  applyWalkingTourGroupHighlight(tour) {
+    const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 0, 10);
+
+    const groupRows = document.querySelectorAll('.walking-group-row');
+    groupRows.forEach((row) => {
+      row.style.border = '';
+      row.style.backgroundColor = '';
+      row.style.borderRadius = '';
+      row.style.padding = '';
+    });
+
+    if (peopleCount <= 0 || !tour) return;
+
+    const groups = this.calculateWalkingTourGroups(tour, peopleCount);
+    const usedTiers = new Set();
+    groups.forEach((g) => usedTiers.add(g.tier.name));
+    usedTiers.forEach((name) => {
+      const row = document.querySelector(`.walking-group-row[data-tier-name="${name}"]`);
+      if (row) {
+        row.style.border = '2px solid #0d6efd';
+        row.style.backgroundColor = '#e7f1ff';
+        row.style.borderRadius = '0.375rem';
+        row.style.padding = '0.5rem';
+      }
+    });
+
+    qsDevLog('🎯 Walking tour group highlighted for', peopleCount, 'people');
   }
 
   /**
@@ -23679,6 +23685,9 @@ class ItineraryBuilder {
       if (typeof updateWalkingGroupTotalDisplay === 'function') {
         updateWalkingGroupTotalDisplay();
       }
+
+      // Los inputs se reconstruyeron (innerHTML): re-aplicar el resaltado del tramo activo.
+      this.applyWalkingTourGroupHighlight(tour);
     }
   }
 
