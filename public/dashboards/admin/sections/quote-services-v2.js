@@ -1877,6 +1877,9 @@ class ItineraryBuilder {
       this.clearAdditionalFlights('roundTripAdditionalFlightsListVuelta', 'roundTripAdditionalFlightsHeaderVuelta');
       // Vehículos adicionales extra — empty by default; appears when checkbox is on.
       this.clearExtraAdditionalVehicles();
+      // Walking tour — vaciar los inputs de precios por grupo (form.reset no limpia un
+      // container construido con innerHTML) y el desglose/total.
+      this.clearWalkingTourFields();
 
       // Clear concepto price field explicitly to avoid cached values
       const conceptoClientPriceField = document.getElementById('conceptoClientPrice');
@@ -20546,6 +20549,28 @@ class ItineraryBuilder {
       const mxnPrice = this.getWalkingTourPrice(tour, peopleCount, duration);
       servicePriceField.value = mxnPrice.toFixed(2);
     }
+  }
+
+  /**
+   * Limpia los inputs del walking tour al abrir el modal para un servicio NUEVO.
+   * form.reset() no vacía el container de precios por grupo (se construye con innerHTML),
+   * así que aquí se vacía explícitamente junto con el desglose/total.
+   */
+  clearWalkingTourFields() {
+    const container = document.getElementById('walkingTourGroupPricesContainer');
+    if (container) container.innerHTML = '';
+
+    const peopleCount = document.getElementById('walkingTourPeopleCount');
+    if (peopleCount) peopleCount.value = '1';
+    const currency = document.getElementById('walkingTourCurrency');
+    if (currency) currency.value = 'MXN';
+
+    const breakdown = document.getElementById('walkingTourGroupBreakdown');
+    if (breakdown) breakdown.classList.add('d-none');
+    const breakdownContent = document.getElementById('walkingTourGroupBreakdownContent');
+    if (breakdownContent) breakdownContent.innerHTML = '';
+
+    if (typeof window !== 'undefined') window.walkingGroupTotal = 0;
   }
 
   /**
