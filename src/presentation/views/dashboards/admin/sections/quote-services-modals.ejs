@@ -1089,14 +1089,6 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             </div>
                         </div>
                         
-                        <!-- Duración (horas): se autollena de la experiencia seleccionada y es editable. -->
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="experienceDuration" class="form-label">Duración <small class="text-muted">(horas)</small></label>
-                                <input type="number" min="0" step="0.5" class="form-control" id="experienceDuration" placeholder="Ej: 2" autocomplete="off">
-                                <small class="text-muted d-block">Se autollena de la experiencia; puedes modificarla.</small>
-                            </div>
-                        </div>
                         <!-- Hora de inicio / Hora de fin (user input) -->
                         <div class="row mb-3">
                             <div class="col-md-6">
@@ -1112,6 +1104,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <span class="input-group-text"><i class="ti ti-clock"></i></span>
                                     <input type="text" class="form-control time-input" id="experienceEndTime" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
                                 </div>
+                            </div>
+                        </div>
+                        <!-- Duración (horas): se autollena de la experiencia seleccionada y es editable. Full width, debajo del horario. -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="experienceDuration" class="form-label">Duración <small class="text-muted">(horas)</small></label>
+                                <input type="number" min="0" step="0.5" class="form-control" id="experienceDuration" placeholder="Ej: 2" autocomplete="off">
+                                <small class="text-muted d-block">Se autollena de la experiencia; puedes modificarla.</small>
                             </div>
                         </div>
                         
