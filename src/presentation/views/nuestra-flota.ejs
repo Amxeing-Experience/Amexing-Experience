@@ -31,12 +31,12 @@ Created by Denisse Maldonado
         ]
     };
     const fleet = [
-        { key: 'economy',  label: 'Economy',     vehicle: suburban },
-        { key: 'premium',  label: 'Premium',     vehicle: suburban },
-        { key: 'green',    label: 'Green Class', vehicle: suburban },
-        { key: 'first',    label: 'First Class', vehicle: suburban }
+        { cat: 'economy',  label: 'Economy',     vehicle: suburban },
+        { cat: 'premium',  label: 'Premium',     vehicle: suburban },
+        { cat: 'green',    label: 'Green Class', vehicle: suburban },
+        { cat: 'first',    label: 'First Class', vehicle: suburban }
     ];
-    const activeKey = 'first';
+    const activeCat = 'first';
 %>
 <!DOCTYPE html>
 <html lang="es">
@@ -487,11 +487,11 @@ Created by Denisse Maldonado
     }) %>
 
     <%# Datos de la flota para el JS interactivo %>
-    <script type="application/json" id="fleet-data"><%- JSON.stringify({ fleet, activeKey }) %></script>
+    <script type="application/json" id="fleet-data"><%- JSON.stringify({ fleet, activeCat }) %></script>
 
     <section class="fleet">
         <div class="fleet__stage">
-            <% const active = fleet.find(f => f.key === activeKey) || fleet[0]; const v = active.vehicle; %>
+            <% const active = fleet.find(f => f.cat === activeCat) || fleet[0]; const v = active.vehicle; %>
             <img class="fleet__photo" src="<%= v.image %>" alt="<%= active.label %> — <%= v.name %>">
 
             <div class="fleet__inner">
@@ -499,9 +499,9 @@ Created by Denisse Maldonado
 
                 <nav class="fleet__tabs" role="tablist" aria-label="Categorías de la flota">
                     <% fleet.forEach(function(f) { %>
-                        <button class="fleet__tab<%= f.key === activeKey ? ' is-active' : '' %>"
-                                role="tab" data-key="<%= f.key %>"
-                                aria-selected="<%= f.key === activeKey ? 'true' : 'false' %>"><%= f.label %></button>
+                        <button class="fleet__tab<%= f.cat === activeCat ? ' is-active' : '' %>"
+                                role="tab" data-cat="<%= f.cat %>"
+                                aria-selected="<%= f.cat === activeCat ? 'true' : 'false' %>"><%= f.label %></button>
                     <% }); %>
                 </nav>
 
@@ -563,20 +563,20 @@ Created by Denisse Maldonado
     <script>
         (function () {
             const data = JSON.parse(document.getElementById('fleet-data').textContent);
-            const byKey = Object.fromEntries(data.fleet.map(f => [f.key, f]));
+            const byCat = Object.fromEntries(data.fleet.map(f => [f.cat, f]));
             const stage = document.querySelector('.fleet');
             const photo = stage.querySelector('.fleet__photo');
             const cards = stage.querySelectorAll('.fleet-card');
-            let current = byKey[data.activeKey] || data.fleet[0];
+            let current = byCat[data.activeCat] || data.fleet[0];
 
-            function render(key) {
-                const f = byKey[key];
+            function render(cat) {
+                const f = byCat[cat];
                 if (!f) return;
                 const v = f.vehicle;
                 current = f;
 
                 stage.querySelectorAll('.fleet__tab').forEach(t => {
-                    const on = t.dataset.key === key;
+                    const on = t.dataset.cat === cat;
                     t.classList.toggle('is-active', on);
                     t.setAttribute('aria-selected', on ? 'true' : 'false');
                 });
@@ -584,8 +584,8 @@ Created by Denisse Maldonado
                 // el tab activo siempre se mueve al último lugar (posición de First Class);
                 // los demás conservan su orden original
                 const tabsEl = stage.querySelector('.fleet__tabs');
-                data.fleet.map(x => x.key).filter(k => k !== key).concat(key)
-                    .forEach(k => tabsEl.appendChild(tabsEl.querySelector('[data-key="' + k + '"]')));
+                data.fleet.map(x => x.cat).filter(c => c !== cat).concat(cat)
+                    .forEach(c => tabsEl.appendChild(tabsEl.querySelector('[data-cat="' + c + '"]')));
 
                 photo.src = v.image;
                 photo.alt = f.label + ' — ' + v.name;
@@ -607,7 +607,7 @@ Created by Denisse Maldonado
             }
 
             stage.querySelectorAll('.fleet__tab').forEach(tab => {
-                tab.addEventListener('click', () => render(tab.dataset.key));
+                tab.addEventListener('click', () => render(tab.dataset.cat));
             });
 
             /* ---- Lightbox de galería ---- */
