@@ -14,6 +14,8 @@ Created by Denisse Maldonado
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <%# Fuente script para el título del hero (Bodas y Eventos / Weddings & Events) %>
+    <link href="https://fonts.googleapis.com/css2?family=Imperial+Script&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/css/fonts.css">
     <link rel="icon" type="image/png" href="/images/heart_black.png">
@@ -30,6 +32,7 @@ Created by Denisse Maldonado
 
         /* ---- Header: banner con imagen ---- */
         .bodas-hero {
+            position: relative;
             width: 100%;
             line-height: 0;
         }
@@ -38,6 +41,46 @@ Created by Denisse Maldonado
             display: block;
             width: 100%;
             height: auto;
+        }
+
+        .bodas-hero__title {
+            position: absolute;
+            top: clamp(1.2rem, 4vw, 3rem);
+            left: 50%;
+            transform: translateX(-50%);
+            margin: 0;
+            font-family: 'Imperial Script', cursive;
+            font-weight: 400;
+            color: #ffffff;
+            font-size: clamp(2.8rem, 8vw, 6rem);
+            line-height: 1.05;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            text-align: center;
+            text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+            pointer-events: none;
+        }
+
+        /* línea decorativa debajo del título, con hueco al centro (bajo la "y") */
+        .bodas-hero__title::after {
+            content: '';
+            display: block;
+            width: min(620px, 72vw);
+            height: 1px;
+            margin: clamp(-0.4rem, -0.4vw, 0rem) auto 0;
+            background: linear-gradient(90deg,
+                rgba(255, 255, 255, 0.9) 0 43%,
+                transparent 43% 53%,
+                rgba(255, 255, 255, 0.9) 53% 100%);
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+        }
+
+        /* en inglés ("Weddings & Events") el hueco va bajo el "&", a la derecha */
+        .bodas-hero__title--en::after {
+            background: linear-gradient(90deg,
+                rgba(255, 255, 255, 0.9) 0 53%,
+                transparent 53% 63%,
+                rgba(255, 255, 255, 0.9) 63% 100%);
         }
 
         /* ---- Logística día del evento ---- */
@@ -296,7 +339,8 @@ Created by Denisse Maldonado
 
     <%# Header: banner con la imagen de bodas %>
     <section class="bodas-hero">
-        <img src="/images/bodas_header.jpg" alt="Bodas y Eventos — Amexing Experience" class="bodas-hero__img">
+        <img src="/images/bodas_header.jpg" alt="<%= t('pages:bodas.heroAlt') %>" class="bodas-hero__img">
+        <h1 class="bodas-hero__title<%= (typeof currentLang !== 'undefined' && currentLang === 'en') ? ' bodas-hero__title--en' : '' %>"><%= t('pages:bodas.heroTitle') %></h1>
     </section>
 
     <%# Logística día del evento %>
@@ -308,14 +352,14 @@ Created by Denisse Maldonado
             <% logisticaImages.forEach(function(img, i) { %>
                 <div class="bodas-logistica__img"
                      <% if (img) { %>style="background-image: url('<%= img %>')"<% } %>
-                     role="img" aria-label="Imagen <%= i + 1 %><%= img ? '' : ' (placeholder)' %>">
+                     role="img" aria-label="<%= t('pages:bodas.imageAlt', { n: i + 1 }) %><%= img ? '' : ' (placeholder)' %>">
                     <% if (!img) { %><i class="fa-regular fa-image" aria-hidden="true"></i><% } %>
                 </div>
             <% }); %>
         </div>
 
         <div class="bodas-logistica__body">
-            <h2 class="bodas-logistica__title">Logística día del evento y landing personalizada para la boda</h2>
+            <h2 class="bodas-logistica__title"><%= t('pages:bodas.logistica.title') %></h2>
             <span class="bodas-logistica__rule" aria-hidden="true"></span>
             <div class="bodas-logistica__text">
                 <p>Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat.</p>
@@ -329,30 +373,30 @@ Created by Denisse Maldonado
     <section class="bodas-novios">
         <div class="bodas-novios__box">
             <p class="bodas-novios__title">
-                <span class="bodas-novios__lg">Conoce</span>
-                <span class="bodas-novios__sm">nuestros</span>
-                <span class="bodas-novios__sm">beneficios</span>
-                <span class="bodas-novios__sm">exclusivos</span>
-                <span class="bodas-novios__sm">para</span>
-                <span class="bodas-novios__lg">Novios</span>
-                <span class="bodas-novios__lg"><span class="bodas-novios__conj">y</span> anfitriones</span>
+                <span class="bodas-novios__lg"><%= t('pages:bodas.novios.w1') %></span>
+                <span class="bodas-novios__sm"><%= t('pages:bodas.novios.w2') %></span>
+                <span class="bodas-novios__sm"><%= t('pages:bodas.novios.w3') %></span>
+                <span class="bodas-novios__sm"><%= t('pages:bodas.novios.w4') %></span>
+                <span class="bodas-novios__sm"><%= t('pages:bodas.novios.w5') %></span>
+                <span class="bodas-novios__lg"><%= t('pages:bodas.novios.w6') %></span>
+                <span class="bodas-novios__lg"><span class="bodas-novios__conj"><%= t('pages:bodas.novios.conj') %></span> <%= t('pages:bodas.novios.w7') %></span>
             </p>
         </div>
-        <a href="/contacto" class="bodas-novios__btn">Contáctanos</a>
+        <a href="/contacto" class="bodas-novios__btn"><%= t('pages:bodas.novios.cta') %></a>
     </section>
 
     <%# Servicios disponibles (asistentes al evento) %>
     <%
         const bodasServicios = [
-            { label: 'Transporte',  img: '/images/boda_s1.png' },
-            { label: 'Hospedaje',   img: '/images/boda_s2.png' },
-            { label: 'Vuelos',      img: '/images/boda_s3.png' },
-            { label: 'Actividades', img: '/images/boda_s4.png' }
+            { label: t('pages:bodas.servicios.transporte'),  img: '/images/boda_s1.png' },
+            { label: t('pages:bodas.servicios.hospedaje'),   img: '/images/boda_s2.png' },
+            { label: t('pages:bodas.servicios.vuelos'),      img: '/images/boda_s3.png' },
+            { label: t('pages:bodas.servicios.actividades'), img: '/images/boda_s4.png' }
         ];
     %>
     <section class="bodas-servicios">
         <div class="bodas-servicios__inner">
-            <h2 class="bodas-servicios__title">Servicios disponibles</h2>
+            <h2 class="bodas-servicios__title"><%= t('pages:bodas.servicios.title') %></h2>
             <div class="bodas-servicios__grid">
                 <% bodasServicios.forEach(function(s) { %>
                     <figure class="bodas-servicios__card">
@@ -365,12 +409,14 @@ Created by Denisse Maldonado
                     </figure>
                 <% }); %>
             </div>
-            <a href="/contacto" class="bodas-servicios__btn">Book now</a>
+            <a href="/contacto" class="bodas-servicios__btn"><%= t('pages:bodas.servicios.cta') %></a>
         </div>
     </section>
 
     <%# CTA Contacto (reutilizable) %>
-    <%- include('../organisms/landing/cta-contacto-section') %>
+    <%- include('../organisms/landing/cta-contacto-section', {
+        t: typeof t !== 'undefined' ? t : ((key) => key)
+    }) %>
 
     <%# Footer %>
     <%- include('../organisms/landing/landing-footer', {

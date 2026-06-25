@@ -17,7 +17,18 @@
   "fleet": {
     "title": "Our Fleet - Amexing Experience",
     "description": "Discover our premium fleet featuring Tesla vehicles and other luxury automobiles for executive transportation in San Miguel de Allende. Comfort, elegance, and sustainability combined.",
-    "keywords": "fleet, tesla, luxury vehicles, executive transport, san miguel de allende, sustainable transportation"
+    "keywords": "fleet, tesla, luxury vehicles, executive transport, san miguel de allende, sustainable transportation",
+    "brand1": "Our",
+    "brand2": "Fleet",
+    "aria": {
+      "categories": "Fleet categories",
+      "openGallery": "View vehicle gallery",
+      "gallery": "Vehicle gallery",
+      "close": "Close gallery",
+      "prev": "Previous",
+      "next": "Next"
+    },
+    "photoWord": "photo"
   },
   "contact": {
     "title": "Contact - Amexing Experience",
@@ -75,5 +86,91 @@
       "connectionError": "Connection error. Please check your internet connection and try again.",
       "characterCounter": "characters"
     }
+  },
+  "bodas": {
+    "heroAlt": "Weddings & Events — Amexing Experience",
+    "heroTitle": "Weddings & Events",
+    "imageAlt": "Image {{n}}",
+    "logistica": {
+      "title": "Event-day logistics and a personalized landing page for the wedding"
+    },
+    "novios": {
+      "w1": "Discover",
+      "w2": "our",
+      "w3": "exclusive",
+      "w4": "benefits",
+      "w5": "for",
+      "w6": "Couples",
+      "conj": "&",
+      "w7": "hosts",
+      "cta": "Contact us"
+    },
+    "servicios": {
+      "title": "Available services",
+      "transporte": "Transportation",
+      "hospedaje": "Accommodation",
+      "vuelos": "Flights",
+      "actividades": "Activities",
+      "cta": "Book now"
+    }
+  },
+  "transporte": {
+    "heroAlt": "Amexing Experience Fleet",
+    "options": { "title1": "Options", "title2": "for Everyone" },
+    "perfectFor": "Perfect for:",
+    "bookNow": "Book Now",
+    "vehicles": {
+      "sedan": "Private Sedan",
+      "suv": "Private SUV",
+      "van": "Private Van"
+    },
+    "audiences": {
+      "couples": "Couples",
+      "individual": "Solo travelers",
+      "business": "Business travelers",
+      "smallFamilies": "Small families",
+      "largeFamilies": "Large families",
+      "largeGroups": "Large groups"
+    },
+    "mapAlt": "Airport transfers — airports near San Miguel de Allende",
+    "pointToPointAlt": "Point-to-point transfers",
+    "bookAria": "Book Now — book a transfer",
+    "local": {
+      "title1": "Local",
+      "title2": "Transfers",
+      "icons": {
+        "food": "Food & wine",
+        "products": "Local products",
+        "art": "Art & culture",
+        "hotels": "Hotels"
+      }
+    }
+  },
+  "categories": {
+    "catas": "Tastings",
+    "arte": "Art",
+    "historiaArquitectura": "History & Architecture",
+    "gastronomicas": "Gastronomy",
+    "aventura": "Adventure",
+    "naturaleza": "Nature",
+    "deTemporada": "Seasonal"
+  },
+  "tours": { "title": "Tours" },
+  "experiencias": { "title": "Experiences" },
+  "categoryDetail": {
+    "bookNow": "Book Now",
+    "placeholderTitle": "Vineyard Tours",
+    "duration": "Duration:",
+    "durationValue": "6 hrs.",
+    "minPeople": "Minimum people:",
+    "minPeopleValue": "8",
+    "availableDays": "Available days:",
+    "availableDaysValue": "Monday, Tuesday, Thursday and Saturday.",
+    "availableTimes": "Available times:",
+    "availableTimesValue": "9:00 AM, 1:00 PM and 4:00 PM"
+  },
+  "cta": {
+    "title": "Can't find what you're looking for?",
+    "button": "Contact us"
   }
 }
