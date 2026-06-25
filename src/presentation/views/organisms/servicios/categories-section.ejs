@@ -13,6 +13,7 @@ Created by Denisse Maldonado
 %>
 <%
     // Defaults defensivos (las páginas pasan su propia data)
+    var _t = (typeof t === 'function') ? t : function (k) { return k; };
     var _pageTitle = (typeof pageTitle !== 'undefined' && pageTitle) ? pageTitle : 'Experiencias';
     var _intro = (typeof intro !== 'undefined' && intro) ? intro
         : 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud.';
@@ -26,14 +27,14 @@ Created by Denisse Maldonado
         { label: 'De Temporada', img: '/images/1.png' }
     ];
     var _placeholderCard = {
-        title: 'Recorridos en Viñedos',
+        title: _t('pages:categoryDetail.placeholderTitle'),
         img: '/images/7.png',
         bookHref: '/contacto#book',
         items: [
-            { label: 'Duración:', value: '6 hrs.' },
-            { label: 'Mínimo de personas:', value: '8' },
-            { label: 'Días disponibles:', value: 'lunes, martes, jueves y sábado.', block: true },
-            { label: 'Horarios disponibles:', value: '9:00 am, 1:00 pm y 4:00 pm', block: true }
+            { label: _t('pages:categoryDetail.duration'), value: _t('pages:categoryDetail.durationValue') },
+            { label: _t('pages:categoryDetail.minPeople'), value: _t('pages:categoryDetail.minPeopleValue') },
+            { label: _t('pages:categoryDetail.availableDays'), value: _t('pages:categoryDetail.availableDaysValue'), block: true },
+            { label: _t('pages:categoryDetail.availableTimes'), value: _t('pages:categoryDetail.availableTimesValue'), block: true }
         ]
     };
     var _detailCards = (typeof detailCards !== 'undefined' && Array.isArray(detailCards) && detailCards.length)
@@ -372,7 +373,7 @@ Created by Denisse Maldonado
                     <% (card.items || []).forEach(function(it) { %>
                         <div class="exp-detail__item"><strong><%= it.label %></strong><% if (it.block) { %><br><%= it.value %><% } else { %> <%= it.value %><% } %></div>
                     <% }); %>
-                    <a href="<%= card.bookHref || '/contacto#book' %>" class="exp-detail__book">Book Now</a>
+                    <a href="<%= card.bookHref || '/contacto#book' %>" class="exp-detail__book"><%= _t('pages:categoryDetail.bookNow') %></a>
                 </div>
             </div>
         </div>

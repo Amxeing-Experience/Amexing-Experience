@@ -134,6 +134,29 @@
       }
     }
   },
+  "categories": {
+    "catas": "Tastings",
+    "arte": "Art",
+    "historiaArquitectura": "History & Architecture",
+    "gastronomicas": "Gastronomy",
+    "aventura": "Adventure",
+    "naturaleza": "Nature",
+    "deTemporada": "Seasonal"
+  },
+  "tours": { "title": "Tours" },
+  "experiencias": { "title": "Experiences" },
+  "categoryDetail": {
+    "bookNow": "Book Now",
+    "placeholderTitle": "Vineyard Tours",
+    "duration": "Duration:",
+    "durationValue": "6 hrs.",
+    "minPeople": "Minimum people:",
+    "minPeopleValue": "8",
+    "availableDays": "Available days:",
+    "availableDaysValue": "Monday, Tuesday, Thursday and Saturday.",
+    "availableTimes": "Available times:",
+    "availableTimesValue": "9:00 AM, 1:00 PM and 4:00 PM"
+  },
   "cta": {
     "title": "Can't find what you're looking for?",
     "button": "Contact us"

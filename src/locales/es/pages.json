@@ -134,6 +134,29 @@
       }
     }
   },
+  "categories": {
+    "catas": "Catas",
+    "arte": "Arte",
+    "historiaArquitectura": "Historia y Arquitectura",
+    "gastronomicas": "Gastronómicas",
+    "aventura": "Aventura",
+    "naturaleza": "Naturaleza",
+    "deTemporada": "De Temporada"
+  },
+  "tours": { "title": "Tours" },
+  "experiencias": { "title": "Experiencias" },
+  "categoryDetail": {
+    "bookNow": "Book Now",
+    "placeholderTitle": "Recorridos en Viñedos",
+    "duration": "Duración:",
+    "durationValue": "6 hrs.",
+    "minPeople": "Mínimo de personas:",
+    "minPeopleValue": "8",
+    "availableDays": "Días disponibles:",
+    "availableDaysValue": "lunes, martes, jueves y sábado.",
+    "availableTimes": "Horarios disponibles:",
+    "availableTimesValue": "9:00 am, 1:00 pm y 4:00 pm"
+  },
   "cta": {
     "title": "¿No encuentras lo que buscas?",
     "button": "Contáctanos"
