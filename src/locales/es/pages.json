@@ -102,6 +102,38 @@
       "cta": "Book now"
     }
   },
+  "transporte": {
+    "heroAlt": "Flota Amexing Experience",
+    "options": { "title1": "Opciones", "title2": "para Todos" },
+    "perfectFor": "Perfecto para:",
+    "bookNow": "Book Now",
+    "vehicles": {
+      "sedan": "Sedan Privado",
+      "suv": "SUV Privada",
+      "van": "Van Privada"
+    },
+    "audiences": {
+      "couples": "Parejas",
+      "individual": "Viajeros individuales",
+      "business": "Viajeros de negocios",
+      "smallFamilies": "Pequeñas familias",
+      "largeFamilies": "Familias grandes",
+      "largeGroups": "Grupos grandes"
+    },
+    "mapAlt": "Transfers al aeropuerto — aeropuertos cercanos a San Miguel de Allende",
+    "pointToPointAlt": "Traslados punto a punto",
+    "bookAria": "Book Now — reservar traslado",
+    "local": {
+      "title1": "Traslados",
+      "title2": "Locales",
+      "icons": {
+        "food": "Gastronomía y vinos",
+        "products": "Productos locales",
+        "art": "Arte y cultura",
+        "hotels": "Hoteles"
+      }
+    }
+  },
   "cta": {
     "title": "¿No encuentras lo que buscas?",
     "button": "Contáctanos"

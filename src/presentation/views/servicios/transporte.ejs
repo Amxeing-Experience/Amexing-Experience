@@ -377,24 +377,24 @@ Created by Denisse Maldonado
 
     <%# Header: banner con la imagen de la flota %>
     <section class="transporte-hero">
-        <img src="/images/transportes_services.jpg" alt="Flota Amexing Experience" class="transporte-hero__img">
+        <img src="/images/transportes_services.jpg" alt="<%= t('pages:transporte.heroAlt') %>" class="transporte-hero__img">
     </section>
 
     <%# Opciones de vehículos %>
     <%
         const vehiculos = [
-            { name: 'Sedan Privado', img: '/images/sedan_privado.png', side: 'left', color: 'dark',
-              para: ['Parejas', 'Viajeros individuales', 'Viajeros de negocios'] },
-            { name: 'SUV Privada', img: '/images/suv_privada.png', side: 'right', color: 'green',
-              para: ['Parejas', 'Viajeros individuales', 'Viajeros de negocios', 'Pequeñas familias'] },
-            { name: 'Van Privada', img: '/images/van_privada.png', side: 'left', color: 'olive',
-              para: ['Viajeros de negocios', 'Familias grandes', 'Grupos grande'] }
+            { name: t('pages:transporte.vehicles.sedan'), img: '/images/sedan_privado.png', side: 'left', color: 'dark',
+              para: [t('pages:transporte.audiences.couples'), t('pages:transporte.audiences.individual'), t('pages:transporte.audiences.business')] },
+            { name: t('pages:transporte.vehicles.suv'), img: '/images/suv_privada.png', side: 'right', color: 'green',
+              para: [t('pages:transporte.audiences.couples'), t('pages:transporte.audiences.individual'), t('pages:transporte.audiences.business'), t('pages:transporte.audiences.smallFamilies')] },
+            { name: t('pages:transporte.vehicles.van'), img: '/images/van_privada.png', side: 'left', color: 'olive',
+              para: [t('pages:transporte.audiences.business'), t('pages:transporte.audiences.largeFamilies'), t('pages:transporte.audiences.largeGroups')] }
         ];
     %>
     <section class="veh">
         <div class="veh__frame">
             <div class="veh__title-wrap">
-                <h2 class="veh__title">Opciones<br>para Todos</h2>
+                <h2 class="veh__title"><%= t('pages:transporte.options.title1') %><br><%= t('pages:transporte.options.title2') %></h2>
             </div>
             <p class="veh__intro">
                 Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud.
@@ -406,11 +406,11 @@ Created by Denisse Maldonado
                         <div class="veh-row__card">
                             <div class="veh-row__content">
                                 <h3 class="veh-row__name"><%= v.name %></h3>
-                                <p class="veh-row__for">Perfecto para:</p>
+                                <p class="veh-row__for"><%= t('pages:transporte.perfectFor') %></p>
                                 <ul class="veh-row__para">
                                     <% v.para.forEach(function(p) { %><li><%= p %></li><% }); %>
                                 </ul>
-                                <a href="/contacto#book" class="veh-row__book">Book Now</a>
+                                <a href="/contacto#book" class="veh-row__book"><%= t('pages:transporte.bookNow') %></a>
                             </div>
                         </div>
                         <div class="veh-row__image" style="background-image: url('<%= v.img %>')" role="img" aria-label="<%= v.name %>"></div>
@@ -422,13 +422,13 @@ Created by Denisse Maldonado
 
     <%# Mapa: transfers al aeropuerto %>
     <section class="transfers-map">
-        <img src="/images/map_transfers.jpg" alt="Transfers al aeropuerto — aeropuertos cercanos a San Miguel de Allende" class="transfers-map__img">
+        <img src="/images/map_transfers.jpg" alt="<%= t('pages:transporte.mapAlt') %>" class="transfers-map__img">
     </section>
 
     <%# Traslados punto a punto %>
     <section class="book-vehicles">
-        <img src="/images/book_vehicles.jpg" alt="Traslados punto a punto" class="book-vehicles__img">
-        <a href="/contacto#book" class="book-vehicles__cta" aria-label="Book Now — reservar traslado"></a>
+        <img src="/images/book_vehicles.jpg" alt="<%= t('pages:transporte.pointToPointAlt') %>" class="book-vehicles__img">
+        <a href="/contacto#book" class="book-vehicles__cta" aria-label="<%= t('pages:transporte.bookAria') %>"></a>
     </section>
 
     <%# Espacio en blanco de separación %>
@@ -437,17 +437,17 @@ Created by Denisse Maldonado
     <%# Traslados locales %>
     <%
         const localIcons = [
-            { img: '/images/cava.png', label: 'Gastronomía y vinos' },
-            { img: '/images/maiz.png', label: 'Productos locales' },
-            { img: '/images/arte.png', label: 'Arte y cultura' },
-            { img: '/images/hotel.png', label: 'Hoteles' }
+            { img: '/images/cava.png', label: t('pages:transporte.local.icons.food') },
+            { img: '/images/maiz.png', label: t('pages:transporte.local.icons.products') },
+            { img: '/images/arte.png', label: t('pages:transporte.local.icons.art') },
+            { img: '/images/hotel.png', label: t('pages:transporte.local.icons.hotels') }
         ];
     %>
     <section class="local-transfers">
         <div class="local-transfers__inner">
             <div class="local-transfers__left">
-                <h2 class="local-transfers__title">Traslados<br>Locales</h2>
-                <a href="/contacto#book" class="local-transfers__book">Book Now</a>
+                <h2 class="local-transfers__title"><%= t('pages:transporte.local.title1') %><br><%= t('pages:transporte.local.title2') %></h2>
+                <a href="/contacto#book" class="local-transfers__book"><%= t('pages:transporte.bookNow') %></a>
             </div>
             <div class="local-transfers__icons">
                 <% localIcons.forEach(function(it) { %>
@@ -458,7 +458,9 @@ Created by Denisse Maldonado
     </section>
 
     <%# CTA Contacto (reutilizable) %>
-    <%- include('../organisms/landing/cta-contacto-section') %>
+    <%- include('../organisms/landing/cta-contacto-section', {
+        t: typeof t !== 'undefined' ? t : ((key) => key)
+    }) %>
 
     <%# Footer %>
     <%- include('../organisms/landing/landing-footer', {
