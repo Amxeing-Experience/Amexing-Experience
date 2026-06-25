@@ -75,5 +75,35 @@
       "connectionError": "Hubo un error de conexión. Por favor verifique su conexión a internet e intente nuevamente.",
       "characterCounter": "caracteres"
     }
+  },
+  "bodas": {
+    "heroAlt": "Bodas y Eventos — Amexing Experience",
+    "imageAlt": "Imagen {{n}}",
+    "logistica": {
+      "title": "Logística día del evento y landing personalizada para la boda"
+    },
+    "novios": {
+      "w1": "Conoce",
+      "w2": "nuestros",
+      "w3": "beneficios",
+      "w4": "exclusivos",
+      "w5": "para",
+      "w6": "Novios",
+      "conj": "y",
+      "w7": "anfitriones",
+      "cta": "Contáctanos"
+    },
+    "servicios": {
+      "title": "Servicios disponibles",
+      "transporte": "Transporte",
+      "hospedaje": "Hospedaje",
+      "vuelos": "Vuelos",
+      "actividades": "Actividades",
+      "cta": "Book now"
+    }
+  },
+  "cta": {
+    "title": "¿No encuentras lo que buscas?",
+    "button": "Contáctanos"
   }
 }
