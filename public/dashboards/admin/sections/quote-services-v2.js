@@ -1115,13 +1115,15 @@ class ItineraryBuilder {
 
     // Editar a mano la duración de ruta → recalcular guía/greeter, desglose y hora de salida
     // sugerida (getRouteDurationMinutes toma este campo como prioridad).
-    document.getElementById('routeDurationInput')?.addEventListener('input', () => {
-      this.serviceModified = true;
-      this.updateDevPaymentBreakdown();
-      this.updateSuggestedDepartureTime();
-      // Route time feeds the local estimated-arrival calc.
-      this.updateTransferArrivalEstimate();
-      setTimeout(() => this.updateServicePriceBreakdown(), 50);
+    ['routeDurationHours', 'routeDurationMinutes'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => {
+        this.serviceModified = true;
+        this.updateDevPaymentBreakdown();
+        this.updateSuggestedDepartureTime();
+        // Route time feeds the local estimated-arrival calc.
+        this.updateTransferArrivalEstimate();
+        setTimeout(() => this.updateServicePriceBreakdown(), 50);
+      });
     });
 
     // Local transfers: recompute the estimated arrival when the pick-up time changes.
@@ -6446,7 +6448,7 @@ class ItineraryBuilder {
           this.updateWaitingTimeRateDisplay();
           // Restaurar la duración de ruta guardada en el campo editable (manda sobre el lookup
           // al editar, para conservar un valor capturado a mano).
-          { const rd = document.getElementById('routeDurationInput'); if (rd) rd.value = this.minutesToHoursInput(service.routeDuration); }
+          this.setRouteDurationFields(service.routeDuration);
           // Update dev payment breakdown now that transport data is loaded
           this.updateDevPaymentBreakdown();
           // Update service price breakdown now that transport data is loaded
@@ -13012,8 +13014,7 @@ class ItineraryBuilder {
     // Limpia la duración de ruta cacheada para que no se herede de otro servicio (afecta guía/
     // greeter/hora de salida sugerida). Se repuebla con el lookup de la ruta de este servicio.
     this.cachedRouteDuration = null;
-    const rdInput = document.getElementById('routeDurationInput');
-    if (rdInput) rdInput.value = '';
+    this.setRouteDurationFields(null);
 
     // Vehículo adicional (transporte / vehicle tour)
     const addCheckbox = document.getElementById('additionalVehicleCheckbox');
@@ -15935,23 +15936,34 @@ class ItineraryBuilder {
    * @example
    */
   // Duración de ruta efectiva (min) que usan guía/greeter y la hora de salida sugerida.
-  // Prioridad: el campo editable (#routeDurationInput) → la duración del lookup (cache) → la
+  // Prioridad: los campos editables (#routeDurationHours/#routeDurationMinutes) → el lookup (cache) → la
   // guardada en el servicio (al editar). Así un valor capturado a mano manda, y las rutas sin
   // duración configurada se pueden completar a mano para que sí calculen.
   // Convierte minutos (lo que usa el backend/cálculos) a horas para mostrar en el campo.
-  minutesToHoursInput(min) {
+  // Setea los dos campos (horas + minutos) a partir de una duración en MINUTOS. Vacíos si no hay.
+  setRouteDurationFields(min) {
+    const hoursEl = document.getElementById('routeDurationHours');
+    const minsEl = document.getElementById('routeDurationMinutes');
     const m = Number(min);
-    if (!m || Number.isNaN(m) || m <= 0) return '';
-    return String(parseFloat((m / 60).toFixed(2)));
+    if (!m || Number.isNaN(m) || m <= 0) {
+      if (hoursEl) hoursEl.value = '';
+      if (minsEl) minsEl.value = '';
+      return;
+    }
+    if (hoursEl) hoursEl.value = Math.floor(m / 60);
+    if (minsEl) minsEl.value = Math.round(m % 60);
   }
 
   getRouteDurationMinutes() {
-    // El campo se captura/muestra en HORAS; internamente todo (guía/greeter/hora sugerida,
-    // guardado) usa MINUTOS. Aquí convertimos horas→minutos.
-    const fieldEl = document.getElementById('routeDurationInput');
-    if (fieldEl && fieldEl.value !== '') {
-      const hours = parseFloat(fieldEl.value);
-      if (!Number.isNaN(hours) && hours > 0) return Math.round(hours * 60);
+    // Los campos se capturan/muestran en HORAS + MINUTOS; internamente todo (guía/greeter/hora
+    // sugerida, guardado) usa MINUTOS. Aquí sumamos horas*60 + minutos.
+    const hoursEl = document.getElementById('routeDurationHours');
+    const minsEl = document.getElementById('routeDurationMinutes');
+    if ((hoursEl && hoursEl.value !== '') || (minsEl && minsEl.value !== '')) {
+      const h = parseInt(hoursEl?.value || 0, 10) || 0;
+      const mm = parseInt(minsEl?.value || 0, 10) || 0;
+      const total = (h * 60) + mm;
+      if (total > 0) return total;
     }
     let rd = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
     if (!rd && this.currentServiceId && this.services.has(this.currentServiceId)) {
@@ -18264,8 +18276,7 @@ class ItineraryBuilder {
       const minutes = result?.data?.routeDuration;
       if (minutes) {
         this.cachedRouteDuration = minutes;
-        const rdInput = document.getElementById('routeDurationInput');
-        if (rdInput) rdInput.value = this.minutesToHoursInput(minutes);
+        this.setRouteDurationFields(minutes);
         if (typeof this.updateTransferArrivalEstimate === 'function') this.updateTransferArrivalEstimate();
       }
     } catch (e) {
@@ -18440,8 +18451,7 @@ class ItineraryBuilder {
       // la ruta no la trae → se captura a mano). En restauración de edición NO se pisa: el valor
       // guardado se pone en el restore.
       if (!this._populatingTransportForm) {
-        const rdInput = document.getElementById('routeDurationInput');
-        if (rdInput) rdInput.value = this.minutesToHoursInput(result.data.routeDuration);
+        this.setRouteDurationFields(result.data.routeDuration);
       }
 
       qsDevLog('🚗 Route duration received:', {
