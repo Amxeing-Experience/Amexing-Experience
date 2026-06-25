@@ -1,6 +1,18 @@
 <%
-// Travel-preference types mirror the reference design.
-const PREFERENCE_TYPES = ['Activity', 'Bed', 'Hotel', 'Meal', 'Mood', 'Seat'];
+// Curated travel-preference catalog. Categories and options informed by industry practice (luxury
+// travel concierge profiles, IATA airline seat/special-meal SSR codes, luxury-hotel guest preference
+// profiles) plus the experiences Amexing offers. The option field is a datalist, so the team can also
+// type a custom value not in the list.
+const PREFERENCE_CATALOG = {
+  'Asiento (avión)': ['Ventana', 'Pasillo', 'En medio', 'Espacio extra para piernas', 'Adelante', 'Atrás', 'Sin preferencia'],
+  'Clase de vuelo': ['Turista', 'Turista premium', 'Ejecutiva (Business)', 'Primera clase'],
+  'Tipo de comida': ['Mexicana', 'Internacional', 'Mariscos', 'Italiana', 'Asiática', 'Japonesa', 'Cortes / Carnes', 'Vegetariana', 'Vegana', 'Alta cocina', 'Fusión', 'Tradicional', 'Saludable'],
+  'Restricción / Alergia': ['Ninguna', 'Sin gluten', 'Sin lácteos', 'Sin nueces', 'Sin mariscos', 'Vegetariano', 'Vegano', 'Kosher', 'Halal', 'Diabética', 'Otra (especificar)'],
+  'Bebida / Alcohol': ['Vino', 'Cerveza', 'Cócteles', 'Tequila / Mezcal', 'Whisky', 'Champaña / Espumosos'],
+  'Interés / Experiencia': ['Cata de vinos / Viñedos', 'Gastronomía', 'Aventura', 'Tours culturales / históricos', 'Bienestar / Spa', 'Vida nocturna', 'Naturaleza', 'Arte', 'Fotografía', 'Compras', 'Golf', 'Playa', 'Transporte ejecutivo'],
+  'Vehículo preferido': ['Sedán', 'SUV', 'Suburban', 'Eléctrico'],
+  'Idioma preferido': ['Español', 'Inglés', 'Francés', 'Alemán', 'Italiano', 'Portugués'],
+};
 %>
 <style>
     #profileModal .form-control, #profileModal .form-select,
@@ -20,7 +32,24 @@ window.initProfileSection = function (root) {
     // ownerBase lets this section drive either /api/clients/:id (Client) or /api/agents/:id
     // (AmexingUser agent). Falls back to the client base for backward compatibility.
     const base = root.dataset.ownerBase || `/api/clients/${clientId}`;
-    const PREFERENCE_TYPES = <%- JSON.stringify(PREFERENCE_TYPES) %>;
+    const PREFERENCE_CATALOG = <%- JSON.stringify(PREFERENCE_CATALOG) %>;
+    // Categories where the client can pick several options at once (rendered as checkboxes).
+    const PREFERENCE_MULTI = ['Tipo de comida', 'Restricción / Alergia', 'Bebida / Alcohol', 'Interés / Experiencia'];
+
+    // Character limit per input TYPE (not per field) — reviewed against each field's real-world content
+    // so the cap is sensible. This is the UI guard; persisted values are also trimmed server-side.
+    const FIELD_LIMITS = {
+        label: 40,          // short tag: "Casa", "Pasaporte 1"
+        street: 120,        // full street line: número + calle + interior
+        city: 80,           // municipio / ciudad (cubre municipios largos de SEPOMEX)
+        state: 60,          // estado / provincia / región
+        colonia: 80,        // asentamiento SEPOMEX (puede ser largo)
+        postalCode: 10,     // MX/US 5, CA "A1A 1A1" 7; el JS lo acota más por país
+        programName: 60,    // programa de lealtad: "Aeroméxico Club Premier"
+        membership: 40,     // número de viajero frecuente / membresía
+        passportNumber: 14, // los pasaportes son máx ~9-12 caracteres
+        otherText: 120,     // texto libre de "Otra (especificar)"
+    };
 
     // Country list for passport dropdowns. México/Estados Unidos/Canadá first (Mexican travel
     // company), then the rest alphabetically.
@@ -217,8 +246,8 @@ window.initProfileSection = function (root) {
     function passportForm(p = {}) {
         return `
             <div class="row g-2">
-                <div class="col-md-6"><label class="form-label small">Etiqueta</label><input class="form-control" data-f="label" value="${esc(p.label)}" placeholder="Passport 1"></div>
-                <div class="col-md-6"><label class="form-label small">Passport Number</label><input class="form-control" data-f="number" maxlength="14" placeholder="${p.hasNumber ? 'Dejar vacío para conservar' : ''}"></div>
+                <div class="col-md-6"><label class="form-label small">Etiqueta</label><input class="form-control" data-f="label" maxlength="${FIELD_LIMITS.label}" value="${esc(p.label)}" placeholder="Passport 1"></div>
+                <div class="col-md-6"><label class="form-label small">Passport Number</label><input class="form-control" data-f="number" maxlength="${FIELD_LIMITS.passportNumber}" placeholder="${p.hasNumber ? 'Dejar vacío para conservar' : ''}"></div>
                 <div class="col-md-6"><label class="form-label small">Country of Issue</label>${countrySelect('countryOfIssue', p.countryOfIssue)}</div>
                 <div class="col-md-6"><label class="form-label small">Nationality</label>${nationalitySelect('nationality', p.nationality)}</div>
                 <div class="col-md-6"><label class="form-label small">Date of Issue</label><input type="date" class="form-control" data-f="dateOfIssue" value="${dateInput(p.dateOfIssue)}"></div>
@@ -275,13 +304,13 @@ window.initProfileSection = function (root) {
     function addressForm(a = {}) {
         return `
             <div class="row g-2">
-                <div class="col-md-6"><label class="form-label small">Etiqueta</label><input class="form-control" data-f="label" value="${esc(a.label)}"></div>
+                <div class="col-md-6"><label class="form-label small">Etiqueta</label><input class="form-control" data-f="label" maxlength="${FIELD_LIMITS.label}" value="${esc(a.label)}"></div>
                 <div class="col-md-6"><label class="form-label small">País</label>${countrySelect('country', countryDisplay(a.country))}</div>
-                <div class="col-12"><label class="form-label small">Calle</label><input class="form-control" data-f="street" value="${esc(a.street)}"></div>
-                <div class="col-md-4"><label class="form-label small">CP</label><input class="form-control" data-f="zipCode" inputmode="numeric" autocomplete="off" value="${esc(a.zipCode)}"><small class="d-block mt-1" data-cp-feedback></small></div>
-                <div class="col-md-4"><label class="form-label small">Estado</label><input class="form-control" data-f="state" value="${esc(a.state)}"></div>
-                <div class="col-md-4"><label class="form-label small">Ciudad</label><input class="form-control" data-f="city" value="${esc(a.city)}"></div>
-                <div class="col-12"><label class="form-label small">Colonia</label><input class="form-control" data-f="colonia" list="coloniaOptions" autocomplete="off" value="${esc(a.colonia)}"><datalist id="coloniaOptions"></datalist></div>
+                <div class="col-12"><label class="form-label small">Calle</label><input class="form-control" data-f="street" maxlength="${FIELD_LIMITS.street}" value="${esc(a.street)}"></div>
+                <div class="col-md-4"><label class="form-label small">CP</label><input class="form-control" data-f="zipCode" inputmode="numeric" autocomplete="off" maxlength="${FIELD_LIMITS.postalCode}" value="${esc(a.zipCode)}"><small class="d-block mt-1" data-cp-feedback></small></div>
+                <div class="col-md-4"><label class="form-label small">Estado</label><input class="form-control" data-f="state" maxlength="${FIELD_LIMITS.state}" value="${esc(a.state)}"></div>
+                <div class="col-md-4"><label class="form-label small">Ciudad</label><input class="form-control" data-f="city" maxlength="${FIELD_LIMITS.city}" value="${esc(a.city)}"></div>
+                <div class="col-12"><label class="form-label small">Colonia</label><input class="form-control" data-f="colonia" list="coloniaOptions" autocomplete="off" maxlength="${FIELD_LIMITS.colonia}" value="${esc(a.colonia)}"><datalist id="coloniaOptions"></datalist></div>
                 <div class="col-12 form-check ms-2 mt-2"><input class="form-check-input" type="checkbox" data-f="isFavorite" id="favChk" ${a.isFavorite ? 'checked' : ''}><label class="form-check-label small" for="favChk">Marcar como favorita</label></div>
             </div>`;
     }
@@ -291,26 +320,84 @@ window.initProfileSection = function (root) {
         const box = document.getElementById('preferencesContainer');
         try {
             const { preferences } = await api('/travel-preferences');
-            if (!preferences.length) { box.innerHTML = '<p class="text-muted mb-0">Sin preferencias registradas.</p>'; return; }
-            box.innerHTML = preferences.map((p) => `
-                <div class="d-flex justify-content-between align-items-center border-bottom py-2">
-                    <div><span class="fw-semibold">${esc(p.type)}</span><span class="text-muted ms-2">${esc(p.option)}</span></div>
-                    <div class="btn-group btn-group-sm">
-                        <button class="btn btn-light" title="Editar" data-edit-pref="${p.id}"><i class="ti ti-pencil"></i></button>
-                        <button class="btn btn-light text-danger" title="Eliminar" data-del-pref="${p.id}"><i class="ti ti-trash"></i></button>
-                    </div>
+            const grouped = {};
+            preferences.forEach((p) => { (grouped[p.type] = grouped[p.type] || []).push(p.option); });
+            box._grouped = grouped;
+            const keys = Object.keys(grouped);
+            if (!keys.length) { box.innerHTML = '<p class="text-muted mb-0">Sin preferencias registradas. Usa “Editar preferencias”.</p>'; return; }
+            box.innerHTML = keys.map((t) => `
+                <div class="d-flex justify-content-between align-items-start border-bottom py-2">
+                    <span class="text-muted small me-3">${esc(t)}</span>
+                    <span class="fw-semibold text-end">${esc(grouped[t].join(', '))}</span>
                 </div>`).join('');
-            box._data = preferences;
         } catch (e) { box.innerHTML = `<p class="text-danger mb-0">${esc(e.message)}</p>`; }
     }
 
-    function preferenceForm(p = {}) {
-        const opts = PREFERENCE_TYPES.map((t) => `<option value="${t}" ${p.type === t ? 'selected' : ''}>${t}</option>`).join('');
-        return `
-            <div class="row g-2">
-                <div class="col-md-6"><label class="form-label small">Tipo</label><select class="form-select" data-f="type"><option value="">Selecciona…</option>${opts}</select></div>
-                <div class="col-md-6"><label class="form-label small">Opción</label><input class="form-control" data-f="option" value="${esc(p.option)}"></div>
-            </div>`;
+    // Single form with all preference categories. Multi categories (PREFERENCE_MULTI) render checkboxes
+    // so several can be picked; the rest a dropdown. Filled at once and saved in one PUT.
+    function preferencesForm(current = {}) {
+        return `<div class="row g-3">${Object.keys(PREFERENCE_CATALOG).map((type, ti) => {
+            const cur = current[type] || [];
+            if (type === 'Bebida / Alcohol') {
+                const hasNo = cur.includes('No toma alcohol');
+                const types = cur.filter((o) => o !== 'No toma alcohol' && o !== 'Sí, toma alcohol');
+                const yes = !hasNo && (types.length > 0 || cur.includes('Sí, toma alcohol'));
+                const boxes = PREFERENCE_CATALOG[type].map((o, oi) => {
+                    const id = `pref-alc-${oi}`;
+                    return `<div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="${id}" data-pref-multi="${esc(type)}" value="${esc(o)}" ${types.includes(o) ? 'checked' : ''}>
+                        <label class="form-check-label small" for="${id}">${esc(o)}</label>
+                    </div>`;
+                }).join('');
+                return `<div class="col-12">
+                    <label class="form-label small fw-semibold">${esc(type)}</label>
+                    <div class="mb-1">
+                        <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="alcoholToggle" id="alcSi" data-alcohol-toggle value="si" ${yes ? 'checked' : ''}><label class="form-check-label small" for="alcSi">Sí toma</label></div>
+                        <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="alcoholToggle" id="alcNo" data-alcohol-toggle value="no" ${hasNo ? 'checked' : ''}><label class="form-check-label small" for="alcNo">No toma</label></div>
+                    </div>
+                    <div data-alcohol-types ${yes ? '' : 'style="display:none"'}>${boxes}</div>
+                </div>`;
+            }
+            if (type === 'Restricción / Alergia') {
+                const noneChecked = cur.includes('Ninguna');
+                const others = PREFERENCE_CATALOG[type].filter((o) => o !== 'Ninguna');
+                // Values not in the catalog are custom "Otra" entries the user typed previously.
+                const customVals = cur.filter((o) => o !== 'Ninguna' && !PREFERENCE_CATALOG[type].includes(o));
+                const otraChecked = customVals.length > 0;
+                const boxes = others.map((o, oi) => {
+                    const id = `pref-alg-${oi}`;
+                    const isOtra = o === 'Otra (especificar)';
+                    const checked = isOtra ? otraChecked : cur.includes(o);
+                    const attr = isOtra ? 'data-allergy-otra' : `data-pref-multi="${esc(type)}"`;
+                    return `<div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="${id}" ${attr} value="${esc(o)}" ${checked ? 'checked' : ''}>
+                        <label class="form-check-label small" for="${id}">${esc(o)}</label>
+                    </div>`;
+                }).join('');
+                return `<div class="col-12">
+                    <label class="form-label small fw-semibold">${esc(type)}</label>
+                    <div class="form-check mb-1"><input class="form-check-input" type="checkbox" id="algNone" data-allergy-none ${noneChecked ? 'checked' : ''}><label class="form-check-label small" for="algNone">Ninguna</label></div>
+                    <div data-allergy-types ${noneChecked ? 'style="display:none"' : ''}>${boxes}
+                        <input type="text" class="form-control form-control-sm mt-2" data-allergy-other maxlength="${FIELD_LIMITS.otherText}" placeholder="Especifica cuál" value="${esc(customVals.join(', '))}" ${otraChecked ? '' : 'style="display:none"'}>
+                    </div>
+                </div>`;
+            }
+            if (PREFERENCE_MULTI.includes(type)) {
+                const boxes = PREFERENCE_CATALOG[type].map((o, oi) => {
+                    const id = `pref-${ti}-${oi}`;
+                    return `<div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="${id}" data-pref-multi="${esc(type)}" value="${esc(o)}" ${cur.includes(o) ? 'checked' : ''}>
+                        <label class="form-check-label small" for="${id}">${esc(o)}</label>
+                    </div>`;
+                }).join('');
+                return `<div class="col-12"><label class="form-label small fw-semibold">${esc(type)}</label><div>${boxes}</div></div>`;
+            }
+            const sel = cur[0] || '';
+            const custom = sel && !PREFERENCE_CATALOG[type].includes(sel) ? `<option value="${esc(sel)}" selected>${esc(sel)}</option>` : '';
+            const opts = PREFERENCE_CATALOG[type].map((o) => `<option value="${esc(o)}" ${sel === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
+            return `<div class="col-md-6"><label class="form-label small fw-semibold">${esc(type)}</label>
+                <select class="form-select" data-pref-single="${esc(type)}"><option value="">— Sin especificar —</option>${custom}${opts}</select></div>`;
+        }).join('')}</div>`;
     }
 
     // ---------- Loyalty programs (array on the client) ----------
@@ -324,14 +411,30 @@ window.initProfileSection = function (root) {
         } catch (e) { box.innerHTML = `<p class="text-danger mb-0">${esc(e.message)}</p>`; }
     }
 
+    function loyaltyRow(p = {}) {
+        return `<div class="row g-2 mb-2 align-items-center" data-loyalty-row>
+            <div class="col-md-5"><input class="form-control form-control-sm" data-l-type maxlength="${FIELD_LIMITS.programName}" placeholder="Programa (ej. Club Premier)" value="${esc(p.type || '')}"></div>
+            <div class="col-md-5"><input class="form-control form-control-sm" data-l-number maxlength="${FIELD_LIMITS.membership}" placeholder="N° de membresía" value="${esc(p.number || '')}"></div>
+            <div class="col-md-2 text-end"><button type="button" class="btn btn-sm btn-light text-danger" data-loyalty-del="1" title="Quitar"><i class="ti ti-trash"></i></button></div>
+        </div>`;
+    }
+
+    // Loyalty has only 2 fields → inline in the card (no modal). Read mode shows a pencil; clicking it
+    // (or Agregar) switches to editable rows + Guardar, then back to read mode.
     function renderLoyalty() {
         const box = document.getElementById('loyaltyContainer');
         const list = box._data || [];
+        if (box._editing) {
+            const rows = (list.length ? list : [{}]).map((p) => loyaltyRow(p)).join('');
+            box.innerHTML = `<div data-loyalty-rows>${rows}</div>
+                <div class="text-end mt-2"><button type="button" class="btn btn-sm btn-primary" data-loyalty-save="1"><i class="ti ti-check me-1"></i>Guardar</button></div>`;
+            return;
+        }
         if (!list.length) { box.innerHTML = '<p class="text-muted mb-0">Sin programas registrados.</p>'; return; }
-        box.innerHTML = list.map((p, i) => `
+        box.innerHTML = list.map((p) => `
             <div class="d-flex justify-content-between align-items-center border-bottom py-2">
                 <div><span class="fw-semibold">${esc(p.type)}</span><span class="text-muted ms-2">${esc(p.number)}</span></div>
-                <button class="btn btn-light btn-sm text-danger" title="Eliminar" data-del-loyalty="${i}"><i class="ti ti-trash"></i></button>
+                <button class="btn btn-light btn-sm" title="Editar" data-loyalty-edit="1"><i class="ti ti-pencil"></i></button>
             </div>`).join('');
     }
 
@@ -408,6 +511,31 @@ window.initProfileSection = function (root) {
             addrCp.addEventListener('change', runLookup);
             addrCountry.addEventListener('change', () => setFeedback('', ''));
         }
+        // Alcohol preference: reveal the type checkboxes only when "Sí toma" is selected.
+        const alcTypes = el.querySelector('[data-alcohol-types]');
+        if (alcTypes) {
+            el.querySelectorAll('[data-alcohol-toggle]').forEach((r) => r.addEventListener('change', () => {
+                alcTypes.style.display = el.querySelector('[data-alcohol-toggle][value="si"]').checked ? '' : 'none';
+            }));
+        }
+        // Allergies: "Ninguna" hides (and clears) the specific restriction checkboxes.
+        const algNone = el.querySelector('[data-allergy-none]');
+        const algTypes = el.querySelector('[data-allergy-types]');
+        if (algNone && algTypes) {
+            algNone.addEventListener('change', () => {
+                algTypes.style.display = algNone.checked ? 'none' : '';
+                if (algNone.checked) algTypes.querySelectorAll('input[type="checkbox"]').forEach((c) => { c.checked = false; });
+            });
+        }
+        // Allergies: "Otra (especificar)" reveals a textbox to write the specific restriction.
+        const algOtra = el.querySelector('[data-allergy-otra]');
+        const algOther = el.querySelector('[data-allergy-other]');
+        if (algOtra && algOther) {
+            algOtra.addEventListener('change', () => {
+                algOther.style.display = algOtra.checked ? '' : 'none';
+                if (algOtra.checked) algOther.focus(); else algOther.value = '';
+            });
+        }
         const modal = bootstrap.Modal.getOrCreateInstance(el);
         const saveBtn = el.querySelector('#profileModalSave');
         const fresh = saveBtn.cloneNode(true);
@@ -471,18 +599,48 @@ window.initProfileSection = function (root) {
         openModal('Agregar Dirección', addressForm(), async (v) => { await api('/addresses', 'POST', v); notify('Dirección creada'); loadAddresses(); }, 'map-pin');
     });
     document.getElementById('addPreferenceBtn')?.addEventListener('click', () => {
-        openModal('Agregar Preferencia', preferenceForm(), async (v) => { await api('/travel-preferences', 'POST', v); notify('Preferencia creada'); loadPreferences(); }, 'plane');
+        const grouped = document.getElementById('preferencesContainer')._grouped || {};
+        openModal('Preferencias de viaje', preferencesForm(grouped), async () => {
+            const modal = document.getElementById('profileModal');
+            const preferences = [];
+            modal.querySelectorAll('[data-pref-single]').forEach((sel) => {
+                if (sel.value) preferences.push({ type: sel.dataset.prefSingle, option: sel.value });
+            });
+            modal.querySelectorAll('[data-pref-multi]:checked').forEach((cb) => {
+                if (cb.dataset.prefMulti === 'Bebida / Alcohol') return; // handled via the Sí/No toggle
+                preferences.push({ type: cb.dataset.prefMulti, option: cb.value });
+            });
+            // Alcohol: No → "No toma alcohol"; Sí → checked types (or "Sí, toma alcohol" if none).
+            const alc = modal.querySelector('[data-alcohol-toggle]:checked');
+            if (alc && alc.value === 'no') {
+                preferences.push({ type: 'Bebida / Alcohol', option: 'No toma alcohol' });
+            } else if (alc && alc.value === 'si') {
+                const types = [...modal.querySelectorAll('[data-pref-multi="Bebida / Alcohol"]:checked')].map((c) => c.value);
+                if (types.length) types.forEach((o) => preferences.push({ type: 'Bebida / Alcohol', option: o }));
+                else preferences.push({ type: 'Bebida / Alcohol', option: 'Sí, toma alcohol' });
+            }
+            // Allergies: "Ninguna" → only Ninguna; otherwise specific restrictions (from the multi loop)
+            // plus the free-text "Otra (especificar)" value when provided.
+            const algNoneEl = modal.querySelector('[data-allergy-none]');
+            if (algNoneEl && algNoneEl.checked) {
+                preferences.push({ type: 'Restricción / Alergia', option: 'Ninguna' });
+            } else {
+                const algOtherEl = modal.querySelector('[data-allergy-other]');
+                if (algOtherEl && algOtherEl.value.trim()) {
+                    preferences.push({ type: 'Restricción / Alergia', option: algOtherEl.value.trim() });
+                }
+            }
+            await api('/travel-preferences', 'PUT', { preferences });
+            notify('Preferencias guardadas'); loadPreferences();
+        }, 'plane');
     });
     document.getElementById('addLoyaltyBtn')?.addEventListener('click', () => {
-        openModal('Agregar Programa', `
-            <div class="row g-2">
-                <div class="col-md-6"><label class="form-label small">Programa</label><input class="form-control" data-f="type"></div>
-                <div class="col-md-6"><label class="form-label small">N° de Membresía</label><input class="form-control" data-f="number"></div>
-            </div>`, async (v) => {
-            const box = document.getElementById('loyaltyContainer');
-            const list = [...(box._data || []), { type: v.type, number: v.number }];
-            await saveLoyalty(list); box._data = list; renderLoyalty(); notify('Programa agregado');
-        }, 'star');
+        const box = document.getElementById('loyaltyContainer');
+        if (!box) return;
+        box._editing = true;
+        renderLoyalty();
+        const rows = box.querySelector('[data-loyalty-rows]');
+        if (rows) rows.insertAdjacentHTML('beforeend', loyaltyRow());
     });
 
     root.addEventListener('click', async (e) => {
@@ -518,17 +676,18 @@ window.initProfileSection = function (root) {
                 openModal('Editar Dirección', addressForm(a), async (v) => { await api(`/addresses/${a.id}`, 'PUT', v); notify('Dirección actualizada'); loadAddresses(); }, 'map-pin');
             } else if (btn.dataset.delAddr) {
                 if (await confirmDanger('¿Eliminar esta dirección?')) { await api(`/addresses/${btn.dataset.delAddr}`, 'DELETE'); notify('Dirección eliminada correctamente'); loadAddresses(); }
-            } else if (btn.dataset.editPref) {
-                const p = (document.getElementById('preferencesContainer')._data || []).find((x) => x.id === btn.dataset.editPref);
-                openModal('Editar Preferencia', preferenceForm(p), async (v) => { await api(`/travel-preferences/${p.id}`, 'PUT', v); notify('Preferencia actualizada'); loadPreferences(); }, 'plane');
-            } else if (btn.dataset.delPref) {
-                if (await confirmDanger('¿Eliminar esta preferencia?')) { await api(`/travel-preferences/${btn.dataset.delPref}`, 'DELETE'); notify('Preferencia eliminada correctamente'); loadPreferences(); }
-            } else if (btn.dataset.delLoyalty) {
-                if (await confirmDanger('¿Eliminar este programa?')) {
-                    const box = document.getElementById('loyaltyContainer');
-                    const list = (box._data || []).filter((_, i) => i !== Number(btn.dataset.delLoyalty));
-                    await saveLoyalty(list); box._data = list; renderLoyalty(); notify('Programa eliminado correctamente');
-                }
+            } else if (btn.dataset.loyaltyEdit) {
+                const box = document.getElementById('loyaltyContainer');
+                box._editing = true; renderLoyalty();
+            } else if (btn.dataset.loyaltyDel) {
+                btn.closest('[data-loyalty-row]')?.remove();
+            } else if (btn.dataset.loyaltySave) {
+                const box = document.getElementById('loyaltyContainer');
+                const list = [...box.querySelectorAll('[data-loyalty-row]')].map((r) => ({
+                    type: (r.querySelector('[data-l-type]').value || '').trim(),
+                    number: (r.querySelector('[data-l-number]').value || '').trim(),
+                })).filter((p) => p.type);
+                await saveLoyalty(list); box._data = list; box._editing = false; renderLoyalty(); notify('Programas de lealtad guardados');
             }
         } catch (err) { notify(err.message, 'error'); }
     });

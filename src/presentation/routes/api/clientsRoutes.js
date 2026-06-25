@@ -1220,6 +1220,8 @@ router.put('/:clientId/addresses/:id', validateClientAccess, writeOperationsLimi
 router.delete('/:clientId/addresses/:id', validateClientAccess, writeOperationsLimiter, clientProfileController.deleteAddress);
 
 router.get('/:clientId/travel-preferences', validateClientAccess, clientProfileController.getTravelPreferences);
+// PUT (no id) replaces the whole preference set in one save (single-form modal).
+router.put('/:clientId/travel-preferences', validateClientAccess, writeOperationsLimiter, clientProfileController.saveTravelPreferences);
 router.post('/:clientId/travel-preferences', validateClientAccess, writeOperationsLimiter, clientProfileController.createTravelPreference);
 router.put('/:clientId/travel-preferences/:id', validateClientAccess, writeOperationsLimiter, clientProfileController.updateTravelPreference);
 router.delete('/:clientId/travel-preferences/:id', validateClientAccess, writeOperationsLimiter, clientProfileController.deleteTravelPreference);
