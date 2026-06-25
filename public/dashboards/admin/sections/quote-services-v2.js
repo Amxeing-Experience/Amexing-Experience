@@ -14015,7 +14015,8 @@ class ItineraryBuilder {
           if (!vehicleInfo || !vehicleInfo.id) return;
           const pax = vehicleInfo.capacity || 0;
           const trunk = vehicleInfo.trunkCapacity || 0;
-          const opt = new Option(`${vehicleType} - ${pax} pax, ${trunk} carry-on`, vehicleInfo.id);
+          // En tours se omite el carry-on en el TEXTO del dropdown (el dato trunk se conserva abajo).
+          const opt = new Option(`${vehicleType} - ${pax} pax`, vehicleInfo.id);
           // For tours the price is per-hour. calculateVehicleTourDevBreakdown
           // multiplies by tourDuration later.
           const perHour = this.getVehiclePriceWithPriority(vehicleType, tourId, segmentId) || 0;
@@ -19377,7 +19378,9 @@ class ItineraryBuilder {
         const clientIndicator = vehicle.isClientPrice ? ' *' : '';
         const vehicleType = vehicle.vehicleType || 'Vehículo desconocido';
 
-        option.textContent = `${vehicleType} - ${pax} pax, ${trunk} carry-on${clientIndicator}`;
+        // En tours se omite el carry-on en el dropdown de vehículos adicionales (solo en tours).
+        const capacityText = this.currentServiceType === 'tour' ? `${pax} pax` : `${pax} pax, ${trunk} carry-on`;
+        option.textContent = `${vehicleType} - ${capacityText}${clientIndicator}`;
         // Cache the list (catalog) efectivo price so the custom-price UI can show it.
         option.dataset.efectivoPrice = String(parseFloat(vehicle.finalPrice ?? vehicle.basePrice ?? 0) || 0);
 
