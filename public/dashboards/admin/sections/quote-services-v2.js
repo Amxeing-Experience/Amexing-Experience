@@ -3363,8 +3363,9 @@ class ItineraryBuilder {
     if (transportType === 'aeropuerto') {
       if (idaHeader) idaHeader.innerHTML = '<i class="ti ti-plane-arrival me-2"></i>Arrival';
       if (vueltaHeader) vueltaHeader.innerHTML = '<i class="ti ti-plane-departure me-2"></i>Departure';
-      if (dateIdaLabel) dateIdaLabel.textContent = 'Fecha de Llegada';
-      if (timeIdaLabel) timeIdaLabel.textContent = 'Hora de Llegada';
+      // Aeropuerto Ida: la fecha/hora corresponden al vuelo de llegada → "de Vuelo".
+      if (dateIdaLabel) dateIdaLabel.textContent = 'Fecha de Vuelo';
+      if (timeIdaLabel) timeIdaLabel.textContent = 'Hora de Vuelo';
       if (dateVueltaLabel) dateVueltaLabel.textContent = 'Fecha de Salida';
       if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Salida';
     } else if (transportType === 'punto-a-punto') {
