@@ -10119,7 +10119,9 @@ class ItineraryBuilder {
       let greeterCostEfectivo = 0;
 
       if (includeGreeter && routeDuration) {
-        greeterCostEfectivo = this.calculateGreeterPrice(routeDuration);
+        // Round-trip: el greeter atiende ida + vuelta (×2), igual que el transporte (legMultiplier).
+        // Antes quedaba en ×1 y se sub-cobraba el greeter en viajes redondos.
+        greeterCostEfectivo = this.calculateGreeterPrice(routeDuration) * legMultiplier;
       }
 
       // Calculate additional vehicle costs if applicable
@@ -10273,7 +10275,7 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const basePrice = this.greeterRateCache?.basePrice || 760;
         const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
-        efectivoBreakdown += `\nGreeter ($${basePrice} + $${hourlyRate}×${durationHours}h = $${greeterCostEfectivo.toFixed(2)}): $${greeterCostEfectivo.toFixed(2)}`;
+        efectivoBreakdown += `\nGreeter (($${basePrice} + $${hourlyRate}×${durationHours}h)${legMultiplier > 1 ? ` × ${legMultiplier}` : ''} = $${greeterCostEfectivo.toFixed(2)}): $${greeterCostEfectivo.toFixed(2)}`;
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         efectivoBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingHourlyRate.toFixed(2)}): $${waitingCostEfectivo.toFixed(2)}`;
@@ -10300,7 +10302,7 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const basePrice = this.greeterRateCache?.basePrice || 760;
         const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
-        transferenciaBreakdown += `\nGreeter ($${basePrice} + $${hourlyRate}×${durationHours}h = $${greeterCostTransferencia.toFixed(2)}): $${greeterCostTransferencia.toFixed(2)}`;
+        transferenciaBreakdown += `\nGreeter (($${basePrice} + $${hourlyRate}×${durationHours}h)${legMultiplier > 1 ? ` × ${legMultiplier}` : ''} = $${greeterCostTransferencia.toFixed(2)}): $${greeterCostTransferencia.toFixed(2)}`;
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.transferRate / 100));
@@ -10328,7 +10330,7 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const basePrice = this.greeterRateCache?.basePrice || 760;
         const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
-        tarjetaBreakdown += `\nGreeter ($${basePrice} + $${hourlyRate}×${durationHours}h = $${greeterCostTarjeta.toFixed(2)}): $${greeterCostTarjeta.toFixed(2)}`;
+        tarjetaBreakdown += `\nGreeter (($${basePrice} + $${hourlyRate}×${durationHours}h)${legMultiplier > 1 ? ` × ${legMultiplier}` : ''} = $${greeterCostTarjeta.toFixed(2)}): $${greeterCostTarjeta.toFixed(2)}`;
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.agencyRate / 100));
