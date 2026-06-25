@@ -2115,6 +2115,18 @@ class ItineraryBuilder {
 
     // Show/hide Tiempo de espera section
     const tiempoEsperaSection = document.getElementById('tiempoEsperaSection');
+    // Layout: en transporte el renglón es Precio + Tiempo de espera + Cantidad (3×col-4);
+    // en los demás tipos, Precio + Cantidad (2×col-6). La espera vive junto al precio base.
+    {
+      const servicePriceCol = document.getElementById('servicePriceCol');
+      const serviceQuantityCol = document.getElementById('serviceQuantityCol');
+      const isTransportLayout = type === 'transport';
+      servicePriceCol?.classList.toggle('col-md-4', isTransportLayout);
+      servicePriceCol?.classList.toggle('col-md-6', !isTransportLayout);
+      serviceQuantityCol?.classList.toggle('col-md-4', isTransportLayout);
+      serviceQuantityCol?.classList.toggle('col-md-6', !isTransportLayout);
+      tiempoEsperaSection?.classList.toggle('d-none', !isTransportLayout);
+    }
 
     if (type === 'transport') {
       transportTypeSelector?.classList.remove('d-none');
@@ -14263,7 +14275,7 @@ class ItineraryBuilder {
     const rateEl = row.querySelector('.extra-waiting-rate');
     if (!rateEl) return;
     const wt = this.getExtraRowWaitingPrice(row);
-    rateEl.textContent = wt ? `${this.formatCurrency(wt.pricePerHour)}/h` : '';
+    rateEl.textContent = wt ? `Lista: ${this.formatCurrency(wt.pricePerHour)}/h` : '';
   }
 
   /** Suma del costo de espera (tarifa × horas) de TODOS los vehículos adicionales, en efectivo. */
@@ -18891,8 +18903,8 @@ class ItineraryBuilder {
 
     const wtPrice = this.getWaitingTimePrice();
     if (wtPrice) {
-      const surcharged = this.getDisplayPrice(wtPrice.pricePerHour);
-      rateEl.textContent = `$${surcharged.toFixed(2)} ${wtPrice.currency}/hora`;
+      // Tarifa de lista (catálogo, efectivo) por hora — mismo estilo "Lista: $X" del precio.
+      rateEl.textContent = `Lista: ${this.formatCurrency(wtPrice.pricePerHour)}/hora`;
     } else {
       rateEl.textContent = '';
     }

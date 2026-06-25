@@ -967,22 +967,6 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         </div>
                     </div>
 
-                    <!-- Tiempo de Espera (Transport only) -->
-                    <div id="tiempoEsperaSection" class="d-none mb-3">
-                        <div class="row align-items-end">
-                            <div class="col-md-4">
-                                <label for="waitingTimeHours" class="form-label"><i class="ti ti-clock me-1"></i>Tiempo de espera</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" id="waitingTimeHours" min="0" step="0.5" value="0" placeholder="0">
-                                    <span class="input-group-text">horas</span>
-                                </div>
-                            </div>
-                            <div class="col-md-4 d-flex align-items-center" style="min-height: 38px; padding-bottom: 4px;">
-                                <small id="waitingTimeRate" class="text-muted"></small>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Standard pricing for non-experience services -->
                     <div class="row" id="standardPricingSection">
                         <div class="col-md-6 mb-3" id="servicePriceCol">
@@ -1027,7 +1011,16 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             </div>
                             <% } %>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <!-- Tiempo de espera del vehículo principal — junto al precio base (solo transporte). -->
+                        <div class="col-md-4 mb-3 d-none" id="tiempoEsperaSection">
+                            <label for="waitingTimeHours" class="form-label"><i class="ti ti-clock me-1"></i>Tiempo de espera</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="waitingTimeHours" min="0" step="0.5" value="0" placeholder="0">
+                                <span class="input-group-text">horas</span>
+                            </div>
+                            <small class="text-muted d-block" id="waitingTimeRate"></small>
+                        </div>
+                        <div class="col-md-6 mb-3" id="serviceQuantityCol">
                             <label for="serviceQuantity" class="form-label">Cantidad</label>
                             <input type="number" class="form-control" id="serviceQuantity" value="1" min="1" required>
                             <small class="text-muted d-none" id="roundTripQuantityHint">Vehículo Ida y Regreso</small>
