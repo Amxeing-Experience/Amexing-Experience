@@ -495,20 +495,20 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <div id="flightDetailsSection" class="d-none">
                                     <hr class="my-2">
                                     <div class="row">
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-4 mb-3">
                                             <label for="airline" class="form-label">Aerolínea</label>
                                             <input type="text" class="form-control" id="airline" placeholder="Ej: American Airlines">
                                         </div>
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-4 mb-3">
                                             <label for="flightNumber" class="form-label">Número de Vuelo</label>
                                             <input type="text" class="form-control" id="flightNumber" placeholder="Ej: AA1234">
                                         </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-4 mb-3">
                                             <label for="flightTime" class="form-label">Hora Vuelo</label>
                                             <input type="text" class="form-control time-input" id="flightTime" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
                                         </div>
+                                    </div>
+                                    <div class="row">
                                         <div class="col-md-6 mb-3" id="flightDepartureTimeSuggestedContainer">
                                             <label for="flightDepartureTimeSuggested" class="form-label" id="flightDepartureTimeSuggestedLabel">Hora de salida sugerida</label>
                                             <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
