@@ -10219,6 +10219,11 @@ class ItineraryBuilder {
       // greeter no) y devuelve los totales por forma de pago + el desglose por nodo.
       const transferRate = this.transferRate;
       const agencyRate = this.agencyRate;
+      // Tiempo de espera de los vehículos adicionales: cada uno su tarifa × sus horas (×1,
+      // no se duplica en round-trip, igual que la espera del principal).
+      const extraWaitingCostEfectivo = (typeof this.getExtraAdditionalVehiclesWaitingCostEfectivo === 'function')
+        ? this.getExtraAdditionalVehiclesWaitingCostEfectivo()
+        : 0;
       const transportNodes = [
         { key: 'vehicle', efectivo: vehicleTotalEfectivo, surcharge: true },
         { key: 'waiting', efectivo: waitingCostEfectivo, surcharge: true },
@@ -10226,6 +10231,7 @@ class ItineraryBuilder {
         { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: true },
         { key: 'additionalVehicle', efectivo: additionalVehicleCostEfectivo, surcharge: true },
         { key: 'extraVehicles', efectivo: extraVehiclesCostEfectivo, surcharge: true },
+        { key: 'extraWaiting', efectivo: extraWaitingCostEfectivo, surcharge: true },
       ];
       const transportPricing = window.PricingEngine
         ? window.PricingEngine.composeServiceNodes({ transferRate, agencyRate, nodes: transportNodes })
@@ -10307,6 +10313,9 @@ class ItineraryBuilder {
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         efectivoBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingHourlyRate.toFixed(2)}): $${waitingCostEfectivo.toFixed(2)}`;
       }
+      if (extraWaitingCostEfectivo > 0) {
+        efectivoBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.efectivo ?? extraWaitingCostEfectivo).toFixed(2)}`;
+      }
       efectivoBreakdown += `\nTotal: $${totalEfectivo.toFixed(2)}`;
 
       // Build transferencia breakdown
@@ -10335,6 +10344,9 @@ class ItineraryBuilder {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.transferRate / 100));
         transferenciaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTransferencia.toFixed(2)}`;
       }
+      if (extraWaitingCostEfectivo > 0) {
+        transferenciaBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.transferencia ?? 0).toFixed(2)}`;
+      }
       transferenciaBreakdown += `\nTotal: $${totalTransferencia.toFixed(2)}`;
 
       // Build tarjeta breakdown
@@ -10362,6 +10374,9 @@ class ItineraryBuilder {
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.agencyRate / 100));
         tarjetaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTarjeta.toFixed(2)}`;
+      }
+      if (extraWaitingCostEfectivo > 0) {
+        tarjetaBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.tarjeta ?? 0).toFixed(2)}`;
       }
       tarjetaBreakdown += `\nTotal: $${totalTarjeta.toFixed(2)}`;
 
@@ -13914,22 +13929,29 @@ class ItineraryBuilder {
     row.className = 'row g-2 mb-2 extra-additional-vehicle-row align-items-end';
     row.dataset.index = String(rowIdx);
     row.innerHTML = `
-      <div class="col-md-4">
+      <div class="col-md-3">
         <select class="form-select form-select-sm extra-segment-select">
           <option value="">Seleccionar segmento</option>
         </select>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <select class="form-select form-select-sm extra-vehicle-select" disabled>
           <option value="">Primero selecciona un segmento</option>
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <div class="input-group input-group-sm">
           <span class="input-group-text">$</span>
           <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-price-input" placeholder="0.00">
         </div>
         <small class="text-muted extra-list-price d-block"></small>
+      </div>
+      <div class="col-md-3">
+        <div class="input-group input-group-sm">
+          <input type="number" min="0" step="0.5" value="0" class="form-control form-control-sm extra-waiting-input" placeholder="0">
+          <span class="input-group-text">h</span>
+        </div>
+        <small class="text-muted extra-waiting-rate d-block"></small>
       </div>
       <div class="col-md-1 text-end">
         <button type="button" class="btn btn-sm btn-outline-danger remove-extra-additional-vehicle-btn" title="Quitar">
@@ -13945,6 +13967,11 @@ class ItineraryBuilder {
     const priceInput = row.querySelector('.extra-price-input');
     if (priceInput && vehicle.customPrice !== undefined && vehicle.customPrice !== null && vehicle.customPrice !== '') {
       priceInput.value = parseFloat(vehicle.customPrice).toFixed(2);
+    }
+    // Restaurar las horas de tiempo de espera de este vehículo (cada uno el suyo).
+    const waitingInput = row.querySelector('.extra-waiting-input');
+    if (waitingInput && vehicle.waitingHours !== undefined && vehicle.waitingHours !== null && vehicle.waitingHours !== '') {
+      waitingInput.value = vehicle.waitingHours;
     }
 
     // Mirror the segment options from #transportCategory (synchronous: options
@@ -13985,6 +14012,11 @@ class ItineraryBuilder {
     });
     // Manual per-vehicle price edits feed the breakdown.
     priceInput?.addEventListener('input', () => {
+      this.serviceModified = true;
+      this.updateServicePriceBreakdown();
+    });
+    // Cada vehículo lleva su propio tiempo de espera (puede diferir entre vehículos).
+    waitingInput?.addEventListener('input', () => {
       this.serviceModified = true;
       this.updateServicePriceBreakdown();
     });
@@ -14211,6 +14243,39 @@ class ItineraryBuilder {
       if (listEl) listEl.textContent = '';
       if (!vehicleSelect.value) priceInput.value = '';
     }
+    // Mostrar la tarifa de tiempo de espera de este vehículo+segmento.
+    this.updateExtraRowWaitingRate(row);
+  }
+
+  /**
+   * Tarifa de tiempo de espera (pricePerHour) de la fila según su vehículo+segmento.
+   * @param row
+   */
+  getExtraRowWaitingPrice(row) {
+    const vehicleId = row.querySelector('.extra-vehicle-select')?.value;
+    const segmentId = row.querySelector('.extra-segment-select')?.value;
+    if (!vehicleId || !segmentId) return null;
+    return this.getWaitingTimePriceFor(vehicleId, segmentId);
+  }
+
+  /** Muestra la tarifa por hora de espera bajo el input de la fila. */
+  updateExtraRowWaitingRate(row) {
+    const rateEl = row.querySelector('.extra-waiting-rate');
+    if (!rateEl) return;
+    const wt = this.getExtraRowWaitingPrice(row);
+    rateEl.textContent = wt ? `${this.formatCurrency(wt.pricePerHour)}/h` : '';
+  }
+
+  /** Suma del costo de espera (tarifa × horas) de TODOS los vehículos adicionales, en efectivo. */
+  getExtraAdditionalVehiclesWaitingCostEfectivo() {
+    let total = 0;
+    document.querySelectorAll('#extraAdditionalVehiclesList .extra-additional-vehicle-row').forEach((row) => {
+      const hours = parseFloat(row.querySelector('.extra-waiting-input')?.value || 0) || 0;
+      if (hours <= 0) return;
+      const wt = this.getExtraRowWaitingPrice(row);
+      if (wt) total += wt.pricePerHour * hours;
+    });
+    return total;
   }
 
   // Sum of efectivo prices across all extra additional vehicle rows.
@@ -14363,6 +14428,8 @@ class ItineraryBuilder {
         const customPrice = priceInput && priceInput.value !== ''
           ? (parseFloat(priceInput.value) || 0)
           : null;
+        const waitingInput = row.querySelector('.extra-waiting-input');
+        const waitingHours = waitingInput ? (parseFloat(waitingInput.value) || 0) : 0;
         return {
           segment: segmentId,
           segmentName,
@@ -14371,6 +14438,7 @@ class ItineraryBuilder {
           vehicleTypeName,
           customPrice,
           listPrice,
+          waitingHours,
         };
       })
       .filter((v) => v.vehicleId);
@@ -18798,15 +18866,19 @@ class ItineraryBuilder {
    * @returns {{ pricePerHour: number, currency: string }|null}
    * @example
    */
-  getWaitingTimePrice() {
-    const vehicleTypeId = document.getElementById('vehicleSelect')?.value;
-    const rateId = document.getElementById('transportCategory')?.value;
+  getWaitingTimePriceFor(vehicleTypeId, rateId) {
     if (!vehicleTypeId || !rateId || !this.vehicleRatePricesCache.length) return null;
-
     const match = this.vehicleRatePricesCache.find(
       (p) => p.vehicleTypeId === vehicleTypeId && p.rateId === rateId
     );
     return match ? { pricePerHour: match.pricePerHour, currency: match.currency || 'MXN' } : null;
+  }
+
+  getWaitingTimePrice() {
+    return this.getWaitingTimePriceFor(
+      document.getElementById('vehicleSelect')?.value,
+      document.getElementById('transportCategory')?.value,
+    );
   }
 
   /**

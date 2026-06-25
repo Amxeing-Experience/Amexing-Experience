@@ -83,7 +83,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
 
 <!-- Service Modal -->
 <div class="modal fade" id="serviceModal" tabindex="-1" aria-labelledby="serviceModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header border-bottom">
                 <h5 class="modal-title" id="serviceModalLabel">
@@ -1047,9 +1047,10 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             </small>
                             <!-- Headers tipo tabla (una sola fila); se muestra solo cuando hay vehículos. -->
                             <div class="row g-2 mb-1 d-none" id="extraAdditionalVehiclesHeader">
-                                <div class="col-md-4"><small class="text-muted fw-semibold">Segmento</small></div>
-                                <div class="col-md-4"><small class="text-muted fw-semibold">Vehículo</small></div>
-                                <div class="col-md-3"><small class="text-muted fw-semibold">Precio (efectivo)</small></div>
+                                <div class="col-md-3"><small class="text-muted fw-semibold">Segmento</small></div>
+                                <div class="col-md-3"><small class="text-muted fw-semibold">Vehículo</small></div>
+                                <div class="col-md-2"><small class="text-muted fw-semibold">Precio (efectivo)</small></div>
+                                <div class="col-md-3"><small class="text-muted fw-semibold">Tiempo de espera</small></div>
                                 <div class="col-md-1"></div>
                             </div>
                             <div id="extraAdditionalVehiclesList"></div>
