@@ -728,6 +728,10 @@ class ItineraryBuilder {
     document.getElementById('addAdditionalFlightBtn')?.addEventListener('click', () => {
       this.addAdditionalFlightRow({});
     });
+    // Vuelos adicionales de la Ida (round-trip aeropuerto) — lista propia.
+    document.getElementById('addRoundTripAdditionalFlightIdaBtn')?.addEventListener('click', () => {
+      this.addAdditionalFlightRow({}, 'roundTripAdditionalFlightsListIda', 'roundTripAdditionalFlightsHeaderIda');
+    });
 
     // Extra additional vehicles (Phase 1) — "+ Agregar otro vehículo" button appends a new row.
     document.getElementById('addExtraAdditionalVehicleBtn')?.addEventListener('click', () => {
@@ -1865,6 +1869,7 @@ class ItineraryBuilder {
       this.clearAttendees();
       // Vuelos adicionales — empty by default; user clicks "Agregar vuelo" to add one.
       this.clearAdditionalFlights();
+      this.clearAdditionalFlights('roundTripAdditionalFlightsListIda', 'roundTripAdditionalFlightsHeaderIda');
       // Vehículos adicionales extra — empty by default; appears when checkbox is on.
       this.clearExtraAdditionalVehicles();
 
@@ -3664,6 +3669,8 @@ class ItineraryBuilder {
         ...serviceData,
         tripType: 'one-way',
         directionType: 'departure',
+        // Los vuelos adicionales capturados son de la Ida; la Vuelta no los hereda.
+        additionalFlights: [],
         concept: `${typeLabel}: ${serviceData.returnOrigin} - ${serviceData.returnDestination} (Vuelta)`,
         origin: serviceData.returnOrigin,
         originName: serviceData.returnOrigin,
@@ -4921,6 +4928,8 @@ class ItineraryBuilder {
             data.flightNumber = document.getElementById('roundTripFlightNumberIda')?.value || '';
             data.returnAirline = document.getElementById('roundTripAirlineVuelta')?.value || '';
             data.returnFlightNumber = document.getElementById('roundTripFlightNumberVuelta')?.value || '';
+            // Vuelos adicionales de la Ida → se asignan a la pierna Ida al separar (la Vuelta queda en []).
+            data.additionalFlights = this.collectAdditionalFlights('roundTripAdditionalFlightsListIda');
           }
 
           data.originName = data.origin || 'Origen';
@@ -6242,6 +6251,8 @@ class ItineraryBuilder {
             document.getElementById('roundTripAirlineIda').value = service.airline;
             document.getElementById('roundTripFlightNumberIda').value = service.flightNumber || '';
           }
+          // Vuelos adicionales de la Ida (cuando se edita como round-trip).
+          this.populateAdditionalFlights(service.additionalFlights || [], 'roundTripAdditionalFlightsListIda', 'roundTripAdditionalFlightsHeaderIda');
           if (service.returnAirline) {
             document.getElementById('roundTripAirlineVuelta').value = service.returnAirline;
             document.getElementById('roundTripFlightNumberVuelta').value = service.returnFlightNumber || '';
@@ -13811,8 +13822,8 @@ class ItineraryBuilder {
   }
 
   // === Additional flights helpers (airport transport with multiple flights) ===
-  addAdditionalFlightRow(flight = {}) {
-    const list = document.getElementById('additionalFlightsList');
+  addAdditionalFlightRow(flight = {}, listId = 'additionalFlightsList', headerId = 'additionalFlightsHeader') {
+    const list = document.getElementById(listId);
     if (!list) return;
     const row = document.createElement('div');
     row.className = 'row g-2 mb-2 additional-flight-row align-items-end';
@@ -13835,35 +13846,35 @@ class ItineraryBuilder {
     `;
     row.querySelector('.remove-additional-flight-btn')?.addEventListener('click', () => {
       row.remove();
-      this.updateAdditionalFlightsHeaderVisibility();
+      this.updateAdditionalFlightsHeaderVisibility(listId, headerId);
     });
     list.appendChild(row);
-    this.updateAdditionalFlightsHeaderVisibility();
+    this.updateAdditionalFlightsHeaderVisibility(listId, headerId);
   }
 
   // Muestra la fila de headers (tipo tabla) sólo cuando hay al menos un vuelo en la lista.
-  updateAdditionalFlightsHeaderVisibility() {
-    const header = document.getElementById('additionalFlightsHeader');
-    const list = document.getElementById('additionalFlightsList');
+  updateAdditionalFlightsHeaderVisibility(listId = 'additionalFlightsList', headerId = 'additionalFlightsHeader') {
+    const header = document.getElementById(headerId);
+    const list = document.getElementById(listId);
     if (!header || !list) return;
     const hasRows = list.querySelectorAll('.additional-flight-row').length > 0;
     header.classList.toggle('d-none', !hasRows);
   }
 
-  clearAdditionalFlights() {
-    const list = document.getElementById('additionalFlightsList');
+  clearAdditionalFlights(listId = 'additionalFlightsList', headerId = 'additionalFlightsHeader') {
+    const list = document.getElementById(listId);
     if (list) list.innerHTML = '';
-    this.updateAdditionalFlightsHeaderVisibility();
+    this.updateAdditionalFlightsHeaderVisibility(listId, headerId);
   }
 
-  populateAdditionalFlights(flights) {
-    this.clearAdditionalFlights();
+  populateAdditionalFlights(flights, listId = 'additionalFlightsList', headerId = 'additionalFlightsHeader') {
+    this.clearAdditionalFlights(listId, headerId);
     const arr = Array.isArray(flights) ? flights : [];
-    arr.forEach((f) => this.addAdditionalFlightRow(f || {}));
+    arr.forEach((f) => this.addAdditionalFlightRow(f || {}, listId, headerId));
   }
 
-  collectAdditionalFlights() {
-    const rows = document.querySelectorAll('#additionalFlightsList .additional-flight-row');
+  collectAdditionalFlights(listId = 'additionalFlightsList') {
+    const rows = document.querySelectorAll(`#${listId} .additional-flight-row`);
     return Array.from(rows)
       .map((row) => ({
         airline: (row.querySelector('.additional-flight-airline')?.value || '').trim(),
