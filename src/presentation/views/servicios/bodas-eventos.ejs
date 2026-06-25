@@ -14,6 +14,8 @@ Created by Denisse Maldonado
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <%# Fuente script para el título del hero (Bodas y Eventos / Weddings & Events) %>
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/css/fonts.css">
     <link rel="icon" type="image/png" href="/images/heart_black.png">
@@ -30,6 +32,7 @@ Created by Denisse Maldonado
 
         /* ---- Header: banner con imagen ---- */
         .bodas-hero {
+            position: relative;
             width: 100%;
             line-height: 0;
         }
@@ -38,6 +41,24 @@ Created by Denisse Maldonado
             display: block;
             width: 100%;
             height: auto;
+        }
+
+        .bodas-hero__title {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            margin: 0;
+            font-family: 'Great Vibes', cursive;
+            font-weight: 400;
+            color: #ffffff;
+            font-size: clamp(2.4rem, 7vw, 5.5rem);
+            line-height: 1;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            text-align: center;
+            text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+            pointer-events: none;
         }
 
         /* ---- Logística día del evento ---- */
@@ -297,6 +318,7 @@ Created by Denisse Maldonado
     <%# Header: banner con la imagen de bodas %>
     <section class="bodas-hero">
         <img src="/images/bodas_header.jpg" alt="<%= t('pages:bodas.heroAlt') %>" class="bodas-hero__img">
+        <h1 class="bodas-hero__title"><%= t('pages:bodas.heroTitle') %></h1>
     </section>
 
     <%# Logística día del evento %>
