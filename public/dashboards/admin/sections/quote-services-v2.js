@@ -732,6 +732,10 @@ class ItineraryBuilder {
     document.getElementById('addRoundTripAdditionalFlightIdaBtn')?.addEventListener('click', () => {
       this.addAdditionalFlightRow({}, 'roundTripAdditionalFlightsListIda', 'roundTripAdditionalFlightsHeaderIda');
     });
+    // Vuelos adicionales de la Vuelta (round-trip aeropuerto) — lista propia.
+    document.getElementById('addRoundTripAdditionalFlightVueltaBtn')?.addEventListener('click', () => {
+      this.addAdditionalFlightRow({}, 'roundTripAdditionalFlightsListVuelta', 'roundTripAdditionalFlightsHeaderVuelta');
+    });
 
     // Extra additional vehicles (Phase 1) — "+ Agregar otro vehículo" button appends a new row.
     document.getElementById('addExtraAdditionalVehicleBtn')?.addEventListener('click', () => {
@@ -1870,6 +1874,7 @@ class ItineraryBuilder {
       // Vuelos adicionales — empty by default; user clicks "Agregar vuelo" to add one.
       this.clearAdditionalFlights();
       this.clearAdditionalFlights('roundTripAdditionalFlightsListIda', 'roundTripAdditionalFlightsHeaderIda');
+      this.clearAdditionalFlights('roundTripAdditionalFlightsListVuelta', 'roundTripAdditionalFlightsHeaderVuelta');
       // Vehículos adicionales extra — empty by default; appears when checkbox is on.
       this.clearExtraAdditionalVehicles();
 
@@ -3368,11 +3373,11 @@ class ItineraryBuilder {
     if (transportType === 'aeropuerto') {
       if (idaHeader) idaHeader.innerHTML = '<i class="ti ti-plane-arrival me-2"></i>Arrival';
       if (vueltaHeader) vueltaHeader.innerHTML = '<i class="ti ti-plane-departure me-2"></i>Departure';
-      // Aeropuerto Ida: la fecha/hora corresponden al vuelo de llegada → "de Vuelo".
+      // Aeropuerto: la fecha/hora de cada pierna corresponden a su vuelo → "de Vuelo".
       if (dateIdaLabel) dateIdaLabel.textContent = 'Fecha de Vuelo';
       if (timeIdaLabel) timeIdaLabel.textContent = 'Hora de Vuelo';
-      if (dateVueltaLabel) dateVueltaLabel.textContent = 'Fecha de Salida';
-      if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Salida';
+      if (dateVueltaLabel) dateVueltaLabel.textContent = 'Fecha de Vuelo';
+      if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Vuelo';
     } else if (transportType === 'punto-a-punto') {
       // Punto a Punto: the first leg is the arrival at the destination,
       // the second leg is the return trip from it.
@@ -3669,8 +3674,9 @@ class ItineraryBuilder {
         ...serviceData,
         tripType: 'one-way',
         directionType: 'departure',
-        // Los vuelos adicionales capturados son de la Ida; la Vuelta no los hereda.
-        additionalFlights: [],
+        // Cada pierna lleva sus propios vuelos adicionales: la Vuelta usa returnAdditionalFlights
+        // (no hereda los de la Ida, que viven en serviceData.additionalFlights).
+        additionalFlights: Array.isArray(serviceData.returnAdditionalFlights) ? serviceData.returnAdditionalFlights : [],
         concept: `${typeLabel}: ${serviceData.returnOrigin} - ${serviceData.returnDestination} (Vuelta)`,
         origin: serviceData.returnOrigin,
         originName: serviceData.returnOrigin,
@@ -4928,8 +4934,10 @@ class ItineraryBuilder {
             data.flightNumber = document.getElementById('roundTripFlightNumberIda')?.value || '';
             data.returnAirline = document.getElementById('roundTripAirlineVuelta')?.value || '';
             data.returnFlightNumber = document.getElementById('roundTripFlightNumberVuelta')?.value || '';
-            // Vuelos adicionales de la Ida → se asignan a la pierna Ida al separar (la Vuelta queda en []).
+            // Vuelos adicionales por pierna: la Ida va en additionalFlights, la Vuelta en
+            // returnAdditionalFlights. Al separar, cada pierna recibe los suyos.
             data.additionalFlights = this.collectAdditionalFlights('roundTripAdditionalFlightsListIda');
+            data.returnAdditionalFlights = this.collectAdditionalFlights('roundTripAdditionalFlightsListVuelta');
           }
 
           data.originName = data.origin || 'Origen';
@@ -6257,6 +6265,8 @@ class ItineraryBuilder {
             document.getElementById('roundTripAirlineVuelta').value = service.returnAirline;
             document.getElementById('roundTripFlightNumberVuelta').value = service.returnFlightNumber || '';
           }
+          // Vuelos adicionales de la Vuelta (cuando se edita como round-trip).
+          this.populateAdditionalFlights(service.returnAdditionalFlights || [], 'roundTripAdditionalFlightsListVuelta', 'roundTripAdditionalFlightsHeaderVuelta');
         } else {
           // One way fields
           if (service.directionType) {
@@ -13343,6 +13353,7 @@ class ItineraryBuilder {
             overlapAccepted: subconcept.overlapAccepted || false,
             attendees: Array.isArray(subconcept.attendees) ? subconcept.attendees : [],
             additionalFlights: Array.isArray(subconcept.additionalFlights) ? subconcept.additionalFlights : [],
+            returnAdditionalFlights: Array.isArray(subconcept.returnAdditionalFlights) ? subconcept.returnAdditionalFlights : [],
             extraAdditionalVehicles: Array.isArray(subconcept.extraAdditionalVehicles) ? subconcept.extraAdditionalVehicles : [],
             conceptoPricePerPerson: subconcept.conceptoPricePerPerson !== undefined ? subconcept.conceptoPricePerPerson : null,
             includeInTotal: subconcept.includeInTotal !== undefined ? subconcept.includeInTotal : true,
@@ -22272,6 +22283,7 @@ class ItineraryBuilder {
             attendees: Array.isArray(service.attendees) ? service.attendees : [],
             // Additional flights (airport transport with multiple flights per service)
             additionalFlights: Array.isArray(service.additionalFlights) ? service.additionalFlights : [],
+            returnAdditionalFlights: Array.isArray(service.returnAdditionalFlights) ? service.returnAdditionalFlights : [],
             // Extra additional vehicles beyond the first `additionalVehicleId` (Phase 1 — data only;
             // pricing impact lands in Phase 2 of the multi-vehicle support work).
             extraAdditionalVehicles: Array.isArray(service.extraAdditionalVehicles) ? service.extraAdditionalVehicles : [],
