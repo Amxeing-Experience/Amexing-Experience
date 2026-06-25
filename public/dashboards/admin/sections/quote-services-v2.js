@@ -20335,7 +20335,12 @@ class ItineraryBuilder {
 
     // CRITICAL FIX: Only prefill from quote data for NEW tours, never during edit
     // Check if we're editing an existing service or if restoration is in progress
-    const isEditMode = this.currentServiceId || this.editMode === 'service';
+    // "Edición" = hay un servicio existente cargado (currentServiceId). NO usar editMode==='service'
+    // aquí: openServiceModal lo pone en 'service' tanto al AGREGAR como al editar, así que incluirlo
+    // hacía isEditMode siempre true → el prefill de personas NUNCA corría para servicios nuevos, y
+    // walkingTourPeopleCount se quedaba en su default (1) → se calculaba el tier del grupo más chico
+    // aunque los campos mostraran las personas correctas. La duración default ya usa solo currentServiceId.
+    const isEditMode = !!this.currentServiceId;
     const isRestoringData = this._restoringWalkingTourData === true;
 
     if (this.quoteData && !isEditMode && !isRestoringData) {
