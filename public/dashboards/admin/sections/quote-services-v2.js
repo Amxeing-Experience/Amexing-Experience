@@ -13938,7 +13938,7 @@ class ItineraryBuilder {
     row.className = 'row g-2 mb-2 extra-additional-vehicle-row align-items-end';
     row.dataset.index = String(rowIdx);
     row.innerHTML = `
-      <div class="col-md-3">
+      <div class="col-md-2">
         <select class="form-select form-select-sm extra-segment-select">
           <option value="">Seleccionar segmento</option>
         </select>
@@ -13955,7 +13955,7 @@ class ItineraryBuilder {
         </div>
         <small class="text-muted extra-list-price d-block"></small>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
         <div class="d-flex gap-1">
           <div class="input-group input-group-sm" style="max-width: 64px;">
             <input type="number" min="0" step="0.5" value="0" class="form-control form-control-sm extra-waiting-input" placeholder="0">
@@ -14371,8 +14371,11 @@ class ItineraryBuilder {
     if (isTransport && waitingCol && transportRow) {
       if (priceCol.parentElement !== transportRow) transportRow.appendChild(priceCol);
       if (waitingCol.parentElement !== transportRow) transportRow.appendChild(waitingCol);
-      setMainFieldWidths('col-md-3');
-      priceCol.className = 'col-md-2 mb-3';
+      // Segmento más angosto (col-2), Vehículo col-3, Precio más ancho (col-3), Espera col-4.
+      const mainFields = transportRow.querySelectorAll('.transport-main-field');
+      if (mainFields[0]) mainFields[0].className = 'col-md-2 mb-3 transport-main-field';
+      if (mainFields[1]) mainFields[1].className = 'col-md-3 mb-3 transport-main-field';
+      priceCol.className = 'col-md-3 mb-3';
       waitingCol.className = 'col-md-4 mb-3';
       waitingCol.classList.remove('d-none');
       // Refrescar la tarifa de lista del waiting al armar el layout (no solo en change).
