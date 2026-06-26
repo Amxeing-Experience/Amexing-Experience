@@ -1,6 +1,7 @@
 <%#
-Tours (subpágina de Servicios) — versión PROVISIONAL.
-Se irá editando con el contenido real.
+Tours (subpágina de Servicios).
+Usa el organismo compartido `categories-section` (mismo diseño que Experiencias);
+los datos que cargue por categoría serán distintos (se conectarán al backend).
 
 Created by Denisse Maldonado
 %>
@@ -23,55 +24,9 @@ Created by Denisse Maldonado
             font-family: 'Montserrat', sans-serif;
             margin: 0;
             padding: 0;
-            background: #fff;
+            background: #eff0ec;
             color: #333;
             padding-top: 80px; /* navbar fijo */
-        }
-
-        .subpage-hero {
-            background: #2e2e2d;
-            color: #ffffff;
-            text-align: center;
-            padding: clamp(4rem, 10vw, 7rem) 2rem;
-        }
-
-        .subpage-hero__crumb {
-            font-family: var(--font-myriad);
-            font-size: 0.8rem;
-            letter-spacing: 0.22em;
-            text-transform: uppercase;
-            color: #969b81;
-            margin: 0 0 1rem;
-        }
-
-        .subpage-hero__title {
-            font-family: var(--font-newsreader);
-            font-weight: 300;
-            font-size: clamp(2rem, 5vw, 3.4rem);
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            margin: 0;
-        }
-
-        .subpage-placeholder {
-            background: #eff0ec;
-            text-align: center;
-            padding: clamp(3rem, 8vw, 6rem) 2rem;
-            color: #585757;
-        }
-
-        .subpage-placeholder__icon {
-            font-size: 2rem;
-            color: #969b81;
-            margin-bottom: 1rem;
-        }
-
-        .subpage-placeholder__text {
-            font-family: var(--font-newsreader);
-            font-size: clamp(1.1rem, 2vw, 1.5rem);
-            margin: 0 auto;
-            max-width: 640px;
-            line-height: 1.6;
         }
     </style>
 </head>
@@ -86,24 +41,31 @@ Created by Denisse Maldonado
         t: typeof t !== 'undefined' ? t : ((key) => key)
     }) %>
 
-    <%# Hero de la subpágina %>
-    <section class="subpage-hero">
-        <p class="subpage-hero__crumb">Servicios</p>
-        <h1 class="subpage-hero__title">Tours</h1>
-    </section>
-
-    <%# Placeholder provisional %>
-    <section class="subpage-placeholder">
-        <div class="subpage-placeholder__icon"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i></div>
-        <p class="subpage-placeholder__text">Página en construcción — aquí irá el contenido de Tours.</p>
-    </section>
+    <%# Sección interactiva (compartida con Experiencias) — datos de Tours %>
+    <%- include('../organisms/servicios/categories-section', {
+        t: typeof t !== 'undefined' ? t : ((key) => key),
+        pageTitle: t('pages:tours.title'),
+        intro: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud.',
+        categories: [
+            { label: t('pages:categories.catas'), img: '/images/7.png' },
+            { label: t('pages:categories.arte'), img: '/images/4.png' },
+            { label: t('pages:categories.historiaArquitectura'), img: '/images/3.png' },
+            { label: t('pages:categories.gastronomicas'), img: '/images/6.png' },
+            { label: t('pages:categories.aventura'), img: '/images/5.png' },
+            { label: t('pages:categories.naturaleza'), img: '/images/2.png' },
+            { label: t('pages:categories.deTemporada'), img: '/images/1.png' }
+        ]
+    }) %>
 
     <%# CTA Contacto (reutilizable) %>
-    <%- include('../organisms/landing/cta-contacto-section') %>
+    <%- include('../organisms/landing/cta-contacto-section', {
+        t: typeof t !== 'undefined' ? t : ((key) => key)
+    }) %>
 
     <%# Footer %>
     <%- include('../organisms/landing/landing-footer', {
-        companyInfo: typeof company !== 'undefined' ? company : null
+        companyInfo: typeof company !== 'undefined' ? company : null,
+        req: typeof req !== 'undefined' ? req : null
     }) %>
 </body>
 </html>
