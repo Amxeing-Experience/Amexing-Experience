@@ -1034,7 +1034,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             const toggleIcon = row.active ? 'ti-archive' : 'ti-archive-off';
                             menuItems += `
                                 <li><button type="button" class="dropdown-item quick-add-experience-btn" data-id="${id}" data-name="${row.name}"><i class="ti ti-plus me-2"></i>Agregar experiencia rápida</button></li>
-                                <li><button type="button" class="dropdown-item manage-images-btn" data-id="${id}" data-name="${row.name}"><i class="ti ti-photo me-2"></i>Gestionar imágenes</button></li>
                                 <li><button type="button" class="dropdown-item toggle-provider-status-btn" data-id="${id}" data-current-status="${row.active}" data-name="${row.name}"><i class="ti ${toggleIcon} me-2"></i>${toggleTitle}</button></li>
                                 <li><button type="button" class="dropdown-item convert-to-establishment-btn" data-id="${id}" data-name="${row.name}"><i class="ti ti-building me-2"></i>Convertir a establecimiento</button></li>`;
                         }
