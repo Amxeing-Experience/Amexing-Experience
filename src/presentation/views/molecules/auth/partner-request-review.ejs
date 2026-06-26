@@ -1,0 +1,91 @@
+<%
+/**
+ * Partner Request Review Molecule
+ * Shows a partner request summary with Approve / Reject actions.
+ *
+ * @param {object} request - Plain partner request view object
+ * @param {string} token - Signed action token (HMAC)
+ * @param {string} csrfToken - CSRF token for the action forms
+ */
+const reviewReq = request;
+const reviewToken = typeof token !== 'undefined' ? token : '';
+const reviewCsrf = typeof csrfToken !== 'undefined' ? csrfToken : '';
+const submittedLabel = reviewReq.submittedAt
+  ? new Date(reviewReq.submittedAt).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short' })
+  : '';
+function rowItem(label, value) {
+  if (!value) return '';
+  return `<div class="pr-row"><span class="pr-label">${label}</span><span class="pr-value">${value}</span></div>`;
+}
+%>
+
+<div class="partner-review">
+    <div class="text-center mb-4">
+        <span class="d-block text-uppercase fw-semibold text-muted mb-2" style="letter-spacing: 2px;">Amexing CRM</span>
+        <h2 class="fw-bold text-dark mb-2">Revisar Solicitud</h2>
+        <p class="text-muted">Confirma tu decisión sobre esta solicitud de colaborador.</p>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+            <h5 class="mb-3"><%= reviewReq.fullName %></h5>
+            <%- rowItem('Correo', reviewReq.email) %>
+            <%- rowItem('Teléfono', reviewReq.phone) %>
+            <%- rowItem('Idioma de preferencia', reviewReq.preferredLanguage) %>
+            <%- rowItem('Tipo de colaborador', reviewReq.collaboratorType) %>
+            <%- rowItem('Redes sociales o sitio web', reviewReq.website) %>
+            <%- rowItem('Afiliación profesional', reviewReq.professionalAffiliation) %>
+            <%- rowItem('¿Cómo se enteraron de nosotros?', reviewReq.howDidYouHear) %>
+            <% if (reviewReq.comments) { %>
+                <div class="pr-row flex-column align-items-start">
+                    <span class="pr-label mb-1">Comentarios</span>
+                    <span class="pr-value" style="white-space: pre-wrap;"><%= reviewReq.comments %></span>
+                </div>
+            <% } %>
+            <%- rowItem('Fecha de solicitud', submittedLabel) %>
+        </div>
+    </div>
+
+    <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
+        <form action="/partner-requests/<%= reviewReq.id %>/approve" method="POST" class="flex-fill">
+            <input type="hidden" name="csrfToken" value="<%= reviewCsrf %>">
+            <input type="hidden" name="token" value="<%= reviewToken %>">
+            <button type="submit" class="btn btn-lg w-100 pr-approve">
+                <i class="ti ti-check me-2"></i>Aprobar
+            </button>
+        </form>
+        <form action="/partner-requests/<%= reviewReq.id %>/reject" method="POST" class="flex-fill"
+              onsubmit="return confirm('¿Seguro que deseas rechazar esta solicitud?');">
+            <input type="hidden" name="csrfToken" value="<%= reviewCsrf %>">
+            <input type="hidden" name="token" value="<%= reviewToken %>">
+            <button type="submit" class="btn btn-lg w-100 pr-reject">
+                <i class="ti ti-x me-2"></i>Rechazar
+            </button>
+        </form>
+    </div>
+</div>
+
+<style>
+    .partner-review { max-width: 560px; margin: 0 auto; }
+    .partner-review .card { border-radius: 16px; border: 1px solid rgba(150, 155, 129, 0.12) !important; }
+    .pr-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.55rem 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    .pr-row:last-child { border-bottom: none; }
+    .pr-label { color: #6b6b66; font-size: 0.9rem; flex-shrink: 0; }
+    .pr-value { color: #2e2e2d; font-weight: 500; text-align: right; word-break: break-word; }
+    .pr-approve {
+        background: linear-gradient(135deg, #969B81, #7f846a);
+        color: #fff; border: none; border-radius: 50px; font-weight: 600;
+        box-shadow: 0 8px 20px rgba(150, 155, 129, 0.3);
+    }
+    .pr-approve:hover { color: #fff; transform: translateY(-2px); }
+    .pr-reject {
+        background: #fff; color: #b02a37; border: 1px solid #b02a37; border-radius: 50px; font-weight: 600;
+    }
+    .pr-reject:hover { background: #b02a37; color: #fff; }
+</style>

@@ -432,6 +432,26 @@ const contactRateLimiter = rateLimit({
 
 router.post('/contact', contactRateLimiter, apiController.submitContactForm);
 
+// Rate limiter for partner (collaborator) access requests
+const partnerRequestRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // 10 submissions per hour per IP
+  message: 'Demasiadas solicitudes. Inténtalo de nuevo más tarde.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.warn(`Partner request rate limit exceeded for IP: ${req.ip}`);
+    res.status(429).json({
+      success: false,
+      error: 'Rate limit exceeded',
+      message: 'Demasiadas solicitudes. Inténtalo de nuevo más tarde.',
+      retryAfter: Math.ceil(req.rateLimit.resetTime / 1000),
+    });
+  },
+});
+
+router.post('/partner-request', partnerRequestRateLimiter, apiController.submitPartnerRequest);
+
 // PUBLIC ROUTES - No authentication required (must be before router.use(authenticateToken))
 
 /**

@@ -351,11 +351,19 @@
                 <div class="auth-brand__logo">
                     <img src="/images/logos/light_white_amexing.png" alt="Amexing Experience">
                 </div>
+                <%
+                    const hasAuthT = typeof t === 'function';
+                    const ab = (key, fallback) => {
+                        if (!hasAuthT) return fallback;
+                        const v = t(`pages:auth.brand.${key}`);
+                        return (v && v !== `pages:auth.brand.${key}`) ? v : fallback;
+                    };
+                %>
                 <div class="auth-brand__content">
-                    <span class="auth-brand__eyebrow">Bienvenido de vuelta</span>
+                    <span class="auth-brand__eyebrow"><%= ab('welcome', 'Bienvenido') %></span>
                     <hr class="auth-brand__rule">
-                    <h2 class="auth-brand__title">Elevamos la experiencia de viaje</h2>
-                    <p class="auth-brand__subtitle">Gestión premium de viajes y experiencias a la medida.</p>
+                    <h2 class="auth-brand__title"><%= ab('title', 'La mejor experiencia de viaje empieza aquí') %></h2>
+                    <p class="auth-brand__subtitle"><%= ab('subtitle', 'Plataforma premium de gestión de reservaciones') %></p>
                 </div>
             </aside>
 
@@ -402,8 +410,8 @@
     </div>
 
     <!-- Core JavaScript -->
-    <script src="/flexy-bootstrap-lite-1.0.0/node_modules/jquery/dist/jquery.min.js"></script>
-    <script src="/flexy-bootstrap-lite-1.0.0/node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/dashboard/libs/jquery.min.js"></script>
+    <script src="/dashboard/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Auth Layout Script -->
     <script>

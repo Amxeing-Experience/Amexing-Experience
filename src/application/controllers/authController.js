@@ -116,6 +116,7 @@ class AuthController {
 
     res.render('auth/login', {
       title: 'Login - AmexingWeb',
+      t: req.t || ((key) => key),
       error: req.query.error || null,
       message: req.query.message || null,
       info: req.query.info || null,
@@ -184,10 +185,14 @@ class AuthController {
       ? 'denisse@meeplab.com'
       : 'michelle@amexing.com';
 
+    const PartnerRequestService = require('../services/PartnerRequestService');
+
     res.render('auth/request-access', {
       title: 'Solicitud de Acceso - Agencias - Amexing',
       csrfToken: csrf,
       supportEmail,
+      formToken: PartnerRequestService.generateFormToken(),
+      t: req.t || ((key) => key),
       error: req.query.error || null,
       oauth_attempted: req.query.oauth_attempted || null,
       email: req.query.email || null,
@@ -818,6 +823,7 @@ class AuthController {
 
     res.render('auth/forgot-password', {
       title: 'Forgot Password - AmexingWeb',
+      t: req.t || ((key) => key),
       error: req.query.error || null,
       success: req.query.success || null,
       csrfToken: csrf,
