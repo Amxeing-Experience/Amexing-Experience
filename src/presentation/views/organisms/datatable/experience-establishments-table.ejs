@@ -345,13 +345,29 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
 <!-- Template para experiencia de establecimiento editable inline -->
 <template id="establishmentExperienciaEditableTemplate">
-    <div class="experiencia-editable card mb-3 border-warning border-opacity-25" data-index="" data-id="">
+    <div class="experiencia-editable card mb-2 border-success border-opacity-25" data-index="" data-id="">
+        <!-- Cabecera colapsable: resumen siempre visible (click para expandir) -->
+        <div class="card-header experiencia-acc-header d-flex justify-content-between align-items-center gap-2 py-2 px-3" role="button" style="cursor: pointer; background: #f0fdf4;">
+            <span class="d-flex align-items-center gap-2 text-truncate">
+                <i class="ti ti-chevron-right experiencia-acc-chevron text-success" style="transition: transform .15s ease;"></i>
+                <span class="fw-semibold text-success experiencia-acc-title text-truncate">Nueva experiencia</span>
+                <span class="badge bg-light text-success border experiencia-acc-tipo d-none"></span>
+            </span>
+            <span class="d-flex align-items-center gap-2 flex-shrink-0">
+                <span class="fw-semibold text-success small experiencia-acc-price"></span>
+                <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn experiencia-acc-delete" title="Eliminar experiencia">
+                    <i class="ti ti-trash"></i>
+                </button>
+            </span>
+        </div>
+        <!-- Cuerpo editable: colapsado por defecto (difiere la descarga de fotos) -->
+        <div class="experiencia-acc-body" style="display: none;">
         <div class="card-body p-3">
             <!-- Fila principal: Nombre y Tipo -->
             <div class="row mb-2">
-                <div class="col-md-7">
+                <div class="col-md-8">
                     <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Nombre <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control experiencia-name-input" required maxlength="200" 
+                    <input type="text" class="form-control experiencia-name-input" required maxlength="200"
                            placeholder="Ej: Cena Romántica VIP">
                 </div>
                 <div class="col-md-4">
@@ -362,11 +378,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <option value="Compartido">Compartido</option>
                         <option value="Privado">Privado</option>
                     </select>
-                </div>
-                <div class="col-md-1 d-flex align-items-end">
-                    <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn w-100" title="Eliminar experiencia">
-                        <i class="ti ti-trash"></i>
-                    </button>
                 </div>
             </div>
             
@@ -641,6 +652,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 </div>
             </div>
         </div>
+        </div><!-- /.experiencia-acc-body -->
     </div>
 </template>
 
@@ -1783,6 +1795,71 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     }
 
         // Establishment Experience Management Functions
+        // ========== SUBEXPERIENCIA ACCORDION (Establecimientos) ==========
+        // Cada subexperiencia se renderiza colapsada (solo cabecera con nombre/
+        // precio/tipo); al hacer click se expande. Las fotos usan loading="lazy"
+        // dentro de un cuerpo display:none, así su descarga se difiere.
+        function syncEstablishmentHeader(cardEl, exp) {
+            const el = cardEl && cardEl.jquery ? cardEl[0] : cardEl;
+            if (!el) return;
+            const nameVal = exp ? (exp.name || '') : (el.querySelector('.experiencia-name-input')?.value || '');
+            const priceRaw = exp ? exp.price : el.querySelector('.experiencia-price-input')?.value;
+            const tipoVal = exp ? (exp.tipo || exp.providerType || '') : (el.querySelector('.experiencia-tipo-input')?.value || '');
+
+            const titleEl = el.querySelector('.experiencia-acc-title');
+            if (titleEl) titleEl.textContent = (nameVal && nameVal.trim()) ? nameVal.trim() : 'Nueva experiencia';
+
+            const priceEl = el.querySelector('.experiencia-acc-price');
+            if (priceEl) {
+                const n = parseFloat(priceRaw);
+                priceEl.textContent = (!isNaN(n) && n > 0) ? ('$' + n.toLocaleString('es-MX')) : '';
+            }
+
+            const tipoEl = el.querySelector('.experiencia-acc-tipo');
+            if (tipoEl) {
+                if (tipoVal) { tipoEl.textContent = tipoVal; tipoEl.classList.remove('d-none'); }
+                else { tipoEl.textContent = ''; tipoEl.classList.add('d-none'); }
+            }
+        }
+        function expandEstablishmentCard(cardEl) {
+            const el = cardEl && cardEl.jquery ? cardEl[0] : cardEl;
+            if (!el) return;
+            const body = el.querySelector('.experiencia-acc-body');
+            const chevron = el.querySelector('.experiencia-acc-chevron');
+            if (body && getComputedStyle(body).display === 'none') {
+                $(body).slideDown(150);
+                if (chevron) chevron.style.transform = 'rotate(90deg)';
+                el.classList.add('experiencia-expanded');
+            }
+        }
+        function collapseEstablishmentCard(cardEl) {
+            const el = cardEl && cardEl.jquery ? cardEl[0] : cardEl;
+            if (!el) return;
+            const body = el.querySelector('.experiencia-acc-body');
+            const chevron = el.querySelector('.experiencia-acc-chevron');
+            if (body && getComputedStyle(body).display !== 'none') {
+                $(body).slideUp(150);
+                if (chevron) chevron.style.transform = 'rotate(0deg)';
+                el.classList.remove('experiencia-expanded');
+            }
+        }
+        // Toggle al click en la cabecera (ignora el botón borrar / inputs)
+        $(document).on('click.accEst', '#establishmentExperienciasList .experiencia-acc-header', function(e) {
+            if ($(e.target).closest('button, a, input, select, textarea').length) return;
+            const el = this.closest('.experiencia-editable');
+            if (!el) return;
+            const body = el.querySelector('.experiencia-acc-body');
+            if (body && getComputedStyle(body).display === 'none') expandEstablishmentCard(el);
+            else collapseEstablishmentCard(el);
+        });
+        // Mantener el resumen de la cabecera en sync mientras se escribe
+        $(document).on('input.accEst change.accEst',
+            '#establishmentExperienciasList .experiencia-name-input, #establishmentExperienciasList .experiencia-price-input, #establishmentExperienciasList .experiencia-tipo-input',
+            function() {
+                const el = this.closest('.experiencia-editable');
+                if (el) syncEstablishmentHeader(el);
+            });
+
         function addEstablishmentExperiencia() {
             const template = document.getElementById('establishmentExperienciaEditableTemplate');
             const clone = template.content.cloneNode(true);
@@ -1793,9 +1870,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             const container = document.getElementById('establishmentExperienciasList');
             container.appendChild(clone);
-            
+
             updateEstablishmentNoExperienciasMessage();
-            
+
+            // Una subexperiencia nueva nace expandida para poder llenarla
+            expandEstablishmentCard(experienciaCard);
+
             // Scroll to the new experience card
             setTimeout(() => {
                 experienciaCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1994,7 +2074,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                      ${fullPhotoData ? `data-photo-full='${JSON.stringify(fullPhotoData).replace(/'/g, '&#39;')}'` : ''}>
                     <div class="card position-relative">
                         ${formatBadge}
-                        <img src="${escapedDataUrl}" class="card-img-top" style="height: 120px; object-fit: cover;" alt="${fileName}">
+                        <img src="${escapedDataUrl}" loading="lazy" class="card-img-top" style="height: 120px; object-fit: cover;" alt="${fileName}">
                         <div class="card-body p-2">
                             <div class="d-flex justify-content-between align-items-center">
                                 <small class="text-muted text-truncate me-2" title="${fileName}">${fileName}</small>
@@ -2656,7 +2736,10 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             card.setAttribute('data-index', index);
             card.setAttribute('data-id', experiencia.id || '');
-            
+
+            // Poblar el resumen de la cabecera del acordeón (nombre / precio / tipo)
+            syncEstablishmentHeader(card, experiencia);
+
             // CRITICAL: Store original provider ID to prevent cross-establishment updates
             if (experiencia.provider && experiencia.provider.id) {
                 card.setAttribute('data-original-provider-id', experiencia.provider.id);
