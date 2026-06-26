@@ -14340,6 +14340,8 @@ class ItineraryBuilder {
       priceCol.className = 'col-md-3 mb-3';
       waitingCol.className = 'col-md-3 mb-3';
       waitingCol.classList.remove('d-none');
+      // Refrescar la tarifa de lista del waiting al armar el layout (no solo en change).
+      this.updateWaitingTimeRateDisplay();
       return;
     }
 
