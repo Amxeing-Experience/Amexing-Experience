@@ -8495,6 +8495,7 @@ class ItineraryBuilder {
                                                             ${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}`
           : service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}
                                                             ${service.rateId ? ` - ${this.getCategoryName(service.rateId) || 'Segmento'}` : ''}
+                                                            ${service.type === 'transport' && service.waitingTimeHours > 0 ? ` <span class="text-warning"><i class="ti ti-clock"></i> ${service.waitingTimeHours}h espera</span>` : ''}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -8543,14 +8544,7 @@ class ItineraryBuilder {
                                             </div>
                                         </div>
                                     ` : ''}
-                                    ${service.type === 'transport' && service.waitingTimeHours > 0 ? `
-                                        <div class="row g-2 text-warning small mt-1">
-                                            <div class="col-auto">
-                                                <i class="ti ti-clock me-1"></i>
-                                                <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
-                                            </div>
-                                        </div>
-                                    ` : ''}
+                                    ${''/* Tiempo de espera del principal ahora se muestra inline junto al vehículo */}
                                     ${service.availabilityPending ? `
                                         <div class="mt-1">
                                             <span class="badge bg-warning text-dark">
@@ -8886,6 +8880,7 @@ class ItineraryBuilder {
             const categoryName = service.category ? this.getCategoryName(service.category) : '';
             return service.category ? ` - ${categoryName || 'Segmento'}` : '';
           })()}
+                                                    ${service.type === 'transport' && service.waitingTimeHours > 0 ? ` <span class="text-warning"><i class="ti ti-clock"></i> ${service.waitingTimeHours}h espera</span>` : ''}
                                                 </span>
                                             </div>
                                         </div>
@@ -8933,15 +8928,7 @@ class ItineraryBuilder {
                                     <strong>Incluye Greeter + Driver</strong>
                                 </div>
                             ` : ''}
-                            ${service.waitingTimeHours > 0 ? `
-                                <div class="d-flex align-items-center text-warning small mt-1">
-                                    <i class="ti ti-clock me-1"></i>
-                                    <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
-                                    ${service.waitingTimePricePerHour ? `
-                                        <small class="text-muted ms-2">(${this.formatCurrency(service.waitingTimePricePerHour)}/h)</small>
-                                    ` : ''}
-                                </div>
-                            ` : ''}
+                            ${''/* Tiempo de espera del principal ahora se muestra inline junto al vehículo */}
                             ${service.isCustomPrice && this.canEditPrices ? `
                                 <div class="d-flex align-items-center text-info small mt-1">
                                     <i class="ti ti-edit me-1"></i>

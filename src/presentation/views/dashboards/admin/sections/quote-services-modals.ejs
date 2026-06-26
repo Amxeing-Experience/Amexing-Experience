@@ -951,13 +951,13 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         <div class="col-12 mb-3">
                             <label class="form-label d-block mb-1">Opcionales</label>
                             <div class="d-flex flex-wrap align-items-center gap-4">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" value="" id="includeGuide">
-                                    <label class="form-check-label small" for="includeGuide" id="guideLabel">Guía + Chofer</label>
+                                <div class="form-check d-flex align-items-center gap-2">
+                                    <input class="form-check-input m-0" type="checkbox" value="" id="includeGuide" style="width: 1.35rem; height: 1.35rem;">
+                                    <label class="form-check-label" for="includeGuide" id="guideLabel">Guía + Chofer</label>
                                 </div>
-                                <div class="form-check" id="greeterCheckboxContainer">
-                                    <input class="form-check-input" type="checkbox" value="" id="includeGreeter">
-                                    <label class="form-check-label small" for="includeGreeter" id="greeterLabel">Greeter</label>
+                                <div class="form-check d-flex align-items-center gap-2" id="greeterCheckboxContainer">
+                                    <input class="form-check-input m-0" type="checkbox" value="" id="includeGreeter" style="width: 1.35rem; height: 1.35rem;">
+                                    <label class="form-check-label" for="includeGreeter" id="greeterLabel">Greeter</label>
                                 </div>
                                 <div class="form-check ms-2 d-none" id="greeterInVehicleContainer">
                                     <input class="form-check-input" type="checkbox" value="" id="greeterInVehicle">
