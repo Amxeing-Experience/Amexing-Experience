@@ -3449,13 +3449,13 @@ class ItineraryBuilder {
       if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Recoger';
     }
 
-    // "Hora de salida sugerida" de la vuelta: NO aplica en local (la vuelta es "Recoger");
-    // sí aplica en aeropuerto / punto-a-punto (la vuelta es la salida). Se oculta y limpia en local.
+    // "Hora de salida sugerida" de la vuelta: SOLO aplica en aeropuerto. En local y punto-a-punto
+    // se usa la "Hora estimada de llegada" por pierna, así que se oculta y limpia aquí.
     const vueltaSuggestedRow = document.getElementById('roundTripDepartureTimeSuggestedVueltaRow');
     if (vueltaSuggestedRow) {
-      const isLocalRoundTrip = transportType === 'local';
-      vueltaSuggestedRow.classList.toggle('d-none', isLocalRoundTrip);
-      if (isLocalRoundTrip) {
+      const hideSuggested = transportType !== 'aeropuerto';
+      vueltaSuggestedRow.classList.toggle('d-none', hideSuggested);
+      if (hideSuggested) {
         const vueltaSuggestedField = document.getElementById('roundTripDepartureTimeSuggestedVuelta');
         if (vueltaSuggestedField) vueltaSuggestedField.value = '';
       }
