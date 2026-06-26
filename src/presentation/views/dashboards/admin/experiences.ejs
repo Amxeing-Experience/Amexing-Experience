@@ -174,7 +174,7 @@ const shouldRenderMobile = (forceMobile || isMobileRequest) && !forceDesktop;
         <% }); %>
     </ul>
     <% if (activeSection === 'providers' && ['superadmin', 'admin'].includes(currentUserRole)) { %>
-        <button type="button" class="btn btn-sm text-white" style="background: var(--brand-gradient);" id="createProviderBtn">
+        <button type="button" class="btn text-white" style="background: var(--brand-gradient); padding: 0.5rem 1rem;" id="createProviderBtn">
             <i class="ti ti-plus me-1"></i>Nuevo Proveedor
         </button>
     <% } %>
