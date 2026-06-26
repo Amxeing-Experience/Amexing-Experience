@@ -2985,9 +2985,22 @@ class ItineraryBuilder {
     const endInput = document.getElementById('transportEndTime');
     if (!startInput || !endInput) return;
     const routeMinutes = this.getRouteDurationMinutes();
-    const totalMinutes = routeMinutes ? routeMinutes * (this.isRoundTrip() ? 2 : 1) : 0;
+    const isRT = this.isRoundTrip();
+    const totalMinutes = routeMinutes ? routeMinutes * (isRT ? 2 : 1) : 0;
     const arrival = this.addMinutesToTime(startInput.value, totalMinutes);
     if (arrival) endInput.value = arrival;
+    // Small text: duración de ruta con la que se estima la hora de llegada.
+    const hintEl = document.getElementById('transportArrivalDurationHint');
+    if (hintEl) {
+      if (routeMinutes > 0) {
+        const base = `Duración de ruta: ${this.formatMinutesToHoursAndMinutes(routeMinutes)}`;
+        hintEl.textContent = isRT
+          ? `${base} (×2 ida y vuelta = ${this.formatMinutesToHoursAndMinutes(totalMinutes)})`
+          : base;
+      } else {
+        hintEl.textContent = 'Sin duración de ruta; selecciona origen y destino.';
+      }
+    }
   }
 
   // Parses an "HH:MM" (24h) string into minutes since midnight, or null.
