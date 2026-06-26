@@ -162,16 +162,23 @@ const shouldRenderMobile = (forceMobile || isMobileRequest) && !forceDesktop;
     </div>
 </div>
 
-<!-- Section Navigation (pills) -->
-<ul class="nav nav-pills experiences-pills mb-4">
-    <% menuItems.forEach(function(item) { %>
-        <li class="nav-item">
-            <a href="<%= item.href %>" class="nav-link <%= item.section === activeSection ? 'active' : '' %>">
-                <i class="ti ti-<%= item.icon %> me-1"></i><%= item.label %>
-            </a>
-        </li>
-    <% }); %>
-</ul>
+<!-- Section Navigation (pills) + acción de sección a la derecha -->
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <ul class="nav nav-pills experiences-pills mb-0">
+        <% menuItems.forEach(function(item) { %>
+            <li class="nav-item">
+                <a href="<%= item.href %>" class="nav-link <%= item.section === activeSection ? 'active' : '' %>">
+                    <i class="ti ti-<%= item.icon %> me-1"></i><%= item.label %>
+                </a>
+            </li>
+        <% }); %>
+    </ul>
+    <% if (activeSection === 'providers' && ['superadmin', 'admin'].includes(currentUserRole)) { %>
+        <button type="button" class="btn btn-sm text-white" style="background: var(--brand-gradient);" id="createProviderBtn">
+            <i class="ti ti-plus me-1"></i>Nuevo Proveedor
+        </button>
+    <% } %>
+</div>
 
 <!-- Main Content (full width) -->
 <div class="row">

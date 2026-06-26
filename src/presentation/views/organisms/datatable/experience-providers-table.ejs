@@ -22,14 +22,7 @@ const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 %>
 
-<!-- Barra superior: botón Nuevo a la derecha (sobre el detalle) -->
-<% if (canCreate) { %>
-    <div class="d-flex justify-content-end mb-3">
-        <button type="button" class="btn btn-sm text-white" style="background: var(--brand-gradient);" id="createProviderBtn">
-            <i class="ti ti-plus me-1"></i>Nuevo Proveedor
-        </button>
-    </div>
-<% } %>
+<!-- El botón "Nuevo Proveedor" vive en la fila de pills del contenedor (experiences.ejs) -->
 
 <!-- Bandeja master-detail: lista de proveedores (izquierda) + detalle inline (derecha) -->
 <div class="row g-3 provider-inbox">
