@@ -1115,6 +1115,7 @@ class ItineraryBuilder {
       const handler = () => {
         clearSuggestedEdited(suggestedId);
         this.updateSuggestedDepartureTime();
+        this.updateRoundTripArrivalEstimates();
       };
       el.addEventListener('change', handler);
       el.addEventListener('input', () => { if (/^\d{2}:\d{2}$/.test(el.value)) handler(); });
@@ -2979,6 +2980,8 @@ class ItineraryBuilder {
   // For point transfers (local & punto a punto), recompute the estimated arrival
   // = start + route duration (x2 when round trip). No-op for other types.
   updateTransferArrivalEstimate() {
+    // Round-trip (local/punto-a-punto) tiene su llegada estimada por pierna (Ida + Vuelta).
+    this.updateRoundTripArrivalEstimates();
     const type = document.querySelector('input[name="transportType"]:checked')?.value;
     if (type !== 'local' && type !== 'punto-a-punto') return;
     const startInput = document.getElementById('transportStartTime');
@@ -3001,6 +3004,32 @@ class ItineraryBuilder {
         hintEl.textContent = 'Sin duración de ruta; selecciona origen y destino.';
       }
     }
+  }
+
+  // Round-trip local/punto-a-punto: llegada estimada por pierna = hora de la pierna + duración de ruta.
+  // Solo lectura; el small muestra la duración de ruta usada. Se oculta en aeropuerto.
+  updateRoundTripArrivalEstimates() {
+    const type = document.querySelector('input[name="transportType"]:checked')?.value;
+    const show = (type === 'local' || type === 'punto-a-punto');
+    const routeMinutes = this.getRouteDurationMinutes();
+    const legs = [
+      { timeId: 'roundTripTimeIda', arrId: 'roundTripArrivalIda', hintId: 'roundTripArrivalIdaHint', rowId: 'roundTripArrivalIdaRow' },
+      { timeId: 'roundTripTimeVuelta', arrId: 'roundTripArrivalVuelta', hintId: 'roundTripArrivalVueltaHint', rowId: 'roundTripArrivalVueltaRow' },
+    ];
+    legs.forEach((leg) => {
+      const row = document.getElementById(leg.rowId);
+      if (row) row.classList.toggle('d-none', !show);
+      if (!show) return;
+      const timeVal = document.getElementById(leg.timeId)?.value;
+      const arrInput = document.getElementById(leg.arrId);
+      const hintEl = document.getElementById(leg.hintId);
+      if (arrInput) arrInput.value = routeMinutes ? (this.addMinutesToTime(timeVal, routeMinutes) || '') : '';
+      if (hintEl) {
+        hintEl.textContent = routeMinutes > 0
+          ? `Duración de ruta: ${this.formatMinutesToHoursAndMinutes(routeMinutes)}`
+          : 'Sin duración de ruta; selecciona origen y destino.';
+      }
+    });
   }
 
   // Parses an "HH:MM" (24h) string into minutes since midnight, or null.

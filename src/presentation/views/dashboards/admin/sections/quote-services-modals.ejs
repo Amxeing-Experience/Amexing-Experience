@@ -573,6 +573,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         </div>
                                     </div>
 
+                                    <!-- Hora estimada de llegada (local / punto-a-punto): salida + duración de ruta -->
+                                    <div class="row d-none" id="roundTripArrivalIdaRow">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="roundTripArrivalIda" class="form-label">Hora estimada de llegada</label>
+                                            <input type="text" class="form-control time-input" id="roundTripArrivalIda" placeholder="__:__" maxlength="5" autocomplete="off" readonly>
+                                            <small class="text-muted d-block" id="roundTripArrivalIdaHint"></small>
+                                        </div>
+                                    </div>
+
                                     <!-- Flight Details for Ida (only show if Aeropuerto is selected) -->
                                     <div class="roundtrip-flight-details-ida d-none">
                                         <hr class="my-2">
@@ -670,6 +679,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         <div class="col-md-6 mb-3">
                                             <label for="roundTripTimeVuelta" class="form-label" id="roundTripTimeVueltaLabel">Hora Vuelo</label>
                                             <input type="text" class="form-control time-input" id="roundTripTimeVuelta" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
+                                        </div>
+                                    </div>
+                                    <!-- Hora estimada de llegada (local / punto-a-punto): salida + duración de ruta -->
+                                    <div class="row d-none" id="roundTripArrivalVueltaRow">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="roundTripArrivalVuelta" class="form-label">Hora estimada de llegada</label>
+                                            <input type="text" class="form-control time-input" id="roundTripArrivalVuelta" placeholder="__:__" maxlength="5" autocomplete="off" readonly>
+                                            <small class="text-muted d-block" id="roundTripArrivalVueltaHint"></small>
                                         </div>
                                     </div>
                                     <div class="row" id="roundTripDepartureTimeSuggestedVueltaRow">
