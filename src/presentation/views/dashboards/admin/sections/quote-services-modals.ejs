@@ -1015,11 +1015,11 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         <div class="col-md-4 mb-3 d-none" id="tiempoEsperaSection">
                             <label class="form-label"><i class="ti ti-clock me-1"></i>Tiempo de espera</label>
                             <div class="d-flex gap-1">
-                                <div class="input-group" style="max-width: 110px;">
+                                <div class="input-group" style="flex: 1 1 0;">
                                     <input type="number" class="form-control" id="waitingTimeHours" min="0" step="0.5" value="0" placeholder="0">
                                     <span class="input-group-text">h</span>
                                 </div>
-                                <div class="input-group">
+                                <div class="input-group" style="flex: 1 1 0;">
                                     <span class="input-group-text">$</span>
                                     <input type="number" class="form-control" id="waitingTimePrice" min="0" step="0.01" placeholder="0.00" title="Tarifa por hora (editable)">
                                     <span class="input-group-text">/h</span>
