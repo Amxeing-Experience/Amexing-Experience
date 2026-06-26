@@ -13956,9 +13956,15 @@ class ItineraryBuilder {
         <small class="text-muted extra-list-price d-block"></small>
       </div>
       <div class="col-md-3">
-        <div class="input-group input-group-sm">
-          <input type="number" min="0" step="0.5" value="0" class="form-control form-control-sm extra-waiting-input" placeholder="0">
-          <span class="input-group-text">h</span>
+        <div class="d-flex gap-1">
+          <div class="input-group input-group-sm" style="max-width: 64px;">
+            <input type="number" min="0" step="0.5" value="0" class="form-control form-control-sm extra-waiting-input" placeholder="0">
+            <span class="input-group-text">h</span>
+          </div>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">$</span>
+            <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-waiting-price" placeholder="0.00" title="Tarifa por hora (editable)">
+          </div>
         </div>
         <small class="text-muted extra-waiting-rate d-block"></small>
       </div>
@@ -13981,6 +13987,11 @@ class ItineraryBuilder {
     const waitingInput = row.querySelector('.extra-waiting-input');
     if (waitingInput && vehicle.waitingHours !== undefined && vehicle.waitingHours !== null && vehicle.waitingHours !== '') {
       waitingInput.value = vehicle.waitingHours;
+    }
+    // Restaurar la tarifa por hora editada (si se guardó); si no, syncExtraRowPrice autollena la de catálogo.
+    const waitingPriceInput = row.querySelector('.extra-waiting-price');
+    if (waitingPriceInput && vehicle.waitingPricePerHour !== undefined && vehicle.waitingPricePerHour !== null && vehicle.waitingPricePerHour !== '' && parseFloat(vehicle.waitingPricePerHour) > 0) {
+      waitingPriceInput.value = parseFloat(vehicle.waitingPricePerHour).toFixed(2);
     }
 
     // Mirror the segment options from #transportCategory (synchronous: options
@@ -14026,6 +14037,11 @@ class ItineraryBuilder {
     });
     // Cada vehículo lleva su propio tiempo de espera (puede diferir entre vehículos).
     waitingInput?.addEventListener('input', () => {
+      this.serviceModified = true;
+      this.updateServicePriceBreakdown();
+    });
+    // Tarifa por hora de espera editable de la fila.
+    row.querySelector('.extra-waiting-price')?.addEventListener('input', () => {
       this.serviceModified = true;
       this.updateServicePriceBreakdown();
     });
@@ -14252,8 +14268,8 @@ class ItineraryBuilder {
       if (listEl) listEl.textContent = '';
       if (!vehicleSelect.value) priceInput.value = '';
     }
-    // Mostrar la tarifa de tiempo de espera de este vehículo+segmento.
-    this.updateExtraRowWaitingRate(row);
+    // Mostrar/resetear la tarifa de tiempo de espera de este vehículo+segmento.
+    this.updateExtraRowWaitingRate(row, forceListPrice);
   }
 
   /**
@@ -14267,12 +14283,22 @@ class ItineraryBuilder {
     return this.getWaitingTimePriceFor(vehicleId, segmentId);
   }
 
-  /** Muestra la tarifa por hora de espera bajo el input de la fila. */
-  updateExtraRowWaitingRate(row) {
-    const rateEl = row.querySelector('.extra-waiting-rate');
-    if (!rateEl) return;
+  /** Tarifa de espera efectiva de la fila: la editada si existe, si no la de catálogo. */
+  getEffectiveExtraRowWaitingRate(row) {
+    const edited = parseFloat(row.querySelector('.extra-waiting-price')?.value);
+    if (Number.isFinite(edited) && edited > 0) return edited;
+    return this.getExtraRowWaitingPrice(row)?.pricePerHour || 0;
+  }
+
+  /** Muestra "Lista: $X/h" y autollena la tarifa editable (forceReset al cambiar vehículo). */
+  updateExtraRowWaitingRate(row, forceReset = false) {
     const wt = this.getExtraRowWaitingPrice(row);
-    rateEl.textContent = wt ? `Lista: ${this.formatCurrency(wt.pricePerHour)}/h` : '';
+    const rateEl = row.querySelector('.extra-waiting-rate');
+    if (rateEl) rateEl.textContent = wt ? `Lista: ${this.formatCurrency(wt.pricePerHour)}/h` : '';
+    const priceInput = row.querySelector('.extra-waiting-price');
+    if (priceInput && wt && (forceReset || priceInput.value === '' || priceInput.value === null)) {
+      priceInput.value = Number(wt.pricePerHour).toFixed(2);
+    }
   }
 
   /** Suma del costo de espera (tarifa × horas) de TODOS los vehículos adicionales, en efectivo. */
@@ -14281,8 +14307,8 @@ class ItineraryBuilder {
     document.querySelectorAll('#extraAdditionalVehiclesList .extra-additional-vehicle-row').forEach((row) => {
       const hours = parseFloat(row.querySelector('.extra-waiting-input')?.value || 0) || 0;
       if (hours <= 0) return;
-      const wt = this.getExtraRowWaitingPrice(row);
-      if (wt) total += wt.pricePerHour * hours;
+      // Tarifa efectiva: la editada en la fila si existe, si no la de catálogo.
+      total += this.getEffectiveExtraRowWaitingRate(row) * hours;
     });
     return total;
   }
@@ -14469,6 +14495,8 @@ class ItineraryBuilder {
           : null;
         const waitingInput = row.querySelector('.extra-waiting-input');
         const waitingHours = waitingInput ? (parseFloat(waitingInput.value) || 0) : 0;
+        // Tarifa por hora efectiva (editada o catálogo) para persistir y recalcular.
+        const waitingPricePerHour = this.getEffectiveExtraRowWaitingRate(row);
         return {
           segment: segmentId,
           segmentName,
@@ -14478,6 +14506,7 @@ class ItineraryBuilder {
           customPrice,
           listPrice,
           waitingHours,
+          waitingPricePerHour,
         };
       })
       .filter((v) => v.vehicleId);
