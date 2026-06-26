@@ -13957,7 +13957,7 @@ class ItineraryBuilder {
       </div>
       <div class="col-md-4">
         <div class="d-flex gap-1">
-          <div class="input-group input-group-sm" style="max-width: 64px;">
+          <div class="input-group input-group-sm" style="max-width: 96px;">
             <input type="number" min="0" step="0.5" value="0" class="form-control form-control-sm extra-waiting-input" placeholder="0">
             <span class="input-group-text">h</span>
           </div>
