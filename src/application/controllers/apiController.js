@@ -383,6 +383,144 @@ class ApiController {
       });
     }
   }
+
+  /**
+   * Handles submission of the partner (collaborator) access request form.
+   * Validates input, stores the request with a pending status, and notifies operations.
+   * @function submitPartnerRequest
+   * @param {object} req - Express request with partner form data in body.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} JSON response with submission status.
+   * @example
+   * // POST /api/partner-request
+   * // Body: { firstName, lastName, email, phone, preferredLanguage, collaboratorType, ... }
+   */
+  async submitPartnerRequest(req, res) {
+    /**
+     * Localized message helper that falls back to the provided default.
+     * @param {string} key - Key under pages:requestAccess in the i18n catalog.
+     * @param {string} fallback - Default message when no translation is found.
+     * @returns {string} The translated message or the fallback.
+     * @example
+     * tr('successMessage', '¡Gracias!');
+     */
+    const tr = (key, fallback) => {
+      const value = req.t ? req.t(`pages:requestAccess.${key}`) : null;
+      return value && value !== `pages:requestAccess.${key}` ? value : fallback;
+    };
+
+    try {
+      const {
+        firstName, lastName, email, phone, preferredLanguage,
+        collaboratorType, collaboratorTypeOther, website,
+        professionalAffiliation, howDidYouHear, comments,
+      } = req.body;
+
+      // Required fields
+      if (!firstName || !lastName || !email || !phone || !collaboratorType) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields',
+          message: tr('requiredFields', 'Nombre, apellido, correo, teléfono y tipo de colaborador son obligatorios.'),
+        });
+      }
+
+      // Email format validation
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(email)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid email format',
+          message: tr('invalidEmail', 'Por favor proporciona un correo electrónico válido.'),
+        });
+      }
+
+      // Phone format validation: 10 to 15 digits (allowing + ( ) - and spaces)
+      const phoneDigits = String(phone).replace(/\D/g, '');
+      const phoneHasInvalidChars = /[^\d\s+().-]/.test(phone);
+      if (phoneDigits.length < 10 || phoneDigits.length > 15 || phoneHasInvalidChars) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid phone format',
+          message: tr('invalidPhone', 'Ingresa un teléfono válido (10 a 15 dígitos).'),
+        });
+      }
+
+      // Allowed collaborator types
+      const allowedTypes = [
+        'travel_agent', 'wedding_planner', 'concierge', 'dmc',
+        'airbnb_villa_owner', 'company', 'other',
+      ];
+      if (!allowedTypes.includes(collaboratorType)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid collaborator type',
+          message: tr('invalidType', 'Por favor selecciona un tipo de colaborador.'),
+        });
+      }
+
+      // When "other", require the free-text specification
+      if (collaboratorType === 'other' && !collaboratorTypeOther?.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing collaborator type detail',
+          message: tr('invalidOther', 'Por favor especifica el tipo de colaborador.'),
+        });
+      }
+
+      const PartnerRequestService = require('../services/PartnerRequestService');
+      const partnerRequestService = new PartnerRequestService();
+
+      const result = await partnerRequestService.processPartnerRequest({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+        preferredLanguage: preferredLanguage?.trim() || null,
+        collaboratorType,
+        collaboratorTypeOther: collaboratorTypeOther?.trim() || null,
+        website: website?.trim() || null,
+        professionalAffiliation: professionalAffiliation?.trim() || null,
+        howDidYouHear: howDidYouHear?.trim() || null,
+        comments: comments?.trim() || null,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date(),
+      });
+
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          error: result.error || 'Failed to process partner request',
+          message: tr('serverError', 'Hubo un error al procesar tu solicitud. Inténtalo de nuevo más tarde.'),
+        });
+      }
+
+      logger.info('Partner request submitted successfully', {
+        email: email.toLowerCase(),
+        collaboratorType,
+        ip: req.ip,
+        submissionId: result.submissionId,
+      });
+
+      return res.json({
+        success: true,
+        message: tr('successMessage', '¡Gracias! Recibimos tu solicitud y nuestro equipo la revisará pronto.'),
+      });
+    } catch (error) {
+      logger.error('Error processing partner request:', {
+        error: error.message,
+        stack: error.stack,
+        ip: req.ip,
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: 'Internal Server Error',
+        message: tr('serverError', 'Hubo un error al procesar tu solicitud. Inténtalo de nuevo más tarde.'),
+      });
+    }
+  }
 }
 
 module.exports = new ApiController();

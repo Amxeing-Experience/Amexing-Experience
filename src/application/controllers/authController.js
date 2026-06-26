@@ -116,6 +116,7 @@ class AuthController {
 
     res.render('auth/login', {
       title: 'Login - AmexingWeb',
+      t: req.t || ((key) => key),
       error: req.query.error || null,
       message: req.query.message || null,
       info: req.query.info || null,
@@ -188,6 +189,7 @@ class AuthController {
       title: 'Solicitud de Acceso - Agencias - Amexing',
       csrfToken: csrf,
       supportEmail,
+      t: req.t || ((key) => key),
       error: req.query.error || null,
       oauth_attempted: req.query.oauth_attempted || null,
       email: req.query.email || null,
@@ -818,6 +820,7 @@ class AuthController {
 
     res.render('auth/forgot-password', {
       title: 'Forgot Password - AmexingWeb',
+      t: req.t || ((key) => key),
       error: req.query.error || null,
       success: req.query.success || null,
       csrfToken: csrf,

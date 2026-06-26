@@ -1,0 +1,10 @@
+<%- include('../templates/auth-layout', {
+    title: typeof title !== 'undefined' ? title : 'Revisar Solicitud - Amexing CRM',
+    page: 'partner-request-review',
+    showAuthHeader: false,
+    content: include('../molecules/auth/partner-request-review', {
+        request: request,
+        token: token,
+        csrfToken: csrfToken
+    })
+}) %>

@@ -1,0 +1,85 @@
+<%
+/**
+ * Partner Request Result Molecule
+ * Renders the outcome of an approve/reject action (or an error state).
+ *
+ * @param {string} outcome - approved | rejected | already | not_found | invalid | error
+ * @param {object|null} request - Plain partner request view object (optional)
+ */
+const resultOutcome = outcome;
+const resultReq = typeof request !== 'undefined' ? request : null;
+
+const config = {
+  approved: {
+    icon: 'ti-circle-check', color: '#2e7d32',
+    title: 'Solicitud aprobada',
+    message: 'La solicitud fue marcada como <strong>aprobada</strong>.',
+  },
+  rejected: {
+    icon: 'ti-circle-x', color: '#b02a37',
+    title: 'Solicitud rechazada',
+    message: 'La solicitud fue marcada como <strong>rechazada</strong>.',
+  },
+  already: {
+    icon: 'ti-info-circle', color: '#0d6efd',
+    title: 'Solicitud ya resuelta',
+    message: 'Esta solicitud ya había sido procesada anteriormente.',
+  },
+  not_found: {
+    icon: 'ti-alert-triangle', color: '#b08400',
+    title: 'Solicitud no encontrada',
+    message: 'No encontramos esta solicitud. Es posible que haya sido eliminada.',
+  },
+  invalid: {
+    icon: 'ti-lock', color: '#b02a37',
+    title: 'Enlace no válido',
+    message: 'Este enlace no es válido o ha expirado. Vuelve a abrir el correo original.',
+  },
+  error: {
+    icon: 'ti-alert-triangle', color: '#b02a37',
+    title: 'Ocurrió un error',
+    message: 'No pudimos procesar la acción. Inténtalo de nuevo más tarde.',
+  },
+};
+const c = config[resultOutcome] || config.error;
+%>
+
+<div class="partner-result text-center">
+    <span class="d-block text-uppercase fw-semibold text-muted mb-3" style="letter-spacing: 2px;">Amexing CRM</span>
+    <div class="result-icon mb-3" style="color: <%= c.color %>;">
+        <i class="ti <%= c.icon %>"></i>
+    </div>
+    <h2 class="fw-bold text-dark mb-2"><%= c.title %></h2>
+    <p class="text-muted mb-4"><%- c.message %></p>
+
+    <% if (resultReq) { %>
+        <div class="card border-0 shadow-sm mx-auto" style="max-width: 420px;">
+            <div class="card-body p-3 text-start">
+                <div class="pr-row"><span class="pr-label">Colaborador</span><span class="pr-value"><%= resultReq.fullName %></span></div>
+                <div class="pr-row"><span class="pr-label">Correo</span><span class="pr-value"><%= resultReq.email %></span></div>
+                <% if (resultReq.status) { %>
+                    <div class="pr-row"><span class="pr-label">Estado</span><span class="pr-value text-capitalize"><%= resultReq.status %></span></div>
+                <% } %>
+            </div>
+        </div>
+    <% } %>
+
+    <div class="mt-4">
+        <a href="/login" class="text-decoration-none fw-semibold" style="color: #7f846a;">
+            <i class="ti ti-arrow-left me-1"></i>Ir al inicio de sesión
+        </a>
+    </div>
+</div>
+
+<style>
+    .partner-result { max-width: 520px; margin: 0 auto; }
+    .partner-result .result-icon i { font-size: 4rem; }
+    .partner-result .card { border-radius: 14px; border: 1px solid rgba(150, 155, 129, 0.12) !important; }
+    .partner-result .pr-row {
+        display: flex; justify-content: space-between; gap: 1rem;
+        padding: 0.5rem 0; border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    .partner-result .pr-row:last-child { border-bottom: none; }
+    .partner-result .pr-label { color: #6b6b66; font-size: 0.9rem; }
+    .partner-result .pr-value { color: #2e2e2d; font-weight: 500; text-align: right; word-break: break-word; }
+</style>

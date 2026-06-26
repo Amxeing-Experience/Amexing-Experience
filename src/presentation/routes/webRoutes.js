@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const homeController = require('../../application/controllers/homeController');
 const authController = require('../../application/controllers/authController');
+const partnerRequestController = require('../../application/controllers/PartnerRequestController');
 const dashboardAuth = require('../../application/middleware/dashboardAuthMiddleware');
 
 // Language switching endpoint
@@ -176,6 +177,10 @@ router.get('/login', dashboardAuth.redirectIfAuthenticated, authController.showL
 router.get('/register', dashboardAuth.redirectIfAuthenticated, authController.showRegister);
 router.get('/auth/request-access', dashboardAuth.redirectIfAuthenticated, authController.showRequestAccess);
 router.get('/request-access', dashboardAuth.redirectIfAuthenticated, authController.showRequestAccess);
+
+// Partner request approve/reject flow (signed links from admin notification email)
+router.get('/partner-requests/:id/review', (req, res) => partnerRequestController.showReview(req, res));
+router.post('/partner-requests/:id/:action', (req, res) => partnerRequestController.handleAction(req, res));
 router.post('/logout', dashboardAuth.logout, (req, res) => {
   // Force redirect to login without any middleware interference
   res.redirect(`/login?message=${encodeURIComponent('You have been logged out successfully')}`);

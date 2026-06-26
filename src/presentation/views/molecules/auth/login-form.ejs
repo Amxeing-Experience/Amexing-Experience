@@ -15,12 +15,19 @@ const loginInfo = typeof info !== 'undefined' && info ? info : null;
 const loginCsrfToken = typeof csrfToken !== 'undefined' ? csrfToken : '';
 const loginOauthProviders = typeof oauthProviders !== 'undefined' ? oauthProviders : [];
 const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
+// i18n helper with safe fallback
+const hasLoginT = typeof t === 'function';
+const lg = (key, fallback) => {
+  if (!hasLoginT) return fallback;
+  const v = t(`pages:login.${key}`);
+  return (v && v !== `pages:login.${key}`) ? v : fallback;
+};
 %>
 
 <div class="login-form-container">
     <div class="text-center mb-4">
-        <h2 class="login-title mb-2">Iniciar Sesión</h2>
-        <p class="login-subtitle">Accede a tu cuenta Amexing</p>
+        <h2 class="login-title mb-2"><%= lg('title', 'Iniciar Sesión') %></h2>
+        <p class="login-subtitle"><%= lg('subtitle', 'Accede a tu cuenta Amexing') %></p>
     </div>
 
     <!-- Error Alert -->
@@ -49,26 +56,27 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
         <!-- Email/Username Field -->
         <div class="mb-4">
             <label for="identifier" class="form-label text-dark fw-semibold">
-                <i class="ti ti-user me-1"></i>Email o Usuario
+                <i class="ti ti-user me-1"></i><%= lg('emailLabel', 'Correo electrónico') %>
             </label>
             <input
-                type="text"
+                type="email"
                 class="form-control form-control-lg"
                 id="identifier"
                 name="identifier"
-                placeholder="Ingresa tu email o usuario"
+                placeholder="<%= lg('emailPlaceholder', 'Ingresa tu correo electrónico') %>"
                 required
-                autocomplete="username"
+                autocomplete="email"
+                inputmode="email"
             >
             <div class="invalid-feedback">
-                Por favor ingresa tu email o usuario.
+                <%= lg('emailInvalid', 'Por favor ingresa un correo electrónico válido.') %>
             </div>
         </div>
 
         <!-- Password Field -->
         <div class="mb-4">
             <label for="password" class="form-label text-dark fw-semibold">
-                <i class="ti ti-lock me-1"></i>Contraseña
+                <i class="ti ti-lock me-1"></i><%= lg('passwordLabel', 'Contraseña') %>
             </label>
             <div class="input-group">
                 <input
@@ -76,7 +84,7 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
                     class="form-control form-control-lg"
                     id="password"
                     name="password"
-                    placeholder="Ingresa tu contraseña"
+                    placeholder="<%= lg('passwordPlaceholder', 'Ingresa tu contraseña') %>"
                     required
                     autocomplete="current-password"
                 >
@@ -84,26 +92,26 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
                     class="btn btn-outline-secondary"
                     type="button"
                     id="togglePassword"
-                    aria-label="Mostrar/ocultar contraseña"
+                    aria-label="<%= lg('passwordToggle', 'Mostrar/ocultar contraseña') %>"
                 >
                     <i class="ti ti-eye" id="togglePasswordIcon"></i>
                 </button>
             </div>
             <div class="invalid-feedback">
-                Por favor ingresa tu contraseña.
+                <%= lg('passwordInvalid', 'Por favor ingresa tu contraseña.') %>
             </div>
         </div>
 
         <!-- Forgot Password -->
         <div class="d-flex justify-content-end align-items-center mb-4">
             <a href="/auth/forgot-password" class="login-link text-decoration-none">
-                <i class="ti ti-help me-1"></i>¿Olvidaste tu contraseña?
+                <i class="ti ti-help me-1"></i><%= lg('forgotPassword', '¿Olvidaste tu contraseña?') %>
             </a>
         </div>
 
         <!-- Submit Button -->
         <button type="submit" class="btn btn-primary btn-lg w-100 mb-4">
-            <i class="ti ti-login me-2"></i>Iniciar Sesión
+            <i class="ti ti-login me-2"></i><%= lg('submit', 'Iniciar Sesión') %>
         </button>
     </form>
 
@@ -111,7 +119,7 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
     <% if (loginOauthProviders && loginOauthProviders.length > 0) { %>
         <div class="auth-divider mb-4">
             <hr class="my-3">
-            <span class="auth-divider-text px-3 text-muted">O inicia sesión con</span>
+            <span class="auth-divider-text px-3 text-muted"><%= lg('orLoginWith', 'O inicia sesión con') %></span>
         </div>
 
         <div class="oauth-providers">
@@ -120,7 +128,7 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
                     <a href="/auth/oauth/<%= provider.name %><% if (loginRedirectTo) { %>?redirectTo=<%= encodeURIComponent(loginRedirectTo) %><% } %>"
                        class="btn btn-outline-dark btn-lg w-100 mb-2 oauth-btn oauth-<%= provider.name %>">
                         <i class="ti ti-brand-google me-2"></i>
-                        Continuar con <%= provider.displayName %>
+                        <%= lg('continueWith', 'Continuar con') %> <%= provider.displayName %>
                     </a>
                 <% } %>
             <% }); %>
@@ -129,13 +137,13 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
 
     <!-- Agency Access Request Link -->
     <div class="text-center mt-4">
-        <p class="text-muted mb-0">
-            ¿Eres una agencia de viajes?
-            <a href="/auth/request-access"
-               class="login-link text-decoration-none fw-semibold">
-                Solicitar Acceso como Agencia
-            </a>
+        <p class="text-muted mb-1">
+            <%= lg('partnerQuestion', '¿Eres agente de viajes, wedding planner o concierge?') %>
         </p>
+        <a href="/auth/request-access"
+           class="login-link text-decoration-none fw-semibold">
+            <%= lg('partnerCta', 'Solicita tu acceso como partner') %>
+        </a>
     </div>
 </div>
 
@@ -145,7 +153,7 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="oauthConfirmationModalLabel">
-                    <i class="ti ti-link me-2"></i>Vincular Cuenta
+                    <i class="ti ti-link me-2"></i><%= lg('linkModalTitle', 'Vincular Cuenta') %>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -154,14 +162,14 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
                     <div class="oauth-provider-icon mb-3">
                         <i class="ti ti-brand-google" style="font-size: 3rem; color: #4285F4;"></i>
                     </div>
-                    <h6>¿Vincular tu cuenta de Google?</h6>
+                    <h6><%= lg('linkGoogleQuestion', '¿Vincular tu cuenta de Google?') %></h6>
                     <p class="text-muted mb-3">
-                        Queremos vincular tu cuenta de <strong><span id="oauthEmail"></span></strong> 
-                        con tu cuenta existente de Amexing <strong><span id="existingEmail"></span></strong>.
+                        <%= lg('linkDescBefore', 'Queremos vincular tu cuenta de') %> <strong><span id="oauthEmail"></span></strong>
+                        <%= lg('linkDescMiddle', 'con tu cuenta existente de Amexing') %> <strong><span id="existingEmail"></span></strong>.
                     </p>
                     <div class="alert alert-info">
                         <i class="ti ti-info-circle me-2"></i>
-                        Esto te permitirá iniciar sesión con Google en el futuro.
+                        <%= lg('linkInfo', 'Esto te permitirá iniciar sesión con Google en el futuro.') %>
                     </div>
                 </div>
             </div>
@@ -169,10 +177,10 @@ const loginRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
                 <form action="/auth/oauth/confirm-link" method="POST" class="d-flex gap-2 w-100">
                     <input type="hidden" name="csrfToken" value="<%= loginCsrfToken %>">
                     <button type="submit" name="action" value="deny" class="btn btn-outline-secondary flex-fill">
-                        <i class="ti ti-x me-1"></i>Cancelar
+                        <i class="ti ti-x me-1"></i><%= lg('cancel', 'Cancelar') %>
                     </button>
                     <button type="submit" name="action" value="approve" class="btn btn-primary flex-fill">
-                        <i class="ti ti-check me-1"></i>Vincular Cuenta
+                        <i class="ti ti-check me-1"></i><%= lg('linkButton', 'Vincular Cuenta') %>
                     </button>
                 </form>
             </div>

@@ -1,9 +1,12 @@
-<%- include('../templates/auth-layout', {
-    title: 'Solicitud de Acceso - Agencias - Amexing',
+<%
+const tFn = typeof t === 'function' ? t : ((key) => key);
+%><%- include('../templates/auth-layout', {
+    title: tFn('pages:requestAccess.pageTitle'),
     page: 'request-access',
     showAuthHeader: false,
     content: include('../molecules/auth/request-access-form', {
         csrfToken: csrfToken,
-        supportEmail: supportEmail
+        supportEmail: supportEmail,
+        t: tFn
     })
 }) %>
