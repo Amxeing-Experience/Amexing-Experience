@@ -467,7 +467,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     // Refresh local data and re-render the status row.
                     reservationData.quoteStatus = newStatus;
                     const quoteBadge = getQuoteStatusBadge(reservationData.quoteStatus);
-                    const reservationBadge = getReservationStatusBadge(reservationData.status);
+                    const reservationBadge = getReservationOverallStatusBadge(reservationData.status);
                     document.getElementById('infoStatus').innerHTML = `${quoteBadge} ${reservationBadge}`;
                     wireQuoteStatusDropdown();
                 } catch (err) {
@@ -490,6 +490,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         };
         const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
         return `<span class="badge ${s.cls}" title="Estado operacional de reservación">${s.label}</span>`;
+    }
+
+    // Estado GENERAL de la reservación: mismo modelo (y colores) que el segmented
+    // control en el detalle de cotización. 'assigned'/'in_progress' = Confirmada
+    // (definición del negocio: todo asignado = confirmada). No usar por-servicio.
+    function getReservationOverallStatusBadge(status) {
+        const map = {
+            hold: { label: 'Bloqueado', cls: 'bg-warning text-dark' },
+            pending: { label: 'Asignaciones pendientes', cls: 'bg-info text-white' },
+            assigned: { label: 'Confirmada', cls: 'bg-primary text-white' },
+            in_progress: { label: 'Confirmada', cls: 'bg-primary text-white' },
+            confirmed: { label: 'Confirmada', cls: 'bg-primary text-white' },
+            completed: { label: 'Finalizada', cls: 'bg-success text-white' },
+            cancelled: { label: 'Cancelada', cls: 'bg-danger text-white' },
+        };
+        const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}" title="Estado de la reservación">${s.label}</span>`;
     }
 
     function formatDate(dateStr) {
@@ -582,7 +599,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         const quoteBadge = getQuoteStatusBadge(d.quoteStatus);
-        const reservationBadge = getReservationStatusBadge(d.status);
+        const reservationBadge = getReservationOverallStatusBadge(d.status);
         document.getElementById('infoStatus').innerHTML = `${quoteBadge} ${reservationBadge}`;
         wireQuoteStatusDropdown();
         document.getElementById('infoCreatedAt').textContent = formatDate(d.createdAt);

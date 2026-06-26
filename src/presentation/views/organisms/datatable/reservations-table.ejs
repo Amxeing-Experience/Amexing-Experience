@@ -421,6 +421,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 responsivePriority: 1,  // High priority - always show
                 render: function(data, type, row) {
                     const quoteBadge = getQuoteStatusBadge(row.quoteStatus);
+                    // Solo admin ve el estado operativo de la reserva; department managers
+                    // y agentes ven únicamente el estado de la cotización.
+                    const canSeeReservationStatus = <%= (typeof basePath !== 'undefined' && basePath === 'admin') ? 'true' : 'false' %>;
+                    if (!canSeeReservationStatus) {
+                        return quoteBadge;
+                    }
                     const reservationBadge = getReservationStatusBadge(row.status);
                     return `${quoteBadge} ${reservationBadge}`;
                 }

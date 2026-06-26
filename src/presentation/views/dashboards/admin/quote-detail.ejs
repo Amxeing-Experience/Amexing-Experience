@@ -16,7 +16,7 @@ const resStatusRaw = typeof reservationStatus !== 'undefined' ? reservationStatu
 const resSegMap = {
     hold: 'hold',
     pending: 'pending',
-    assigned: 'pending',      // todo asignado pero aún sin Confirmar → sigue en "pendientes"
+    assigned: 'confirmed',    // todo asignado = Confirmada (definición del negocio)
     confirmed: 'confirmed',
     in_progress: 'confirmed',
     completed: 'completed',
