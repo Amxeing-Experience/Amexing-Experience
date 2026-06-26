@@ -690,7 +690,7 @@
             // Greeter (transporte, tours y a-disposición)
             if ((service.type === 'tour' || service.type === 'transport' || service.type === 'a-disposicion') && service.includeGreeter) {
                 const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
-                html += `<div class="service-detail-item text-info mt-1">
+                html += `<div class="service-detail-item mt-1" style="color: #8a9aa8;">
                     <i class="ti ti-users me-1"></i>
                     <strong>Incluye Greeter + Driver${greeterLocation}</strong>
                 </div>`;
@@ -1066,9 +1066,11 @@
                 if (hasVehicle) {
                     const vehicleName = this.getVehicleDisplayName(service);
                     const segmentName = this.getMainSegmentSuffix(service);
+                    const mainWaitingTxt = service.type === 'transport' && service.waitingTimeHours > 0
+                        ? ` <span style="color: #c4a747;"><i class="ti ti-clock me-1"></i>${service.waitingTimeHours}h espera</span>` : '';
                     html += `<div style="margin-left: 20px;">
                         <strong>${vehicleName}</strong>${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` :
-                            service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}${segmentName}
+                            service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}${segmentName}${mainWaitingTxt}
                     </div>`;
                 }
 
@@ -1090,8 +1092,10 @@
                         const cleanSegName = segName && segName !== v.segment ? segName : '';
                         const segColor = (v && v.segmentColor) || (v && v.segment ? this.getCategoryColorFromCache(v.segment) : '');
                         const chip = cleanSegName ? ` - ${this.renderSegmentChip(cleanSegName, segColor)}` : '';
+                        const wh = parseFloat(v && v.waitingHours) || 0;
+                        const waitingTxt = wh > 0 ? ` <span style="color: #c4a747;"><i class="ti ti-clock me-1"></i>${wh}h espera</span>` : '';
                         html += `<div style="margin-left: 20px; margin-top: 4px;">
-                            <strong>${name}</strong>${chip}
+                            <strong>${name}</strong>${chip}${waitingTxt}
                         </div>`;
                     });
                 }
@@ -1103,7 +1107,7 @@
                 const guideLabel = service.type === 'a-disposicion'
                     ? 'Incluye Chofer'
                     : (service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía');
-                html += `<div class="service-detail-item text-success mt-1">
+                html += `<div class="service-detail-item mt-1" style="color: #7a7f6b;">
                     <i class="ti ti-user me-1"></i>
                     <strong>${guideLabel}</strong>
                 </div>`;
@@ -1112,19 +1116,13 @@
             // Greeter
             if (service.includeGreeter) {
                 const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
-                html += `<div class="service-detail-item text-info mt-1">
+                html += `<div class="service-detail-item mt-1" style="color: #8a9aa8;">
                     <i class="ti ti-users me-1"></i>
                     <strong>Incluye Greeter + Driver${greeterLocation}</strong>
                 </div>`;
             }
 
-            // Waiting time
-            if (service.waitingTimeHours > 0) {
-                html += `<div class="service-detail-item text-warning mt-1">
-                    <i class="ti ti-clock me-1"></i>
-                    <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
-                </div>`;
-            }
+            // Tiempo de espera: ahora se muestra inline junto a cada vehículo (principal + adicionales).
 
             html += '</div>'; // service-details
             html += '</div>'; // service-info
