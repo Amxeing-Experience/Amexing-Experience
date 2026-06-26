@@ -13956,17 +13956,21 @@ class ItineraryBuilder {
         <small class="text-muted extra-list-price d-block"></small>
       </div>
       <div class="col-md-4">
-        <div class="d-flex gap-1">
-          <div class="input-group input-group-sm" style="flex: 1 1 0;">
-            <input type="number" min="0" step="0.5" value="0" class="form-control form-control-sm extra-waiting-input" placeholder="0">
-            <span class="input-group-text">h</span>
+        <div class="row g-1">
+          <div class="col-5">
+            <div class="input-group input-group-sm">
+              <input type="number" min="0" step="0.5" value="0" class="form-control form-control-sm extra-waiting-input" placeholder="0">
+              <span class="input-group-text">h</span>
+            </div>
           </div>
-          <div class="input-group input-group-sm" style="flex: 1 1 0;">
-            <span class="input-group-text">$</span>
-            <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-waiting-price" placeholder="0.00" title="Tarifa por hora (editable)">
+          <div class="col-7">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">$</span>
+              <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-waiting-price" placeholder="0.00" title="Tarifa por hora (editable)">
+            </div>
+            <small class="text-muted extra-waiting-rate d-block"></small>
           </div>
         </div>
-        <small class="text-muted extra-waiting-rate d-block"></small>
       </div>
       <div class="col-md-1 text-end">
         <button type="button" class="btn btn-sm btn-outline-danger remove-extra-additional-vehicle-btn" title="Quitar">
