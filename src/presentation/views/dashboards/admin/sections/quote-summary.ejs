@@ -69,8 +69,8 @@ const e = __isRes ? 'reservación' : 'cotización';
     .public-header h1 {
         background: #969b81;
         color: white;
-        font-size: 1.2rem;
-        font-weight: 400;
+        font-size: calc(1.2rem + 1px);
+        font-weight: 600;
         letter-spacing: 0.3rem;
         text-transform: uppercase;
         padding: 0.75rem;
@@ -337,8 +337,8 @@ const e = __isRes ? 'reservación' : 'cotización';
         margin-top: 0.5rem;
     }
     .sm-totals-grand {
-        /* font-weight: 700; */
-        font-size: 1.1rem;
+        font-weight: 600;
+        font-size: calc(1.1rem + 1px);
         color: #212529;
         padding: 0.75rem;
         border: 2px solid #969b81;
@@ -521,6 +521,9 @@ const e = __isRes ? 'reservación' : 'cotización';
         padding: 15px !important;
         font-size: 0.95rem !important;
         page-break-inside: avoid;
+        /* Keep the following "THANK YOU" attached so it can't be orphaned. */
+        break-after: avoid;
+        page-break-after: avoid;
     }
 
     .pdf-export-mode .sm-section-title {
@@ -532,6 +535,10 @@ const e = __isRes ? 'reservación' : 'cotización';
         padding: 15px !important;
         font-size: 0.8rem !important;
         page-break-inside: avoid;
+        /* Glue the "THANK YOU" to the totals card above it so it never lands
+           alone on its own page — if it doesn't fit, both move together. */
+        break-before: avoid;
+        page-break-before: avoid;
     }
 
     /* Keep the quote-info fields on a single row in the PDF (the narrow render

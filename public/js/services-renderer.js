@@ -329,20 +329,26 @@
                         display: none !important;
                     }
 
-                    /* ===== PDF pagination (section-per-day strategy) =====
-                       Per stakeholder request: prefer whole, readable sections over
-                       compact pages — even if that leaves blank space at the bottom of a
-                       page, that reads better than an arbitrary mid-content cut.
-                       - Each day starts on a fresh page (except the first, which flows
-                         right under the header / client info).
-                       - A single service is never split across pages. Assignments are
-                         hidden from the PDF (below), so services stay short enough that
-                         break-inside:avoid is always physically honorable.
-                       Scoped to .pdf-export-mode (added to <body> by PdfRenderService)
+                    /* ===== PDF pagination (pack-by-day, height-aware) =====
+                       El objetivo: empacar días juntos PERO sin partir un día que cabe
+                       completo en una hoja, y sin dejar la primera hoja en blanco por un
+                       día muy alto.
+                       - Un día que cabe en una hoja lleva la clase .pdf-keep-whole (la
+                         agrega PdfRenderService midiendo la altura real justo antes de
+                         exportar) → break-inside: avoid lo mantiene entero; si no cabe en
+                         lo que resta, salta entero a la hoja siguiente.
+                       - Un día más alto que una hoja (muchos servicios) NO lleva esa clase,
+                         así fluye desde donde va y el navegador lo parte ENTRE servicios
+                         (cada service-item tiene break-inside: avoid → un servicio nunca se
+                         corta a la mitad). Esto evita la hoja en blanco que provocaba forzar
+                         break-inside: avoid en TODO .day-card.
+                       - El banner del día (day-header) nunca queda huérfano: break-after:
+                         avoid lo mantiene pegado a su contenido.
+                       Scoped to .pdf-export-mode (added to <body> when ?pdf=1)
                        so on-screen rendering is untouched. */
-                    .pdf-export-mode .day-card + .day-card {
-                        break-before: page;
-                        page-break-before: always;
+                    .pdf-export-mode .day-card.pdf-keep-whole {
+                        break-inside: avoid;
+                        page-break-inside: avoid;
                     }
                     .pdf-export-mode .service-item,
                     .pdf-export-mode .day-footer {

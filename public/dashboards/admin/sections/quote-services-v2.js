@@ -1115,6 +1115,7 @@ class ItineraryBuilder {
       const handler = () => {
         clearSuggestedEdited(suggestedId);
         this.updateSuggestedDepartureTime();
+        this.updateRoundTripArrivalEstimates();
       };
       el.addEventListener('change', handler);
       el.addEventListener('input', () => { if (/^\d{2}:\d{2}$/.test(el.value)) handler(); });
@@ -1122,6 +1123,24 @@ class ItineraryBuilder {
     recalcOnFlightTime('flightTime', 'flightDepartureTimeSuggested');
     recalcOnFlightTime('roundTripTimeIda', 'roundTripDepartureTimeSuggestedIda');
     recalcOnFlightTime('roundTripTimeVuelta', 'roundTripDepartureTimeSuggestedVuelta');
+
+    // "Hora de salida sugerida": Confirmar la deja fija como hora de pick-up; Editar la habilita.
+    const setupSuggestedConfirm = (fieldId, confirmBtnId, editBtnId, confirmedHintId) => {
+      const field = document.getElementById(fieldId);
+      const hint = document.getElementById(confirmedHintId);
+      document.getElementById(confirmBtnId)?.addEventListener('click', () => {
+        if (field) { field.readOnly = true; field.dataset.userEdited = '1'; field.dataset.confirmed = '1'; }
+        hint?.classList.remove('d-none');
+        this.serviceModified = true;
+      });
+      document.getElementById(editBtnId)?.addEventListener('click', () => {
+        if (field) { field.readOnly = false; field.dataset.userEdited = '1'; delete field.dataset.confirmed; field.focus(); }
+        hint?.classList.add('d-none');
+        this.serviceModified = true;
+      });
+    };
+    setupSuggestedConfirm('flightDepartureTimeSuggested', 'confirmFlightDepartureBtn', 'editFlightDepartureBtn', 'flightDepartureConfirmedHint');
+    setupSuggestedConfirm('roundTripDepartureTimeSuggestedVuelta', 'confirmRoundTripDepartureVueltaBtn', 'editRoundTripDepartureVueltaBtn', 'roundTripDepartureVueltaConfirmedHint');
 
     // Editar a mano la duración de ruta → recalcular guía/greeter, desglose y hora de salida
     // sugerida (getRouteDurationMinutes toma este campo como prioridad).
@@ -2901,7 +2920,11 @@ class ItineraryBuilder {
     // que el auto-cálculo vuelva a llenar en un servicio nuevo).
     ['flightDepartureTimeSuggested', 'roundTripDepartureTimeSuggestedIda', 'roundTripDepartureTimeSuggestedVuelta'].forEach((id) => {
       const sf = document.getElementById(id);
-      if (sf) delete sf.dataset.userEdited;
+      if (sf) { delete sf.dataset.userEdited; delete sf.dataset.confirmed; sf.readOnly = true; }
+    });
+    // Ocultar los hints de "confirmada como hora de pick-up" (clean slate por servicio nuevo).
+    ['flightDepartureConfirmedHint', 'roundTripDepartureVueltaConfirmedHint'].forEach((id) => {
+      document.getElementById(id)?.classList.add('d-none');
     });
 
     // Clear round trip fields
@@ -2979,15 +3002,56 @@ class ItineraryBuilder {
   // For point transfers (local & punto a punto), recompute the estimated arrival
   // = start + route duration (x2 when round trip). No-op for other types.
   updateTransferArrivalEstimate() {
+    // Round-trip (local/punto-a-punto) tiene su llegada estimada por pierna (Ida + Vuelta).
+    this.updateRoundTripArrivalEstimates();
     const type = document.querySelector('input[name="transportType"]:checked')?.value;
     if (type !== 'local' && type !== 'punto-a-punto') return;
     const startInput = document.getElementById('transportStartTime');
     const endInput = document.getElementById('transportEndTime');
     if (!startInput || !endInput) return;
     const routeMinutes = this.getRouteDurationMinutes();
-    const totalMinutes = routeMinutes ? routeMinutes * (this.isRoundTrip() ? 2 : 1) : 0;
+    const isRT = this.isRoundTrip();
+    const totalMinutes = routeMinutes ? routeMinutes * (isRT ? 2 : 1) : 0;
     const arrival = this.addMinutesToTime(startInput.value, totalMinutes);
     if (arrival) endInput.value = arrival;
+    // Small text: duración de ruta con la que se estima la hora de llegada.
+    const hintEl = document.getElementById('transportArrivalDurationHint');
+    if (hintEl) {
+      if (routeMinutes > 0) {
+        const base = `Duración de ruta: ${this.formatMinutesToHoursAndMinutes(routeMinutes)}`;
+        hintEl.textContent = isRT
+          ? `${base} (×2 ida y vuelta = ${this.formatMinutesToHoursAndMinutes(totalMinutes)})`
+          : base;
+      } else {
+        hintEl.textContent = 'Sin duración de ruta; selecciona origen y destino.';
+      }
+    }
+  }
+
+  // Round-trip local/punto-a-punto: llegada estimada por pierna = hora de la pierna + duración de ruta.
+  // Solo lectura; el small muestra la duración de ruta usada. Se oculta en aeropuerto.
+  updateRoundTripArrivalEstimates() {
+    const type = document.querySelector('input[name="transportType"]:checked')?.value;
+    const show = (type === 'local' || type === 'punto-a-punto');
+    const routeMinutes = this.getRouteDurationMinutes();
+    const legs = [
+      { timeId: 'roundTripTimeIda', arrId: 'roundTripArrivalIda', hintId: 'roundTripArrivalIdaHint', rowId: 'roundTripArrivalIdaRow' },
+      { timeId: 'roundTripTimeVuelta', arrId: 'roundTripArrivalVuelta', hintId: 'roundTripArrivalVueltaHint', rowId: 'roundTripArrivalVueltaRow' },
+    ];
+    legs.forEach((leg) => {
+      const row = document.getElementById(leg.rowId);
+      if (row) row.classList.toggle('d-none', !show);
+      if (!show) return;
+      const timeVal = document.getElementById(leg.timeId)?.value;
+      const arrInput = document.getElementById(leg.arrId);
+      const hintEl = document.getElementById(leg.hintId);
+      if (arrInput) arrInput.value = routeMinutes ? (this.addMinutesToTime(timeVal, routeMinutes) || '') : '';
+      if (hintEl) {
+        hintEl.textContent = routeMinutes > 0
+          ? `Duración de ruta: ${this.formatMinutesToHoursAndMinutes(routeMinutes)}`
+          : 'Sin duración de ruta; selecciona origen y destino.';
+      }
+    });
   }
 
   // Parses an "HH:MM" (24h) string into minutes since midnight, or null.
@@ -3407,13 +3471,13 @@ class ItineraryBuilder {
       if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Recoger';
     }
 
-    // "Hora de salida sugerida" de la vuelta: NO aplica en local (la vuelta es "Recoger");
-    // sí aplica en aeropuerto / punto-a-punto (la vuelta es la salida). Se oculta y limpia en local.
+    // "Hora de salida sugerida" de la vuelta: SOLO aplica en aeropuerto. En local y punto-a-punto
+    // se usa la "Hora estimada de llegada" por pierna, así que se oculta y limpia aquí.
     const vueltaSuggestedRow = document.getElementById('roundTripDepartureTimeSuggestedVueltaRow');
     if (vueltaSuggestedRow) {
-      const isLocalRoundTrip = transportType === 'local';
-      vueltaSuggestedRow.classList.toggle('d-none', isLocalRoundTrip);
-      if (isLocalRoundTrip) {
+      const hideSuggested = transportType !== 'aeropuerto';
+      vueltaSuggestedRow.classList.toggle('d-none', hideSuggested);
+      if (hideSuggested) {
         const vueltaSuggestedField = document.getElementById('roundTripDepartureTimeSuggestedVuelta');
         if (vueltaSuggestedField) vueltaSuggestedField.value = '';
       }
