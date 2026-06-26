@@ -575,7 +575,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const quoteLink = document.getElementById('infoQuoteLink');
         if (d.quoteId) {
-            quoteLink.href = `/dashboard/admin/quotes/${d.quoteId}`;
+            // Abrimos desde una reservación → activamos la bandera de contexto para que
+            // el detalle muestre títulos/estado como "Reservación".
+            quoteLink.href = `/dashboard/admin/quotes/${d.quoteId}?context=reservation`;
             quoteLink.textContent = d.quoteFolio;
         }
 
