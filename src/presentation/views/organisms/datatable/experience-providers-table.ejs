@@ -22,27 +22,25 @@ const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 %>
 
+<!-- Barra superior: botón Nuevo a la derecha (sobre el detalle) -->
+<% if (canCreate) { %>
+    <div class="d-flex justify-content-end mb-3">
+        <button type="button" class="btn btn-sm text-white" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%);" id="createProviderBtn">
+            <i class="ti ti-plus me-1"></i>Nuevo Proveedor
+        </button>
+    </div>
+<% } %>
+
 <!-- Bandeja master-detail: lista de proveedores (izquierda) + detalle inline (derecha) -->
 <div class="row g-3 provider-inbox">
     <!-- Columna lista (master) -->
     <div class="col-lg-5 col-xl-4">
         <div class="card border-0 shadow-sm">
-            <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-                <div class="row align-items-center">
-                    <div class="col">
-                        <h5 class="card-title mb-0 text-white">
-                            <i class="ti ti-building-store me-2"></i>Proveedores
-                        </h5>
-                        <small class="text-white" style="opacity: 0.9;">Gestión de proveedores y partners</small>
-                    </div>
-                    <div class="col-auto">
-                        <% if (canCreate) { %>
-                            <button type="button" class="btn btn-light btn-sm" id="createProviderBtn">
-                                <i class="ti ti-plus me-1"></i>Nuevo
-                            </button>
-                        <% } %>
-                    </div>
-                </div>
+            <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%); border: none;">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-building-store me-2"></i>Proveedores
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Gestión de proveedores y partners</small>
             </div>
 
             <div class="card-body" id="providers-content">
@@ -3710,10 +3708,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 .provider-inbox #<%= dtTableId %> tbody tr.table-active {
     background-color: #ecfdf5;
     box-shadow: inset 3px 0 0 0 #10b981;
-}
-.provider-inbox #providerDetailCard {
-    position: sticky;
-    top: 1rem;
 }
 .experiencia-acc-header:hover {
     filter: brightness(0.98);
