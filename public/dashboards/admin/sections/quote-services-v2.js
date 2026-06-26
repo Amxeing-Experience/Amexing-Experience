@@ -1230,6 +1230,11 @@ class ItineraryBuilder {
       // Dev breakdown FIRST — the service breakdown reads its line items from it.
       this.updateServicePriceBreakdown();
     });
+    // Tarifa por hora de espera editable (principal): recalcula el desglose al editarla.
+    document.getElementById('waitingTimePrice')?.addEventListener('input', () => {
+      this.serviceModified = true;
+      this.updateServicePriceBreakdown();
+    });
 
     // Preview
     document.getElementById('previewItineraryBtn')?.addEventListener('click', () => this.showPreview());
@@ -2923,6 +2928,8 @@ class ItineraryBuilder {
     // Clear waiting time
     const waitingTimeHours = document.getElementById('waitingTimeHours');
     if (waitingTimeHours) waitingTimeHours.value = 0;
+    const waitingTimePrice = document.getElementById('waitingTimePrice');
+    if (waitingTimePrice) waitingTimePrice.value = '';
     const waitingTimeRate = document.getElementById('waitingTimeRate');
     if (waitingTimeRate) waitingTimeRate.textContent = '';
 
@@ -5115,9 +5122,9 @@ class ItineraryBuilder {
           data.baseVehiclePrice = data.price;
         }
 
-        // Waiting time (Tiempo de espera)
+        // Waiting time (Tiempo de espera) — la tarifa puede ser editada por el usuario.
         data.waitingTimeHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
-        data.waitingTimePricePerHour = this.getWaitingTimePrice()?.pricePerHour || 0;
+        data.waitingTimePricePerHour = this.getEffectiveWaitingHourlyRate();
 
         // Store transport price override flag.
         // The price field holds the per-vehicle base price (the breakdown multiplies it
@@ -6485,10 +6492,14 @@ class ItineraryBuilder {
           // El vehículo principal ya está restaurado: habilitar el botón "Agregar vehículo"
           // (la restauración async no dispara el handler que normalmente lo sincroniza).
           this.syncExtraVehiclesButtonEnabled();
-          // Restore waiting time
+          // Restore waiting time (horas + tarifa editada)
           if (service.waitingTimeHours > 0) {
             const wtHoursField = document.getElementById('waitingTimeHours');
             if (wtHoursField) wtHoursField.value = service.waitingTimeHours;
+          }
+          if (service.waitingTimePricePerHour > 0) {
+            const wtPriceField = document.getElementById('waitingTimePrice');
+            if (wtPriceField) wtPriceField.value = Number(service.waitingTimePricePerHour).toFixed(2);
           }
           this.updateWaitingTimeRateDisplay();
           // Restaurar la duración de ruta guardada en el campo editable (manda sobre el lookup
@@ -10122,11 +10133,9 @@ class ItineraryBuilder {
       let waitingHourlyRate = 0;
 
       if (waitingHours > 0) {
-        const wtPrice = this.getWaitingTimePrice();
-        if (wtPrice) {
-          waitingHourlyRate = wtPrice.pricePerHour;
-          waitingCostEfectivo = waitingHourlyRate * waitingHours;
-        }
+        // Tarifa editable (si el usuario la modificó) o la de catálogo.
+        waitingHourlyRate = this.getEffectiveWaitingHourlyRate();
+        waitingCostEfectivo = waitingHourlyRate * waitingHours;
       }
 
       // Calculate guide costs if applicable
@@ -14337,8 +14346,8 @@ class ItineraryBuilder {
       if (priceCol.parentElement !== transportRow) transportRow.appendChild(priceCol);
       if (waitingCol.parentElement !== transportRow) transportRow.appendChild(waitingCol);
       setMainFieldWidths('col-md-3');
-      priceCol.className = 'col-md-3 mb-3';
-      waitingCol.className = 'col-md-3 mb-3';
+      priceCol.className = 'col-md-2 mb-3';
+      waitingCol.className = 'col-md-4 mb-3';
       waitingCol.classList.remove('d-none');
       // Refrescar la tarifa de lista del waiting al armar el layout (no solo en change).
       this.updateWaitingTimeRateDisplay();
@@ -16468,6 +16477,7 @@ class ItineraryBuilder {
       // ya corre en el listener del segmento), conservando el campo editable.
       this.handleTransportRateSelection(rateId);
       this.updateWaitingTimeRateDisplay();
+      this.autofillWaitingPrice();
       return;
     }
 
@@ -16728,6 +16738,7 @@ class ItineraryBuilder {
       this.recalculateTransportPrice();
       this.updateVehicleCapacityNote();
       this.updateWaitingTimeRateDisplay();
+      this.autofillWaitingPrice();
       return;
     }
 
@@ -18918,16 +18929,32 @@ class ItineraryBuilder {
    * @example
    */
   updateWaitingTimeRateDisplay() {
-    const rateEl = document.getElementById('waitingTimeRate');
-    if (!rateEl) return;
-
     const wtPrice = this.getWaitingTimePrice();
-    if (wtPrice) {
+    const rateEl = document.getElementById('waitingTimeRate');
+    if (rateEl) {
       // Tarifa de lista (catálogo, efectivo) por hora — mismo estilo "Lista: $X" del precio.
-      rateEl.textContent = `Lista: ${this.formatCurrency(wtPrice.pricePerHour)}/hora`;
-    } else {
-      rateEl.textContent = '';
+      rateEl.textContent = wtPrice ? `Lista: ${this.formatCurrency(wtPrice.pricePerHour)}/hora` : '';
     }
+    // Autollenar la tarifa editable con la de catálogo si está vacía (no pisa ediciones del usuario).
+    const priceInput = document.getElementById('waitingTimePrice');
+    if (priceInput && wtPrice && (priceInput.value === '' || priceInput.value === null)) {
+      priceInput.value = Number(wtPrice.pricePerHour).toFixed(2);
+    }
+  }
+
+  /** Resetea la tarifa editable de espera a la de catálogo (al cambiar vehículo/segmento). */
+  autofillWaitingPrice() {
+    const priceInput = document.getElementById('waitingTimePrice');
+    if (!priceInput) return;
+    const wt = this.getWaitingTimePrice();
+    priceInput.value = wt ? Number(wt.pricePerHour).toFixed(2) : '';
+  }
+
+  /** Tarifa de espera efectiva del principal: la editada si existe, si no la de catálogo. */
+  getEffectiveWaitingHourlyRate() {
+    const edited = parseFloat(document.getElementById('waitingTimePrice')?.value);
+    if (Number.isFinite(edited) && edited > 0) return edited;
+    return this.getWaitingTimePrice()?.pricePerHour || 0;
   }
 
   /**
