@@ -1066,9 +1066,11 @@
                 if (hasVehicle) {
                     const vehicleName = this.getVehicleDisplayName(service);
                     const segmentName = this.getMainSegmentSuffix(service);
+                    const mainWaitingTxt = service.type === 'transport' && service.waitingTimeHours > 0
+                        ? ` <span class="text-warning"><i class="ti ti-clock"></i> ${service.waitingTimeHours}h espera</span>` : '';
                     html += `<div style="margin-left: 20px;">
                         <strong>${vehicleName}</strong>${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` :
-                            service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}${segmentName}
+                            service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}${segmentName}${mainWaitingTxt}
                     </div>`;
                 }
 
@@ -1090,8 +1092,10 @@
                         const cleanSegName = segName && segName !== v.segment ? segName : '';
                         const segColor = (v && v.segmentColor) || (v && v.segment ? this.getCategoryColorFromCache(v.segment) : '');
                         const chip = cleanSegName ? ` - ${this.renderSegmentChip(cleanSegName, segColor)}` : '';
+                        const wh = parseFloat(v && v.waitingHours) || 0;
+                        const waitingTxt = wh > 0 ? ` <span class="text-warning"><i class="ti ti-clock"></i> ${wh}h espera</span>` : '';
                         html += `<div style="margin-left: 20px; margin-top: 4px;">
-                            <strong>${name}</strong>${chip}
+                            <strong>${name}</strong>${chip}${waitingTxt}
                         </div>`;
                     });
                 }
@@ -1118,13 +1122,7 @@
                 </div>`;
             }
 
-            // Waiting time
-            if (service.waitingTimeHours > 0) {
-                html += `<div class="service-detail-item text-warning mt-1">
-                    <i class="ti ti-clock me-1"></i>
-                    <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
-                </div>`;
-            }
+            // Tiempo de espera: ahora se muestra inline junto a cada vehículo (principal + adicionales).
 
             html += '</div>'; // service-details
             html += '</div>'; // service-info
