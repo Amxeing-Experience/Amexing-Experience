@@ -29,13 +29,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     <!-- Columna lista (master) -->
     <div class="col-lg-5 col-xl-4">
         <div class="card border-0 shadow-sm h-100">
-            <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-building-store me-2"></i>Proveedores
-                </h5>
-                <small class="text-white" style="opacity: 0.9;">Gestión de proveedores y partners</small>
-            </div>
-
             <div class="card-body" id="providers-content">
                 <table id="<%= dtTableId %>" class="table table-hover provider-inbox-table mb-0" style="width:100%">
                     <thead class="visually-hidden">
