@@ -2113,20 +2113,8 @@ class ItineraryBuilder {
     // Duración estimada de viaje: solo aplica a transporte (one-way y round-trip).
     const routeDurationRow = document.getElementById('routeDurationRow');
 
-    // Show/hide Tiempo de espera section
+    // Show/hide Tiempo de espera section (su posición/ancho los maneja syncMainVehiclePriceLayout).
     const tiempoEsperaSection = document.getElementById('tiempoEsperaSection');
-    // Layout: en transporte el renglón es Precio + Tiempo de espera + Cantidad (3×col-4);
-    // en los demás tipos, Precio + Cantidad (2×col-6). La espera vive junto al precio base.
-    {
-      const servicePriceCol = document.getElementById('servicePriceCol');
-      const serviceQuantityCol = document.getElementById('serviceQuantityCol');
-      const isTransportLayout = type === 'transport';
-      servicePriceCol?.classList.toggle('col-md-4', isTransportLayout);
-      servicePriceCol?.classList.toggle('col-md-6', !isTransportLayout);
-      serviceQuantityCol?.classList.toggle('col-md-4', isTransportLayout);
-      serviceQuantityCol?.classList.toggle('col-md-6', !isTransportLayout);
-      tiempoEsperaSection?.classList.toggle('d-none', !isTransportLayout);
-    }
 
     if (type === 'transport') {
       transportTypeSelector?.classList.remove('d-none');
@@ -14330,16 +14318,44 @@ class ItineraryBuilder {
     const priceCol = document.getElementById('servicePriceCol');
     if (!priceCol) return;
     const stdSection = document.getElementById('standardPricingSection');
-    // Fila destino donde el Precio va junto a Segmento + Vehículo:
-    //  - transporte y tour con traslado → transportFieldsRow
-    //  - a-disposición → aDisposicionVehicleRow
-    //  - demás tipos → de vuelta a standardPricingSection
-    let targetRow = null;
-    if (type === 'transport' || (type === 'tour' && document.getElementById('tourRequiresTransport')?.checked)) {
-      targetRow = document.getElementById('transportFieldsRow');
-    } else if (type === 'a-disposicion') {
-      targetRow = document.getElementById('aDisposicionVehicleRow');
+    const waitingCol = document.getElementById('tiempoEsperaSection');
+    const transportRow = document.getElementById('transportFieldsRow');
+
+    const isTransport = type === 'transport';
+    const isTourTransport = type === 'tour' && document.getElementById('tourRequiresTransport')?.checked;
+
+    // Ancho de las columnas base (Segmento/Vehículo) del transporte.
+    const setMainFieldWidths = (cls) => {
+      document.querySelectorAll('#transportFieldsRow .transport-main-field').forEach((el) => {
+        el.className = `${cls} mb-3 transport-main-field`;
+      });
+    };
+
+    // Solo transporte: el Tiempo de espera viaja junto al Precio dentro de transportFieldsRow,
+    // formando Segmento · Vehículo · Precio · Espera (consistente con las filas de adicionales).
+    if (isTransport && waitingCol && transportRow) {
+      if (priceCol.parentElement !== transportRow) transportRow.appendChild(priceCol);
+      if (waitingCol.parentElement !== transportRow) transportRow.appendChild(waitingCol);
+      setMainFieldWidths('col-md-3');
+      priceCol.className = 'col-md-3 mb-3';
+      waitingCol.className = 'col-md-3 mb-3';
+      waitingCol.classList.remove('d-none');
+      return;
     }
+
+    // Resto de tipos: el Tiempo de espera vuelve a su "home" (standardPricingSection) y se oculta.
+    if (waitingCol) {
+      if (stdSection && waitingCol.parentElement !== stdSection) stdSection.appendChild(waitingCol);
+      waitingCol.classList.add('d-none');
+    }
+    setMainFieldWidths('col-md-4');
+
+    // Fila destino del Precio: tour-con-traslado → transportFieldsRow; a-disposición → su fila;
+    // demás → de vuelta a standardPricingSection.
+    let targetRow = null;
+    if (isTourTransport) targetRow = transportRow;
+    else if (type === 'a-disposicion') targetRow = document.getElementById('aDisposicionVehicleRow');
+
     if (targetRow) {
       if (priceCol.parentElement !== targetRow) targetRow.appendChild(priceCol);
       priceCol.className = 'col-md-4 mb-3';
