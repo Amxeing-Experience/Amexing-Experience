@@ -1193,7 +1193,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Bandeja: sin colapso responsive (interfiere con el click de fila en
             // columna angosta); la lista usa scroll horizontal del wrapper.
             responsive: false,
-            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            // Lista angosta: apila buscador arriba (full width), tabla, y luego
+            // info + paginación, para que los controles no se encimen.
+            dom: '<"mb-2"f>rt<"d-flex flex-wrap justify-content-between align-items-center mt-2 gap-2"ip>',
             drawCallback: function() {
                 const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
                 tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -1239,7 +1241,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
         function closeProviderDetail() {
             $('#providerDetailBody').hide();
-            $('#providerDetailEmpty').show();
+            $('#providerDetailEmpty').removeClass('d-none').addClass('d-flex');
             $(`#${tableId} tbody tr`).removeClass('table-active');
         }
         $('#saveQuickExperienceBtn').on('click', function() { saveQuickExperience(); });
@@ -2904,8 +2906,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
             }
 
-            // Bandeja: mostrar el panel de detalle inline (sin overlay modal)
-            $('#providerDetailEmpty').hide();
+            // Bandeja: mostrar el panel de detalle inline (sin overlay modal).
+            // El estado vacío usa .d-flex (display:flex !important). jQuery .hide()
+            // pondría un inline display:none que pierde contra el !important, y solo
+            // añadir .d-none tampoco basta (en Bootstrap .d-flex va después en el CSS
+            // y gana al tener igual especificidad). Por eso alternamos ambas clases.
+            $('#providerDetailEmpty').removeClass('d-flex').addClass('d-none');
             $('#providerDetailBody').show();
             $('#providerDetailScroll').scrollTop(0);
             // En pantallas donde el panel queda apilado debajo de la lista,
