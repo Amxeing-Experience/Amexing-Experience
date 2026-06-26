@@ -538,13 +538,29 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
 <!-- Template para experiencia editable inline -->
 <template id="experienciaEditableTemplate">
-    <div class="experiencia-editable card mb-3 border-success border-opacity-25" data-index="" data-id="">
+    <div class="experiencia-editable card mb-2 border-success border-opacity-25" data-index="" data-id="">
+        <!-- Cabecera colapsable: resumen siempre visible (click para expandir) -->
+        <div class="card-header experiencia-acc-header d-flex justify-content-between align-items-center gap-2 py-2 px-3" role="button" style="cursor: pointer; background: #f0fdf4;">
+            <span class="d-flex align-items-center gap-2 text-truncate">
+                <i class="ti ti-chevron-right experiencia-acc-chevron text-success" style="transition: transform .15s ease;"></i>
+                <span class="fw-semibold text-success experiencia-acc-title text-truncate">Nueva experiencia</span>
+                <span class="badge bg-light text-success border experiencia-acc-tipo d-none"></span>
+            </span>
+            <span class="d-flex align-items-center gap-2 flex-shrink-0">
+                <span class="fw-semibold text-success small experiencia-acc-price"></span>
+                <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn experiencia-acc-delete" title="Eliminar experiencia">
+                    <i class="ti ti-trash"></i>
+                </button>
+            </span>
+        </div>
+        <!-- Cuerpo editable: colapsado por defecto (difiere la descarga de fotos) -->
+        <div class="experiencia-acc-body" style="display: none;">
         <div class="card-body p-3">
             <!-- Fila principal: Nombre y Tipo -->
             <div class="row mb-2">
-                <div class="col-md-7">
+                <div class="col-md-8">
                     <label class="form-label form-label-sm fw-medium text-success">Nombre <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control experiencia-name-input" required maxlength="200" 
+                    <input type="text" class="form-control experiencia-name-input" required maxlength="200"
                            placeholder="Ej: Tour Centro Histórico">
                 </div>
                 <div class="col-md-4">
@@ -555,11 +571,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <option value="Compartido">Compartido</option>
                         <option value="Privado">Privado</option>
                     </select>
-                </div>
-                <div class="col-md-1 d-flex align-items-end">
-                    <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn w-100" title="Eliminar experiencia">
-                        <i class="ti ti-trash"></i>
-                    </button>
                 </div>
             </div>
             
@@ -875,6 +886,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <!-- Indicador de validez -->
             <div class="validation-feedback" style="display: none;"></div>
         </div>
+        </div><!-- /.experiencia-acc-body -->
     </div>
 </template>
 
@@ -1433,7 +1445,77 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const index = $(this).closest('.experiencia-editable').data('index');
             deleteExperiencia(index);
         });
-        
+
+        // ========== SUBEXPERIENCIA ACCORDION (collapse/expand) ==========
+        // Each subexperiencia renders collapsed, showing only a summary header
+        // (name / price / tipo). Clicking the header expands the full editable
+        // body. Photos use loading="lazy" + a display:none body, so their
+        // network fetch is deferred until the card is actually expanded.
+        function syncExperienciaHeader(cardEl, exp) {
+            const el = cardEl && cardEl.jquery ? cardEl[0] : cardEl;
+            if (!el) return;
+            const nameVal = exp ? (exp.name || '') : (el.querySelector('.experiencia-name-input')?.value || '');
+            const priceRaw = exp ? exp.price : el.querySelector('.experiencia-price-input')?.value;
+            const tipoVal = exp ? (exp.tipo || '') : (el.querySelector('.experiencia-tipo-input')?.value || '');
+
+            const titleEl = el.querySelector('.experiencia-acc-title');
+            if (titleEl) titleEl.textContent = (nameVal && nameVal.trim()) ? nameVal.trim() : 'Nueva experiencia';
+
+            const priceEl = el.querySelector('.experiencia-acc-price');
+            if (priceEl) {
+                const n = parseFloat(priceRaw);
+                priceEl.textContent = (!isNaN(n) && n > 0) ? ('$' + n.toLocaleString('es-MX')) : '';
+            }
+
+            const tipoEl = el.querySelector('.experiencia-acc-tipo');
+            if (tipoEl) {
+                if (tipoVal) { tipoEl.textContent = tipoVal; tipoEl.classList.remove('d-none'); }
+                else { tipoEl.textContent = ''; tipoEl.classList.add('d-none'); }
+            }
+        }
+
+        function expandExperienciaCard(cardEl) {
+            const el = cardEl && cardEl.jquery ? cardEl[0] : cardEl;
+            if (!el) return;
+            const body = el.querySelector('.experiencia-acc-body');
+            const chevron = el.querySelector('.experiencia-acc-chevron');
+            if (body && getComputedStyle(body).display === 'none') {
+                $(body).slideDown(150);
+                if (chevron) chevron.style.transform = 'rotate(90deg)';
+                el.classList.add('experiencia-expanded');
+            }
+        }
+
+        function collapseExperienciaCard(cardEl) {
+            const el = cardEl && cardEl.jquery ? cardEl[0] : cardEl;
+            if (!el) return;
+            const body = el.querySelector('.experiencia-acc-body');
+            const chevron = el.querySelector('.experiencia-acc-chevron');
+            if (body && getComputedStyle(body).display !== 'none') {
+                $(body).slideUp(150);
+                if (chevron) chevron.style.transform = 'rotate(0deg)';
+                el.classList.remove('experiencia-expanded');
+            }
+        }
+
+        // Toggle on header click (ignore clicks on the delete button / inputs)
+        $(document).on('click.accSub', '#providerExperienciasList .experiencia-acc-header', function(e) {
+            if ($(e.target).closest('button, a, input, select, textarea').length) return;
+            const el = this.closest('.experiencia-editable');
+            if (!el) return;
+            const body = el.querySelector('.experiencia-acc-body');
+            if (body && getComputedStyle(body).display === 'none') expandExperienciaCard(el);
+            else collapseExperienciaCard(el);
+        });
+
+        // Keep the collapsed header summary in sync as the user types
+        $(document).on('input.accSub change.accSub',
+            '#providerExperienciasList .experiencia-name-input, #providerExperienciasList .experiencia-price-input, #providerExperienciasList .experiencia-tipo-input',
+            function() {
+                const el = this.closest('.experiencia-editable');
+                if (el) syncExperienciaHeader(el);
+            });
+
         // Handle real-time validation and saving
         $(document).on('input change', '.experiencia-editable input, .experiencia-editable textarea, .experiencia-editable select', function() {
             const card = $(this).closest('.experiencia-editable');
@@ -1475,7 +1557,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             providerExperiencias.push(experiencia);
             renderExperienciaCard(experiencia, index);
-            
+
+            // A brand-new experiencia starts expanded so the user can fill it in
+            const newCard = document.querySelector(`.experiencia-editable[data-index="${index}"]`);
+            if (newCard) expandExperienciaCard(newCard);
+
             // Focus on the name input of the new card
             setTimeout(() => {
                 $(`.experiencia-editable[data-index="${index}"] .experiencia-name-input`).focus();
@@ -1489,7 +1575,10 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             card.setAttribute('data-index', index);
             card.setAttribute('data-id', experiencia.id || '');
-            
+
+            // Populate the collapsed accordion header summary (name / price / tipo)
+            syncExperienciaHeader(card, experiencia);
+
             // Populate form fields
             card.querySelector('.experiencia-name-input').value = experiencia.name || '';
             card.querySelector('.experiencia-description-input').value = experiencia.description || '';
@@ -3441,8 +3530,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const photoHtml = `
                 <div class="col-4 photo-preview" data-photo-id="${photoId}" data-photo-full='${photoDataJson.replace(/'/g, '&#39;')}'>
                     <div class="position-relative">
-                        <img src="${dataUrl}" 
-                             class="img-fluid rounded border" 
+                        <img src="${dataUrl}" loading="lazy"
+                             class="img-fluid rounded border"
                              style="height: 80px; width: 100%; object-fit: cover;">
                         ${formatBadge}
                         <button type="button" 
