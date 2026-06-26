@@ -2866,6 +2866,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         function loadProviderData(providerId) {
             openProviderModal(true);
 
+            // Carga las experiencias EN PARALELO al fetch del proveedor y muestra el
+            // spinner de inmediato, para que el usuario vea feedback al instante (en
+            // vez de la lista vacía mientras llega el primer request). Antes esto se
+            // disparaba solo tras completar el GET del proveedor (doble espera).
+            if (providerId) loadProviderExperiencias(providerId);
+
             $.ajax({
                 url: `${apiEndpoint}/${providerId}`,
                 type: 'GET',
@@ -2891,11 +2897,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         applyProviderDestino();
                         
                         // Don't set providerType, duration, min_people, or cost for providers
-                        
-                        // Load provider experiencias
-                        if (provider.id) {
-                            loadProviderExperiencias(provider.id);
-                        }
+                        // (Las experiencias ya se cargan en paralelo desde loadProviderData)
 
                         // Provider availability has been moved to individual experiencias
                         updateNoDaysMessage();
