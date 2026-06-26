@@ -73,7 +73,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 <div class="modal fade" id="quickAddEstablishmentExperienceModal" tabindex="-1" aria-labelledby="quickAddEstablishmentExperienceModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);">
+            <div class="modal-header" style="background: var(--brand-gradient);">
                 <h5 class="modal-title text-white" id="quickAddEstablishmentExperienceModalLabel">
                     <i class="ti ti-plus me-2"></i>Agregar Experiencia Rápida
                 </h5>
@@ -274,49 +274,19 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <form id="establishmentForm">
                     <input type="hidden" id="establishmentId">
                     <input type="hidden" id="establishmentType" value="Establishment">
+                    <!-- Hidden fields for compatibility -->
+                    <input type="hidden" id="establishmentProviderType" name="providerType" value="">
+                    <input type="hidden" id="establishmentDuration" name="duration" value="">
+                    <input type="hidden" id="establishmentMinPeople" name="min_people" value="">
+                    <input type="hidden" id="establishmentCost" name="cost" value="0">
 
-                    <!-- Nombre -->
-                    <div class="mb-3">
-                        <label for="establishmentName" class="form-label">
-                            Nombre del Establecimiento <span class="text-danger">*</span>
-                        </label>
-                        <input type="text" class="form-control" id="establishmentName" name="name" required maxlength="280" placeholder="Ej: Restaurante Casa de María">
-                        <div class="form-text">Nombre comercial del establecimiento (máximo 200 caracteres)</div>
-                    </div>
-
-                    <!-- Descripción -->
-                    <div class="mb-3">
-                        <label for="establishmentDescription" class="form-label">
-                            Descripción <span class="text-danger">*</span>
-                        </label>
-                        <textarea class="form-control" id="establishmentDescription" name="description" rows="4" required placeholder="Descripción detallada del establecimiento y sus servicios..."></textarea>
-                        <div class="form-text">Descripción completa del establecimiento</div>
-                    </div>
-
-                    <!-- Destino (Optional) -->
-                    <div class="mb-3">
-                        <label for="establishmentDestino" class="form-label">
-                            Destino <small class="text-muted">(Opcional)</small>
-                        </label>
-                        <select class="form-control" id="establishmentDestino" name="destinationPOI">
-                            <option value="">Seleccione un destino...</option>
-                            <!-- Dynamically populated with POI data -->
-                        </select>
-                        <div class="form-text">Punto de interés o destino principal asociado con este establecimiento</div>
-                    </div>
-
-                    <!-- Sección: Experiencias del Establecimiento -->
+                    <!-- Sección: Experiencias del Establecimiento (lo que más se edita: va primero) -->
                     <div class="mb-4">
-                        <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #f59e0b;">
+                        <h6 class="fw-bold text-success border-bottom pb-2 mb-3">
                             <i class="ti ti-sparkles me-1"></i>
                             Experiencias del Establecimiento
                         </h6>
-                        
-                        <div class="alert alert-info" role="alert">
-                            <i class="ti ti-info-circle me-2"></i>
-                            <small>Agregue las diferentes experiencias/servicios que ofrece este establecimiento. Cada experiencia es editable directamente.</small>
-                        </div>
-                        
+
                         <!-- Lista de experiencias editables inline -->
                         <div id="establishmentExperienciasList" class="mb-3">
                             <div id="noEstablishmentExperienciasMessage" class="text-center text-muted py-3 border rounded bg-light">
@@ -325,21 +295,56 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                 <small class="text-muted">Use el botón de abajo para agregar la primera experiencia</small>
                             </div>
                         </div>
-                        
+
                         <!-- Botón para agregar nueva experiencia -->
-                        <button type="button" class="btn btn-sm" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); color: white;" id="addEstablishmentExperienciaBtn">
+                        <button type="button" class="btn btn-sm btn-success" id="addEstablishmentExperienciaBtn">
                             <i class="ti ti-plus me-1"></i>Agregar Nueva Experiencia
                         </button>
                     </div>
 
-                    <!-- Hidden fields for compatibility -->
-                    <input type="hidden" id="establishmentProviderType" name="providerType" value="">
-                    <input type="hidden" id="establishmentDuration" name="duration" value="">
-                    <input type="hidden" id="establishmentMinPeople" name="min_people" value="">
-                    <input type="hidden" id="establishmentCost" name="cost" value="0">
+                    <!-- Información del establecimiento (se da de alta una vez: colapsable) -->
+                    <div class="border-top pt-3">
+                        <button type="button" class="btn btn-link text-decoration-none p-0 fw-bold text-success d-flex align-items-center gap-2" id="toggleEstablishmentInfoBtn">
+                            <i class="ti ti-chevron-right" id="establishmentInfoChevron" style="transition: transform .15s ease;"></i>
+                            <i class="ti ti-building"></i>
+                            Información del establecimiento
+                        </button>
+
+                        <div id="establishmentInfoSection" class="mt-3" style="display: none;">
+                            <!-- Nombre -->
+                            <div class="mb-3">
+                                <label for="establishmentName" class="form-label">
+                                    Nombre del Establecimiento <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" id="establishmentName" name="name" required maxlength="280" placeholder="Ej: Restaurante Casa de María">
+                                <div class="form-text">Nombre comercial del establecimiento (máximo 200 caracteres)</div>
+                            </div>
+
+                            <!-- Descripción -->
+                            <div class="mb-3">
+                                <label for="establishmentDescription" class="form-label">
+                                    Descripción <span class="text-danger">*</span>
+                                </label>
+                                <textarea class="form-control" id="establishmentDescription" name="description" rows="4" required placeholder="Descripción detallada del establecimiento y sus servicios..."></textarea>
+                                <div class="form-text">Descripción completa del establecimiento</div>
+                            </div>
+
+                            <!-- Destino (Optional) -->
+                            <div class="mb-3">
+                                <label for="establishmentDestino" class="form-label">
+                                    Destino <small class="text-muted">(Opcional)</small>
+                                </label>
+                                <select class="form-control" id="establishmentDestino" name="destinationPOI">
+                                    <option value="">Seleccione un destino...</option>
+                                    <!-- Dynamically populated with POI data -->
+                                </select>
+                                <div class="form-text">Punto de interés o destino principal asociado con este establecimiento</div>
+                            </div>
+                        </div>
+                    </div>
                 </form>
-                <button type="button" class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); color: white;" id="saveEstablishmentBtn">
-                    <i class="ti ti-check me-1"></i><span id="saveEstablishmentButtonText">Crear Establecimiento</span>
+                <button type="button" class="btn text-white" style="background: var(--brand-gradient);" id="saveEstablishmentBtn">
+                    <i class="ti ti-device-floppy me-1"></i>Guardar
                 </button>
 </div>
 
@@ -366,12 +371,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <!-- Fila principal: Nombre y Tipo -->
             <div class="row mb-2">
                 <div class="col-md-8">
-                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Nombre <span class="text-danger">*</span></label>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Nombre <span class="text-danger">*</span></label>
                     <input type="text" class="form-control experiencia-name-input" required maxlength="200"
                            placeholder="Ej: Cena Romántica VIP">
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Tipo</label>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Tipo</label>
                     <select class="form-select form-select experiencia-tipo-input">
                         <option value="">Seleccionar</option>
                         <option value="Exclusivo">Exclusivo</option>
@@ -383,7 +388,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             <!-- Descripción -->
             <div class="mb-2">
-                <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Descripción <span class="text-danger">*</span></label>
+                <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Descripción <span class="text-danger">*</span></label>
                 <textarea class="form-control experiencia-description-input" rows="2" required
                           placeholder="Descripción detallada de lo que incluye esta experiencia..."></textarea>
             </div>
@@ -391,7 +396,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <!-- Todos los precios en una fila -->
             <div class="row mb-2">
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Precio Adulto <span class="text-danger">*</span></label>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Precio Adulto <span class="text-danger">*</span></label>
                     <div class="input-group input-group">
                         <span class="input-group-text">$</span>
                         <input type="number" class="form-control experiencia-price-input" required min="0" step="0.01" 
@@ -399,7 +404,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Precio Adulto Sin Alcohol</label>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Precio Adulto Sin Alcohol</label>
                     <div class="input-group input-group">
                         <span class="input-group-text">$</span>
                         <input type="number" class="form-control experiencia-price-no-alcohol-input" min="0" step="0.01" 
@@ -407,7 +412,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Precio Niño</label>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Precio Niño</label>
                     <div class="input-group input-group">
                         <span class="input-group-text">$</span>
                         <input type="number" class="form-control experiencia-price-child-input" min="0" step="0.01" 
@@ -419,7 +424,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <!-- Campos de tiempo en una fila -->
             <div class="row mb-2">
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Duración (hrs)</label>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Duración (hrs)</label>
                     <input type="number" class="form-control experiencia-duration-input" min="0" step="0.5" 
                            placeholder="2.5">
                     <div class="form-text">
@@ -427,7 +432,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Duración Trayecto (min)</label>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Duración Trayecto (min)</label>
                     <input type="number" class="form-control experiencia-travel-duration-input" min="0" step="1" 
                            placeholder="60">
                     <div class="form-text">
@@ -435,7 +440,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Tiempo Anticipación (min)</label>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Tiempo Anticipación (min)</label>
                     <input type="number" class="form-control experiencia-advance-minutes-input" 
                            min="0" step="1" placeholder="1440">
                     <div class="form-text">
@@ -447,12 +452,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <!-- Campos de personas -->
             <div class="row mb-2">
                 <div class="col-md-6">
-                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Mín. Personas</label>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Mín. Personas</label>
                     <input type="number" class="form-control experiencia-min-people-input" min="1" step="1" 
                            placeholder="1">
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">Máx. Personas</label>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Máx. Personas</label>
                     <input type="number" class="form-control experiencia-max-people-input" min="1" step="1" 
                            placeholder="10">
                 </div>
@@ -463,7 +468,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <div class="col-md-6">
                     <!-- Incluye -->
                     <div class="mb-2">
-                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                        <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">
                             Incluye <span class="text-muted">(uno por línea)</span>
                         </label>
                         <textarea class="form-control experiencia-includes-input" 
@@ -478,7 +483,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <div class="col-md-6">
                     <!-- No Incluye -->
                     <div class="mb-2">
-                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                        <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">
                             No incluye <span class="text-muted">(uno por línea)</span>
                         </label>
                         <textarea class="form-control experiencia-notincludes-input" 
@@ -494,7 +499,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
             <!-- Idiomas disponibles -->
             <div class="mb-2">
-                <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">
                     <i class="ti ti-language me-1"></i>Idiomas disponibles <span class="text-muted">(uno por línea)</span>
                 </label>
                 <textarea class="form-control experiencia-languages-input" 
@@ -510,7 +515,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <div class="availability-section">
                 <!-- Availability Summary View (default) -->
                 <div class="availability-summary">
-                    <div class="form-label form-label-sm fw-medium d-flex justify-content-between align-items-center mb-1" style="color: #f59e0b;">
+                    <div class="form-label form-label-sm fw-medium d-flex justify-content-between align-items-center mb-1" style="color: var(--brand-success, #2bb673);">
                         <span class="d-flex align-items-center gap-2 flex-wrap">
                             <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
                             <span class="form-check form-switch mb-0" title='Si se activa, en el detalle muestra "Horarios" en lugar de "Horarios sugeridos" (ej. viñedos).'>
@@ -518,12 +523,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                 <label class="form-check-label small fw-medium">Horario fijo</label>
                             </span>
                         </span>
-                        <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Configurar horarios" style="color: #f59e0b;">
+                        <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Configurar horarios" style="color: var(--brand-success, #2bb673);">
                             <i class="ti ti-settings"></i>
                         </button>
                     </div>
                     <div class="availability-display bg-light border rounded p-2" style="min-height: 35px;">
-                        <small style="color: #f59e0b;">
+                        <small style="color: var(--brand-success, #2bb673);">
                             <i class="ti ti-check-circle me-1"></i>
                             <span class="availability-status">Disponible todos los días</span>
                         </small>
@@ -532,9 +537,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 
                 <!-- Availability Configuration View (hidden by default) -->
                 <div class="availability-content" style="display: none;">
-                    <label class="form-label form-label-sm fw-medium d-flex justify-content-between align-items-center" style="color: #f59e0b;">
+                    <label class="form-label form-label-sm fw-medium d-flex justify-content-between align-items-center" style="color: var(--brand-success, #2bb673);">
                         <span>Configurar Disponibilidad</span>
-                        <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Cerrar configuración" style="color: #f59e0b;">
+                        <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Cerrar configuración" style="color: var(--brand-success, #2bb673);">
                             <i class="ti ti-x"></i>
                         </button>
                     </label>
@@ -561,7 +566,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             <!-- Fotos de la experiencia -->
             <div class="mb-2">
-                <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">
                     Fotos <span class="text-muted">(Opcional)</span>
                 </label>
                 <div class="experience-photos-container">
@@ -594,7 +599,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <div class="col-md-6">
                     <!-- Notas internas -->
                     <div class="mb-2">
-                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                        <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">
                             <i class="ti ti-notes me-1"></i>Notas internas <span class="text-muted">(Uso interno)</span>
                         </label>
                         <textarea class="form-control experiencia-internal-notes-input" 
@@ -608,7 +613,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     
                     <!-- Notas del proveedor -->
                     <div class="mb-2">
-                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                        <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">
                             <i class="ti ti-building me-1"></i>Notas del establecimiento <span class="text-muted">(Del establecimiento)</span>
                         </label>
                         <textarea class="form-control experiencia-provider-notes-input" 
@@ -624,7 +629,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <div class="col-md-6">
                     <!-- Notas de reserva del cliente -->
                     <div class="mb-2">
-                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                        <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">
                             <i class="ti ti-user me-1"></i>Notas reserva cliente <span class="text-muted">(Visible cliente)</span>
                         </label>
                         <textarea class="form-control experiencia-client-booking-notes-input" 
@@ -638,7 +643,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     
                     <!-- Notas del equipo -->
                     <div class="mb-2">
-                        <label class="form-label form-label-sm fw-medium" style="color: #f59e0b;">
+                        <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">
                             <i class="ti ti-users me-1"></i>Notas del equipo <span class="text-muted">(Operaciones)</span>
                         </label>
                         <textarea class="form-control experiencia-team-notes-input" 
@@ -1275,7 +1280,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 active: true,
                 exists: true
             };
-            
+
+            // Nombre/Descripción (requeridos) viven en la sección colapsable: si
+            // faltan, ábrela para que el usuario los vea y los complete.
+            if (!formData.name || !formData.description) {
+                setEstablishmentInfo(true);
+                showEstablishmentError('Completa el nombre y la descripción del establecimiento.');
+                return;
+            }
+
             // Siempre enviar destinationPOI para poder SETEAR o LIMPIAR el destino:
             // vacío => el backend lo hace unset en update (en create simplemente lo ignora).
             // Antes solo se enviaba cuando había valor, así que no se podía quitar.
@@ -1734,31 +1747,29 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         saveBtn.prop('disabled', false).html(originalText);
                     }
                     
-                    // Bandeja: cerrar el panel de detalle (Chunk C lo cambia a keepOpen).
-                    // Inline con jQuery para no depender del scope de la función.
-                    $('#establishmentDetailBody').hide();
-                    $('#establishmentDetailEmpty').removeClass('d-none').addClass('d-flex');
-                    $('.establishment-inbox table tbody tr').removeClass('table-active');
-                    
-                    console.log('🔍 DEBUGGING: About to reload DataTable after establishment save', {
-                        establishmentId: finalEstablishmentId || 'new',
-                        establishmentName: formData.name,
-                        savedExperiences: {
-                            new: newExps?.length || 0,
-                            existing: existingExps?.length || 0
-                        },
-                        timestamp: new Date().toISOString()
+                    // Bandeja: GUARDAR SIN CERRAR. Recarga las subexperiencias para que
+                    // las nuevas tomen su ID (evita duplicar) preservando las tarjetas
+                    // expandidas y el scroll. La lista se refresca en segundo plano.
+                    dataTable.ajax.reload(null, false);
+
+                    const expandedIdx = [];
+                    $('#establishmentExperienciasList .experiencia-editable').each(function(i) {
+                        if (this.classList.contains('experiencia-expanded')) expandedIdx.push(i);
                     });
-                    
-                    // Reload table
-                    dataTable.ajax.reload(function(json) {
-                        console.log('🔍 DEBUGGING: DataTable reloaded', {
-                            recordsTotal: json.recordsTotal,
-                            recordsFiltered: json.recordsFiltered,
-                            dataLength: json.data?.length,
-                            firstRecord: json.data?.[0]
+                    const $estScroll = $('#establishmentDetailScroll');
+                    const estScrollTop = $estScroll.scrollTop();
+
+                    if (finalEstablishmentId) {
+                        $('#establishmentId').val(finalEstablishmentId);
+                        $('#establishmentModalTitle').text('Editar Establecimiento');
+                        currentModalState = { mode: 'edit', establishmentId: finalEstablishmentId, isOpen: true, sessionId: currentModalState.sessionId };
+                        loadEstablishmentExperiencias(finalEstablishmentId, function() {
+                            const cards = document.querySelectorAll('#establishmentExperienciasList .experiencia-editable');
+                            expandedIdx.forEach(i => { if (cards[i]) expandEstablishmentCard(cards[i]); });
+                            $estScroll.scrollTop(estScrollTop);
                         });
-                    }, false);
+                    }
+                    showSuccessAlert('Cambios guardados');
                 },
                 error: function(xhr) {
                     console.error('❌ Error saving establishment:', xhr);
@@ -1860,6 +1871,36 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 if (el) syncEstablishmentHeader(el);
             });
 
+        // ===== Sección colapsable "Información del establecimiento" =====
+        function setEstablishmentInfo(expanded) {
+            const sec = document.getElementById('establishmentInfoSection');
+            const chev = document.getElementById('establishmentInfoChevron');
+            if (!sec) return;
+            sec.style.display = expanded ? 'block' : 'none';
+            if (chev) chev.style.transform = expanded ? 'rotate(90deg)' : 'rotate(0deg)';
+        }
+        function expandEstablishmentInfo() {
+            const sec = document.getElementById('establishmentInfoSection');
+            const chev = document.getElementById('establishmentInfoChevron');
+            if (sec && sec.style.display === 'none') {
+                $(sec).slideDown(150);
+                if (chev) chev.style.transform = 'rotate(90deg)';
+            }
+        }
+        function collapseEstablishmentInfo() {
+            const sec = document.getElementById('establishmentInfoSection');
+            const chev = document.getElementById('establishmentInfoChevron');
+            if (sec && sec.style.display !== 'none') {
+                $(sec).slideUp(150);
+                if (chev) chev.style.transform = 'rotate(0deg)';
+            }
+        }
+        $(document).on('click.accEst', '#toggleEstablishmentInfoBtn', function() {
+            const sec = document.getElementById('establishmentInfoSection');
+            if (sec && sec.style.display === 'none') expandEstablishmentInfo();
+            else collapseEstablishmentInfo();
+        });
+
         function addEstablishmentExperiencia() {
             const template = document.getElementById('establishmentExperienciaEditableTemplate');
             const clone = template.content.cloneNode(true);
@@ -1912,7 +1953,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 const scheduleHtml = `
                     <div class="day-schedule mb-3 border rounded p-2" data-day="${dayNumber}">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <strong style="color: #f59e0b;">${dayName}</strong>
+                            <strong style="color: var(--brand-success, #2bb673);">${dayName}</strong>
                             <button type="button" class="btn btn-sm btn-outline-danger remove-day-btn" data-day="${dayNumber}">
                                 <i class="ti ti-x"></i>
                             </button>
@@ -2533,15 +2574,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             // Update modal title and button text
             const modalTitle = document.getElementById('establishmentModalTitle');
-            const saveButtonText = document.getElementById('saveEstablishmentButtonText');
-            
-            if (isEdit) {
-                modalTitle.textContent = 'Editar Establecimiento';
-                saveButtonText.textContent = 'Actualizar Establecimiento';
-            } else {
-                modalTitle.textContent = 'Crear Nuevo Establecimiento';
-                saveButtonText.textContent = 'Crear Establecimiento';
-            }
+            if (modalTitle) modalTitle.textContent = isEdit ? 'Editar Establecimiento' : 'Crear Nuevo Establecimiento';
+            // Crear: info del establecimiento abierta (hay que llenarla). Editar: colapsada.
+            setEstablishmentInfo(!isEdit);
             
             // Load POI options for Destino selectbox
             loadEstablishmentDestinoOptions();
@@ -2579,7 +2614,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             }
             
             openEstablishmentModal(true, establishmentId);
-            
+
+            // Carga las experiencias EN PARALELO al fetch del establecimiento, para
+            // mostrar el spinner de inmediato (en vez de la lista vacía mientras
+            // llega el primer request). openEstablishmentModal ya dejó el estado en
+            // 'edit' con este id, así que la validación interna pasa.
+            loadEstablishmentExperiencias(establishmentId);
+
             // Show loading state in modal
             $('#establishmentModalAlerts').html(`
                 <div class="alert alert-info">
@@ -2619,11 +2660,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         
                         // Clear loading message
                         $('#establishmentModalAlerts').html('');
-                        
-                        // Load establishment experiences if any
-                        if (establishment.id) {
-                            loadEstablishmentExperiencias(establishment.id);
-                        }
+                        // (Las experiencias ya se cargan en paralelo desde loadEstablishmentData)
                     } else {
                         showEstablishmentError('Formato de respuesta inválido');
                     }
@@ -2641,7 +2678,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         }
 
         // Load establishment experiences
-        function loadEstablishmentExperiencias(establishmentId) {
+        function loadEstablishmentExperiencias(establishmentId, onRendered) {
             if (!establishmentId) return;
             
             console.log('📦 Loading establishment experiences:', establishmentId);
@@ -2701,8 +2738,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         response.data.forEach((exp, index) => {
                             renderEstablishmentExperienciaCard(exp, index);
                         });
-                        
+
                         updateEstablishmentNoExperienciasMessage();
+                        if (typeof onRendered === 'function') {
+                            try { onRendered(); } catch (e) { console.error('onRendered callback error:', e); }
+                        }
                     } else {
                         console.log('ℹ️ No experiences found for establishment');
                     }
@@ -3045,7 +3085,7 @@ function showErrorAlert(message) {
 }
 
 .experience-photos-container:hover {
-    border-color: #f59e0b;
+    border-color: var(--brand-success, #2bb673);
 }
 
 .photo-preview {
@@ -3076,12 +3116,12 @@ function showErrorAlert(message) {
 
 .add-photo-btn {
     transition: all 0.2s ease;
-    border-color: #f59e0b !important;
-    color: #f59e0b !important;
+    border-color: var(--brand-success, #2bb673) !important;
+    color: var(--brand-success, #2bb673) !important;
 }
 
 .add-photo-btn:hover {
-    background-color: #f59e0b !important;
+    background-color: var(--brand-success, #2bb673) !important;
     color: white !important;
     transform: translateY(-1px);
 }
