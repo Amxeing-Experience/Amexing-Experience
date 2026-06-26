@@ -1124,6 +1124,24 @@ class ItineraryBuilder {
     recalcOnFlightTime('roundTripTimeIda', 'roundTripDepartureTimeSuggestedIda');
     recalcOnFlightTime('roundTripTimeVuelta', 'roundTripDepartureTimeSuggestedVuelta');
 
+    // "Hora de salida sugerida": Confirmar la deja fija como hora de pick-up; Editar la habilita.
+    const setupSuggestedConfirm = (fieldId, confirmBtnId, editBtnId, confirmedHintId) => {
+      const field = document.getElementById(fieldId);
+      const hint = document.getElementById(confirmedHintId);
+      document.getElementById(confirmBtnId)?.addEventListener('click', () => {
+        if (field) { field.readOnly = true; field.dataset.userEdited = '1'; field.dataset.confirmed = '1'; }
+        hint?.classList.remove('d-none');
+        this.serviceModified = true;
+      });
+      document.getElementById(editBtnId)?.addEventListener('click', () => {
+        if (field) { field.readOnly = false; field.dataset.userEdited = '1'; delete field.dataset.confirmed; field.focus(); }
+        hint?.classList.add('d-none');
+        this.serviceModified = true;
+      });
+    };
+    setupSuggestedConfirm('flightDepartureTimeSuggested', 'confirmFlightDepartureBtn', 'editFlightDepartureBtn', 'flightDepartureConfirmedHint');
+    setupSuggestedConfirm('roundTripDepartureTimeSuggestedVuelta', 'confirmRoundTripDepartureVueltaBtn', 'editRoundTripDepartureVueltaBtn', 'roundTripDepartureVueltaConfirmedHint');
+
     // Editar a mano la duración de ruta → recalcular guía/greeter, desglose y hora de salida
     // sugerida (getRouteDurationMinutes toma este campo como prioridad).
     ['routeDurationHours', 'routeDurationMinutes'].forEach((id) => {
@@ -2902,7 +2920,11 @@ class ItineraryBuilder {
     // que el auto-cálculo vuelva a llenar en un servicio nuevo).
     ['flightDepartureTimeSuggested', 'roundTripDepartureTimeSuggestedIda', 'roundTripDepartureTimeSuggestedVuelta'].forEach((id) => {
       const sf = document.getElementById(id);
-      if (sf) delete sf.dataset.userEdited;
+      if (sf) { delete sf.dataset.userEdited; delete sf.dataset.confirmed; sf.readOnly = true; }
+    });
+    // Ocultar los hints de "confirmada como hora de pick-up" (clean slate por servicio nuevo).
+    ['flightDepartureConfirmedHint', 'roundTripDepartureVueltaConfirmedHint'].forEach((id) => {
+      document.getElementById(id)?.classList.add('d-none');
     });
 
     // Clear round trip fields

@@ -472,8 +472,13 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <div class="row">
                                         <div class="col-md-12 mb-3" id="flightDepartureTimeSuggestedContainer">
                                             <label for="flightDepartureTimeSuggested" class="form-label" id="flightDepartureTimeSuggestedLabel">Hora de salida sugerida</label>
-                                            <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
-                                            <small class="text-muted">Se calcula automáticamente al seleccionar un segmento; puedes editarla.</small>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off" readonly>
+                                                <button type="button" class="btn btn-outline-success" id="confirmFlightDepartureBtn"><i class="ti ti-check me-1"></i>Confirmar</button>
+                                                <button type="button" class="btn btn-outline-secondary" id="editFlightDepartureBtn"><i class="ti ti-pencil me-1"></i>Editar</button>
+                                            </div>
+                                            <small class="text-muted d-block">Se calcula automáticamente al seleccionar un segmento. Confírmala como hora de pick-up o edítala.</small>
+                                            <small class="text-success d-none d-block mt-1" id="flightDepartureConfirmedHint"><i class="ti ti-check me-1"></i>Confirmada como hora de pick-up</small>
                                             <small class="text-warning d-none d-block mt-1" id="flightDepartureNoRouteWarning"><i class="ti ti-alert-triangle me-1"></i>No se encontró la duración de esta ruta; captura la hora de salida manualmente.</small>
                                         </div>
                                         <!-- Removed Número de Personas field as requested
@@ -692,8 +697,13 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <div class="row" id="roundTripDepartureTimeSuggestedVueltaRow">
                                         <div class="col-md-12 mb-3">
                                             <label for="roundTripDepartureTimeSuggestedVuelta" class="form-label">Hora de salida sugerida</label>
-                                            <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedVuelta" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
-                                            <small class="text-muted">Se calcula automáticamente al seleccionar un segmento; puedes editarla.</small>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedVuelta" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off" readonly>
+                                                <button type="button" class="btn btn-outline-success" id="confirmRoundTripDepartureVueltaBtn"><i class="ti ti-check me-1"></i>Confirmar</button>
+                                                <button type="button" class="btn btn-outline-secondary" id="editRoundTripDepartureVueltaBtn"><i class="ti ti-pencil me-1"></i>Editar</button>
+                                            </div>
+                                            <small class="text-muted d-block">Se calcula automáticamente al seleccionar un segmento. Confírmala como hora de pick-up o edítala.</small>
+                                            <small class="text-success d-none d-block mt-1" id="roundTripDepartureVueltaConfirmedHint"><i class="ti ti-check me-1"></i>Confirmada como hora de pick-up</small>
                                             <small class="text-warning d-none d-block mt-1" id="roundTripDepartureNoRouteWarningVuelta"><i class="ti ti-alert-triangle me-1"></i>No se encontró la duración de esta ruta; captura la hora de salida manualmente.</small>
                                         </div>
                                     </div>
