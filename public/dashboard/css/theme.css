@@ -1,0 +1,212 @@
+/* =============================================================================
+   Amexing Admin — Tema de color centralizado (PRUEBA DE CONCEPTO)
+   -----------------------------------------------------------------------------
+   Objetivo: una sola fuente de verdad para los colores del dashboard.
+   Cambia los tokens del bloque :root de abajo y TODO el admin se re-tematiza
+   (botones, badges, links, fondos, focus, breadcrumb, etc.).
+
+   Por qué este archivo existe:
+   El styles.min.css de Bootstrap viene COMPILADO con hex literales
+   (ej. `.btn-primary { --bs-btn-bg: #1e4db7 }`), por lo que redefinir solo
+   `--bs-primary` no basta. Aquí re-enrutamos las sub-variables de cada
+   componente hacia los tokens de marca, para que un cambio de paleta sea
+   realmente de un solo lugar.
+
+   Cargar SIEMPRE después de styles.min.css y dashboard-custom.css.
+   ============================================================================= */
+
+:root {
+  /* ---------------------------------------------------------------------------
+     PALETA DE MARCA — edita solo esta sección para cambiar todo el tema.
+     (Valores actuales = los de la marca hoy, para que el POC sea no-destructivo.)
+     --------------------------------------------------------------------------- */
+
+  /* Primario — verde salvia de marca */
+  --brand-primary:        #969b81;
+  --brand-primary-rgb:    150, 155, 129;
+  --brand-primary-hover:  #80846e;   /* ~15% más oscuro */
+  --brand-primary-active: #6e7359;   /* ~25% más oscuro */
+  --brand-on-primary:     #ffffff;   /* texto blanco sobre los botones salvia */
+
+  /* Secundario / acentos semánticos */
+  --brand-secondary:      #5a6a85;   /* slate neutro (antes era cian suelto) */
+  --brand-secondary-rgb:  90, 106, 133;
+  --brand-success:        #2bb673;
+  --brand-success-rgb:    43, 182, 115;
+  --brand-info:           #1a97f5;
+  --brand-info-rgb:       26, 151, 245;
+  --brand-warning:        #f6b733;
+  --brand-warning-rgb:    246, 183, 51;
+  --brand-danger:         #e2445c;
+  --brand-danger-rgb:     226, 68, 92;
+
+  /* Gradiente de marca (breadcrumb / headers).
+     Antes era un morado suelto (#667eea→#764ba2) que no casaba con nada. */
+  --brand-gradient: linear-gradient(135deg, #6e7359 0%, #969b81 100%);
+
+  /* ---------------------------------------------------------------------------
+     PUENTE → Bootstrap. No editar normalmente: re-enruta los tokens de BS
+     hacia la paleta de marca de arriba.
+     --------------------------------------------------------------------------- */
+  --bs-primary:            var(--brand-primary);
+  --bs-primary-rgb:        var(--brand-primary-rgb);
+  --bs-secondary:          var(--brand-secondary);
+  --bs-secondary-rgb:      var(--brand-secondary-rgb);
+  --bs-success:            var(--brand-success);
+  --bs-success-rgb:        var(--brand-success-rgb);
+  --bs-info:               var(--brand-info);
+  --bs-info-rgb:           var(--brand-info-rgb);
+  --bs-warning:            var(--brand-warning);
+  --bs-warning-rgb:        var(--brand-warning-rgb);
+  --bs-danger:             var(--brand-danger);
+  --bs-danger-rgb:         var(--brand-danger-rgb);
+
+  --bs-link-color:         var(--brand-primary-active);   /* salvia oscuro: legible sobre blanco */
+  --bs-link-hover-color:   var(--brand-primary-hover);
+
+  /* Variable propia del proyecto usada en spinner y focus del layout */
+  --primary-color:         var(--brand-primary);
+}
+
+/* =============================================================================
+   OVERRIDES POR COMPONENTE
+   Bootstrap leyó hex literales al compilar; aquí re-apuntamos sus sub-vars a
+   los tokens. Misma especificidad que el original + carga posterior = ganan.
+   ============================================================================= */
+
+/* --- Botones sólidos --- */
+.btn-primary {
+  --bs-btn-bg: var(--brand-primary);
+  --bs-btn-border-color: var(--brand-primary);
+  --bs-btn-color: var(--brand-on-primary);
+  --bs-btn-hover-bg: var(--brand-primary-hover);
+  --bs-btn-hover-border-color: var(--brand-primary-hover);
+  --bs-btn-hover-color: var(--brand-on-primary);
+  --bs-btn-active-bg: var(--brand-primary-active);
+  --bs-btn-active-border-color: var(--brand-primary-active);
+  --bs-btn-active-color: var(--brand-on-primary);
+  --bs-btn-disabled-bg: var(--brand-primary);
+  --bs-btn-disabled-border-color: var(--brand-primary);
+  --bs-btn-disabled-color: var(--brand-on-primary);
+}
+.btn-secondary {
+  --bs-btn-bg: var(--brand-secondary);
+  --bs-btn-border-color: var(--brand-secondary);
+  --bs-btn-hover-bg: var(--brand-secondary);
+  --bs-btn-hover-border-color: var(--brand-secondary);
+  --bs-btn-active-bg: var(--brand-secondary);
+  --bs-btn-disabled-bg: var(--brand-secondary);
+  --bs-btn-disabled-border-color: var(--brand-secondary);
+}
+.btn-success { --bs-btn-bg: var(--brand-success); --bs-btn-border-color: var(--brand-success); --bs-btn-disabled-bg: var(--brand-success); --bs-btn-disabled-border-color: var(--brand-success); }
+.btn-info    { --bs-btn-bg: var(--brand-info);    --bs-btn-border-color: var(--brand-info);    --bs-btn-disabled-bg: var(--brand-info);    --bs-btn-disabled-border-color: var(--brand-info); }
+.btn-warning { --bs-btn-bg: var(--brand-warning); --bs-btn-border-color: var(--brand-warning); --bs-btn-disabled-bg: var(--brand-warning); --bs-btn-disabled-border-color: var(--brand-warning); }
+.btn-danger  { --bs-btn-bg: var(--brand-danger);  --bs-btn-border-color: var(--brand-danger);  --bs-btn-disabled-bg: var(--brand-danger);  --bs-btn-disabled-border-color: var(--brand-danger); }
+
+/* --- Botones outline --- */
+.btn-outline-primary {
+  --bs-btn-color: var(--brand-primary-active);   /* salvia oscuro: legible sobre fondo blanco */
+  --bs-btn-border-color: var(--brand-primary);
+  --bs-btn-hover-bg: var(--brand-primary);
+  --bs-btn-hover-border-color: var(--brand-primary);
+  --bs-btn-hover-color: var(--brand-on-primary);
+  --bs-btn-active-bg: var(--brand-primary);
+  --bs-btn-active-border-color: var(--brand-primary);
+  --bs-btn-active-color: var(--brand-on-primary);
+}
+
+/* --- Botones outline semánticos ---
+   Bootstrap los compiló con hex literales (y el "secondary" quedó azulado);
+   aquí los re-enrutamos a los tokens de marca. secondary = slate neutro
+   (para botones tipo "Cancelar"); info/success/danger/warning conservan su
+   significado pero ahora salen de los tokens centralizados. */
+.btn-outline-secondary {
+  --bs-btn-color: var(--brand-secondary);
+  --bs-btn-border-color: var(--brand-secondary);
+  --bs-btn-hover-bg: var(--brand-secondary);
+  --bs-btn-hover-border-color: var(--brand-secondary);
+  --bs-btn-active-bg: var(--brand-secondary);
+  --bs-btn-active-border-color: var(--brand-secondary);
+}
+.btn-outline-info {
+  --bs-btn-color: var(--brand-info);
+  --bs-btn-border-color: var(--brand-info);
+  --bs-btn-hover-bg: var(--brand-info);
+  --bs-btn-hover-border-color: var(--brand-info);
+  --bs-btn-active-bg: var(--brand-info);
+  --bs-btn-active-border-color: var(--brand-info);
+}
+.btn-outline-success {
+  --bs-btn-color: var(--brand-success);
+  --bs-btn-border-color: var(--brand-success);
+  --bs-btn-hover-bg: var(--brand-success);
+  --bs-btn-hover-border-color: var(--brand-success);
+  --bs-btn-active-bg: var(--brand-success);
+  --bs-btn-active-border-color: var(--brand-success);
+}
+.btn-outline-danger {
+  --bs-btn-color: var(--brand-danger);
+  --bs-btn-border-color: var(--brand-danger);
+  --bs-btn-hover-bg: var(--brand-danger);
+  --bs-btn-hover-border-color: var(--brand-danger);
+  --bs-btn-active-bg: var(--brand-danger);
+  --bs-btn-active-border-color: var(--brand-danger);
+}
+.btn-outline-warning {
+  --bs-btn-color: var(--brand-warning);
+  --bs-btn-border-color: var(--brand-warning);
+  --bs-btn-hover-bg: var(--brand-warning);
+  --bs-btn-hover-border-color: var(--brand-warning);
+  --bs-btn-active-bg: var(--brand-warning);
+  --bs-btn-active-border-color: var(--brand-warning);
+}
+
+/* --- Fondos / texto utilitario ---
+   .bg-* y .text-* de BS usan rgba(var(--bs-*-rgb), opacity), así que los
+   tokens *-rgb de :root ya los cubren. Reforzamos por si alguna build vieja
+   bakeó el literal. */
+.bg-primary   { background-color: rgba(var(--brand-primary-rgb),   var(--bs-bg-opacity, 1)) !important; }
+.bg-secondary { background-color: rgba(var(--brand-secondary-rgb), var(--bs-bg-opacity, 1)) !important; }
+.text-primary { color: var(--brand-primary-active) !important; }   /* salvia oscuro para legibilidad */
+
+/* --- Links --- */
+a, .link-primary { color: var(--brand-primary-active); }
+a:hover { color: var(--brand-primary-hover); }
+
+/* --- Badges --- */
+.badge.bg-primary  { background-color: var(--brand-primary) !important; }
+.badge.text-bg-primary { background-color: var(--brand-primary) !important; color: var(--brand-on-primary) !important; }
+
+/* --- Foco de formularios --- */
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 0.2rem rgba(var(--brand-primary-rgb), 0.25);
+}
+
+/* --- Nav / pills activos --- */
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link {
+  background-color: var(--brand-primary);
+}
+
+/* --- Breadcrumb / headers de marca ---
+   El layout usa .breadcrumb-card; aquí lo apuntamos al gradiente de marca. */
+.breadcrumb-card {
+  background: var(--brand-gradient) !important;
+}
+
+/* =============================================================================
+   PARA PROBAR EL TEMA: descomenta este bloque y recarga.
+   Verás cómo TODO el admin cambia de paleta desde un solo lugar.
+   ============================================================================= */
+/*
+:root {
+  --brand-primary:        #1e4db7;
+  --brand-primary-rgb:    30, 77, 183;
+  --brand-primary-hover:  #19409c;
+  --brand-primary-active: #163a8c;
+  --brand-on-primary:     #ffffff;
+  --brand-gradient: linear-gradient(135deg, #1e4db7 0%, #2f6fd6 100%);
+}
+*/

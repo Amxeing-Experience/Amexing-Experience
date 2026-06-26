@@ -15,8 +15,10 @@ include('organisms/landing/cta-contacto-section', { ctaTitle: '¿Listo para tu v
 Created by Denisse Maldonado
 %>
 <%
-const ctaTitleText = typeof ctaTitle !== 'undefined' ? ctaTitle : '¿No encuentras lo que buscas?';
-const ctaBtnText = typeof ctaButtonText !== 'undefined' ? ctaButtonText : 'Contáctanos';
+const ctaTitleText = typeof ctaTitle !== 'undefined' ? ctaTitle
+  : (typeof t !== 'undefined' ? t('pages:cta.title') : '¿No encuentras lo que buscas?');
+const ctaBtnText = typeof ctaButtonText !== 'undefined' ? ctaButtonText
+  : (typeof t !== 'undefined' ? t('pages:cta.button') : 'Contáctanos');
 const ctaBtnHref = typeof ctaButtonHref !== 'undefined' ? ctaButtonHref : '/contacto';
 %>
 
@@ -52,7 +54,7 @@ const ctaBtnHref = typeof ctaButtonHref !== 'undefined' ? ctaButtonHref : '/cont
     font-family: var(--font-arpona);
     font-variant: small-caps;
     font-feature-settings: "smcp";
-    font-size: clamp(1.5rem, 3vw, 2.3rem);
+    font-size: clamp(1.4rem, 2.8vw, 2.2rem); /* -2pt (-0.1rem) */
     font-weight: 400; /* Arpona Regular */
     letter-spacing: 0.12em;
     color: #585757;

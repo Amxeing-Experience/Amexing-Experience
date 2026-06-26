@@ -30,7 +30,7 @@ const initI18n = async () => {
       },
       fallbackLng: 'es',
       supportedLngs: ['es', 'en'],
-      ns: ['translation', 'navbar', 'pages'],
+      ns: ['translation', 'navbar', 'pages', 'faq'],
       defaultNS: 'translation',
       preload: ['es', 'en'],
       saveMissing: false,

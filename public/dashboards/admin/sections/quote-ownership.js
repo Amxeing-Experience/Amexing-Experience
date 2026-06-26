@@ -4,6 +4,25 @@
  * Created by Denisse Maldonado
  */
 
+// Dedup in-flight de GETs idénticos, COMPARTIDO por los módulos de la vista de cotización
+// (este, el builder de servicios y la página). Varios piden /api/quotes/:id a la vez; esto
+// colapsa esas cargas concurrentes en UN request. Se define aquí porque quote-ownership.js es
+// el primer .js compartido por los 3 roles (admin, department_manager, client), así no se
+// duplica en cada shell .ejs. Solo in-flight (se limpia al terminar) -> refetches posteriores
+// siguen frescos. Cada consumidor recibe su propio clone() para conservar su .json()/.text().
+window.amxDedupFetch = window.amxDedupFetch || (function () {
+    const inflight = new Map();
+    return function amxDedupFetch(url, opts) {
+        const o = opts || {};
+        const key = `${o.method || 'GET'}:${url}:${o.body || ''}`;
+        if (!inflight.has(key)) {
+            const p = fetch(url, o).finally(() => inflight.delete(key));
+            inflight.set(key, p);
+        }
+        return inflight.get(key).then((r) => r.clone());
+    };
+})();
+
 class QuoteOwnershipManager {
     constructor(quoteId) {
         this.quoteId = quoteId;
@@ -177,7 +196,9 @@ class QuoteOwnershipManager {
     async loadQuoteData() {
         try {
             console.log('📊 Loading quote data for clientType check:', this.quoteId);
-            const response = await fetch(`/api/quotes/${this.quoteId}`, {
+            // Dedup in-flight: el builder y la página piden el mismo /api/quotes/:id a la vez;
+            // se reusa el request en vuelo en lugar de duplicarlo (fallback a fetch si no está).
+            const response = await (window.amxDedupFetch || fetch)(`/api/quotes/${this.quoteId}`, {
                 headers: {
                     'Authorization': `Bearer ${this.getAccessToken()}`
                 }

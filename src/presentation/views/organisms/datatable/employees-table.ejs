@@ -52,7 +52,7 @@ const roleLabels = {
 %>
 
 <div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: linear-gradient(135deg, #5a6a85 0%, #7a8a9f 100%); border: none;">
+    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
         <div class="row align-items-center">
             <div class="col">
                 <h5 class="card-title mb-0 text-white">
@@ -697,7 +697,7 @@ function openAgentProfile(agentId, agentName) {
                                 <div class="card border-0 shadow-sm mb-3">
                                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                                         <h5 class="mb-0"><i class="ti ti-plane me-2 text-primary"></i>Preferencias de Viaje</h5>
-                                        <button type="button" class="btn btn-sm btn-primary" id="addPreferenceBtn"><i class="ti ti-plus me-1"></i>Agregar Preferencia</button>
+                                        <button type="button" class="btn btn-sm btn-primary" id="addPreferenceBtn"><i class="ti ti-edit me-1"></i>Editar preferencias</button>
                                     </div>
                                     <div class="card-body"><div id="preferencesContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
                                 </div>

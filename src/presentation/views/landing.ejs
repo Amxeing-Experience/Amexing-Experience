@@ -369,6 +369,7 @@ Created by Denisse Maldonado
             position: relative;
             width: 100%;
             margin-top: 4.5rem;
+            padding: 0.75rem 0; /* aire vertical para que el hover-zoom no recorte logos altos */
             overflow: hidden;
             -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
             mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
@@ -1354,10 +1355,12 @@ Created by Denisse Maldonado
             <%
                 // Logos del carrusel. Agrega más empresas aquí y el carrusel crece automáticamente.
                 const logosClientes = [
-                    { name: 'Casa Dragones', url: '#', logo: '/images/casa_dragones.png' },
-                    { name: 'This', url: '#', logo: '/images/this.png' },
-                    { name: 'Avenue', url: '#', logo: '/images/avenue.png' },
-                    { name: 'Maizazul', url: '#', logo: '/images/maiz_azul.png' }
+                    { name: 'Casa Dragones', url: 'https://casadragones.com.mx/visitanos', logo: '/images/casa_dragones.png' },
+                    { name: 'This', url: 'https://www.thistopdestinos.com/', logo: '/images/this.png' },
+                    { name: 'Avenue', url: 'https://www.avenuesanmiguel.com/', logo: '/images/avenue.png' },
+                    { name: 'Maizazul', url: 'https://www.casamaizazul.com/', logo: '/images/maiz_azul.png' },
+                    { name: 'San Miguel Writers Conference', url: 'https://sanmiguelwritersconference.org/', logo: '/images/san_miguel_writers.png' },
+                    { name: 'Casa Proserpina', url: 'https://www.casaproserpinasma.com/', logo: '/images/casa_proserpina.png' }
                 ];
                 // Categorías estáticas que se muestran debajo del carrusel.
                 const categoriasClientes = ['Wedding Planners', 'Agencias de Viajes', 'Hoteles', 'DMCs'];
@@ -1376,6 +1379,7 @@ Created by Denisse Maldonado
                                             class="clientes-confian-section__logo-link"
                                             href="<%= cliente.url %>"
                                             aria-label="Visitar sitio de <%= cliente.name %>"
+                                            <% if (cliente.url && cliente.url !== '#') { %>target="_blank" rel="noopener noreferrer"<% } %>
                                             <% if (copia === 1) { %>aria-hidden="true" tabindex="-1"<% } %>
                                         >
                                             <% if (cliente.logo) { %>
@@ -1579,7 +1583,8 @@ Created by Denisse Maldonado
 
         <%# Footer %>
         <%- include('organisms/landing/landing-footer', {
-            companyInfo: typeof company !== 'undefined' ? company : null
+            companyInfo: typeof company !== 'undefined' ? company : null,
+        req: typeof req !== 'undefined' ? req : null
         }) %>
 
         <%# Scroll to Top Button %>

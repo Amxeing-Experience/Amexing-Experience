@@ -143,6 +143,86 @@ class HomeController {
   }
 
   /**
+   * Renders a provisional Services subpage (Transporte, Tours, Experiencias, Bodas y Eventos).
+   * The view name is injected so a single handler serves every subpage.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware.
+   * @param {string} view - View path to render (e.g. 'servicios/transporte').
+   * @param {string} pageTitle - Title shown in the browser tab.
+   * @returns {Promise<void>} Resolves once the view is rendered.
+   * @example
+   * homeController.servicePage(req, res, next, 'servicios/tours', 'Tours');
+   */
+  async servicePage(req, res, next, view, pageTitle) {
+    try {
+      const currentLang = req.language || 'es';
+      // t fijado al idioma resuelto: req.t queda atado al idioma detectado por
+      // el middleware, antes del changeLanguage de las rutas /en, así que en
+      // esas rutas devolvía español. getFixedT(currentLang) lo corrige.
+      const t = req.i18n && typeof req.i18n.getFixedT === 'function'
+        ? req.i18n.getFixedT(currentLang)
+        : req.t || ((key) => key);
+
+      const data = {
+        title: `${pageTitle} - Amexing Experience`,
+        user: req.session?.user || null,
+        currentPage: 'services',
+        seo: {
+          description: t('pages:services.description'),
+          keywords: t('pages:services.keywords'),
+          author: 'Amexing Experience',
+        },
+        company: this.getCompanyData(),
+        req,
+        t,
+        currentLang,
+      };
+
+      res.render(view, data);
+    } catch (error) {
+      logger.error(`Error rendering service subpage (${view}):`, error);
+      next(error);
+    }
+  }
+
+  /**
+   * Renders the FAQ page (Preguntas Frecuentes) at /recursos/faq.
+   * Two-level accordion: categories -> questions -> answers.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware.
+   * @returns {Promise<void>} Resolves once the view is rendered.
+   * @example
+   * router.get('/recursos/faq', homeController.recursosFaq.bind(homeController));
+   */
+  async recursosFaq(req, res, next) {
+    try {
+      const currentLang = req.language || 'es';
+
+      const data = {
+        title: `${currentLang === 'en' ? 'FAQ' : 'Preguntas Frecuentes'} - Amexing Experience`,
+        user: req.session?.user || null,
+        currentPage: 'faq',
+        seo: {
+          description: 'Preguntas frecuentes sobre los servicios de Amexing Experience.',
+          keywords: 'faq, preguntas frecuentes, ayuda, amexing',
+          author: 'Amexing Experience',
+        },
+        company: this.getCompanyData(),
+        req,
+        t: req.t || ((key) => key),
+        currentLang,
+      };
+
+      res.render('recursos/faq', data);
+    } catch (error) {
+      logger.error('Error rendering FAQ page:', error);
+      next(error);
+    }
+  }
+
+  /**
    * Renders the fleet page (Nuestra Flota).
    * Displays vehicle fleet information and specifications.
    * @param req
@@ -152,20 +232,25 @@ class HomeController {
    */
   async fleet(req, res, next) {
     try {
-      const currentLang = req.language || req.language || 'es';
+      const currentLang = req.language || 'es';
+      // t fijado al idioma resuelto (req.t queda atado al idioma del middleware
+      // antes del changeLanguage de /en/our-fleet).
+      const t = req.i18n && typeof req.i18n.getFixedT === 'function'
+        ? req.i18n.getFixedT(currentLang)
+        : req.t || ((key) => key);
 
       const data = {
-        title: req.t ? req.t('pages:fleet.title') : 'Our Fleet - Amexing Experience',
+        title: t('pages:fleet.title'),
         user: req.session?.user || null,
         currentPage: 'fleet',
         seo: {
-          description: req.t ? req.t('pages:fleet.description') : 'Premium fleet of vehicles',
-          keywords: req.t ? req.t('pages:fleet.keywords') : 'fleet, tesla, premium vehicles',
+          description: t('pages:fleet.description'),
+          keywords: t('pages:fleet.keywords'),
           author: 'Amexing Experience',
         },
         company: this.getCompanyData(),
         req,
-        t: req.t || ((key) => key),
+        t,
         currentLang,
       };
 

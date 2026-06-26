@@ -301,11 +301,14 @@ class ItineraryBuilder {
     const loadingOverlay = document.getElementById('itineraryLoadingOverlay');
 
     try {
-      // Load initial data
-      await this.loadQuoteData();
-
-      // Get client ID for personalized pricing
+      // Get client ID for personalized pricing (viene del DOM #clientId, no del quote).
       this.clientId = this.getClientId();
+
+      // D (carga inicial): arrancamos el fetch+proceso del quote SIN await para solaparlo con el
+      // batch de catálogos. Antes esta era la request más lenta (~4-5 s) y bloqueaba TODO en serie.
+      // processServiceItems se auto-carga lo que necesita (ensureToursCache), y el re-render final
+      // corre después. Se espera (`await quoteReady`) más abajo, antes del re-render/pricing.
+      const quoteReady = this.loadQuoteData();
 
       // Ensure GuideFormulaEvaluator is ready before continuing
       if (typeof GuideFormulaEvaluator !== 'undefined') {
@@ -334,6 +337,10 @@ class ItineraryBuilder {
         this.loadGreeterRateConfiguration(),
         this.loadVehicleRatePrices(),
       ]);
+
+      // Ahora sí esperamos el quote: el re-render y el pricing dependen de los servicios ya
+      // construidos. Su red+proceso se solapó con el batch de arriba (ganamos ~4-5 s en serie).
+      await quoteReady;
 
       // Load pricing rates (exchange, transfer, agency) with auth
       await this.loadPricingRates();
@@ -13153,7 +13160,9 @@ class ItineraryBuilder {
         return;
       }
 
-      const response = await fetch(`/api/quotes/${this.quoteId}`, {
+      // Dedup in-flight: ownership y la página piden el mismo /api/quotes/:id a la vez; esto
+      // reusa el request en vuelo en vez de duplicarlo (fallback a fetch si el helper no está).
+      const response = await (window.amxDedupFetch || fetch)(`/api/quotes/${this.quoteId}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -14070,7 +14079,9 @@ class ItineraryBuilder {
         });
         if (this.clientId) params.append('clientId', this.clientId);
 
-        const res = await fetch(`/api/services/prices-by-route?${params.toString()}`, {
+        // Dedup in-flight: varias filas de vehículo extra del MISMO segmento nuevo cargan a la
+        // vez -> un solo request en vuelo (además del cache transportPriceData/additional ya usado).
+        const res = await (window.amxDedupFetch || fetch)(`/api/services/prices-by-route?${params.toString()}`, {
           headers: { Authorization: `Bearer ${this.getAccessToken() || ''}` },
         });
         if (!res.ok) {
@@ -14371,7 +14382,8 @@ class ItineraryBuilder {
         return;
       }
 
-      const response = await fetch('/api/vehicles', {
+      // lite=1: esta vista no usa imágenes de vehículos -> el backend omite el batch de imágenes + S3.
+      const response = await fetch('/api/vehicles?lite=1', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -14714,7 +14726,8 @@ class ItineraryBuilder {
       }
 
       // Use DataTables format to get all tours
-      const url = '/api/tours?draw=1&start=0&length=1000&search[value]=';
+      // lite=1: esta vista no usa fotos de tours -> el backend omite el N+1 de imágenes por tour.
+      const url = '/api/tours?draw=1&start=0&length=1000&search[value]=&lite=1';
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -14773,8 +14786,10 @@ class ItineraryBuilder {
         return;
       }
 
-      // Load provider experiences using the dedicated provider-experiencias API
-      const response = await fetch('/api/provider-experiencias/all', {
+      // Load provider experiences using the dedicated provider-experiencias API.
+      // Lite: esta vista NO usa las fotos, así el backend omite el procesamiento de fotos (S3) y
+      // manda un payload mucho menor (era ~71KB, el más pesado de la carga inicial).
+      const response = await fetch('/api/provider-experiencias/all?lite=1', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -18375,7 +18390,9 @@ class ItineraryBuilder {
       }
 
       const accessToken = this.getAccessToken();
-      const response = await fetch(`/api/services/prices-by-route?${params.toString()}`, {
+      // Dedup in-flight: colapsa disparos concurrentes idénticos (mismos origen/destino/rate),
+      // p. ej. al restaurar una edición que setea varios campos a la vez. Solo in-flight.
+      const response = await (window.amxDedupFetch || fetch)(`/api/services/prices-by-route?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${accessToken || ''}`,
         },
@@ -18673,7 +18690,9 @@ class ItineraryBuilder {
       const accessToken = this.getAccessToken();
       if (!accessToken) return;
 
-      const response = await fetch('/api/vehicle-rate-prices/all', {
+      // Lite: esta vista solo usa pricePerHour por (vehicleTypeId, rateId) en getWaitingTimePrice,
+      // así el backend omite las consultas a Rate/VehicleType y manda un payload mucho menor.
+      const response = await fetch('/api/vehicle-rate-prices/all?lite=1', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -19019,7 +19038,8 @@ class ItineraryBuilder {
 
         qsDevLog('📡 Fetching from:', apiUrl);
 
-        const response = await fetch(apiUrl, {
+        // Dedup in-flight: colapsa disparos concurrentes idénticos para el mismo segmento/ruta.
+        const response = await (window.amxDedupFetch || fetch)(apiUrl, {
           headers: {
             Authorization: `Bearer ${accessToken || ''}`,
             'Content-Type': 'application/json',
@@ -20315,7 +20335,12 @@ class ItineraryBuilder {
 
     // CRITICAL FIX: Only prefill from quote data for NEW tours, never during edit
     // Check if we're editing an existing service or if restoration is in progress
-    const isEditMode = this.currentServiceId || this.editMode === 'service';
+    // "Edición" = hay un servicio existente cargado (currentServiceId). NO usar editMode==='service'
+    // aquí: openServiceModal lo pone en 'service' tanto al AGREGAR como al editar, así que incluirlo
+    // hacía isEditMode siempre true → el prefill de personas NUNCA corría para servicios nuevos, y
+    // walkingTourPeopleCount se quedaba en su default (1) → se calculaba el tier del grupo más chico
+    // aunque los campos mostraran las personas correctas. La duración default ya usa solo currentServiceId.
+    const isEditMode = !!this.currentServiceId;
     const isRestoringData = this._restoringWalkingTourData === true;
 
     if (this.quoteData && !isEditMode && !isRestoringData) {

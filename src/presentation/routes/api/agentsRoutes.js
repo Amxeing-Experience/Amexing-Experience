@@ -67,6 +67,8 @@ router.put('/:agentId/addresses/:id', requireAdmin, writeOperationsLimiter, clie
 router.delete('/:agentId/addresses/:id', requireAdmin, writeOperationsLimiter, clientProfileController.deleteAddress);
 
 router.get('/:agentId/travel-preferences', requireAdmin, clientProfileController.getTravelPreferences);
+// PUT (no id) replaces the whole preference set in one save (single-form modal).
+router.put('/:agentId/travel-preferences', requireAdmin, writeOperationsLimiter, clientProfileController.saveTravelPreferences);
 router.post('/:agentId/travel-preferences', requireAdmin, writeOperationsLimiter, clientProfileController.createTravelPreference);
 router.put('/:agentId/travel-preferences/:id', requireAdmin, writeOperationsLimiter, clientProfileController.updateTravelPreference);
 router.delete('/:agentId/travel-preferences/:id', requireAdmin, writeOperationsLimiter, clientProfileController.deleteTravelPreference);

@@ -1,0 +1,259 @@
+<%#
+Preguntas Frecuentes (FAQ) — /recursos/faq
+Acordeón de dos niveles: categorías → preguntas → respuestas.
+Contenido en español (provisional; se irá llenando con el cliente).
+
+Created by Denisse Maldonado
+%>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/fonts.css">
+    <link rel="icon" type="image/png" href="/images/heart_black.png">
+
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f2;
+            color: #333;
+            padding-top: 80px; /* navbar fijo */
+        }
+
+        .faq-page {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: clamp(2.5rem, 6vw, 4.5rem) 1.5rem clamp(7.5rem, 15vw, 12rem);
+        }
+
+        /* ---- Título en recuadro ---- */
+        .faq-page__title-box {
+            border: 1px solid #b9bbae;
+            padding: 1.4rem 2rem;
+            text-align: center;
+            max-width: 560px;
+            margin: 0 auto clamp(2.5rem, 5vw, 4rem);
+        }
+
+        .faq-page__title {
+            font-family: var(--font-newsreader), serif;
+            font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-size: clamp(1.9rem, 4vw, 2.6rem); /* +8pt total (+0.4rem) */
+            font-weight: 400;
+            letter-spacing: 0.14em;
+            color: #585757;
+            margin: 0;
+            line-height: 1.1;
+        }
+
+        /* ---- Categoría (barra verde) ---- */
+        .faq-cat {
+            margin-bottom: 0.8rem;
+        }
+
+        .faq-cat:last-child {
+            margin-bottom: 0;
+        }
+
+        .faq-cat__header {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: none;
+            cursor: pointer;
+            background: linear-gradient(180deg, #9ea286 0%, #8d9176 100%);
+            color: #ffffff;
+            border-radius: 22px;
+            padding: 0.85rem 1.8rem;
+            font-family: var(--font-newsreader), serif;
+            font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-size: 1.35rem; /* 27pt (25pt + 2pt) en Illustrator (0.05rem/pt) */
+            letter-spacing: 0.12em;
+            transition: filter 0.25s ease;
+        }
+
+        .faq-cat__header:hover {
+            filter: brightness(1.04);
+        }
+
+        /* cuerpo de la categoría (las preguntas) */
+        .faq-cat__body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.45s ease;
+            /* inset del contenido respecto a la barra verde (izq) + margen derecho */
+            padding: 0 clamp(2rem, 9vw, 7rem) 0 clamp(2rem, 18%, 12rem);
+        }
+
+        .faq-cat.is-open > .faq-cat__body {
+            max-height: 6000px;
+        }
+
+        /* ---- Pregunta ---- */
+        .faq-q {
+            border-bottom: 1px solid #dcdcd6;
+        }
+
+        .faq-q:first-child {
+            margin-top: 1.5rem;
+        }
+
+        .faq-q__header {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            padding: 0.95rem 0 0.95rem clamp(2rem, 8%, 5.5rem);
+            font-family: var(--font-myriad), 'Montserrat', sans-serif;
+            font-size: clamp(0.95rem, 1.4vw, 1.05rem);
+            font-weight: 700;
+            color: #3a3a38;
+            line-height: 1.3;
+        }
+
+        .faq-q__body {
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            padding-left: clamp(3.5rem, 18%, 11rem);
+            transition: max-height 0.4s ease, opacity 0.35s ease, padding 0.35s ease;
+        }
+
+        .faq-q.is-open > .faq-q__body {
+            max-height: 1500px;
+            opacity: 1;
+            padding-bottom: 1.1rem;
+        }
+
+        .faq-q__answer {
+            font-family: var(--font-myriad), 'Montserrat', sans-serif;
+            font-weight: 400;
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: #5a5a52;
+            margin: 0;
+        }
+
+        .faq-q__answer + .faq-q__answer {
+            margin-top: 0.8rem;
+        }
+
+        .faq-cat__empty {
+            font-family: var(--font-newsreader), serif;
+            font-size: 0.9rem;
+            font-style: italic;
+            color: #9a9a90;
+            margin: 1.5rem 0;
+        }
+
+        @media (max-width: 600px) {
+            .faq-cat__body {
+                padding-left: 1.25rem;
+                padding-right: 1.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%# Navigation %>
+    <%- include('../organisms/landing/landing-navigation', {
+        user: typeof user !== 'undefined' ? user : null,
+        currentPage: typeof currentPage !== 'undefined' ? currentPage : 'faq',
+        transparent: false,
+        companyInfo: typeof company !== 'undefined' ? company : null,
+        req: typeof req !== 'undefined' ? req : null,
+        t: typeof t !== 'undefined' ? t : ((key) => key)
+    }) %>
+
+    <%
+        // Contenido del FAQ desde i18n (locales/{es,en}/faq.json). returnObjects
+        // devuelve el árbol de categorías -> preguntas -> respuestas en el idioma actual.
+        const _t = (typeof t !== 'undefined' && t) ? t
+            : ((typeof req !== 'undefined' && req && req.t) ? req.t : function (k) { return k; });
+        let faqCategories = _t('categories', { ns: 'faq', returnObjects: true });
+        if (!Array.isArray(faqCategories)) faqCategories = [];
+        const faqPageTitle = _t('pageTitle', { ns: 'faq' }) || 'Preguntas Frecuentes';
+    %>
+
+    <main class="faq-page">
+        <div class="faq-page__title-box">
+            <h1 class="faq-page__title"><%= faqPageTitle %></h1>
+        </div>
+
+        <div class="faq-accordion" id="faqAccordion">
+            <% faqCategories.forEach(function(cat, catIdx) { %>
+                <div class="faq-cat <%= catIdx === 0 ? 'is-open' : '' %>">
+                    <button type="button" class="faq-cat__header" aria-expanded="<%= catIdx === 0 ? 'true' : 'false' %>">
+                        <%= cat.title %>
+                    </button>
+                    <div class="faq-cat__body">
+                        <% if (cat.questions && cat.questions.length) { %>
+                            <% cat.questions.forEach(function(item, qIdx) { %>
+                                <div class="faq-q <%= (catIdx === 0 && qIdx === 0) ? 'is-open' : '' %>">
+                                    <button type="button" class="faq-q__header" aria-expanded="<%= (catIdx === 0 && qIdx === 0) ? 'true' : 'false' %>">
+                                        <%= item.q %>
+                                    </button>
+                                    <div class="faq-q__body">
+                                        <% (Array.isArray(item.a) ? item.a : [item.a]).forEach(function(p) { %>
+                                            <p class="faq-q__answer"><%= p %></p>
+                                        <% }); %>
+                                    </div>
+                                </div>
+                            <% }); %>
+                        <% } else { %>
+                            <p class="faq-cat__empty">Preguntas en construcción.</p>
+                        <% } %>
+                    </div>
+                </div>
+            <% }); %>
+        </div>
+    </main>
+
+    <%# CTA Contacto (reutilizable) %>
+    <%- include('../organisms/landing/cta-contacto-section') %>
+
+    <%# Footer %>
+    <%- include('../organisms/landing/landing-footer', {
+        companyInfo: typeof company !== 'undefined' ? company : null,
+        req: typeof req !== 'undefined' ? req : null
+    }) %>
+
+    <script>
+    (function () {
+        var root = document.getElementById('faqAccordion');
+        if (!root) return;
+
+        // Toggle de categorías
+        root.querySelectorAll('.faq-cat__header').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var cat = btn.closest('.faq-cat');
+                var open = cat.classList.toggle('is-open');
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+        });
+
+        // Toggle de preguntas
+        root.querySelectorAll('.faq-q__header').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var q = btn.closest('.faq-q');
+                var open = q.classList.toggle('is-open');
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+        });
+    })();
+    </script>
+</body>
+</html>

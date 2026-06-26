@@ -1,0 +1,351 @@
+{
+  "pageTitle": "Preguntas Frecuentes",
+  "categories": [
+    {
+      "title": "Nuestro Servicio",
+      "questions": [
+        {
+          "q": "¿Qué tipo de servicios ofrecen?",
+          "a": [
+            "Ofrecemos transporte privado de lujo, traslados desde y hacia aeropuertos, servicios por hora, city tours, experiencias gastronómicas, visitas a viñedos, recorridos de arte y arquitectura, compras, talleres artesanales, actividades culturales, viajes a ciudades cercanas, bodas, eventos privados, logística para grupos y más.",
+            "También podemos diseñar itinerarios personalizados en San Miguel de Allende y sus alrededores, de acuerdo con el perfil, intereses y ocasión de viaje de cada cliente."
+          ]
+        },
+        {
+          "q": "¿Los servicios son privados?",
+          "a": [
+            "Sí. La mayoría de nuestros servicios son privados y personalizados. Esto nos permite adaptar cada traslado, tour o experiencia al ritmo, intereses y necesidades de nuestros clientes.",
+            "Trabajamos con viajeros individuales, familias, parejas, grupos privados, bodas, agencias de viaje, hoteles, empresas y clientes VIP que buscan una operación discreta, puntual y cuidadosamente coordinada."
+          ]
+        },
+        {
+          "q": "¿Puedo personalizar mi recorrido o experiencia?",
+          "a": [
+            "Sí. Diseñamos recorridos y experiencias a la medida, de acuerdo con los intereses de cada cliente. Podemos integrar historia, arte, arquitectura, gastronomía, viñedos, compras, tradiciones locales, talleres artesanales, experiencias culinarias, encuentros con anfitriones locales y visitas privadas.",
+            "Nuestro objetivo es crear experiencias auténticas, bien curadas y con un sentido profundo del destino, evitando itinerarios genéricos o impersonales."
+          ]
+        },
+        {
+          "q": "¿Pueden ayudarme a organizar un viaje completo?",
+          "a": [
+            "Sí. Dependiendo del tipo de solicitud, podemos apoyar con transporte, experiencias, vuelos, hoteles, renta de autos, actividades privadas, recomendaciones locales y coordinación general del itinerario.",
+            "Nuestro enfoque es ofrecer un servicio integral para clientes que buscan una experiencia fluida, cuidada y bien ejecutada de principio a fin."
+          ]
+        },
+        {
+          "q": "¿También son agencia de viajes?",
+          "a": [
+            "Sí. Además de ser una operadora turística local y DMC en San Miguel de Allende, somos una agencia de viajes acreditada por IATA.",
+            "Esto nos permite apoyar a nuestros clientes con servicios adicionales como vuelos, hoteles, renta de autos y otros componentes de viaje, cuando así lo requieran."
+          ]
+        },
+        {
+          "q": "¿Pueden organizar servicios fuera de San Miguel de Allende?",
+          "a": [
+            "Sí. Aunque nuestra base está en San Miguel de Allende, podemos coordinar traslados, experiencias e itinerarios hacia otros destinos bajo solicitud, dependiendo de la ruta, disponibilidad y tipo de servicio requerido.",
+            "También podemos apoyar con conexiones hacia ciudades, aeropuertos, viñedos, pueblos históricos y destinos cercanos."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Reservaciones y Cotizaciones",
+      "questions": [
+        {
+          "q": "¿Cómo puedo reservar un servicio?",
+          "a": [
+            "Puedes solicitar tu reservación directamente por WhatsApp, correo electrónico o a través de nuestro formulario de contacto. Nuestro equipo revisará cuidadosamente los detalles de tu solicitud y preparará una propuesta personalizada de acuerdo con el tipo de servicio, fecha, horario, número de pasajeros, equipaje, preferencias y necesidades específicas.",
+            "Cada servicio se confirma de manera individual para asegurar que la logística, el vehículo, el equipo asignado y la experiencia estén alineados con el nivel de atención que nuestros clientes esperan."
+          ]
+        },
+        {
+          "q": "¿Qué información necesito proporcionar para cotizar o reservar?",
+          "a": [
+            "Para preparar una cotización precisa, necesitamos la fecha del servicio, horario, punto de salida, destino, número de pasajeros, cantidad aproximada de equipaje y cualquier requerimiento especial.",
+            "En servicios de aeropuerto, también solicitamos número de vuelo, aerolínea, hora estimada de llegada o salida, nombre del pasajero principal y dirección final en San Miguel de Allende o en el destino correspondiente.",
+            "Para bodas, eventos o grupos, es ideal compartir el itinerario general, número estimado de invitados, venues, horarios clave y cualquier movimiento especial que deba coordinarse."
+          ]
+        },
+        {
+          "q": "¿Con cuánta anticipación debo reservar?",
+          "a": [
+            "Recomendamos reservar con la mayor anticipación posible, especialmente durante fines de semana, temporada alta, bodas, eventos privados, festivales, viajes de incentivo y fechas de alta demanda en San Miguel de Allende.",
+            "Algunos servicios están sujetos a disponibilidad de vehículos, conductores bilingües, guías especializados, experiencias privadas, restaurantes, viñedos o proveedores externos. Una reservación anticipada nos permite cuidar mejor cada detalle."
+          ]
+        },
+        {
+          "q": "¿Mi servicio queda confirmado al solicitar una cotización?",
+          "a": [
+            "No necesariamente. Una cotización no garantiza disponibilidad hasta que el servicio haya sido confirmado por nuestro equipo y, cuando aplique, se haya recibido el pago, depósito o garantía correspondiente.",
+            "La disponibilidad de vehículos, conductores, guías, experiencias y proveedores puede cambiar, especialmente en fechas de alta demanda."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Transporte, Aeropuertos y Vehículos",
+      "questions": [
+        {
+          "q": "¿Pueden recogerme en el aeropuerto?",
+          "a": [
+            "Sí. Ofrecemos traslados privados desde y hacia aeropuertos como Querétaro, Bajío/León, Ciudad de México y otros destinos bajo solicitud.",
+            "Nuestro conductor puede esperarte en el punto acordado con un letrero con tu nombre. Para dar seguimiento adecuado al servicio, es importante compartir número de vuelo, aerolínea y hora estimada de llegada."
+          ]
+        },
+        {
+          "q": "¿Qué pasa si mi vuelo se retrasa?",
+          "a": [
+            "Cuando contamos con la información completa del vuelo, damos seguimiento a la llegada. Si el vuelo presenta retraso, ajustaremos el horario de recogida en la medida de lo posible.",
+            "En casos de retrasos prolongados, cambios de vuelo, pérdida de conexión o modificaciones de último momento, el servicio puede estar sujeto a disponibilidad y a cargos adicionales, dependiendo de la situación operativa."
+          ]
+        },
+        {
+          "q": "¿Qué tipo de vehículos ofrecen?",
+          "a": [
+            "Ofrecemos diferentes opciones de vehículos privados, desde sedanes hasta SUVs, Suburbans, vehículos eléctricos Tesla y vans tipo Sprinter para grupos.",
+            "La recomendación del vehículo depende del número de pasajeros, cantidad de equipaje, tipo de servicio, distancia, nivel de comodidad deseado y disponibilidad."
+          ]
+        },
+        {
+          "q": "¿Cómo sé qué vehículo necesito?",
+          "a": [
+            "Nuestro equipo puede recomendarte la mejor opción según el número de pasajeros, equipaje, destino y tipo de experiencia. Para traslados de aeropuerto, consideramos especialmente la cantidad y tamaño de maletas, ya que esto puede influir en el tipo de vehículo requerido.",
+            "Para grupos, bodas o eventos, podemos diseñar una logística con varios vehículos, Sprinters, SUVs o combinaciones especiales de acuerdo con el itinerario."
+          ]
+        },
+        {
+          "q": "¿Los vehículos tienen capacidad para equipaje?",
+          "a": [
+            "Sí, pero la capacidad depende del tipo de vehículo. Al momento de cotizar, solicitamos la cantidad aproximada de maletas para recomendar la opción más adecuada y evitar inconvenientes el día del servicio.",
+            "En algunos casos, especialmente con grupos o familias con equipaje abundante, puede ser necesario asignar un vehículo adicional para mayor comodidad."
+          ]
+        },
+        {
+          "q": "¿Incluyen agua o amenidades?",
+          "a": [
+            "En muchos de nuestros servicios incluimos agua embotellada y amenidades básicas. Para servicios especiales, bodas, grupos VIP o experiencias personalizadas, podemos coordinar amenidades adicionales bajo solicitud.",
+            "Estas pueden incluir bebidas, snacks, detalles de bienvenida, cartas personalizadas, amenidades para invitados o elementos especiales de hospitalidad."
+          ]
+        },
+        {
+          "q": "¿Cuentan con sillas para niños?",
+          "a": [
+            "Podemos apoyar con sillas infantiles o boosters bajo solicitud previa y sujeto a disponibilidad. Es importante solicitarlo al momento de reservar e indicar la edad, peso y estatura aproximada del menor para coordinar la opción más adecuada."
+          ]
+        },
+        {
+          "q": "¿Aceptan mascotas?",
+          "a": [
+            "Algunos servicios pueden aceptar mascotas bajo solicitud previa. Es necesario informarlo antes de confirmar la reservación para validar el tipo de vehículo, condiciones del servicio y cualquier requerimiento especial de limpieza o seguridad."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Experiencias, Tours y Recomendaciones",
+      "questions": [
+        {
+          "q": "¿Qué tipo de experiencias ofrecen?",
+          "a": [
+            "Ofrecemos experiencias culturales, gastronómicas, artísticas, enológicas y de estilo de vida en San Miguel de Allende y sus alrededores. Estas pueden incluir visitas a viñedos, recorridos de arte y arquitectura, talleres artesanales, experiencias culinarias, catas privadas, compras, tradiciones locales, recorridos históricos y actividades diseñadas a la medida.",
+            "Cada experiencia puede adaptarse al perfil del cliente, la ocasión del viaje, el tiempo disponible y el nivel de exclusividad deseado."
+          ]
+        },
+        {
+          "q": "¿Sus recorridos incluyen guía?",
+          "a": [
+            "Depende del tipo de servicio. Algunos recorridos incluyen guía especializado, mientras que otros pueden ser únicamente con conductor privado.",
+            "Cuando una experiencia requiere interpretación histórica, cultural, artística, gastronómica o enológica, recomendamos incluir un guía especializado para enriquecer el recorrido."
+          ]
+        },
+        {
+          "q": "¿Cuál es la diferencia entre conductor bilingüe y guía?",
+          "a": [
+            "Un conductor bilingüe puede asistir con comunicación básica y logística durante el traslado. Un guía especializado, en cambio, acompaña la experiencia con información histórica, cultural, artística, gastronómica o contextual del destino.",
+            "Para recorridos más profundos, experiencias culturales o visitas especializadas, recomendamos reservar un guía profesional."
+          ]
+        },
+        {
+          "q": "¿Pueden apoyar con recomendaciones durante mi estancia?",
+          "a": [
+            "Sí. Conocemos profundamente San Miguel de Allende y sus alrededores. Podemos apoyar con recomendaciones de restaurantes, viñedos, galerías, talleres, experiencias privadas, actividades culturales, servicios especiales y opciones para diferentes estilos de viaje.",
+            "Nuestras recomendaciones se basan en el perfil del cliente, la ocasión del viaje, el tiempo disponible y el tipo de experiencia que desea vivir."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Grupos, Bodas y Eventos",
+      "questions": [
+        {
+          "q": "¿Pueden ayudarme a organizar transporte para grupos, bodas o eventos?",
+          "a": [
+            "Sí. Coordinamos transporte privado y logística local para bodas destino, eventos corporativos, viajes de incentivo, celebraciones privadas, reuniones ejecutivas y grupos VIP.",
+            "Podemos apoyar con traslados desde aeropuertos, hoteles, venues, restaurantes, viñedos, cenas privadas, actividades especiales y movimientos entre diferentes puntos del itinerario."
+          ]
+        },
+        {
+          "q": "¿Pueden coordinar transporte para bodas destino?",
+          "a": [
+            "Sí. Somos especialistas en transporte y logística local para bodas destino en San Miguel de Allende y sus alrededores.",
+            "Podemos coordinar traslados para novios, familiares, invitados, proveedores, cenas de bienvenida, eventos previos, ceremonia, recepción, after party y salidas posteriores. También podemos apoyar con itinerarios, asignación de vehículos, horarios, rutas y puntos de encuentro."
+          ]
+        },
+        {
+          "q": "¿Ofrecen tarifas especiales para grupos o eventos?",
+          "a": [
+            "Sí. Para grupos, bodas, eventos corporativos o movimientos recurrentes, podemos preparar una propuesta personalizada de acuerdo con el número de pasajeros, fechas, horarios, vehículos requeridos y complejidad logística."
+          ]
+        },
+        {
+          "q": "¿Pueden trabajar directamente con mi agencia, concierge o wedding planner?",
+          "a": [
+            "Sí. Colaboramos con agencias de viaje, hoteles, concierges, wedding planners, DMCs, empresas y organizadores de eventos que requieren un aliado local confiable en San Miguel de Allende.",
+            "Podemos operar servicios individuales, itinerarios completos, traslados para invitados, experiencias privadas y logística terrestre para grupos, siempre cuidando la comunicación, puntualidad, presentación y nivel de servicio."
+          ]
+        },
+        {
+          "q": "¿Pueden apoyar con invitados VIP o clientes de alto perfil?",
+          "a": [
+            "Sí. Trabajamos con discreción, puntualidad y atención personalizada para clientes VIP, familias, ejecutivos, invitados especiales, anfitriones y grupos privados que requieren un nivel adicional de cuidado.",
+            "La logística puede adaptarse a necesidades específicas de privacidad, horarios, accesos, seguridad, amenidades o comunicación directa con asistentes personales, planners, agencias u hoteles."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Servicio, Seguridad y Atención VIP",
+      "questions": [
+        {
+          "q": "¿Sus conductores hablan inglés?",
+          "a": [
+            "Contamos con conductores y guías bilingües disponibles para ciertos servicios. Recomendamos solicitarlo al momento de reservar para confirmar disponibilidad."
+          ]
+        },
+        {
+          "q": "¿Sus servicios cuentan con seguro?",
+          "a": [
+            "Nuestros servicios de transporte se operan con vehículos y conductores asignados de acuerdo con los requerimientos del servicio. Cuando se trate de actividades con proveedores externos, cada experiencia puede contar con sus propias condiciones operativas y de seguro.",
+            "Si necesitas información específica para una agencia, empresa o evento, podemos compartir los detalles correspondientes bajo solicitud."
+          ]
+        },
+        {
+          "q": "¿Cuentan con permisos para operar servicios turísticos?",
+          "a": [
+            "Sí. Operamos como empresa turística y de transporte con documentación aplicable para prestar servicios privados y turísticos. También somos agencia de viajes acreditada por IATA, lo que fortalece nuestra capacidad para apoyar con servicios de viaje más completos."
+          ]
+        },
+        {
+          "q": "¿Cómo manejan la privacidad de clientes VIP?",
+          "a": [
+            "Trabajamos con discreción y confidencialidad. Entendemos que algunos clientes, familias, ejecutivos, celebridades o grupos privados requieren un nivel adicional de privacidad, por lo que cuidamos la comunicación, logística, asignación de personal y manejo de información con especial atención."
+          ]
+        },
+        {
+          "q": "¿Qué hace diferente a Amexing Experience?",
+          "a": [
+            "Somos una empresa local con profundo conocimiento de San Miguel de Allende, especializada en transporte privado, experiencias personalizadas, bodas, eventos y servicios de viaje boutique.",
+            "Combinamos operación logística, hospitalidad local y curaduría de experiencias para ofrecer un servicio confiable, elegante y a la medida. Nuestro objetivo no es solamente llevarte de un punto a otro, sino cuidar cada detalle para que tu estancia se sienta fluida, especial y bien acompañada."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Pagos y Facturación",
+      "questions": [
+        {
+          "q": "¿Qué métodos de pago aceptan?",
+          "a": [
+            "Aceptamos pagos en efectivo, tarjeta de crédito o débito, transferencia bancaria y, en algunos casos, pagos internacionales mediante transferencia o métodos disponibles en Estados Unidos.",
+            "Las opciones pueden variar según el tipo de servicio, país desde donde se realiza el pago, monto total y condiciones de la reservación."
+          ]
+        },
+        {
+          "q": "¿Puedo pagar con tarjeta?",
+          "a": [
+            "Sí. Podemos enviar un link de pago seguro para pagos con tarjeta. Los pagos con tarjeta pueden estar sujetos a IVA, comisiones bancarias o cargos de procesamiento, los cuales se confirmarán antes de enviar el link de pago."
+          ]
+        },
+        {
+          "q": "¿El precio cambia si pago con tarjeta o transferencia?",
+          "a": [
+            "No aplicamos cargos adicionales por pagar con tarjeta. Sin embargo, en algunos casos podemos ofrecer descuentos especiales para ciertos métodos de pago, como efectivo o transferencia nacional.",
+            "Siempre confirmamos el total final antes de procesar cualquier pago o reserva."
+          ]
+        },
+        {
+          "q": "¿Necesito pagar por adelantado?",
+          "a": [
+            "Algunos servicios pueden requerir pago anticipado o depósito para confirmar la reservación, especialmente en tours personalizados, experiencias privadas, servicios con proveedores externos, eventos, bodas o grupos.",
+            "Para traslados sencillos, las condiciones pueden variar según el servicio solicitado, la fecha y la disponibilidad."
+          ]
+        },
+        {
+          "q": "¿Puedo pagar en dólares?",
+          "a": [
+            "Sí, aceptamos pagos en dólares estadounidenses en algunos servicios. El monto en USD se confirma previamente según el tipo de cambio aplicable al momento de la cotización o reservación."
+          ]
+        },
+        {
+          "q": "¿Emiten factura?",
+          "a": [
+            "Sí, podemos emitir factura cuando sea solicitada. Para ello, es necesario compartir los datos fiscales completos y la constancia de situación fiscal vigente antes de procesar la factura."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Cambios, Cancelaciones y Condiciones",
+      "questions": [
+        {
+          "q": "¿Cuál es su política de cancelación?",
+          "a": [
+            "Nuestra política de cancelación varía según el tipo de servicio reservado, la fecha, la disponibilidad y las condiciones de cada proveedor. Siempre buscamos ofrecer la mayor flexibilidad posible y revisar cada caso de manera personalizada.",
+            "En servicios de transporte estándar, las cancelaciones realizadas con al menos 24 horas de anticipación normalmente pueden realizarse sin penalización. Sin embargo, algunos servicios, experiencias privadas, eventos, grupos, reservas con proveedores externos o servicios especiales pueden estar sujetos a políticas más estrictas, anticipos no reembolsables o cancelación total no permitida.",
+            "Antes de confirmar cualquier reserva, nuestro equipo le compartirá las condiciones aplicables a su servicio para que tenga claridad sobre cambios, cancelaciones y posibles penalizaciones."
+          ]
+        },
+        {
+          "q": "¿Qué pasa si necesito cambiar la fecha u horario de mi servicio?",
+          "a": [
+            "Haremos lo posible por ajustar tu servicio de acuerdo con la disponibilidad. Los cambios solicitados con poca anticipación están sujetos a disponibilidad de vehículos, conductores, guías, experiencias y proveedores externos.",
+            "En algunos casos, los cambios de último momento pueden generar cargos adicionales."
+          ]
+        },
+        {
+          "q": "¿Qué pasa si no me presento al servicio?",
+          "a": [
+            "En caso de no presentación, el servicio puede cobrarse en su totalidad. Esto aplica especialmente cuando el vehículo, conductor, guía o proveedor ya han sido asignados y bloqueados para tu reservación."
+          ]
+        },
+        {
+          "q": "¿Las experiencias con terceros son reembolsables?",
+          "a": [
+            "Las experiencias privadas, talleres, degustaciones, comidas especiales, entradas y servicios operados por terceros normalmente no son reembolsables una vez confirmados.",
+            "La mayoría de estas experiencias requieren pago anticipado para poder garantizar la reservación, ya que involucran proveedores especializados, espacios privados, guías, chefs, sommeliers, artesanos u operadores externos que bloquean fecha, horario y recursos para cada servicio.",
+            "Antes de confirmar cualquier experiencia, nuestro equipo le informará las condiciones específicas de reserva, pago, cambios y cancelación aplicables a ese servicio."
+          ]
+        },
+        {
+          "q": "¿Qué ocurre en caso de mal clima?",
+          "a": [
+            "Cuando sea posible, buscaremos ajustar el horario, modificar la experiencia o proponer una alternativa. Sin embargo, algunas actividades al aire libre, experiencias privadas o servicios con proveedores externos pueden estar sujetas a sus propias políticas de cambio o cancelación."
+          ]
+        },
+        {
+          "q": "¿Qué sucede si quiero extender el servicio durante el recorrido?",
+          "a": [
+            "Si deseas extender el tiempo del servicio, hacer paradas adicionales o modificar el itinerario, haremos lo posible por adaptarnos. Las extensiones están sujetas a disponibilidad del conductor, vehículo, guía y operación del día.",
+            "El tiempo adicional puede generar cargos extra, los cuales serán confirmados antes de continuar con el servicio cuando sea posible."
+          ]
+        },
+        {
+          "q": "¿La propina está incluida?",
+          "a": [
+            "Salvo que se indique lo contrario en la cotización, las propinas no están incluidas. Las propinas para conductores, guías, anfitriones o personal de apoyo quedan a discreción del cliente."
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -105,6 +105,8 @@ class PublicReservationController {
         isPublicView: true,
         isReservationView: true,
         pageTitle: `Reservación ${folio}`,
+        arponaEmbedCss: getArponaEmbedCss(),
+        myriadEmbedCss: getMyriadEmbedCss(),
       });
     } catch (error) {
       return this.handleError(error, folio, req, res);

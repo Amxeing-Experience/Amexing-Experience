@@ -1,97 +1,476 @@
 <%#
 Nuestra Flota (Fleet) Page
-Fleet page showcasing Amexing Experience vehicle fleet and specifications
+Página interactiva de la flota: barra de categorías (Economy / Premium /
+Green Class / First Class), hero con detalle del vehículo + foto y carrusel
+de tarjetas. La categoría activa se cambia con JS desde los datos de `fleet`.
 
 @param {string} title - Page title
 @param {object} user - Current user session (optional)
-@param {object} seo - SEO meta data
 @param {object} company - Company information
 @param {string} currentPage - Current page identifier
 
 Created by Denisse Maldonado
 %>
-
+<%
+    // Datos por categoría. First Class viene del diseño; las demás usan el
+    // Suburban como plantilla hasta tener la info/imagen real de cada clase.
+    const suburban = {
+        name: 'Suburban',
+        models: '2024-2025 Models',
+        pax: 6,
+        carryOns: 9,
+        amenities: ['Green Class Amenities', 'Soda', 'Snacks', 'Streaming services', 'Unlimited Wi-Fi'],
+        image: '/images/suv_privada.png',
+        // galería (placeholders por ahora — reemplazar con las fotos reales por categoría)
+        gallery: [
+            '/images/suv_privada.png',
+            '/images/IniciosSuburbans.jpg',
+            '/images/hero-services.jpg',
+            '/images/IniciosSedan.jpg',
+            '/images/2t2.jpg'
+        ]
+    };
+    const fleet = [
+        { cat: 'economy',  label: 'Economy',     vehicle: suburban },
+        { cat: 'premium',  label: 'Premium',     vehicle: suburban },
+        { cat: 'green',    label: 'Green Class', vehicle: suburban },
+        { cat: 'first',    label: 'First Class', vehicle: suburban }
+    ];
+    const activeCat = 'first';
+%>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= title %></title>
-    
+
     <%# Google Fonts %>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
-    
+
     <%# Font Awesome Icons %>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <%# Custom Fonts CSS %>
     <link rel="stylesheet" href="/css/fonts.css">
-    
+
     <style>
         body {
             font-family: 'Montserrat', sans-serif;
             margin: 0;
             padding: 0;
-            background: #000;
-            color: #333;
+            background: #1c1c1b;
+            color: #fff;
         }
-        
-        .page-hero {
+
+        /* ---- Hero / stage ---- */
+        .fleet {
+            background: #1c1c1b;
+            /* inset compartido: contenido centrado en 1180px máx, alineado
+               (título, tabs, detalle y tarjetas comparten el borde izquierdo) */
+            --inset: max((100% - 1180px) / 2, clamp(1.25rem, 4vw, 3rem));
+        }
+
+        .fleet__stage {
             position: relative;
-            min-height: 400px;
+            overflow: hidden;
+            min-height: clamp(520px, 62vw, 680px);
+            margin-top: 80px; /* navbar fija */
+        }
+
+        .fleet__photo {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: 70% center;
+            z-index: 0;
+        }
+
+        /* oscurece la izquierda para legibilidad, deja ver el vehículo a la derecha */
+        .fleet__stage::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(100deg,
+                rgba(28, 28, 27, 1) 0%,
+                rgba(28, 28, 27, 1) 32%,
+                rgba(28, 28, 27, 0.7) 48%,
+                rgba(28, 28, 27, 0.25) 68%,
+                rgba(28, 28, 27, 0) 92%);
+            z-index: 1;
+        }
+
+        .fleet__inner {
+            position: relative;
+            z-index: 2;
+            min-height: inherit;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fleet__brand {
+            font-family: var(--font-arpona), serif;
+            font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-weight: 400;
+            color: #ffffff;
+            font-size: clamp(2.4rem, 5vw, 3.8rem);
+            line-height: 0.98;
+            letter-spacing: 0.04em;
+            margin: 0;
+            padding: clamp(1.8rem, 3.5vw, 2.8rem) var(--inset) clamp(1.2rem, 2.5vw, 1.8rem);
+        }
+
+        /* ---- Barra de categorías ---- */
+        .fleet__tabs {
+            display: flex;
+            background: rgba(151, 160, 127, 0.92);
+            backdrop-filter: blur(1px);
+            padding: 0 var(--inset);
+        }
+
+        .fleet__tab {
+            flex: 1;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-family: var(--font-arpona), serif;
+            font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-weight: 500;
+            font-size: clamp(1.05rem, 2vw, 1.5rem);
+            letter-spacing: 0.08em;
+            color: rgba(255, 255, 255, 0.55);
+            text-align: left;
+            padding: 0.1em 0 0.1em 0.7rem;
+            transition: color 0.25s ease, background 0.25s ease;
+        }
+
+        .fleet__tab:hover {
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .fleet__tab.is-active {
+            color: #ffffff;
+        }
+
+        /* ---- Panel de detalle ---- */
+        .fleet__detail {
+            padding: clamp(1.6rem, 3vw, 2.4rem) 0 clamp(2rem, 4vw, 3rem);
+            margin-left: var(--inset);
+            max-width: 360px;
+        }
+
+        .fleet__class {
+            font-family: var(--font-arpona), serif;
+            font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-weight: 500;
+            font-size: clamp(1.3rem, 2.4vw, 1.8rem);
+            letter-spacing: 0.04em;
+            margin: 0 0 0.9rem;
+        }
+
+        .fleet__pill {
+            display: inline-block;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            font-family: var(--font-arpona), serif;
+            font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-size: 1.4rem;
+            letter-spacing: 0.06em;
+            text-align: left;
+            padding: 0 1rem 0 0;
+            margin-bottom: 1rem;
+        }
+
+        .fleet__models {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.95);
+            margin-bottom: 0.7rem;
+        }
+
+        .fleet__specs {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .fleet__spec {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .fleet__spec i {
+            width: 1.1rem;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.75);
+        }
+
+        .fleet__amenities-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.95);
+            margin-bottom: 0.4rem;
+        }
+
+        .fleet__amenities {
+            list-style: none;
+            margin: 0 0 1.3rem;
+            padding: 0;
+            width: fit-content; /* las líneas miden lo de la amenidad más larga */
+        }
+
+        .fleet__amenities li {
+            font-size: 0.82rem;
+            color: rgba(255, 255, 255, 0.85);
+            padding: 0.35rem 0;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+        }
+
+        .fleet__pay {
+            margin-bottom: 1.3rem;
+            display: block;
+            width: fit-content;
+            border: none;
+            background: transparent;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        .fleet__pay-icon {
+            width: 48px;
+            height: auto;
+            display: block;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .fleet__pay:hover .fleet__pay-icon {
+            opacity: 0.75;
+            transform: scale(1.05);
+        }
+
+        /* ---- Lightbox de galería ---- */
+        .fleet-lightbox {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, rgba(46, 46, 45, 0.9), rgba(46, 46, 45, 0.7)), url('/images/hero-background.jpg');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            color: white;
+            background: rgba(28, 28, 27, 0.96);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            backdrop-filter: blur(0);
+            transition: opacity 0.4s ease,
+                        visibility 0s linear 0.4s,
+                        backdrop-filter 0.5s ease;
+        }
+
+        .fleet-lightbox.is-open {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            backdrop-filter: blur(3px);
+            transition: opacity 0.4s ease,
+                        visibility 0s,
+                        backdrop-filter 0.5s ease;
+        }
+
+        .fleet-lightbox__stage {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            width: min(1100px, 92vw);
+            max-height: 92vh;
+            opacity: 0;
+            transform: scale(0.92) translateY(16px);
+            transition: opacity 0.45s ease 0.05s,
+                        transform 0.55s cubic-bezier(0.16, 0.84, 0.32, 1) 0.05s;
+        }
+
+        .fleet-lightbox.is-open .fleet-lightbox__stage {
+            opacity: 1;
+            transform: none;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .fleet-lightbox,
+            .fleet-lightbox__stage {
+                transition: opacity 0.2s ease;
+                transform: none;
+            }
+        }
+
+        .fleet-lightbox__img {
+            max-width: 100%;
+            max-height: 64vh;
+            object-fit: contain;
+            background: #000;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .fleet-lightbox__meta {
             text-align: center;
-            margin-top: 80px;
         }
 
-        .page-hero__container {
-            max-width: 1200px;
-            width: 100%;
-            padding: 0 2rem;
-            margin: 0 auto;
-        }
-
-        .page-hero__content {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .page-hero__title {
-            font-family: var(--font-arpona);
-            font-size: clamp(3rem, 6vw, 5rem);
-            font-weight: 400;
-            margin-bottom: 1.5rem;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-            letter-spacing: 2px;
+        .fleet-lightbox__caption {
+            font-family: var(--font-arpona), serif;
             font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-weight: 500;
+            font-size: 1.3rem;
+            letter-spacing: 0.06em;
+            color: #ffffff;
+            margin: 0 0 0.2rem;
         }
 
-        .page-hero__subtitle {
-            font-family: 'Montserrat', sans-serif;
-            font-size: clamp(1.1rem, 2vw, 1.3rem);
-            font-weight: 300;
-            line-height: 1.6;
+        .fleet-lightbox__counter {
+            font-family: var(--font-myriad);
+            font-size: 0.8rem;
+            letter-spacing: 0.2em;
+            color: rgba(255, 255, 255, 0.6);
+            margin: 0;
+        }
+
+        .fleet-lightbox__thumbs {
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 100%;
+        }
+
+        .fleet-lightbox__thumb {
+            width: 84px;
+            height: 56px;
+            object-fit: cover;
+            cursor: pointer;
+            opacity: 0.5;
+            border: 2px solid transparent;
+            transition: opacity 0.25s ease, border-color 0.25s ease;
+        }
+
+        .fleet-lightbox__thumb:hover {
+            opacity: 0.85;
+        }
+
+        .fleet-lightbox__thumb.is-active {
+            opacity: 1;
+            border-color: #8b9176;
+        }
+
+        .fleet-lightbox__close,
+        .fleet-lightbox__nav {
+            position: absolute;
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            cursor: pointer;
+            line-height: 1;
+            transition: color 0.25s ease, transform 0.25s ease;
+        }
+
+        .fleet-lightbox__close {
+            top: clamp(1rem, 3vw, 2rem);
+            right: clamp(1rem, 3vw, 2.2rem);
+            font-size: 2.6rem;
+        }
+
+        .fleet-lightbox__nav {
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            padding: 0 clamp(0.5rem, 2vw, 1.5rem);
+        }
+
+        .fleet-lightbox__nav--prev { left: clamp(0.2rem, 2vw, 1.5rem); }
+        .fleet-lightbox__nav--next { right: clamp(0.2rem, 2vw, 1.5rem); }
+
+        .fleet-lightbox__close:hover,
+        .fleet-lightbox__nav:hover { color: #8b9176; }
+
+        .fleet-lightbox__nav--prev:hover { transform: translateY(-50%) translateX(-3px); }
+        .fleet-lightbox__nav--next:hover { transform: translateY(-50%) translateX(3px); }
+
+        body.fleet-lightbox-open { overflow: hidden; }
+
+        .fleet__book {
+            display: inline-block;
+            background: #8b9176;
+            color: #ffffff;
+            font-family: var(--font-myriad);
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            text-decoration: none;
+            padding: 0.85rem 2.4rem;
+            transition: background 0.3s ease;
+        }
+
+        .fleet__book:hover {
+            background: #767c63;
+        }
+
+        /* ---- Carrusel de tarjetas ---- */
+        .fleet__cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(1rem, 2.5vw, 2rem);
+            padding: clamp(1.5rem, 4vw, 3rem) var(--inset) clamp(3rem, 6vw, 5rem);
+        }
+
+        .fleet-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.7rem;
+            margin: 0; /* reset del margin por defecto de <figure> (0 40px) */
+        }
+
+        .fleet-card__img {
+            width: 100%;
+            aspect-ratio: 16 / 10;
+            object-fit: cover;
+            display: block;
+        }
+
+        .fleet-card__caption {
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            text-align: center;
+            padding: 0.55rem 0.5rem;
+            font-family: var(--font-newsreader), serif;
+            font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-size: 0.9rem;
+            letter-spacing: 0.04em;
             color: rgba(255, 255, 255, 0.9);
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
         }
 
         @media (max-width: 768px) {
-            .page-hero {
-                min-height: 300px;
-                background-attachment: scroll;
+            .fleet__stage::before {
+                background: linear-gradient(180deg,
+                    rgba(28, 28, 27, 0.55) 0%,
+                    rgba(28, 28, 27, 0.85) 100%);
             }
-            
-            .page-hero__container {
-                padding: 0 1rem;
+            .fleet__detail {
+                max-width: none;
+            }
+            .fleet__cards {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -107,22 +486,204 @@ Created by Denisse Maldonado
         t: typeof t !== 'undefined' ? t : ((key) => key)
     }) %>
 
-    <%# Page Hero Section %>
-    <section class="page-hero">
-        <div class="page-hero__container">
-            <div class="page-hero__content">
-                <h1 class="page-hero__title">Nuestra Flota</h1>
-                <p class="page-hero__subtitle">Vehículos premium y tecnología de vanguardia</p>
+    <%# Datos de la flota para el JS interactivo %>
+    <script type="application/json" id="fleet-data"><%- JSON.stringify({ fleet, activeCat, photoWord: t('pages:fleet.photoWord') }) %></script>
+
+    <section class="fleet">
+        <div class="fleet__stage">
+            <% const active = fleet.find(f => f.cat === activeCat) || fleet[0]; const v = active.vehicle; %>
+            <img class="fleet__photo" src="<%= v.image %>" alt="<%= active.label %> — <%= v.name %>">
+
+            <div class="fleet__inner">
+                <h1 class="fleet__brand"><%= t('pages:fleet.brand1') %><br><%= t('pages:fleet.brand2') %></h1>
+
+                <nav class="fleet__tabs" role="tablist" aria-label="<%= t('pages:fleet.aria.categories') %>">
+                    <% fleet.forEach(function(f) { %>
+                        <button class="fleet__tab<%= f.cat === activeCat ? ' is-active' : '' %>"
+                                role="tab" data-cat="<%= f.cat %>"
+                                aria-selected="<%= f.cat === activeCat ? 'true' : 'false' %>"><%= f.label %></button>
+                    <% }); %>
+                </nav>
+
+                <div class="fleet__detail">
+                    <h2 class="fleet__class" data-bind="class"><%= active.label %></h2>
+                    <span class="fleet__pill" data-bind="name"><%= v.name %></span>
+                    <p class="fleet__models" data-bind="models"><%= v.models %></p>
+
+                    <div class="fleet__specs">
+                        <span class="fleet__spec"><i class="fa-solid fa-user"></i> <span data-bind="pax"><%= v.pax %></span> pax</span>
+                        <span class="fleet__spec"><i class="fa-solid fa-suitcase"></i> <span data-bind="carryOns"><%= v.carryOns %></span> carry-ons</span>
+                    </div>
+
+                    <p class="fleet__amenities-title">Included Amenities:</p>
+                    <ul class="fleet__amenities" data-bind="amenities">
+                        <% v.amenities.forEach(function(a) { %><li><%= a %></li><% }); %>
+                    </ul>
+
+                    <button type="button" class="fleet__pay" data-gallery-open aria-label="<%= t('pages:fleet.aria.openGallery') %>">
+                        <img src="/images/galeria_vehiculos.png" alt="" class="fleet__pay-icon">
+                    </button>
+
+                    <a href="/contacto#book" class="fleet__book">Book now</a>
+                </div>
             </div>
+        </div>
+
+        <div class="fleet__cards">
+            <% for (let i = 0; i < 3; i++) { %>
+                <figure class="fleet-card">
+                    <img class="fleet-card__img" src="<%= v.image %>" alt="<%= v.name %>">
+                    <figcaption class="fleet-card__caption" data-card-caption><%= v.name %> | <%= v.models %></figcaption>
+                </figure>
+            <% } %>
         </div>
     </section>
 
-    <%# Fleet Section %>
-    <%- include('organisms/landing/fleet-section') %>
+    <%# Lightbox de galería (vanilla, sin librerías) %>
+    <div class="fleet-lightbox" id="fleet-lightbox" aria-hidden="true" role="dialog" aria-modal="true" aria-label="<%= t('pages:fleet.aria.gallery') %>">
+        <button type="button" class="fleet-lightbox__close" data-gallery-close aria-label="<%= t('pages:fleet.aria.close') %>">&times;</button>
+        <button type="button" class="fleet-lightbox__nav fleet-lightbox__nav--prev" data-gallery-prev aria-label="<%= t('pages:fleet.aria.prev') %>">&#8249;</button>
+        <button type="button" class="fleet-lightbox__nav fleet-lightbox__nav--next" data-gallery-next aria-label="<%= t('pages:fleet.aria.next') %>">&#8250;</button>
+
+        <div class="fleet-lightbox__stage">
+            <img class="fleet-lightbox__img" id="fleet-lightbox-img" src="" alt="">
+            <div class="fleet-lightbox__meta">
+                <p class="fleet-lightbox__caption" id="fleet-lightbox-caption"></p>
+                <p class="fleet-lightbox__counter" id="fleet-lightbox-counter"></p>
+            </div>
+            <div class="fleet-lightbox__thumbs" id="fleet-lightbox-thumbs"></div>
+        </div>
+    </div>
+
+    <%# CTA Contacto (reutilizable) %>
+    <%- include('organisms/landing/cta-contacto-section', {
+        t: typeof t !== 'undefined' ? t : ((key) => key)
+    }) %>
 
     <%# Footer %>
     <%- include('organisms/landing/landing-footer', {
-        companyInfo: typeof company !== 'undefined' ? company : null
+        companyInfo: typeof company !== 'undefined' ? company : null,
+        req: typeof req !== 'undefined' ? req : null
     }) %>
+
+    <script>
+        (function () {
+            const data = JSON.parse(document.getElementById('fleet-data').textContent);
+            const byCat = Object.fromEntries(data.fleet.map(f => [f.cat, f]));
+            const stage = document.querySelector('.fleet');
+            const photo = stage.querySelector('.fleet__photo');
+            const cards = stage.querySelectorAll('.fleet-card');
+            let current = byCat[data.activeCat] || data.fleet[0];
+
+            function render(cat) {
+                const f = byCat[cat];
+                if (!f) return;
+                const v = f.vehicle;
+                current = f;
+
+                stage.querySelectorAll('.fleet__tab').forEach(t => {
+                    const on = t.dataset.cat === cat;
+                    t.classList.toggle('is-active', on);
+                    t.setAttribute('aria-selected', on ? 'true' : 'false');
+                });
+
+                // el tab activo siempre se mueve al último lugar (posición de First Class);
+                // los demás conservan su orden original
+                const tabsEl = stage.querySelector('.fleet__tabs');
+                data.fleet.map(x => x.cat).filter(c => c !== cat).concat(cat)
+                    .forEach(c => tabsEl.appendChild(tabsEl.querySelector('[data-cat="' + c + '"]')));
+
+                photo.src = v.image;
+                photo.alt = f.label + ' — ' + v.name;
+                stage.querySelector('[data-bind="class"]').textContent = f.label;
+                stage.querySelector('[data-bind="name"]').textContent = v.name;
+                stage.querySelector('[data-bind="models"]').textContent = v.models;
+                stage.querySelector('[data-bind="pax"]').textContent = v.pax;
+                stage.querySelector('[data-bind="carryOns"]').textContent = v.carryOns;
+                stage.querySelector('[data-bind="amenities"]').innerHTML =
+                    v.amenities.map(a => '<li></li>').join('');
+                stage.querySelectorAll('[data-bind="amenities"] li')
+                    .forEach((li, i) => { li.textContent = v.amenities[i]; });
+
+                cards.forEach(card => {
+                    card.querySelector('.fleet-card__img').src = v.image;
+                    card.querySelector('.fleet-card__img').alt = v.name;
+                    card.querySelector('[data-card-caption]').textContent = v.name + ' | ' + v.models;
+                });
+            }
+
+            stage.querySelectorAll('.fleet__tab').forEach(tab => {
+                tab.addEventListener('click', () => render(tab.dataset.cat));
+            });
+
+            /* ---- Lightbox de galería ---- */
+            const lb = document.getElementById('fleet-lightbox');
+            const lbImg = document.getElementById('fleet-lightbox-img');
+            const lbCaption = document.getElementById('fleet-lightbox-caption');
+            const lbCounter = document.getElementById('fleet-lightbox-counter');
+            const lbThumbs = document.getElementById('fleet-lightbox-thumbs');
+            let images = [];
+            let index = 0;
+
+            function show(i) {
+                if (!images.length) return;
+                index = (i + images.length) % images.length;
+                lbImg.src = images[index];
+                lbImg.alt = current.vehicle.name + ' — ' + (data.photoWord || 'foto') + ' ' + (index + 1);
+                lbCounter.textContent = (index + 1) + ' / ' + images.length;
+                lbThumbs.querySelectorAll('.fleet-lightbox__thumb').forEach((t, i2) => {
+                    t.classList.toggle('is-active', i2 === index);
+                });
+            }
+
+            function openGallery() {
+                const v = current.vehicle;
+                images = (v.gallery && v.gallery.length) ? v.gallery : [v.image];
+                lbCaption.textContent = v.name + ' · ' + current.label;
+                lbThumbs.innerHTML = '';
+                images.forEach((src, i) => {
+                    const t = document.createElement('img');
+                    t.className = 'fleet-lightbox__thumb';
+                    t.src = src;
+                    t.alt = '';
+                    t.addEventListener('click', () => show(i));
+                    lbThumbs.appendChild(t);
+                });
+                show(0);
+                lb.classList.add('is-open');
+                lb.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('fleet-lightbox-open');
+            }
+
+            function closeGallery() {
+                lb.classList.remove('is-open');
+                lb.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('fleet-lightbox-open');
+            }
+
+            document.querySelector('[data-gallery-open]').addEventListener('click', openGallery);
+            lb.querySelector('[data-gallery-close]').addEventListener('click', closeGallery);
+            lb.querySelector('[data-gallery-prev]').addEventListener('click', () => show(index - 1));
+            lb.querySelector('[data-gallery-next]').addEventListener('click', () => show(index + 1));
+            lb.addEventListener('click', e => { if (e.target === lb) closeGallery(); });
+
+            document.addEventListener('keydown', e => {
+                if (!lb.classList.contains('is-open')) return;
+                if (e.key === 'Escape') closeGallery();
+                else if (e.key === 'ArrowLeft') show(index - 1);
+                else if (e.key === 'ArrowRight') show(index + 1);
+            });
+
+            /* swipe en móvil */
+            let touchX = null;
+            lb.addEventListener('touchstart', e => { touchX = e.changedTouches[0].clientX; }, { passive: true });
+            lb.addEventListener('touchend', e => {
+                if (touchX === null) return;
+                const dx = e.changedTouches[0].clientX - touchX;
+                if (Math.abs(dx) > 45) show(index + (dx < 0 ? 1 : -1));
+                touchX = null;
+            }, { passive: true });
+        })();
+    </script>
 </body>
 </html>

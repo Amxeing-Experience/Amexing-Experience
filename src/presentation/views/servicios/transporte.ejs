@@ -1,0 +1,471 @@
+<%#
+Transporte (subpágina de Servicios).
+Header: banner con imagen de la flota.
+
+Created by Denisse Maldonado
+%>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/fonts.css">
+    <link rel="icon" type="image/png" href="/images/heart_black.png">
+
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #eff0ec;
+            color: #333;
+            padding-top: 80px; /* navbar fijo */
+        }
+
+        /* ---- Header: banner con imagen ---- */
+        .transporte-hero {
+            width: 100%;
+            line-height: 0;
+        }
+
+        .transporte-hero__img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        /* ---- Mapa: transfers al aeropuerto ---- */
+        .transfers-map {
+            width: 100%;
+            line-height: 0;
+        }
+
+        .transfers-map__img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        /* ---- Traslados punto a punto ---- */
+        .book-vehicles {
+            position: relative;
+            width: 100%;
+            line-height: 0;
+        }
+
+        .book-vehicles__img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        /* zona clickeable transparente sobre el "BOOK NOW" de la imagen */
+        .book-vehicles__cta {
+            position: absolute;
+            left: 71%;
+            top: 80%;
+            width: 13%;
+            height: 11%;
+        }
+
+        /* ---- Espacio en blanco de separación ---- */
+        .section-gap {
+            height: clamp(0.6rem, 1.4vw, 1.1rem);
+            background: #ffffff;
+        }
+
+        /* ---- Traslados locales ---- */
+        .local-transfers {
+            background: #8b9074; /* full-width */
+            padding: clamp(2.5rem, 5vw, 4rem) clamp(2rem, 8vw, 7rem);
+        }
+
+        .local-transfers__inner {
+            max-width: 870px;
+            margin: 0 auto;
+            border-top: 2px solid rgba(255, 255, 255, 0.6);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.6);
+            padding: clamp(0.9rem, 2vw, 1.5rem) clamp(1.5rem, 5vw, 4.5rem);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: clamp(1.5rem, 4vw, 3.5rem);
+            flex-wrap: wrap;
+        }
+
+        .local-transfers__left {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: clamp(1rem, 2.5vw, 1.8rem);
+            flex: 0 0 auto;
+        }
+
+        .local-transfers__title {
+            font-family: var(--font-arpona), serif;
+            font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-size: clamp(1.6rem, 3vw, 2.4rem);
+            font-weight: 400;
+            letter-spacing: 0.05em;
+            color: #ffffff;
+            text-align: center;
+            margin: 0;
+            line-height: 1.1;
+        }
+
+        .local-transfers__book {
+            display: inline-block;
+            background: #e8eade;
+            color: #353530;
+            border: none;
+            padding: 0.7rem 1.9rem;
+            font-family: var(--font-myriad), 'Montserrat', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            text-decoration: none;
+            transition: filter 0.3s ease;
+        }
+
+        .local-transfers__book:hover {
+            filter: brightness(0.95);
+        }
+
+        .local-transfers__icons {
+            display: flex;
+            align-items: center;
+            gap: clamp(0.8rem, 2.5vw, 2rem);
+            flex-wrap: wrap;
+        }
+
+        /* las imágenes ya traen el círculo */
+        .local-transfers__icon {
+            width: clamp(72px, 9.5vw, 124px);
+            height: auto;
+            display: block;
+        }
+
+        @media (max-width: 720px) {
+            .local-transfers__inner {
+                justify-content: center;
+                text-align: center;
+            }
+            .local-transfers__left {
+                align-items: center;
+            }
+        }
+
+        /* ---- Opciones de vehículos ---- */
+        .veh {
+            background: #eff0ec;
+            padding: clamp(4.5rem, 9vw, 8rem) clamp(1rem, 4vw, 3rem) clamp(3rem, 6vw, 5rem);
+        }
+
+        .veh__frame {
+            max-width: 1080px;
+            margin: 0 auto;
+            position: relative;
+            border: 0.5px solid #000000;
+            padding: clamp(2.5rem, 6vw, 5rem) clamp(1rem, 3vw, 2.5rem) clamp(2.5rem, 5vw, 4rem);
+        }
+
+        /* doble borde (igual que la sección de Transporte en /servicios) */
+        .veh__frame::before {
+            content: '';
+            position: absolute;
+            top: -0.5rem;
+            left: 0.5rem;
+            right: 0.5rem;
+            bottom: -0.5rem;
+            border: 0.5px solid #2e2e2e;
+            pointer-events: none;
+        }
+
+        .veh__title-wrap {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            transform: translateY(-50%);
+            text-align: center;
+            z-index: 2;
+        }
+
+        .veh__title {
+            display: inline-block;
+            background: #eff0ec; /* corta el doble borde por detrás */
+            padding: 0 clamp(1.2rem, 3vw, 2.5rem);
+            font-family: var(--font-newsreader), serif;
+            font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-size: clamp(2.8rem, 5vw, 3.8rem); /* +1em */
+            font-weight: 400;
+            letter-spacing: 0.04em;
+            color: #585757;
+            text-align: center;
+            margin: 0;
+            line-height: 1.15;
+        }
+
+        .veh__intro {
+            font-family: var(--font-myriad), 'Montserrat', sans-serif;
+            font-weight: 300;
+            font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+            line-height: 1.65;
+            color: #4a4a44;
+            text-align: center;
+            max-width: 640px;
+            margin: clamp(0.2rem, 0.8vw, 0.5rem) auto clamp(2rem, 5vw, 3.5rem);
+        }
+
+        /* ---- Filas de vehículo (imagen + card traslapados) ---- */
+        .veh-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-items: center;
+            margin: -0.1rem 0;
+        }
+
+        .veh-row__image {
+            grid-area: 1 / 1 / 2 / 2;
+            z-index: 2;
+            height: clamp(230px, 27vw, 330px);
+            background-size: cover;
+            background-position: center;
+        }
+
+        /* la imagen se alarga sobre el card: sliver exterior + franja del card antes del texto */
+        .veh-row--left .veh-row__image {
+            grid-area: 1 / 1 / 2 / 3;
+            margin-left: clamp(2rem, 5vw, 4rem);
+            margin-right: 40%;
+        }
+
+        .veh-row--right .veh-row__image {
+            grid-area: 1 / 1 / 2 / 3;
+            margin-right: clamp(2rem, 5vw, 4rem);
+            margin-left: 40%;
+        }
+
+        .veh-row__card {
+            grid-area: 1 / 1 / 2 / 3;
+            z-index: 1;
+            height: clamp(180px, 21vw, 265px);
+            display: flex;
+            align-items: center;
+        }
+
+        .veh-row--dark .veh-row__card { background: #3a3a38; }
+        .veh-row--green .veh-row__card { background: #969b81; }
+        .veh-row--olive .veh-row__card { background: #565649; }
+
+        .veh-row__content {
+            width: 33%;
+            text-align: center;
+            padding: 1rem clamp(1rem, 2.5vw, 2rem);
+            box-sizing: border-box;
+            color: #ffffff;
+        }
+
+        /* texto centrado en la franja negra visible (al lado de la imagen) */
+        .veh-row--left .veh-row__content { margin-left: auto; margin-right: 3.5%; }
+        .veh-row--right .veh-row__content { margin-right: auto; margin-left: 3.5%; }
+
+        .veh-row__name {
+            font-family: var(--font-arpona), serif;
+            font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-size: clamp(1.2rem, 2vw, 1.6rem);
+            font-weight: 400;
+            letter-spacing: 0.06em;
+            margin: 0 0 0.7rem;
+            line-height: 1;
+        }
+
+        .veh-row__for {
+            font-family: var(--font-myriad), 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-size: clamp(0.85rem, 1.1vw, 0.95rem);
+            margin: 0 0 0.4rem;
+        }
+
+        .veh-row__para {
+            list-style: none;
+            margin: 0 0 clamp(0.9rem, 2vw, 1.4rem);
+            padding: 0;
+            font-family: var(--font-newsreader), serif;
+            font-variant: small-caps;
+            font-feature-settings: "smcp";
+            font-size: clamp(0.85rem, 1.1vw, 1rem);
+            letter-spacing: 0.05em;
+            line-height: 1.55;
+            color: rgba(255, 255, 255, 0.92);
+        }
+
+        .veh-row__book {
+            display: inline-block;
+            background: transparent;
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            padding: 0.6rem 1.8rem;
+            font-family: var(--font-myriad), 'Montserrat', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            text-decoration: none;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        /* Sedan (oscuro) y Van (olivo): botón verde, sin borde, texto negro */
+        .veh-row--dark .veh-row__book,
+        .veh-row--olive .veh-row__book {
+            background: #969b81;
+            color: #000000;
+            border: none;
+        }
+
+        /* SUV (card verde): botón negro, sin borde, texto blanco */
+        .veh-row--green .veh-row__book {
+            background: #2e2e2d;
+            color: #ffffff;
+            border: none;
+        }
+
+        .veh-row__book:hover { filter: brightness(1.1); }
+
+        @media (max-width: 720px) {
+            .veh-row,
+            .veh-row--right {
+                grid-template-columns: 1fr;
+            }
+            .veh-row__image,
+            .veh-row--right .veh-row__image {
+                grid-area: 1 / 1 / 2 / 2;
+                height: clamp(180px, 50vw, 260px);
+            }
+            .veh-row__card {
+                grid-area: 2 / 1 / 3 / 2;
+                height: auto;
+            }
+            .veh-row__content {
+                width: 100%;
+                margin: 0;
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%# Navigation %>
+    <%- include('../organisms/landing/landing-navigation', {
+        user: typeof user !== 'undefined' ? user : null,
+        currentPage: typeof currentPage !== 'undefined' ? currentPage : 'services',
+        transparent: false,
+        companyInfo: typeof company !== 'undefined' ? company : null,
+        req: typeof req !== 'undefined' ? req : null,
+        t: typeof t !== 'undefined' ? t : ((key) => key)
+    }) %>
+
+    <%# Header: banner con la imagen de la flota %>
+    <section class="transporte-hero">
+        <img src="/images/transportes_services.jpg" alt="<%= t('pages:transporte.heroAlt') %>" class="transporte-hero__img">
+    </section>
+
+    <%# Opciones de vehículos %>
+    <%
+        const vehiculos = [
+            { name: t('pages:transporte.vehicles.sedan'), img: '/images/sedan_privado.png', side: 'left', color: 'dark',
+              para: [t('pages:transporte.audiences.couples'), t('pages:transporte.audiences.individual'), t('pages:transporte.audiences.business')] },
+            { name: t('pages:transporte.vehicles.suv'), img: '/images/suv_privada.png', side: 'right', color: 'green',
+              para: [t('pages:transporte.audiences.couples'), t('pages:transporte.audiences.individual'), t('pages:transporte.audiences.business'), t('pages:transporte.audiences.smallFamilies')] },
+            { name: t('pages:transporte.vehicles.van'), img: '/images/van_privada.png', side: 'left', color: 'olive',
+              para: [t('pages:transporte.audiences.business'), t('pages:transporte.audiences.largeFamilies'), t('pages:transporte.audiences.largeGroups')] }
+        ];
+    %>
+    <section class="veh">
+        <div class="veh__frame">
+            <div class="veh__title-wrap">
+                <h2 class="veh__title"><%= t('pages:transporte.options.title1') %><br><%= t('pages:transporte.options.title2') %></h2>
+            </div>
+            <p class="veh__intro">
+                Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud.
+            </p>
+
+            <div class="veh__list">
+                <% vehiculos.forEach(function(v) { %>
+                    <div class="veh-row veh-row--<%= v.side %> veh-row--<%= v.color %>">
+                        <div class="veh-row__card">
+                            <div class="veh-row__content">
+                                <h3 class="veh-row__name"><%= v.name %></h3>
+                                <p class="veh-row__for"><%= t('pages:transporte.perfectFor') %></p>
+                                <ul class="veh-row__para">
+                                    <% v.para.forEach(function(p) { %><li><%= p %></li><% }); %>
+                                </ul>
+                                <a href="/contacto#book" class="veh-row__book"><%= t('pages:transporte.bookNow') %></a>
+                            </div>
+                        </div>
+                        <div class="veh-row__image" style="background-image: url('<%= v.img %>')" role="img" aria-label="<%= v.name %>"></div>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+    </section>
+
+    <%# Mapa: transfers al aeropuerto %>
+    <section class="transfers-map">
+        <img src="/images/map_transfers.jpg" alt="<%= t('pages:transporte.mapAlt') %>" class="transfers-map__img">
+    </section>
+
+    <%# Traslados punto a punto %>
+    <section class="book-vehicles">
+        <img src="/images/book_vehicles.jpg" alt="<%= t('pages:transporte.pointToPointAlt') %>" class="book-vehicles__img">
+        <a href="/contacto#book" class="book-vehicles__cta" aria-label="<%= t('pages:transporte.bookAria') %>"></a>
+    </section>
+
+    <%# Espacio en blanco de separación %>
+    <div class="section-gap"></div>
+
+    <%# Traslados locales %>
+    <%
+        const localIcons = [
+            { img: '/images/cava.png', label: t('pages:transporte.local.icons.food') },
+            { img: '/images/maiz.png', label: t('pages:transporte.local.icons.products') },
+            { img: '/images/arte.png', label: t('pages:transporte.local.icons.art') },
+            { img: '/images/hotel.png', label: t('pages:transporte.local.icons.hotels') }
+        ];
+    %>
+    <section class="local-transfers">
+        <div class="local-transfers__inner">
+            <div class="local-transfers__left">
+                <h2 class="local-transfers__title"><%= t('pages:transporte.local.title1') %><br><%= t('pages:transporte.local.title2') %></h2>
+                <a href="/contacto#book" class="local-transfers__book"><%= t('pages:transporte.bookNow') %></a>
+            </div>
+            <div class="local-transfers__icons">
+                <% localIcons.forEach(function(it) { %>
+                    <img src="<%= it.img %>" alt="<%= it.label %>" class="local-transfers__icon">
+                <% }); %>
+            </div>
+        </div>
+    </section>
+
+    <%# CTA Contacto (reutilizable) %>
+    <%- include('../organisms/landing/cta-contacto-section', {
+        t: typeof t !== 'undefined' ? t : ((key) => key)
+    }) %>
+
+    <%# Footer %>
+    <%- include('../organisms/landing/landing-footer', {
+        companyInfo: typeof company !== 'undefined' ? company : null,
+        req: typeof req !== 'undefined' ? req : null
+    }) %>
+</body>
+</html>

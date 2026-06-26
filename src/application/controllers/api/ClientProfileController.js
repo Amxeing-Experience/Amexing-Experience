@@ -52,6 +52,7 @@ class ClientProfileController {
     this.createTravelPreference = this.createTravelPreference.bind(this);
     this.updateTravelPreference = this.updateTravelPreference.bind(this);
     this.deleteTravelPreference = this.deleteTravelPreference.bind(this);
+    this.saveTravelPreferences = this.saveTravelPreferences.bind(this);
     this.getLoyaltyPrograms = this.getLoyaltyPrograms.bind(this);
     this.saveLoyaltyPrograms = this.saveLoyaltyPrograms.bind(this);
     this.getPassports = this.getPassports.bind(this);
@@ -334,6 +335,34 @@ class ClientProfileController {
       this.sendSuccess(res, { id: req.params.id }, 'Preferencia eliminada');
     } catch (error) {
       logger.error('Error in ClientProfileController.deleteTravelPreference', { error: error.message, ownerId: owner.ownerId });
+      this.sendError(res, error.message, error.status || 500);
+    }
+  }
+
+  // Replace the owner's whole preference set in one save (the UI sends all categories at once).
+  async saveTravelPreferences(req, res) {
+    const owner = this.resolveOwner(req);
+    try {
+      await this.validateOwnerExists(owner);
+
+      const incoming = Array.isArray(req.body.preferences) ? req.body.preferences : [];
+      const clean = incoming
+        .filter((p) => p && typeof p.type === 'string' && p.type.trim()
+          && typeof p.option === 'string' && p.option.trim())
+        .map((p) => ({ type: p.type.trim(), option: p.option.trim() }));
+
+      // Replace-all: drop the existing rows, then insert the submitted set.
+      const existing = await TravelPreference.getByOwner(owner.ownerType, owner.ownerId);
+      if (existing.length) await Parse.Object.destroyAll(existing, { useMasterKey: true });
+
+      const created = clean.map((p) => TravelPreference.create({
+        ...p, ownerType: owner.ownerType, ownerId: owner.ownerId,
+      }));
+      if (created.length) await Parse.Object.saveAll(created, { useMasterKey: true });
+
+      this.sendSuccess(res, { preferences: created.map((p) => p.toJSON()) }, 'Preferencias guardadas');
+    } catch (error) {
+      logger.error('Error in ClientProfileController.saveTravelPreferences', { error: error.message, ownerId: owner.ownerId });
       this.sendError(res, error.message, error.status || 500);
     }
   }
