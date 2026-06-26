@@ -18898,8 +18898,10 @@ class ItineraryBuilder {
    */
   getWaitingTimePriceFor(vehicleTypeId, rateId) {
     if (!vehicleTypeId || !rateId || !this.vehicleRatePricesCache.length) return null;
+    // Tolerante: el id puede venir como string (objectId) o como pointer/objeto {objectId|id}.
+    const idOf = (v) => (v && typeof v === 'object' ? (v.objectId || v.id) : v);
     const match = this.vehicleRatePricesCache.find(
-      (p) => p.vehicleTypeId === vehicleTypeId && p.rateId === rateId
+      (p) => idOf(p.vehicleTypeId) === vehicleTypeId && idOf(p.rateId) === rateId
     );
     return match ? { pricePerHour: match.pricePerHour, currency: match.currency || 'MXN' } : null;
   }
