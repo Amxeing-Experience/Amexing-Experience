@@ -123,6 +123,17 @@ router.patch(
 );
 
 /**
+ * PUT /api/reservations/:id/status — Manually set reservation status (confirmed/hold).
+ */
+router.put(
+  '/:id/status',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => ReservationController.setReservationStatus(req, res)
+);
+
+/**
  * POST /api/reservations/:id/cancel — Cancel reservation.
  */
 router.post(

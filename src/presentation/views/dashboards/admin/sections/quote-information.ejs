@@ -2568,7 +2568,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 const dashboardPathMap = { department_manager: '/dashboard/department_manager', client: '/dashboard/client' };
                 const dashboardPath = dashboardPathMap[userRole] || '/dashboard/admin';
                 setTimeout(() => {
-                    window.location.href = `${dashboardPath}/quotes/${quoteId}?section=services`;
+                    // Preserve the reservation context so the header keeps reading
+                    // "Reservación" (not "Cotización") after auto-advancing.
+                    const resCtx = window.__isReservation ? '&context=reservation' : '';
+                    window.location.href = `${dashboardPath}/quotes/${quoteId}?section=services${resCtx}`;
                 }, 1500);
             } else {
                 showAlert('quoteInformationAlerts', result.error || `Error al actualizar la ${Qe}`, 'danger');
@@ -2718,7 +2721,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 const dashboardPathMap = { department_manager: '/dashboard/department_manager', client: '/dashboard/client' };
                 const dashboardPath = dashboardPathMap[userRole] || '/dashboard/admin';
                 setTimeout(() => {
-                    window.location.href = `${dashboardPath}/quotes/${result.data.id}?section=services`;
+                    // A freshly created quote is always a "Cotización", but preserve the
+                    // context if somehow set so the header label stays consistent.
+                    const resCtx = window.__isReservation ? '&context=reservation' : '';
+                    window.location.href = `${dashboardPath}/quotes/${result.data.id}?section=services${resCtx}`;
                 }, 1500);
             } else {
                 showAlert('quoteInformationAlerts', result.error || 'Error al crear la cotización', 'danger');

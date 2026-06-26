@@ -1046,6 +1046,77 @@ class ReservationController {
   }
 
   /**
+   * PUT /api/reservations/:id/status — Manually set the reservation's overall status.
+   * Only the MANUAL states are allowed here: 'confirmed' (todo asignado y confirmado)
+   * and 'hold' (bloqueado). The derived states (pending/assigned/in_progress/completed)
+   * are computed from service assignments by updateReservationStatus and must not be set
+   * by hand; 'cancelled' has its own cascade flow (cancelReservation).
+   * @param {object} req - Express request; body: { status }.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON { success, data: { status } }.
+   * @example
+   *   PUT /api/reservations/abc123/status { "status": "confirmed" }
+   */
+  static async setReservationStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body || {};
+      // 'confirmed'/'hold' are set manually. 'pending' is the RELEASE action: it
+      // clears the manual state and recomputes the real status from the service
+      // assignments (so the user can step back out of Bloqueado/Confirmada).
+      const MANUAL_STATUSES = ['confirmed', 'hold'];
+      const RELEASE_STATUS = 'pending';
+      const ALLOWED = [...MANUAL_STATUSES, RELEASE_STATUS];
+      if (!ALLOWED.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: `Estado inválido. Sólo se permite: ${ALLOWED.join(', ')}`,
+        });
+      }
+
+      const query = new Parse.Query('Reservation');
+      query.equalTo('active', true);
+      query.equalTo('exists', true);
+      const reservation = await query.get(id, { useMasterKey: true });
+      if (!reservation) {
+        return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      }
+
+      if (reservation.get('status') === 'cancelled') {
+        return res.status(409).json({
+          success: false,
+          error: 'No se puede cambiar el estado de una reservación cancelada',
+        });
+      }
+
+      if (status === RELEASE_STATUS) {
+        // Drop the manual hold/confirmed, then let updateReservationStatus derive
+        // the real state (pending/assigned/completed) from the service statuses.
+        reservation.set('status', 'pending');
+        await reservation.save(null, { useMasterKey: true });
+        await ReservationController.updateReservationStatus(reservation);
+        const finalStatus = reservation.get('status');
+        logger.info('Reservation status released (recomputed)', {
+          reservationId: id, finalStatus, performedBy: req.user?.id,
+        });
+        return res.json({ success: true, data: { status: finalStatus } });
+      }
+
+      reservation.set('status', status);
+      await reservation.save(null, { useMasterKey: true });
+
+      logger.info('Reservation status set manually', {
+        reservationId: id, status, performedBy: req.user?.id,
+      });
+
+      return res.json({ success: true, data: { status } });
+    } catch (error) {
+      logger.error('Error setting reservation status', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Error al actualizar estado' });
+    }
+  }
+
+  /**
    * PUT /api/reservations/:id/services/batch-assign — Batch assign employees/vehicle to multiple services.
    * @param req
    * @param res
