@@ -414,7 +414,41 @@ class ApiController {
         firstName, lastName, email, phone, preferredLanguage,
         collaboratorType, collaboratorTypeOther, website,
         professionalAffiliation, howDidYouHear, comments,
+        formToken, company_url: honeypot,
       } = req.body;
+
+      const PartnerRequestService = require('../services/PartnerRequestService');
+
+      // Honeypot: if the hidden field is filled, treat as a bot. Respond as if
+      // successful (so the bot does not retry) but do nothing.
+      if (honeypot && String(honeypot).trim() !== '') {
+        logger.warn('Partner request honeypot triggered', { ip: req.ip });
+        return res.json({
+          success: true,
+          message: tr('successMessage', '¡Gracias! Recibimos tu solicitud y nuestro equipo la revisará pronto.'),
+        });
+      }
+
+      // Time-trap: reject submissions that are too fast or whose token is invalid/expired.
+      const tokenCheck = PartnerRequestService.verifyFormToken(formToken);
+      if (!tokenCheck.valid) {
+        if (tokenCheck.reason === 'too_fast') {
+          logger.warn('Partner request rejected (too fast)', { ip: req.ip });
+          return res.status(400).json({
+            success: false,
+            error: 'too_fast',
+            message: tr('tooFast', 'Tu solicitud se envió demasiado rápido. Inténtalo de nuevo.'),
+          });
+        }
+        logger.warn('Partner request rejected (invalid form token)', {
+          ip: req.ip, reason: tokenCheck.reason,
+        });
+        return res.status(400).json({
+          success: false,
+          error: tokenCheck.reason || 'invalid_form',
+          message: tr('formExpired', 'El formulario expiró. Recarga la página e inténtalo de nuevo.'),
+        });
+      }
 
       // Required fields
       if (!firstName || !lastName || !email || !phone || !collaboratorType) {
@@ -468,7 +502,6 @@ class ApiController {
         });
       }
 
-      const PartnerRequestService = require('../services/PartnerRequestService');
       const partnerRequestService = new PartnerRequestService();
 
       const result = await partnerRequestService.processPartnerRequest({

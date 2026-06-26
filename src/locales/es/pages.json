@@ -231,7 +231,9 @@
     "errorMessage": "No pudimos enviar tu solicitud. Inténtalo de nuevo.",
     "connectionError": "Ocurrió un error de conexión. Inténtalo de nuevo más tarde.",
     "requiredFields": "Nombre, apellido, correo, teléfono y tipo de colaborador son obligatorios.",
-    "serverError": "Hubo un error al procesar tu solicitud. Inténtalo de nuevo más tarde."
+    "serverError": "Hubo un error al procesar tu solicitud. Inténtalo de nuevo más tarde.",
+    "tooFast": "Tu solicitud se envió demasiado rápido. Inténtalo de nuevo.",
+    "formExpired": "El formulario expiró. Recarga la página e inténtalo de nuevo."
   },
   "auth": {
     "brand": {

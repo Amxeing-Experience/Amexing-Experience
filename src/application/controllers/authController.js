@@ -185,10 +185,13 @@ class AuthController {
       ? 'denisse@meeplab.com'
       : 'michelle@amexing.com';
 
+    const PartnerRequestService = require('../services/PartnerRequestService');
+
     res.render('auth/request-access', {
       title: 'Solicitud de Acceso - Agencias - Amexing',
       csrfToken: csrf,
       supportEmail,
+      formToken: PartnerRequestService.generateFormToken(),
       t: req.t || ((key) => key),
       error: req.query.error || null,
       oauth_attempted: req.query.oauth_attempted || null,

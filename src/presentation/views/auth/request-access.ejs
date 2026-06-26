@@ -7,6 +7,7 @@ const tFn = typeof t === 'function' ? t : ((key) => key);
     content: include('../molecules/auth/request-access-form', {
         csrfToken: csrfToken,
         supportEmail: supportEmail,
+        formToken: typeof formToken !== 'undefined' ? formToken : '',
         t: tFn
     })
 }) %>

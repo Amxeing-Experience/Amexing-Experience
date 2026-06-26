@@ -626,6 +626,58 @@ Enviado automáticamente desde el formulario de solicitud de acceso de Amexing C
   }
 
   /**
+   * Generates a signed timestamp token embedded in the public form (time-trap).
+   * @returns {string} Token in the form "<timestamp>.<hmac>".
+   * @example
+   * const token = PartnerRequestService.generateFormToken();
+   */
+  static generateFormToken() {
+    const ts = Date.now().toString();
+    const sig = crypto
+      .createHmac('sha256', PartnerRequestService.getSigningSecret())
+      .update(`form:${ts}`)
+      .digest('hex');
+    return `${ts}.${sig}`;
+  }
+
+  /**
+   * Verifies a form token: valid signature and elapsed time within bounds.
+   * Rejects submissions that are too fast (bots) or whose token expired.
+   * @param {string} token - Token produced by generateFormToken().
+   * @returns {{valid: boolean, reason?: string}} Validation result.
+   * @example
+   * PartnerRequestService.verifyFormToken(req.body.formToken);
+   */
+  static verifyFormToken(token) {
+    const MIN_MS = 2500; // submissions faster than this are almost certainly bots
+    const MAX_MS = 6 * 60 * 60 * 1000; // token good for 6 hours
+    if (!token || typeof token !== 'string' || !token.includes('.')) {
+      return { valid: false, reason: 'missing' };
+    }
+    const [ts, sig] = token.split('.');
+    const expected = crypto
+      .createHmac('sha256', PartnerRequestService.getSigningSecret())
+      .update(`form:${ts}`)
+      .digest('hex');
+    const sigBuf = Buffer.from(sig);
+    const expBuf = Buffer.from(expected);
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      return { valid: false, reason: 'invalid' };
+    }
+    const elapsed = Date.now() - parseInt(ts, 10);
+    if (Number.isNaN(elapsed) || elapsed < 0) {
+      return { valid: false, reason: 'invalid' };
+    }
+    if (elapsed < MIN_MS) {
+      return { valid: false, reason: 'too_fast' };
+    }
+    if (elapsed > MAX_MS) {
+      return { valid: false, reason: 'expired' };
+    }
+    return { valid: true };
+  }
+
+  /**
    * Fetches a single PartnerRequest by id.
    * @param {string} submissionId - PartnerRequest object id.
    * @returns {Promise<Parse.Object|null>} The request or null if not found.

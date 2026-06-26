@@ -231,7 +231,9 @@
     "errorMessage": "We couldn't send your request. Please try again.",
     "connectionError": "A connection error occurred. Please try again later.",
     "requiredFields": "First name, last name, email, phone, and type of collaborator are required.",
-    "serverError": "There was an error processing your request. Please try again later."
+    "serverError": "There was an error processing your request. Please try again later.",
+    "tooFast": "Your request was submitted too quickly. Please try again.",
+    "formExpired": "The form expired. Please reload the page and try again."
   },
   "auth": {
     "brand": {

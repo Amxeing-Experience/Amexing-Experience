@@ -9,6 +9,7 @@
 
 // Default parameters
 const accessCsrfToken = typeof csrfToken !== 'undefined' ? csrfToken : '';
+const accessFormToken = typeof formToken !== 'undefined' ? formToken : '';
 const accessSupportEmail = typeof supportEmail !== 'undefined' ? supportEmail : 'support@amexing.com';
 const accessError = typeof error !== 'undefined' && error ? error : null;
 const accessOAuthAttempted = typeof oauth_attempted !== 'undefined' ? oauth_attempted : null;
@@ -113,6 +114,13 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
 
             <form id="partnerRequestForm" class="needs-validation" novalidate>
                 <input type="hidden" name="csrfToken" value="<%= accessCsrfToken %>">
+                <!-- Time-trap: signed timestamp generated when the form was rendered -->
+                <input type="hidden" name="formToken" value="<%= accessFormToken %>">
+                <!-- Honeypot: hidden from humans; if filled, the submission is treated as a bot -->
+                <div class="hp-field" aria-hidden="true">
+                    <label for="company_url">No llenar este campo</label>
+                    <input type="text" id="company_url" name="company_url" tabindex="-1" autocomplete="off">
+                </div>
 
                 <!-- Datos de contacto -->
                 <h5 class="form-section-title mb-4">
@@ -412,6 +420,18 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
 
     .request-access-container a.text-primary:hover {
         color: #5f6450 !important;
+    }
+
+    /* Honeypot: visually removed, off-screen, never focusable */
+    .hp-field {
+        position: absolute !important;
+        left: -9999px !important;
+        top: -9999px !important;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        opacity: 0;
+        pointer-events: none;
     }
 
     /* Form section titles */
