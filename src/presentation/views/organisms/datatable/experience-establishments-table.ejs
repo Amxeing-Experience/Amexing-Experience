@@ -22,42 +22,49 @@ const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 %>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-        <div class="row align-items-center">
-            <div class="col">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-building me-2"></i>Establecimientos
-                </h5>
-                <small class="text-white" style="opacity: 0.9;">Gestión de establecimientos y locales</small>
-            </div>
-            <div class="col-auto">
-                <% if (canCreate) { %>
-                    <button type="button" class="btn btn-light btn-sm" id="createEstablishmentBtn">
-                        <i class="ti ti-plus me-1"></i>Nuevo Establecimiento
-                    </button>
-                <% } %>
+<!-- Bandeja master-detail: lista de establecimientos (izquierda) + detalle inline (derecha) -->
+<div class="row g-3 establishment-inbox">
+    <!-- Columna lista (master) -->
+    <div class="col-lg-5 col-xl-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body" id="establishments-content">
+                <table id="<%= dtTableId %>" class="table table-hover establishment-inbox-table mb-0" style="width:100%">
+                    <thead class="visually-hidden">
+                        <tr>
+                            <th>Establecimiento</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <div class="card-body" id="establishments-content">
-        <div class="table-responsive">
-            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
-                <thead class="table-light">
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Descripción</th>
-                        <th>Experiencias</th>
-                        <th>Última Actualización</th>
-                        <th>Estado</th>
-                        <% if (dtShowActions) { %>
-                            <th class="text-center">Acciones</th>
-                        <% } %>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+    <!-- Columna detalle (detail) -->
+    <div class="col-lg-7 col-xl-8">
+        <div class="card border-0 shadow-sm h-100" id="establishmentDetailCard">
+            <!-- Estado vacío: ningún establecimiento seleccionado -->
+            <div id="establishmentDetailEmpty" class="card-body d-flex flex-column align-items-center justify-content-center text-center text-muted" style="min-height: 420px;">
+                <i class="ti ti-hand-click mb-3" style="font-size: 2.5rem; opacity: .4;"></i>
+                <h6 class="mb-1">Selecciona un establecimiento</h6>
+                <p class="mb-0 small">Elige uno de la lista o crea uno nuevo para ver y editar sus experiencias aquí.</p>
+            </div>
+
+            <!-- Detalle del establecimiento (el formulario se reubica aquí en runtime) -->
+            <div id="establishmentDetailBody" style="display: none;">
+                <div class="card-header d-flex justify-content-between align-items-center" style="background: var(--brand-gradient);">
+                    <h5 class="mb-0 text-white">
+                        <i class="ti ti-building me-2"></i><span id="establishmentModalTitle">Crear Nuevo Establecimiento</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" id="closeEstablishmentDetailBtn" title="Cerrar" aria-label="Cerrar"></button>
+                </div>
+                <div class="card-body" id="establishmentDetailScroll" style="max-height: calc(100vh - 230px); overflow-y: auto;">
+                    <!-- #establishmentModalAlerts y #establishmentForm se mueven aquí al iniciar -->
+                </div>
+                <div class="card-footer d-flex justify-content-end gap-2" id="establishmentDetailFooter">
+                    <!-- El botón Guardar se mueve aquí al iniciar -->
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -259,18 +266,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 </div>
 
 <!-- Establishment Creation/Edit Modal -->
-<div class="modal fade" id="establishmentModal" tabindex="-1" aria-labelledby="establishmentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);">
-                <h5 class="modal-title text-white" id="establishmentModalLabel">
-                    <i class="ti ti-building me-2"></i><span id="establishmentModalTitle">Crear Nuevo Establecimiento</span>
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-
-            <div class="modal-body">
-                <!-- Alert container for modal-specific errors -->
+<!-- Holder oculto: sus nodos (alerts, form, botón) se reubican en el panel de detalle al iniciar (ver relocateEstablishmentForm) -->
+<div id="establishmentModal" class="d-none">
+                <!-- Alert container for detail-panel errors -->
                 <div id="establishmentModalAlerts"></div>
 
                 <form id="establishmentForm">
@@ -340,18 +338,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <input type="hidden" id="establishmentMinPeople" name="min_people" value="">
                     <input type="hidden" id="establishmentCost" name="cost" value="0">
                 </form>
-            </div>
-
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="ti ti-x me-1"></i>Cancelar
-                </button>
                 <button type="button" class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); color: white;" id="saveEstablishmentBtn">
                     <i class="ti ti-check me-1"></i><span id="saveEstablishmentButtonText">Crear Establecimiento</span>
                 </button>
-            </div>
-        </div>
-    </div>
 </div>
 
 <!-- Template para experiencia de establecimiento editable inline -->
@@ -720,6 +709,19 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         }
 
         // DataTable initialization with type=Establishment filter
+        // Master-detail: reubica el form + botón fuera del holder (modal oculto)
+        // hacia el panel de detalle inline; los nodos conservan sus handlers.
+        (function relocateEstablishmentForm() {
+            const $scroll = $('#establishmentDetailScroll');
+            const $footer = $('#establishmentDetailFooter');
+            if ($scroll.length && $('#establishmentForm').length) {
+                $scroll.append($('#establishmentModalAlerts'));
+                $scroll.append($('#establishmentForm'));
+                $footer.append($('#saveEstablishmentBtn'));
+                $('#establishmentModal').remove();
+            }
+        })();
+
         const dataTable = $(`#${tableId}`).DataTable({
             processing: true,
             serverSide: true,
@@ -735,163 +737,66 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 }
             },
         columns: [
-            // Nombre
+            // Bandeja: una sola columna por establecimiento (nombre + nº experiencias
+            // + estado + menú de acciones). El renglón completo es clicable.
             {
-                data: 'name',
-                orderable: true,
-                render: function(data, type, row) {
-                    if (type === 'display') {
-                        const truncatedName = data.length > 30 ? data.substring(0, 30) + '...' : data;
-                        return `<div class="fw-medium">${truncatedName}</div>`;
-                    }
-                    return data;
-                }
-            },
-            // Descripción
-            {
-                data: 'description',
-                orderable: false,
-                render: function(data, type, row) {
-                    if (type === 'display') {
-                        if (!data) return '<span class="text-muted">Sin descripción</span>';
-                        const truncatedDesc = data.length > 50 ? data.substring(0, 50) + '...' : data;
-                        return `<small class="text-muted">${truncatedDesc}</small>`;
-                    }
-                    return data || '';
-                }
-            },
-            // Experiencias count
-            {
-                data: 'experienciasCount',
-                orderable: true,
-                render: function(data) {
-                    return `<span class="badge bg-primary">${data || 0}</span>`;
-                }
-            },
-            // Última actualización
-            {
-                data: 'updatedAt',
-                orderable: true,
-                render: function(data) {
-                    if (!data) return '<span class="text-muted">-</span>';
-                    const date = new Date(data);
-                    const formattedDate = date.toLocaleDateString('es-ES', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                    });
-                    const formattedTime = date.toLocaleTimeString('es-ES', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                    return `<small class="text-muted">${formattedDate}<br>${formattedTime}</small>`;
-                }
-            },
-            // Estado
-            {
-                data: 'active',
-                orderable: false,
-                render: function(data) {
-                    return data
-                        ? '<span class="badge bg-success">Activo</span>'
-                        : '<span class="badge bg-warning">Inactivo</span>';
-                }
-            },
-            ...(showActions ? [{
                 data: null,
                 orderable: false,
-                className: 'text-center',
                 render: function(data, type, row) {
-                    let actions = '<div class="btn-group btn-group-sm" role="group">';
-                    
+                    const id = row.id;
+                    const count = row.experienciasCount || 0;
+                    const countLabel = count > 0
+                        ? `${count} experiencia${count !== 1 ? 's' : ''}`
+                        : 'Sin experiencias';
+                    const status = row.active
+                        ? '<span class="badge bg-success">Activo</span>'
+                        : '<span class="badge bg-warning">Inactivo</span>';
+
+                    let menuItems = '';
                     if (canEdit) {
-                        // Edit button - Primary blue (matches providers)
-                        actions += `<button type="button"
-                                        class="btn btn-primary edit-establishment-btn"
-                                        data-id="${row.id}"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Editar Establecimiento">
-                                        <i class="ti ti-edit"></i>
-                                    </button>`;
-
-                        // Add Experience button - Success green (matches providers)  
-                        actions += `<button type="button"
-                                        class="btn btn-success quick-add-establishment-experience-btn"
-                                        data-id="${row.id}"
-                                        data-name="${row.name}"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Agregar Experiencia Rápida">
-                                        <i class="ti ti-plus"></i>
-                                    </button>`;
-
-                        // Manage Images button - Secondary gray (matches providers)
-                        actions += `<button type="button"
-                                        class="btn btn-secondary manage-establishment-images-btn"
-                                        data-id="${row.id}"
-                                        data-name="${row.name}"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Gestionar Imágenes">
-                                        <i class="ti ti-photo"></i>
-                                    </button>`;
-
-                        // Toggle Status button - Warning/Success with archive icons (matches providers)
-                        const statusIcon = row.active ? 'ti-archive' : 'ti-archive-off';
-                        const statusTitle = row.active ? 'Desactivar Establecimiento' : 'Activar Establecimiento';
-                        const statusClass = row.active ? 'btn-warning' : 'btn-success';
-
-                        actions += `<button type="button"
-                                        class="btn ${statusClass} toggle-establishment-status-btn"
-                                        data-id="${row.id}"
-                                        data-current-status="${row.active}"
-                                        data-name="${row.name}"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="${statusTitle}">
-                                        <i class="ti ${statusIcon}"></i>
-                                    </button>`;
+                        const toggleTitle = row.active ? 'Desactivar' : 'Activar';
+                        const toggleIcon = row.active ? 'ti-archive' : 'ti-archive-off';
+                        menuItems += `
+                            <li><button type="button" class="dropdown-item quick-add-establishment-experience-btn" data-id="${id}" data-name="${row.name}"><i class="ti ti-plus me-2"></i>Agregar experiencia rápida</button></li>
+                            <li><button type="button" class="dropdown-item toggle-establishment-status-btn" data-id="${id}" data-current-status="${row.active}" data-name="${row.name}"><i class="ti ${toggleIcon} me-2"></i>${toggleTitle}</button></li>
+                            <li><button type="button" class="dropdown-item convert-to-provider-btn" data-id="${id}" data-name="${row.name}"><i class="ti ti-building-store me-2"></i>Convertir a proveedor</button></li>`;
                     }
-
-                    // Add conversion to Provider button
-                    if (canEdit) {
-                        actions += `<button type="button"
-                                        class="btn btn-warning convert-to-provider-btn"
-                                        data-id="${row.id}"
-                                        data-name="${row.name}"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Convertir a Proveedor">
-                                        <i class="ti ti-building-store"></i>
-                                    </button>`;
-                    }
-
                     if (canDelete) {
-                        // Delete button - Danger red (matches providers)
-                        actions += `<button type="button"
-                                        class="btn btn-danger delete-establishment-btn"
-                                        data-id="${row.id}"
-                                        data-name="${row.name}"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Eliminar Establecimiento">
-                                        <i class="ti ti-trash"></i>
-                                    </button>`;
+                        menuItems += `
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button type="button" class="dropdown-item text-danger delete-establishment-btn" data-id="${id}" data-name="${row.name}"><i class="ti ti-trash me-2"></i>Eliminar</button></li>`;
                     }
+                    const menu = (showActions && menuItems) ? `
+                        <div class="dropdown flex-shrink-0">
+                            <button class="btn btn-sm btn-link text-muted p-0 px-1" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Acciones">
+                                <i class="ti ti-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">${menuItems}</ul>
+                        </div>` : '';
 
-                    actions += '</div>';
-                    return actions;
+                    return `
+                        <div class="d-flex justify-content-between align-items-start gap-2 py-1">
+                            <div class="flex-grow-1" style="min-width: 0;">
+                                <div class="fw-semibold text-truncate">${row.name || '-'}</div>
+                                <div class="small text-muted">${countLabel}</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                ${status}
+                                ${menu}
+                            </div>
+                        </div>`;
                 }
-            }] : [])
+            }
         ],
-        order: [[3, 'desc']], // Order by last updated
-        pageLength: 25,
-        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        order: [],
+        ordering: false,
+        pageLength: 10,
         language: {
             url: '/assets/vendor/datatables/es-ES.json'
         },
-        responsive: true,
+        // Lista angosta: sin colapso responsive; búsqueda arriba, tabla, info+paginación
+        responsive: false,
+        dom: '<"mb-2"f>rt<"d-flex flex-wrap justify-content-between align-items-center mt-2 gap-2"ip>',
         drawCallback: function() {
             // Initialize tooltips
             $('[data-bs-toggle="tooltip"]').tooltip();
@@ -905,6 +810,27 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             console.log('📝 Edit establishment:', establishmentId);
             loadEstablishmentData(establishmentId);
         });
+
+        // Bandeja: click en una fila abre su detalle a la derecha
+        $(`#${tableId} tbody`).on('click', 'tr', function(e) {
+            if ($(e.target).closest('button, a, .btn-group, .dtr-control').length) return;
+            const rowData = dataTable.row(this).data();
+            if (!rowData) return;
+            const id = rowData.id || rowData.objectId;
+            if (!id) return;
+            $(`#${tableId} tbody tr`).removeClass('table-active');
+            $(this).addClass('table-active');
+            loadEstablishmentData(id);
+        });
+
+        // Cerrar el panel de detalle -> volver al estado vacío
+        $('#closeEstablishmentDetailBtn').on('click', function() { closeEstablishmentDetail(); });
+
+        function closeEstablishmentDetail() {
+            $('#establishmentDetailBody').hide();
+            $('#establishmentDetailEmpty').removeClass('d-none').addClass('d-flex');
+            $(`#${tableId} tbody tr`).removeClass('table-active');
+        }
 
         // Toggle establishment status
         $(`#${tableId}`).on('click', '.toggle-establishment-status-btn', function() {
@@ -1796,9 +1722,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         saveBtn.prop('disabled', false).html(originalText);
                     }
                     
-                    // Close modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('establishmentModal'));
-                    modal.hide();
+                    // Bandeja: cerrar el panel de detalle (Chunk C lo cambia a keepOpen).
+                    // Inline con jQuery para no depender del scope de la función.
+                    $('#establishmentDetailBody').hide();
+                    $('#establishmentDetailEmpty').removeClass('d-none').addClass('d-flex');
+                    $('.establishment-inbox table tbody tr').removeClass('table-active');
                     
                     console.log('🔍 DEBUGGING: About to reload DataTable after establishment save', {
                         establishmentId: finalEstablishmentId || 'new',
@@ -2537,10 +2465,17 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             // Load POI options for Destino selectbox
             loadEstablishmentDestinoOptions();
-            
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('establishmentModal'));
-            modal.show();
+
+            // Bandeja: mostrar el panel de detalle inline (sin overlay modal).
+            // El estado vacío usa .d-flex (display:flex !important): se alterna
+            // .d-flex/.d-none para ocultarlo/mostrarlo de forma confiable.
+            $('#establishmentDetailEmpty').removeClass('d-flex').addClass('d-none');
+            $('#establishmentDetailBody').show();
+            $('#establishmentDetailScroll').scrollTop(0);
+            const detailCard = document.getElementById('establishmentDetailCard');
+            if (detailCard && window.innerWidth < 992) {
+                detailCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
 
         // Make functions globally accessible for button clicks
@@ -2979,6 +2914,45 @@ function showErrorAlert(message) {
 
 <!-- Photo Upload Styling -->
 <style>
+/* Bandeja master-detail: lista tipo bandeja de entrada */
+.establishment-inbox #<%= dtTableId %> tbody tr {
+    cursor: pointer;
+}
+.establishment-inbox-table tbody td {
+    padding: 0.65rem 0.5rem;
+    border-bottom: 1px solid #f1f3f5;
+}
+.establishment-inbox-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.establishment-inbox #<%= dtTableId %> tbody tr:hover {
+    background-color: #f6f7f3;
+}
+.establishment-inbox #<%= dtTableId %> tbody tr.table-active {
+    background-color: #eef0e8;
+    box-shadow: inset 3px 0 0 0 #6e7359;
+}
+/* Paginación: indicador activo en verde de marca */
+.establishment-inbox .page-item.active .page-link {
+    background-color: var(--brand-primary, #969b81);
+    border-color: var(--brand-primary, #969b81);
+    color: #fff;
+}
+.establishment-inbox .page-link {
+    color: var(--brand-primary-active, #6e7359);
+}
+.establishment-inbox .dataTables_paginate .paginate_button.current,
+.establishment-inbox .dataTables_paginate .paginate_button.current:hover {
+    background: var(--brand-gradient) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+}
+.establishment-inbox .dataTables_paginate .paginate_button:hover {
+    background: #eef0e8 !important;
+    border-color: var(--brand-primary, #969b81) !important;
+    color: var(--brand-primary-active, #6e7359) !important;
+}
+
 .experience-photos-container {
     background: #f8f9fa;
     border: 1px dashed #dee2e6;
