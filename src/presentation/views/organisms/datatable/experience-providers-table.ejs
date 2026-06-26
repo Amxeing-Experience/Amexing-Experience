@@ -28,7 +28,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 <div class="row g-3 provider-inbox">
     <!-- Columna lista (master) -->
     <div class="col-lg-5 col-xl-4">
-        <div class="card border-0 shadow-sm">
+        <div class="card border-0 shadow-sm h-100">
             <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
                 <h5 class="card-title mb-0 text-white">
                     <i class="ti ti-building-store me-2"></i>Proveedores
@@ -51,7 +51,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
     <!-- Columna detalle (detail) -->
     <div class="col-lg-7 col-xl-8">
-        <div class="card border-0 shadow-sm" id="providerDetailCard">
+        <div class="card border-0 shadow-sm h-100" id="providerDetailCard">
             <!-- Estado vacío: ningún proveedor seleccionado -->
             <div id="providerDetailEmpty" class="card-body d-flex flex-column align-items-center justify-content-center text-center text-muted" style="min-height: 420px;">
                 <i class="ti ti-hand-click mb-3" style="font-size: 2.5rem; opacity: .4;"></i>
