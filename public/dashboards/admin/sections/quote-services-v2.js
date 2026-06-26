@@ -8519,8 +8519,10 @@ class ItineraryBuilder {
                                             ${(Array.isArray(service.extraAdditionalVehicles) ? service.extraAdditionalVehicles : []).map((v) => {
         const name = (v && (v.vehicleTypeName || '')).trim() || 'Vehículo adicional';
         const seg = (v && v.segmentName) || '';
+        const wh = parseFloat(v && v.waitingHours) || 0;
+        const waitingTxt = wh > 0 ? ` <span class="text-warning"><i class="ti ti-clock"></i> ${wh}h espera</span>` : '';
         return `<div class="ms-3 mt-1">
-                                                                <span><strong>${name}</strong>${seg ? ` - ${seg}` : ''}</span>
+                                                                <span><strong>${name}</strong>${seg ? ` - ${seg}` : ''}${waitingTxt}</span>
                                                             </div>`;
       }).join('')}
                                         </div>
@@ -8913,7 +8915,9 @@ class ItineraryBuilder {
                                     ${(Array.isArray(service.extraAdditionalVehicles) ? service.extraAdditionalVehicles : []).map((v) => {
         const name = (v && (v.vehicleTypeName || '')).trim() || 'Vehículo adicional';
         const seg = (v && v.segmentName) || (v && v.segment ? this.getCategoryName(v.segment) : '');
-        return `<div class="ms-3 mt-1"><span><strong>${name}</strong>${seg ? ` - ${seg}` : ''}</span></div>`;
+        const wh = parseFloat(v && v.waitingHours) || 0;
+        const waitingTxt = wh > 0 ? ` <span class="text-warning"><i class="ti ti-clock"></i> ${wh}h espera</span>` : '';
+        return `<div class="ms-3 mt-1"><span><strong>${name}</strong>${seg ? ` - ${seg}` : ''}${waitingTxt}</span></div>`;
       }).join('')}
                                 </div>
                             ` : ''}
