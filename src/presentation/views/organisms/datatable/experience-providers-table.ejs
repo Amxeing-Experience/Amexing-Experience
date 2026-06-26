@@ -46,6 +46,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             </div>
 
             <div class="card-body" id="providers-content">
+                <p class="text-muted small mb-2">
+                    <i class="ti ti-hand-click me-1"></i>Haz clic en un proveedor para ver y editar sus experiencias.
+                </p>
                 <div class="table-responsive">
                     <table id="<%= dtTableId %>" class="table table-hover align-middle" style="width:100%">
                         <thead class="table-light">
@@ -1187,7 +1190,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             ordering: false, // Disable all column sorting UI
             pageLength: 10,
             searchDelay: 300,
-            responsive: true,
+            // Bandeja: sin colapso responsive (interfiere con el click de fila en
+            // columna angosta); la lista usa scroll horizontal del wrapper.
+            responsive: false,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
             drawCallback: function() {
                 const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -2903,6 +2908,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $('#providerDetailEmpty').hide();
             $('#providerDetailBody').show();
             $('#providerDetailScroll').scrollTop(0);
+            // En pantallas donde el panel queda apilado debajo de la lista,
+            // hace scroll para que el detalle quede a la vista al seleccionar.
+            const detailCard = document.getElementById('providerDetailCard');
+            if (detailCard && window.innerWidth < 992) {
+                detailCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
             $('#providerForm')[0].reset();
             // Limpia el destino pendiente al abrir; el editar lo vuelve a setear tras el GET.
             pendingProviderDestino = null;
