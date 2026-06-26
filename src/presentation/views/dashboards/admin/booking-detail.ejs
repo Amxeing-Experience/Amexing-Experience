@@ -779,6 +779,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (sub.waitingTimeHours) {
             horarioItems.push(detailLine('clock-pause', `${sub.waitingTimeHours}h`, 'Espera'));
         }
+        if (Array.isArray(sub.extraAdditionalVehicles)) {
+            sub.extraAdditionalVehicles.forEach((v) => {
+                const wh = parseFloat(v && v.waitingHours) || 0;
+                if (wh > 0) horarioItems.push(detailLine('clock-pause', `${wh}h`, `Espera ${(v.vehicleTypeName || 'adicional')}`));
+            });
+        }
         if (sub.routeDuration) {
             horarioItems.push(detailLine('route', `${sub.routeDuration} min`, 'Duración ruta'));
         }
