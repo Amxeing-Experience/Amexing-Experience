@@ -472,7 +472,10 @@ document.addEventListener('DOMContentLoaded', function() {
             emptyTable: 'No hay reservaciones registradas',
             paginate: { first: 'Primera', previous: 'Anterior', next: 'Siguiente', last: 'Última' },
         },
-        responsive: true,
+        // Responsive collapse deshabilitado: confundía al usuario al ocultar
+        // columnas (p.ej. Fecha Inicio). La tabla usa scroll horizontal
+        // (wrapper .table-responsive) cuando no caben todas las columnas.
+        responsive: false,
         pageLength: 10,
     });
 
