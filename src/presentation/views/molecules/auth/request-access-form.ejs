@@ -87,12 +87,6 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
             </div>
             <div class="col-md-6 mb-3">
                 <div class="benefit-item">
-                    <i class="ti ti-sparkles text-warning me-2"></i>
-                    <span><%= ra('benefit3') %></span>
-                </div>
-            </div>
-            <div class="col-md-6 mb-3">
-                <div class="benefit-item">
                     <i class="ti ti-headset text-danger me-2"></i>
                     <span><%= ra('benefit4') %></span>
                 </div>
@@ -101,6 +95,13 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
                 <div class="benefit-item">
                     <i class="ti ti-chart-bar text-purple me-2"></i>
                     <span><%= ra('benefit5') %></span>
+                </div>
+            </div>
+            <!-- El beneficio más largo va al final, abarcando las dos columnas -->
+            <div class="col-12 mb-3">
+                <div class="benefit-item">
+                    <i class="ti ti-stars text-warning me-2"></i>
+                    <span><%= ra('benefit3') %></span>
                 </div>
             </div>
         </div>
@@ -514,7 +515,7 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
        el ancho y se vea cómodo. Solo en escritorio dividido (el auth-layout
        apila los paneles a <=860px, donde el panel ya es ancho). */
     @media (min-width: 861px) {
-        .request-access-container .row > [class*="col-md-6"] {
+        #partnerRequestForm .row > [class*="col-md-6"] {
             flex: 0 0 100%;
             max-width: 100%;
         }
