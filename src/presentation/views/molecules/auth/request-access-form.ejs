@@ -519,6 +519,11 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
             flex: 0 0 100%;
             max-width: 100%;
         }
+        /* Acota el contenido a un ancho cómodo y centrado: evita que los inputs a
+           una columna se vean estirados a todo el panel. */
+        .request-access-container {
+            max-width: 600px;
+        }
     }
 </style>
 
