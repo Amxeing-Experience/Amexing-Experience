@@ -87,12 +87,6 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
             </div>
             <div class="col-md-6 mb-3">
                 <div class="benefit-item">
-                    <i class="ti ti-sparkles text-warning me-2"></i>
-                    <span><%= ra('benefit3') %></span>
-                </div>
-            </div>
-            <div class="col-md-6 mb-3">
-                <div class="benefit-item">
                     <i class="ti ti-headset text-danger me-2"></i>
                     <span><%= ra('benefit4') %></span>
                 </div>
@@ -101,6 +95,13 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
                 <div class="benefit-item">
                     <i class="ti ti-chart-bar text-purple me-2"></i>
                     <span><%= ra('benefit5') %></span>
+                </div>
+            </div>
+            <!-- El beneficio más largo va al final, abarcando las dos columnas -->
+            <div class="col-12 mb-3">
+                <div class="benefit-item">
+                    <i class="ti ti-stars text-warning me-2"></i>
+                    <span><%= ra('benefit3') %></span>
                 </div>
             </div>
         </div>
@@ -256,22 +257,29 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
     .request-access-container {
         max-width: 1200px;
         margin: 0 auto;
-        padding: 2rem 4rem;
+        padding: 1.5rem 1rem;
     }
 
 
+    /* Aplanado: 'Acerca de' sin caja, como bloque de texto con separador sutil */
+    .about-section {
+        border-top: 1px solid rgba(150, 155, 129, 0.18);
+        padding-top: 1.75rem;
+    }
     .about-section .card {
-        background: rgba(248, 249, 250, 0.5);
-        border-radius: 16px;
-        transition: transform 0.2s ease;
-        border: 1px solid rgba(150, 155, 129, 0.08);
+        background: transparent;
+        border: 0;
+        box-shadow: none !important;
+        border-radius: 0;
         max-width: 100%;
         margin: 0 auto;
     }
-
+    .about-section .card .card-body {
+        padding: 0;
+    }
     .about-section .card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(150, 155, 129, 0.15);
+        transform: none;
+        box-shadow: none;
     }
 
     .benefit-item {
@@ -301,6 +309,27 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
     .benefit-item span {
         font-weight: 500;
         color: #495057;
+    }
+
+    /* Aplanado: el formulario sin "card dentro de card"; respira en el panel */
+    #requestFormCard {
+        background: transparent;
+        border: 0;
+        box-shadow: none !important;
+    }
+    #requestFormCard > .card-body {
+        padding: 0;
+    }
+
+    /* Jerarquía: títulos de sección como "eyebrow" con regla inferior */
+    .form-section-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--amx-green-1, #6e7259);
+        padding-bottom: 0.55rem;
+        border-bottom: 2px solid rgba(150, 155, 129, 0.22);
     }
 
     #requestAccessBtn {
@@ -341,22 +370,22 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
     /* Responsive adjustments */
     @media (max-width: 1400px) {
         .request-access-container {
-            max-width: 90%;
-            padding: 2rem 3rem;
+            max-width: 100%;
+            padding: 1.5rem 1rem;
         }
     }
 
     @media (max-width: 1200px) {
         .request-access-container {
-            max-width: 85%;
-            padding: 2rem 2.5rem;
+            max-width: 100%;
+            padding: 1.5rem 0.75rem;
         }
     }
 
     @media (max-width: 992px) {
         .request-access-container {
-            max-width: 90%;
-            padding: 2rem 2rem;
+            max-width: 100%;
+            padding: 1.5rem 0.75rem;
         }
     }
 
@@ -478,6 +507,22 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
 
         #requestAccessBtn {
             display: none;
+        }
+    }
+
+    /* En el panel derecho (50% en escritorio) las 2 columnas se ven apretadas.
+       Sin tocar el HTML, forzamos una sola columna para que cada campo use todo
+       el ancho y se vea cómodo. Solo en escritorio dividido (el auth-layout
+       apila los paneles a <=860px, donde el panel ya es ancho). */
+    @media (min-width: 861px) {
+        #partnerRequestForm .row > [class*="col-md-6"] {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+        /* Acota el contenido a un ancho cómodo y centrado: evita que los inputs a
+           una columna se vean estirados a todo el panel. */
+        .request-access-container {
+            max-width: 600px;
         }
     }
 </style>
