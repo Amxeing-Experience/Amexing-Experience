@@ -256,7 +256,7 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
     .request-access-container {
         max-width: 1200px;
         margin: 0 auto;
-        padding: 2rem 4rem;
+        padding: 1.5rem 1rem;
     }
 
 
@@ -341,22 +341,22 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
     /* Responsive adjustments */
     @media (max-width: 1400px) {
         .request-access-container {
-            max-width: 90%;
-            padding: 2rem 3rem;
+            max-width: 100%;
+            padding: 1.5rem 1rem;
         }
     }
 
     @media (max-width: 1200px) {
         .request-access-container {
-            max-width: 85%;
-            padding: 2rem 2.5rem;
+            max-width: 100%;
+            padding: 1.5rem 0.75rem;
         }
     }
 
     @media (max-width: 992px) {
         .request-access-container {
-            max-width: 90%;
-            padding: 2rem 2rem;
+            max-width: 100%;
+            padding: 1.5rem 0.75rem;
         }
     }
 
@@ -478,6 +478,20 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
 
         #requestAccessBtn {
             display: none;
+        }
+    }
+
+    /* Esta página tiene un formulario de 2 columnas: dale más ancho al panel del
+       formulario y menos a la imagen, para que no se vea apretado. Solo en
+       escritorio (el auth-layout apila los paneles a <=860px). */
+    @media (min-width: 861px) {
+        .auth-brand {
+            flex: 0 0 40% !important;
+            max-width: 40% !important;
+        }
+        .auth-body {
+            flex: 0 0 60% !important;
+            max-width: 60% !important;
         }
     }
 </style>
