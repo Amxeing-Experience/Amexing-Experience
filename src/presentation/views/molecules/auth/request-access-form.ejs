@@ -481,17 +481,14 @@ const ra = (key) => tt(`pages:requestAccess.${key}`);
         }
     }
 
-    /* Esta página tiene un formulario de 2 columnas: dale más ancho al panel del
-       formulario y menos a la imagen, para que no se vea apretado. Solo en
-       escritorio (el auth-layout apila los paneles a <=860px). */
+    /* En el panel derecho (50% en escritorio) las 2 columnas se ven apretadas.
+       Sin tocar el HTML, forzamos una sola columna para que cada campo use todo
+       el ancho y se vea cómodo. Solo en escritorio dividido (el auth-layout
+       apila los paneles a <=860px, donde el panel ya es ancho). */
     @media (min-width: 861px) {
-        .auth-brand {
-            flex: 0 0 40% !important;
-            max-width: 40% !important;
-        }
-        .auth-body {
-            flex: 0 0 60% !important;
-            max-width: 60% !important;
+        .request-access-container .row > [class*="col-md-6"] {
+            flex: 0 0 100%;
+            max-width: 100%;
         }
     }
 </style>
