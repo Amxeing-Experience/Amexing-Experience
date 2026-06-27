@@ -152,6 +152,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 realSaveBtn.click();
             }
         });
+
+        // Espeja el estado del botón real en el botón fijo: muestra "Guardando…"
+        // (loader) mientras guarda y "Guardado ✓" al terminar, para que se vea que
+        // sí está pasando algo. El guardado real lo maneja saveExperience (intacto).
+        const realSaveBtnForObs = document.getElementById('saveExperienceInfoBtn');
+        if (realSaveBtnForObs) {
+            const stickyIdleHtml = expSaveBtn.innerHTML;
+            new MutationObserver(function() {
+                if (realSaveBtnForObs.disabled) {
+                    expSaveBtn.disabled = true;
+                    expSaveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Guardando…';
+                } else {
+                    expSaveBtn.disabled = false;
+                    const ok = /guardado|completado/i.test(realSaveBtnForObs.textContent || '');
+                    if (ok) {
+                        expSaveBtn.innerHTML = '<i class="ti ti-check me-1"></i>Guardado';
+                        setTimeout(function() { expSaveBtn.innerHTML = stickyIdleHtml; }, 1800);
+                    } else {
+                        expSaveBtn.innerHTML = stickyIdleHtml;
+                    }
+                }
+            }).observe(realSaveBtnForObs, { attributes: true, attributeFilter: ['disabled'] });
+        }
     }
 
     <% if (!isNewExperience) { %>
