@@ -1275,7 +1275,10 @@ class ItineraryBuilder {
             dashboardType = 'department_manager';
           }
 
-          window.location.href = `/dashboard/${dashboardType}/quotes/${quoteId}?section=summary`;
+          // Preserve the reservation context so the header keeps reading
+          // "Reservación" (not "Cotización") on the summary section.
+          const resCtx = window.__isReservation ? '&context=reservation' : '';
+          window.location.href = `/dashboard/${dashboardType}/quotes/${quoteId}?section=summary${resCtx}`;
         }
       }
     });
@@ -8475,7 +8478,7 @@ class ItineraryBuilder {
                     <div class="flex-grow-1">
                         ${roundedTime ? `
                         <div class="mb-2">
-                            <span class="badge bg-info text-white">
+                            <span class="badge bg-secondary text-white">
                                 <i class="ti ti-clock me-1"></i>Hora: ${roundedTime}
                             </span>
                         </div>
@@ -8756,7 +8759,7 @@ class ItineraryBuilder {
                     <div class="flex-grow-1">
                         ${roundedTime ? `
                         <div class="mb-2">
-                            <span class="badge bg-info text-white">
+                            <span class="badge bg-secondary text-white">
                                 <i class="ti ti-clock me-1"></i>Hora: ${roundedTime}
                             </span>
                         </div>

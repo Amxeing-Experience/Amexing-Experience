@@ -779,6 +779,8 @@ class AdminController extends RoleBasedController {
       // list it stays "Cotización" even if a reservation already exists.
       const isReservation = req.query.context === 'reservation';
       let reservationFolio = '';
+      let reservationId = '';
+      let reservationStatus = '';
       if (isReservation && !isNewQuote) {
         try {
           const Parse = require('parse/node');
@@ -789,6 +791,8 @@ class AdminController extends RoleBasedController {
           const reservation = await resQuery.first({ useMasterKey: true });
           if (reservation) {
             reservationFolio = reservation.get('folio') || '';
+            reservationId = reservation.id;
+            reservationStatus = reservation.get('status') || '';
           }
         } catch (e) {
           reservationFolio = '';
@@ -797,12 +801,16 @@ class AdminController extends RoleBasedController {
       const entityLabel = isReservation ? 'Reservación' : 'Cotización';
 
       await this.renderRoleView(req, res, 'quote-detail', {
-        title: isNewQuote ? 'Nueva Cotización' : `${entityLabel} ${quoteId}`,
+        // Browser tab: "Cotización"/"Reservación" without the folio/id (the
+        // layout appends " - Amexing"). New quotes keep the "Nueva" prefix.
+        title: isNewQuote ? `Nueva ${entityLabel}` : entityLabel,
         breadcrumb: null,
         quoteId,
         isNewQuote,
         isReservation,
         reservationFolio,
+        reservationId,
+        reservationStatus,
         currentSection: section,
         pageStyles: ['https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css'],
         footerScripts: `

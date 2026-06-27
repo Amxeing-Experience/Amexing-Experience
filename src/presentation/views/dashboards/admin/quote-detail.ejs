@@ -10,6 +10,20 @@ const isReservationView = typeof isReservation !== 'undefined' && isReservation;
 const entityLabel = isReservationView ? 'Reservación' : 'Cotización';
 const quoteTitle = isNewQuote ? 'Nueva Cotización' : entityLabel;
 
+// Reservation status → active segment. The control shows 5 states; the internal
+// 'assigned'/'in_progress' computed states fold into the nearest visible segment.
+const resStatusRaw = typeof reservationStatus !== 'undefined' ? reservationStatus : '';
+const resSegMap = {
+    hold: 'hold',
+    pending: 'pending',
+    assigned: 'confirmed',    // todo asignado = Confirmada (definición del negocio)
+    confirmed: 'confirmed',
+    in_progress: 'confirmed',
+    completed: 'completed',
+    cancelled: 'cancelled',
+};
+const activeResSeg = resSegMap[resStatusRaw] || 'pending';
+
 // Preserve the reservation context across the stepper's section navigation.
 const ctx = isReservationView ? 'context=reservation' : '';
 const steps = [
@@ -31,6 +45,9 @@ window.__quoteId = '<%= typeof quoteId !== "undefined" ? quoteId : "" %>';
 window.__isReservation = <%= isReservationView ? 'true' : 'false' %>;
 // When it's a reservation, show the reservation folio instead of the quote folio.
 window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reservationFolio : "" %>';
+// Reservation id + current status, used by the reservation status segmented control.
+window.__reservationId = '<%= typeof reservationId !== "undefined" ? reservationId : "" %>';
+window.__reservationStatus = '<%= typeof reservationStatus !== "undefined" ? reservationStatus : "" %>';
 // Nota: window.amxDedupFetch (dedup in-flight de /api/quotes/:id) se define en el .js compartido
 // quote-ownership.js, que cargan los 3 roles antes que el resto de módulos.
 </script>
@@ -67,9 +84,35 @@ window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reser
             <% if (!isNewQuote) { %>
             <div class="quote-status-control" id="quoteStatusControl">
                 <div class="quote-status-header">
-                    <span class="quote-status-title">Estado de la <%= entityLabel %></span>
-                    <span class="quote-status-hint">Selecciona el estado actual</span>
+                    <span class="quote-status-title">
+                        Estado de la <%= entityLabel %>
+                        <% if (isReservationView) { %>
+                        <i class="ti ti-info-circle quote-status-info" title="Bloqueado: congela la reservación manualmente.&#10;Asignaciones pendientes: faltan choferes o guías por asignar (automático). Clic para volver al seguimiento automático.&#10;Confirmada: márcala cuando ya asignaste todo.&#10;Finalizada: automática al completar los servicios.&#10;Cancelada: abre el flujo de cancelación (motivo y política de 24h)."></i>
+                        <% } %>
+                    </span>
+                    <span class="quote-status-hint"><%= isReservationView ? 'Bloqueado y Confirmada son manuales; Asignaciones pendientes y Finalizada son automáticas' : 'Selecciona el estado actual' %></span>
                 </div>
+                <% if (isReservationView) { %>
+                <%
+                  // Mixto: 'hold'/'confirmed'/'cancelled' editables; 'pending'/'completed'
+                  // son derivados (read-only). data-derived marca los no clickables.
+                  const resSegs = [
+                    { key: 'hold', label: 'Bloqueado', icon: 'ti-lock', derived: false },
+                    { key: 'pending', label: 'Asignaciones pendientes', icon: 'ti-user-exclamation', derived: false },
+                    { key: 'confirmed', label: 'Confirmada', icon: 'ti-circle-check', derived: false },
+                    { key: 'completed', label: 'Finalizada', icon: 'ti-flag-check', derived: true },
+                    { key: 'cancelled', label: 'Cancelada', icon: 'ti-x', derived: false },
+                  ];
+                %>
+                <div class="quote-status-segments" data-mode="reservation">
+                    <% resSegs.forEach(function(seg) { %>
+                    <label class="quote-status-seg <%= seg.derived ? 'derived' : '' %>" data-status="<%= seg.key %>" <%= seg.derived ? 'data-derived="1"' : '' %>>
+                        <input type="radio" name="quoteStatus" value="<%= seg.key %>" <%= activeResSeg === seg.key ? 'checked' : '' %> <%= seg.derived ? 'disabled' : '' %>>
+                        <span class="quote-status-seg-label"><i class="ti <%= seg.icon %> me-1"></i><%= seg.label %></span>
+                    </label>
+                    <% }); %>
+                </div>
+                <% } else { %>
                 <div class="quote-status-segments">
                     <label class="quote-status-seg" data-status="quoted">
                         <input type="radio" name="quoteStatus" value="quoted">
@@ -92,6 +135,7 @@ window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reser
                         <span class="quote-status-seg-label"><i class="ti ti-x me-1"></i>Rechazado</span>
                     </label>
                 </div>
+                <% } %>
             </div>
             <% } %>
         </div>
@@ -268,15 +312,15 @@ window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reser
 
 .stepper-item:hover:not(.disabled) {
     background-color: #f8f9fa;
-    color: #f76b1c;
+    color: var(--brand-primary-active);
     text-decoration: none;
 }
 
 .stepper-item.active {
-    background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%);
+    background: var(--brand-gradient);
     color: white;
     font-weight: 600;
-    box-shadow: 0 2px 8px rgba(247, 107, 28, 0.3);
+    box-shadow: 0 2px 8px rgba(var(--brand-primary-rgb), 0.35);
 }
 
 .stepper-item.active .stepper-number {
@@ -285,11 +329,11 @@ window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reser
 }
 
 .stepper-item.completed {
-    color: #198754;
+    color: var(--brand-success);
 }
 
 .stepper-item.completed .stepper-number {
-    background: #198754;
+    background: var(--brand-success);
     color: white;
 }
 
@@ -331,7 +375,7 @@ window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reser
 }
 
 .stepper-connector.completed {
-    background: #198754;
+    background: var(--brand-success);
 }
 
 /* Segmented status control */
@@ -354,9 +398,17 @@ window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reser
     color: #495057;
 }
 .quote-status-hint {
-    font-size: 0.65rem;
+    font-size: 0.78rem;
     color: #adb5bd;
     font-style: italic;
+}
+/* Info icon: informational only (not a button). Native title shows the details. */
+.quote-status-info {
+    margin-left: 0.25rem;
+    color: var(--brand-primary);
+    cursor: help;
+    font-size: 0.95rem;
+    vertical-align: text-bottom;
 }
 .quote-status-segments {
     display: inline-flex;
@@ -387,21 +439,34 @@ window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reser
     background: rgba(255,255,255,0.6);
     color: #495057;
 }
-/* Active states by status */
+/* Active states by status — usan la paleta de marca (theme.css) */
 .quote-status-seg[data-status="quoted"]:has(input:checked) .quote-status-seg-label {
-    background: #0dcaf0; color: white; box-shadow: 0 1px 4px rgba(13,202,240,0.3);
+    background: var(--brand-info); color: white; box-shadow: 0 1px 4px rgba(var(--brand-info-rgb),0.3);
 }
 .quote-status-seg[data-status="requested"]:has(input:checked) .quote-status-seg-label {
-    background: #0d6efd; color: white; box-shadow: 0 1px 4px rgba(13,110,253,0.3);
+    background: var(--brand-secondary); color: white; box-shadow: 0 1px 4px rgba(var(--brand-secondary-rgb),0.3);
 }
 .quote-status-seg[data-status="hold"]:has(input:checked) .quote-status-seg-label {
-    background: #ffc107; color: #000; box-shadow: 0 1px 4px rgba(255,193,7,0.3);
+    background: var(--brand-warning); color: #000; box-shadow: 0 1px 4px rgba(var(--brand-warning-rgb),0.3);
 }
 .quote-status-seg[data-status="scheduled"]:has(input:checked) .quote-status-seg-label {
-    background: #198754; color: white; box-shadow: 0 1px 4px rgba(25,135,84,0.3);
+    background: var(--brand-success); color: white; box-shadow: 0 1px 4px rgba(var(--brand-success-rgb),0.3);
 }
 .quote-status-seg[data-status="rejected"]:has(input:checked) .quote-status-seg-label {
-    background: #dc3545; color: white; box-shadow: 0 1px 4px rgba(220,53,69,0.3);
+    background: var(--brand-danger); color: white; box-shadow: 0 1px 4px rgba(var(--brand-danger-rgb),0.3);
+}
+/* Reservation active states */
+.quote-status-seg[data-status="pending"]:has(input:checked) .quote-status-seg-label {
+    background: var(--brand-info); color: white; box-shadow: 0 1px 4px rgba(var(--brand-info-rgb),0.3);
+}
+.quote-status-seg[data-status="confirmed"]:has(input:checked) .quote-status-seg-label {
+    background: var(--brand-primary); color: white; box-shadow: 0 1px 4px rgba(var(--brand-primary-rgb),0.3);
+}
+.quote-status-seg[data-status="completed"]:has(input:checked) .quote-status-seg-label {
+    background: var(--brand-success); color: white; box-shadow: 0 1px 4px rgba(var(--brand-success-rgb),0.3);
+}
+.quote-status-seg[data-status="cancelled"]:has(input:checked) .quote-status-seg-label {
+    background: var(--brand-danger); color: white; box-shadow: 0 1px 4px rgba(var(--brand-danger-rgb),0.3);
 }
 /* Disabled state (when quote is scheduled/locked) */
 .quote-status-seg.disabled {
@@ -411,6 +476,11 @@ window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reser
 .quote-status-seg.disabled .quote-status-seg-label {
     cursor: not-allowed;
 }
+/* Derived (read-only) reservation states: still show their active color when
+   current, but can't be clicked (the radio is disabled) and don't react to hover. */
+.quote-status-seg.derived .quote-status-seg-label { cursor: default; }
+.quote-status-seg.derived:hover .quote-status-seg-label { transform: none; }
+.quote-status-seg.derived:not(:has(input:checked)) { opacity: 0.6; }
 
 /* Responsive: on small screens */
 @media (max-width: 575.98px) {
@@ -460,6 +530,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+
     // Load quote folio for title display
     <% if (!isNewQuote) { %>
     async function loadQuoteFolio() {
@@ -499,15 +570,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     breadcrumbTitle.textContent = quoteTitleWithFolio;
                 }
 
-                document.title = quoteTitleWithFolio + ' - AmexingWeb';
+                // Browser tab: entity label only (no folio/id), matching the server title.
+                document.title = entityLabel + ' - Amexing';
 
-                // Set status segmented control
-                const statusRadio = document.querySelector(`input[name="quoteStatus"][value="${result.data.status}"]`);
-                if (statusRadio) statusRadio.checked = true;
-                if (result.data.status === 'scheduled') {
-                    document.querySelectorAll('.quote-status-seg').forEach(seg => {
-                        if (seg.dataset.status !== 'scheduled') seg.classList.add('disabled');
-                    });
+                // Set status segmented control. For reservations the control reflects the
+                // RESERVATION status (pre-checked server-side via activeResSeg), not the
+                // quote status — so skip the quote-status sync entirely here.
+                if (!window.__isReservation) {
+                    const statusRadio = document.querySelector(`input[name="quoteStatus"][value="${result.data.status}"]`);
+                    if (statusRadio) statusRadio.checked = true;
+                    if (result.data.status === 'scheduled') {
+                        document.querySelectorAll('.quote-status-seg').forEach(seg => {
+                            if (seg.dataset.status !== 'scheduled') seg.classList.add('disabled');
+                        });
+                    }
                 }
                 // Store createdBy email for fallback in Agendado confirmation
                 window._quoteCreatedByEmail = result.data.createdBy?.email || '';
@@ -611,12 +687,188 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function showReservationToast(msg) {
+        const toast = document.createElement('div');
+        toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
+        toast.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+        toast.innerHTML = `<strong><i class="ti ti-check me-1"></i>${msg}</strong><button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 6000);
+    }
+
+    // ── Cancellation workflow (shared) ───────────────────────────────────────
+    // Same flow the old "Cancelar Reserva" button used: enforces the 24h policy
+    // (creates an approval request when <24h to the event), requires a reason, and
+    // posts to /api/cancellation-requests. Modal is built dynamically. `onClose`
+    // runs whenever the modal is dismissed (used to revert the status segment).
+    function showCancelReservationModal(quote, onClose) {
+        let earliestEventDate = null;
+        if (quote.serviceItems && Array.isArray(quote.serviceItems.days)) {
+            quote.serviceItems.days.forEach((day) => {
+                (day.subconcepts || []).forEach((subconcept) => {
+                    if (subconcept.startDate) {
+                        const eventDate = new Date(subconcept.startDate);
+                        if (!earliestEventDate || eventDate < earliestEventDate) earliestEventDate = eventDate;
+                    }
+                });
+            });
+        }
+        const now = new Date();
+        const hoursBeforeEvent = earliestEventDate ? Math.max(0, Math.floor((earliestEventDate.getTime() - now.getTime()) / (1000 * 60 * 60))) : 0;
+        const requiresApproval = hoursBeforeEvent < 24;
+        const entityLabel = window.__isReservation ? 'Reservación' : 'Cotización';
+        const eventDateStr = earliestEventDate
+            ? earliestEventDate.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : 'No definida';
+
+        const modalHtml = `
+            <div class="modal fade" id="cancelReservationModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title"><i class="ti ti-x me-2"></i>Cancelar Reserva</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert ${requiresApproval ? 'alert-warning' : 'alert-info'}">
+                                <i class="ti ${requiresApproval ? 'ti-alert-triangle' : 'ti-info-circle'} me-2"></i>
+                                ${requiresApproval
+                                    ? `<strong>¡Atención!</strong> La cancelación es con menos de 24 horas de anticipación (${hoursBeforeEvent} horas restantes). Se creará una solicitud de cancelación que requerirá aprobación administrativa.`
+                                    : `La cancelación es con más de 24 horas de anticipación (${hoursBeforeEvent} horas restantes). La reserva se cancelará automáticamente.`}
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Folio de ${entityLabel}</label>
+                                    <div class="form-control-plaintext">${quote.folio || quote.id}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Fecha del Evento</label>
+                                    <div class="form-control-plaintext">${eventDateStr}</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="cancellationReason" class="form-label fw-semibold">Motivo de la Cancelación <span class="text-danger">*</span></label>
+                                <textarea class="form-control" id="cancellationReason" rows="4" placeholder="Por favor especifique el motivo de la cancelación..." required></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-danger" id="confirmCancellationBtn">
+                                <i class="ti ti-check me-2"></i>${requiresApproval ? 'Crear Solicitud' : 'Cancelar Reserva'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+        const existingModal = document.getElementById('cancelReservationModal');
+        if (existingModal) existingModal.remove();
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modalElement = document.getElementById('cancelReservationModal');
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        document.getElementById('confirmCancellationBtn').addEventListener('click', () => {
+            processCancellationRequest(quote, requiresApproval, hoursBeforeEvent, earliestEventDate, modal);
+        });
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            modalElement.remove();
+            if (typeof onClose === 'function') onClose();
+        });
+    }
+
+    async function processCancellationRequest(quote, requiresApproval, hoursBeforeEvent, eventDate, modal) {
+        const reason = document.getElementById('cancellationReason').value.trim();
+        if (!reason) { alert('Por favor ingrese un motivo para la cancelación'); return; }
+        const btn = document.getElementById('confirmCancellationBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+        btn.disabled = true;
+        try {
+            const response = await fetch('/api/cancellation-requests', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${window.quoteAccessToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    quoteFolio: quote.folio || quote.id,
+                    reason,
+                    hoursBeforeEvent,
+                    eventDate: eventDate ? eventDate.toISOString() : null,
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.error || 'Error al procesar la cancelación');
+            modal.hide();
+            if (result.data.directCancellation || result.data.cancellationType === 'direct' || (result.message || '').includes('cancelled successfully')) {
+                alert('La reserva ha sido cancelada exitosamente.');
+                window.location.reload();
+            } else {
+                alert(`Solicitud de cancelación creada exitosamente.\n\nID: ${result.data.requestId}\nEstado: Pendiente de aprobación\n\nRecibirá una notificación cuando sea revisada.`);
+            }
+        } catch (error) {
+            console.error('Error processing cancellation:', error);
+            alert(`Error al procesar la cancelación: ${error.message}`);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    // Reservation status: 'cancelled' runs the shared cancellation workflow above
+    // (policy + reason + approval); 'confirmed'/'hold' use the manual status
+    // endpoint. (Derived states aren't clickable.)
+    async function handleReservationStatusChange(newStatus, previousStatus) {
+        const resId = window.__reservationId;
+        if (!resId) { revertStatus(previousStatus); return; }
+        if (newStatus === 'cancelled') {
+            // Fetch the quote (with serviceItems → event dates) so the modal can apply
+            // the 24h policy, then revert the segment if the user dismisses it.
+            try {
+                const qr = await fetch(`/api/quotes/<%= quoteId %>`, {
+                    headers: { 'Authorization': `Bearer ${window.quoteAccessToken}` },
+                });
+                const qj = await qr.json();
+                const quoteData = (qj && qj.data) ? qj.data : { id: '<%= quoteId %>', folio: window.__reservationFolio };
+                showCancelReservationModal(quoteData, () => revertStatus(previousStatus));
+            } catch (e) {
+                revertStatus(previousStatus);
+                alert('No se pudo abrir la cancelación');
+            }
+            return;
+        }
+        try {
+            const r = await fetch(`/api/reservations/${resId}/status`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${window.quoteAccessToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            const j = await r.json();
+            if (!j.success) throw new Error(j.error || 'Error al actualizar estado');
+            currentStatus = newStatus;
+            if (newStatus === 'pending') {
+                // Release recomputes the real state (pending/assigned/completed) from
+                // assignments — reload so the control reflects the true result.
+                window.location.reload();
+                return;
+            }
+            showReservationToast(newStatus === 'confirmed' ? 'Reservación confirmada' : 'Reservación bloqueada');
+        } catch (error) {
+            revertStatus(previousStatus);
+            alert(error.message || 'Error al actualizar estado');
+        }
+    }
+
     document.querySelectorAll('input[name="quoteStatus"]').forEach(radio => {
         if (radio.checked) currentStatus = radio.value;
         radio.addEventListener('change', function() {
             const newStatus = this.value;
             const previousStatus = currentStatus;
             // Don't update currentStatus yet - wait until confirmed
+
+            // Reservation: the control drives the RESERVATION status via its own
+            // endpoints (manual confirmed/hold; cancel cascade). Quote-only flows
+            // (requested/scheduled modals) don't apply here.
+            if (window.__isReservation) {
+                handleReservationStatusChange(newStatus, previousStatus);
+                return;
+            }
 
             if (newStatus === 'requested') {
                 // Update email in modal from current form value
