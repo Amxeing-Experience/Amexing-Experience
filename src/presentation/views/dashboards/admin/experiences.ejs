@@ -177,6 +177,10 @@ const shouldRenderMobile = (forceMobile || isMobileRequest) && !forceDesktop;
         <button type="button" class="btn text-white" style="background: var(--brand-gradient); padding: 0.5rem 1rem;" id="createProviderBtn">
             <i class="ti ti-plus me-1"></i>Nuevo Proveedor
         </button>
+    <% } else if (activeSection === 'establishments' && ['superadmin', 'admin'].includes(currentUserRole)) { %>
+        <button type="button" class="btn text-white" style="background: var(--brand-gradient); padding: 0.5rem 1rem;" id="createEstablishmentBtn">
+            <i class="ti ti-plus me-1"></i>Nuevo Establecimiento
+        </button>
     <% } %>
 </div>
 

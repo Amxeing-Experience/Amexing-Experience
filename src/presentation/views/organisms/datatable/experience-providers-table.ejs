@@ -2324,9 +2324,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     if (response.success && response.data) {
                         providerExperiencias = response.data;
                         renderAllExperienciaCards();
-                        if (typeof onRendered === 'function') {
-                            try { onRendered(); } catch (e) { console.error('onRendered callback error:', e); }
-                        }
                     } else {
                         console.error('Provider experiencias response without data:', response);
                     }
@@ -2342,6 +2339,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     // Runs on both success and error: always clear the spinner.
                     hideExperienciasLoader();
                     updateNoExperienciasMessage();
+                    // onRendered SIEMPRE corre al terminar (con o sin datos), para que
+                    // quien recarga (p.ej. el guardado) sepa que el reload ya acabó.
+                    if (typeof onRendered === 'function') {
+                        try { onRendered(); } catch (e) { console.error('onRendered callback error:', e); }
+                    }
                 }
             });
         }
@@ -3144,10 +3146,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                     const cards = document.querySelectorAll('#providerExperienciasList .experiencia-editable');
                                     expandedIdx.forEach(i => { if (cards[i]) expandExperienciaCard(cards[i]); });
                                     $scroll.scrollTop(scrollTop);
+                                    // Restaurar el botón SOLO cuando el reload realmente terminó,
+                                    // para que no parezca que acabó mientras siguen cargando.
+                                    showSuccessAlert('Cambios guardados');
+                                    restoreButtons();
                                 });
+                            } else {
+                                showSuccessAlert('Cambios guardados');
+                                restoreButtons();
                             }
-                            showSuccessAlert('Cambios guardados');
-                            restoreButtons();
                         } else {
                             closeProviderDetail();
                             showSuccessAlert(isEdit ? 'Proveedor actualizado exitosamente' : 'Proveedor creado exitosamente');
@@ -3713,6 +3720,10 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 }
 
 /* Bandeja master-detail: lista tipo bandeja de entrada */
+.provider-inbox #providers-content {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
 .provider-inbox #<%= dtTableId %> tbody tr {
     cursor: pointer;
 }
