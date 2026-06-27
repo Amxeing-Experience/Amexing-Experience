@@ -1435,6 +1435,10 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Disable save button and show appropriate message
             const saveBtn = $('#saveEstablishmentBtn');
             const originalText = saveBtn.html();
+            // Cuando guardamos sin cerrar, mantenemos el botón en "Guardando…" hasta
+            // que el reload de subexperiencias termine (no en el complete del save).
+            let establishmentReloadPending = false;
+            const restoreSaveBtn = () => saveBtn.prop('disabled', false).html(originalText);
             const initialButtonText = totalImagesToOptimize > 0 ? 
                 `<i class="spinner-border spinner-border-sm me-1"></i>Optimizando ${totalImagesToOptimize} imagen${totalImagesToOptimize > 1 ? 'es' : ''}...` : 
                 '<i class="spinner-border spinner-border-sm me-1"></i>Guardando...';
@@ -1763,10 +1767,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#establishmentId').val(finalEstablishmentId);
                         $('#establishmentModalTitle').text('Editar Establecimiento');
                         currentModalState = { mode: 'edit', establishmentId: finalEstablishmentId, isOpen: true, sessionId: currentModalState.sessionId };
+                        establishmentReloadPending = true;
                         loadEstablishmentExperiencias(finalEstablishmentId, function() {
                             const cards = document.querySelectorAll('#establishmentExperienciasList .experiencia-editable');
                             expandedIdx.forEach(i => { if (cards[i]) expandEstablishmentCard(cards[i]); });
                             $estScroll.scrollTop(estScrollTop);
+                            // Restaurar el botón SOLO cuando el reload realmente terminó
+                            restoreSaveBtn();
                         });
                     }
                     showSuccessAlert('Cambios guardados');
@@ -1777,12 +1784,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     showEstablishmentError(error);
                 },
                 complete: function() {
-                    // Only re-enable save button if there are no images being optimized
-                    if (totalImagesToOptimize === 0) {
-                        // No image optimization needed, re-enable immediately
+                    // Si vamos a recargar subexperiencias (guardar sin cerrar), el botón
+                    // se restaura al terminar ese reload, no aquí, para que no parezca
+                    // que ya acabó mientras las tarjetas siguen cargando.
+                    if (!establishmentReloadPending && totalImagesToOptimize === 0) {
                         saveBtn.prop('disabled', false).html(originalText);
                     }
-                    // If there are images being optimized, button will be re-enabled 
+                    // If there are images being optimized, button will be re-enabled
                     // after optimization completes in the success callback
                 }
             });
@@ -2740,9 +2748,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         });
 
                         updateEstablishmentNoExperienciasMessage();
-                        if (typeof onRendered === 'function') {
-                            try { onRendered(); } catch (e) { console.error('onRendered callback error:', e); }
-                        }
                     } else {
                         console.log('ℹ️ No experiences found for establishment');
                     }
@@ -2764,6 +2769,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     // Runs on success, error and abort: always clear the spinner.
                     $('#establishmentExperienciasLoader').remove();
                     updateEstablishmentNoExperienciasMessage();
+                    // onRendered SIEMPRE corre al terminar (con o sin datos), para que
+                    // quien recarga (p.ej. el guardado) sepa que el reload ya acabó.
+                    if (typeof onRendered === 'function') {
+                        try { onRendered(); } catch (e) { console.error('onRendered callback error:', e); }
+                    }
                 }
             });
         }
