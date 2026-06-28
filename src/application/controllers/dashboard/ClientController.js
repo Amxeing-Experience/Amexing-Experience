@@ -405,11 +405,30 @@ class ClientController extends RoleBasedController {
 
       const isNewQuote = quoteId === 'new';
 
+      // Traer estado + total de la cotización para pintar el panel (timeline + botón
+      // "Solicitar Servicios") server-side y que no espere al fetch del cliente.
+      let quoteStatus = '';
+      let quoteTotal = 0;
+      if (!isNewQuote) {
+        try {
+          const Parse = require('parse/node');
+          const q = new Parse.Query('Quote');
+          q.equalTo('exists', true);
+          const quote = await q.get(quoteId, { useMasterKey: true });
+          if (quote) {
+            quoteStatus = quote.get('status') || '';
+            quoteTotal = (quote.get('serviceItems') || {}).total || 0;
+          }
+        } catch (e) { /* noop: el cliente lo resuelve por fetch */ }
+      }
+
       await this.renderRoleView(req, res, 'quote-detail', {
         title: isNewQuote ? 'Nueva Cotización' : `Cotización ${quoteId}`,
         breadcrumb: null,
         quoteId,
         isNewQuote,
+        quoteStatus,
+        quoteTotal,
         currentSection: section,
         pageStyles: ['https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css'],
         footerScripts: `
