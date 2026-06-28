@@ -830,13 +830,44 @@ class ExperienceServicesBuilder {
     // Repopulate rates dropdown to filter based on service type
     this.populateRateSelector();
 
-    // Populate POI dropdowns for transport if preselected values exist
+    // (Simplificado) Llena los combos de origen/destino con TODAS las opciones
     if (type === 'transport') {
-      // Use setTimeout to avoid blocking the UI and let the DOM settle
       setTimeout(async () => {
-        await this.populateTransportDropdownsOnLoad();
+        await this.populateMergedTransportLists();
       }, 100);
     }
+  }
+
+  // (Simplificado) Sin separar aeropuerto/p2p/local: llena los datalists de origen
+  // y destino con todas las opciones disponibles (cualquier lugar puede ser origen
+  // o destino). El precio se resuelve por ruta (origen+destino+segmento+vehículo);
+  // si no hay match, el admin lo pone manual.
+  async populateMergedTransportLists() {
+    if (!window.servicesByTransportType) {
+      try {
+        await this.loadActiveServicesForDropdowns();
+      } catch (e) {
+        console.warn('[Services] No se pudieron cargar servicios para origen/destino:', e);
+      }
+    }
+    const groups = window.servicesByTransportType || {};
+    const all = [].concat(groups.aeropuerto || [], groups['punto-a-punto'] || [], groups.local || []);
+    const places = new Set();
+    all.forEach((s) => {
+      if (s && s.origin) places.add(s.origin);
+      if (s && s.destination) places.add(s.destination);
+    });
+    const sorted = [...places].sort();
+    ['transportOriginList', 'transportDestinationList'].forEach((id) => {
+      const dl = document.getElementById(id);
+      if (!dl) return;
+      dl.innerHTML = '';
+      sorted.forEach((name) => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        dl.appendChild(opt);
+      });
+    });
   }
 
   async populateTransportDropdownsOnLoad() {
