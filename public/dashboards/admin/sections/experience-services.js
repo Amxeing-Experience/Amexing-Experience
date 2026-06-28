@@ -1883,6 +1883,10 @@ class ExperienceServicesBuilder {
 
     // Store tour data for later use
     this.selectedTourData = tour;
+
+    // Un tour CON vehículo necesita segmento + vehículo; uno a pie no.
+    // Revela/oculta esos campos automáticamente al elegir el tour.
+    this.handleTourTransportToggle(!tour.isWalkingTour);
   }
 
   buildTourDetailsCard(tour) {
