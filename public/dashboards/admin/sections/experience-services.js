@@ -208,20 +208,8 @@ class ExperienceServicesBuilder {
       radio.addEventListener('change', (e) => this.handleServiceTypeChange(e.target.value));
     });
 
-    // Transport Type Toggle
-    document.querySelectorAll('input[name="transportType"]').forEach((radio) => {
-      radio.addEventListener('change', () => this.handleTransportTypeChange());
-    });
-
-    // Trip Type Toggle
-    document.querySelectorAll('input[name="tripType"]').forEach((radio) => {
-      radio.addEventListener('change', () => this.handleTripTypeChange());
-    });
-
-    // Direction Type Toggle
-    document.querySelectorAll('input[name="directionType"]').forEach((radio) => {
-      radio.addEventListener('change', async () => await this.handleDirectionTypeChange());
-    });
+    // (Simplificado) Se quitaron los toggles de tipo de transporte / viaje /
+    // dirección: ya no existen esos radios en el modal.
 
     // Experience selection
     document.getElementById('experienceSelect')?.addEventListener('change', (e) => {
@@ -870,44 +858,6 @@ class ExperienceServicesBuilder {
     });
   }
 
-  async populateTransportDropdownsOnLoad() {
-    console.log('🚨 DEBUG: populateTransportDropdownsOnLoad called');
-
-    // Ensure services are loaded before populating dropdowns
-    if (!window.servicesByTransportType) {
-      console.log('🚨 DEBUG: No services data available, loading services...');
-      await this.loadActiveServicesForDropdowns();
-    }
-
-    // Check if transport type is preselected
-    const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
-    if (!transportType) {
-      console.log('🚨 DEBUG: No transport type preselected');
-      return;
-    }
-
-    // Check if direction type is preselected  
-    const directionType = document.querySelector('input[name="directionType"]:checked')?.value;
-    if (!directionType) {
-      console.log('🚨 DEBUG: No direction type preselected');
-      return;
-    }
-
-    console.log('🚨 DEBUG: Found preselected values:', { transportType, directionType });
-
-    // Check if we're in One Way mode (default when transport content loads)
-    const tripType = document.querySelector('input[name="tripType"]:checked')?.value || 'one-way';
-
-    if (tripType === 'one-way') {
-      console.log('🚨 DEBUG: Setting up One Way fields and populating dropdowns on load');
-      // First ensure fields are visible by calling direction change handler
-      await this.handleDirectionTypeChange();
-    } else {
-      console.log('🚨 DEBUG: Setting up Round Trip fields and populating dropdowns on load');
-      await this.updateRoundTripFieldVisibility();
-    }
-  }
-
   clearTransportFormFields() {
     if (this._populatingTransportForm) return;
 
@@ -1379,16 +1329,6 @@ class ExperienceServicesBuilder {
   }
 
   // Legacy function - now delegates to quote modal logic
-  async populateTransportPOIDropdowns(transportType, directionType) {
-    console.log('🚨 DEBUG: Legacy populateTransportPOIDropdowns called - delegating to populateDropdownsForTransportType');
-    // Ensure services are loaded first
-    if (!window.servicesByTransportType) {
-      await this.loadActiveServicesForDropdowns();
-    }
-    // Delegate to the quote modal logic
-    this.populateDropdownsForTransportType(transportType, directionType);
-  }
-
   async populateRoundTripDropdowns(transportType) {
     console.log('[Services] populateRoundTripDropdowns called for', transportType);
 
