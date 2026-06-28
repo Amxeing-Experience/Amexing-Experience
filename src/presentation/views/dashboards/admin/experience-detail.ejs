@@ -60,7 +60,6 @@ const experienceTitle = isNewExperience ? 'Nueva Experiencia' : 'Experiencia';
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-0">
                     <%- include('./sections/experience-services', { experienceId: experienceId }) %>
-                    <%- include('./sections/experience-services-modals') %>
                 </div>
             </div>
         </div>
@@ -74,6 +73,10 @@ const experienceTitle = isNewExperience ? 'Nueva Experiencia' : 'Experiencia';
         </div>
     </div>
 </div>
+
+<!-- Modales de servicio: a nivel superior (NO dentro de un tab-pane, o se
+     ocultarían cuando ese tab no está activo, p.ej. al crear). -->
+<%- include('./sections/experience-services-modals') %>
 
 <style>
 /* Barra superior fija */
