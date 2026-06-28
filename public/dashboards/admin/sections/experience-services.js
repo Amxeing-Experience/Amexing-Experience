@@ -2654,23 +2654,34 @@ class ExperienceServicesBuilder {
     });
     if (hasExperiences) select.appendChild(expGroup);
 
-    // Group: Provider Experiencias
+    // Groups: Proveedores y Establecimientos (ambos vienen de provider-experiencias,
+    // se distinguen por provider.type para mostrarlos en grupos separados).
     const providerExps = this.providerExperiencesCache || [];
     if (providerExps.length > 0) {
-      const provGroup = document.createElement('optgroup');
-      provGroup.label = 'Experiencias de Proveedores';
+      // Cachear todas para lookup posterior (precio, edición, etc.)
       providerExps.forEach((exp) => {
-        // Add to experiencesCache for later lookup
         if (!this.experiencesCache.has(exp.id)) {
           this.experiencesCache.set(exp.id, exp);
         }
-        const option = document.createElement('option');
-        option.value = exp.id;
-        const providerName = exp.provider ? ` (${exp.provider.name})` : '';
-        option.textContent = `${exp.name}${providerName}`;
-        provGroup.appendChild(option);
       });
-      select.appendChild(provGroup);
+
+      const buildGroup = (label, predicate) => {
+        const items = providerExps.filter(predicate);
+        if (items.length === 0) return;
+        const group = document.createElement('optgroup');
+        group.label = label;
+        items.forEach((exp) => {
+          const option = document.createElement('option');
+          option.value = exp.id;
+          const parentName = exp.provider ? ` (${exp.provider.name})` : '';
+          option.textContent = `${exp.name}${parentName}`;
+          group.appendChild(option);
+        });
+        select.appendChild(group);
+      };
+
+      buildGroup('Experiencias de Proveedores', (exp) => exp.provider?.type !== 'Establishment');
+      buildGroup('Experiencias de Establecimientos', (exp) => exp.provider?.type === 'Establishment');
     }
   }
 
