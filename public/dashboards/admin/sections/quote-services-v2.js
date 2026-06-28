@@ -15,6 +15,13 @@ const qsDevLog = (...args) => {
   }
 };
 
+// ── Año de los precios de lista (catálogo) ───────────────────────────────────
+// Fuente ÚNICA de verdad para el año que se muestra en los textos "Lista AAAA: $X".
+// Hoy las tarifas de catálogo son 2026; cuando cambien, actualizar SOLO esta línea.
+// Se expone en window para que otros módulos puedan reutilizarlo si hace falta.
+const AMX_PRICE_YEAR = 2026;
+if (typeof window !== 'undefined') window.AMX_PRICE_YEAR = AMX_PRICE_YEAR;
+
 // Include the generic formula evaluator if not already loaded
 if (typeof GuideFormulaEvaluator === 'undefined') {
   const script = document.createElement('script');
@@ -10271,7 +10278,7 @@ class ItineraryBuilder {
         // Show the list (catalog) price alongside when a custom price overrides it.
         const listEfectivo = (parseFloat(item.listPrice) || 0) * legMultiplier;
         const listNote = (listEfectivo > 0 && Math.abs(listEfectivo - efectivo) > 0.01)
-          ? ` (Lista: ${this.formatCurrency(listEfectivo)})`
+          ? ` (Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(listEfectivo)})`
           : '';
         return {
           label: `Vehículo adicional (${item.vehicleType}${item.segmentName ? ` · ${item.segmentName}` : ''})${listNote}`,
@@ -14322,7 +14329,7 @@ class ItineraryBuilder {
     const opt = vehicleSelect.selectedIndex >= 0 ? vehicleSelect.options[vehicleSelect.selectedIndex] : null;
     const listPrice = opt ? (parseFloat(opt.dataset.efectivoPrice || '0') || 0) : 0;
     if (vehicleSelect.value && listPrice > 0) {
-      if (listEl) listEl.textContent = `Lista: ${this.formatCurrency(listPrice)}`;
+      if (listEl) listEl.textContent = `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(listPrice)}`;
       if (forceListPrice || priceInput.value === '' || priceInput.value === null) {
         priceInput.value = listPrice.toFixed(2);
       }
@@ -14356,7 +14363,7 @@ class ItineraryBuilder {
   updateExtraRowWaitingRate(row, forceReset = false) {
     const wt = this.getExtraRowWaitingPrice(row);
     const rateEl = row.querySelector('.extra-waiting-rate');
-    if (rateEl) rateEl.textContent = wt ? `Lista: ${this.formatCurrency(wt.pricePerHour)}/h` : '';
+    if (rateEl) rateEl.textContent = wt ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(wt.pricePerHour)}/h` : '';
     const priceInput = row.querySelector('.extra-waiting-price');
     if (priceInput && wt && (forceReset || priceInput.value === '' || priceInput.value === null)) {
       priceInput.value = Number(wt.pricePerHour).toFixed(2);
@@ -14399,7 +14406,7 @@ class ItineraryBuilder {
     const price = Number(catalogPrice) || 0;
     this._mainVehicleCatalogPrice = price;
     const listEl = document.getElementById('servicePriceListPrice');
-    if (listEl) listEl.textContent = price > 0 ? `Lista: ${this.formatCurrency(price)}` : '';
+    if (listEl) listEl.textContent = price > 0 ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(price)}` : '';
   }
 
   // Resetea la marca de "precio editado a mano" para que el siguiente cálculo vuelva a
@@ -14424,7 +14431,10 @@ class ItineraryBuilder {
     // Ancho de las columnas base (Segmento/Vehículo) del transporte.
     const setMainFieldWidths = (cls) => {
       document.querySelectorAll('#transportFieldsRow .transport-main-field').forEach((el) => {
-        el.className = `${cls} mb-3 transport-main-field`;
+        // Preservar d-none: reasignar className completo borraba el ocultamiento que pone
+        // handleTourTransportToggle(false) (p.ej. walking tour / tour sin traslado).
+        const hidden = el.classList.contains('d-none');
+        el.className = `${cls} mb-3 transport-main-field${hidden ? ' d-none' : ''}`;
       });
     };
 
@@ -15657,7 +15667,7 @@ class ItineraryBuilder {
     // precio personalizado. Usa los mismos valores de catálogo que autollenan los inputs.
     const setExpListPrice = (id, val) => {
       const el = document.getElementById(id);
-      if (el) el.textContent = (val && Number(val) > 0) ? `Lista: ${this.formatCurrency(val)}` : '';
+      if (el) el.textContent = (val && Number(val) > 0) ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(val)}` : '';
     };
     setExpListPrice('adultPriceListPrice', experience.price);
     setExpListPrice('childPriceListPrice', experience.price_child);
@@ -19027,7 +19037,7 @@ class ItineraryBuilder {
     const rateEl = document.getElementById('waitingTimeRate');
     if (rateEl) {
       // Tarifa de lista (catálogo, efectivo) por hora — mismo estilo "Lista: $X" del precio.
-      rateEl.textContent = wtPrice ? `Lista: ${this.formatCurrency(wtPrice.pricePerHour)}/hora` : '';
+      rateEl.textContent = wtPrice ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(wtPrice.pricePerHour)}/hora` : '';
     }
     // Autollenar la tarifa editable con la de catálogo si está vacía (no pisa ediciones del usuario).
     const priceInput = document.getElementById('waitingTimePrice');
@@ -19567,7 +19577,7 @@ class ItineraryBuilder {
     const opt = select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
     const listPrice = opt ? (parseFloat(opt.dataset.efectivoPrice || '0') || 0) : 0;
     if (select.value && listPrice > 0) {
-      if (listEl) listEl.textContent = `Lista: ${this.formatCurrency(listPrice)}`;
+      if (listEl) listEl.textContent = `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(listPrice)}`;
       if (forceListPrice || priceInput.value === '' || priceInput.value === null) {
         priceInput.value = listPrice.toFixed(2);
       }
@@ -20305,7 +20315,7 @@ class ItineraryBuilder {
         row.dataset.segmentLabel = saved.segmentLabel || (segmentSel.selectedOptions[0]?.textContent || '');
         priceInput.value = Number(custom).toFixed(2);
         row.querySelector('.adisp-av-list').textContent = catalog > 0
-          ? `Lista: ${this.formatCurrency(catalog)}/h` : '';
+          ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(catalog)}/h` : '';
       }
     }
     // Solo marca modificado cuando lo agrega el usuario; en restauración (saved) no, para no
@@ -20382,7 +20392,7 @@ class ItineraryBuilder {
     }
     const hourly = await this.getADisposicionHourlyPriceCached(vehicleTypeId, rateId);
     row.dataset.hourlyRate = String(hourly); // catálogo (para "Lista" y fallback del efectivo)
-    if (listEl) listEl.textContent = hourly > 0 ? `Lista: ${this.formatCurrency(hourly)}/h` : '';
+    if (listEl) listEl.textContent = hourly > 0 ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(hourly)}/h` : '';
     // Autollenar el precio con el catálogo al elegir/cambiar vehículo.
     if (priceInput) priceInput.value = Number(hourly).toFixed(2);
   }
@@ -20721,13 +20731,15 @@ class ItineraryBuilder {
     // (precargados del catálogo). Da consistencia con los otros tipos y elimina el estado
     // pegado del toggle entre servicios. En edición, la restauración rellena los precios
     // guardados sobre estos inputs después.
+    // Los precios por grupo son SIEMPRE visibles y editables (diseño), sin importar el rol:
+    // mostrar la sección y generar los inputs aquí, fuera del gate de canEditPrices.
+    document.getElementById('walkingTourManualPriceContainer')?.classList.remove('d-none');
+    const wtPeople = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10) || 1;
+    this.generateWalkingTourGroupInputs(tour, wtPeople);
     if (this.canEditPrices) {
       const walkingOverride = document.getElementById('tourOverridePrices');
       if (walkingOverride) walkingOverride.checked = true;
       document.getElementById('tourOverridePricesContainer')?.classList.add('d-none');
-      document.getElementById('walkingTourManualPriceContainer')?.classList.remove('d-none');
-      const wtPeople = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10) || 1;
-      this.generateWalkingTourGroupInputs(tour, wtPeople);
     }
 
     // Update the dev breakdown first, then the service breakdown reads from it.
@@ -21149,14 +21161,11 @@ class ItineraryBuilder {
           if (walkingPricingSection) walkingPricingSection.classList.remove('d-none');
 
           // Show the override checkbox for walking tours (per-group price editing).
+          // La sección de precios por grupo la muestra/gener handleWalkingTourSelection
+          // SIEMPRE (no se oculta aquí, antes se ocultaba y se re-mostraba después).
           if (this.canEditPrices) {
             const overrideContainer = document.getElementById('tourOverridePricesContainer');
             overrideContainer?.classList.remove('d-none');
-            // Default to unchecked + hidden manual section when selecting a fresh tour.
-            const overrideCheckbox = document.getElementById('tourOverridePrices');
-            if (overrideCheckbox && !overrideCheckbox.checked) {
-              document.getElementById('walkingTourManualPriceContainer')?.classList.add('d-none');
-            }
           }
 
           // Hide transport checkbox for walking tours (they don't require transport)
