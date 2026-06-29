@@ -36,11 +36,17 @@ jest.mock('parse/node', () => {
   });
 
   // Create a fresh mock query instance for each Query() call
-  const MockQuery = jest.fn(() => {
+  const defaultQueryImpl = () => {
     const instance = createMockQueryInstance();
     mockInstances.push(instance);
     return instance;
-  });
+  };
+  const MockQuery = jest.fn(defaultQueryImpl);
+
+  // Restaura la implementación por defecto. Algunos tests la sobreescriben con
+  // mockImplementation, y jest.clearAllMocks() NO la revierte -> contaminaba a los
+  // tests siguientes (new Parse.Query().get quedaba undefined).
+  MockQuery.resetToDefault = () => MockQuery.mockImplementation(defaultQueryImpl);
 
   // OR query returns a new instance with combined behavior
   MockQuery.or = jest.fn((...queries) => {
@@ -134,6 +140,10 @@ describe('ExperienceController', () => {
     };
 
     jest.clearAllMocks();
+
+    // Restaurar la implementación por defecto de Parse.Query (clearAllMocks no la
+    // revierte si un test previo usó mockImplementation).
+    if (Parse.Query.resetToDefault) Parse.Query.resetToDefault();
 
     // Reset Parse.Query mock if it exists
     if (Parse.Query.getAllInstances) {
