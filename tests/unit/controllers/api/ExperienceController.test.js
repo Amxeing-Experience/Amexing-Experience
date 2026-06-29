@@ -90,6 +90,20 @@ jest.mock('parse/node', () => {
             super();
             this.className = className;
           }
+
+          // Métodos PROPIOS (delegan al padre) para que jest.spyOn(Clase.prototype, 'set')
+          // los encuentre — con solo herencia, spyOn falla con "Property set does not exist".
+          set(key, value) {
+            return super.set(key, value);
+          }
+
+          get(key) {
+            return super.get(key);
+          }
+
+          save() {
+            return super.save();
+          }
         };
       }
 
@@ -123,11 +137,19 @@ const controller = require('../../../../src/application/controllers/api/Experien
 const logger = require('../../../../src/infrastructure/logger');
 const Parse = require('parse/node');
 
+// extend() original del mock: algunos tests lo sobreescriben (Parse.Object.extend =
+// jest.fn(...)) y no lo restauran, y clearMocks no lo revierte -> contaminaba a los
+// siguientes (Clase.prototype.set quedaba undefined). Se restaura en beforeEach.
+const ORIGINAL_OBJECT_EXTEND = Parse.Object.extend;
+
 describe('ExperienceController', () => {
   let mockReq;
   let mockRes;
 
   beforeEach(() => {
+    // Restaurar extend por si un test previo lo sobreescribió.
+    Parse.Object.extend = ORIGINAL_OBJECT_EXTEND;
+
     // Reset shared Parse.Query instance before each test
     Parse.Query.resetSharedInstance();
 
