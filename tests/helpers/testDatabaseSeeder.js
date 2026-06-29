@@ -244,6 +244,17 @@ class TestDatabaseSeeder {
       },
     ];
 
+    // Asignar los basePermissions canónicos de producción a cada rol. Sin esto, los
+    // roles se creaban sin permisos y los endpoints con requirePermission devolvían
+    // 403 a todos (incluido superadmin con ['*']).
+    const canonicalRoles = Role.getSystemRoles();
+    systemRoles.forEach((roleData) => {
+      const canon = canonicalRoles.find((c) => c.name === roleData.name);
+      if (canon && canon.basePermissions) {
+        roleData.basePermissions = canon.basePermissions;
+      }
+    });
+
     this.logger.info(`Creating ${systemRoles.length} system roles...`);
 
     for (const roleData of systemRoles) {

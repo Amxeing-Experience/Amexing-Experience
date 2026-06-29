@@ -96,20 +96,17 @@ describe('Billing Controller Integration Tests', () => {
   });
 
   describe('POST /api/billing/save - Save billing info', () => {
+    // Esquema CFDI (fiscal MX). El "extranjero" se maneja con regimenFiscal '610'
+    // dentro de este mismo esquema. El controlador valida formato de rfc y
+    // codigoPostal; el resto es opcional.
     const validBillingInfo = {
-      companyName: 'Test Company',
-      taxId: 'RFC123456789',
-      address: {
-        street: '123 Test Street',
-        city: 'Mexico City',
-        state: 'CDMX',
-        zipCode: '01234',
-        country: 'Mexico'
-      },
-      contactEmail: 'billing@testcompany.com',
-      contactPhone: '+52 55 1234 5678',
-      paymentMethod: 'invoice',
-      paymentTerms: '30'
+      rfc: 'XAXX010101AB1',
+      regimenFiscal: '601',
+      usoCfdi: 'G03',
+      razonSocial: 'Test Company',
+      direccion: '123 Test Street, CDMX',
+      codigoPostal: '01234',
+      emailFacturacion: 'billing@testcompany.com',
     };
 
     it('should save valid billing information', async () => {
@@ -130,10 +127,10 @@ describe('Billing Controller Integration Tests', () => {
         .set('Authorization', `Bearer ${clientToken}`)
         .send(validBillingInfo);
 
-      // Update
+      // Update (razonSocial = nombre fiscal en CFDI)
       const updatedInfo = {
         ...validBillingInfo,
-        companyName: 'Updated Company Name'
+        razonSocial: 'Updated Company Name',
       };
 
       const response = await request(app)
@@ -149,72 +146,70 @@ describe('Billing Controller Integration Tests', () => {
         .get('/api/billing/get')
         .set('Authorization', `Bearer ${clientToken}`);
 
-      expect(getResponse.body.data.billingInfo.companyName).toBe('Updated Company Name');
+      expect(getResponse.body.data.billingInfo.razonSocial).toBe('Updated Company Name');
     });
 
-    it('should validate required fields', async () => {
-      const invalidInfo = {
-        companyName: '' // Empty required field
+    it('should accept billing info without required fields (CFDI; soporta extranjero)', async () => {
+      // El esquema CFDI no exige campos: los vacíos/omitidos se ignoran (200).
+      const response = await request(app)
+        .post('/api/billing/save')
+        .set('Authorization', `Bearer ${clientToken}`)
+        .send({ razonSocial: 'Solo razon social' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should validate codigo postal format', async () => {
+      const invalidCP = {
+        ...validBillingInfo,
+        codigoPostal: '123', // CP mexicano = 5 dígitos
       };
 
       const response = await request(app)
         .post('/api/billing/save')
         .set('Authorization', `Bearer ${clientToken}`)
-        .send(invalidInfo);
+        .send(invalidCP);
 
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
     });
 
-    it('should validate email format', async () => {
-      const invalidEmail = {
+    it('should validate RFC format', async () => {
+      const invalidRfc = {
         ...validBillingInfo,
-        contactEmail: 'invalid-email'
+        rfc: '123', // formato de RFC inválido
       };
 
       const response = await request(app)
         .post('/api/billing/save')
         .set('Authorization', `Bearer ${clientToken}`)
-        .send(invalidEmail);
+        .send(invalidRfc);
 
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
     });
 
-    it('should validate tax ID format for Mexico', async () => {
-      const invalidTaxId = {
+    it('should only store allowed CFDI fields (ignora extras)', async () => {
+      const withExtra = {
         ...validBillingInfo,
-        taxId: '123' // Too short for RFC
+        hackerField: 'nope',
+        companyName: 'esquema-viejo',
       };
 
       const response = await request(app)
         .post('/api/billing/save')
         .set('Authorization', `Bearer ${clientToken}`)
-        .send(invalidTaxId);
-
-      expect(response.status).toBe(400);
-      expect(response.body.success).toBe(false);
-    });
-
-    it('should sanitize input data', async () => {
-      const maliciousInput = {
-        ...validBillingInfo,
-        companyName: '<script>alert("xss")</script>Test Company'
-      };
-
-      const response = await request(app)
-        .post('/api/billing/save')
-        .set('Authorization', `Bearer ${clientToken}`)
-        .send(maliciousInput);
+        .send(withExtra);
 
       expect(response.status).toBe(200);
 
-      // Verify sanitization
       const getResponse = await request(app)
         .get('/api/billing/get')
         .set('Authorization', `Bearer ${clientToken}`);
 
-      expect(getResponse.body.data.billingInfo.companyName).not.toContain('<script>');
+      expect(getResponse.body.data.billingInfo).not.toHaveProperty('hackerField');
+      expect(getResponse.body.data.billingInfo).not.toHaveProperty('companyName');
     });
 
     it('should require authentication', async () => {
@@ -396,22 +391,20 @@ describe('Billing Controller Integration Tests', () => {
       expect([200, 400]).toContain(response.status);
     });
 
-    it('should validate address completeness', async () => {
-      const incompleteAddress = {
-        ...validBillingInfo,
-        address: {
-          street: '123 Test St'
-          // Missing city, state, zipCode
-        }
-      };
-
-      const response = await request(app)
+    it('should store CFDI address fields (direccion, codigoPostal)', async () => {
+      // En CFDI la dirección es un string opcional + codigoPostal; no hay
+      // validación de "completeness" (un extranjero puede no llenarla toda).
+      await request(app)
         .post('/api/billing/save')
         .set('Authorization', `Bearer ${clientToken}`)
-        .send(incompleteAddress);
+        .send(validBillingInfo);
 
-      expect(response.status).toBe(400);
-      expect(response.body.success).toBe(false);
+      const getResponse = await request(app)
+        .get('/api/billing/get')
+        .set('Authorization', `Bearer ${clientToken}`);
+
+      expect(getResponse.body.data.billingInfo.direccion).toBe(validBillingInfo.direccion);
+      expect(getResponse.body.data.billingInfo.codigoPostal).toBe(validBillingInfo.codigoPostal);
     });
 
     it('should handle international addresses', async () => {

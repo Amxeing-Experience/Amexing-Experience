@@ -350,9 +350,14 @@ class AuthTestHelper {
     }
 
     try {
-      // Get login page to obtain CSRF token
-      const loginPage = await agent.get('/login');
-      const csrfToken = this.extractCsrfToken(loginPage.text);
+      // Get login page to obtain CSRF token. La página de login puede responder de
+      // forma transitoria sin el token (race de init/regeneración de sesión justo
+      // después de un logout); se reintenta unas veces antes de fallar.
+      let csrfToken = null;
+      for (let attempt = 0; attempt < 5 && !csrfToken; attempt += 1) {
+        const loginPage = await agent.get('/login');
+        csrfToken = this.extractCsrfToken(loginPage.text);
+      }
 
       if (!csrfToken) {
         throw new Error('Failed to extract CSRF token from login page');

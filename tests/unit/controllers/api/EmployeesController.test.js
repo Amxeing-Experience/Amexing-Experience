@@ -154,7 +154,7 @@ describe('EmployeesController', () => {
               { id: 'emp1', email: 'emp1@amexing.com', role: 'employee_amexing' },
               { id: 'emp2', email: 'emp2@amexing.com', role: 'employee_amexing' },
             ]),
-            total: 2,
+            pagination: expect.objectContaining({ totalItems: 2 }),
             requestMetadata: expect.any(Object),
           }),
         })
