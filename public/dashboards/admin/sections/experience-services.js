@@ -2176,91 +2176,22 @@ class ExperienceServicesBuilder {
       return;
     }
 
-    // Get origin and destination from the appropriate fields based on direction
-    const directionRadio = document.querySelector('input[name="directionType"]:checked');
-    const direction = directionRadio?.value || 'arrival';
-    const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
-    const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+    // (Simplificado) Origen/Destino vienen directamente de los dos combos del modal.
+    // Ya no hay dirección/tipo/ida-vuelta. El origen es opcional: el destino + el
+    // segmento bastan para resolver precio y vehículos por ruta.
+    const originName = document.getElementById('transportOriginCombo')?.value?.trim()
+      || fallbackOrigin || '';
+    const destinationName = document.getElementById('transportDestinationCombo')?.value?.trim()
+      || fallbackDestination || '';
 
-    let originName = '';
-    let destinationName = '';
-
-    if (tripType === 'round-trip') {
-      // Round trip: read from Ida fields (arrival leg)
-      if (transportType === 'local') {
-        // Local: Ida origin = TEXT, Ida destination = SELECT
-        originName = document.getElementById('roundTripOriginIdaText')?.value || '';
-        const destSelect = document.getElementById('roundTripDestinationIdaSelect');
-        const destSlug = destSelect?.value;
-        destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
-      } else {
-        // Aeropuerto / Punto a Punto: Ida origin = SELECT (slug), Ida destination = SELECT (slug)
-        const originSelect = document.getElementById('roundTripOriginIdaSelect');
-        const originSlug = originSelect?.value;
-        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
-        const destSelect = document.getElementById('roundTripDestinationIdaSelect');
-        const destSlug = destSelect?.value;
-        destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
-      }
-    } else {
-      // One-way: read from one-way fields based on direction
-      const isDepartureWithSelect = direction === 'departure' && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
-
-      // Helper to resolve destination SELECT display name
-      const resolveDestSelect = () => {
-        const destSelect = document.getElementById('transportDestinationSelect');
-        const destSlug = destSelect?.value;
-        return window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
-      };
-
-      const isLocalIda = direction === 'arrival' && transportType === 'local';
-
-      if (isLocalIda) {
-        // Local Ida: origin TEXT, destination SELECT
-        originName = document.getElementById('transportOriginText')?.value || '';
-        destinationName = resolveDestSelect();
-      } else if (direction === 'departure' && transportType === 'local') {
-        // Local Vuelta: origin SELECT, destination TEXT
-        const originSelect = document.getElementById('transportOriginSelect');
-        const slug = originSelect?.value;
-        originName = window.slugToOriginalMapping?.get(slug) || slug || '';
-        destinationName = document.getElementById('transportDestinationText')?.value || '';
-      } else if (direction === 'departure') {
-        // Departure: origin SELECT (city), destination SELECT (airport)
-        const originSelect = document.getElementById('transportOriginSelect');
-        const originSlug = originSelect?.value;
-        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
-        destinationName = resolveDestSelect();
-      } else {
-        // Arrival: origin SELECT (airport), destination SELECT (city)
-        const originSelect = document.getElementById('transportOriginSelect');
-        const originSlug = originSelect?.value;
-        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
-        destinationName = resolveDestSelect();
-      }
-    }
-
-    // Use fallbacks from service data if form fields are empty (edit race condition)
-    if (!originName && fallbackOrigin) originName = fallbackOrigin;
-    if (!destinationName && fallbackDestination) destinationName = fallbackDestination;
-
-    if (!originName || !destinationName) {
+    if (!destinationName) {
       this.clearVehicleDropdown();
       this.transportPriceData = null;
       return;
     }
 
-    // For one-way departure: swap origin/destination for API query
-    // DB stores routes as origin→destination, but user selected in reverse for departure
-    // Round trip uses Ida (arrival) data which is already in DB order
-    let apiOrigin = originName;
-    let apiDestination = destinationName;
-
-    if (tripType !== 'round-trip' && direction === 'departure') {
-      apiOrigin = destinationName;
-      apiDestination = originName;
-      console.log('🔄 Swapped for departure:', { apiOrigin, apiDestination });
-    }
+    const apiOrigin = originName;
+    const apiDestination = destinationName;
 
     // Show loading spinner next to Vehículo label
     const vehicleSpinner = document.getElementById('vehicleLoadingSpinner');
@@ -2268,10 +2199,10 @@ class ExperienceServicesBuilder {
 
     try {
       const params = new URLSearchParams({
-        originPOI: apiOrigin,
         destinationPOI: apiDestination,
         rateId,
       });
+      if (apiOrigin) params.append('originPOI', apiOrigin);
       if (this.clientId) {
         params.append('clientId', this.clientId);
       }
