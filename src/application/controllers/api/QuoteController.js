@@ -3213,9 +3213,10 @@ class QuoteController {
         return true;
       }
 
-      // For all other roles, check if they created the quote
+      // For non-client roles, having created the quote grants access.
+      // Clients are gated strictly by current ownership below (created == owner unless transferred).
       const createdBy = quote.get('createdBy');
-      if (createdBy && createdBy.id === currentUser.id) {
+      if (userRole !== 'client' && createdBy && createdBy.id === currentUser.id) {
         return true;
       }
 
@@ -3255,17 +3256,15 @@ class QuoteController {
         }
       }
 
-      // Clients can access quotes in their organization
+      // Clients can access ONLY quotes they currently own. Collaboration-shared quotes
+      // are granted earlier in getQuoteById via collaborationService.hasAccess.
       if (userRole === 'client') {
-        const userClientId = currentUser.clientId || currentUser.get('clientId');
-        const clientPtr = quote.get('client');
-
-        // Check if client pointer matches the org owner
-        if (clientPtr && userClientId && clientPtr.id === userClientId) {
+        const ownerPtr = quote.get('owner');
+        if (ownerPtr && ownerPtr.id === currentUser.id) {
           return true;
         }
-        // Check if client pointer matches current user
-        if (clientPtr && clientPtr.id === currentUser.id) {
+        // Legacy quotes without an owner pointer: creator is the de-facto owner.
+        if (!ownerPtr && createdBy && createdBy.id === currentUser.id) {
           return true;
         }
       }
@@ -3391,157 +3390,63 @@ class QuoteController {
         return;
       }
 
-      // Clients see quotes FOR their organization + quotes they created
-      // Match by role name OR by having a clientId (client org members may have non-client roles)
+      // Clients see ONLY quotes they currently own (creator = initial owner; updated on
+      // transfer via the denormalized `owner` pointer) PLUS quotes explicitly shared with
+      // them via collaboration (QuoteAccess editor/viewer). No org-wide visibility.
       const userClientId = currentUser.clientId || currentUser.get('clientId');
       if (userRole === 'client' || userClientId) {
-        const effectiveClientId = userClientId || currentUser.id;
-
-        // Find all users in the same client organization
-        const clientUsersQuery = new Parse.Query('AmexingUser');
-        clientUsersQuery.equalTo('clientId', effectiveClientId);
-        clientUsersQuery.equalTo('exists', true);
-        clientUsersQuery.equalTo('active', true);
-
-        const clientUsers = await clientUsersQuery.find({ useMasterKey: true });
-
-        // Build list of client pointers (organization users)
-        const clientUserPointers = clientUsers.map((user) => ({
-          __type: 'Pointer',
-          className: 'AmexingUser',
-          objectId: user.id,
-        }));
-
-        // Also include the "parent" client user (the one whose objectId IS the clientId)
-        // This covers cases where the client pointer on quotes points to the org owner
-        if (effectiveClientId && !clientUserPointers.find((p) => p.objectId === effectiveClientId)) {
-          clientUserPointers.push({
-            __type: 'Pointer',
-            className: 'AmexingUser',
-            objectId: effectiveClientId,
-          });
-        }
-
-        // Always include current user pointer
         const currentUserPointer = {
           __type: 'Pointer',
           className: 'AmexingUser',
           objectId: currentUser.id,
         };
-        if (!clientUserPointers.find((p) => p.objectId === currentUser.id)) {
-          clientUserPointers.push(currentUserPointer);
-        }
 
-        // Query 3: Quotes where client has collaboration access OR ownership
+        // Quotes explicitly shared with this user via collaboration
         const accessQuery = new Parse.Query('QuoteAccess');
         accessQuery.equalTo('agent', currentUserPointer);
         accessQuery.equalTo('active', true);
         accessQuery.equalTo('exists', true);
         const accessRecords = await accessQuery.find({ useMasterKey: true });
-
-        // Check for ownership
-        const ownershipQuery = new Parse.Query('QuoteOwnership');
-        ownershipQuery.equalTo('owner', currentUserPointer);
-        ownershipQuery.equalTo('isCurrent', true);
-        ownershipQuery.equalTo('exists', true);
-        const ownershipRecords = await ownershipQuery.find({ useMasterKey: true });
-
-        // Separate quotes into owned vs unowned for proper access control precedence
-        const allOwnershipQuery = new Parse.Query('QuoteOwnership');
-        allOwnershipQuery.equalTo('isCurrent', true);
-        allOwnershipQuery.equalTo('exists', true);
-        allOwnershipQuery.select('quote');
-        const allOwnedQuotes = await allOwnershipQuery.find({ useMasterKey: true });
-        const ownedQuoteIds = allOwnedQuotes
-          .map((ownership) => ownership.get('quote')?.id)
+        const now = new Date();
+        const sharedQuoteIds = accessRecords
+          // Match QuoteAccess.isValid(): exclude revoked and expired shares so the list
+          // never shows a quote the open-gate (hasAccess) would 403.
+          .filter((access) => access.get('revoked') !== true)
+          .filter((access) => {
+            const expiresAt = access.get('expiresAt');
+            return !expiresAt || expiresAt > now;
+          })
+          .map((access) => access.get('quote')?.id)
           .filter((id) => id);
-
-        console.log('=== CLIENT ACCESS CONTROL REBUILD ===');
-        console.log('Total quotes with ownership:', ownedQuoteIds.length);
-        console.log('Current user ID:', currentUser.id);
-        console.log('User owns quotes directly:', ownershipRecords.length);
-        console.log('User has collaboration access:', accessRecords.length);
 
         const queries = [];
 
-        // PATH B: Quotes WITHOUT established ownership - use legacy access (client + creator)
-        // Only for quotes that have no ownership records at all
-        if (ownedQuoteIds.length > 0) {
-          // Only check unowned quotes for client assignment
-          const queryByClient = new Parse.Query('Quote');
-          queryByClient.containedIn('client', clientUserPointers);
-          queryByClient.notContainedIn('objectId', ownedQuoteIds);
-          queries.push(queryByClient);
+        // Current owner (creator = initial owner; pointer updated on transfer)
+        const queryByOwner = new Parse.Query('Quote');
+        queryByOwner.equalTo('owner', currentUserPointer);
+        queries.push(queryByOwner);
 
-          // Only check unowned quotes for creator access
-          const queryByCreator = new Parse.Query('Quote');
-          queryByCreator.equalTo('createdBy', currentUserPointer);
-          queryByCreator.notContainedIn('objectId', ownedQuoteIds);
-          queries.push(queryByCreator);
+        // Fallback for legacy quotes without an `owner` pointer: the creator is the
+        // de-facto owner (mirrors QuoteOwnershipService.transferOwnership fallback).
+        const queryByCreator = new Parse.Query('Quote');
+        queryByCreator.equalTo('createdBy', currentUserPointer);
+        queryByCreator.doesNotExist('owner');
+        queries.push(queryByCreator);
 
-          logger.info('Added legacy access filters (excluding owned quotes) for client', {
-            userId: currentUser.id,
-            excludedOwnedQuotes: ownedQuoteIds.length,
-          });
-        } else {
-          // No ownership system in use, use standard legacy queries
-          const queryByClient = new Parse.Query('Quote');
-          queryByClient.containedIn('client', clientUserPointers);
-          queries.push(queryByClient);
-
-          const queryByCreator = new Parse.Query('Quote');
-          queryByCreator.equalTo('createdBy', currentUserPointer);
-          queries.push(queryByCreator);
-
-          logger.info('Added legacy access filters (no ownership system) for client', {
-            userId: currentUser.id,
-          });
+        // Quotes explicitly shared with this user via collaboration
+        if (sharedQuoteIds.length > 0) {
+          const queryByCollaboration = new Parse.Query('Quote');
+          queryByCollaboration.containedIn('objectId', sharedQuoteIds);
+          queries.push(queryByCollaboration);
         }
 
-        // Add collaboration-based quotes (only for quotes WITH ownership)
-        if (accessRecords.length > 0 && ownedQuoteIds.length > 0) {
-          const collaborativeQuotePointers = accessRecords
-            .map((access) => access.get('quote'))
-            .filter((quote) => quote && quote.id && ownedQuoteIds.includes(quote.id));
-
-          if (collaborativeQuotePointers.length > 0) {
-            const queryByCollaboration = new Parse.Query('Quote');
-            queryByCollaboration.containedIn('objectId', collaborativeQuotePointers.map((q) => q.id));
-            queries.push(queryByCollaboration);
-
-            logger.info('Added collaboration filter for owned quotes (client)', {
-              userId: currentUser.id,
-              collaborativeOwnedQuotesCount: collaborativeQuotePointers.length,
-            });
-          }
-        }
-
-        // Add ownership-based quotes (only for quotes the user directly owns)
-        if (ownershipRecords.length > 0) {
-          const ownedQuotePointers = ownershipRecords
-            .map((ownership) => ownership.get('quote'))
-            .filter((quote) => quote && quote.id);
-
-          if (ownedQuotePointers.length > 0) {
-            const queryByOwnership = new Parse.Query('Quote');
-            queryByOwnership.containedIn('objectId', ownedQuotePointers.map((q) => q.id));
-            queries.push(queryByOwnership);
-
-            logger.info('Added ownership filter for client', {
-              userId: currentUser.id,
-              ownedQuotesCount: ownedQuotePointers.length,
-            });
-          }
-        }
-
-        // Combine with OR — client sees quotes assigned to their org OR created by them OR shared via collaboration
         // eslint-disable-next-line no-underscore-dangle
         query._orQuery(queries);
 
-        logger.info('Applied client filter to quotes query (client)', {
+        logger.info('Applied owner + collaboration filter to quotes query (client)', {
           userId: currentUser.id,
           clientId: userClientId,
-          clientUsersCount: clientUsers.length,
+          sharedQuotesCount: sharedQuoteIds.length,
         });
 
         return;

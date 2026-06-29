@@ -26,12 +26,11 @@ const fileStorageService = new FileStorageService({
  */
 class ReservationController {
   /**
-   * Get role-based user pointers for filtering reservations by clientPtr.
-   * Filters by clientPtr (the client the reservation is FOR), not createdBy,
-   * so reservations created by admins on behalf of a client still appear.
-   * Returns null if no filtering needed (admin/superadmin), or an array of user pointers.
+   * Get the clientPtr-based visibility filter for reservations (DM and default roles).
+   * Returns null for admin/superadmin (see all) and for clients (which are scoped by quote
+   * ownership via getClientEligibleQuoteIds + applyQuoteConstraint instead).
    * @param {object} req - Express request with user info from JWT middleware.
-   * @returns {Array|null} Array of AmexingUser pointers for containedIn on clientPtr, or null.
+   * @returns {object|null} { field: 'clientPtr', pointers: Array } for containedIn, or null.
    * @example
    */
   static async getRoleFilterPointers(req) {
@@ -43,7 +42,7 @@ class ReservationController {
       return null;
     }
 
-    // Department managers see reservations for clients in their department
+    // Department managers see reservations for clients in their department (filtered by clientPtr)
     if (userRole === 'department_manager') {
       const userDepartmentId = currentUser.departmentId || currentUser.get('departmentId');
 
@@ -60,11 +59,14 @@ class ReservationController {
             departmentId: userDepartmentId,
             departmentUsersCount: departmentUsers.length,
           });
-          return departmentUsers.map((user) => ({
-            __type: 'Pointer',
-            className: 'AmexingUser',
-            objectId: user.id,
-          }));
+          return {
+            field: 'clientPtr',
+            pointers: departmentUsers.map((user) => ({
+              __type: 'Pointer',
+              className: 'AmexingUser',
+              objectId: user.id,
+            })),
+          };
         }
       }
 
@@ -72,59 +74,95 @@ class ReservationController {
       logger.warn('Department manager missing departmentId, restricting to own reservations', {
         userId: currentUser.id,
       });
-      return [{ __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id }];
+      return {
+        field: 'clientPtr',
+        pointers: [{ __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id }],
+      };
     }
 
-    // Clients see reservations for users in their client organization
+    // Clients are scoped by quote ownership, which lives on the quote (quotePtr), not on the
+    // reservation. That scoping is applied via the quote subquery inside applyQuoteConstraint
+    // (see getClientEligibleQuoteIds) so it composes with the hold/type filter through a
+    // SINGLE matchesQuery on quotePtr (two separate constraints on quotePtr overwrite each
+    // other). Therefore no clientPtr filter is returned here.
     if (userRole === 'client') {
-      const userClientId = currentUser.clientId || currentUser.get('clientId') || currentUser.id;
-
-      const clientUsersQuery = new Parse.Query('AmexingUser');
-      clientUsersQuery.equalTo('clientId', userClientId);
-      clientUsersQuery.equalTo('exists', true);
-      clientUsersQuery.equalTo('active', true);
-      const clientUsers = await clientUsersQuery.find({ useMasterKey: true });
-
-      const pointers = [];
-
-      // Add user pointers for users with matching clientId
-      if (clientUsers.length > 0) {
-        const userIds = clientUsers.map((u) => u.id);
-        logger.info('Applied client filter to reservations query (clientPtr)', {
-          userId: currentUser.id,
-          clientId: userClientId,
-          clientUsersCount: clientUsers.length,
-          userIds: userIds.slice(0, 5), // Log first 5 user IDs for debugging
-        });
-
-        clientUsers.forEach((user) => {
-          pointers.push({
-            __type: 'Pointer',
-            className: 'AmexingUser',
-            objectId: user.id,
-          });
-        });
-      }
-
-      // IMPORTANT: Also add the clientId itself as a pointer
-      // This handles legacy reservations where clientPtr was incorrectly set to clientId
-      // instead of a user object ID (e.g., RES-2026-0002)
-      pointers.push({
-        __type: 'Pointer',
-        className: 'AmexingUser',
-        objectId: userClientId,
-      });
-
-      logger.info('Including legacy clientId pointer for old reservations', {
-        clientId: userClientId,
-        totalPointers: pointers.length,
-      });
-
-      return pointers;
+      return null;
     }
 
-    // Default: only reservations where they are the client
-    return [{ __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id }];
+    // Default (employee/driver/guest): only reservations where they are the client
+    return {
+      field: 'clientPtr',
+      pointers: [{ __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id }],
+    };
+  }
+
+  /**
+   * Compute the quote ids a client may see: quotes they currently own (creator = initial
+   * owner, updated on transfer), legacy quotes without an owner pointer that they created,
+   * or quotes explicitly shared with them via collaboration (QuoteAccess). Reservations are
+   * then scoped to these quotes (through quotePtr). Returns null for non-client roles.
+   * @param {object} req - Express request with user info from JWT middleware.
+   * @returns {Array<string>|null} Eligible quote ids for clients, or null for other roles.
+   * @example
+   */
+  static async getClientEligibleQuoteIds(req) {
+    const { userRole } = req;
+    const currentUser = req.user;
+    if (userRole !== 'client') {
+      return null;
+    }
+
+    const mePtr = { __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id };
+
+    // Quotes explicitly shared with this user via collaboration
+    const accessQuery = new Parse.Query('QuoteAccess');
+    accessQuery.equalTo('agent', mePtr);
+    accessQuery.equalTo('active', true);
+    accessQuery.equalTo('exists', true);
+    const accessRecords = await accessQuery.find({ useMasterKey: true });
+    const now = new Date();
+    const sharedQuoteIds = accessRecords
+      // Match QuoteAccess.isValid(): exclude revoked and expired shares.
+      .filter((access) => access.get('revoked') !== true)
+      .filter((access) => {
+        const expiresAt = access.get('expiresAt');
+        return !expiresAt || expiresAt > now;
+      })
+      .map((access) => access.get('quote')?.id)
+      .filter((id) => id);
+
+    // Eligible quotes: owner == me OR (legacy: no owner pointer AND created by me) OR shared
+    const ownedQuotesQuery = new Parse.Query('Quote');
+    ownedQuotesQuery.equalTo('owner', mePtr);
+
+    const legacyQuotesQuery = new Parse.Query('Quote');
+    legacyQuotesQuery.doesNotExist('owner');
+    legacyQuotesQuery.equalTo('createdBy', mePtr);
+
+    const orParts = [ownedQuotesQuery, legacyQuotesQuery];
+    if (sharedQuoteIds.length > 0) {
+      const sharedQuotesQuery = new Parse.Query('Quote');
+      sharedQuotesQuery.containedIn('objectId', sharedQuoteIds);
+      orParts.push(sharedQuotesQuery);
+    }
+
+    const eligibleQuotesQuery = Parse.Query.or(...orParts);
+    eligibleQuotesQuery.limit(1000);
+    const eligibleQuotes = await eligibleQuotesQuery.find({ useMasterKey: true });
+
+    if (eligibleQuotes.length === 1000) {
+      logger.warn('Client eligible-quotes lookup hit the 1000 limit; some reservations may be omitted', {
+        userId: currentUser.id,
+      });
+    }
+
+    logger.info('Computed client eligible quotes for reservation scoping', {
+      userId: currentUser.id,
+      eligibleQuotesCount: eligibleQuotes.length,
+      sharedQuotesCount: sharedQuoteIds.length,
+    });
+
+    return eligibleQuotes.map((quote) => quote.id);
   }
 
   /**
@@ -181,6 +219,9 @@ class ReservationController {
 
       // Get role-based filter pointers (null = no filter for admins)
       const roleFilterPointers = await ReservationController.getRoleFilterPointers(req);
+      // For clients: ids of quotes they may see (owner/legacy/shared). null for other roles.
+      // Applied inside applyQuoteConstraint so it composes with the hold/type filter.
+      const clientQuoteIds = await ReservationController.getClientEligibleQuoteIds(req);
 
       // Build query
       const query = new Parse.Query('Reservation');
@@ -193,7 +234,7 @@ class ReservationController {
       query.include('clientPtr');
       query.include('createdBy');
       if (roleFilterPointers) {
-        query.containedIn('clientPtr', roleFilterPointers);
+        query.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
       }
 
       /**
@@ -352,6 +393,14 @@ class ReservationController {
           innerQuote.notEqualTo('status', 'hold');
           has = true;
         }
+        // Client scoping: restrict to quotes the client owns / was shared with (see
+        // getClientEligibleQuoteIds). Applied on the SAME inner Quote query so it composes
+        // with the hold/type filter via a single matchesQuery on quotePtr (avoids the
+        // two-constraints-on-quotePtr overwrite). An empty list yields zero results.
+        if (clientQuoteIds) {
+          innerQuote.containedIn('objectId', clientQuoteIds);
+          has = true;
+        }
         if (has) q.matchesQuery('quotePtr', innerQuote);
       };
 
@@ -368,7 +417,7 @@ class ReservationController {
       totalQuery.equalTo('active', true);
       totalQuery.equalTo('exists', true);
       if (roleFilterPointers) {
-        totalQuery.containedIn('clientPtr', roleFilterPointers);
+        totalQuery.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
       }
 
       // Apply the same combined date constraints to the total count
@@ -383,7 +432,7 @@ class ReservationController {
       pendingCountQuery.equalTo('active', true);
       pendingCountQuery.equalTo('exists', true);
       if (roleFilterPointers) {
-        pendingCountQuery.containedIn('clientPtr', roleFilterPointers);
+        pendingCountQuery.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
       }
       applyQuoteConstraint(pendingCountQuery, clientTypeFilter, clientIdFilter, 'only');
       const pendingCompletionCount = await pendingCountQuery.count({ useMasterKey: true });
@@ -412,10 +461,10 @@ class ReservationController {
 
         // Apply role filter to each sub-query
         if (roleFilterPointers) {
-          folioQuery.containedIn('clientPtr', roleFilterPointers);
-          contactQuery.containedIn('clientPtr', roleFilterPointers);
-          eventQuery.containedIn('clientPtr', roleFilterPointers);
-          emailQuery.containedIn('clientPtr', roleFilterPointers);
+          folioQuery.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
+          contactQuery.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
+          eventQuery.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
+          emailQuery.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
         }
 
         // Apply the same combined date constraints to each search sub-query
@@ -476,7 +525,7 @@ class ReservationController {
       countQuery.equalTo('active', true);
       countQuery.equalTo('exists', true);
       if (roleFilterPointers) {
-        countQuery.containedIn('clientPtr', roleFilterPointers);
+        countQuery.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
       }
       if (statusFilter) {
         countQuery.equalTo('status', statusFilter);
@@ -1152,6 +1201,29 @@ class ReservationController {
 
       reservation.set('status', status);
       await reservation.save(null, { useMasterKey: true });
+
+      // When a reservation is confirmed, advance its quote from 'hold' (Bloqueada) to
+      // 'scheduled' (Agendada): confirming the reservation means the block is resolved.
+      // Non-blocking — the reservation status change already succeeded.
+      if (status === 'confirmed') {
+        try {
+          const quotePtr = reservation.get('quotePtr');
+          if (quotePtr) {
+            const quote = await new Parse.Query('Quote').get(quotePtr.id, { useMasterKey: true });
+            if (quote && quote.get('status') === 'hold') {
+              quote.set('status', 'scheduled');
+              await quote.save(null, { useMasterKey: true });
+              logger.info('Quote advanced hold → scheduled after reservation confirmed', {
+                reservationId: id, quoteId: quote.id, performedBy: req.user?.id,
+              });
+            }
+          }
+        } catch (quoteErr) {
+          logger.warn('Failed to advance quote status after reservation confirmed', {
+            reservationId: id, error: quoteErr.message,
+          });
+        }
+      }
 
       logger.info('Reservation status set manually', {
         reservationId: id, status, performedBy: req.user?.id,
