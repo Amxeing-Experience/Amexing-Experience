@@ -810,31 +810,31 @@ document.addEventListener('DOMContentLoaded', function() {
     font-weight: 500;
 }
 
-/* Custom Orange-themed Pills */
+/* Brand-themed Pills (salvia) */
 .btn-orange-pill {
-    color: #f76b1c;
-    border: 1px solid #f76b1c;
+    color: var(--brand-primary-active);
+    border: 1px solid var(--brand-primary);
     background-color: transparent;
     transition: all 0.2s ease-in-out;
 }
 
 .btn-orange-pill:hover {
     color: white;
-    background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%);
-    border-color: #f76b1c;
+    background: var(--brand-gradient);
+    border-color: var(--brand-primary);
 }
 
 /* Only show active state when actually checked */
 .btn-check:checked + .btn-orange-pill {
     color: white;
-    background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%) !important;
-    border-color: #f76b1c;
+    background: var(--brand-gradient) !important;
+    border-color: var(--brand-primary);
 }
 
 /* Ensure unchecked state is always outline style */
 .btn-check:not(:checked) + .btn-orange-pill {
-    color: #f76b1c !important;
-    border: 1px solid #f76b1c;
+    color: var(--brand-primary-active) !important;
+    border: 1px solid var(--brand-primary);
     background-color: transparent !important;
 }
 
