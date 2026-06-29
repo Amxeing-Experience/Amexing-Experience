@@ -26,6 +26,25 @@ const fileStorageService = new FileStorageService({
  */
 class ReservationController {
   /**
+   * Fetch an object by id, returning null when it does not exist instead of throwing.
+   * Parse's Query.get() throws OBJECT_NOT_FOUND (101) for missing/invalid ids; without
+   * this the surrounding catch blocks turn a legitimate "not found" into a 500.
+   * @param {Parse.Query} query - Configured query (includes/constraints already set).
+   * @param {string} id - objectId to fetch.
+   * @returns {Promise<Parse.Object|null>} The object, or null if not found.
+   */
+  static async safeGet(query, id) {
+    try {
+      return await query.get(id, { useMasterKey: true });
+    } catch (error) {
+      if (error.code === Parse.Error.OBJECT_NOT_FOUND) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Get the clientPtr-based visibility filter for reservations (DM and default roles).
    * Returns null for admin/superadmin (see all) and for clients (which are scoped by quote
    * ownership via getClientEligibleQuoteIds + applyQuoteConstraint instead).
@@ -580,7 +599,7 @@ class ReservationController {
       query.include('clientPtr');
       query.include('createdBy');
       query.include('serviceCustomer');
-      const reservation = await query.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(query, id);
 
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
@@ -921,7 +940,7 @@ class ReservationController {
       const resQuery = new Parse.Query('Reservation');
       resQuery.equalTo('active', true);
       resQuery.equalTo('exists', true);
-      const reservation = await resQuery.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(resQuery, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -931,7 +950,7 @@ class ReservationController {
       svcQuery.equalTo('reservationPtr', reservation);
       svcQuery.equalTo('active', true);
       svcQuery.equalTo('exists', true);
-      const service = await svcQuery.get(serviceId, { useMasterKey: true });
+      const service = await ReservationController.safeGet(svcQuery, serviceId);
       if (!service) {
         return res.status(404).json({ success: false, error: 'Servicio no encontrado' });
       }
@@ -1044,7 +1063,7 @@ class ReservationController {
       const resQuery = new Parse.Query('Reservation');
       resQuery.equalTo('active', true);
       resQuery.equalTo('exists', true);
-      const reservation = await resQuery.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(resQuery, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1054,7 +1073,7 @@ class ReservationController {
       svcQuery.equalTo('reservationPtr', reservation);
       svcQuery.equalTo('active', true);
       svcQuery.equalTo('exists', true);
-      const service = await svcQuery.get(serviceId, { useMasterKey: true });
+      const service = await ReservationController.safeGet(svcQuery, serviceId);
       if (!service) {
         return res.status(404).json({ success: false, error: 'Servicio no encontrado' });
       }
@@ -1092,7 +1111,7 @@ class ReservationController {
       const query = new Parse.Query('Reservation');
       query.equalTo('active', true);
       query.equalTo('exists', true);
-      const reservation = await query.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(query, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1174,7 +1193,7 @@ class ReservationController {
       const query = new Parse.Query('Reservation');
       query.equalTo('active', true);
       query.equalTo('exists', true);
-      const reservation = await query.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(query, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1257,7 +1276,7 @@ class ReservationController {
       const resQuery = new Parse.Query('Reservation');
       resQuery.equalTo('active', true);
       resQuery.equalTo('exists', true);
-      const reservation = await resQuery.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(resQuery, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1359,7 +1378,7 @@ class ReservationController {
       const resQuery = new Parse.Query('Reservation');
       resQuery.equalTo('active', true);
       resQuery.equalTo('exists', true);
-      const reservation = await resQuery.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(resQuery, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1449,7 +1468,7 @@ class ReservationController {
       const query = new Parse.Query('Reservation');
       query.equalTo('active', true);
       query.equalTo('exists', true);
-      const reservation = await query.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(query, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1526,7 +1545,7 @@ class ReservationController {
       const query = new Parse.Query('Reservation');
       query.equalTo('active', true);
       query.equalTo('exists', true);
-      const reservation = await query.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(query, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
