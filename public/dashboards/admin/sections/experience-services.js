@@ -2818,16 +2818,21 @@ class ExperienceServicesBuilder {
     if (adultsQty) adultsQty.value = service.adultsQuantity || 0;
     if (childrenQty) childrenQty.value = service.childrenQuantity || 0;
     if (noAlcQty) noAlcQty.value = service.adultsNoAlcoholQuantity || 0;
-    if (adultPrice) adultPrice.value = service.adultPrice || 0;
-    if (childPrice) childPrice.value = service.childPrice || 0;
-    if (noAlcPrice) noAlcPrice.value = service.noAlcoholPrice || 0;
+
+    // Cargar el catálogo (tarjeta + precios base) ANTES de restaurar los precios
+    // guardados, para que la EDICIÓN gane sobre el catálogo (antes los pisaba).
+    if (service.experienceId) this.handleExperienceSelection(service.experienceId);
+
+    // Precios guardados por encima del catálogo. Niño/sin-alcohol: si se guardaron
+    // vacíos (null), el campo se queda vacío.
+    if (adultPrice && service.adultPrice != null) adultPrice.value = service.adultPrice;
+    if (childPrice) childPrice.value = service.childPrice != null ? service.childPrice : '';
+    if (noAlcPrice) noAlcPrice.value = service.noAlcoholPrice != null ? service.noAlcoholPrice : '';
 
     const startTime = document.getElementById('experienceStartTime');
     const endTime = document.getElementById('experienceEndTime');
     if (startTime) startTime.value = service.startTime || '';
     if (endTime) endTime.value = service.endTime || '';
-
-    if (service.experienceId) this.handleExperienceSelection(service.experienceId);
 
     // Restore languages and clientNotes after handleExperienceSelection populates from cache
     setTimeout(() => {
@@ -3048,14 +3053,17 @@ class ExperienceServicesBuilder {
     const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value) || 0;
     const noAlcQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value) || 0;
     const adultPrice = parseFloat(document.getElementById('adultPrice')?.value) || 0;
-    // Default: si el campo de niño o "sin alcohol" está vacío, usa el de adulto
-    // (un 0 explícito sí se respeta).
     const childRaw = document.getElementById('childPrice')?.value;
     const noAlcRaw = document.getElementById('noAlcoholPrice')?.value;
-    const childPrice = (childRaw == null || childRaw === '') ? adultPrice : (parseFloat(childRaw) || 0);
-    const noAlcPrice = (noAlcRaw == null || noAlcRaw === '') ? adultPrice : (parseFloat(noAlcRaw) || 0);
+    // Valor capturado: null si se dejó vacío (así al reabrir el campo sigue vacío
+    // y se respeta la edición). Un 0 explícito sí se conserva.
+    const childPrice = (childRaw == null || childRaw === '') ? null : (parseFloat(childRaw) || 0);
+    const noAlcPrice = (noAlcRaw == null || noAlcRaw === '') ? null : (parseFloat(noAlcRaw) || 0);
+    // Para el TOTAL, si no se capturó precio de niño/sin-alcohol se usa el de adulto.
+    const childForCalc = childPrice != null ? childPrice : adultPrice;
+    const noAlcForCalc = noAlcPrice != null ? noAlcPrice : adultPrice;
 
-    const total = (adultsQty * adultPrice) + (childrenQty * childPrice) + (noAlcQty * noAlcPrice);
+    const total = (adultsQty * adultPrice) + (childrenQty * childForCalc) + (noAlcQty * noAlcForCalc);
 
     const isProvider = exp && exp.type === 'provider_experience';
 
