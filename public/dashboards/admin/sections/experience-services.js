@@ -267,14 +267,12 @@ class ExperienceServicesBuilder {
       this.handleVehicleSelection(e.target.value);
     });
 
-    // Tour con vehículo: recalcular el precio (pricePerHour × horas) al cambiar las horas.
-    document.getElementById('hoursQuantity')?.addEventListener('input', () => {
-      const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
-      const vehicleId = document.getElementById('vehicleSelect')?.value;
-      if (serviceType === 'tour' && vehicleId) {
-        this.handleVehicleSelection(vehicleId);
-      }
-    });
+    // El input de Precio es el BASE; el Total (base × horas/cantidad) se recalcula
+    // al cambiar horas, precio, cantidad o el check de vehículo adicional.
+    document.getElementById('hoursQuantity')?.addEventListener('input', () => this.updateServiceTotal());
+    document.getElementById('servicePrice')?.addEventListener('input', () => this.updateServiceTotal());
+    document.getElementById('serviceQuantity')?.addEventListener('input', () => this.updateServiceTotal());
+    document.getElementById('additionalVehicle')?.addEventListener('change', () => this.updateServiceTotal());
 
     // Guide checkbox
     document.getElementById('includeGuide')?.addEventListener('change', (e) => {
@@ -871,6 +869,9 @@ class ExperienceServicesBuilder {
         await this.populateMergedTransportLists();
       }, 100);
     }
+
+    // Muestra/oculta y actualiza el Total según el tipo de servicio.
+    this.updateServiceTotal();
   }
 
   // (Simplificado) Sin separar aeropuerto/p2p/local: llena los datalists de origen
@@ -2437,16 +2438,51 @@ class ExperienceServicesBuilder {
           priceEl.value = vehicle.finalPrice || '0.00';
         }
       } else if (priceEl && !isPopulating) {
-        // Tour con vehículo: precio = (precio por hora de tour-prices) × horas del tour.
-        const perHour = this.getTourVehiclePrice(vehicleId);
-        const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 0;
-        if (perHour != null && hours > 0) {
-          priceEl.value = (perHour * hours).toFixed(2);
-        }
+        // Tour: el input de Precio muestra el BASE (precio por hora de tour-prices);
+        // el total (base × horas) se muestra aparte vía updateServiceTotal().
+        const base = this.getTourVehiclePrice(vehicleId);
+        if (base != null) priceEl.value = base.toFixed(2);
       }
     }
 
     this.updateWaitingTimeRateDisplay();
+    this.updateServiceTotal();
+  }
+
+  // Muestra el Total (base × multiplicador) para servicios no-experiencia.
+  // Tour: base × horas. Concepto: base × cantidad. Transporte: base × (1 ó 2 vehículos).
+  updateServiceTotal() {
+    const totalRow = document.getElementById('serviceTotalRow');
+    const totalEl = document.getElementById('serviceTotalDisplay');
+    if (!totalRow || !totalEl) return;
+
+    const type = this.currentServiceType;
+    if (type !== 'tour' && type !== 'concepto' && type !== 'transport') {
+      totalRow.classList.add('d-none');
+      return;
+    }
+    totalRow.classList.remove('d-none');
+
+    const base = parseFloat(document.getElementById('servicePrice')?.value) || 0;
+    const currency = document.getElementById('currencySymbol')?.textContent || 'MXN';
+    let total = base;
+    let detail = '';
+
+    if (type === 'tour') {
+      const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
+      total = base * hours;
+      detail = ` ($${base.toFixed(2)} × ${hours} h)`;
+    } else if (type === 'concepto') {
+      const qty = parseInt(document.getElementById('serviceQuantity')?.value, 10) || 1;
+      total = base * qty;
+      if (qty > 1) detail = ` ($${base.toFixed(2)} × ${qty})`;
+    } else if (type === 'transport') {
+      const qty = document.getElementById('additionalVehicle')?.checked ? 2 : 1;
+      total = base * qty;
+      if (qty > 1) detail = ` ($${base.toFixed(2)} × ${qty})`;
+    }
+
+    totalEl.textContent = `$${total.toFixed(2)} ${currency}${detail}`;
   }
 
   handleIncludeGuideChange(checked) {
@@ -2685,6 +2721,8 @@ class ExperienceServicesBuilder {
     if (servicePriceField) {
       servicePriceField.value = '0.00';
     }
+
+    this.updateServiceTotal();
   }
 
   retriggerRateLookup() {
@@ -2873,6 +2911,30 @@ class ExperienceServicesBuilder {
 
     if (service.tourId) this.handleTourSelection(service.tourId);
 
+    // Restaurar horas guardadas (handleTourSelection las pone con la duración del tour).
+    if (service.hours) {
+      const hoursEl = document.getElementById('hoursQuantity');
+      if (hoursEl) hoursEl.value = service.hours;
+    }
+
+    // Restaurar segmento + vehículo + precio BASE guardados (sin que se recalcule).
+    if (service.rateId) {
+      const rateSelect = document.getElementById('transportCategory');
+      if (rateSelect) {
+        rateSelect.value = service.rateId;
+        this._populatingTransportForm = true;
+        this.handleRateSelection(service.rateId); // tour -> puebla vehículos (síncrono)
+        if (service.vehicleId) {
+          const vehicleSelect = document.getElementById('vehicleSelect');
+          if (vehicleSelect) vehicleSelect.value = service.vehicleId;
+        }
+        const priceEl = document.getElementById('servicePrice');
+        if (priceEl) priceEl.value = service.unitPrice != null ? service.unitPrice : (service.price || 0);
+        this._populatingTransportForm = false;
+      }
+    }
+    this.updateServiceTotal();
+
     // Restore languages and clientNotes after handleTourSelection populates from cache
     setTimeout(() => {
       const langEl = document.getElementById('tourLanguages');
@@ -2934,6 +2996,7 @@ class ExperienceServicesBuilder {
             if (priceEl) priceEl.value = service.price || 0;
 
             this.updateWaitingTimeRateDisplay();
+            this.updateServiceTotal();
             this._populatingTransportForm = false;
           });
         }
@@ -2981,6 +3044,8 @@ class ExperienceServicesBuilder {
 
     const notesEl = document.getElementById('serviceNotes');
     if (notesEl) notesEl.value = service.notes || '';
+
+    this.updateServiceTotal();
   }
 
   // =====================
@@ -3153,12 +3218,17 @@ class ExperienceServicesBuilder {
     const vehicleId = document.getElementById('vehicleSelect')?.value || null;
     const vehicleType = vehicleId ? this.vehicleTypesMap.get(vehicleId) : null;
 
-    const total = (adultsQty * adultPrice) + (childrenQty * childPrice) + (noAlcQty * noAlcPrice);
+    // El precio del tour-con-vehículo = base (precio por hora de tour-prices) × horas.
+    const base = parseFloat(document.getElementById('servicePrice')?.value) || 0;
+    const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
+    const total = base * hours;
 
     return {
       tourId,
       concept: tour ? (tour.destinationPOI?.name || tour.name || 'Tour') : 'Tour',
       price: total,
+      unitPrice: base,
+      hours,
       quantity: 1,
       adultsQuantity: adultsQty,
       childrenQuantity: childrenQty,
