@@ -793,6 +793,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     reason,
                     hoursBeforeEvent,
                     eventDate: eventDate ? eventDate.toISOString() : null,
+                    // When this detail page is used for a reservation, tag the request as
+                    // a reservation cancellation so it is classified/searchable correctly
+                    // (otherwise the controller defaults to cancellationType 'quote').
+                    ...(window.__isReservation ? {
+                        cancellationType: 'reservation',
+                        reservationId: window.__reservationId || undefined,
+                        reservationFolio: window.__reservationFolio || undefined,
+                    } : {}),
                 }),
             });
             const result = await response.json();
@@ -802,7 +810,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('La reserva ha sido cancelada exitosamente.');
                 window.location.reload();
             } else {
-                alert(`Solicitud de cancelación creada exitosamente.\n\nID: ${result.data.requestId}\nEstado: Pendiente de aprobación\n\nRecibirá una notificación cuando sea revisada.`);
+                const requestId = result.data.request?.id || result.data.requestId || 'N/D';
+                alert(`Solicitud de cancelación creada exitosamente.\n\nID: ${requestId}\nEstado: Pendiente de aprobación\n\nRecibirá una notificación cuando sea revisada.`);
             }
         } catch (error) {
             console.error('Error processing cancellation:', error);
