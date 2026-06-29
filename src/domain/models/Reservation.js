@@ -191,6 +191,42 @@ class Reservation extends BaseModel {
   setServicesSubtotal(amount) {
     this.set('servicesSubtotal', amount);
   }
+
+  // Payment rollup (computed by PaymentService from active Payment records).
+  // paymentStatus is orthogonal to status (operational): pending|partial|paid|refunded.
+
+  getPaymentStatus() {
+    return this.get('paymentStatus') || 'pending';
+  }
+
+  setPaymentStatus(paymentStatus) {
+    this.set('paymentStatus', paymentStatus);
+  }
+
+  getPaidAmount() {
+    return this.get('paidAmount') || 0;
+  }
+
+  setPaidAmount(amount) {
+    this.set('paidAmount', amount);
+  }
+
+  getBalance() {
+    return this.get('balance');
+  }
+
+  setBalance(balance) {
+    this.set('balance', balance);
+  }
+
+  // Reservation-level tip (added on top of services + IVA for the amount due).
+  getTip() {
+    return this.get('tip') || 0;
+  }
+
+  setTip(tip) {
+    this.set('tip', tip);
+  }
 }
 
 // Register the subclass with Parse

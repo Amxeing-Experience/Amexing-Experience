@@ -223,6 +223,34 @@ class ReservationService extends BaseModel {
   setExtraAssignments(extraAssignments) {
     this.set('extraAssignments', extraAssignments);
   }
+
+  // Per-service payment rollup (computed by PaymentService from Payments
+  // assigned to this service via reservationServicePtr). paymentStatus is
+  // orthogonal to status (operational): pending|partial|paid.
+
+  getPaidAmount() {
+    return this.get('paidAmount') || 0;
+  }
+
+  setPaidAmount(amount) {
+    this.set('paidAmount', amount);
+  }
+
+  getBalance() {
+    return this.get('balance');
+  }
+
+  setBalance(balance) {
+    this.set('balance', balance);
+  }
+
+  getPaymentStatus() {
+    return this.get('paymentStatus') || 'pending';
+  }
+
+  setPaymentStatus(paymentStatus) {
+    this.set('paymentStatus', paymentStatus);
+  }
 }
 
 // Register the subclass with Parse
