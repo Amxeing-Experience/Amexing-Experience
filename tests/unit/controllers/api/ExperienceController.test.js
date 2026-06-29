@@ -29,18 +29,34 @@ jest.mock('parse/node', () => {
     limit: jest.fn().mockReturnThis(),
     include: jest.fn().mockReturnThis(),
     matches: jest.fn().mockReturnThis(),
+    doesNotExist: jest.fn().mockReturnThis(),
+    exists: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    greaterThan: jest.fn().mockReturnThis(),
+    lessThan: jest.fn().mockReturnThis(),
     get: jest.fn(),
     find: jest.fn(),
     count: jest.fn(),
     first: jest.fn(),
   });
 
-  // Create a fresh mock query instance for each Query() call
-  const MockQuery = jest.fn(() => {
-    const instance = createMockQueryInstance();
-    mockInstances.push(instance);
-    return instance;
-  });
+  // Instancia COMPARTIDA por test: cada new Parse.Query() devuelve la misma, para
+  // que el test y el controlador operen sobre el mismo mock (lo que el test
+  // configura con .get/.find es lo que usa el controlador). Se resetea en beforeEach.
+  let sharedInstance = null;
+  const defaultQueryImpl = () => {
+    if (!sharedInstance) {
+      sharedInstance = createMockQueryInstance();
+      mockInstances.push(sharedInstance);
+    }
+    return sharedInstance;
+  };
+  const MockQuery = jest.fn(defaultQueryImpl);
+
+  // Restaura la implementación por defecto. Algunos tests la sobreescriben con
+  // mockImplementation, y jest.clearAllMocks() NO la revierte -> contaminaba a los
+  // tests siguientes (new Parse.Query().get quedaba undefined).
+  MockQuery.resetToDefault = () => MockQuery.mockImplementation(defaultQueryImpl);
 
   // OR query returns a new instance with combined behavior
   MockQuery.or = jest.fn((...queries) => {
@@ -58,6 +74,7 @@ jest.mock('parse/node', () => {
   // Reset function to clear all instances between tests
   MockQuery.resetSharedInstance = () => {
     mockInstances.length = 0;
+    sharedInstance = null;
   };
 
   return {
@@ -134,6 +151,10 @@ describe('ExperienceController', () => {
     };
 
     jest.clearAllMocks();
+
+    // Restaurar la implementación por defecto de Parse.Query (clearAllMocks no la
+    // revierte si un test previo usó mockImplementation).
+    if (Parse.Query.resetToDefault) Parse.Query.resetToDefault();
 
     // Reset Parse.Query mock if it exists
     if (Parse.Query.getAllInstances) {
