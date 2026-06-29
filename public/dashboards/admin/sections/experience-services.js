@@ -86,6 +86,9 @@ class ExperienceServicesBuilder {
 
   async init() {
     try {
+      // El botón de "Agregar servicio" no sirve hasta que el catálogo cargue
+      // (los listeners se enganchan al final del init): deshabilítalo mientras tanto.
+      this.setAddServiceButtonsEnabled(false);
       await this.loadExperienceData();
 
       // Load temporarily stored services for new experiences
@@ -115,9 +118,37 @@ class ExperienceServicesBuilder {
       this.sortAndDetectOverlaps();
       this.renderServices();
       this.updateTotals();
+      // Catálogo listo: ya se puede usar el modal.
+      this.setAddServiceButtonsEnabled(true);
     } catch (error) {
       console.error('Error initializing experience services builder:', error);
+      this.setAddServiceButtonsError();
     }
+  }
+
+  // Habilita/deshabilita los botones de "Agregar servicio" mostrando un estado de carga.
+  setAddServiceButtonsEnabled(enabled) {
+    ['addServiceBtn', 'emptyStateAddServiceBtn'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.disabled = !enabled;
+      if (!enabled) {
+        if (!btn.dataset.idleHtml) btn.dataset.idleHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Cargando servicios…';
+      } else if (btn.dataset.idleHtml) {
+        btn.innerHTML = btn.dataset.idleHtml;
+        delete btn.dataset.idleHtml;
+      }
+    });
+  }
+
+  setAddServiceButtonsError() {
+    ['addServiceBtn', 'emptyStateAddServiceBtn'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="ti ti-alert-triangle me-1"></i>Error al cargar';
+    });
   }
 
   setupEventListeners() {
