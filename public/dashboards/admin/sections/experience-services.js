@@ -835,21 +835,28 @@ class ExperienceServicesBuilder {
       if (additionalVehicleContainer) additionalVehicleContainer.classList.add('d-none');
     }
 
-    // Hide Guía + Chofer and Greeter checkboxes for transport (as requested)
+    // Guía/Greeter por tipo: Tour -> "Guía + Chofer" (sin greeter);
+    // Transporte -> "Guía" + "Greeter".
     const includeGuideContainer = document.getElementById('includeGuide')?.closest('.form-check');
     const includeGreeterContainer = document.getElementById('greeterCheckboxContainer');
-
-    // Hide the "Opcional" label column for transport
     const opcionalLabelContainer = includeGuideContainer?.closest('.col-md-2');
+    const guideLabel = document.getElementById('guideLabel');
 
     if (type === 'transport') {
-      if (includeGuideContainer) includeGuideContainer.classList.add('d-none');
-      if (includeGreeterContainer) includeGreeterContainer.classList.add('d-none');
-      if (opcionalLabelContainer) opcionalLabelContainer.classList.add('d-none');
-    } else {
       if (includeGuideContainer) includeGuideContainer.classList.remove('d-none');
       if (includeGreeterContainer) includeGreeterContainer.classList.remove('d-none');
       if (opcionalLabelContainer) opcionalLabelContainer.classList.remove('d-none');
+      if (guideLabel) guideLabel.textContent = 'Guía';
+    } else if (type === 'tour') {
+      if (includeGuideContainer) includeGuideContainer.classList.remove('d-none');
+      if (includeGreeterContainer) includeGreeterContainer.classList.add('d-none');
+      if (opcionalLabelContainer) opcionalLabelContainer.classList.remove('d-none');
+      if (guideLabel) guideLabel.textContent = 'Guía + Chofer';
+    } else {
+      // Experiencia/Concepto: no aplican (la fila de transporte va oculta).
+      if (includeGuideContainer) includeGuideContainer.classList.add('d-none');
+      if (includeGreeterContainer) includeGreeterContainer.classList.add('d-none');
+      if (opcionalLabelContainer) opcionalLabelContainer.classList.add('d-none');
     }
 
     // Hide horas field for transport but keep for tours and experiences  
