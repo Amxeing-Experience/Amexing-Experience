@@ -28,33 +28,6 @@ const isClient = dtUserRole === 'client';
 %>
 
 <style>
-/* Lista de experiencias: filas clicables + paginación en verde de marca */
-#experiences-content #<%= dtTableId %> tbody tr {
-    cursor: pointer;
-}
-#experiences-content #<%= dtTableId %> tbody tr:hover {
-    background-color: #f6f7f3;
-}
-#experiences-content .page-item.active .page-link {
-    background-color: var(--brand-primary, #969b81);
-    border-color: var(--brand-primary, #969b81);
-    color: #fff;
-}
-#experiences-content .page-link {
-    color: var(--brand-primary-active, #6e7259);
-}
-#experiences-content .dataTables_paginate .paginate_button.current,
-#experiences-content .dataTables_paginate .paginate_button.current:hover {
-    background: var(--brand-gradient) !important;
-    border-color: transparent !important;
-    color: #fff !important;
-}
-#experiences-content .dataTables_paginate .paginate_button:hover {
-    background: #eef0e8 !important;
-    border-color: var(--brand-primary, #969b81) !important;
-    color: var(--brand-primary-active, #6e7259) !important;
-}
-
 /* Enhanced TomSelect Dropdown Styles */
 .tomselect-option-enhanced {
     padding: 8px 12px;
@@ -146,6 +119,24 @@ const isClient = dtUserRole === 'client';
 </style>
 
 <div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-star me-2"></i>Experiencias
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Gestión completa del catálogo de experiencias</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createExperienceBtn">
+                        <i class="ti ti-plus me-1"></i>Nueva Experiencia
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
     <div class="card-body" id="experiences-content">
         <!-- Filter Controls -->
         <div class="d-flex justify-content-end align-items-center mb-3">
@@ -1343,15 +1334,6 @@ const isClient = dtUserRole === 'client';
 
         $('#createExperienceBtn').on('click', function() { window.location.href = '/dashboard/admin/experiences/new'; });
         $(`#${tableId}`).on('click', '.edit-experience-btn', function() { window.location.href = `/dashboard/admin/experiences/${$(this).data('id')}`; });
-
-        // Click en cualquier parte de la fila abre el editor (ignora botones/acciones)
-        $(`#${tableId} tbody`).on('click', 'tr', function(e) {
-            if ($(e.target).closest('button, a, .btn-group, .dropdown, .dtr-control').length) return;
-            const rowData = dataTable.row(this).data();
-            if (!rowData) return;
-            const id = rowData.objectId || rowData.id;
-            if (id) window.location.href = `/dashboard/admin/experiences/${id}`;
-        });
         $(`#${tableId}`).on('click', '.manage-images-btn', function() {
             const experienceId = $(this).data('id');
             const name = $(this).data('name');

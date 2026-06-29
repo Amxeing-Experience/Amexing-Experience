@@ -8,106 +8,108 @@
 const experienceTitle = isNewExperience ? 'Nueva Experiencia' : 'Experiencia';
 %>
 
-<div class="experience-editor">
-    <!-- Barra superior fija: navegación + guardar siempre visibles -->
-    <div class="exp-topbar d-flex justify-content-between align-items-center gap-2 mb-3">
-        <div class="d-flex align-items-center gap-3" style="min-width: 0;">
-            <a href="/dashboard/admin/experiences" class="btn btn-sm btn-outline-secondary flex-shrink-0">
-                <i class="ti ti-arrow-left me-1"></i>Volver
-            </a>
-            <div style="min-width: 0;">
-                <h2 class="h5 mb-0 fw-bold text-truncate" id="experienceTitle">
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h2 class="mb-1 fw-bold" id="experienceTitle">
                     <%= experienceTitle %>
                     <% if (!isNewExperience) { %>
-                        <span id="experienceNameSpan" class="text-muted fw-normal" style="font-size: 0.9em;">
+                        <span id="experienceNameSpan" class="text-muted" style="font-size: 0.9em;">
                             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                         </span>
                     <% } %>
                 </h2>
-                <nav aria-label="breadcrumb" class="d-none d-md-block">
-                    <ol class="breadcrumb mb-0 small">
-                        <li class="breadcrumb-item"><a href="/dashboard/admin">Dashboard</a></li>
-                        <li class="breadcrumb-item"><a href="/dashboard/admin/experiences">Experiencias</a></li>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="/dashboard/admin/experiences"><i class="ti ti-star me-1"></i>Experiencias</a></li>
                         <li class="breadcrumb-item active" id="breadcrumbExperienceTitle"><%= experienceTitle %></li>
                     </ol>
                 </nav>
             </div>
-        </div>
-        <div class="d-flex align-items-center gap-2 flex-shrink-0">
-            <button type="button" class="btn text-white" style="background: var(--brand-gradient);" id="expSaveBtn">
-                <i class="ti ti-device-floppy me-1"></i><%= isNewExperience ? 'Crear Experiencia' : 'Guardar' %>
-            </button>
-        </div>
-    </div>
-
-    <!-- Tabs: Servicios | Información (sustituyen al acordeón; cada sección a ancho completo) -->
-    <ul class="nav nav-pills exp-tabs mb-3" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link <%= isNewExperience ? '' : 'active' %>" id="tab-servicios-btn" data-bs-toggle="tab" data-bs-target="#tab-servicios" type="button" role="tab">
-                <i class="ti ti-list me-1"></i>Servicios
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link <%= isNewExperience ? 'active' : '' %>" id="tab-informacion-btn" data-bs-toggle="tab" data-bs-target="#tab-informacion" type="button" role="tab">
-                <i class="ti ti-info-circle me-1"></i>Información
-            </button>
-        </li>
-    </ul>
-
-    <div class="tab-content">
-        <!-- Servicios -->
-        <div class="tab-pane fade <%= isNewExperience ? '' : 'show active' %>" id="tab-servicios" role="tabpanel" aria-labelledby="tab-servicios-btn">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-0">
-                    <%- include('./sections/experience-services', { experienceId: experienceId }) %>
-                </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="/dashboard/admin/experiences" class="btn btn-sm btn-outline-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>Volver
+                </a>
             </div>
         </div>
-        <!-- Información -->
-        <div class="tab-pane fade <%= isNewExperience ? 'show active' : '' %>" id="tab-informacion" role="tabpanel" aria-labelledby="tab-informacion-btn">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-0">
-                    <%- include('./sections/experience-information', { experienceId: experienceId, isNewExperience: isNewExperience, userRole: userRole }) %>
+    </div>
+</div>
+
+<!-- Accordion Sections -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="accordion" id="experienceAccordion">
+            <!-- Services Section -->
+            <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden" id="servicesAccordionItem">
+                <h2 class="accordion-header" id="headingServices">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseServices"
+                        aria-expanded="true" aria-controls="collapseServices" id="servicesAccordionBtn">
+                        <i class="ti ti-list me-2 fs-5"></i>
+                        <span class="fw-bold">Servicios</span>
+                    </button>
+                </h2>
+                <div id="collapseServices" class="accordion-collapse collapse show" aria-labelledby="headingServices" data-bs-parent="#experienceAccordion">
+                    <div class="accordion-body p-0">
+                        <%- include('./sections/experience-services', { experienceId: experienceId }) %>
+                        <%- include('./sections/experience-services-modals') %>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Information Section -->
+            <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden">
+                <h2 class="accordion-header" id="headingInformation">
+                    <button class="accordion-button <%= isNewExperience ? '' : 'collapsed' %>" type="button" data-bs-toggle="collapse" data-bs-target="#collapseInformation" aria-expanded="<%= isNewExperience ? 'true' : 'false' %>" aria-controls="collapseInformation">
+                        <i class="ti ti-info-circle me-2 fs-5"></i>
+                        <span class="fw-bold">Informacion</span>
+                    </button>
+                </h2>
+                <div id="collapseInformation" class="accordion-collapse collapse <%= isNewExperience ? 'show' : '' %>" aria-labelledby="headingInformation" data-bs-parent="#experienceAccordion">
+                    <div class="accordion-body p-0">
+                        <%- include('./sections/experience-information', { experienceId: experienceId, isNewExperience: isNewExperience, userRole: userRole }) %>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modales de servicio: a nivel superior (NO dentro de un tab-pane, o se
-     ocultarían cuando ese tab no está activo, p.ej. al crear). -->
-<%- include('./sections/experience-services-modals') %>
-
 <style>
-/* Barra superior fija */
-.experience-editor .exp-topbar {
-    position: sticky;
-    top: 0;
-    z-index: 1020;
-    background: #fff;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-    border: 1px solid #eef0f2;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+/* Accordion Styles */
+.accordion-button:not(.collapsed) {
+    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+    color: white;
+    box-shadow: none;
 }
 
-/* Tabs en verde de marca */
-.experience-editor .exp-tabs .nav-link {
-    color: var(--brand-secondary, #5a6a85);
-    font-weight: 500;
-}
-.experience-editor .exp-tabs .nav-link.active {
-    background: var(--brand-gradient);
-    color: #fff;
+.accordion-button:not(.collapsed)::after {
+    filter: brightness(0) invert(1);
 }
 
-/* Breadcrumb en tono de marca */
+.accordion-button:focus {
+    box-shadow: 0 0 0 0.15rem rgba(245, 158, 11, 0.25);
+}
+
+.accordion-button.disabled-accordion {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.accordion-item {
+    border-radius: 0.5rem !important;
+}
+
+/* Breadcrumb styles */
 .breadcrumb-item a {
     color: #5a6a85;
     text-decoration: none;
 }
+
 .breadcrumb-item a:hover {
-    color: var(--brand-primary, #969b81);
+    color: #f59e0b;
 }
 </style>
 
@@ -139,46 +141,16 @@ window.getAccessToken = getAccessToken;
 document.addEventListener('DOMContentLoaded', function() {
     // The token is already set globally above
 
-    // Botón "Guardar" de la barra fija: dispara el guardado de Información que ya
-    // existe (#saveExperienceInfoBtn). Si estás en la pestaña de Servicios, primero
-    // muestra Información para que la validación pueda enfocar los campos requeridos.
-    const expSaveBtn = document.getElementById('expSaveBtn');
-    if (expSaveBtn) {
-        expSaveBtn.addEventListener('click', function() {
-            const realSaveBtn = document.getElementById('saveExperienceInfoBtn');
-            if (!realSaveBtn) return;
-            const infoTabBtn = document.getElementById('tab-informacion-btn');
-            if (infoTabBtn && !infoTabBtn.classList.contains('active') && window.bootstrap && window.bootstrap.Tab) {
-                window.bootstrap.Tab.getOrCreateInstance(infoTabBtn).show();
-                setTimeout(function() { realSaveBtn.click(); }, 60);
-            } else {
-                realSaveBtn.click();
+    // Load experience name for title
+    // Auto-scroll to accordion section header when opened
+    document.querySelectorAll('.accordion-collapse').forEach(function(collapse) {
+        collapse.addEventListener('shown.bs.collapse', function() {
+            const header = this.previousElementSibling;
+            if (header) {
+                header.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
-
-        // Espeja el estado del botón real en el botón fijo: muestra "Guardando…"
-        // (loader) mientras guarda y "Guardado ✓" al terminar, para que se vea que
-        // sí está pasando algo. El guardado real lo maneja saveExperience (intacto).
-        const realSaveBtnForObs = document.getElementById('saveExperienceInfoBtn');
-        if (realSaveBtnForObs) {
-            const stickyIdleHtml = expSaveBtn.innerHTML;
-            new MutationObserver(function() {
-                if (realSaveBtnForObs.disabled) {
-                    expSaveBtn.disabled = true;
-                    expSaveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Guardando…';
-                } else {
-                    expSaveBtn.disabled = false;
-                    const ok = /guardado|completado/i.test(realSaveBtnForObs.textContent || '');
-                    if (ok) {
-                        expSaveBtn.innerHTML = '<i class="ti ti-check me-1"></i>Guardado';
-                        setTimeout(function() { expSaveBtn.innerHTML = stickyIdleHtml; }, 1800);
-                    } else {
-                        expSaveBtn.innerHTML = stickyIdleHtml;
-                    }
-                }
-            }).observe(realSaveBtnForObs, { attributes: true, attributeFilter: ['disabled'] });
-        }
-    }
+    });
 
     <% if (!isNewExperience) { %>
     async function loadExperienceName() {

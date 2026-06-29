@@ -38,11 +38,6 @@ class ExperienceServicesBuilder {
     this.vehicleRatePricesCache = [];
     this.agencyRateCache = null;
     this.driverTourRateCache = null;
-    // Tarifas de guía (transporte) y greeter, para sumarlos al Total.
-    this.guideTransportRateCache = null;
-    this.guideFormulaConfigCache = null;
-    this.greeterRateCache = null;
-    this.greeterRateCacheTime = null;
 
     // Pricing rates for Pago/Moneda
     this.transferRate = 3.0;
@@ -91,9 +86,6 @@ class ExperienceServicesBuilder {
 
   async init() {
     try {
-      // El botón de "Agregar servicio" no sirve hasta que el catálogo cargue
-      // (los listeners se enganchan al final del init): deshabilítalo mientras tanto.
-      this.setAddServiceButtonsEnabled(false);
       await this.loadExperienceData();
 
       // Load temporarily stored services for new experiences
@@ -111,9 +103,6 @@ class ExperienceServicesBuilder {
         this.loadProviderExperiences(),
         this.loadAgencyRate(),
         this.loadDriverTourRate(),
-        this.loadGuideTransportRate(),
-        this.loadGuideFormulaConfiguration(),
-        this.loadGreeterRateConfiguration(),
         this.loadPricingRates(),
         this.loadTransportServices(),
         this.loadVehicleRatePrices(),
@@ -126,37 +115,9 @@ class ExperienceServicesBuilder {
       this.sortAndDetectOverlaps();
       this.renderServices();
       this.updateTotals();
-      // Catálogo listo: ya se puede usar el modal.
-      this.setAddServiceButtonsEnabled(true);
     } catch (error) {
       console.error('Error initializing experience services builder:', error);
-      this.setAddServiceButtonsError();
     }
-  }
-
-  // Habilita/deshabilita los botones de "Agregar servicio" mostrando un estado de carga.
-  setAddServiceButtonsEnabled(enabled) {
-    ['addServiceBtn', 'emptyStateAddServiceBtn'].forEach((id) => {
-      const btn = document.getElementById(id);
-      if (!btn) return;
-      btn.disabled = !enabled;
-      if (!enabled) {
-        if (!btn.dataset.idleHtml) btn.dataset.idleHtml = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Cargando servicios…';
-      } else if (btn.dataset.idleHtml) {
-        btn.innerHTML = btn.dataset.idleHtml;
-        delete btn.dataset.idleHtml;
-      }
-    });
-  }
-
-  setAddServiceButtonsError() {
-    ['addServiceBtn', 'emptyStateAddServiceBtn'].forEach((id) => {
-      const btn = document.getElementById(id);
-      if (!btn) return;
-      btn.disabled = true;
-      btn.innerHTML = '<i class="ti ti-alert-triangle me-1"></i>Error al cargar';
-    });
   }
 
   setupEventListeners() {
@@ -247,8 +208,20 @@ class ExperienceServicesBuilder {
       radio.addEventListener('change', (e) => this.handleServiceTypeChange(e.target.value));
     });
 
-    // (Simplificado) Se quitaron los toggles de tipo de transporte / viaje /
-    // dirección: ya no existen esos radios en el modal.
+    // Transport Type Toggle
+    document.querySelectorAll('input[name="transportType"]').forEach((radio) => {
+      radio.addEventListener('change', () => this.handleTransportTypeChange());
+    });
+
+    // Trip Type Toggle
+    document.querySelectorAll('input[name="tripType"]').forEach((radio) => {
+      radio.addEventListener('change', () => this.handleTripTypeChange());
+    });
+
+    // Direction Type Toggle
+    document.querySelectorAll('input[name="directionType"]').forEach((radio) => {
+      radio.addEventListener('change', async () => await this.handleDirectionTypeChange());
+    });
 
     // Experience selection
     document.getElementById('experienceSelect')?.addEventListener('change', (e) => {
@@ -275,23 +248,14 @@ class ExperienceServicesBuilder {
       this.handleVehicleSelection(e.target.value);
     });
 
-    // El input de Precio es el BASE; el Total (base × horas/cantidad) se recalcula
-    // al cambiar horas, precio, cantidad o el check de vehículo adicional.
-    document.getElementById('hoursQuantity')?.addEventListener('input', () => this.updateServiceTotal());
-    document.getElementById('servicePrice')?.addEventListener('input', () => this.updateServiceTotal());
-    document.getElementById('serviceQuantity')?.addEventListener('input', () => this.updateServiceTotal());
-    document.getElementById('additionalVehicle')?.addEventListener('change', () => this.updateServiceTotal());
-
     // Guide checkbox
     document.getElementById('includeGuide')?.addEventListener('change', (e) => {
       this.handleIncludeGuideChange(e.target.checked);
-      this.updateServiceTotal();
     });
 
     // Greeter checkbox
     document.getElementById('includeGreeter')?.addEventListener('change', (e) => {
       this.handleIncludeGreeterChange(e.target.checked);
-      this.updateServiceTotal();
     });
 
     // Waiting time input
@@ -558,9 +522,7 @@ class ExperienceServicesBuilder {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
-      // Este endpoint responde en formato DataTables ({ data, recordsTotal, ... }),
-      // sin 'success'. Tomar data.data tal cual (cada fila trae defaultCapacity).
-      this.vehiclesCache = Array.isArray(data?.data) ? data.data : [];
+      if (data.success) this.vehiclesCache = data.data || [];
     } catch (error) {
       console.error('Error loading vehicles:', error);
     }
@@ -623,8 +585,7 @@ class ExperienceServicesBuilder {
       const data = await response.json();
       if (data.success && data.data) {
         data.data.forEach((tp) => {
-          // /api/tour-prices devuelve tourPtr/ratePtr (no tourId/rateId).
-          const key = `${tp.tourPtr}_${tp.ratePtr}`;
+          const key = `${tp.tourId}_${tp.rateId}`;
           if (!this.tourPricesMap.has(key)) {
             this.tourPricesMap.set(key, []);
           }
@@ -694,125 +655,6 @@ class ExperienceServicesBuilder {
     } catch (error) {
       console.error('Error loading driver tour rate:', error);
     }
-  }
-
-  async loadGuideTransportRate() {
-    try {
-      const token = this.getAccessToken();
-      if (!token) return;
-      const response = await fetch('/api/guide-transport-rate/current', {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) this.guideTransportRateCache = result.data;
-      }
-    } catch (error) {
-      console.error('Error loading guide transport rate:', error);
-    }
-  }
-
-  async loadGuideFormulaConfiguration() {
-    try {
-      const token = this.getAccessToken();
-      const response = await fetch('/api/guide-transport-rate/formula', {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.config) this.guideFormulaConfigCache = result.config;
-      } else {
-        this.guideFormulaConfigCache = { roundTripMultiplier: 2, minimumCharge: 0 };
-      }
-    } catch (error) {
-      this.guideFormulaConfigCache = { roundTripMultiplier: 2, minimumCharge: 0 };
-    }
-  }
-
-  async loadGreeterRateConfiguration() {
-    try {
-      const token = this.getAccessToken();
-      const response = await fetch('/api/greeter-rate/formula', {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          this.greeterRateCache = {
-            basePrice: result.data.basePrice || 760,
-            hourlyRate: result.data.hourlyRate || 640,
-          };
-        }
-      }
-    } catch (error) {
-      console.error('Error loading greeter rate:', error);
-    }
-  }
-
-  // Costo del guía de transporte = fórmula (guideTransportRate + config). Igual que cotización.
-  calculateGuideTransportCost(durationMinutes) {
-    const guideRate = this.guideTransportRateCache?.value || 400;
-    let componentsCost = null;
-    let roundTripMultiplier = null;
-    let minimumCharge = 0;
-
-    if (typeof GuideFormulaEvaluator !== 'undefined' && GuideFormulaEvaluator.formulaConfig) {
-      const config = GuideFormulaEvaluator.formulaConfig;
-      minimumCharge = config.minimumCharge || 0;
-      if (config.formulaComponents && config.formulaComponents.length > 0) {
-        componentsCost = GuideFormulaEvaluator.evaluateComponents(config.formulaComponents, durationMinutes, guideRate);
-      } else if (config.roundTripMultiplier) {
-        roundTripMultiplier = config.roundTripMultiplier;
-      }
-    }
-    if (componentsCost === null && roundTripMultiplier === null) {
-      const formulaConfig = this.guideFormulaConfigCache || { roundTripMultiplier: 2, minimumCharge: 0 };
-      roundTripMultiplier = formulaConfig.roundTripMultiplier;
-      minimumCharge = formulaConfig.minimumCharge || 0;
-    }
-
-    const params = { durationMinutes, guideRate, roundTripMultiplier, minimumCharge, componentsCost };
-    if (window.PricingEngine) return window.PricingEngine.calculateGuideTransportCost(params);
-
-    const durationHours = durationMinutes / 60;
-    if (!durationHours || durationHours <= 0) return 0;
-    if (componentsCost !== null) return Math.max(componentsCost, minimumCharge);
-    return Math.max(durationHours * (roundTripMultiplier || 0) * guideRate, minimumCharge);
-  }
-
-  // Costo del greeter = 760 + 640 × horas (o el motor único si está cargado).
-  calculateGreeterPrice(durationMinutes) {
-    const basePrice = this.greeterRateCache?.basePrice || 760;
-    const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
-    if (window.PricingEngine) {
-      return window.PricingEngine.calculateGreeterPrice({ durationMinutes, basePrice, hourlyRate });
-    }
-    const durationHours = durationMinutes / 60;
-    if (!durationHours || durationHours <= 0) return basePrice;
-    return basePrice + (hourlyRate * durationHours);
-  }
-
-  // { guide, greeter } según tipo + checkboxes, para sumarlos al Total.
-  // Tour: guía = ChoferTour × horas. Transporte: guía = fórmula(duración ruta),
-  // greeter = 760 + 640 × horas(duración ruta).
-  getGuideGreeterCost() {
-    const type = this.currentServiceType;
-    const includeGuide = document.getElementById('includeGuide')?.checked || false;
-    const includeGreeter = document.getElementById('includeGreeter')?.checked || false;
-    let guide = 0;
-    let greeter = 0;
-
-    if (type === 'tour') {
-      if (includeGuide) {
-        const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 0;
-        guide = (this.driverTourRateCache?.value || 0) * hours;
-      }
-    } else if (type === 'transport') {
-      const durationMinutes = this.cachedRouteDuration || 0;
-      if (includeGuide) guide = this.calculateGuideTransportCost(durationMinutes);
-      if (includeGreeter) greeter = this.calculateGreeterPrice(durationMinutes);
-    }
-    return { guide, greeter };
   }
 
   async loadPricingRates() {
@@ -897,10 +739,6 @@ class ExperienceServicesBuilder {
   handleServiceTypeChange(type) {
     this.currentServiceType = type;
 
-    // Al cambiar de servicio, limpia segmento/vehículo/precio para no arrastrar
-    // la selección del tipo o ítem anterior. (En edición se restauran después.)
-    this.resetSegmentVehiclePrice();
-
     // Hide all content sections
     document.querySelectorAll('.service-content').forEach((el) => el.classList.add('d-none'));
 
@@ -964,28 +802,21 @@ class ExperienceServicesBuilder {
       if (additionalVehicleContainer) additionalVehicleContainer.classList.add('d-none');
     }
 
-    // Guía/Greeter por tipo: Tour -> "Guía + Chofer" (sin greeter);
-    // Transporte -> "Guía" + "Greeter".
+    // Hide Guía + Chofer and Greeter checkboxes for transport (as requested)
     const includeGuideContainer = document.getElementById('includeGuide')?.closest('.form-check');
     const includeGreeterContainer = document.getElementById('greeterCheckboxContainer');
+
+    // Hide the "Opcional" label column for transport
     const opcionalLabelContainer = includeGuideContainer?.closest('.col-md-2');
-    const guideLabel = document.getElementById('guideLabel');
 
     if (type === 'transport') {
-      if (includeGuideContainer) includeGuideContainer.classList.remove('d-none');
-      if (includeGreeterContainer) includeGreeterContainer.classList.remove('d-none');
-      if (opcionalLabelContainer) opcionalLabelContainer.classList.remove('d-none');
-      if (guideLabel) guideLabel.textContent = 'Guía';
-    } else if (type === 'tour') {
-      if (includeGuideContainer) includeGuideContainer.classList.remove('d-none');
-      if (includeGreeterContainer) includeGreeterContainer.classList.add('d-none');
-      if (opcionalLabelContainer) opcionalLabelContainer.classList.remove('d-none');
-      if (guideLabel) guideLabel.textContent = 'Guía + Chofer';
-    } else {
-      // Experiencia/Concepto: no aplican (la fila de transporte va oculta).
       if (includeGuideContainer) includeGuideContainer.classList.add('d-none');
       if (includeGreeterContainer) includeGreeterContainer.classList.add('d-none');
       if (opcionalLabelContainer) opcionalLabelContainer.classList.add('d-none');
+    } else {
+      if (includeGuideContainer) includeGuideContainer.classList.remove('d-none');
+      if (includeGreeterContainer) includeGreeterContainer.classList.remove('d-none');
+      if (opcionalLabelContainer) opcionalLabelContainer.classList.remove('d-none');
     }
 
     // Hide horas field for transport but keep for tours and experiences  
@@ -999,47 +830,51 @@ class ExperienceServicesBuilder {
     // Repopulate rates dropdown to filter based on service type
     this.populateRateSelector();
 
-    // (Simplificado) Llena los combos de origen/destino con TODAS las opciones
+    // Populate POI dropdowns for transport if preselected values exist
     if (type === 'transport') {
+      // Use setTimeout to avoid blocking the UI and let the DOM settle
       setTimeout(async () => {
-        await this.populateMergedTransportLists();
+        await this.populateTransportDropdownsOnLoad();
       }, 100);
     }
-
-    // Muestra/oculta y actualiza el Total según el tipo de servicio.
-    this.updateServiceTotal();
   }
 
-  // (Simplificado) Sin separar aeropuerto/p2p/local: llena los datalists de origen
-  // y destino con todas las opciones disponibles (cualquier lugar puede ser origen
-  // o destino). El precio se resuelve por ruta (origen+destino+segmento+vehículo);
-  // si no hay match, el admin lo pone manual.
-  async populateMergedTransportLists() {
+  async populateTransportDropdownsOnLoad() {
+    console.log('🚨 DEBUG: populateTransportDropdownsOnLoad called');
+
+    // Ensure services are loaded before populating dropdowns
     if (!window.servicesByTransportType) {
-      try {
-        await this.loadActiveServicesForDropdowns();
-      } catch (e) {
-        console.warn('[Services] No se pudieron cargar servicios para origen/destino:', e);
-      }
+      console.log('🚨 DEBUG: No services data available, loading services...');
+      await this.loadActiveServicesForDropdowns();
     }
-    const groups = window.servicesByTransportType || {};
-    const all = [].concat(groups.aeropuerto || [], groups['punto-a-punto'] || [], groups.local || []);
-    const places = new Set();
-    all.forEach((s) => {
-      if (s && s.origin) places.add(s.origin);
-      if (s && s.destination) places.add(s.destination);
-    });
-    const sorted = [...places].sort();
-    ['transportOriginList', 'transportDestinationList'].forEach((id) => {
-      const dl = document.getElementById(id);
-      if (!dl) return;
-      dl.innerHTML = '';
-      sorted.forEach((name) => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        dl.appendChild(opt);
-      });
-    });
+
+    // Check if transport type is preselected
+    const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
+    if (!transportType) {
+      console.log('🚨 DEBUG: No transport type preselected');
+      return;
+    }
+
+    // Check if direction type is preselected  
+    const directionType = document.querySelector('input[name="directionType"]:checked')?.value;
+    if (!directionType) {
+      console.log('🚨 DEBUG: No direction type preselected');
+      return;
+    }
+
+    console.log('🚨 DEBUG: Found preselected values:', { transportType, directionType });
+
+    // Check if we're in One Way mode (default when transport content loads)
+    const tripType = document.querySelector('input[name="tripType"]:checked')?.value || 'one-way';
+
+    if (tripType === 'one-way') {
+      console.log('🚨 DEBUG: Setting up One Way fields and populating dropdowns on load');
+      // First ensure fields are visible by calling direction change handler
+      await this.handleDirectionTypeChange();
+    } else {
+      console.log('🚨 DEBUG: Setting up Round Trip fields and populating dropdowns on load');
+      await this.updateRoundTripFieldVisibility();
+    }
   }
 
   clearTransportFormFields() {
@@ -1513,6 +1348,16 @@ class ExperienceServicesBuilder {
   }
 
   // Legacy function - now delegates to quote modal logic
+  async populateTransportPOIDropdowns(transportType, directionType) {
+    console.log('🚨 DEBUG: Legacy populateTransportPOIDropdowns called - delegating to populateDropdownsForTransportType');
+    // Ensure services are loaded first
+    if (!window.servicesByTransportType) {
+      await this.loadActiveServicesForDropdowns();
+    }
+    // Delegate to the quote modal logic
+    this.populateDropdownsForTransportType(transportType, directionType);
+  }
+
   async populateRoundTripDropdowns(transportType) {
     console.log('[Services] populateRoundTripDropdowns called for', transportType);
 
@@ -1621,8 +1466,6 @@ class ExperienceServicesBuilder {
     const adultPriceEl = document.getElementById('adultPrice');
     if (adultPriceEl && adultPrice) adultPriceEl.value = adultPrice;
 
-    // El campo se deja vacío si la experiencia no trae el precio; el default a
-    // adulto se aplica solo en el cálculo/guardado (no se rellena en pantalla).
     const childPriceEl = document.getElementById('childPrice');
     if (childPriceEl) childPriceEl.value = isProvider ? (exp.price_child || '') : (exp.childPrice || '');
 
@@ -2069,20 +1912,6 @@ class ExperienceServicesBuilder {
 
     // Store tour data for later use
     this.selectedTourData = tour;
-
-    // Un tour CON vehículo necesita segmento + vehículo; uno a pie no.
-    // Revela/oculta esos campos automáticamente al elegir el tour.
-    this.handleTourTransportToggle(!tour.isWalkingTour);
-
-    // Autocargar la duración del tour en "Horas" (tour.time está en minutos).
-    // Ej: Mineral de Pozos = 180 min -> 3 horas.
-    const hoursInput = document.getElementById('hoursQuantity');
-    if (hoursInput && tour.time) {
-      const hrs = parseInt(tour.time, 10) / 60;
-      if (!isNaN(hrs) && hrs > 0) {
-        hoursInput.value = +hrs.toFixed(1);
-      }
-    }
   }
 
   buildTourDetailsCard(tour) {
@@ -2327,11 +2156,6 @@ class ExperienceServicesBuilder {
     if (transportFieldsRow) {
       transportFieldsRow.classList.toggle('d-none', !checked);
     }
-    // Un tour CON vehículo cobra por el vehículo -> muestra el campo de Precio.
-    const standardPricingSection = document.getElementById('standardPricingSection');
-    if (standardPricingSection) {
-      standardPricingSection.classList.toggle('d-none', !checked);
-    }
   }
 
   async handleRateSelection(rateId) {
@@ -2356,57 +2180,8 @@ class ExperienceServicesBuilder {
       return;
     }
 
-    // Tour con vehículo: la lista y el precio salen de tour-prices (no de la
-    // tarifa de tiempo de espera).
-    if (serviceType === 'tour') {
-      this.populateTourVehicleDropdown(rateId);
-      return;
-    }
-
     // For non-transport services, use fallback vehicle population
     this.populateVehicleSelectFallback(rateId);
-  }
-
-  // Vehículos disponibles para un tour+segmento, desde tour-prices, con su pax.
-  populateTourVehicleDropdown(rateId) {
-    const select = document.getElementById('vehicleSelect');
-    if (!select) return;
-    select.innerHTML = '<option value="">-- Seleccionar vehículo --</option>';
-
-    const tourId = this.selectedTourData?.id;
-    if (!tourId || !rateId) return;
-
-    const prices = this.tourPricesMap.get(`${tourId}_${rateId}`) || [];
-    const capacityById = new Map();
-    (this.vehiclesCache || []).forEach((v) => capacityById.set(v.id, v.defaultCapacity ?? v.capacity));
-
-    prices.forEach((tp) => {
-      if (!tp.vehicleTypeId) return;
-      const option = document.createElement('option');
-      option.value = tp.vehicleTypeId;
-      const name = tp.vehicleType || tp.vehicleTypeId;
-      const pax = capacityById.get(tp.vehicleTypeId);
-      option.textContent = pax != null ? `${name} - ${pax} pax` : name;
-      select.appendChild(option);
-    });
-  }
-
-  // Precio por hora del vehículo para el tour+segmento seleccionados (tour-prices).
-  getTourVehiclePrice(vehicleId) {
-    const tourId = this.selectedTourData?.id;
-    const rateId = document.getElementById('transportCategory')?.value;
-    if (!tourId || !rateId || !vehicleId) return null;
-    const prices = this.tourPricesMap.get(`${tourId}_${rateId}`) || [];
-    const tp = prices.find((p) => p.vehicleTypeId === vehicleId);
-    return tp && tp.price != null ? Number(tp.price) : null;
-  }
-
-  // Limpia segmento + vehículo + precio (al cambiar de servicio).
-  resetSegmentVehiclePrice() {
-    const seg = document.getElementById('transportCategory');
-    if (seg) seg.value = '';
-    this.transportPriceData = null;
-    this.clearVehicleDropdown(); // resetea vehicleSelect y pone el precio en 0.00
   }
 
   async handleTransportRateSelection(rateId, fallbackOrigin = null, fallbackDestination = null) {
@@ -2416,22 +2191,91 @@ class ExperienceServicesBuilder {
       return;
     }
 
-    // (Simplificado) Origen/Destino vienen directamente de los dos combos del modal.
-    // Ya no hay dirección/tipo/ida-vuelta. El origen es opcional: el destino + el
-    // segmento bastan para resolver precio y vehículos por ruta.
-    const originName = document.getElementById('transportOriginCombo')?.value?.trim()
-      || fallbackOrigin || '';
-    const destinationName = document.getElementById('transportDestinationCombo')?.value?.trim()
-      || fallbackDestination || '';
+    // Get origin and destination from the appropriate fields based on direction
+    const directionRadio = document.querySelector('input[name="directionType"]:checked');
+    const direction = directionRadio?.value || 'arrival';
+    const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
+    const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
 
-    if (!destinationName) {
+    let originName = '';
+    let destinationName = '';
+
+    if (tripType === 'round-trip') {
+      // Round trip: read from Ida fields (arrival leg)
+      if (transportType === 'local') {
+        // Local: Ida origin = TEXT, Ida destination = SELECT
+        originName = document.getElementById('roundTripOriginIdaText')?.value || '';
+        const destSelect = document.getElementById('roundTripDestinationIdaSelect');
+        const destSlug = destSelect?.value;
+        destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
+      } else {
+        // Aeropuerto / Punto a Punto: Ida origin = SELECT (slug), Ida destination = SELECT (slug)
+        const originSelect = document.getElementById('roundTripOriginIdaSelect');
+        const originSlug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
+        const destSelect = document.getElementById('roundTripDestinationIdaSelect');
+        const destSlug = destSelect?.value;
+        destinationName = window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
+      }
+    } else {
+      // One-way: read from one-way fields based on direction
+      const isDepartureWithSelect = direction === 'departure' && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
+
+      // Helper to resolve destination SELECT display name
+      const resolveDestSelect = () => {
+        const destSelect = document.getElementById('transportDestinationSelect');
+        const destSlug = destSelect?.value;
+        return window.slugToOriginalMapping?.get(destSlug) || destSlug || '';
+      };
+
+      const isLocalIda = direction === 'arrival' && transportType === 'local';
+
+      if (isLocalIda) {
+        // Local Ida: origin TEXT, destination SELECT
+        originName = document.getElementById('transportOriginText')?.value || '';
+        destinationName = resolveDestSelect();
+      } else if (direction === 'departure' && transportType === 'local') {
+        // Local Vuelta: origin SELECT, destination TEXT
+        const originSelect = document.getElementById('transportOriginSelect');
+        const slug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(slug) || slug || '';
+        destinationName = document.getElementById('transportDestinationText')?.value || '';
+      } else if (direction === 'departure') {
+        // Departure: origin SELECT (city), destination SELECT (airport)
+        const originSelect = document.getElementById('transportOriginSelect');
+        const originSlug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
+        destinationName = resolveDestSelect();
+      } else {
+        // Arrival: origin SELECT (airport), destination SELECT (city)
+        const originSelect = document.getElementById('transportOriginSelect');
+        const originSlug = originSelect?.value;
+        originName = window.slugToOriginalMapping?.get(originSlug) || originSlug || '';
+        destinationName = resolveDestSelect();
+      }
+    }
+
+    // Use fallbacks from service data if form fields are empty (edit race condition)
+    if (!originName && fallbackOrigin) originName = fallbackOrigin;
+    if (!destinationName && fallbackDestination) destinationName = fallbackDestination;
+
+    if (!originName || !destinationName) {
       this.clearVehicleDropdown();
       this.transportPriceData = null;
       return;
     }
 
-    const apiOrigin = originName;
-    const apiDestination = destinationName;
+    // For one-way departure: swap origin/destination for API query
+    // DB stores routes as origin→destination, but user selected in reverse for departure
+    // Round trip uses Ida (arrival) data which is already in DB order
+    let apiOrigin = originName;
+    let apiDestination = destinationName;
+
+    if (tripType !== 'round-trip' && direction === 'departure') {
+      apiOrigin = destinationName;
+      apiDestination = originName;
+      console.log('🔄 Swapped for departure:', { apiOrigin, apiDestination });
+    }
 
     // Show loading spinner next to Vehículo label
     const vehicleSpinner = document.getElementById('vehicleLoadingSpinner');
@@ -2439,10 +2283,10 @@ class ExperienceServicesBuilder {
 
     try {
       const params = new URLSearchParams({
+        originPOI: apiOrigin,
         destinationPOI: apiDestination,
         rateId,
       });
-      if (apiOrigin) params.append('originPOI', apiOrigin);
       if (this.clientId) {
         params.append('clientId', this.clientId);
       }
@@ -2573,60 +2417,10 @@ class ExperienceServicesBuilder {
         if (vehicle && priceEl) {
           priceEl.value = vehicle.finalPrice || '0.00';
         }
-      } else if (priceEl && !isPopulating) {
-        // Tour: el input de Precio muestra el BASE (precio por hora de tour-prices);
-        // el total (base × horas) se muestra aparte vía updateServiceTotal().
-        const base = this.getTourVehiclePrice(vehicleId);
-        if (base != null) priceEl.value = base.toFixed(2);
       }
     }
 
     this.updateWaitingTimeRateDisplay();
-    this.updateServiceTotal();
-  }
-
-  // Muestra el Total (base × multiplicador) para servicios no-experiencia.
-  // Tour: base × horas. Concepto: base × cantidad. Transporte: base × (1 ó 2 vehículos).
-  updateServiceTotal() {
-    const totalRow = document.getElementById('serviceTotalRow');
-    const totalEl = document.getElementById('serviceTotalDisplay');
-    if (!totalRow || !totalEl) return;
-
-    const type = this.currentServiceType;
-    if (type !== 'tour' && type !== 'concepto' && type !== 'transport') {
-      totalRow.classList.add('d-none');
-      return;
-    }
-    totalRow.classList.remove('d-none');
-
-    const base = parseFloat(document.getElementById('servicePrice')?.value) || 0;
-    const currency = document.getElementById('currencySymbol')?.textContent || 'MXN';
-    let total = base;
-    let detail = '';
-
-    if (type === 'tour') {
-      const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
-      total = base * hours;
-      detail = ` ($${base.toFixed(2)} × ${hours} h)`;
-    } else if (type === 'concepto') {
-      const qty = parseInt(document.getElementById('serviceQuantity')?.value, 10) || 1;
-      total = base * qty;
-      if (qty > 1) detail = ` ($${base.toFixed(2)} × ${qty})`;
-    } else if (type === 'transport') {
-      const qty = document.getElementById('additionalVehicle')?.checked ? 2 : 1;
-      total = base * qty;
-      if (qty > 1) detail = ` ($${base.toFixed(2)} × ${qty})`;
-    }
-
-    // Sumar guía/greeter (según tipo + checkboxes).
-    const { guide, greeter } = this.getGuideGreeterCost();
-    total += guide + greeter;
-    const extras = [];
-    if (guide > 0) extras.push(`guía $${guide.toFixed(2)}`);
-    if (greeter > 0) extras.push(`greeter $${greeter.toFixed(2)}`);
-    if (extras.length) detail += ` + ${extras.join(' + ')}`;
-
-    totalEl.textContent = `$${total.toFixed(2)} ${currency}${detail}`;
   }
 
   handleIncludeGuideChange(checked) {
@@ -2834,20 +2628,14 @@ class ExperienceServicesBuilder {
       this.vehiclesCache.forEach((v) => {
         const option = document.createElement('option');
         option.value = v.id;
-        option.textContent = `${v.name} (${v.defaultCapacity ?? v.capacity} pax)`;
+        option.textContent = `${v.name} (${v.capacity} pax)`;
         select.appendChild(option);
       });
     } else {
-      // Capacidad (pax) por tipo de vehículo, desde vehiclesCache.
-      // El campo real es defaultCapacity (no capacity).
-      const capacityById = new Map();
-      (this.vehiclesCache || []).forEach((v) => capacityById.set(v.id, v.defaultCapacity ?? v.capacity));
       filtered.forEach((p) => {
         const option = document.createElement('option');
         option.value = p.vehicleTypeId;
-        const name = p.vehicleTypeName || p.vehicleTypeCode || p.vehicleTypeId;
-        const pax = capacityById.get(p.vehicleTypeId);
-        option.textContent = pax != null ? `${name} - ${pax} pax` : name;
+        option.textContent = `${p.vehicleTypeName || p.vehicleTypeCode || p.vehicleTypeId}`;
         select.appendChild(option);
       });
     }
@@ -2865,8 +2653,6 @@ class ExperienceServicesBuilder {
     if (servicePriceField) {
       servicePriceField.value = '0.00';
     }
-
-    this.updateServiceTotal();
   }
 
   retriggerRateLookup() {
@@ -2897,34 +2683,23 @@ class ExperienceServicesBuilder {
     });
     if (hasExperiences) select.appendChild(expGroup);
 
-    // Groups: Proveedores y Establecimientos (ambos vienen de provider-experiencias,
-    // se distinguen por provider.type para mostrarlos en grupos separados).
+    // Group: Provider Experiencias
     const providerExps = this.providerExperiencesCache || [];
     if (providerExps.length > 0) {
-      // Cachear todas para lookup posterior (precio, edición, etc.)
+      const provGroup = document.createElement('optgroup');
+      provGroup.label = 'Experiencias de Proveedores';
       providerExps.forEach((exp) => {
+        // Add to experiencesCache for later lookup
         if (!this.experiencesCache.has(exp.id)) {
           this.experiencesCache.set(exp.id, exp);
         }
+        const option = document.createElement('option');
+        option.value = exp.id;
+        const providerName = exp.provider ? ` (${exp.provider.name})` : '';
+        option.textContent = `${exp.name}${providerName}`;
+        provGroup.appendChild(option);
       });
-
-      const buildGroup = (label, predicate) => {
-        const items = providerExps.filter(predicate);
-        if (items.length === 0) return;
-        const group = document.createElement('optgroup');
-        group.label = label;
-        items.forEach((exp) => {
-          const option = document.createElement('option');
-          option.value = exp.id;
-          const parentName = exp.provider ? ` (${exp.provider.name})` : '';
-          option.textContent = `${exp.name}${parentName}`;
-          group.appendChild(option);
-        });
-        select.appendChild(group);
-      };
-
-      buildGroup('Experiencias de Proveedores', (exp) => exp.provider?.type !== 'Establishment');
-      buildGroup('Experiencias de Establecimientos', (exp) => exp.provider?.type === 'Establishment');
+      select.appendChild(provGroup);
     }
   }
 
@@ -3000,21 +2775,16 @@ class ExperienceServicesBuilder {
     if (adultsQty) adultsQty.value = service.adultsQuantity || 0;
     if (childrenQty) childrenQty.value = service.childrenQuantity || 0;
     if (noAlcQty) noAlcQty.value = service.adultsNoAlcoholQuantity || 0;
-
-    // Cargar el catálogo (tarjeta + precios base) ANTES de restaurar los precios
-    // guardados, para que la EDICIÓN gane sobre el catálogo (antes los pisaba).
-    if (service.experienceId) this.handleExperienceSelection(service.experienceId);
-
-    // Precios guardados por encima del catálogo. Niño/sin-alcohol: si se guardaron
-    // vacíos (null), el campo se queda vacío.
-    if (adultPrice && service.adultPrice != null) adultPrice.value = service.adultPrice;
-    if (childPrice) childPrice.value = service.childPrice != null ? service.childPrice : '';
-    if (noAlcPrice) noAlcPrice.value = service.noAlcoholPrice != null ? service.noAlcoholPrice : '';
+    if (adultPrice) adultPrice.value = service.adultPrice || 0;
+    if (childPrice) childPrice.value = service.childPrice || 0;
+    if (noAlcPrice) noAlcPrice.value = service.noAlcoholPrice || 0;
 
     const startTime = document.getElementById('experienceStartTime');
     const endTime = document.getElementById('experienceEndTime');
     if (startTime) startTime.value = service.startTime || '';
     if (endTime) endTime.value = service.endTime || '';
+
+    if (service.experienceId) this.handleExperienceSelection(service.experienceId);
 
     // Restore languages and clientNotes after handleExperienceSelection populates from cache
     setTimeout(() => {
@@ -3054,30 +2824,6 @@ class ExperienceServicesBuilder {
     if (includeGreeter) includeGreeter.checked = service.includeGreeter || false;
 
     if (service.tourId) this.handleTourSelection(service.tourId);
-
-    // Restaurar horas guardadas (handleTourSelection las pone con la duración del tour).
-    if (service.hours) {
-      const hoursEl = document.getElementById('hoursQuantity');
-      if (hoursEl) hoursEl.value = service.hours;
-    }
-
-    // Restaurar segmento + vehículo + precio BASE guardados (sin que se recalcule).
-    if (service.rateId) {
-      const rateSelect = document.getElementById('transportCategory');
-      if (rateSelect) {
-        rateSelect.value = service.rateId;
-        this._populatingTransportForm = true;
-        this.handleRateSelection(service.rateId); // tour -> puebla vehículos (síncrono)
-        if (service.vehicleId) {
-          const vehicleSelect = document.getElementById('vehicleSelect');
-          if (vehicleSelect) vehicleSelect.value = service.vehicleId;
-        }
-        const priceEl = document.getElementById('servicePrice');
-        if (priceEl) priceEl.value = service.unitPrice != null ? service.unitPrice : (service.price || 0);
-        this._populatingTransportForm = false;
-      }
-    }
-    this.updateServiceTotal();
 
     // Restore languages and clientNotes after handleTourSelection populates from cache
     setTimeout(() => {
@@ -3135,14 +2881,11 @@ class ExperienceServicesBuilder {
               const vehicleSelect = document.getElementById('vehicleSelect');
               if (vehicleSelect) vehicleSelect.value = service.vehicleId;
             }
-            // 7. Restaurar el precio BASE (unitPrice); el Total se recompone aparte.
-            const addVehEl = document.getElementById('additionalVehicle');
-            if (addVehEl) addVehEl.checked = service.additionalVehicle || false;
+            // 7. Set price (override any auto-filled price with saved value)
             const priceEl = document.getElementById('servicePrice');
-            if (priceEl) priceEl.value = service.unitPrice != null ? service.unitPrice : (service.price || 0);
+            if (priceEl) priceEl.value = service.price || 0;
 
             this.updateWaitingTimeRateDisplay();
-            this.updateServiceTotal();
             this._populatingTransportForm = false;
           });
         }
@@ -3190,8 +2933,6 @@ class ExperienceServicesBuilder {
 
     const notesEl = document.getElementById('serviceNotes');
     if (notesEl) notesEl.value = service.notes || '';
-
-    this.updateServiceTotal();
   }
 
   // =====================
@@ -3264,17 +3005,10 @@ class ExperienceServicesBuilder {
     const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value) || 0;
     const noAlcQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value) || 0;
     const adultPrice = parseFloat(document.getElementById('adultPrice')?.value) || 0;
-    const childRaw = document.getElementById('childPrice')?.value;
-    const noAlcRaw = document.getElementById('noAlcoholPrice')?.value;
-    // Valor capturado: null si se dejó vacío (así al reabrir el campo sigue vacío
-    // y se respeta la edición). Un 0 explícito sí se conserva.
-    const childPrice = (childRaw == null || childRaw === '') ? null : (parseFloat(childRaw) || 0);
-    const noAlcPrice = (noAlcRaw == null || noAlcRaw === '') ? null : (parseFloat(noAlcRaw) || 0);
-    // Para el TOTAL, si no se capturó precio de niño/sin-alcohol se usa el de adulto.
-    const childForCalc = childPrice != null ? childPrice : adultPrice;
-    const noAlcForCalc = noAlcPrice != null ? noAlcPrice : adultPrice;
+    const childPrice = parseFloat(document.getElementById('childPrice')?.value) || 0;
+    const noAlcPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value) || 0;
 
-    const total = (adultsQty * adultPrice) + (childrenQty * childForCalc) + (noAlcQty * noAlcForCalc);
+    const total = (adultsQty * adultPrice) + (childrenQty * childPrice) + (noAlcQty * noAlcPrice);
 
     const isProvider = exp && exp.type === 'provider_experience';
 
@@ -3364,20 +3098,12 @@ class ExperienceServicesBuilder {
     const vehicleId = document.getElementById('vehicleSelect')?.value || null;
     const vehicleType = vehicleId ? this.vehicleTypesMap.get(vehicleId) : null;
 
-    // El precio del tour-con-vehículo = base (precio por hora de tour-prices) × horas
-    // + guía (Chofer Tour × horas) si aplica.
-    const base = parseFloat(document.getElementById('servicePrice')?.value) || 0;
-    const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
-    const { guide: guideCost } = this.getGuideGreeterCost();
-    const total = (base * hours) + guideCost;
+    const total = (adultsQty * adultPrice) + (childrenQty * childPrice) + (noAlcQty * noAlcPrice);
 
     return {
       tourId,
       concept: tour ? (tour.destinationPOI?.name || tour.name || 'Tour') : 'Tour',
       price: total,
-      unitPrice: base,
-      hours,
-      guideCost,
       quantity: 1,
       adultsQuantity: adultsQty,
       childrenQuantity: childrenQty,
@@ -3400,14 +3126,9 @@ class ExperienceServicesBuilder {
   }
 
   buildTransportService() {
-    // Precio = base por ruta × vehículos + guía (fórmula) + greeter. quantity = 1
-    // porque el total ya viene completo (el detalle por vehículo queda en unitPrice).
-    const base = parseFloat(document.getElementById('servicePrice')?.value) || 0;
+    const price = parseFloat(document.getElementById('servicePrice')?.value) || 0;
     const additionalVehicle = document.getElementById('additionalVehicle')?.checked || false;
-    const vehicleQty = additionalVehicle ? 2 : 1;
-    const { guide: guideCost, greeter: greeterCost } = this.getGuideGreeterCost();
-    const price = (base * vehicleQty) + guideCost + greeterCost;
-    const quantity = 1;
+    const quantity = additionalVehicle ? 2 : 1;
     const rateId = document.getElementById('transportCategory')?.value || null;
     const vehicleId = document.getElementById('vehicleSelect')?.value || null;
     const vehicleType = vehicleId ? this.vehicleTypesMap.get(vehicleId) : null;
@@ -3445,11 +3166,7 @@ class ExperienceServicesBuilder {
     return {
       concept: 'Transporte',
       price,
-      unitPrice: base,
       quantity,
-      additionalVehicle,
-      guideCost,
-      greeterCost,
       rateId,
       rateName,
       vehicleId,

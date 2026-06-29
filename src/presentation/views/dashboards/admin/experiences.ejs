@@ -173,11 +173,7 @@ const shouldRenderMobile = (forceMobile || isMobileRequest) && !forceDesktop;
             </li>
         <% }); %>
     </ul>
-    <% if (activeSection === 'experiences' && ['superadmin', 'admin'].includes(currentUserRole)) { %>
-        <button type="button" class="btn text-white" style="background: var(--brand-gradient); padding: 0.5rem 1rem;" id="createExperienceBtn">
-            <i class="ti ti-plus me-1"></i>Nueva Experiencia
-        </button>
-    <% } else if (activeSection === 'providers' && ['superadmin', 'admin'].includes(currentUserRole)) { %>
+    <% if (activeSection === 'providers' && ['superadmin', 'admin'].includes(currentUserRole)) { %>
         <button type="button" class="btn text-white" style="background: var(--brand-gradient); padding: 0.5rem 1rem;" id="createProviderBtn">
             <i class="ti ti-plus me-1"></i>Nuevo Proveedor
         </button>
