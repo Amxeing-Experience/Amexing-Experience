@@ -615,7 +615,8 @@ class ExperienceServicesBuilder {
       const data = await response.json();
       if (data.success && data.data) {
         data.data.forEach((tp) => {
-          const key = `${tp.tourId}_${tp.rateId}`;
+          // /api/tour-prices devuelve tourPtr/ratePtr (no tourId/rateId).
+          const key = `${tp.tourPtr}_${tp.ratePtr}`;
           if (!this.tourPricesMap.has(key)) {
             this.tourPricesMap.set(key, []);
           }
@@ -2212,8 +2213,49 @@ class ExperienceServicesBuilder {
       return;
     }
 
+    // Tour con vehículo: la lista y el precio salen de tour-prices (no de la
+    // tarifa de tiempo de espera).
+    if (serviceType === 'tour') {
+      this.populateTourVehicleDropdown(rateId);
+      return;
+    }
+
     // For non-transport services, use fallback vehicle population
     this.populateVehicleSelectFallback(rateId);
+  }
+
+  // Vehículos disponibles para un tour+segmento, desde tour-prices, con su pax.
+  populateTourVehicleDropdown(rateId) {
+    const select = document.getElementById('vehicleSelect');
+    if (!select) return;
+    select.innerHTML = '<option value="">-- Seleccionar vehículo --</option>';
+
+    const tourId = this.selectedTourData?.id;
+    if (!tourId || !rateId) return;
+
+    const prices = this.tourPricesMap.get(`${tourId}_${rateId}`) || [];
+    const capacityById = new Map();
+    (this.vehiclesCache || []).forEach((v) => capacityById.set(v.id, v.defaultCapacity ?? v.capacity));
+
+    prices.forEach((tp) => {
+      if (!tp.vehicleTypeId) return;
+      const option = document.createElement('option');
+      option.value = tp.vehicleTypeId;
+      const name = tp.vehicleType || tp.vehicleTypeId;
+      const pax = capacityById.get(tp.vehicleTypeId);
+      option.textContent = pax != null ? `${name} - ${pax} pax` : name;
+      select.appendChild(option);
+    });
+  }
+
+  // Precio por hora del vehículo para el tour+segmento seleccionados (tour-prices).
+  getTourVehiclePrice(vehicleId) {
+    const tourId = this.selectedTourData?.id;
+    const rateId = document.getElementById('transportCategory')?.value;
+    if (!tourId || !rateId || !vehicleId) return null;
+    const prices = this.tourPricesMap.get(`${tourId}_${rateId}`) || [];
+    const tp = prices.find((p) => p.vehicleTypeId === vehicleId);
+    return tp && tp.price != null ? Number(tp.price) : null;
   }
 
   async handleTransportRateSelection(rateId, fallbackOrigin = null, fallbackDestination = null) {
@@ -2381,14 +2423,11 @@ class ExperienceServicesBuilder {
           priceEl.value = vehicle.finalPrice || '0.00';
         }
       } else if (priceEl && !isPopulating) {
-        // Tour con vehículo: precio = tarifa por hora (segmento × vehículo) × horas.
-        const rateId = document.getElementById('transportCategory')?.value;
-        const match = (this.vehicleRatePricesCache || []).find(
-          (p) => p.rateId === rateId && p.vehicleTypeId === vehicleId,
-        );
+        // Tour con vehículo: precio = (precio por hora de tour-prices) × horas del tour.
+        const perHour = this.getTourVehiclePrice(vehicleId);
         const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 0;
-        if (match && match.pricePerHour != null && hours > 0) {
-          priceEl.value = (Number(match.pricePerHour) * hours).toFixed(2);
+        if (perHour != null && hours > 0) {
+          priceEl.value = (perHour * hours).toFixed(2);
         }
       }
     }
