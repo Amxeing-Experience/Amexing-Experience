@@ -550,7 +550,9 @@ class ExperienceServicesBuilder {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
-      if (data.success) this.vehiclesCache = data.data || [];
+      // Este endpoint responde en formato DataTables ({ data, recordsTotal, ... }),
+      // sin 'success'. Tomar data.data tal cual (cada fila trae defaultCapacity).
+      this.vehiclesCache = Array.isArray(data?.data) ? data.data : [];
     } catch (error) {
       console.error('Error loading vehicles:', error);
     }
