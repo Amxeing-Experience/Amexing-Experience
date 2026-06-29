@@ -181,7 +181,11 @@ class VehicleController {
 
       // Batch fetch all primary images in a single query (instead of N+1)
       const vehicleIds = vehicles.map((v) => v.id);
-      const primaryImageMap = await VehicleImage.getPrimaryImagesForVehicles(vehicleIds);
+      // Modo lite (vista de cotización): no usa imágenes de vehículos -> se omite el batch de
+      // imágenes primarias y la generación de URLs S3 (el mapa vacío deja imageUrl '').
+      const primaryImageMap = req.query.lite
+        ? new Map()
+        : await VehicleImage.getPrimaryImagesForVehicles(vehicleIds);
 
       // Format data for DataTables
       const data = await Promise.all(

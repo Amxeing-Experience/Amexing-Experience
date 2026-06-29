@@ -329,20 +329,26 @@
                         display: none !important;
                     }
 
-                    /* ===== PDF pagination (section-per-day strategy) =====
-                       Per stakeholder request: prefer whole, readable sections over
-                       compact pages — even if that leaves blank space at the bottom of a
-                       page, that reads better than an arbitrary mid-content cut.
-                       - Each day starts on a fresh page (except the first, which flows
-                         right under the header / client info).
-                       - A single service is never split across pages. Assignments are
-                         hidden from the PDF (below), so services stay short enough that
-                         break-inside:avoid is always physically honorable.
-                       Scoped to .pdf-export-mode (added to <body> by PdfRenderService)
+                    /* ===== PDF pagination (pack-by-day, height-aware) =====
+                       El objetivo: empacar días juntos PERO sin partir un día que cabe
+                       completo en una hoja, y sin dejar la primera hoja en blanco por un
+                       día muy alto.
+                       - Un día que cabe en una hoja lleva la clase .pdf-keep-whole (la
+                         agrega PdfRenderService midiendo la altura real justo antes de
+                         exportar) → break-inside: avoid lo mantiene entero; si no cabe en
+                         lo que resta, salta entero a la hoja siguiente.
+                       - Un día más alto que una hoja (muchos servicios) NO lleva esa clase,
+                         así fluye desde donde va y el navegador lo parte ENTRE servicios
+                         (cada service-item tiene break-inside: avoid → un servicio nunca se
+                         corta a la mitad). Esto evita la hoja en blanco que provocaba forzar
+                         break-inside: avoid en TODO .day-card.
+                       - El banner del día (day-header) nunca queda huérfano: break-after:
+                         avoid lo mantiene pegado a su contenido.
+                       Scoped to .pdf-export-mode (added to <body> when ?pdf=1)
                        so on-screen rendering is untouched. */
-                    .pdf-export-mode .day-card + .day-card {
-                        break-before: page;
-                        page-break-before: always;
+                    .pdf-export-mode .day-card.pdf-keep-whole {
+                        break-inside: avoid;
+                        page-break-inside: avoid;
                     }
                     .pdf-export-mode .service-item,
                     .pdf-export-mode .day-footer {
@@ -690,7 +696,7 @@
             // Greeter (transporte, tours y a-disposición)
             if ((service.type === 'tour' || service.type === 'transport' || service.type === 'a-disposicion') && service.includeGreeter) {
                 const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
-                html += `<div class="service-detail-item text-info mt-1">
+                html += `<div class="service-detail-item mt-1" style="color: #8a9aa8;">
                     <i class="ti ti-users me-1"></i>
                     <strong>Incluye Greeter + Driver${greeterLocation}</strong>
                 </div>`;
@@ -1066,9 +1072,11 @@
                 if (hasVehicle) {
                     const vehicleName = this.getVehicleDisplayName(service);
                     const segmentName = this.getMainSegmentSuffix(service);
+                    const mainWaitingTxt = service.type === 'transport' && service.waitingTimeHours > 0
+                        ? ` <span style="color: #c4a747;"><i class="ti ti-clock me-1"></i>${service.waitingTimeHours}h espera</span>` : '';
                     html += `<div style="margin-left: 20px;">
                         <strong>${vehicleName}</strong>${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}` :
-                            service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}${segmentName}
+                            service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}${segmentName}${mainWaitingTxt}
                     </div>`;
                 }
 
@@ -1090,8 +1098,10 @@
                         const cleanSegName = segName && segName !== v.segment ? segName : '';
                         const segColor = (v && v.segmentColor) || (v && v.segment ? this.getCategoryColorFromCache(v.segment) : '');
                         const chip = cleanSegName ? ` - ${this.renderSegmentChip(cleanSegName, segColor)}` : '';
+                        const wh = parseFloat(v && v.waitingHours) || 0;
+                        const waitingTxt = wh > 0 ? ` <span style="color: #c4a747;"><i class="ti ti-clock me-1"></i>${wh}h espera</span>` : '';
                         html += `<div style="margin-left: 20px; margin-top: 4px;">
-                            <strong>${name}</strong>${chip}
+                            <strong>${name}</strong>${chip}${waitingTxt}
                         </div>`;
                     });
                 }
@@ -1103,7 +1113,7 @@
                 const guideLabel = service.type === 'a-disposicion'
                     ? 'Incluye Chofer'
                     : (service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía');
-                html += `<div class="service-detail-item text-success mt-1">
+                html += `<div class="service-detail-item mt-1" style="color: #7a7f6b;">
                     <i class="ti ti-user me-1"></i>
                     <strong>${guideLabel}</strong>
                 </div>`;
@@ -1112,19 +1122,13 @@
             // Greeter
             if (service.includeGreeter) {
                 const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
-                html += `<div class="service-detail-item text-info mt-1">
+                html += `<div class="service-detail-item mt-1" style="color: #8a9aa8;">
                     <i class="ti ti-users me-1"></i>
                     <strong>Incluye Greeter + Driver${greeterLocation}</strong>
                 </div>`;
             }
 
-            // Waiting time
-            if (service.waitingTimeHours > 0) {
-                html += `<div class="service-detail-item text-warning mt-1">
-                    <i class="ti ti-clock me-1"></i>
-                    <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
-                </div>`;
-            }
+            // Tiempo de espera: ahora se muestra inline junto a cada vehículo (principal + adicionales).
 
             html += '</div>'; // service-details
             html += '</div>'; // service-info

@@ -1,5 +1,9 @@
 const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
+const { TtlCache } = require('../../infrastructure/cache/ttlCache');
+
+// Caché del registro "actual" (cambia rara vez, se consulta en cada carga). Invalida en writes.
+const currentRateCache = new TtlCache();
 
 /**
  * DriverTourRate Domain Model.
@@ -24,13 +28,17 @@ class DriverTourRate extends Parse.Object {
    */
   static async getCurrentDriverTourRate() {
     try {
+      const cached = currentRateCache.get();
+      if (cached !== undefined) return cached;
+
       const query = new Parse.Query('DriverTourRate');
       query.equalTo('active', true);
       query.equalTo('exists', true);
       query.descending('createdAt');
       query.include('createdBy');
 
-      return await query.first({ useMasterKey: true });
+      const result = await query.first({ useMasterKey: true });
+      return currentRateCache.set(result || null);
     } catch (error) {
       logger.error('Error getting current driver tour rate:', error);
       throw error;
@@ -93,6 +101,7 @@ class DriverTourRate extends Parse.Object {
       }
 
       const savedRate = await driverTourRate.save(null, { useMasterKey: true });
+      currentRateCache.clear(); // el "actual" cambió -> invalidar caché
 
       logger.info('Driver tour rate created successfully', {
         rateId: savedRate.id,
@@ -244,6 +253,7 @@ class DriverTourRate extends Parse.Object {
       rate.set('exists', false);
       rate.set('active', false);
       await rate.save(null, { useMasterKey: true });
+      currentRateCache.clear(); // estado cambió -> invalidar caché
 
       logger.info('Driver tour rate soft deleted', {
         rateId: id,

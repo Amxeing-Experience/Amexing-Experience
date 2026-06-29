@@ -1,0 +1,9 @@
+<%- include('../templates/auth-layout', {
+    title: typeof title !== 'undefined' ? title : 'Solicitud - Amexing CRM',
+    page: 'partner-request-result',
+    showAuthHeader: false,
+    content: include('../molecules/auth/partner-request-result', {
+        outcome: outcome,
+        request: request
+    })
+}) %>

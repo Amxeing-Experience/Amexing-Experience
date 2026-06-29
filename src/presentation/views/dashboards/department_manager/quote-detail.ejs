@@ -26,7 +26,7 @@ window.currentUser = {
 <!-- Page Header -->
 <div class="row mb-3">
     <div class="col-12">
-        <div class="d-flex justify-content-between align-items-start">
+        <div class="d-flex justify-content-between align-items-center">
             <div>
                 <h2 class="mb-1 fw-bold" id="quoteTitle">
                     <%= quoteTitle %>
@@ -44,124 +44,100 @@ window.currentUser = {
                     </ol>
                 </nav>
             </div>
+            <% if (!isNewQuote) { %>
+            <div id="quoteStatusCompact" style="max-width: 460px; width: 100%;">
+            <!-- Timeline: indicador único de estado -->
+            <div class="timeline-wrapper">
+                <div class="timeline-compact">
+                    <!-- Main timeline flow -->
+                    <div class="timeline-main-flow">
+                        <div class="timeline-item active" data-status="quoted">
+                            <div class="timeline-dot"><i class="ti ti-file-text"></i></div>
+                            <span>Cotizado</span>
+                        </div>
+                        <div class="timeline-line"></div>
+                        <div class="timeline-item" data-status="requested">
+                            <div class="timeline-dot"><i class="ti ti-clock"></i></div>
+                            <span>Solicitado</span>
+                        </div>
+                        <div class="timeline-line"></div>
+                        <div class="timeline-item" data-status="scheduled">
+                            <div class="timeline-dot"><i class="ti ti-check"></i></div>
+                            <span>Agendado</span>
+                        </div>
+                    </div>
+
+                    <!-- Alternative status branches (only shown when active) -->
+                    <div class="timeline-branches d-none">
+                        <div class="timeline-branch-connector"></div>
+                        <div class="timeline-branch-items">
+                            <div class="timeline-item timeline-branch" data-status="hold">
+                                <div class="timeline-dot"><i class="ti ti-lock"></i></div>
+                                <span>Bloqueado</span>
+                            </div>
+                            <div class="timeline-item timeline-branch" data-status="rejected">
+                                <div class="timeline-dot"><i class="ti ti-x"></i></div>
+                                <span>Rechazado</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA debajo del timeline -->
+            <div class="status-action text-center" id="statusAction">
+                <button type="button" class="btn w-100 <%= (typeof quoteTotal !== 'undefined' && Number(quoteTotal) > 0) ? 'btn-primary' : 'btn-outline-warning' %>" id="requestServiceBtn" <%= (typeof quoteStatus !== 'undefined' && quoteStatus === 'quoted') ? '' : 'style="display:none;"' %> <%= (typeof quoteTotal !== 'undefined' && Number(quoteTotal) > 0) ? '' : 'disabled' %>>
+                    <i class="ti <%= (typeof quoteTotal !== 'undefined' && Number(quoteTotal) > 0) ? 'ti-send' : 'ti-alert-triangle' %> me-1"></i><%= (typeof quoteTotal !== 'undefined' && Number(quoteTotal) > 0) ? 'Solicitar Servicios' : 'Completar Cotización' %>
+                </button>
+                <small class="text-muted d-block mt-1" id="actionHint" <%= (typeof quoteStatus !== 'undefined' && quoteStatus === 'quoted') ? '' : 'style="display:none;"' %>>Confirma para crear la reservación</small>
+            </div>
+            </div>
+            <% } %>
         </div>
     </div>
 </div>
 
-<!-- Status Component Full Width -->
-<% if (!isNewQuote) { %>
+<!-- DEV PANEL (Only in Development) — panel blanco aparte -->
+<% if (!isNewQuote && typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') { %>
 <div class="row mb-4">
     <div class="col-12">
-        <div class="quote-status-compact" id="quoteStatusCompact">
-            <!-- Status Header -->
-            <div class="status-header-row">
-                <span class="status-header-label">ESTADO ACTUAL</span>
-            </div>
-            
-            <!-- Two Column Layout -->
-            <div class="row g-3">
-                <!-- Left Column: Status + Action -->
-                <div class="col-md-4">
-                    <div class="status-card">
-                        <div class="status-card-body" id="currentStatusCard">
-                            <i class="ti ti-file-text status-icon text-info"></i>
-                            <div class="status-text">
-                                <span class="status-name">COTIZADO</span>
-                                <p class="status-desc">Cotización del departamento lista para revisión</p>
-                            </div>
-                        </div>
+        <div class="quote-status-compact" id="quoteStatusDevPanel">
+            <div class="dev-panel p-2 border rounded bg-light" id="devPanel">
+                <small class="text-muted d-block text-center mb-2 fw-bold">🛠️ DEV PANEL</small>
+                <div class="row g-1">
+                    <div class="col-6 col-md">
+                        <button type="button" class="btn btn-info btn-sm w-100" data-status="quoted">
+                            <i class="ti ti-file-text"></i> COTIZADO
+                        </button>
                     </div>
-                    
-                    <div class="status-action mt-2" id="statusAction">
-                        <button type="button" class="btn btn-primary w-100" id="requestServiceBtn" style="display:none;">
-                            <i class="ti ti-send me-1"></i>Solicitar Servicios
+                    <div class="col-6 col-md">
+                        <button type="button" class="btn btn-primary btn-sm w-100" data-status="requested">
+                            <i class="ti ti-clock"></i> SOLICITADO
                         </button>
-                        <small class="text-muted text-center d-block mt-1" id="actionHint" style="display:none;">
-                            Confirma para crear la reservación
-                        </small>
-                        
-                        <!-- DEV PANEL (Only in Development) -->
-                        <% if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') { %>
-                        <div class="dev-panel mt-3 p-2 border rounded bg-light" id="devPanel">
-                            <small class="text-muted d-block text-center mb-2 fw-bold">🛠️ DEV PANEL</small>
-                            <div class="row g-1">
-                                <div class="col-6">
-                                    <button type="button" class="btn btn-info btn-sm w-100" data-status="quoted">
-                                        <i class="ti ti-file-text"></i> COTIZADO
-                                    </button>
-                                </div>
-                                <div class="col-6">
-                                    <button type="button" class="btn btn-primary btn-sm w-100" data-status="requested">
-                                        <i class="ti ti-clock"></i> SOLICITADO
-                                    </button>
-                                </div>
-                                <div class="col-6">
-                                    <button type="button" class="btn btn-warning btn-sm w-100" data-status="hold">
-                                        <i class="ti ti-lock"></i> BLOQUEADO
-                                    </button>
-                                </div>
-                                <div class="col-6">
-                                    <button type="button" class="btn btn-success btn-sm w-100" data-status="scheduled">
-                                        <i class="ti ti-check"></i> AGENDADO
-                                    </button>
-                                </div>
-                                <div class="col-12">
-                                    <button type="button" class="btn btn-danger btn-sm w-100" data-status="rejected">
-                                        <i class="ti ti-x"></i> RECHAZADO
-                                    </button>
-                                </div>
-                            </div>
-                            <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2" id="toggleDevPanel">
-                                <i class="ti ti-eye-off"></i> Ocultar Panel
-                            </button>
-                        </div>
-                        <button type="button" class="btn btn-outline-info btn-sm w-100 mt-2" id="showDevPanel" style="display:none;">
-                            <i class="ti ti-settings"></i> Mostrar Panel DEV
+                    </div>
+                    <div class="col-6 col-md">
+                        <button type="button" class="btn btn-warning btn-sm w-100" data-status="hold">
+                            <i class="ti ti-lock"></i> BLOQUEADO
                         </button>
-                        <% } %>
+                    </div>
+                    <div class="col-6 col-md">
+                        <button type="button" class="btn btn-success btn-sm w-100" data-status="scheduled">
+                            <i class="ti ti-check"></i> AGENDADO
+                        </button>
+                    </div>
+                    <div class="col-12 col-md">
+                        <button type="button" class="btn btn-danger btn-sm w-100" data-status="rejected">
+                            <i class="ti ti-x"></i> RECHAZADO
+                        </button>
                     </div>
                 </div>
-                
-                <!-- Right Column: Timeline -->
-                <div class="col-md-8">
-                    <div class="timeline-wrapper">
-                        <div class="timeline-compact">
-                            <!-- Main timeline flow -->
-                            <div class="timeline-main-flow">
-                                <div class="timeline-item active" data-status="quoted">
-                                    <div class="timeline-dot"><i class="ti ti-file-text"></i></div>
-                                    <span>Cotizado</span>
-                                </div>
-                                <div class="timeline-line"></div>
-                                <div class="timeline-item" data-status="requested">
-                                    <div class="timeline-dot"><i class="ti ti-clock"></i></div>
-                                    <span>Solicitado</span>
-                                </div>
-                                <div class="timeline-line"></div>
-                                <div class="timeline-item" data-status="scheduled">
-                                    <div class="timeline-dot"><i class="ti ti-check"></i></div>
-                                    <span>Agendado</span>
-                                </div>
-                            </div>
-                            
-                            <!-- Alternative status branches -->
-                            <div class="timeline-branches">
-                                <div class="timeline-branch-connector"></div>
-                                <div class="timeline-branch-items">
-                                    <div class="timeline-item timeline-branch" data-status="hold">
-                                        <div class="timeline-dot"><i class="ti ti-lock"></i></div>
-                                        <span>Bloqueado</span>
-                                    </div>
-                                    <div class="timeline-item timeline-branch" data-status="rejected">
-                                        <div class="timeline-dot"><i class="ti ti-x"></i></div>
-                                        <span>Rechazado</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2" id="toggleDevPanel">
+                    <i class="ti ti-eye-off"></i> Ocultar Panel
+                </button>
             </div>
+            <button type="button" class="btn btn-outline-info btn-sm w-100 mt-2" id="showDevPanel" style="display:none;">
+                <i class="ti ti-settings"></i> Mostrar Panel DEV
+            </button>
         </div>
     </div>
 </div>
@@ -345,15 +321,15 @@ window.currentUser = {
 
 .stepper-item:hover:not(.disabled) {
     background-color: #f8f9fa;
-    color: #f76b1c;
+    color: var(--brand-primary-active);
     text-decoration: none;
 }
 
 .stepper-item.active {
-    background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%);
+    background: var(--brand-gradient);
     color: white;
     font-weight: 600;
-    box-shadow: 0 2px 8px rgba(247, 107, 28, 0.3);
+    box-shadow: 0 2px 8px rgba(var(--brand-primary-rgb), 0.35);
 }
 
 .stepper-item.active .stepper-number {
@@ -362,11 +338,11 @@ window.currentUser = {
 }
 
 .stepper-item.completed {
-    color: #198754;
+    color: var(--brand-success);
 }
 
 .stepper-item.completed .stepper-number {
-    background: #198754;
+    background: var(--brand-success);
     color: white;
 }
 
@@ -408,7 +384,7 @@ window.currentUser = {
 }
 
 .stepper-connector.completed {
-    background: #198754;
+    background: var(--brand-success);
 }
 
 /* Segmented status control */
@@ -585,6 +561,26 @@ window.currentUser = {
     letter-spacing: 0.5px;
 }
 
+/* Status Caption (replaces redundant status card) */
+.status-caption {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.status-caption-name {
+    font-weight: 700;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.25px;
+}
+
+.status-caption-desc {
+    font-size: 0.75rem;
+    color: #6c757d;
+    line-height: 1.2;
+}
+
 /* Status Card */
 .status-card {
     flex: 0 0 auto;
@@ -627,11 +623,11 @@ window.currentUser = {
 
 /* Timeline Wrapper */
 .timeline-wrapper {
-    height: 100%;
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.5rem 0;
+    padding: 0;
 }
 
 .timeline-compact {
@@ -639,9 +635,10 @@ window.currentUser = {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
-    padding: 1rem 0;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
     position: relative;
+    width: 100%;
 }
 
 .timeline-main-flow {
@@ -649,6 +646,7 @@ window.currentUser = {
     align-items: center;
     gap: 0.5rem;
     position: relative;
+    width: 100%;
 }
 
 .timeline-branches {
@@ -704,7 +702,8 @@ window.currentUser = {
 }
 
 .timeline-line {
-    width: 3rem;
+    flex: 1 1 auto;
+    min-width: 1.5rem;
     height: 2px;
     background: #dee2e6;
     margin: 0 -0.25rem;
@@ -849,23 +848,27 @@ window.currentUser = {
 
 <script>
 // Function to check quote pricing and show/hide request button with appropriate messaging
-async function checkQuotePricingAndShowButton() {
+async function checkQuotePricingAndShowButton(prefetchedQuote) {
     const requestBtn = document.getElementById('requestServiceBtn');
     const actionHint = document.getElementById('actionHint');
-    
+
     try {
-        // Fetch current quote data to check pricing
-        const response = await fetch(`/api/quotes/<%= quoteId %>`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success && result.data) {
-            const quote = result.data;
+        // Reutiliza la cotización ya cargada por loadQuoteFolio si se pasa; si no, la trae.
+        // Antes SIEMPRE hacía un segundo fetch pesado a /api/quotes/:id, lo que retrasaba
+        // mucho la aparición del botón "Solicitar Servicios".
+        let quote = prefetchedQuote || null;
+        if (!quote) {
+            const response = await fetch(`/api/quotes/<%= quoteId %>`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
+                }
+            });
+            const result = await response.json();
+            quote = (result && result.success && result.data) ? result.data : null;
+        }
+
+        if (quote) {
             const serviceItems = quote.serviceItems || {};
             const total = serviceItems.total || 0;
             
@@ -875,7 +878,7 @@ async function checkQuotePricingAndShowButton() {
                     requestBtn.style.display = 'inline-block';
                     requestBtn.disabled = false;
                     requestBtn.innerHTML = '<i class="ti ti-send me-1"></i>Solicitar Servicios';
-                    requestBtn.className = 'btn btn-primary w-100';
+                    requestBtn.className = 'btn w-100 btn-primary';
                     requestBtn.title = `Solicitar servicios por $${total.toLocaleString()} ${serviceItems.currency || 'MXN'}`;
                 }
                 if (actionHint) {
@@ -889,7 +892,7 @@ async function checkQuotePricingAndShowButton() {
                     requestBtn.style.display = 'inline-block';
                     requestBtn.disabled = true;
                     requestBtn.innerHTML = '<i class="ti ti-alert-triangle me-1"></i>Completar Cotización';
-                    requestBtn.className = 'btn btn-outline-warning w-100';
+                    requestBtn.className = 'btn w-100 btn-outline-warning';
                     requestBtn.title = 'Esta cotización no tiene servicios con precio. Agrega servicios antes de solicitar.';
                 }
                 if (actionHint) {
@@ -904,7 +907,7 @@ async function checkQuotePricingAndShowButton() {
                 requestBtn.style.display = 'inline-block';
                 requestBtn.disabled = true;
                 requestBtn.innerHTML = '<i class="ti ti-alert-circle me-1"></i>Error al Cargar';
-                requestBtn.className = 'btn btn-outline-danger w-100';
+                requestBtn.className = 'btn w-100 btn-outline-danger';
             }
             if (actionHint) {
                 actionHint.style.display = 'block';
@@ -919,7 +922,7 @@ async function checkQuotePricingAndShowButton() {
             requestBtn.style.display = 'inline-block';
             requestBtn.disabled = true;
             requestBtn.innerHTML = '<i class="ti ti-alert-circle me-1"></i>Error de Conexión';
-            requestBtn.className = 'btn btn-outline-danger w-100';
+            requestBtn.className = 'btn w-100 btn-outline-danger';
         }
         if (actionHint) {
             actionHint.style.display = 'block';
@@ -930,7 +933,7 @@ async function checkQuotePricingAndShowButton() {
 }
 
 // Global function to update status display - available for dev panel
-function updateStatusDisplay(status) {
+function updateStatusDisplay(status, quoteData) {
     const statusInfo = {
         'quoted': {
             icon: 'ti-file-text',
@@ -965,28 +968,26 @@ function updateStatusDisplay(status) {
     };
 
     const info = statusInfo[status] || statusInfo['quoted'];
-    
-    // Update current status card
-    const statusCard = document.getElementById('currentStatusCard');
-    if (statusCard) {
-        statusCard.innerHTML = `
-            <i class="ti ${info.icon} status-icon text-${info.color}"></i>
-            <div class="status-text">
-                <span class="status-name">${info.text}</span>
-                <p class="status-desc">${info.description}</p>
-            </div>
-        `;
-    }
-    
+
     // Update timeline progress
     document.querySelectorAll('.timeline-item').forEach(item => {
         item.classList.remove('active', 'completed');
     });
-    
+
     // Remove special timeline classes
     const timelineCompact = document.querySelector('.timeline-compact');
     if (timelineCompact) {
         timelineCompact.classList.remove('timeline-hold-active', 'timeline-rejected-active');
+    }
+
+    // Show branches (Bloqueado/Rechazado) only when one of them is active
+    const timelineBranches = document.querySelector('.timeline-branches');
+    if (timelineBranches) {
+        if (['hold', 'rejected'].includes(status)) {
+            timelineBranches.classList.remove('d-none');
+        } else {
+            timelineBranches.classList.add('d-none');
+        }
     }
     
     // Mark completed and active steps according to NEW REQUIREMENTS:
@@ -1073,8 +1074,8 @@ function updateStatusDisplay(status) {
     const actionHint = document.getElementById('actionHint');
     
     if (status === 'quoted') {
-        // Check quote pricing before showing request button
-        checkQuotePricingAndShowButton();
+        // Check quote pricing before showing request button (usa la data ya cargada si la hay)
+        checkQuotePricingAndShowButton(quoteData);
     } else {
         // Hide the button for other statuses
         if (requestBtn) requestBtn.style.display = 'none';
@@ -1283,8 +1284,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 document.title = quoteTitleWithFolio + ' - AmexingWeb';
 
-                // Update status display for department manager view
-                updateStatusDisplay(result.data.status);
+                // Update status display for department manager view (pasa la data ya
+                // cargada para que el botón no haga un segundo fetch).
+                updateStatusDisplay(result.data.status, result.data);
                 // Store createdBy email for fallback in Agendado confirmation
                 window._quoteCreatedByEmail = result.data.createdBy?.email || '';
             }

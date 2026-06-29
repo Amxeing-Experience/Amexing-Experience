@@ -118,7 +118,7 @@ class SecurityMiddleware {
           ].filter(Boolean),
           workerSrc: ["'self'", 'blob:'], // Required for Redocly web workers
           imgSrc: ["'self'", 'data:', 'https:'],
-          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com', 'data:'],
           connectSrc: [
             "'self'",
             'http://localhost:1337', // Development

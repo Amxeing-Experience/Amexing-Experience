@@ -29,28 +29,44 @@ const company = typeof companyInfo !== 'undefined' ? companyInfo : {
     certifications: ['SECTUR', 'AMESTUR', 'EarthCheck']
 };
 
+// Idioma (mismo criterio que el navbar): español por defecto, inglés en /en
+const currentLang = (typeof req !== 'undefined' && req && req.language) || 'es';
+const isEnglish = currentLang === 'en';
+const tr = (es, en) => (isEnglish ? en : es);
+
+const footerTitles = {
+    empresa: tr('Empresa', 'Company'),
+    servicios: tr('Servicios', 'Services'),
+    recursos: tr('Recursos', 'Resources'),
+    contacto: tr('Contacto', 'Contact')
+};
+
 const empresaLinks = [
-    { name: 'Sobre nosotros', href: '/nosotros' },
-    { name: 'Nuestro equipo', href: '/nosotros#equipo' },
-    { name: 'Certificaciones', href: '/nosotros#certificaciones' }
+    { name: tr('Sobre nosotros', 'About us'), href: isEnglish ? '/en/about' : '/nosotros' },
+    { name: tr('Nuestro equipo', 'Our team'), href: isEnglish ? '/en/about#equipo' : '/nosotros#equipo' },
+    { name: tr('Certificaciones', 'Certifications'), href: isEnglish ? '/en/about#certificaciones' : '/nosotros#certificaciones' }
 ];
 
 const serviciosLinks = [
-    { name: 'Transporte', href: '/servicios/transporte' },
-    { name: 'Tours', href: '/servicios/tours' },
-    { name: 'Experiencias', href: '/servicios/experiencias' },
-    { name: 'Bodas', href: '/servicios/bodas-eventos' }
+    { name: tr('Transporte', 'Transportation'), href: isEnglish ? '/en/services/transportation' : '/servicios/transporte' },
+    { name: tr('Tours', 'Tours'), href: isEnglish ? '/en/services/tours' : '/servicios/tours' },
+    { name: tr('Experiencias', 'Experiences'), href: isEnglish ? '/en/services/experiences' : '/servicios/experiencias' },
+    { name: tr('Bodas', 'Weddings'), href: isEnglish ? '/en/services/weddings' : '/servicios/bodas-eventos' }
 ];
 
+// Documentos PDF según idioma
 const recursosLinks = [
-    { name: 'FAQ', href: '/recursos/faq' },
-    { name: 'Aviso de privacidad', href: '/docs/AMEXING_Aviso_Privacidad_2026_V1.pdf', external: true },
-    { name: 'Términos y condiciones', href: '/docs/AMEXING_Condiciones_2026_V1.pdf', external: true },
-    { name: 'Política de cancelación', href: '/legal/cancellation' }
+    { name: 'FAQ', href: isEnglish ? '/en/resources/faq' : '/recursos/faq' },
+    { name: tr('Aviso de privacidad', 'Privacy Notice'),
+      href: isEnglish ? '/docs/AMEXING_Aviso_Privacidad_ING_2026.pdf' : '/docs/AMEXING_Aviso_Privacidad_2026_VF.pdf', external: true },
+    { name: tr('Términos y condiciones', 'Terms & Conditions'),
+      href: isEnglish ? '/docs/AMEXING_Condiciones_ING_2026.pdf' : '/docs/AMEXING_Condiciones_2026_VF.pdf', external: true },
+    { name: tr('Política de cancelación', 'Cancellation Policy'),
+      href: isEnglish ? '/docs/AMEXING_Politicas_ING_2026_VF.pdf' : '/docs/AMEXING_Politicas_2026_VF.pdf', external: true }
 ];
 
 const contactoLinks = [
-    { name: 'Teléfono', href: `tel:${company.phone.replace(/[^+\d]/g, '')}` },
+    { name: tr('Teléfono', 'Phone'), href: `tel:${company.phone.replace(/[^+\d]/g, '')}` },
     { name: 'WhatsApp', href: `https://wa.me/524151527890` },
     { name: 'Email', href: `mailto:${company.email}` }
 ];
@@ -77,7 +93,7 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
 
                 <%# Empresa %>
                 <div class="landing-footer__section">
-                    <h3 class="landing-footer__title">Empresa</h3>
+                    <h3 class="landing-footer__title"><%= footerTitles.empresa %></h3>
                     <ul class="landing-footer__list">
                         <% empresaLinks.forEach(function(link) { %>
                         <li class="landing-footer__list-item">
@@ -91,7 +107,7 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
 
                 <%# Servicios %>
                 <div class="landing-footer__section">
-                    <h3 class="landing-footer__title">Servicios</h3>
+                    <h3 class="landing-footer__title"><%= footerTitles.servicios %></h3>
                     <ul class="landing-footer__list">
                         <% serviciosLinks.forEach(function(link) { %>
                         <li class="landing-footer__list-item">
@@ -105,7 +121,7 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
 
                 <%# Recursos %>
                 <div class="landing-footer__section">
-                    <h3 class="landing-footer__title">Recursos</h3>
+                    <h3 class="landing-footer__title"><%= footerTitles.recursos %></h3>
                     <ul class="landing-footer__list">
                         <% recursosLinks.forEach(function(link) { %>
                         <li class="landing-footer__list-item">
@@ -119,7 +135,7 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
 
                 <%# Contacto %>
                 <div class="landing-footer__section">
-                    <h3 class="landing-footer__title">Contacto</h3>
+                    <h3 class="landing-footer__title"><%= footerTitles.contacto %></h3>
                     <ul class="landing-footer__list">
                         <% contactoLinks.forEach(function(link) { %>
                         <li class="landing-footer__list-item">
@@ -164,7 +180,7 @@ const socialLinks = typeof socialMedia !== 'undefined' ? socialMedia : {
         <div class="landing-footer__bottom">
             <div class="landing-footer__bottom-content">
                 <p class="landing-footer__copyright">
-                    ©<%= new Date().getFullYear() %> <%= company.fullName %>. Todos los derechos reservados.
+                    ©<%= new Date().getFullYear() %> <%= company.fullName %>. <%= tr('Todos los derechos reservados.', 'All rights reserved.') %>
                 </p>
             </div>
         </div>

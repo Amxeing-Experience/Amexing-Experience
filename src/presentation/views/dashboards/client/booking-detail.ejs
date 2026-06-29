@@ -462,6 +462,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (pax.length) tags.push(tag('users', pax.join(', '), 'primary'));
             if (sub.airline || sub.flightNumber) tags.push(tag('plane', `${sub.airline || ''} ${sub.flightNumber || ''}`.trim(), 'info'));
             if (sub.waitingTimeHours) tags.push(tag('clock-pause', `Espera: ${sub.waitingTimeHours}h`, 'warning'));
+            if (Array.isArray(sub.extraAdditionalVehicles)) {
+                sub.extraAdditionalVehicles.forEach((v) => {
+                    const wh = parseFloat(v && v.waitingHours) || 0;
+                    if (wh > 0) tags.push(tag('clock-pause', `Espera ${(v.vehicleTypeName || 'adicional')}: ${wh}h`, 'warning'));
+                });
+            }
             if (sub.routeDuration) tags.push(tag('route', `Duración: ${sub.routeDuration} min`, 'secondary'));
         }
 

@@ -300,11 +300,13 @@
             vehicleTypeName: service.vehicleTypeName,
             quantity: service.quantity || 1,
 
-            // Additional vehicle (tours)
+            // Additional vehicle (tours, legacy primary)
             hasAdditionalVehicle: service.hasAdditionalVehicle || false,
             additionalVehicleId: service.additionalVehicleId,
             additionalVehicleTypeName: service.additionalVehicleTypeName,
             additionalVehicleSegmentName: service.additionalVehicleSegmentName,
+            // Vehículos adicionales (lista multi-vehículo) — cada item incluye su waitingHours/waitingPricePerHour.
+            extraAdditionalVehicles: Array.isArray(service.extraAdditionalVehicles) ? service.extraAdditionalVehicles : [],
 
             // Guide and Greeter features
             includeGuide: service.includeGuide || false,

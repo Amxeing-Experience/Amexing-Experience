@@ -77,7 +77,8 @@ class PublicQuoteController {
       return res.render('dashboards/admin/quote-public', {
         quote: quoteData,
         isPublicView: true,
-        pageTitle: `Cotización ${folio}`,
+        // Pestaña sin folio/id, consistente con el detalle admin.
+        pageTitle: 'Cotización - Amexing',
       });
     } catch (error) {
       return this.handlePublicQuoteError(error, folio, req, res);

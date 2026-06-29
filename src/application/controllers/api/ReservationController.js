@@ -165,6 +165,9 @@ class ReservationController {
 
       // Date filter
       const dateFilter = req.query.dateFilter || 'upcoming'; // Default to upcoming
+      // "Pendientes de completar" = reservaciones con cotización en hold. En ese filtro
+      // solo mostramos las hold ('only'); en los pills por fecha las excluimos ('exclude').
+      const holdMode = dateFilter === 'pending_completion' ? 'only' : 'exclude';
 
       // Year, Month, Day filters
       const yearFilter = req.query.yearFilter ? parseInt(req.query.yearFilter, 10) : null;
@@ -217,6 +220,17 @@ class ReservationController {
        *   applyDateConstraints(query, 'ongoing', today, 2026, 5, null);
        */
       const applyDateConstraints = (q, filter, today, yearVal, monthVal, dayVal) => {
+        // 'pending_completion' no es un filtro por fecha sino por estado de cotización
+        // (hold) → no aplica ninguna restricción de fecha/periodo.
+        if (filter === 'pending_completion') return;
+        /**
+         * Return the later of two dates, treating a falsy value as unbounded.
+         * @param {Date|null} a - First date, or null if unbounded.
+         * @param {Date|null} b - Second date, or null if unbounded.
+         * @returns {Date|null} The later date, or the other operand if one is falsy.
+         * @example
+         *   maxDate(new Date('2026-05-01'), new Date('2026-06-01')); // 2026-06-01
+         */
         const maxDate = (a, b) => {
           if (!a) return b;
           if (!b) return a;
@@ -294,9 +308,21 @@ class ReservationController {
        * @returns {void}
        * @example
        */
-      const applyClientFilter = (q, type, id) => {
-        if (type !== 'agency' && type !== 'client') return; // sin filtro
+      /**
+       * Constrain a Reservation query through its quote: combines the agency/client
+       * molecule filter with the quote-status (hold) filter in a SINGLE inner Quote
+       * query + one matchesQuery, so the two don't overwrite each other on `quotePtr`.
+       * @param {Parse.Query} q - Reservation query to constrain.
+       * @param {string} type - '' | 'agency' | 'client'.
+       * @param {string} id - ObjectId of the agency (AmexingUser) or Client (optional).
+       * @param {string|null} holdFilter - 'only' = solo cotización en hold; 'exclude' = saca las hold; null = sin filtro de estado.
+       * @returns {void}
+       * @example
+       *   applyQuoteConstraint(query, 'agency', 'abc', 'exclude');
+       */
+      const applyQuoteConstraint = (q, type, id, holdFilter) => {
         const innerQuote = new Parse.Query('Quote');
+        let has = false;
         if (type === 'client') {
           if (id) {
             const ClientCls = Parse.Object.extend('Client');
@@ -307,15 +333,26 @@ class ReservationController {
             innerQuote.exists('companyClientPtr');
             innerQuote.doesNotExist('client');
           }
-        } else if (id) {
-          const UserCls = Parse.Object.extend('AmexingUser');
-          const userObj = new UserCls();
-          userObj.id = id;
-          innerQuote.equalTo('client', userObj);
-        } else {
-          innerQuote.exists('client');
+          has = true;
+        } else if (type === 'agency') {
+          if (id) {
+            const UserCls = Parse.Object.extend('AmexingUser');
+            const userObj = new UserCls();
+            userObj.id = id;
+            innerQuote.equalTo('client', userObj);
+          } else {
+            innerQuote.exists('client');
+          }
+          has = true;
         }
-        q.matchesQuery('quotePtr', innerQuote);
+        if (holdFilter === 'only') {
+          innerQuote.equalTo('status', 'hold');
+          has = true;
+        } else if (holdFilter === 'exclude') {
+          innerQuote.notEqualTo('status', 'hold');
+          has = true;
+        }
+        if (has) q.matchesQuery('quotePtr', innerQuote);
       };
 
       // Apply date filter based on startDate and endDate
@@ -324,7 +361,7 @@ class ReservationController {
 
       // Apply combined date constraints (upcoming/ongoing/past + year/month/day)
       applyDateConstraints(query, dateFilter, today, yearFilter, monthFilter, dayFilter);
-      applyClientFilter(query, clientTypeFilter, clientIdFilter);
+      applyQuoteConstraint(query, clientTypeFilter, clientIdFilter, holdMode);
 
       // Total count (without search/status filters, but with role filter)
       const totalQuery = new Parse.Query('Reservation');
@@ -336,9 +373,20 @@ class ReservationController {
 
       // Apply the same combined date constraints to the total count
       applyDateConstraints(totalQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
-      applyClientFilter(totalQuery, clientTypeFilter, clientIdFilter);
+      applyQuoteConstraint(totalQuery, clientTypeFilter, clientIdFilter, holdMode);
 
       const recordsTotal = await totalQuery.count({ useMasterKey: true });
+
+      // Contador del pill "Pendientes de completar": reservaciones con cotización en
+      // hold, respetando rol y el filtro agencia/cliente, sin importar fecha ni el pill activo.
+      const pendingCountQuery = new Parse.Query('Reservation');
+      pendingCountQuery.equalTo('active', true);
+      pendingCountQuery.equalTo('exists', true);
+      if (roleFilterPointers) {
+        pendingCountQuery.containedIn('clientPtr', roleFilterPointers);
+      }
+      applyQuoteConstraint(pendingCountQuery, clientTypeFilter, clientIdFilter, 'only');
+      const pendingCompletionCount = await pendingCountQuery.count({ useMasterKey: true });
 
       // Apply search filter
       if (searchValue) {
@@ -377,10 +425,10 @@ class ReservationController {
         applyDateConstraints(emailQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
 
         // Apply the same agency/client filter to each search sub-query
-        applyClientFilter(folioQuery, clientTypeFilter, clientIdFilter);
-        applyClientFilter(contactQuery, clientTypeFilter, clientIdFilter);
-        applyClientFilter(eventQuery, clientTypeFilter, clientIdFilter);
-        applyClientFilter(emailQuery, clientTypeFilter, clientIdFilter);
+        applyQuoteConstraint(folioQuery, clientTypeFilter, clientIdFilter, holdMode);
+        applyQuoteConstraint(contactQuery, clientTypeFilter, clientIdFilter, holdMode);
+        applyQuoteConstraint(eventQuery, clientTypeFilter, clientIdFilter, holdMode);
+        applyQuoteConstraint(emailQuery, clientTypeFilter, clientIdFilter, holdMode);
 
         const compoundQuery = Parse.Query.or(folioQuery, contactQuery, eventQuery, emailQuery);
         compoundQuery.include('quotePtr');
@@ -414,7 +462,7 @@ class ReservationController {
         }));
 
         return res.json({
-          draw, recordsTotal, recordsFiltered, data,
+          draw, recordsTotal, recordsFiltered, data, pendingCompletionCount,
         });
       }
 
@@ -436,7 +484,7 @@ class ReservationController {
 
       // Apply the same combined date constraints to the count query
       applyDateConstraints(countQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
-      applyClientFilter(countQuery, clientTypeFilter, clientIdFilter);
+      applyQuoteConstraint(countQuery, clientTypeFilter, clientIdFilter, holdMode);
 
       const recordsFiltered = await countQuery.count({ useMasterKey: true });
 
@@ -458,7 +506,7 @@ class ReservationController {
       }));
 
       return res.json({
-        draw, recordsTotal, recordsFiltered, data,
+        draw, recordsTotal, recordsFiltered, data, pendingCompletionCount,
       });
     } catch (error) {
       logger.error('Error fetching reservations', { error: error.message, stack: error.stack });
@@ -1042,6 +1090,77 @@ class ReservationController {
     } catch (error) {
       logger.error('Error cancelling reservation', { error: error.message });
       return res.status(500).json({ success: false, error: 'Error al cancelar reservación' });
+    }
+  }
+
+  /**
+   * PUT /api/reservations/:id/status — Manually set the reservation's overall status.
+   * Only the MANUAL states are allowed here: 'confirmed' (todo asignado y confirmado)
+   * and 'hold' (bloqueado). The derived states (pending/assigned/in_progress/completed)
+   * are computed from service assignments by updateReservationStatus and must not be set
+   * by hand; 'cancelled' has its own cascade flow (cancelReservation).
+   * @param {object} req - Express request; body: { status }.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON { success, data: { status } }.
+   * @example
+   *   PUT /api/reservations/abc123/status { "status": "confirmed" }
+   */
+  static async setReservationStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body || {};
+      // 'confirmed'/'hold' are set manually. 'pending' is the RELEASE action: it
+      // clears the manual state and recomputes the real status from the service
+      // assignments (so the user can step back out of Bloqueado/Confirmada).
+      const MANUAL_STATUSES = ['confirmed', 'hold'];
+      const RELEASE_STATUS = 'pending';
+      const ALLOWED = [...MANUAL_STATUSES, RELEASE_STATUS];
+      if (!ALLOWED.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: `Estado inválido. Sólo se permite: ${ALLOWED.join(', ')}`,
+        });
+      }
+
+      const query = new Parse.Query('Reservation');
+      query.equalTo('active', true);
+      query.equalTo('exists', true);
+      const reservation = await query.get(id, { useMasterKey: true });
+      if (!reservation) {
+        return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      }
+
+      if (reservation.get('status') === 'cancelled') {
+        return res.status(409).json({
+          success: false,
+          error: 'No se puede cambiar el estado de una reservación cancelada',
+        });
+      }
+
+      if (status === RELEASE_STATUS) {
+        // Drop the manual hold/confirmed, then let updateReservationStatus derive
+        // the real state (pending/assigned/completed) from the service statuses.
+        reservation.set('status', 'pending');
+        await reservation.save(null, { useMasterKey: true });
+        await ReservationController.updateReservationStatus(reservation);
+        const finalStatus = reservation.get('status');
+        logger.info('Reservation status released (recomputed)', {
+          reservationId: id, finalStatus, performedBy: req.user?.id,
+        });
+        return res.json({ success: true, data: { status: finalStatus } });
+      }
+
+      reservation.set('status', status);
+      await reservation.save(null, { useMasterKey: true });
+
+      logger.info('Reservation status set manually', {
+        reservationId: id, status, performedBy: req.user?.id,
+      });
+
+      return res.json({ success: true, data: { status } });
+    } catch (error) {
+      logger.error('Error setting reservation status', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Error al actualizar estado' });
     }
   }
 

@@ -83,7 +83,7 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
 
 <!-- Service Modal -->
 <div class="modal fade" id="serviceModal" tabindex="-1" aria-labelledby="serviceModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header border-bottom">
                 <h5 class="modal-title" id="serviceModalLabel">
@@ -295,33 +295,8 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <!-- Hidden field for total people count (used by tier pricing logic) -->
                                 <input type="hidden" id="walkingTourPeopleCount" value="1">
                                 <input type="hidden" id="walkingTourCurrency" value="MXN">
-                                <label class="form-label mb-2">Precios por Grupo <small class="text-muted">(efectivo)</small></label>
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <div class="card walking-tier-card" id="walkingTierSmall">
-                                            <div class="card-body text-center p-2">
-                                                <small class="text-muted d-block" id="walkingRangeSmallLabel">—</small>
-                                                <h5 class="mb-0" id="walkingPriceSmallLabel">$0.00</h5>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="card walking-tier-card" id="walkingTierMedium">
-                                            <div class="card-body text-center p-2">
-                                                <small class="text-muted d-block" id="walkingRangeMediumLabel">—</small>
-                                                <h5 class="mb-0" id="walkingPriceMediumLabel">$0.00</h5>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="card walking-tier-card" id="walkingTierLarge">
-                                            <div class="card-body text-center p-2">
-                                                <small class="text-muted d-block" id="walkingRangeLargeLabel">—</small>
-                                                <h5 class="mb-0" id="walkingPriceLargeLabel">$0.00</h5>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <!-- Tarjetas de tramos (read-only) removidas: eran redundantes con los inputs
+                                     editables de abajo. El tramo que aplica ahora se resalta en el grupo editable. -->
                                 <!-- Group breakdown when people exceed max tier -->
                                 <div id="walkingTourGroupBreakdown" class="alert alert-info py-2 mt-3 d-none">
                                     <div id="walkingTourGroupBreakdownContent"></div>
@@ -434,16 +409,6 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         <input type="text" class="form-control d-none" id="transportDestinationText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
                                     </div>
                                 </div>
-                                <!-- Duración de ruta (min): se autollena de la ruta y es editable. La usan guía/greeter
-                                     y la hora de salida sugerida. Si la ruta no la trae, captúrala aquí. -->
-                                <div class="row">
-                                    <div class="col-md-4 mb-3">
-                                        <label for="routeDurationInput" class="form-label">Duración estimada de viaje <small class="text-muted">(horas)</small></label>
-                                        <input type="number" min="0" step="0.25" class="form-control" id="routeDurationInput" placeholder="Ej: 1.75" autocomplete="off">
-                                        <small class="text-muted d-block">Se autollena de la ruta; usada para guía/greeter y hora de salida sugerida.</small>
-                                    </div>
-                                </div>
-
                                 <!-- Pickup / Drop-off address (Punto a Punto only) -->
                                 <div class="row d-none" id="papAddressesRow">
                                     <div class="col-md-6 mb-3">
@@ -480,8 +445,9 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="text" class="form-control time-input" id="transportStartTime" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="transportEndTime" class="form-label">Hora de fin</label>
-                                            <input type="text" class="form-control time-input" id="transportEndTime" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
+                                            <label for="transportEndTime" class="form-label">Hora estimada de llegada</label>
+                                            <input type="text" class="form-control time-input" id="transportEndTime" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off" readonly>
+                                            <small class="text-muted d-block" id="transportArrivalDurationHint"></small>
                                         </div>
                                     </div>
                                 </div>
@@ -490,24 +456,29 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <div id="flightDetailsSection" class="d-none">
                                     <hr class="my-2">
                                     <div class="row">
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-4 mb-3">
                                             <label for="airline" class="form-label">Aerolínea</label>
                                             <input type="text" class="form-control" id="airline" placeholder="Ej: American Airlines">
                                         </div>
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-4 mb-3">
                                             <label for="flightNumber" class="form-label">Número de Vuelo</label>
                                             <input type="text" class="form-control" id="flightNumber" placeholder="Ej: AA1234">
                                         </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-4 mb-3">
                                             <label for="flightTime" class="form-label">Hora Vuelo</label>
                                             <input type="text" class="form-control time-input" id="flightTime" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
                                         </div>
-                                        <div class="col-md-6 mb-3" id="flightDepartureTimeSuggestedContainer">
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-12 mb-3" id="flightDepartureTimeSuggestedContainer">
                                             <label for="flightDepartureTimeSuggested" class="form-label" id="flightDepartureTimeSuggestedLabel">Hora de salida sugerida</label>
-                                            <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
-                                            <small class="text-muted">Se calcula automáticamente al seleccionar un segmento; puedes editarla.</small>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control time-input" id="flightDepartureTimeSuggested" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off" readonly>
+                                                <button type="button" class="btn btn-outline-success" id="confirmFlightDepartureBtn"><i class="ti ti-check me-1"></i>Confirmar</button>
+                                                <button type="button" class="btn btn-outline-secondary" id="editFlightDepartureBtn"><i class="ti ti-pencil me-1"></i>Editar</button>
+                                            </div>
+                                            <small class="text-muted d-block">Se calcula automáticamente al seleccionar un segmento. Confírmala como hora de pick-up o edítala.</small>
+                                            <small class="text-success d-none d-block mt-1" id="flightDepartureConfirmedHint"><i class="ti ti-check me-1"></i>Confirmada como hora de pick-up</small>
                                             <small class="text-warning d-none d-block mt-1" id="flightDepartureNoRouteWarning"><i class="ti ti-alert-triangle me-1"></i>No se encontró la duración de esta ruta; captura la hora de salida manualmente.</small>
                                         </div>
                                         <!-- Removed Número de Personas field as requested
@@ -607,6 +578,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         </div>
                                     </div>
 
+                                    <!-- Hora estimada de llegada (local / punto-a-punto): salida + duración de ruta -->
+                                    <div class="row d-none" id="roundTripArrivalIdaRow">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="roundTripArrivalIda" class="form-label">Hora estimada de llegada</label>
+                                            <input type="text" class="form-control time-input" id="roundTripArrivalIda" placeholder="__:__" maxlength="5" autocomplete="off" readonly>
+                                            <small class="text-muted d-block" id="roundTripArrivalIdaHint"></small>
+                                        </div>
+                                    </div>
+
                                     <!-- Flight Details for Ida (only show if Aeropuerto is selected) -->
                                     <div class="roundtrip-flight-details-ida d-none">
                                         <hr class="my-2">
@@ -618,6 +598,25 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <div class="col-md-6 mb-3">
                                                 <label for="roundTripFlightNumberIda" class="form-label">Número de Vuelo</label>
                                                 <input type="text" class="form-control" id="roundTripFlightNumberIda" placeholder="Ej: AA1234">
+                                            </div>
+                                        </div>
+                                        <!-- Vuelos adicionales (Ida) — varios pasajeros en vuelos distintos -->
+                                        <div class="row">
+                                            <div class="col-12 mb-3">
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <label class="form-label mb-0"><i class="ti ti-plane me-1"></i>Vuelos adicionales</label>
+                                                    <button type="button" class="btn btn-outline-primary" id="addRoundTripAdditionalFlightIdaBtn">
+                                                        <i class="ti ti-plus me-1"></i>Agregar vuelo
+                                                    </button>
+                                                </div>
+                                                <small class="form-text text-muted d-block mb-2">Si distintos pasajeros llegan en vuelos distintos, agrégalos aquí.</small>
+                                                <div class="row g-2 mb-1 d-none" id="roundTripAdditionalFlightsHeaderIda">
+                                                    <div class="col-md-4"><small class="text-muted fw-semibold">Aerolínea</small></div>
+                                                    <div class="col-md-3"><small class="text-muted fw-semibold">N° vuelo</small></div>
+                                                    <div class="col-md-3"><small class="text-muted fw-semibold">Hora de vuelo</small></div>
+                                                    <div class="col-md-2"></div>
+                                                </div>
+                                                <div id="roundTripAdditionalFlightsListIda"></div>
                                             </div>
                                         </div>
                                     </div>
@@ -687,11 +686,24 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="text" class="form-control time-input" id="roundTripTimeVuelta" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
                                         </div>
                                     </div>
+                                    <!-- Hora estimada de llegada (local / punto-a-punto): salida + duración de ruta -->
+                                    <div class="row d-none" id="roundTripArrivalVueltaRow">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="roundTripArrivalVuelta" class="form-label">Hora estimada de llegada</label>
+                                            <input type="text" class="form-control time-input" id="roundTripArrivalVuelta" placeholder="__:__" maxlength="5" autocomplete="off" readonly>
+                                            <small class="text-muted d-block" id="roundTripArrivalVueltaHint"></small>
+                                        </div>
+                                    </div>
                                     <div class="row" id="roundTripDepartureTimeSuggestedVueltaRow">
                                         <div class="col-md-12 mb-3">
                                             <label for="roundTripDepartureTimeSuggestedVuelta" class="form-label">Hora de salida sugerida</label>
-                                            <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedVuelta" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
-                                            <small class="text-muted">Se calcula automáticamente al seleccionar un segmento; puedes editarla.</small>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control time-input" id="roundTripDepartureTimeSuggestedVuelta" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off" readonly>
+                                                <button type="button" class="btn btn-outline-success" id="confirmRoundTripDepartureVueltaBtn"><i class="ti ti-check me-1"></i>Confirmar</button>
+                                                <button type="button" class="btn btn-outline-secondary" id="editRoundTripDepartureVueltaBtn"><i class="ti ti-pencil me-1"></i>Editar</button>
+                                            </div>
+                                            <small class="text-muted d-block">Se calcula automáticamente al seleccionar un segmento. Confírmala como hora de pick-up o edítala.</small>
+                                            <small class="text-success d-none d-block mt-1" id="roundTripDepartureVueltaConfirmedHint"><i class="ti ti-check me-1"></i>Confirmada como hora de pick-up</small>
                                             <small class="text-warning d-none d-block mt-1" id="roundTripDepartureNoRouteWarningVuelta"><i class="ti ti-alert-triangle me-1"></i>No se encontró la duración de esta ruta; captura la hora de salida manualmente.</small>
                                         </div>
                                     </div>
@@ -707,6 +719,25 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <div class="col-md-6 mb-3">
                                                 <label for="roundTripFlightNumberVuelta" class="form-label">Número de Vuelo</label>
                                                 <input type="text" class="form-control" id="roundTripFlightNumberVuelta" placeholder="Ej: AA5678">
+                                            </div>
+                                        </div>
+                                        <!-- Vuelos adicionales (Vuelta) — varios pasajeros en vuelos distintos -->
+                                        <div class="row">
+                                            <div class="col-12 mb-3">
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <label class="form-label mb-0"><i class="ti ti-plane me-1"></i>Vuelos adicionales</label>
+                                                    <button type="button" class="btn btn-outline-primary" id="addRoundTripAdditionalFlightVueltaBtn">
+                                                        <i class="ti ti-plus me-1"></i>Agregar vuelo
+                                                    </button>
+                                                </div>
+                                                <small class="form-text text-muted d-block mb-2">Si distintos pasajeros salen en vuelos distintos, agrégalos aquí.</small>
+                                                <div class="row g-2 mb-1 d-none" id="roundTripAdditionalFlightsHeaderVuelta">
+                                                    <div class="col-md-4"><small class="text-muted fw-semibold">Aerolínea</small></div>
+                                                    <div class="col-md-3"><small class="text-muted fw-semibold">N° vuelo</small></div>
+                                                    <div class="col-md-3"><small class="text-muted fw-semibold">Hora de vuelo</small></div>
+                                                    <div class="col-md-2"></div>
+                                                </div>
+                                                <div id="roundTripAdditionalFlightsListVuelta"></div>
                                             </div>
                                         </div>
                                     </div>
@@ -909,15 +940,32 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         </div>
                     </div>
                     
+                    <!-- Duración estimada de viaje (horas/minutos): común a one-way y round-trip. Se
+                         autollena de la ruta y es editable. La usan guía/greeter y la hora de salida
+                         sugerida. Si la ruta no la trae, captúrala aquí. -->
+                    <div class="row" id="routeDurationRow">
+                        <div class="col-md-5 mb-3">
+                            <label class="form-label">Duración estimada de viaje <small class="text-muted">(horas y minutos)</small></label>
+                            <div class="input-group">
+                                <input type="number" min="0" step="1" class="form-control" id="routeDurationHours" placeholder="0" autocomplete="off" aria-label="Horas">
+                                <span class="input-group-text">h</span>
+                                <input type="number" min="0" max="59" step="5" class="form-control" id="routeDurationMinutes" placeholder="0" autocomplete="off" aria-label="Minutos">
+                                <span class="input-group-text">min</span>
+                            </div>
+                            <small class="text-muted d-block">Se autollena de la ruta; usada para guía/greeter y hora de salida sugerida.</small>
+                            <small class="text-info d-block d-none" id="routeDurationRoundTripHint"></small>
+                        </div>
+                    </div>
+
                     <div class="row" id="transportFieldsRow">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-4 mb-3 transport-main-field">
                             <label for="transportCategory" class="form-label">Segmento <span class="text-danger">*</span></label>
                             <select class="form-select" id="transportCategory" required>
                                 <option value="">-- Seleccionar segmento --</option>
                                 <!-- Options will be loaded dynamically from Rate table -->
                             </select>
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-4 mb-3 transport-main-field">
                             <label for="vehicleSelect" class="form-label">Vehículo <span id="vehicleLoadingSpinner" class="spinner-border spinner-border-sm text-primary d-none" role="status" style="width: 14px; height: 14px; border-width: 2px;"></span></label>
                             <select class="form-select" id="vehicleSelect">
                                 <option value="">-- Sin vehículo --</option>
@@ -931,34 +979,18 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         <div class="col-12 mb-3">
                             <label class="form-label d-block mb-1">Opcionales</label>
                             <div class="d-flex flex-wrap align-items-center gap-4">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" value="" id="includeGuide">
-                                    <label class="form-check-label small" for="includeGuide" id="guideLabel">Guía + Chofer</label>
+                                <div class="form-check d-flex align-items-center gap-2">
+                                    <input class="form-check-input m-0" type="checkbox" value="" id="includeGuide" style="width: 1.35rem; height: 1.35rem;">
+                                    <label class="form-check-label" for="includeGuide" id="guideLabel">Guía + Chofer</label>
                                 </div>
-                                <div class="form-check" id="greeterCheckboxContainer">
-                                    <input class="form-check-input" type="checkbox" value="" id="includeGreeter">
-                                    <label class="form-check-label small" for="includeGreeter" id="greeterLabel">Greeter</label>
+                                <div class="form-check d-flex align-items-center gap-2" id="greeterCheckboxContainer">
+                                    <input class="form-check-input m-0" type="checkbox" value="" id="includeGreeter" style="width: 1.35rem; height: 1.35rem;">
+                                    <label class="form-check-label" for="includeGreeter" id="greeterLabel">Greeter</label>
                                 </div>
                                 <div class="form-check ms-2 d-none" id="greeterInVehicleContainer">
                                     <input class="form-check-input" type="checkbox" value="" id="greeterInVehicle">
                                     <label class="form-check-label small text-muted" for="greeterInVehicle">Viaja en el vehículo</label>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Tiempo de Espera (Transport only) -->
-                    <div id="tiempoEsperaSection" class="d-none mb-3">
-                        <div class="row align-items-end">
-                            <div class="col-md-4">
-                                <label for="waitingTimeHours" class="form-label"><i class="ti ti-clock me-1"></i>Tiempo de espera</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" id="waitingTimeHours" min="0" step="0.5" value="0" placeholder="0">
-                                    <span class="input-group-text">horas</span>
-                                </div>
-                            </div>
-                            <div class="col-md-4 d-flex align-items-center" style="min-height: 38px; padding-bottom: 4px;">
-                                <small id="waitingTimeRate" class="text-muted"></small>
                             </div>
                         </div>
                     </div>
@@ -1007,7 +1039,27 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             </div>
                             <% } %>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <!-- Tiempo de espera del vehículo principal — junto al precio base (solo transporte). -->
+                        <div class="col-md-4 mb-3 d-none" id="tiempoEsperaSection">
+                            <label class="form-label"><i class="ti ti-clock me-1"></i>Tiempo de espera</label>
+                            <div class="row g-1">
+                                <div class="col-5">
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="waitingTimeHours" min="0" step="0.5" value="0" placeholder="0">
+                                        <span class="input-group-text">h</span>
+                                    </div>
+                                </div>
+                                <div class="col-7">
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control" id="waitingTimePrice" min="0" step="0.01" placeholder="0.00" title="Tarifa por hora (editable)">
+                                        <span class="input-group-text">/h</span>
+                                    </div>
+                                    <small class="text-muted d-block" id="waitingTimeRate"></small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3" id="serviceQuantityCol">
                             <label for="serviceQuantity" class="form-label">Cantidad</label>
                             <input type="number" class="form-control" id="serviceQuantity" value="1" min="1" required>
                             <small class="text-muted d-none" id="roundTripQuantityHint">Vehículo Ida y Regreso</small>
@@ -1027,9 +1079,10 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             </small>
                             <!-- Headers tipo tabla (una sola fila); se muestra solo cuando hay vehículos. -->
                             <div class="row g-2 mb-1 d-none" id="extraAdditionalVehiclesHeader">
-                                <div class="col-md-4"><small class="text-muted fw-semibold">Segmento</small></div>
-                                <div class="col-md-4"><small class="text-muted fw-semibold">Vehículo</small></div>
-                                <div class="col-md-3"><small class="text-muted fw-semibold">Precio (efectivo)</small></div>
+                                <div class="col-md-2"><small class="text-muted fw-semibold">Segmento</small></div>
+                                <div class="col-md-3"><small class="text-muted fw-semibold">Vehículo</small></div>
+                                <div class="col-md-2"><small class="text-muted fw-semibold">Precio (efectivo)</small></div>
+                                <div class="col-md-4"><small class="text-muted fw-semibold">Tiempo de espera</small></div>
                                 <div class="col-md-1"></div>
                             </div>
                             <div id="extraAdditionalVehiclesList"></div>
@@ -1059,6 +1112,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <span class="input-group-text"><i class="ti ti-clock"></i></span>
                                     <input type="text" class="form-control time-input" id="experienceEndTime" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
                                 </div>
+                            </div>
+                        </div>
+                        <!-- Duración (horas): se autollena de la experiencia seleccionada y es editable. Full width, debajo del horario. -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="experienceDuration" class="form-label">Duración <small class="text-muted">(horas)</small></label>
+                                <input type="number" min="0" step="0.5" class="form-control" id="experienceDuration" placeholder="Ej: 2" autocomplete="off">
+                                <small class="text-muted d-block">Se autollena de la experiencia; puedes modificarla.</small>
                             </div>
                         </div>
                         

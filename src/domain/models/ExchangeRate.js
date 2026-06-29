@@ -1,4 +1,9 @@
 const Parse = require('parse/node');
+const { TtlCache } = require('../../infrastructure/cache/ttlCache');
+
+// Caché del registro "actual" (cambia rara vez, se consulta en cada carga de cotización).
+// Se invalida al crear un nuevo tipo de cambio. Ver ttlCache.js.
+const currentRateCache = new TtlCache();
 
 /**
  * ExchangeRate Model.
@@ -49,6 +54,7 @@ class ExchangeRate extends Parse.Object {
       }
 
       const savedRate = await exchangeRate.save(null, { useMasterKey: true });
+      currentRateCache.clear(); // el "actual" cambió -> invalidar caché
       return savedRate;
     } catch (error) {
       throw new Error(`Failed to create exchange rate: ${error.message}`);
@@ -62,6 +68,9 @@ class ExchangeRate extends Parse.Object {
    */
   static async getCurrentExchangeRate() {
     try {
+      const cached = currentRateCache.get();
+      if (cached !== undefined) return cached;
+
       const query = new Parse.Query(ExchangeRate);
       query.equalTo('active', true);
       query.equalTo('exists', true);
@@ -69,7 +78,7 @@ class ExchangeRate extends Parse.Object {
       query.limit(1);
 
       const result = await query.first({ useMasterKey: true });
-      return result || null;
+      return currentRateCache.set(result || null);
     } catch (error) {
       console.error('Error getting current exchange rate:', error);
       return null;

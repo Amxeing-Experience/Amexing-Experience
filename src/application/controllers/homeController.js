@@ -157,19 +157,25 @@ class HomeController {
   async servicePage(req, res, next, view, pageTitle) {
     try {
       const currentLang = req.language || 'es';
+      // t fijado al idioma resuelto: req.t queda atado al idioma detectado por
+      // el middleware, antes del changeLanguage de las rutas /en, así que en
+      // esas rutas devolvía español. getFixedT(currentLang) lo corrige.
+      const t = req.i18n && typeof req.i18n.getFixedT === 'function'
+        ? req.i18n.getFixedT(currentLang)
+        : req.t || ((key) => key);
 
       const data = {
         title: `${pageTitle} - Amexing Experience`,
         user: req.session?.user || null,
         currentPage: 'services',
         seo: {
-          description: req.t ? req.t('pages:services.description') : 'Premium transportation services',
-          keywords: req.t ? req.t('pages:services.keywords') : 'services, premium transport',
+          description: t('pages:services.description'),
+          keywords: t('pages:services.keywords'),
           author: 'Amexing Experience',
         },
         company: this.getCompanyData(),
         req,
-        t: req.t || ((key) => key),
+        t,
         currentLang,
       };
 
@@ -226,20 +232,25 @@ class HomeController {
    */
   async fleet(req, res, next) {
     try {
-      const currentLang = req.language || req.language || 'es';
+      const currentLang = req.language || 'es';
+      // t fijado al idioma resuelto (req.t queda atado al idioma del middleware
+      // antes del changeLanguage de /en/our-fleet).
+      const t = req.i18n && typeof req.i18n.getFixedT === 'function'
+        ? req.i18n.getFixedT(currentLang)
+        : req.t || ((key) => key);
 
       const data = {
-        title: req.t ? req.t('pages:fleet.title') : 'Our Fleet - Amexing Experience',
+        title: t('pages:fleet.title'),
         user: req.session?.user || null,
         currentPage: 'fleet',
         seo: {
-          description: req.t ? req.t('pages:fleet.description') : 'Premium fleet of vehicles',
-          keywords: req.t ? req.t('pages:fleet.keywords') : 'fleet, tesla, premium vehicles',
+          description: t('pages:fleet.description'),
+          keywords: t('pages:fleet.keywords'),
           author: 'Amexing Experience',
         },
         company: this.getCompanyData(),
         req,
-        t: req.t || ((key) => key),
+        t,
         currentLang,
       };
 

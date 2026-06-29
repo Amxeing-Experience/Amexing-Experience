@@ -15,6 +15,13 @@ const qsDevLog = (...args) => {
   }
 };
 
+// ── Año de los precios de lista (catálogo) ───────────────────────────────────
+// Fuente ÚNICA de verdad para el año que se muestra en los textos "Lista AAAA: $X".
+// Hoy las tarifas de catálogo son 2026; cuando cambien, actualizar SOLO esta línea.
+// Se expone en window para que otros módulos puedan reutilizarlo si hace falta.
+const AMX_PRICE_YEAR = 2026;
+if (typeof window !== 'undefined') window.AMX_PRICE_YEAR = AMX_PRICE_YEAR;
+
 // Include the generic formula evaluator if not already loaded
 if (typeof GuideFormulaEvaluator === 'undefined') {
   const script = document.createElement('script');
@@ -301,11 +308,14 @@ class ItineraryBuilder {
     const loadingOverlay = document.getElementById('itineraryLoadingOverlay');
 
     try {
-      // Load initial data
-      await this.loadQuoteData();
-
-      // Get client ID for personalized pricing
+      // Get client ID for personalized pricing (viene del DOM #clientId, no del quote).
       this.clientId = this.getClientId();
+
+      // D (carga inicial): arrancamos el fetch+proceso del quote SIN await para solaparlo con el
+      // batch de catálogos. Antes esta era la request más lenta (~4-5 s) y bloqueaba TODO en serie.
+      // processServiceItems se auto-carga lo que necesita (ensureToursCache), y el re-render final
+      // corre después. Se espera (`await quoteReady`) más abajo, antes del re-render/pricing.
+      const quoteReady = this.loadQuoteData();
 
       // Ensure GuideFormulaEvaluator is ready before continuing
       if (typeof GuideFormulaEvaluator !== 'undefined') {
@@ -334,6 +344,10 @@ class ItineraryBuilder {
         this.loadGreeterRateConfiguration(),
         this.loadVehicleRatePrices(),
       ]);
+
+      // Ahora sí esperamos el quote: el re-render y el pricing dependen de los servicios ya
+      // construidos. Su red+proceso se solapó con el batch de arriba (ganamos ~4-5 s en serie).
+      await quoteReady;
 
       // Load pricing rates (exchange, transfer, agency) with auth
       await this.loadPricingRates();
@@ -702,6 +716,8 @@ class ItineraryBuilder {
         this.handleTripTypeChange();
         // Round trip doubles the route time → re-estimate local arrival.
         this.updateTransferArrivalEstimate();
+        // Mostrar/ocultar el total ida y vuelta (×2) según el tipo de viaje.
+        this.updateRouteDurationRoundTripHint();
       });
     });
 
@@ -718,6 +734,14 @@ class ItineraryBuilder {
     // Vuelos adicionales — "Agregar vuelo" button appends an empty flight row.
     document.getElementById('addAdditionalFlightBtn')?.addEventListener('click', () => {
       this.addAdditionalFlightRow({});
+    });
+    // Vuelos adicionales de la Ida (round-trip aeropuerto) — lista propia.
+    document.getElementById('addRoundTripAdditionalFlightIdaBtn')?.addEventListener('click', () => {
+      this.addAdditionalFlightRow({}, 'roundTripAdditionalFlightsListIda', 'roundTripAdditionalFlightsHeaderIda');
+    });
+    // Vuelos adicionales de la Vuelta (round-trip aeropuerto) — lista propia.
+    document.getElementById('addRoundTripAdditionalFlightVueltaBtn')?.addEventListener('click', () => {
+      this.addAdditionalFlightRow({}, 'roundTripAdditionalFlightsListVuelta', 'roundTripAdditionalFlightsHeaderVuelta');
     });
 
     // Extra additional vehicles (Phase 1) — "+ Agregar otro vehículo" button appends a new row.
@@ -1098,6 +1122,7 @@ class ItineraryBuilder {
       const handler = () => {
         clearSuggestedEdited(suggestedId);
         this.updateSuggestedDepartureTime();
+        this.updateRoundTripArrivalEstimates();
       };
       el.addEventListener('change', handler);
       el.addEventListener('input', () => { if (/^\d{2}:\d{2}$/.test(el.value)) handler(); });
@@ -1106,15 +1131,41 @@ class ItineraryBuilder {
     recalcOnFlightTime('roundTripTimeIda', 'roundTripDepartureTimeSuggestedIda');
     recalcOnFlightTime('roundTripTimeVuelta', 'roundTripDepartureTimeSuggestedVuelta');
 
+    // "Hora de salida sugerida": Confirmar la deja fija como hora de pick-up; Editar la habilita.
+    const setupSuggestedConfirm = (fieldId, confirmBtnId, editBtnId, confirmedHintId) => {
+      const field = document.getElementById(fieldId);
+      const hint = document.getElementById(confirmedHintId);
+      document.getElementById(confirmBtnId)?.addEventListener('click', () => {
+        if (field) { field.readOnly = true; field.dataset.userEdited = '1'; field.dataset.confirmed = '1'; }
+        hint?.classList.remove('d-none');
+        this.serviceModified = true;
+      });
+      document.getElementById(editBtnId)?.addEventListener('click', () => {
+        if (field) { field.readOnly = false; field.dataset.userEdited = '1'; delete field.dataset.confirmed; field.focus(); }
+        hint?.classList.add('d-none');
+        this.serviceModified = true;
+      });
+    };
+    setupSuggestedConfirm('flightDepartureTimeSuggested', 'confirmFlightDepartureBtn', 'editFlightDepartureBtn', 'flightDepartureConfirmedHint');
+    setupSuggestedConfirm('roundTripDepartureTimeSuggestedVuelta', 'confirmRoundTripDepartureVueltaBtn', 'editRoundTripDepartureVueltaBtn', 'roundTripDepartureVueltaConfirmedHint');
+
     // Editar a mano la duración de ruta → recalcular guía/greeter, desglose y hora de salida
     // sugerida (getRouteDurationMinutes toma este campo como prioridad).
-    document.getElementById('routeDurationInput')?.addEventListener('input', () => {
+    ['routeDurationHours', 'routeDurationMinutes'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => {
+        this.serviceModified = true;
+        this.updateDevPaymentBreakdown();
+        this.updateSuggestedDepartureTime();
+        // Route time feeds the local estimated-arrival calc.
+        this.updateTransferArrivalEstimate();
+        this.updateRouteDurationRoundTripHint();
+        setTimeout(() => this.updateServicePriceBreakdown(), 50);
+      });
+    });
+
+    // Duración de experiencia (editable): solo marca el servicio como modificado (no afecta precio).
+    document.getElementById('experienceDuration')?.addEventListener('input', () => {
       this.serviceModified = true;
-      this.updateDevPaymentBreakdown();
-      this.updateSuggestedDepartureTime();
-      // Route time feeds the local estimated-arrival calc.
-      this.updateTransferArrivalEstimate();
-      setTimeout(() => this.updateServicePriceBreakdown(), 50);
     });
 
     // Local transfers: recompute the estimated arrival when the pick-up time changes.
@@ -1205,6 +1256,11 @@ class ItineraryBuilder {
       // Dev breakdown FIRST — the service breakdown reads its line items from it.
       this.updateServicePriceBreakdown();
     });
+    // Tarifa por hora de espera editable (principal): recalcula el desglose al editarla.
+    document.getElementById('waitingTimePrice')?.addEventListener('input', () => {
+      this.serviceModified = true;
+      this.updateServicePriceBreakdown();
+    });
 
     // Preview
     document.getElementById('previewItineraryBtn')?.addEventListener('click', () => this.showPreview());
@@ -1226,7 +1282,10 @@ class ItineraryBuilder {
             dashboardType = 'department_manager';
           }
 
-          window.location.href = `/dashboard/${dashboardType}/quotes/${quoteId}?section=summary`;
+          // Preserve the reservation context so the header keeps reading
+          // "Reservación" (not "Cotización") on the summary section.
+          const resCtx = window.__isReservation ? '&context=reservation' : '';
+          window.location.href = `/dashboard/${dashboardType}/quotes/${quoteId}?section=summary${resCtx}`;
         }
       }
     });
@@ -1848,8 +1907,13 @@ class ItineraryBuilder {
       this.clearAttendees();
       // Vuelos adicionales — empty by default; user clicks "Agregar vuelo" to add one.
       this.clearAdditionalFlights();
+      this.clearAdditionalFlights('roundTripAdditionalFlightsListIda', 'roundTripAdditionalFlightsHeaderIda');
+      this.clearAdditionalFlights('roundTripAdditionalFlightsListVuelta', 'roundTripAdditionalFlightsHeaderVuelta');
       // Vehículos adicionales extra — empty by default; appears when checkbox is on.
       this.clearExtraAdditionalVehicles();
+      // Walking tour — vaciar los inputs de precios por grupo (form.reset no limpia un
+      // container construido con innerHTML) y el desglose/total.
+      this.clearWalkingTourFields();
 
       // Clear concepto price field explicitly to avoid cached values
       const conceptoClientPriceField = document.getElementById('conceptoClientPrice');
@@ -2080,8 +2144,10 @@ class ItineraryBuilder {
     const tripTypeSelector = document.getElementById('tripTypeSelector');
     const tourTransportCheckbox = document.getElementById('tourTransportCheckboxContainer');
     const transportPeopleFieldsRow = document.getElementById('transportPeopleFieldsRow');
+    // Duración estimada de viaje: solo aplica a transporte (one-way y round-trip).
+    const routeDurationRow = document.getElementById('routeDurationRow');
 
-    // Show/hide Tiempo de espera section
+    // Show/hide Tiempo de espera section (su posición/ancho los maneja syncMainVehiclePriceLayout).
     const tiempoEsperaSection = document.getElementById('tiempoEsperaSection');
 
     if (type === 'transport') {
@@ -2092,6 +2158,7 @@ class ItineraryBuilder {
       if (transportPeopleFieldsRow) {
         transportPeopleFieldsRow.style.display = 'flex';
       }
+      if (routeDurationRow) routeDurationRow.style.display = 'flex';
       // Initialize transport form based on current selections
       this.handleTransportTypeChange();
       this.handleTripTypeChange();
@@ -2107,6 +2174,7 @@ class ItineraryBuilder {
       if (transportPeopleFieldsRow) {
         transportPeopleFieldsRow.style.display = 'none';
       }
+      if (routeDurationRow) routeDurationRow.style.display = 'none';
       // Checkbox "Se requiere traslado" OCULTO: el traslado se deriva del tipo de tour
       // (con vehículo siempre requiere; walking no). El input sigue en el DOM y se auto-marca
       // al seleccionar el tour, que es lo que muestra los campos de transporte.
@@ -2121,6 +2189,7 @@ class ItineraryBuilder {
       if (transportPeopleFieldsRow) {
         transportPeopleFieldsRow.style.display = 'none';
       }
+      if (routeDurationRow) routeDurationRow.style.display = 'none';
       // Hide tour transport checkbox
       if (tourTransportCheckbox) {
         tourTransportCheckbox.style.display = 'none';
@@ -2861,7 +2930,11 @@ class ItineraryBuilder {
     // que el auto-cálculo vuelva a llenar en un servicio nuevo).
     ['flightDepartureTimeSuggested', 'roundTripDepartureTimeSuggestedIda', 'roundTripDepartureTimeSuggestedVuelta'].forEach((id) => {
       const sf = document.getElementById(id);
-      if (sf) delete sf.dataset.userEdited;
+      if (sf) { delete sf.dataset.userEdited; delete sf.dataset.confirmed; sf.readOnly = true; }
+    });
+    // Ocultar los hints de "confirmada como hora de pick-up" (clean slate por servicio nuevo).
+    ['flightDepartureConfirmedHint', 'roundTripDepartureVueltaConfirmedHint'].forEach((id) => {
+      document.getElementById(id)?.classList.add('d-none');
     });
 
     // Clear round trip fields
@@ -2888,6 +2961,8 @@ class ItineraryBuilder {
     // Clear waiting time
     const waitingTimeHours = document.getElementById('waitingTimeHours');
     if (waitingTimeHours) waitingTimeHours.value = 0;
+    const waitingTimePrice = document.getElementById('waitingTimePrice');
+    if (waitingTimePrice) waitingTimePrice.value = '';
     const waitingTimeRate = document.getElementById('waitingTimeRate');
     if (waitingTimeRate) waitingTimeRate.textContent = '';
 
@@ -2937,15 +3012,56 @@ class ItineraryBuilder {
   // For point transfers (local & punto a punto), recompute the estimated arrival
   // = start + route duration (x2 when round trip). No-op for other types.
   updateTransferArrivalEstimate() {
+    // Round-trip (local/punto-a-punto) tiene su llegada estimada por pierna (Ida + Vuelta).
+    this.updateRoundTripArrivalEstimates();
     const type = document.querySelector('input[name="transportType"]:checked')?.value;
     if (type !== 'local' && type !== 'punto-a-punto') return;
     const startInput = document.getElementById('transportStartTime');
     const endInput = document.getElementById('transportEndTime');
     if (!startInput || !endInput) return;
     const routeMinutes = this.getRouteDurationMinutes();
-    const totalMinutes = routeMinutes ? routeMinutes * (this.isRoundTrip() ? 2 : 1) : 0;
+    const isRT = this.isRoundTrip();
+    const totalMinutes = routeMinutes ? routeMinutes * (isRT ? 2 : 1) : 0;
     const arrival = this.addMinutesToTime(startInput.value, totalMinutes);
     if (arrival) endInput.value = arrival;
+    // Small text: duración de ruta con la que se estima la hora de llegada.
+    const hintEl = document.getElementById('transportArrivalDurationHint');
+    if (hintEl) {
+      if (routeMinutes > 0) {
+        const base = `Duración de ruta: ${this.formatMinutesToHoursAndMinutes(routeMinutes)}`;
+        hintEl.textContent = isRT
+          ? `${base} (×2 ida y vuelta = ${this.formatMinutesToHoursAndMinutes(totalMinutes)})`
+          : base;
+      } else {
+        hintEl.textContent = 'Sin duración de ruta; selecciona origen y destino.';
+      }
+    }
+  }
+
+  // Round-trip local/punto-a-punto: llegada estimada por pierna = hora de la pierna + duración de ruta.
+  // Solo lectura; el small muestra la duración de ruta usada. Se oculta en aeropuerto.
+  updateRoundTripArrivalEstimates() {
+    const type = document.querySelector('input[name="transportType"]:checked')?.value;
+    const show = (type === 'local' || type === 'punto-a-punto');
+    const routeMinutes = this.getRouteDurationMinutes();
+    const legs = [
+      { timeId: 'roundTripTimeIda', arrId: 'roundTripArrivalIda', hintId: 'roundTripArrivalIdaHint', rowId: 'roundTripArrivalIdaRow' },
+      { timeId: 'roundTripTimeVuelta', arrId: 'roundTripArrivalVuelta', hintId: 'roundTripArrivalVueltaHint', rowId: 'roundTripArrivalVueltaRow' },
+    ];
+    legs.forEach((leg) => {
+      const row = document.getElementById(leg.rowId);
+      if (row) row.classList.toggle('d-none', !show);
+      if (!show) return;
+      const timeVal = document.getElementById(leg.timeId)?.value;
+      const arrInput = document.getElementById(leg.arrId);
+      const hintEl = document.getElementById(leg.hintId);
+      if (arrInput) arrInput.value = routeMinutes ? (this.addMinutesToTime(timeVal, routeMinutes) || '') : '';
+      if (hintEl) {
+        hintEl.textContent = routeMinutes > 0
+          ? `Duración de ruta: ${this.formatMinutesToHoursAndMinutes(routeMinutes)}`
+          : 'Sin duración de ruta; selecciona origen y destino.';
+      }
+    });
   }
 
   // Parses an "HH:MM" (24h) string into minutes since midnight, or null.
@@ -3341,10 +3457,11 @@ class ItineraryBuilder {
     if (transportType === 'aeropuerto') {
       if (idaHeader) idaHeader.innerHTML = '<i class="ti ti-plane-arrival me-2"></i>Arrival';
       if (vueltaHeader) vueltaHeader.innerHTML = '<i class="ti ti-plane-departure me-2"></i>Departure';
-      if (dateIdaLabel) dateIdaLabel.textContent = 'Fecha de Llegada';
-      if (timeIdaLabel) timeIdaLabel.textContent = 'Hora de Llegada';
-      if (dateVueltaLabel) dateVueltaLabel.textContent = 'Fecha de Salida';
-      if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Salida';
+      // Aeropuerto: la fecha/hora de cada pierna corresponden a su vuelo → "de Vuelo".
+      if (dateIdaLabel) dateIdaLabel.textContent = 'Fecha de Vuelo';
+      if (timeIdaLabel) timeIdaLabel.textContent = 'Hora de Vuelo';
+      if (dateVueltaLabel) dateVueltaLabel.textContent = 'Fecha de Vuelo';
+      if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Vuelo';
     } else if (transportType === 'punto-a-punto') {
       // Punto a Punto: the first leg is the arrival at the destination,
       // the second leg is the return trip from it.
@@ -3364,13 +3481,13 @@ class ItineraryBuilder {
       if (timeVueltaLabel) timeVueltaLabel.textContent = 'Hora de Recoger';
     }
 
-    // "Hora de salida sugerida" de la vuelta: NO aplica en local (la vuelta es "Recoger");
-    // sí aplica en aeropuerto / punto-a-punto (la vuelta es la salida). Se oculta y limpia en local.
+    // "Hora de salida sugerida" de la vuelta: SOLO aplica en aeropuerto. En local y punto-a-punto
+    // se usa la "Hora estimada de llegada" por pierna, así que se oculta y limpia aquí.
     const vueltaSuggestedRow = document.getElementById('roundTripDepartureTimeSuggestedVueltaRow');
     if (vueltaSuggestedRow) {
-      const isLocalRoundTrip = transportType === 'local';
-      vueltaSuggestedRow.classList.toggle('d-none', isLocalRoundTrip);
-      if (isLocalRoundTrip) {
+      const hideSuggested = transportType !== 'aeropuerto';
+      vueltaSuggestedRow.classList.toggle('d-none', hideSuggested);
+      if (hideSuggested) {
         const vueltaSuggestedField = document.getElementById('roundTripDepartureTimeSuggestedVuelta');
         if (vueltaSuggestedField) vueltaSuggestedField.value = '';
       }
@@ -3641,6 +3758,9 @@ class ItineraryBuilder {
         ...serviceData,
         tripType: 'one-way',
         directionType: 'departure',
+        // Cada pierna lleva sus propios vuelos adicionales: la Vuelta usa returnAdditionalFlights
+        // (no hereda los de la Ida, que viven en serviceData.additionalFlights).
+        additionalFlights: Array.isArray(serviceData.returnAdditionalFlights) ? serviceData.returnAdditionalFlights : [],
         concept: `${typeLabel}: ${serviceData.returnOrigin} - ${serviceData.returnDestination} (Vuelta)`,
         origin: serviceData.returnOrigin,
         originName: serviceData.returnOrigin,
@@ -4579,6 +4699,9 @@ class ItineraryBuilder {
     switch (type) {
       case 'experience': {
         data.experienceId = document.getElementById('experienceSelect')?.value;
+        // Duración editable de la experiencia (autollenada del catálogo, modificable). Se guarda en
+        // data.duration (ya persistido) — informativa; no afecta el precio (que es por persona).
+        data.duration = parseFloat(document.getElementById('experienceDuration')?.value) || null;
         data.adultsQuantity = parseInt(document.getElementById('adultsQuantity')?.value || 0);
         data.childrenQuantity = parseInt(document.getElementById('childrenQuantity')?.value || 0);
         data.adultsNoAlcoholQuantity = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
@@ -4895,6 +5018,10 @@ class ItineraryBuilder {
             data.flightNumber = document.getElementById('roundTripFlightNumberIda')?.value || '';
             data.returnAirline = document.getElementById('roundTripAirlineVuelta')?.value || '';
             data.returnFlightNumber = document.getElementById('roundTripFlightNumberVuelta')?.value || '';
+            // Vuelos adicionales por pierna: la Ida va en additionalFlights, la Vuelta en
+            // returnAdditionalFlights. Al separar, cada pierna recibe los suyos.
+            data.additionalFlights = this.collectAdditionalFlights('roundTripAdditionalFlightsListIda');
+            data.returnAdditionalFlights = this.collectAdditionalFlights('roundTripAdditionalFlightsListVuelta');
           }
 
           data.originName = data.origin || 'Origen';
@@ -5069,9 +5196,9 @@ class ItineraryBuilder {
           data.baseVehiclePrice = data.price;
         }
 
-        // Waiting time (Tiempo de espera)
+        // Waiting time (Tiempo de espera) — la tarifa puede ser editada por el usuario.
         data.waitingTimeHours = parseFloat(document.getElementById('waitingTimeHours')?.value || 0);
-        data.waitingTimePricePerHour = this.getWaitingTimePrice()?.pricePerHour || 0;
+        data.waitingTimePricePerHour = this.getEffectiveWaitingHourlyRate();
 
         // Store transport price override flag.
         // The price field holds the per-vehicle base price (the breakdown multiplies it
@@ -5833,6 +5960,10 @@ class ItineraryBuilder {
             const expEndTimeField = document.getElementById('experienceEndTime');
             if (expStartTimeField && service.startTime) expStartTimeField.value = service.startTime;
             if (expEndTimeField && service.endTime) expEndTimeField.value = service.endTime;
+            const expDurationField = document.getElementById('experienceDuration');
+            if (expDurationField && service.duration !== undefined && service.duration !== null) {
+              expDurationField.value = service.duration;
+            }
           } else if (attempt < 5) {
             // Retry with longer delay
 
@@ -6212,10 +6343,14 @@ class ItineraryBuilder {
             document.getElementById('roundTripAirlineIda').value = service.airline;
             document.getElementById('roundTripFlightNumberIda').value = service.flightNumber || '';
           }
+          // Vuelos adicionales de la Ida (cuando se edita como round-trip).
+          this.populateAdditionalFlights(service.additionalFlights || [], 'roundTripAdditionalFlightsListIda', 'roundTripAdditionalFlightsHeaderIda');
           if (service.returnAirline) {
             document.getElementById('roundTripAirlineVuelta').value = service.returnAirline;
             document.getElementById('roundTripFlightNumberVuelta').value = service.returnFlightNumber || '';
           }
+          // Vuelos adicionales de la Vuelta (cuando se edita como round-trip).
+          this.populateAdditionalFlights(service.returnAdditionalFlights || [], 'roundTripAdditionalFlightsListVuelta', 'roundTripAdditionalFlightsHeaderVuelta');
         } else {
           // One way fields
           if (service.directionType) {
@@ -6431,15 +6566,19 @@ class ItineraryBuilder {
           // El vehículo principal ya está restaurado: habilitar el botón "Agregar vehículo"
           // (la restauración async no dispara el handler que normalmente lo sincroniza).
           this.syncExtraVehiclesButtonEnabled();
-          // Restore waiting time
+          // Restore waiting time (horas + tarifa editada)
           if (service.waitingTimeHours > 0) {
             const wtHoursField = document.getElementById('waitingTimeHours');
             if (wtHoursField) wtHoursField.value = service.waitingTimeHours;
           }
+          if (service.waitingTimePricePerHour > 0) {
+            const wtPriceField = document.getElementById('waitingTimePrice');
+            if (wtPriceField) wtPriceField.value = Number(service.waitingTimePricePerHour).toFixed(2);
+          }
           this.updateWaitingTimeRateDisplay();
           // Restaurar la duración de ruta guardada en el campo editable (manda sobre el lookup
           // al editar, para conservar un valor capturado a mano).
-          { const rd = document.getElementById('routeDurationInput'); if (rd) rd.value = this.minutesToHoursInput(service.routeDuration); }
+          this.setRouteDurationFields(service.routeDuration);
           // Update dev payment breakdown now that transport data is loaded
           this.updateDevPaymentBreakdown();
           // Update service price breakdown now that transport data is loaded
@@ -8346,7 +8485,7 @@ class ItineraryBuilder {
                     <div class="flex-grow-1">
                         ${roundedTime ? `
                         <div class="mb-2">
-                            <span class="badge bg-info text-white">
+                            <span class="badge bg-secondary text-white">
                                 <i class="ti ti-clock me-1"></i>Hora: ${roundedTime}
                             </span>
                         </div>
@@ -8430,6 +8569,7 @@ class ItineraryBuilder {
                                                             ${service.type === 'a-disposicion' && service.vehicleCount > 1 ? ` x${service.vehicleCount}`
           : service.type !== 'a-disposicion' && service.quantity > 1 ? ` x${service.quantity}` : ''}
                                                             ${service.rateId ? ` - ${this.getCategoryName(service.rateId) || 'Segmento'}` : ''}
+                                                            ${service.type === 'transport' && service.waitingTimeHours > 0 ? ` <span class="text-warning"><i class="ti ti-clock"></i> ${service.waitingTimeHours}h espera</span>` : ''}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -8454,8 +8594,10 @@ class ItineraryBuilder {
                                             ${(Array.isArray(service.extraAdditionalVehicles) ? service.extraAdditionalVehicles : []).map((v) => {
         const name = (v && (v.vehicleTypeName || '')).trim() || 'Vehículo adicional';
         const seg = (v && v.segmentName) || '';
+        const wh = parseFloat(v && v.waitingHours) || 0;
+        const waitingTxt = wh > 0 ? ` <span class="text-warning"><i class="ti ti-clock"></i> ${wh}h espera</span>` : '';
         return `<div class="ms-3 mt-1">
-                                                                <span><strong>${name}</strong>${seg ? ` - ${seg}` : ''}</span>
+                                                                <span><strong>${name}</strong>${seg ? ` - ${seg}` : ''}${waitingTxt}</span>
                                                             </div>`;
       }).join('')}
                                         </div>
@@ -8476,14 +8618,7 @@ class ItineraryBuilder {
                                             </div>
                                         </div>
                                     ` : ''}
-                                    ${service.type === 'transport' && service.waitingTimeHours > 0 ? `
-                                        <div class="row g-2 text-warning small mt-1">
-                                            <div class="col-auto">
-                                                <i class="ti ti-clock me-1"></i>
-                                                <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
-                                            </div>
-                                        </div>
-                                    ` : ''}
+                                    ${''/* Tiempo de espera del principal ahora se muestra inline junto al vehículo */}
                                     ${service.availabilityPending ? `
                                         <div class="mt-1">
                                             <span class="badge bg-warning text-dark">
@@ -8631,7 +8766,7 @@ class ItineraryBuilder {
                     <div class="flex-grow-1">
                         ${roundedTime ? `
                         <div class="mb-2">
-                            <span class="badge bg-info text-white">
+                            <span class="badge bg-secondary text-white">
                                 <i class="ti ti-clock me-1"></i>Hora: ${roundedTime}
                             </span>
                         </div>
@@ -8819,6 +8954,7 @@ class ItineraryBuilder {
             const categoryName = service.category ? this.getCategoryName(service.category) : '';
             return service.category ? ` - ${categoryName || 'Segmento'}` : '';
           })()}
+                                                    ${service.type === 'transport' && service.waitingTimeHours > 0 ? ` <span class="text-warning"><i class="ti ti-clock"></i> ${service.waitingTimeHours}h espera</span>` : ''}
                                                 </span>
                                             </div>
                                         </div>
@@ -8848,7 +8984,9 @@ class ItineraryBuilder {
                                     ${(Array.isArray(service.extraAdditionalVehicles) ? service.extraAdditionalVehicles : []).map((v) => {
         const name = (v && (v.vehicleTypeName || '')).trim() || 'Vehículo adicional';
         const seg = (v && v.segmentName) || (v && v.segment ? this.getCategoryName(v.segment) : '');
-        return `<div class="ms-3 mt-1"><span><strong>${name}</strong>${seg ? ` - ${seg}` : ''}</span></div>`;
+        const wh = parseFloat(v && v.waitingHours) || 0;
+        const waitingTxt = wh > 0 ? ` <span class="text-warning"><i class="ti ti-clock"></i> ${wh}h espera</span>` : '';
+        return `<div class="ms-3 mt-1"><span><strong>${name}</strong>${seg ? ` - ${seg}` : ''}${waitingTxt}</span></div>`;
       }).join('')}
                                 </div>
                             ` : ''}
@@ -8864,15 +9002,7 @@ class ItineraryBuilder {
                                     <strong>Incluye Greeter + Driver</strong>
                                 </div>
                             ` : ''}
-                            ${service.waitingTimeHours > 0 ? `
-                                <div class="d-flex align-items-center text-warning small mt-1">
-                                    <i class="ti ti-clock me-1"></i>
-                                    <strong>Tiempo de espera: ${service.waitingTimeHours}h</strong>
-                                    ${service.waitingTimePricePerHour ? `
-                                        <small class="text-muted ms-2">(${this.formatCurrency(service.waitingTimePricePerHour)}/h)</small>
-                                    ` : ''}
-                                </div>
-                            ` : ''}
+                            ${''/* Tiempo de espera del principal ahora se muestra inline junto al vehículo */}
                             ${service.isCustomPrice && this.canEditPrices ? `
                                 <div class="d-flex align-items-center text-info small mt-1">
                                     <i class="ti ti-edit me-1"></i>
@@ -10068,11 +10198,9 @@ class ItineraryBuilder {
       let waitingHourlyRate = 0;
 
       if (waitingHours > 0) {
-        const wtPrice = this.getWaitingTimePrice();
-        if (wtPrice) {
-          waitingHourlyRate = wtPrice.pricePerHour;
-          waitingCostEfectivo = waitingHourlyRate * waitingHours;
-        }
+        // Tarifa editable (si el usuario la modificó) o la de catálogo.
+        waitingHourlyRate = this.getEffectiveWaitingHourlyRate();
+        waitingCostEfectivo = waitingHourlyRate * waitingHours;
       }
 
       // Calculate guide costs if applicable
@@ -10090,7 +10218,11 @@ class ItineraryBuilder {
       let greeterCostEfectivo = 0;
 
       if (includeGreeter && routeDuration) {
-        greeterCostEfectivo = this.calculateGreeterPrice(routeDuration);
+        // Round-trip: el greeter atiende ida + vuelta (×2), igual que el transporte (legMultiplier).
+        // Antes quedaba en ×1 y se sub-cobraba el greeter en viajes redondos.
+        // TODO(cliente): pendiente de confirmación — ver docs/backlog/TODO-roundtrip-greeter-duracion.md
+        // (greeter ×2, guía en one-way, y regreso con duración distinta). Rama sin mergear hasta validar.
+        greeterCostEfectivo = this.calculateGreeterPrice(routeDuration) * legMultiplier;
       }
 
       // Calculate additional vehicle costs if applicable
@@ -10146,7 +10278,7 @@ class ItineraryBuilder {
         // Show the list (catalog) price alongside when a custom price overrides it.
         const listEfectivo = (parseFloat(item.listPrice) || 0) * legMultiplier;
         const listNote = (listEfectivo > 0 && Math.abs(listEfectivo - efectivo) > 0.01)
-          ? ` (Lista: ${this.formatCurrency(listEfectivo)})`
+          ? ` (Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(listEfectivo)})`
           : '';
         return {
           label: `Vehículo adicional (${item.vehicleType}${item.segmentName ? ` · ${item.segmentName}` : ''})${listNote}`,
@@ -10161,6 +10293,11 @@ class ItineraryBuilder {
       // greeter no) y devuelve los totales por forma de pago + el desglose por nodo.
       const transferRate = this.transferRate;
       const agencyRate = this.agencyRate;
+      // Tiempo de espera de los vehículos adicionales: cada uno su tarifa × sus horas (×1,
+      // no se duplica en round-trip, igual que la espera del principal).
+      const extraWaitingCostEfectivo = (typeof this.getExtraAdditionalVehiclesWaitingCostEfectivo === 'function')
+        ? this.getExtraAdditionalVehiclesWaitingCostEfectivo()
+        : 0;
       const transportNodes = [
         { key: 'vehicle', efectivo: vehicleTotalEfectivo, surcharge: true },
         { key: 'waiting', efectivo: waitingCostEfectivo, surcharge: true },
@@ -10168,6 +10305,7 @@ class ItineraryBuilder {
         { key: 'greeter', efectivo: greeterCostEfectivo, surcharge: true },
         { key: 'additionalVehicle', efectivo: additionalVehicleCostEfectivo, surcharge: true },
         { key: 'extraVehicles', efectivo: extraVehiclesCostEfectivo, surcharge: true },
+        { key: 'extraWaiting', efectivo: extraWaitingCostEfectivo, surcharge: true },
       ];
       const transportPricing = window.PricingEngine
         ? window.PricingEngine.composeServiceNodes({ transferRate, agencyRate, nodes: transportNodes })
@@ -10244,10 +10382,13 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const basePrice = this.greeterRateCache?.basePrice || 760;
         const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
-        efectivoBreakdown += `\nGreeter ($${basePrice} + $${hourlyRate}×${durationHours}h = $${greeterCostEfectivo.toFixed(2)}): $${greeterCostEfectivo.toFixed(2)}`;
+        efectivoBreakdown += `\nGreeter (($${basePrice} + $${hourlyRate}×${durationHours}h)${legMultiplier > 1 ? ` × ${legMultiplier}` : ''} = $${greeterCostEfectivo.toFixed(2)}): $${greeterCostEfectivo.toFixed(2)}`;
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         efectivoBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingHourlyRate.toFixed(2)}): $${waitingCostEfectivo.toFixed(2)}`;
+      }
+      if (extraWaitingCostEfectivo > 0) {
+        efectivoBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.efectivo ?? extraWaitingCostEfectivo).toFixed(2)}`;
       }
       efectivoBreakdown += `\nTotal: $${totalEfectivo.toFixed(2)}`;
 
@@ -10271,11 +10412,14 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const basePrice = this.greeterRateCache?.basePrice || 760;
         const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
-        transferenciaBreakdown += `\nGreeter ($${basePrice} + $${hourlyRate}×${durationHours}h = $${greeterCostTransferencia.toFixed(2)}): $${greeterCostTransferencia.toFixed(2)}`;
+        transferenciaBreakdown += `\nGreeter (($${basePrice} + $${hourlyRate}×${durationHours}h)${legMultiplier > 1 ? ` × ${legMultiplier}` : ''} = $${greeterCostTransferencia.toFixed(2)}): $${greeterCostTransferencia.toFixed(2)}`;
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.transferRate / 100));
         transferenciaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTransferencia.toFixed(2)}`;
+      }
+      if (extraWaitingCostEfectivo > 0) {
+        transferenciaBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.transferencia ?? 0).toFixed(2)}`;
       }
       transferenciaBreakdown += `\nTotal: $${totalTransferencia.toFixed(2)}`;
 
@@ -10299,11 +10443,14 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const basePrice = this.greeterRateCache?.basePrice || 760;
         const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
-        tarjetaBreakdown += `\nGreeter ($${basePrice} + $${hourlyRate}×${durationHours}h = $${greeterCostTarjeta.toFixed(2)}): $${greeterCostTarjeta.toFixed(2)}`;
+        tarjetaBreakdown += `\nGreeter (($${basePrice} + $${hourlyRate}×${durationHours}h)${legMultiplier > 1 ? ` × ${legMultiplier}` : ''} = $${greeterCostTarjeta.toFixed(2)}): $${greeterCostTarjeta.toFixed(2)}`;
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.agencyRate / 100));
         tarjetaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTarjeta.toFixed(2)}`;
+      }
+      if (extraWaitingCostEfectivo > 0) {
+        tarjetaBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.tarjeta ?? 0).toFixed(2)}`;
       }
       tarjetaBreakdown += `\nTotal: $${totalTarjeta.toFixed(2)}`;
 
@@ -13005,8 +13152,7 @@ class ItineraryBuilder {
     // Limpia la duración de ruta cacheada para que no se herede de otro servicio (afecta guía/
     // greeter/hora de salida sugerida). Se repuebla con el lookup de la ruta de este servicio.
     this.cachedRouteDuration = null;
-    const rdInput = document.getElementById('routeDurationInput');
-    if (rdInput) rdInput.value = '';
+    this.setRouteDurationFields(null);
 
     // Vehículo adicional (transporte / vehicle tour)
     const addCheckbox = document.getElementById('additionalVehicleCheckbox');
@@ -13299,6 +13445,7 @@ class ItineraryBuilder {
             overlapAccepted: subconcept.overlapAccepted || false,
             attendees: Array.isArray(subconcept.attendees) ? subconcept.attendees : [],
             additionalFlights: Array.isArray(subconcept.additionalFlights) ? subconcept.additionalFlights : [],
+            returnAdditionalFlights: Array.isArray(subconcept.returnAdditionalFlights) ? subconcept.returnAdditionalFlights : [],
             extraAdditionalVehicles: Array.isArray(subconcept.extraAdditionalVehicles) ? subconcept.extraAdditionalVehicles : [],
             conceptoPricePerPerson: subconcept.conceptoPricePerPerson !== undefined ? subconcept.conceptoPricePerPerson : null,
             includeInTotal: subconcept.includeInTotal !== undefined ? subconcept.includeInTotal : true,
@@ -13778,8 +13925,8 @@ class ItineraryBuilder {
   }
 
   // === Additional flights helpers (airport transport with multiple flights) ===
-  addAdditionalFlightRow(flight = {}) {
-    const list = document.getElementById('additionalFlightsList');
+  addAdditionalFlightRow(flight = {}, listId = 'additionalFlightsList', headerId = 'additionalFlightsHeader') {
+    const list = document.getElementById(listId);
     if (!list) return;
     const row = document.createElement('div');
     row.className = 'row g-2 mb-2 additional-flight-row align-items-end';
@@ -13802,35 +13949,35 @@ class ItineraryBuilder {
     `;
     row.querySelector('.remove-additional-flight-btn')?.addEventListener('click', () => {
       row.remove();
-      this.updateAdditionalFlightsHeaderVisibility();
+      this.updateAdditionalFlightsHeaderVisibility(listId, headerId);
     });
     list.appendChild(row);
-    this.updateAdditionalFlightsHeaderVisibility();
+    this.updateAdditionalFlightsHeaderVisibility(listId, headerId);
   }
 
   // Muestra la fila de headers (tipo tabla) sólo cuando hay al menos un vuelo en la lista.
-  updateAdditionalFlightsHeaderVisibility() {
-    const header = document.getElementById('additionalFlightsHeader');
-    const list = document.getElementById('additionalFlightsList');
+  updateAdditionalFlightsHeaderVisibility(listId = 'additionalFlightsList', headerId = 'additionalFlightsHeader') {
+    const header = document.getElementById(headerId);
+    const list = document.getElementById(listId);
     if (!header || !list) return;
     const hasRows = list.querySelectorAll('.additional-flight-row').length > 0;
     header.classList.toggle('d-none', !hasRows);
   }
 
-  clearAdditionalFlights() {
-    const list = document.getElementById('additionalFlightsList');
+  clearAdditionalFlights(listId = 'additionalFlightsList', headerId = 'additionalFlightsHeader') {
+    const list = document.getElementById(listId);
     if (list) list.innerHTML = '';
-    this.updateAdditionalFlightsHeaderVisibility();
+    this.updateAdditionalFlightsHeaderVisibility(listId, headerId);
   }
 
-  populateAdditionalFlights(flights) {
-    this.clearAdditionalFlights();
+  populateAdditionalFlights(flights, listId = 'additionalFlightsList', headerId = 'additionalFlightsHeader') {
+    this.clearAdditionalFlights(listId, headerId);
     const arr = Array.isArray(flights) ? flights : [];
-    arr.forEach((f) => this.addAdditionalFlightRow(f || {}));
+    arr.forEach((f) => this.addAdditionalFlightRow(f || {}, listId, headerId));
   }
 
-  collectAdditionalFlights() {
-    const rows = document.querySelectorAll('#additionalFlightsList .additional-flight-row');
+  collectAdditionalFlights(listId = 'additionalFlightsList') {
+    const rows = document.querySelectorAll(`#${listId} .additional-flight-row`);
     return Array.from(rows)
       .map((row) => ({
         airline: (row.querySelector('.additional-flight-airline')?.value || '').trim(),
@@ -13856,22 +14003,39 @@ class ItineraryBuilder {
     row.className = 'row g-2 mb-2 extra-additional-vehicle-row align-items-end';
     row.dataset.index = String(rowIdx);
     row.innerHTML = `
-      <div class="col-md-4">
+      <div class="col-md-2">
         <select class="form-select form-select-sm extra-segment-select">
           <option value="">Seleccionar segmento</option>
         </select>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <select class="form-select form-select-sm extra-vehicle-select" disabled>
           <option value="">Primero selecciona un segmento</option>
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <div class="input-group input-group-sm">
           <span class="input-group-text">$</span>
           <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-price-input" placeholder="0.00">
         </div>
         <small class="text-muted extra-list-price d-block"></small>
+      </div>
+      <div class="col-md-4">
+        <div class="row g-1">
+          <div class="col-5">
+            <div class="input-group input-group-sm">
+              <input type="number" min="0" step="0.5" value="0" class="form-control form-control-sm extra-waiting-input" placeholder="0">
+              <span class="input-group-text">h</span>
+            </div>
+          </div>
+          <div class="col-7">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">$</span>
+              <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-waiting-price" placeholder="0.00" title="Tarifa por hora (editable)">
+            </div>
+            <small class="text-muted extra-waiting-rate d-block"></small>
+          </div>
+        </div>
       </div>
       <div class="col-md-1 text-end">
         <button type="button" class="btn btn-sm btn-outline-danger remove-extra-additional-vehicle-btn" title="Quitar">
@@ -13887,6 +14051,16 @@ class ItineraryBuilder {
     const priceInput = row.querySelector('.extra-price-input');
     if (priceInput && vehicle.customPrice !== undefined && vehicle.customPrice !== null && vehicle.customPrice !== '') {
       priceInput.value = parseFloat(vehicle.customPrice).toFixed(2);
+    }
+    // Restaurar las horas de tiempo de espera de este vehículo (cada uno el suyo).
+    const waitingInput = row.querySelector('.extra-waiting-input');
+    if (waitingInput && vehicle.waitingHours !== undefined && vehicle.waitingHours !== null && vehicle.waitingHours !== '') {
+      waitingInput.value = vehicle.waitingHours;
+    }
+    // Restaurar la tarifa por hora editada (si se guardó); si no, syncExtraRowPrice autollena la de catálogo.
+    const waitingPriceInput = row.querySelector('.extra-waiting-price');
+    if (waitingPriceInput && vehicle.waitingPricePerHour !== undefined && vehicle.waitingPricePerHour !== null && vehicle.waitingPricePerHour !== '' && parseFloat(vehicle.waitingPricePerHour) > 0) {
+      waitingPriceInput.value = parseFloat(vehicle.waitingPricePerHour).toFixed(2);
     }
 
     // Mirror the segment options from #transportCategory (synchronous: options
@@ -13927,6 +14101,16 @@ class ItineraryBuilder {
     });
     // Manual per-vehicle price edits feed the breakdown.
     priceInput?.addEventListener('input', () => {
+      this.serviceModified = true;
+      this.updateServicePriceBreakdown();
+    });
+    // Cada vehículo lleva su propio tiempo de espera (puede diferir entre vehículos).
+    waitingInput?.addEventListener('input', () => {
+      this.serviceModified = true;
+      this.updateServicePriceBreakdown();
+    });
+    // Tarifa por hora de espera editable de la fila.
+    row.querySelector('.extra-waiting-price')?.addEventListener('input', () => {
       this.serviceModified = true;
       this.updateServicePriceBreakdown();
     });
@@ -13983,7 +14167,8 @@ class ItineraryBuilder {
           if (!vehicleInfo || !vehicleInfo.id) return;
           const pax = vehicleInfo.capacity || 0;
           const trunk = vehicleInfo.trunkCapacity || 0;
-          const opt = new Option(`${vehicleType} - ${pax} pax, ${trunk} carry-on`, vehicleInfo.id);
+          // En tours se omite el carry-on en el TEXTO del dropdown (el dato trunk se conserva abajo).
+          const opt = new Option(`${vehicleType} - ${pax} pax`, vehicleInfo.id);
           // For tours the price is per-hour. calculateVehicleTourDevBreakdown
           // multiplies by tourDuration later.
           const perHour = this.getVehiclePriceWithPriority(vehicleType, tourId, segmentId) || 0;
@@ -14144,7 +14329,7 @@ class ItineraryBuilder {
     const opt = vehicleSelect.selectedIndex >= 0 ? vehicleSelect.options[vehicleSelect.selectedIndex] : null;
     const listPrice = opt ? (parseFloat(opt.dataset.efectivoPrice || '0') || 0) : 0;
     if (vehicleSelect.value && listPrice > 0) {
-      if (listEl) listEl.textContent = `Lista: ${this.formatCurrency(listPrice)}`;
+      if (listEl) listEl.textContent = `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(listPrice)}`;
       if (forceListPrice || priceInput.value === '' || priceInput.value === null) {
         priceInput.value = listPrice.toFixed(2);
       }
@@ -14152,6 +14337,49 @@ class ItineraryBuilder {
       if (listEl) listEl.textContent = '';
       if (!vehicleSelect.value) priceInput.value = '';
     }
+    // Mostrar/resetear la tarifa de tiempo de espera de este vehículo+segmento.
+    this.updateExtraRowWaitingRate(row, forceListPrice);
+  }
+
+  /**
+   * Tarifa de tiempo de espera (pricePerHour) de la fila según su vehículo+segmento.
+   * @param row
+   */
+  getExtraRowWaitingPrice(row) {
+    const vehicleId = row.querySelector('.extra-vehicle-select')?.value;
+    const segmentId = row.querySelector('.extra-segment-select')?.value;
+    if (!vehicleId || !segmentId) return null;
+    return this.getWaitingTimePriceFor(vehicleId, segmentId);
+  }
+
+  /** Tarifa de espera efectiva de la fila: la editada si existe, si no la de catálogo. */
+  getEffectiveExtraRowWaitingRate(row) {
+    const edited = parseFloat(row.querySelector('.extra-waiting-price')?.value);
+    if (Number.isFinite(edited) && edited > 0) return edited;
+    return this.getExtraRowWaitingPrice(row)?.pricePerHour || 0;
+  }
+
+  /** Muestra "Lista: $X/h" y autollena la tarifa editable (forceReset al cambiar vehículo). */
+  updateExtraRowWaitingRate(row, forceReset = false) {
+    const wt = this.getExtraRowWaitingPrice(row);
+    const rateEl = row.querySelector('.extra-waiting-rate');
+    if (rateEl) rateEl.textContent = wt ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(wt.pricePerHour)}/h` : '';
+    const priceInput = row.querySelector('.extra-waiting-price');
+    if (priceInput && wt && (forceReset || priceInput.value === '' || priceInput.value === null)) {
+      priceInput.value = Number(wt.pricePerHour).toFixed(2);
+    }
+  }
+
+  /** Suma del costo de espera (tarifa × horas) de TODOS los vehículos adicionales, en efectivo. */
+  getExtraAdditionalVehiclesWaitingCostEfectivo() {
+    let total = 0;
+    document.querySelectorAll('#extraAdditionalVehiclesList .extra-additional-vehicle-row').forEach((row) => {
+      const hours = parseFloat(row.querySelector('.extra-waiting-input')?.value || 0) || 0;
+      if (hours <= 0) return;
+      // Tarifa efectiva: la editada en la fila si existe, si no la de catálogo.
+      total += this.getEffectiveExtraRowWaitingRate(row) * hours;
+    });
+    return total;
   }
 
   // Sum of efectivo prices across all extra additional vehicle rows.
@@ -14178,7 +14406,7 @@ class ItineraryBuilder {
     const price = Number(catalogPrice) || 0;
     this._mainVehicleCatalogPrice = price;
     const listEl = document.getElementById('servicePriceListPrice');
-    if (listEl) listEl.textContent = price > 0 ? `Lista: ${this.formatCurrency(price)}` : '';
+    if (listEl) listEl.textContent = price > 0 ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(price)}` : '';
   }
 
   // Resetea la marca de "precio editado a mano" para que el siguiente cálculo vuelva a
@@ -14194,16 +14422,52 @@ class ItineraryBuilder {
     const priceCol = document.getElementById('servicePriceCol');
     if (!priceCol) return;
     const stdSection = document.getElementById('standardPricingSection');
-    // Fila destino donde el Precio va junto a Segmento + Vehículo:
-    //  - transporte y tour con traslado → transportFieldsRow
-    //  - a-disposición → aDisposicionVehicleRow
-    //  - demás tipos → de vuelta a standardPricingSection
-    let targetRow = null;
-    if (type === 'transport' || (type === 'tour' && document.getElementById('tourRequiresTransport')?.checked)) {
-      targetRow = document.getElementById('transportFieldsRow');
-    } else if (type === 'a-disposicion') {
-      targetRow = document.getElementById('aDisposicionVehicleRow');
+    const waitingCol = document.getElementById('tiempoEsperaSection');
+    const transportRow = document.getElementById('transportFieldsRow');
+
+    const isTransport = type === 'transport';
+    const isTourTransport = type === 'tour' && document.getElementById('tourRequiresTransport')?.checked;
+
+    // Ancho de las columnas base (Segmento/Vehículo) del transporte.
+    const setMainFieldWidths = (cls) => {
+      document.querySelectorAll('#transportFieldsRow .transport-main-field').forEach((el) => {
+        // Preservar d-none: reasignar className completo borraba el ocultamiento que pone
+        // handleTourTransportToggle(false) (p.ej. walking tour / tour sin traslado).
+        const hidden = el.classList.contains('d-none');
+        el.className = `${cls} mb-3 transport-main-field${hidden ? ' d-none' : ''}`;
+      });
+    };
+
+    // Solo transporte: el Tiempo de espera viaja junto al Precio dentro de transportFieldsRow,
+    // formando Segmento · Vehículo · Precio · Espera (consistente con las filas de adicionales).
+    if (isTransport && waitingCol && transportRow) {
+      if (priceCol.parentElement !== transportRow) transportRow.appendChild(priceCol);
+      if (waitingCol.parentElement !== transportRow) transportRow.appendChild(waitingCol);
+      // Segmento más angosto (col-2), Vehículo col-3, Precio más ancho (col-3), Espera col-4.
+      const mainFields = transportRow.querySelectorAll('.transport-main-field');
+      if (mainFields[0]) mainFields[0].className = 'col-md-2 mb-3 transport-main-field';
+      if (mainFields[1]) mainFields[1].className = 'col-md-3 mb-3 transport-main-field';
+      priceCol.className = 'col-md-3 mb-3';
+      waitingCol.className = 'col-md-4 mb-3';
+      waitingCol.classList.remove('d-none');
+      // Refrescar la tarifa de lista del waiting al armar el layout (no solo en change).
+      this.updateWaitingTimeRateDisplay();
+      return;
     }
+
+    // Resto de tipos: el Tiempo de espera vuelve a su "home" (standardPricingSection) y se oculta.
+    if (waitingCol) {
+      if (stdSection && waitingCol.parentElement !== stdSection) stdSection.appendChild(waitingCol);
+      waitingCol.classList.add('d-none');
+    }
+    setMainFieldWidths('col-md-4');
+
+    // Fila destino del Precio: tour-con-traslado → transportFieldsRow; a-disposición → su fila;
+    // demás → de vuelta a standardPricingSection.
+    let targetRow = null;
+    if (isTourTransport) targetRow = transportRow;
+    else if (type === 'a-disposicion') targetRow = document.getElementById('aDisposicionVehicleRow');
+
     if (targetRow) {
       if (priceCol.parentElement !== targetRow) targetRow.appendChild(priceCol);
       priceCol.className = 'col-md-4 mb-3';
@@ -14304,6 +14568,10 @@ class ItineraryBuilder {
         const customPrice = priceInput && priceInput.value !== ''
           ? (parseFloat(priceInput.value) || 0)
           : null;
+        const waitingInput = row.querySelector('.extra-waiting-input');
+        const waitingHours = waitingInput ? (parseFloat(waitingInput.value) || 0) : 0;
+        // Tarifa por hora efectiva (editada o catálogo) para persistir y recalcular.
+        const waitingPricePerHour = this.getEffectiveExtraRowWaitingRate(row);
         return {
           segment: segmentId,
           segmentName,
@@ -14312,6 +14580,8 @@ class ItineraryBuilder {
           vehicleTypeName,
           customPrice,
           listPrice,
+          waitingHours,
+          waitingPricePerHour,
         };
       })
       .filter((v) => v.vehicleId);
@@ -14375,7 +14645,8 @@ class ItineraryBuilder {
         return;
       }
 
-      const response = await fetch('/api/vehicles', {
+      // lite=1: esta vista no usa imágenes de vehículos -> el backend omite el batch de imágenes + S3.
+      const response = await fetch('/api/vehicles?lite=1', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -14718,7 +14989,8 @@ class ItineraryBuilder {
       }
 
       // Use DataTables format to get all tours
-      const url = '/api/tours?draw=1&start=0&length=1000&search[value]=';
+      // lite=1: esta vista no usa fotos de tours -> el backend omite el N+1 de imágenes por tour.
+      const url = '/api/tours?draw=1&start=0&length=1000&search[value]=&lite=1';
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -14777,8 +15049,10 @@ class ItineraryBuilder {
         return;
       }
 
-      // Load provider experiences using the dedicated provider-experiencias API
-      const response = await fetch('/api/provider-experiencias/all', {
+      // Load provider experiences using the dedicated provider-experiencias API.
+      // Lite: esta vista NO usa las fotos, así el backend omite el procesamiento de fotos (S3) y
+      // manda un payload mucho menor (era ~71KB, el más pesado de la carga inicial).
+      const response = await fetch('/api/provider-experiencias/all?lite=1', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -15323,6 +15597,10 @@ class ItineraryBuilder {
         adultsNoAlcoholQuantityField.value = experience.defaultAdultsNoAlcohol || '';
         adultsNoAlcoholQuantityField.placeholder = '0';
       }
+      // Duración: autollenar del catálogo de la experiencia (editable). Solo NEW; en edición la
+      // restauración pone la guardada.
+      const expDurationField = document.getElementById('experienceDuration');
+      if (expDurationField) expDurationField.value = experience.duration || '';
     } else {
 
     }
@@ -15389,7 +15667,7 @@ class ItineraryBuilder {
     // precio personalizado. Usa los mismos valores de catálogo que autollenan los inputs.
     const setExpListPrice = (id, val) => {
       const el = document.getElementById(id);
-      if (el) el.textContent = (val && Number(val) > 0) ? `Lista: ${this.formatCurrency(val)}` : '';
+      if (el) el.textContent = (val && Number(val) > 0) ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(val)}` : '';
     };
     setExpListPrice('adultPriceListPrice', experience.price);
     setExpListPrice('childPriceListPrice', experience.price_child);
@@ -15924,23 +16202,51 @@ class ItineraryBuilder {
    * @example
    */
   // Duración de ruta efectiva (min) que usan guía/greeter y la hora de salida sugerida.
-  // Prioridad: el campo editable (#routeDurationInput) → la duración del lookup (cache) → la
+  // Prioridad: los campos editables (#routeDurationHours/#routeDurationMinutes) → el lookup (cache) → la
   // guardada en el servicio (al editar). Así un valor capturado a mano manda, y las rutas sin
   // duración configurada se pueden completar a mano para que sí calculen.
   // Convierte minutos (lo que usa el backend/cálculos) a horas para mostrar en el campo.
-  minutesToHoursInput(min) {
+  // Setea los dos campos (horas + minutos) a partir de una duración en MINUTOS. Vacíos si no hay.
+  setRouteDurationFields(min) {
+    const hoursEl = document.getElementById('routeDurationHours');
+    const minsEl = document.getElementById('routeDurationMinutes');
     const m = Number(min);
-    if (!m || Number.isNaN(m) || m <= 0) return '';
-    return String(parseFloat((m / 60).toFixed(2)));
+    if (!m || Number.isNaN(m) || m <= 0) {
+      if (hoursEl) hoursEl.value = '';
+      if (minsEl) minsEl.value = '';
+    } else {
+      if (hoursEl) hoursEl.value = Math.floor(m / 60);
+      if (minsEl) minsEl.value = Math.round(m % 60);
+    }
+    this.updateRouteDurationRoundTripHint();
+  }
+
+  // Muestra (solo en round-trip) el total ida y vuelta = duración del trayecto × 2. El campo
+  // captura UN trayecto (la ida); el ×2 se aplica en los cálculos (guía/greeter/hora sugerida).
+  updateRouteDurationRoundTripHint() {
+    const hintEl = document.getElementById('routeDurationRoundTripHint');
+    if (!hintEl) return;
+    const h = parseInt(document.getElementById('routeDurationHours')?.value || 0, 10) || 0;
+    const mm = parseInt(document.getElementById('routeDurationMinutes')?.value || 0, 10) || 0;
+    const oneLeg = (h * 60) + mm;
+    if (this.isRoundTrip() && oneLeg > 0) {
+      hintEl.textContent = `Ida y vuelta (×2): total ${this.formatMinutesToHoursAndMinutes(oneLeg * 2)}`;
+      hintEl.classList.remove('d-none');
+    } else {
+      hintEl.classList.add('d-none');
+    }
   }
 
   getRouteDurationMinutes() {
-    // El campo se captura/muestra en HORAS; internamente todo (guía/greeter/hora sugerida,
-    // guardado) usa MINUTOS. Aquí convertimos horas→minutos.
-    const fieldEl = document.getElementById('routeDurationInput');
-    if (fieldEl && fieldEl.value !== '') {
-      const hours = parseFloat(fieldEl.value);
-      if (!Number.isNaN(hours) && hours > 0) return Math.round(hours * 60);
+    // Los campos se capturan/muestran en HORAS + MINUTOS; internamente todo (guía/greeter/hora
+    // sugerida, guardado) usa MINUTOS. Aquí sumamos horas*60 + minutos.
+    const hoursEl = document.getElementById('routeDurationHours');
+    const minsEl = document.getElementById('routeDurationMinutes');
+    if ((hoursEl && hoursEl.value !== '') || (minsEl && minsEl.value !== '')) {
+      const h = parseInt(hoursEl?.value || 0, 10) || 0;
+      const mm = parseInt(minsEl?.value || 0, 10) || 0;
+      const total = (h * 60) + mm;
+      if (total > 0) return total;
     }
     let rd = this.transportPriceData?.routeDuration || this.cachedRouteDuration || null;
     if (!rd && this.currentServiceId && this.services.has(this.currentServiceId)) {
@@ -16275,6 +16581,7 @@ class ItineraryBuilder {
       // ya corre en el listener del segmento), conservando el campo editable.
       this.handleTransportRateSelection(rateId);
       this.updateWaitingTimeRateDisplay();
+      this.autofillWaitingPrice();
       return;
     }
 
@@ -16535,6 +16842,7 @@ class ItineraryBuilder {
       this.recalculateTransportPrice();
       this.updateVehicleCapacityNote();
       this.updateWaitingTimeRateDisplay();
+      this.autofillWaitingPrice();
       return;
     }
 
@@ -18253,8 +18561,7 @@ class ItineraryBuilder {
       const minutes = result?.data?.routeDuration;
       if (minutes) {
         this.cachedRouteDuration = minutes;
-        const rdInput = document.getElementById('routeDurationInput');
-        if (rdInput) rdInput.value = this.minutesToHoursInput(minutes);
+        this.setRouteDurationFields(minutes);
         if (typeof this.updateTransferArrivalEstimate === 'function') this.updateTransferArrivalEstimate();
       }
     } catch (e) {
@@ -18429,8 +18736,7 @@ class ItineraryBuilder {
       // la ruta no la trae → se captura a mano). En restauración de edición NO se pisa: el valor
       // guardado se pone en el restore.
       if (!this._populatingTransportForm) {
-        const rdInput = document.getElementById('routeDurationInput');
-        if (rdInput) rdInput.value = this.minutesToHoursInput(result.data.routeDuration);
+        this.setRouteDurationFields(result.data.routeDuration);
       }
 
       qsDevLog('🚗 Route duration received:', {
@@ -18679,7 +18985,9 @@ class ItineraryBuilder {
       const accessToken = this.getAccessToken();
       if (!accessToken) return;
 
-      const response = await fetch('/api/vehicle-rate-prices/all', {
+      // Lite: esta vista solo usa pricePerHour por (vehicleTypeId, rateId) en getWaitingTimePrice,
+      // así el backend omite las consultas a Rate/VehicleType y manda un payload mucho menor.
+      const response = await fetch('/api/vehicle-rate-prices/all?lite=1', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -18703,15 +19011,21 @@ class ItineraryBuilder {
    * @returns {{ pricePerHour: number, currency: string }|null}
    * @example
    */
-  getWaitingTimePrice() {
-    const vehicleTypeId = document.getElementById('vehicleSelect')?.value;
-    const rateId = document.getElementById('transportCategory')?.value;
+  getWaitingTimePriceFor(vehicleTypeId, rateId) {
     if (!vehicleTypeId || !rateId || !this.vehicleRatePricesCache.length) return null;
-
+    // Tolerante: el id puede venir como string (objectId) o como pointer/objeto {objectId|id}.
+    const idOf = (v) => (v && typeof v === 'object' ? (v.objectId || v.id) : v);
     const match = this.vehicleRatePricesCache.find(
-      (p) => p.vehicleTypeId === vehicleTypeId && p.rateId === rateId
+      (p) => idOf(p.vehicleTypeId) === vehicleTypeId && idOf(p.rateId) === rateId
     );
     return match ? { pricePerHour: match.pricePerHour, currency: match.currency || 'MXN' } : null;
+  }
+
+  getWaitingTimePrice() {
+    return this.getWaitingTimePriceFor(
+      document.getElementById('vehicleSelect')?.value,
+      document.getElementById('transportCategory')?.value,
+    );
   }
 
   /**
@@ -18719,16 +19033,32 @@ class ItineraryBuilder {
    * @example
    */
   updateWaitingTimeRateDisplay() {
-    const rateEl = document.getElementById('waitingTimeRate');
-    if (!rateEl) return;
-
     const wtPrice = this.getWaitingTimePrice();
-    if (wtPrice) {
-      const surcharged = this.getDisplayPrice(wtPrice.pricePerHour);
-      rateEl.textContent = `$${surcharged.toFixed(2)} ${wtPrice.currency}/hora`;
-    } else {
-      rateEl.textContent = '';
+    const rateEl = document.getElementById('waitingTimeRate');
+    if (rateEl) {
+      // Tarifa de lista (catálogo, efectivo) por hora — mismo estilo "Lista: $X" del precio.
+      rateEl.textContent = wtPrice ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(wtPrice.pricePerHour)}/hora` : '';
     }
+    // Autollenar la tarifa editable con la de catálogo si está vacía (no pisa ediciones del usuario).
+    const priceInput = document.getElementById('waitingTimePrice');
+    if (priceInput && wtPrice && (priceInput.value === '' || priceInput.value === null)) {
+      priceInput.value = Number(wtPrice.pricePerHour).toFixed(2);
+    }
+  }
+
+  /** Resetea la tarifa editable de espera a la de catálogo (al cambiar vehículo/segmento). */
+  autofillWaitingPrice() {
+    const priceInput = document.getElementById('waitingTimePrice');
+    if (!priceInput) return;
+    const wt = this.getWaitingTimePrice();
+    priceInput.value = wt ? Number(wt.pricePerHour).toFixed(2) : '';
+  }
+
+  /** Tarifa de espera efectiva del principal: la editada si existe, si no la de catálogo. */
+  getEffectiveWaitingHourlyRate() {
+    const edited = parseFloat(document.getElementById('waitingTimePrice')?.value);
+    if (Number.isFinite(edited) && edited > 0) return edited;
+    return this.getWaitingTimePrice()?.pricePerHour || 0;
   }
 
   /**
@@ -19247,7 +19577,7 @@ class ItineraryBuilder {
     const opt = select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
     const listPrice = opt ? (parseFloat(opt.dataset.efectivoPrice || '0') || 0) : 0;
     if (select.value && listPrice > 0) {
-      if (listEl) listEl.textContent = `Lista: ${this.formatCurrency(listPrice)}`;
+      if (listEl) listEl.textContent = `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(listPrice)}`;
       if (forceListPrice || priceInput.value === '' || priceInput.value === null) {
         priceInput.value = listPrice.toFixed(2);
       }
@@ -19309,7 +19639,9 @@ class ItineraryBuilder {
         const clientIndicator = vehicle.isClientPrice ? ' *' : '';
         const vehicleType = vehicle.vehicleType || 'Vehículo desconocido';
 
-        option.textContent = `${vehicleType} - ${pax} pax, ${trunk} carry-on${clientIndicator}`;
+        // En tours se omite el carry-on en el dropdown de vehículos adicionales (solo en tours).
+        const capacityText = this.currentServiceType === 'tour' ? `${pax} pax` : `${pax} pax, ${trunk} carry-on`;
+        option.textContent = `${vehicleType} - ${capacityText}${clientIndicator}`;
         // Cache the list (catalog) efectivo price so the custom-price UI can show it.
         option.dataset.efectivoPrice = String(parseFloat(vehicle.finalPrice ?? vehicle.basePrice ?? 0) || 0);
 
@@ -19983,7 +20315,7 @@ class ItineraryBuilder {
         row.dataset.segmentLabel = saved.segmentLabel || (segmentSel.selectedOptions[0]?.textContent || '');
         priceInput.value = Number(custom).toFixed(2);
         row.querySelector('.adisp-av-list').textContent = catalog > 0
-          ? `Lista: ${this.formatCurrency(catalog)}/h` : '';
+          ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(catalog)}/h` : '';
       }
     }
     // Solo marca modificado cuando lo agrega el usuario; en restauración (saved) no, para no
@@ -20060,7 +20392,7 @@ class ItineraryBuilder {
     }
     const hourly = await this.getADisposicionHourlyPriceCached(vehicleTypeId, rateId);
     row.dataset.hourlyRate = String(hourly); // catálogo (para "Lista" y fallback del efectivo)
-    if (listEl) listEl.textContent = hourly > 0 ? `Lista: ${this.formatCurrency(hourly)}/h` : '';
+    if (listEl) listEl.textContent = hourly > 0 ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(hourly)}/h` : '';
     // Autollenar el precio con el catálogo al elegir/cambiar vehículo.
     if (priceInput) priceInput.value = Number(hourly).toFixed(2);
   }
@@ -20291,10 +20623,7 @@ class ItineraryBuilder {
     const tourTransportCheckbox = document.getElementById('tourTransportCheckboxContainer');
     if (tourTransportCheckbox) tourTransportCheckbox.style.display = 'none';
 
-    // Populate tier cards
-    document.getElementById('walkingRangeSmallLabel').textContent = tour.walkingRangeSmall || '—';
-    document.getElementById('walkingRangeMediumLabel').textContent = tour.walkingRangeMedium || '—';
-    document.getElementById('walkingRangeLargeLabel').textContent = tour.walkingRangeLarge || '—';
+    // (Tarjetas de tramos removidas; los rangos se muestran en los inputs editables por grupo.)
 
     const currency = tour.walkingPriceCurrency || 'MXN';
     document.getElementById('walkingTourCurrency').value = currency;
@@ -20322,7 +20651,12 @@ class ItineraryBuilder {
 
     // CRITICAL FIX: Only prefill from quote data for NEW tours, never during edit
     // Check if we're editing an existing service or if restoration is in progress
-    const isEditMode = this.currentServiceId || this.editMode === 'service';
+    // "Edición" = hay un servicio existente cargado (currentServiceId). NO usar editMode==='service'
+    // aquí: openServiceModal lo pone en 'service' tanto al AGREGAR como al editar, así que incluirlo
+    // hacía isEditMode siempre true → el prefill de personas NUNCA corría para servicios nuevos, y
+    // walkingTourPeopleCount se quedaba en su default (1) → se calculaba el tier del grupo más chico
+    // aunque los campos mostraran las personas correctas. La duración default ya usa solo currentServiceId.
+    const isEditMode = !!this.currentServiceId;
     const isRestoringData = this._restoringWalkingTourData === true;
 
     if (this.quoteData && !isEditMode && !isRestoringData) {
@@ -20397,13 +20731,15 @@ class ItineraryBuilder {
     // (precargados del catálogo). Da consistencia con los otros tipos y elimina el estado
     // pegado del toggle entre servicios. En edición, la restauración rellena los precios
     // guardados sobre estos inputs después.
+    // Los precios por grupo son SIEMPRE visibles y editables (diseño), sin importar el rol:
+    // mostrar la sección y generar los inputs aquí, fuera del gate de canEditPrices.
+    document.getElementById('walkingTourManualPriceContainer')?.classList.remove('d-none');
+    const wtPeople = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10) || 1;
+    this.generateWalkingTourGroupInputs(tour, wtPeople);
     if (this.canEditPrices) {
       const walkingOverride = document.getElementById('tourOverridePrices');
       if (walkingOverride) walkingOverride.checked = true;
       document.getElementById('tourOverridePricesContainer')?.classList.add('d-none');
-      document.getElementById('walkingTourManualPriceContainer')?.classList.remove('d-none');
-      const wtPeople = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10) || 1;
-      this.generateWalkingTourGroupInputs(tour, wtPeople);
     }
 
     // Update the dev breakdown first, then the service breakdown reads from it.
@@ -20438,36 +20774,10 @@ class ItineraryBuilder {
   highlightWalkingTourTier(tour) {
     const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 0, 10);
 
-    const tierCards = {
-      Small: document.getElementById('walkingTierSmall'),
-      Medium: document.getElementById('walkingTierMedium'),
-      Large: document.getElementById('walkingTierLarge'),
-    };
-
-    // Remove all highlights
-    Object.values(tierCards).forEach((card) => {
-      if (card) {
-        card.style.border = '';
-        card.style.backgroundColor = '';
-      }
-    });
+    // Resaltado del tramo activo sobre los inputs editables por grupo.
+    this.applyWalkingTourGroupHighlight(tour);
 
     if (peopleCount <= 0) return;
-
-    const groups = this.calculateWalkingTourGroups(tour, peopleCount);
-
-    // Highlight all used tiers (keep visual feedback)
-    const usedTiers = new Set();
-    groups.forEach((g) => usedTiers.add(g.tier.name));
-    usedTiers.forEach((name) => {
-      const card = tierCards[name];
-      if (card) {
-        card.style.border = '2px solid #0d6efd';
-        card.style.backgroundColor = '#e7f1ff';
-      }
-    });
-
-    qsDevLog('🎯 Walking tour tiers highlighted for', peopleCount, 'people - breakdown will be handled by standard service breakdown');
 
     // Set service price using getWalkingTourPrice (normalizes to MXN)
     const servicePriceField = document.getElementById('servicePrice');
@@ -20476,6 +20786,63 @@ class ItineraryBuilder {
       const mxnPrice = this.getWalkingTourPrice(tour, peopleCount, duration);
       servicePriceField.value = mxnPrice.toFixed(2);
     }
+  }
+
+  /**
+   * Limpia los inputs del walking tour al abrir el modal para un servicio NUEVO.
+   * form.reset() no vacía el container de precios por grupo (se construye con innerHTML),
+   * así que aquí se vacía explícitamente junto con el desglose/total.
+   */
+  clearWalkingTourFields() {
+    const container = document.getElementById('walkingTourGroupPricesContainer');
+    if (container) container.innerHTML = '';
+
+    const peopleCount = document.getElementById('walkingTourPeopleCount');
+    if (peopleCount) peopleCount.value = '1';
+    const currency = document.getElementById('walkingTourCurrency');
+    if (currency) currency.value = 'MXN';
+
+    const breakdown = document.getElementById('walkingTourGroupBreakdown');
+    if (breakdown) breakdown.classList.add('d-none');
+    const breakdownContent = document.getElementById('walkingTourGroupBreakdownContent');
+    if (breakdownContent) breakdownContent.innerHTML = '';
+
+    if (typeof window !== 'undefined') window.walkingGroupTotal = 0;
+  }
+
+  /**
+   * Resalta, sobre los inputs editables por grupo (.walking-group-row), el/los tramo(s)
+   * que aplican según el número de personas. Reemplaza a las tarjetas read-only removidas.
+   * Sin efectos sobre el precio (lo maneja highlightWalkingTourTier).
+   * @param tour
+   */
+  applyWalkingTourGroupHighlight(tour) {
+    const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 0, 10);
+
+    const groupRows = document.querySelectorAll('.walking-group-row');
+    groupRows.forEach((row) => {
+      row.style.border = '';
+      row.style.backgroundColor = '';
+      row.style.borderRadius = '';
+      row.style.padding = '';
+    });
+
+    if (peopleCount <= 0 || !tour) return;
+
+    const groups = this.calculateWalkingTourGroups(tour, peopleCount);
+    const usedTiers = new Set();
+    groups.forEach((g) => usedTiers.add(g.tier.name));
+    usedTiers.forEach((name) => {
+      const row = document.querySelector(`.walking-group-row[data-tier-name="${name}"]`);
+      if (row) {
+        row.style.border = '2px solid #0d6efd';
+        row.style.backgroundColor = '#e7f1ff';
+        row.style.borderRadius = '0.375rem';
+        row.style.padding = '0.5rem';
+      }
+    });
+
+    qsDevLog('🎯 Walking tour group highlighted for', peopleCount, 'people');
   }
 
   /**
@@ -20794,14 +21161,11 @@ class ItineraryBuilder {
           if (walkingPricingSection) walkingPricingSection.classList.remove('d-none');
 
           // Show the override checkbox for walking tours (per-group price editing).
+          // La sección de precios por grupo la muestra/gener handleWalkingTourSelection
+          // SIEMPRE (no se oculta aquí, antes se ocultaba y se re-mostraba después).
           if (this.canEditPrices) {
             const overrideContainer = document.getElementById('tourOverridePricesContainer');
             overrideContainer?.classList.remove('d-none');
-            // Default to unchecked + hidden manual section when selecting a fresh tour.
-            const overrideCheckbox = document.getElementById('tourOverridePrices');
-            if (overrideCheckbox && !overrideCheckbox.checked) {
-              document.getElementById('walkingTourManualPriceContainer')?.classList.add('d-none');
-            }
           }
 
           // Hide transport checkbox for walking tours (they don't require transport)
@@ -22184,6 +22548,7 @@ class ItineraryBuilder {
             attendees: Array.isArray(service.attendees) ? service.attendees : [],
             // Additional flights (airport transport with multiple flights per service)
             additionalFlights: Array.isArray(service.additionalFlights) ? service.additionalFlights : [],
+            returnAdditionalFlights: Array.isArray(service.returnAdditionalFlights) ? service.returnAdditionalFlights : [],
             // Extra additional vehicles beyond the first `additionalVehicleId` (Phase 1 — data only;
             // pricing impact lands in Phase 2 of the multi-vehicle support work).
             extraAdditionalVehicles: Array.isArray(service.extraAdditionalVehicles) ? service.extraAdditionalVehicles : [],
@@ -23579,6 +23944,9 @@ class ItineraryBuilder {
       if (typeof updateWalkingGroupTotalDisplay === 'function') {
         updateWalkingGroupTotalDisplay();
       }
+
+      // Los inputs se reconstruyeron (innerHTML): re-aplicar el resaltado del tramo activo.
+      this.applyWalkingTourGroupHighlight(tour);
     }
   }
 

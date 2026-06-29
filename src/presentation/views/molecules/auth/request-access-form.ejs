@@ -9,17 +9,22 @@
 
 // Default parameters
 const accessCsrfToken = typeof csrfToken !== 'undefined' ? csrfToken : '';
+const accessFormToken = typeof formToken !== 'undefined' ? formToken : '';
 const accessSupportEmail = typeof supportEmail !== 'undefined' ? supportEmail : 'support@amexing.com';
 const accessError = typeof error !== 'undefined' && error ? error : null;
 const accessOAuthAttempted = typeof oauth_attempted !== 'undefined' ? oauth_attempted : null;
 const accessUserEmail = typeof email !== 'undefined' ? email : null;
+// i18n helper with safe fallback
+const tt = typeof t === 'function' ? t : ((key) => key);
+const ra = (key) => tt(`pages:requestAccess.${key}`);
 %>
 
 <div class="request-access-container">
     <!-- Header -->
     <div class="text-center mb-5">
-        <h2 class="fw-bold text-dark mb-3">Solicitud de Acceso - Agencias</h2>
-        <p class="text-muted lead">Únete a la plataforma exclusiva de gestión de transporte ejecutivo</p>
+        <span class="d-block text-uppercase fw-semibold text-muted mb-2" style="letter-spacing: 2px;"><%= ra('eyebrow') %></span>
+        <h2 class="fw-bold text-dark mb-3"><%= ra('title') %></h2>
+        <p class="text-muted lead"><%= ra('subtitle') %></p>
     </div>
 
     <!-- Account Status Messages -->
@@ -52,17 +57,11 @@ const accessUserEmail = typeof email !== 'undefined' ? email : null;
             <div class="card-body p-4">
                 <h5 class="card-title mb-3">
                     <i class="ti ti-info-circle me-2 text-primary"></i>
-                    Sobre Amexing Experience
+                    <%= ra('aboutTitle') %>
                 </h5>
-                <p class="card-text mb-3">
-                    Amexing Experience es una plataforma exclusiva de gestión de servicios de transporte, 
-                    tours y experiencias únicas, diseñada especialmente para agencias de viajes y empresas 
-                    que buscan ofrecer servicios completos y memorables a sus clientes.
-                </p>
-                <p class="card-text text-muted mb-0">
-                    <strong>El acceso requiere aprobación administrativa</strong> para garantizar la calidad 
-                    y exclusividad de nuestros servicios.
-                </p>
+                <p class="card-text mb-3"><%= ra('aboutP1') %></p>
+                <p class="card-text mb-3"><%= ra('aboutP2') %></p>
+                <p class="card-text text-muted mb-0"><%= ra('aboutP3') %></p>
             </div>
         </div>
     </div>
@@ -71,69 +70,160 @@ const accessUserEmail = typeof email !== 'undefined' ? email : null;
     <div class="benefits-section mb-5">
         <h5 class="mb-4">
             <i class="ti ti-star me-2 text-warning"></i>
-            Beneficios para Agencias
+            <%= ra('benefitsTitle') %>
         </h5>
         <div class="row">
             <div class="col-md-6 mb-3">
                 <div class="benefit-item">
                     <i class="ti ti-settings text-primary me-2"></i>
-                    <span>Gestión centralizada de servicios</span>
+                    <span><%= ra('benefit1') %></span>
                 </div>
             </div>
             <div class="col-md-6 mb-3">
                 <div class="benefit-item">
                     <i class="ti ti-discount text-success me-2"></i>
-                    <span>Tarifas preferenciales</span>
-                </div>
-            </div>
-            <div class="col-md-6 mb-3">
-                <div class="benefit-item">
-                    <i class="ti ti-map-pin text-warning me-2"></i>
-                    <span>Tours y experiencias exclusivas</span>
-                </div>
-            </div>
-            <div class="col-md-6 mb-3">
-                <div class="benefit-item">
-                    <i class="ti ti-car text-info me-2"></i>
-                    <span>Transporte de todas las categorías</span>
-                </div>
-            </div>
-            <div class="col-md-6 mb-3">
-                <div class="benefit-item">
-                    <i class="ti ti-chart-bar text-purple me-2"></i>
-                    <span>Reportes detallados</span>
+                    <span><%= ra('benefit2') %></span>
                 </div>
             </div>
             <div class="col-md-6 mb-3">
                 <div class="benefit-item">
                     <i class="ti ti-headset text-danger me-2"></i>
-                    <span>Soporte dedicado</span>
+                    <span><%= ra('benefit4') %></span>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="benefit-item">
+                    <i class="ti ti-chart-bar text-purple me-2"></i>
+                    <span><%= ra('benefit5') %></span>
+                </div>
+            </div>
+            <!-- El beneficio más largo va al final, abarcando las dos columnas -->
+            <div class="col-12 mb-3">
+                <div class="benefit-item">
+                    <i class="ti ti-stars text-warning me-2"></i>
+                    <span><%= ra('benefit3') %></span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Request Access Button -->
-    <div class="text-center mb-5">
-        <button 
-            type="button" 
-            class="btn btn-primary btn-lg px-5 py-3" 
-            id="requestAccessBtn"
-        >
-            <i class="ti ti-mail-forward me-2"></i>
-            Enviar Solicitud de Acceso
-        </button>
-        <p class="text-muted mt-3 small">
-            Se abrirá tu cliente de correo con un formulario predefinido
-        </p>
+    <!-- Request Access Form -->
+    <div class="card border-0 shadow-sm mb-5" id="requestFormCard">
+        <div class="card-body p-4 p-md-5">
+            <!-- Success / error alerts (populated via JS) -->
+            <div id="partnerFormAlert" class="alert d-none" role="alert"></div>
+
+            <form id="partnerRequestForm" class="needs-validation" novalidate>
+                <input type="hidden" name="csrfToken" value="<%= accessCsrfToken %>">
+                <!-- Time-trap: signed timestamp generated when the form was rendered -->
+                <input type="hidden" name="formToken" value="<%= accessFormToken %>">
+                <!-- Honeypot: hidden from humans; if filled, the submission is treated as a bot -->
+                <div class="hp-field" aria-hidden="true">
+                    <label for="company_url">No llenar este campo</label>
+                    <input type="text" id="company_url" name="company_url" tabindex="-1" autocomplete="off">
+                </div>
+
+                <!-- Datos de contacto -->
+                <h5 class="form-section-title mb-4">
+                    <i class="ti ti-user-circle me-2 text-primary"></i><%= ra('contactSectionTitle') %>
+                </h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="firstName" class="form-label fw-semibold"><%= ra('firstName') %> <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-lg" id="firstName" name="firstName" required maxlength="100">
+                        <div class="invalid-feedback"><%= ra('invalidFirstName') %></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="lastName" class="form-label fw-semibold"><%= ra('lastName') %> <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-lg" id="lastName" name="lastName" required maxlength="100">
+                        <div class="invalid-feedback"><%= ra('invalidLastName') %></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="email" class="form-label fw-semibold"><%= ra('email') %> <span class="text-danger">*</span></label>
+                        <input type="email" class="form-control form-control-lg" id="email" name="email" required autocomplete="email" inputmode="email" pattern="[^\s@]+@[^\s@]+\.[^\s@]+" title="<%= ra('emailTitle') %>">
+                        <div class="invalid-feedback"><%= ra('invalidEmail') %></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="phone" class="form-label fw-semibold"><%= ra('phone') %> <span class="text-danger">*</span></label>
+                        <input type="tel" class="form-control form-control-lg" id="phone" name="phone" required autocomplete="tel" inputmode="tel" maxlength="30" title="<%= ra('phoneTitle') %>">
+                        <div class="invalid-feedback"><%= ra('invalidPhone') %></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="preferredLanguage" class="form-label fw-semibold"><%= ra('preferredLanguage') %></label>
+                        <select class="form-select form-select-lg" id="preferredLanguage" name="preferredLanguage">
+                            <option value="es" selected><%= ra('langEs') %></option>
+                            <option value="en"><%= ra('langEn') %></option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Perfil -->
+                <h5 class="form-section-title mt-4 mb-4">
+                    <i class="ti ti-id-badge-2 me-2 text-primary"></i><%= ra('profileTitle') %>
+                </h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="collaboratorType" class="form-label fw-semibold"><%= ra('collaboratorType') %> <span class="text-danger">*</span></label>
+                        <select class="form-select form-select-lg" id="collaboratorType" name="collaboratorType" required>
+                            <option value="" disabled selected><%= ra('selectOption') %></option>
+                            <option value="travel_agent"><%= ra('typeTravelAgent') %></option>
+                            <option value="wedding_planner"><%= ra('typeWeddingPlanner') %></option>
+                            <option value="concierge"><%= ra('typeConcierge') %></option>
+                            <option value="dmc"><%= ra('typeDmc') %></option>
+                            <option value="airbnb_villa_owner"><%= ra('typeAirbnb') %></option>
+                            <option value="company"><%= ra('typeCompany') %></option>
+                            <option value="other"><%= ra('typeOther') %></option>
+                        </select>
+                        <div class="invalid-feedback"><%= ra('invalidType') %></div>
+                    </div>
+                    <div class="col-md-6 mb-3 d-none" id="collaboratorOtherWrapper">
+                        <label for="collaboratorTypeOther" class="form-label fw-semibold"><%= ra('specify') %></label>
+                        <input type="text" class="form-control form-control-lg" id="collaboratorTypeOther" name="collaboratorTypeOther" maxlength="120">
+                        <div class="invalid-feedback"><%= ra('invalidOther') %></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="website" class="form-label fw-semibold"><%= ra('website') %></label>
+                        <input type="text" class="form-control form-control-lg" id="website" name="website" maxlength="200" placeholder="https://...">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="professionalAffiliation" class="form-label fw-semibold">
+                            <%= ra('affiliation') %> <span class="text-muted fw-normal">(<%= ra('optional') %>)</span>
+                        </label>
+                        <input type="text" class="form-control form-control-lg" id="professionalAffiliation" name="professionalAffiliation" maxlength="120">
+                    </div>
+                </div>
+
+                <!-- Información adicional -->
+                <h5 class="form-section-title mt-4 mb-4">
+                    <i class="ti ti-message-2 me-2 text-primary"></i><%= ra('additionalTitle') %>
+                </h5>
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <label for="howDidYouHear" class="form-label fw-semibold"><%= ra('howDidYouHear') %></label>
+                        <input type="text" class="form-control form-control-lg" id="howDidYouHear" name="howDidYouHear" maxlength="200">
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label for="comments" class="form-label fw-semibold"><%= ra('comments') %></label>
+                        <textarea class="form-control" id="comments" name="comments" rows="4" maxlength="2000"></textarea>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div class="text-center mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg px-5 py-3" id="partnerSubmitBtn">
+                        <i class="ti ti-send me-2"></i><%= ra('submit') %>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Back to Login -->
     <div class="text-center mt-5 pt-4 border-top">
         <p class="text-muted mb-0">
-            ¿Ya tienes una cuenta?
+            <%= ra('alreadyAccount') %>
             <a href="/login" class="text-primary text-decoration-none fw-semibold">
-                <i class="ti ti-arrow-left me-1"></i>Volver al Login
+                <i class="ti ti-arrow-left me-1"></i><%= ra('backToLogin') %>
             </a>
         </p>
     </div>
@@ -141,10 +231,10 @@ const accessUserEmail = typeof email !== 'undefined' ? email : null;
     <!-- Contact Information -->
     <div class="text-center mt-4">
         <small class="text-muted">
-            ¿Necesitas ayuda?
-            <a href="mailto:<%= accessSupportEmail %>?subject=Consulta%20sobre%20Solicitud%20de%20Acceso" 
+            <%= ra('needHelp') %>
+            <a href="mailto:<%= accessSupportEmail %>?subject=Consulta%20sobre%20Solicitud%20de%20Acceso"
                class="text-primary text-decoration-none">
-                Contactar Soporte
+                <%= ra('contactSupport') %>
             </a>
         </small>
     </div>
@@ -167,22 +257,29 @@ const accessUserEmail = typeof email !== 'undefined' ? email : null;
     .request-access-container {
         max-width: 1200px;
         margin: 0 auto;
-        padding: 2rem 4rem;
+        padding: 1.5rem 1rem;
     }
 
 
+    /* Aplanado: 'Acerca de' sin caja, como bloque de texto con separador sutil */
+    .about-section {
+        border-top: 1px solid rgba(150, 155, 129, 0.18);
+        padding-top: 1.75rem;
+    }
     .about-section .card {
-        background: rgba(248, 249, 250, 0.5);
-        border-radius: 16px;
-        transition: transform 0.2s ease;
-        border: 1px solid rgba(150, 155, 129, 0.08);
+        background: transparent;
+        border: 0;
+        box-shadow: none !important;
+        border-radius: 0;
         max-width: 100%;
         margin: 0 auto;
     }
-
+    .about-section .card .card-body {
+        padding: 0;
+    }
     .about-section .card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(150, 155, 129, 0.15);
+        transform: none;
+        box-shadow: none;
     }
 
     .benefit-item {
@@ -212,6 +309,27 @@ const accessUserEmail = typeof email !== 'undefined' ? email : null;
     .benefit-item span {
         font-weight: 500;
         color: #495057;
+    }
+
+    /* Aplanado: el formulario sin "card dentro de card"; respira en el panel */
+    #requestFormCard {
+        background: transparent;
+        border: 0;
+        box-shadow: none !important;
+    }
+    #requestFormCard > .card-body {
+        padding: 0;
+    }
+
+    /* Jerarquía: títulos de sección como "eyebrow" con regla inferior */
+    .form-section-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--amx-green-1, #6e7259);
+        padding-bottom: 0.55rem;
+        border-bottom: 2px solid rgba(150, 155, 129, 0.22);
     }
 
     #requestAccessBtn {
@@ -252,22 +370,22 @@ const accessUserEmail = typeof email !== 'undefined' ? email : null;
     /* Responsive adjustments */
     @media (max-width: 1400px) {
         .request-access-container {
-            max-width: 90%;
-            padding: 2rem 3rem;
+            max-width: 100%;
+            padding: 1.5rem 1rem;
         }
     }
 
     @media (max-width: 1200px) {
         .request-access-container {
-            max-width: 85%;
-            padding: 2rem 2.5rem;
+            max-width: 100%;
+            padding: 1.5rem 0.75rem;
         }
     }
 
     @media (max-width: 992px) {
         .request-access-container {
-            max-width: 90%;
-            padding: 2rem 2rem;
+            max-width: 100%;
+            padding: 1.5rem 0.75rem;
         }
     }
 
@@ -333,35 +451,242 @@ const accessUserEmail = typeof email !== 'undefined' ? email : null;
         color: #5f6450 !important;
     }
 
+    /* Honeypot: visually removed, off-screen, never focusable */
+    .hp-field {
+        position: absolute !important;
+        left: -9999px !important;
+        top: -9999px !important;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* Form section titles */
+    .form-section-title {
+        font-weight: 600;
+        color: #2e2e2d;
+        border-bottom: 1px solid rgba(150, 155, 129, 0.2);
+        padding-bottom: 0.5rem;
+    }
+
+    #requestFormCard {
+        border-radius: 16px;
+        background: #ffffff;
+        border: 1px solid rgba(150, 155, 129, 0.1) !important;
+    }
+
+    #partnerSubmitBtn {
+        background: linear-gradient(135deg, #969B81, #7f846a);
+        border: none;
+        border-radius: 50px;
+        box-shadow: 0 8px 20px rgba(150, 155, 129, 0.3);
+        transition: all 0.3s ease;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    #partnerSubmitBtn:hover:not(:disabled) {
+        background: linear-gradient(135deg, #7f846a, #969B81);
+        transform: translateY(-2px);
+        box-shadow: 0 12px 24px rgba(150, 155, 129, 0.4);
+    }
+
+    .request-access-container .form-control:focus,
+    .request-access-container .form-select:focus {
+        border-color: #969B81;
+        box-shadow: 0 0 0 0.2rem rgba(150, 155, 129, 0.2);
+    }
+
     /* Print styles */
     @media print {
         .request-access-container {
             color: black !important;
         }
-        
+
         #requestAccessBtn {
             display: none;
+        }
+    }
+
+    /* En el panel derecho (50% en escritorio) las 2 columnas se ven apretadas.
+       Sin tocar el HTML, forzamos una sola columna para que cada campo use todo
+       el ancho y se vea cómodo. Solo en escritorio dividido (el auth-layout
+       apila los paneles a <=860px, donde el panel ya es ancho). */
+    @media (min-width: 861px) {
+        #partnerRequestForm .row > [class*="col-md-6"] {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+        /* Acota el contenido a un ancho cómodo y centrado: evita que los inputs a
+           una columna se vean estirados a todo el panel. */
+        .request-access-container {
+            max-width: 600px;
         }
     }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🎬 CLIENT: Request access page loaded');
-    
-    // Add visual feedback for better UX
-    const requestBtn = document.getElementById('requestAccessBtn');
-    
-    if (requestBtn) {
-        // Add click event listener
-        requestBtn.addEventListener('click', sendAccessRequest);
-        
-        requestBtn.addEventListener('mouseenter', function() {
-            this.style.transform = 'translateY(-2px) scale(1.02)';
+    // Localized strings injected from i18n
+    const i18n = {
+        sending: <%- JSON.stringify(ra('sending')) %>,
+        success: <%- JSON.stringify(ra('successMessage')) %>,
+        error: <%- JSON.stringify(ra('errorMessage')) %>,
+        connectionError: <%- JSON.stringify(ra('connectionError')) %>
+    };
+
+    const form = document.getElementById('partnerRequestForm');
+    const submitBtn = document.getElementById('partnerSubmitBtn');
+    const alertBox = document.getElementById('partnerFormAlert');
+    const typeSelect = document.getElementById('collaboratorType');
+    const otherWrapper = document.getElementById('collaboratorOtherWrapper');
+    const otherInput = document.getElementById('collaboratorTypeOther');
+
+    // Toggle the "Otro: especificar" field based on collaborator type
+    function toggleOther() {
+        const isOther = typeSelect.value === 'other';
+        otherWrapper.classList.toggle('d-none', !isOther);
+        otherInput.required = isOther;
+        if (!isOther) {
+            otherInput.value = '';
+            otherInput.classList.remove('is-invalid');
+        }
+    }
+    if (typeSelect) {
+        typeSelect.addEventListener('change', toggleOther);
+        toggleOther();
+    }
+
+    // --- Live validation (validate while typing) for email and phone ---
+    const emailInput = document.getElementById('email');
+    const phoneInput = document.getElementById('phone');
+
+    // Phone: require 10 to 15 digits, allowing + ( ) - and spaces
+    function validatePhone() {
+        if (!phoneInput) return;
+        const digits = phoneInput.value.replace(/\D/g, '');
+        const hasInvalidChars = /[^\d\s+().-]/.test(phoneInput.value);
+        if (phoneInput.value.trim() !== '' && (digits.length < 10 || digits.length > 15 || hasInvalidChars)) {
+            phoneInput.setCustomValidity('invalid-phone');
+        } else {
+            phoneInput.setCustomValidity('');
+        }
+    }
+
+    // Reflect validity state with green/red borders as the user types
+    function reflect(field, extraCheck) {
+        if (!field) return;
+        if (typeof extraCheck === 'function') extraCheck();
+        if (field.value.trim() === '') {
+            field.classList.remove('is-valid', 'is-invalid');
+            return;
+        }
+        const valid = field.checkValidity();
+        field.classList.toggle('is-valid', valid);
+        field.classList.toggle('is-invalid', !valid);
+    }
+
+    if (emailInput) {
+        emailInput.addEventListener('input', () => reflect(emailInput));
+        emailInput.addEventListener('blur', () => reflect(emailInput));
+    }
+    // Strip any character that is not a digit, +, space, -, ( or )
+    function sanitizePhone() {
+        if (!phoneInput) return;
+        const cleaned = phoneInput.value.replace(/[^\d\s+().-]/g, '');
+        if (cleaned !== phoneInput.value) {
+            const pos = phoneInput.selectionStart - (phoneInput.value.length - cleaned.length);
+            phoneInput.value = cleaned;
+            // Keep the caret in a sensible position after removing characters
+            try { phoneInput.setSelectionRange(pos, pos); } catch (e) { /* ignore */ }
+        }
+    }
+
+    if (phoneInput) {
+        phoneInput.addEventListener('input', () => {
+            sanitizePhone();
+            reflect(phoneInput, validatePhone);
         });
-        
-        requestBtn.addEventListener('mouseleave', function() {
-            this.style.transform = 'translateY(0) scale(1)';
+        phoneInput.addEventListener('blur', () => reflect(phoneInput, validatePhone));
+    }
+
+    function showAlert(type, message) {
+        alertBox.className = `alert alert-${type}`;
+        alertBox.textContent = message;
+        alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // Full-page loader managed by auth-layout (must be hidden for this AJAX form)
+    const authLoader = document.getElementById('authLoader');
+    function hideAuthLoader() {
+        if (authLoader) {
+            authLoader.classList.remove('show');
+            authLoader.style.opacity = '0';
+            authLoader.style.visibility = 'hidden';
+            authLoader.style.display = 'none';
+        }
+    }
+
+    if (form) {
+        form.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            // Stop the layout's generic submit handler from showing the full-page loader
+            event.stopImmediatePropagation();
+
+            // Re-run custom phone check in case value was pasted
+            validatePhone();
+
+            if (!form.checkValidity()) {
+                form.classList.add('was-validated');
+                reflect(emailInput);
+                reflect(phoneInput, validatePhone);
+                return;
+            }
+
+            const originalContent = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + i18n.sending;
+            alertBox.className = 'alert d-none';
+
+            const formData = new FormData(form);
+            const payload = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch('/api/partner-request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': payload.csrfToken || ''
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                let result = {};
+                try {
+                    result = await response.json();
+                } catch (parseErr) {
+                    result = {};
+                }
+
+                if (response.ok && result.success) {
+                    form.reset();
+                    form.classList.remove('was-validated');
+                    toggleOther();
+                    form.classList.add('d-none');
+                    showAlert('success', i18n.success);
+                } else {
+                    showAlert('danger', result.message || i18n.error);
+                }
+            } catch (err) {
+                showAlert('danger', i18n.connectionError);
+            } finally {
+                // Always restore the button and hide the full-page loader
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalContent;
+                hideAuthLoader();
+            }
         });
     }
 
@@ -369,132 +694,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     const showToast = urlParams.get('toast') === 'true';
     const errorType = urlParams.get('error');
-    
+
     if (showToast && errorType === 'account_deactivated') {
-        // Show the deactivation toast
         const toastElement = document.getElementById('deactivationToast');
         if (toastElement) {
-            const toast = new bootstrap.Toast(toastElement, {
-                autohide: false, // Keep it visible until manually dismissed
-            });
+            const toast = new bootstrap.Toast(toastElement, { autohide: false });
             toast.show();
         }
     }
-    
-    // Optional analytics
-    if (typeof gtag !== 'undefined') {
-        gtag('event', 'page_view', {
-            page_title: 'Agency Access Request',
-            page_location: window.location.href
-        });
-    }
 });
-
-function sendAccessRequest() {
-    console.log('🎬 CLIENT: Sending access request via mailto');
-    
-    const supportEmail = '<%= accessSupportEmail %>';
-    const subject = encodeURIComponent('Solicitud de Acceso - Agencia');
-    
-    const emailBody = encodeURIComponent(`Estimado equipo de Amexing,
-
-Me dirijo a ustedes para solicitar acceso a la plataforma Amexing Experience para mi agencia.
-
-INFORMACIÓN DE LA AGENCIA:
-- Nombre de Agencia: [Escribir nombre de la agencia]
-- Nombre del Solicitante: [Escribir nombre completo]
-- Cargo: [Escribir cargo/posición]
-- Teléfono de Contacto: [Escribir teléfono]
-- Email de Contacto: [Escribir email]
-- Sitio Web: [Escribir URL si tiene]
-
-INFORMACIÓN DEL NEGOCIO:
-- Volumen Estimado Mensual: [Escribir cantidad estimada de servicios]
-- Tipo de Clientes que Maneja: [Describir perfil de clientes]
-- Ciudades donde Opera: [Escribir ciudades principales]
-- Años en el Negocio: [Escribir años de experiencia]
-- Especialidad Principal: [Turismo, Corporativo, Eventos, etc.]
-
-SERVICIOS DE INTERÉS:
-- [ ] Transporte ejecutivo y empresarial
-- [ ] Transporte estándar y económico  
-- [ ] Traslados aeroportuarios
-- [ ] Tours y excursiones guiadas
-- [ ] Experiencias gastronómicas
-- [ ] Experiencias culturales y recreativas
-- [ ] Eventos corporativos y sociales
-- [ ] Servicios para grupos grandes
-- [ ] Otros: [Especificar]
-
-EXPERIENCIAS Y TOURS ESPECÍFICOS:
-- [ ] City tours urbanos
-- [ ] Tours gastronómicos
-- [ ] Experiencias nocturnas
-- [ ] Tours culturales e históricos
-- [ ] Aventura y naturaleza
-- [ ] Experiencias personalizadas
-
-COMENTARIOS ADICIONALES:
-[Escribir cualquier información adicional que considere relevante sobre los servicios que busca para sus clientes]
-
-Agradezco de antemano su atención y quedo en espera de su respuesta.
-
-Saludos cordiales`);
-    
-    const mailtoLink = `mailto:${supportEmail}?subject=${subject}&body=${emailBody}`;
-    
-    // Track the action
-    if (typeof gtag !== 'undefined') {
-        gtag('event', 'agency_access_request', {
-            method: 'mailto',
-            support_email: supportEmail
-        });
-    }
-    
-    // Open mailto link
-    window.location.href = mailtoLink;
-    
-    // Show confirmation message
-    showConfirmationMessage();
-}
-
-function showConfirmationMessage() {
-    const btn = document.getElementById('requestAccessBtn');
-    const originalContent = btn.innerHTML;
-    
-    btn.innerHTML = `
-        <i class="ti ti-check me-2"></i>
-        Solicitud Enviada
-    `;
-    btn.classList.add('btn-success');
-    btn.classList.remove('btn-primary');
-    btn.disabled = true;
-    
-    // Reset button after 3 seconds
-    setTimeout(() => {
-        btn.innerHTML = originalContent;
-        btn.classList.remove('btn-success');
-        btn.classList.add('btn-primary');
-        btn.disabled = false;
-    }, 3000);
-    
-    // Show additional message
-    const container = document.querySelector('.request-access-container');
-    const successMessage = document.createElement('div');
-    successMessage.className = 'alert alert-success mt-3';
-    successMessage.innerHTML = `
-        <i class="ti ti-circle-check me-2"></i>
-        <strong>¡Perfecto!</strong> Tu cliente de correo debería haberse abierto con el formulario predefinido. 
-        Complete la información y envíe el email para procesar su solicitud.
-    `;
-    
-    btn.parentNode.appendChild(successMessage);
-    
-    // Remove message after 5 seconds
-    setTimeout(() => {
-        if (successMessage.parentNode) {
-            successMessage.remove();
-        }
-    }, 5000);
-}
 </script>

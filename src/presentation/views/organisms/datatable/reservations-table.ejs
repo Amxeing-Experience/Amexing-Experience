@@ -29,6 +29,24 @@ const canManageReservations = !!(locals && locals.canManageReservations);
         backdrop-filter: blur(1px);
         border-radius: 0.5rem;
     }
+    /* Contador del pill "Pendientes de completar": badge salvia en la esquina sup. der. */
+    .pending-completion-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        min-width: 22px;
+        height: 22px;
+        padding: 0 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--brand-primary);
+        color: #fff;
+        font-size: 0.72rem;
+        font-weight: 700;
+        border-radius: 11px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
 </style>
 
 <!-- Page Content -->
@@ -53,6 +71,12 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                         <div class="row align-items-center">
                             <div class="col-md-auto mb-2 mb-md-0">
                                 <div class="btn-group" role="group" aria-label="Filtro por fecha de reservaciones">
+                                    <input type="radio" class="btn-check" name="dateFilter" id="filterPendingCompletion" value="pending_completion">
+                                    <label class="btn btn-outline-primary position-relative" for="filterPendingCompletion">
+                                        <i class="ti ti-alert-triangle me-1"></i>PENDIENTES DE COMPLETAR
+                                        <span id="pendingCompletionCounter" class="pending-completion-badge d-none">0</span>
+                                    </label>
+
                                     <input type="radio" class="btn-check" name="dateFilter" id="filterUpcoming" value="upcoming" checked>
                                     <label class="btn btn-outline-primary" for="filterUpcoming">
                                         <i class="ti ti-calendar-forward me-1"></i>PRÓXIMAS
@@ -122,7 +146,7 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                                        data-bs-trigger="hover focus"
                                        data-bs-placement="bottom"
                                        data-bs-title="¿Cómo funcionan los filtros?"
-                                       data-bs-content="Una reservación aparece según el rango de fechas de sus servicios (inicio y fin):<br><br><strong>Próximas:</strong> aún no inicia.<br><strong>En curso:</strong> ya inició y no ha terminado.<br><strong>Pasadas:</strong> ya terminó.<br><br>El Año/Mes/Día acota a ese periodo: se muestra si la reservación tiene un servicio en la fecha seleccionada."></i>
+                                       data-bs-content="<strong>Pendientes de completar:</strong> reservaciones con la cotización bloqueada (faltan datos). No usan fecha.<br><br>Los demás filtros usan el rango de fechas de los servicios (inicio y fin):<br><strong>Próximas:</strong> aún no inicia.<br><strong>En curso:</strong> ya inició y no ha terminado.<br><strong>Pasadas:</strong> ya terminó.<br><br>El Año/Mes/Día acota a ese periodo: se muestra si la reservación tiene un servicio en la fecha seleccionada."></i>
                                 </div>
                             </div>
                         </div>
@@ -240,6 +264,24 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
         return `<span class="badge ${s.cls}" title="Estado operacional de reservación">${s.label}</span>`;
+    }
+
+    // Estado UNIFICADO de alto nivel para el agente (DM/client): un solo badge que
+    // progresa Bloqueado → Agendado → Confirmado (assigned/confirmed/in_progress/
+    // completed), + Cancelada. La progresión temporal (En curso / Pasada) la indica
+    // el filtro de fechas, no el badge. Sin la granularidad operativa interna.
+    function getAgentUnifiedStatusBadge(quoteStatus, resStatus) {
+        let s;
+        if (quoteStatus === 'hold') {
+            s = { label: 'Bloqueado', cls: 'bg-warning text-dark' };
+        } else if (resStatus === 'cancelled') {
+            s = { label: 'Cancelada', cls: 'bg-danger text-white' };
+        } else if (['assigned', 'confirmed', 'in_progress', 'completed'].includes(resStatus)) {
+            s = { label: 'Confirmado', cls: 'bg-primary text-white' };
+        } else {
+            s = { label: 'Agendado', cls: 'bg-info text-white' };
+        }
+        return `<span class="badge ${s.cls}" title="Estado de la reservación">${s.label}</span>`;
     }
 
     function formatDate(dateStr) {
@@ -420,6 +462,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 className: 'text-center',
                 responsivePriority: 1,  // High priority - always show
                 render: function(data, type, row) {
+                    const isAdminView = <%= (typeof basePath !== 'undefined' && basePath === 'admin') ? 'true' : 'false' %>;
+                    // Agentes (DM/client): un solo badge de alto nivel (Bloqueado →
+                    // Agendado → Confirmado), sin el detalle operativo.
+                    if (!isAdminView) {
+                        return getAgentUnifiedStatusBadge(row.quoteStatus, row.status);
+                    }
+                    // Admin: estado de cotización + estado operativo de la reserva.
                     const quoteBadge = getQuoteStatusBadge(row.quoteStatus);
                     const reservationBadge = getReservationStatusBadge(row.status);
                     return `${quoteBadge} ${reservationBadge}`;
@@ -472,7 +521,10 @@ document.addEventListener('DOMContentLoaded', function() {
             emptyTable: 'No hay reservaciones registradas',
             paginate: { first: 'Primera', previous: 'Anterior', next: 'Siguiente', last: 'Última' },
         },
-        responsive: true,
+        // Responsive collapse deshabilitado: confundía al usuario al ocultar
+        // columnas (p.ej. Fecha Inicio). La tabla usa scroll horizontal
+        // (wrapper .table-responsive) cuando no caben todas las columnas.
+        responsive: false,
         pageLength: 10,
     });
 
@@ -482,8 +534,14 @@ document.addEventListener('DOMContentLoaded', function() {
         .on('preXhr.dt', function() {
             if (loadingOverlay) loadingOverlay.classList.remove('d-none');
         })
-        .on('xhr.dt', function() {
+        .on('xhr.dt', function(e, settings, json) {
             if (loadingOverlay) loadingOverlay.classList.add('d-none');
+            // Actualiza el badge del pill "Pendientes de completar" con el conteo del backend.
+            const counter = document.getElementById('pendingCompletionCounter');
+            if (counter && json && typeof json.pendingCompletionCount === 'number') {
+                counter.textContent = json.pendingCompletionCount;
+                counter.classList.toggle('d-none', json.pendingCompletionCount === 0);
+            }
         });
 
     // Calcula el periodo [inicio, fin) elegido en los selectores Año/Mes/Día,
@@ -513,6 +571,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // El cambio del radio es programático: NO dispara 'change', así que no provoca
     // una recarga doble — quien llama recarga la tabla una sola vez después.
     function autoAdjustStatusFromDate() {
+        // En "Pendientes de completar" (filtro por estado, no por fecha) los selectores
+        // de fecha no aplican: no cambiamos el pill.
+        const activePill = document.querySelector('input[name="dateFilter"]:checked');
+        if (activePill && activePill.value === 'pending_completion') return false;
         const period = getSelectedPeriod();
         if (!period) return;
         const today = new Date(); today.setHours(0, 0, 0, 0);
