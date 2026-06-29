@@ -1484,19 +1484,13 @@ class ExperienceServicesBuilder {
     const adultPriceEl = document.getElementById('adultPrice');
     if (adultPriceEl && adultPrice) adultPriceEl.value = adultPrice;
 
-    // Default: si la experiencia no trae precio de niño o de "sin alcohol",
-    // se usa el de adulto.
+    // El campo se deja vacío si la experiencia no trae el precio; el default a
+    // adulto se aplica solo en el cálculo/guardado (no se rellena en pantalla).
     const childPriceEl = document.getElementById('childPrice');
-    if (childPriceEl) {
-      const child = isProvider ? exp.price_child : exp.childPrice;
-      childPriceEl.value = child || adultPrice || '';
-    }
+    if (childPriceEl) childPriceEl.value = isProvider ? (exp.price_child || '') : (exp.childPrice || '');
 
     const noAlcPriceEl = document.getElementById('noAlcoholPrice');
-    if (noAlcPriceEl) {
-      const noAlc = isProvider ? exp.price_no_alcohol : exp.noAlcoholPrice;
-      noAlcPriceEl.value = noAlc || adultPrice || '';
-    }
+    if (noAlcPriceEl) noAlcPriceEl.value = isProvider ? (exp.price_no_alcohol || '') : (exp.noAlcoholPrice || '');
 
     // Store experience data for later use
     this.selectedExperienceData = exp;
