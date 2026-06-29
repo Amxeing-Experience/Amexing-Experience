@@ -611,4 +611,8 @@
 <!-- Registro de opciones data-driven (costura #2): debe cargar ANTES del builder -->
 <script src="/dashboards/admin/sections/quote-services/option-registry.js"></script>
 <script src="/dashboards/admin/sections/quote-services-v2.js"></script>
+<!-- Helpers de formato/tiempo (prototype de ItineraryBuilder); debe cargar DESPUÉS de quote-services-v2.js -->
+<script src="/dashboards/admin/sections/quote-services-v2-formatters.js"></script>
+<!-- Funciones a nivel módulo extraídas del builder; debe cargar DESPUÉS de quote-services-v2.js -->
+<script src="/dashboards/admin/sections/quote-services-v2-module.js"></script>
 <script src="/dashboards/admin/sections/quote-services/quote-catalog-drag.js"></script>

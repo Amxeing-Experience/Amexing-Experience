@@ -115,3 +115,7 @@ reports/
 backups/
 docs/backlog/README.md
 docs/backlog/_plantilla.md
+
+# Playwright E2E output
+test-results/
+playwright-report/
