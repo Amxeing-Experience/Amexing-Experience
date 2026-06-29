@@ -38,6 +38,11 @@ class ExperienceServicesBuilder {
     this.vehicleRatePricesCache = [];
     this.agencyRateCache = null;
     this.driverTourRateCache = null;
+    // Tarifas de guía (transporte) y greeter, para sumarlos al Total.
+    this.guideTransportRateCache = null;
+    this.guideFormulaConfigCache = null;
+    this.greeterRateCache = null;
+    this.greeterRateCacheTime = null;
 
     // Pricing rates for Pago/Moneda
     this.transferRate = 3.0;
@@ -106,6 +111,9 @@ class ExperienceServicesBuilder {
         this.loadProviderExperiences(),
         this.loadAgencyRate(),
         this.loadDriverTourRate(),
+        this.loadGuideTransportRate(),
+        this.loadGuideFormulaConfiguration(),
+        this.loadGreeterRateConfiguration(),
         this.loadPricingRates(),
         this.loadTransportServices(),
         this.loadVehicleRatePrices(),
@@ -277,11 +285,13 @@ class ExperienceServicesBuilder {
     // Guide checkbox
     document.getElementById('includeGuide')?.addEventListener('change', (e) => {
       this.handleIncludeGuideChange(e.target.checked);
+      this.updateServiceTotal();
     });
 
     // Greeter checkbox
     document.getElementById('includeGreeter')?.addEventListener('change', (e) => {
       this.handleIncludeGreeterChange(e.target.checked);
+      this.updateServiceTotal();
     });
 
     // Waiting time input
@@ -684,6 +694,125 @@ class ExperienceServicesBuilder {
     } catch (error) {
       console.error('Error loading driver tour rate:', error);
     }
+  }
+
+  async loadGuideTransportRate() {
+    try {
+      const token = this.getAccessToken();
+      if (!token) return;
+      const response = await fetch('/api/guide-transport-rate/current', {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) this.guideTransportRateCache = result.data;
+      }
+    } catch (error) {
+      console.error('Error loading guide transport rate:', error);
+    }
+  }
+
+  async loadGuideFormulaConfiguration() {
+    try {
+      const token = this.getAccessToken();
+      const response = await fetch('/api/guide-transport-rate/formula', {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.config) this.guideFormulaConfigCache = result.config;
+      } else {
+        this.guideFormulaConfigCache = { roundTripMultiplier: 2, minimumCharge: 0 };
+      }
+    } catch (error) {
+      this.guideFormulaConfigCache = { roundTripMultiplier: 2, minimumCharge: 0 };
+    }
+  }
+
+  async loadGreeterRateConfiguration() {
+    try {
+      const token = this.getAccessToken();
+      const response = await fetch('/api/greeter-rate/formula', {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          this.greeterRateCache = {
+            basePrice: result.data.basePrice || 760,
+            hourlyRate: result.data.hourlyRate || 640,
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Error loading greeter rate:', error);
+    }
+  }
+
+  // Costo del guía de transporte = fórmula (guideTransportRate + config). Igual que cotización.
+  calculateGuideTransportCost(durationMinutes) {
+    const guideRate = this.guideTransportRateCache?.value || 400;
+    let componentsCost = null;
+    let roundTripMultiplier = null;
+    let minimumCharge = 0;
+
+    if (typeof GuideFormulaEvaluator !== 'undefined' && GuideFormulaEvaluator.formulaConfig) {
+      const config = GuideFormulaEvaluator.formulaConfig;
+      minimumCharge = config.minimumCharge || 0;
+      if (config.formulaComponents && config.formulaComponents.length > 0) {
+        componentsCost = GuideFormulaEvaluator.evaluateComponents(config.formulaComponents, durationMinutes, guideRate);
+      } else if (config.roundTripMultiplier) {
+        roundTripMultiplier = config.roundTripMultiplier;
+      }
+    }
+    if (componentsCost === null && roundTripMultiplier === null) {
+      const formulaConfig = this.guideFormulaConfigCache || { roundTripMultiplier: 2, minimumCharge: 0 };
+      roundTripMultiplier = formulaConfig.roundTripMultiplier;
+      minimumCharge = formulaConfig.minimumCharge || 0;
+    }
+
+    const params = { durationMinutes, guideRate, roundTripMultiplier, minimumCharge, componentsCost };
+    if (window.PricingEngine) return window.PricingEngine.calculateGuideTransportCost(params);
+
+    const durationHours = durationMinutes / 60;
+    if (!durationHours || durationHours <= 0) return 0;
+    if (componentsCost !== null) return Math.max(componentsCost, minimumCharge);
+    return Math.max(durationHours * (roundTripMultiplier || 0) * guideRate, minimumCharge);
+  }
+
+  // Costo del greeter = 760 + 640 × horas (o el motor único si está cargado).
+  calculateGreeterPrice(durationMinutes) {
+    const basePrice = this.greeterRateCache?.basePrice || 760;
+    const hourlyRate = this.greeterRateCache?.hourlyRate || 640;
+    if (window.PricingEngine) {
+      return window.PricingEngine.calculateGreeterPrice({ durationMinutes, basePrice, hourlyRate });
+    }
+    const durationHours = durationMinutes / 60;
+    if (!durationHours || durationHours <= 0) return basePrice;
+    return basePrice + (hourlyRate * durationHours);
+  }
+
+  // { guide, greeter } según tipo + checkboxes, para sumarlos al Total.
+  // Tour: guía = ChoferTour × horas. Transporte: guía = fórmula(duración ruta),
+  // greeter = 760 + 640 × horas(duración ruta).
+  getGuideGreeterCost() {
+    const type = this.currentServiceType;
+    const includeGuide = document.getElementById('includeGuide')?.checked || false;
+    const includeGreeter = document.getElementById('includeGreeter')?.checked || false;
+    let guide = 0;
+    let greeter = 0;
+
+    if (type === 'tour') {
+      if (includeGuide) {
+        const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 0;
+        guide = (this.driverTourRateCache?.value || 0) * hours;
+      }
+    } else if (type === 'transport') {
+      const durationMinutes = this.cachedRouteDuration || 0;
+      if (includeGuide) guide = this.calculateGuideTransportCost(durationMinutes);
+      if (includeGreeter) greeter = this.calculateGreeterPrice(durationMinutes);
+    }
+    return { guide, greeter };
   }
 
   async loadPricingRates() {
@@ -2489,6 +2618,14 @@ class ExperienceServicesBuilder {
       if (qty > 1) detail = ` ($${base.toFixed(2)} × ${qty})`;
     }
 
+    // Sumar guía/greeter (según tipo + checkboxes).
+    const { guide, greeter } = this.getGuideGreeterCost();
+    total += guide + greeter;
+    const extras = [];
+    if (guide > 0) extras.push(`guía $${guide.toFixed(2)}`);
+    if (greeter > 0) extras.push(`greeter $${greeter.toFixed(2)}`);
+    if (extras.length) detail += ` + ${extras.join(' + ')}`;
+
     totalEl.textContent = `$${total.toFixed(2)} ${currency}${detail}`;
   }
 
@@ -2998,9 +3135,11 @@ class ExperienceServicesBuilder {
               const vehicleSelect = document.getElementById('vehicleSelect');
               if (vehicleSelect) vehicleSelect.value = service.vehicleId;
             }
-            // 7. Set price (override any auto-filled price with saved value)
+            // 7. Restaurar el precio BASE (unitPrice); el Total se recompone aparte.
+            const addVehEl = document.getElementById('additionalVehicle');
+            if (addVehEl) addVehEl.checked = service.additionalVehicle || false;
             const priceEl = document.getElementById('servicePrice');
-            if (priceEl) priceEl.value = service.price || 0;
+            if (priceEl) priceEl.value = service.unitPrice != null ? service.unitPrice : (service.price || 0);
 
             this.updateWaitingTimeRateDisplay();
             this.updateServiceTotal();
@@ -3225,10 +3364,12 @@ class ExperienceServicesBuilder {
     const vehicleId = document.getElementById('vehicleSelect')?.value || null;
     const vehicleType = vehicleId ? this.vehicleTypesMap.get(vehicleId) : null;
 
-    // El precio del tour-con-vehículo = base (precio por hora de tour-prices) × horas.
+    // El precio del tour-con-vehículo = base (precio por hora de tour-prices) × horas
+    // + guía (Chofer Tour × horas) si aplica.
     const base = parseFloat(document.getElementById('servicePrice')?.value) || 0;
     const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
-    const total = base * hours;
+    const { guide: guideCost } = this.getGuideGreeterCost();
+    const total = (base * hours) + guideCost;
 
     return {
       tourId,
@@ -3236,6 +3377,7 @@ class ExperienceServicesBuilder {
       price: total,
       unitPrice: base,
       hours,
+      guideCost,
       quantity: 1,
       adultsQuantity: adultsQty,
       childrenQuantity: childrenQty,
@@ -3258,9 +3400,14 @@ class ExperienceServicesBuilder {
   }
 
   buildTransportService() {
-    const price = parseFloat(document.getElementById('servicePrice')?.value) || 0;
+    // Precio = base por ruta × vehículos + guía (fórmula) + greeter. quantity = 1
+    // porque el total ya viene completo (el detalle por vehículo queda en unitPrice).
+    const base = parseFloat(document.getElementById('servicePrice')?.value) || 0;
     const additionalVehicle = document.getElementById('additionalVehicle')?.checked || false;
-    const quantity = additionalVehicle ? 2 : 1;
+    const vehicleQty = additionalVehicle ? 2 : 1;
+    const { guide: guideCost, greeter: greeterCost } = this.getGuideGreeterCost();
+    const price = (base * vehicleQty) + guideCost + greeterCost;
+    const quantity = 1;
     const rateId = document.getElementById('transportCategory')?.value || null;
     const vehicleId = document.getElementById('vehicleSelect')?.value || null;
     const vehicleType = vehicleId ? this.vehicleTypesMap.get(vehicleId) : null;
@@ -3298,7 +3445,11 @@ class ExperienceServicesBuilder {
     return {
       concept: 'Transporte',
       price,
+      unitPrice: base,
       quantity,
+      additionalVehicle,
+      guideCost,
+      greeterCost,
       rateId,
       rateName,
       vehicleId,
