@@ -2599,13 +2599,14 @@ class ExperienceServicesBuilder {
       this.vehiclesCache.forEach((v) => {
         const option = document.createElement('option');
         option.value = v.id;
-        option.textContent = `${v.name} (${v.capacity} pax)`;
+        option.textContent = `${v.name} (${v.defaultCapacity ?? v.capacity} pax)`;
         select.appendChild(option);
       });
     } else {
       // Capacidad (pax) por tipo de vehículo, desde vehiclesCache.
+      // El campo real es defaultCapacity (no capacity).
       const capacityById = new Map();
-      (this.vehiclesCache || []).forEach((v) => capacityById.set(v.id, v.capacity));
+      (this.vehiclesCache || []).forEach((v) => capacityById.set(v.id, v.defaultCapacity ?? v.capacity));
       filtered.forEach((p) => {
         const option = document.createElement('option');
         option.value = p.vehicleTypeId;
