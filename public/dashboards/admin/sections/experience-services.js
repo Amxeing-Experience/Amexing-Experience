@@ -236,6 +236,15 @@ class ExperienceServicesBuilder {
       this.handleVehicleSelection(e.target.value);
     });
 
+    // Tour con vehículo: recalcular el precio (pricePerHour × horas) al cambiar las horas.
+    document.getElementById('hoursQuantity')?.addEventListener('input', () => {
+      const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+      const vehicleId = document.getElementById('vehicleSelect')?.value;
+      if (serviceType === 'tour' && vehicleId) {
+        this.handleVehicleSelection(vehicleId);
+      }
+    });
+
     // Guide checkbox
     document.getElementById('includeGuide')?.addEventListener('change', (e) => {
       this.handleIncludeGuideChange(e.target.checked);
