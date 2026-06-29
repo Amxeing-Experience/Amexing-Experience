@@ -2141,6 +2141,11 @@ class ExperienceServicesBuilder {
     if (transportFieldsRow) {
       transportFieldsRow.classList.toggle('d-none', !checked);
     }
+    // Un tour CON vehículo cobra por el vehículo -> muestra el campo de Precio.
+    const standardPricingSection = document.getElementById('standardPricingSection');
+    if (standardPricingSection) {
+      standardPricingSection.classList.toggle('d-none', !checked);
+    }
   }
 
   async handleRateSelection(rateId) {
@@ -2332,6 +2337,16 @@ class ExperienceServicesBuilder {
         const vehicle = this.transportPriceData.vehicles.find((v) => v.vehicleTypeId === vehicleId);
         if (vehicle && priceEl) {
           priceEl.value = vehicle.finalPrice || '0.00';
+        }
+      } else if (priceEl && !isPopulating) {
+        // Tour con vehículo: precio = tarifa por hora (segmento × vehículo) × horas.
+        const rateId = document.getElementById('transportCategory')?.value;
+        const match = (this.vehicleRatePricesCache || []).find(
+          (p) => p.rateId === rateId && p.vehicleTypeId === vehicleId,
+        );
+        const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 0;
+        if (match && match.pricePerHour != null && hours > 0) {
+          priceEl.value = (Number(match.pricePerHour) * hours).toFixed(2);
         }
       }
     }
@@ -2548,10 +2563,15 @@ class ExperienceServicesBuilder {
         select.appendChild(option);
       });
     } else {
+      // Capacidad (pax) por tipo de vehículo, desde vehiclesCache.
+      const capacityById = new Map();
+      (this.vehiclesCache || []).forEach((v) => capacityById.set(v.id, v.capacity));
       filtered.forEach((p) => {
         const option = document.createElement('option');
         option.value = p.vehicleTypeId;
-        option.textContent = `${p.vehicleTypeName || p.vehicleTypeCode || p.vehicleTypeId}`;
+        const name = p.vehicleTypeName || p.vehicleTypeCode || p.vehicleTypeId;
+        const pax = capacityById.get(p.vehicleTypeId);
+        option.textContent = pax != null ? `${name} - ${pax} pax` : name;
         select.appendChild(option);
       });
     }
