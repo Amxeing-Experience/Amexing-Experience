@@ -1887,6 +1887,16 @@ class ExperienceServicesBuilder {
     // Un tour CON vehículo necesita segmento + vehículo; uno a pie no.
     // Revela/oculta esos campos automáticamente al elegir el tour.
     this.handleTourTransportToggle(!tour.isWalkingTour);
+
+    // Autocargar la duración del tour en "Horas" (tour.time está en minutos).
+    // Ej: Mineral de Pozos = 180 min -> 3 horas.
+    const hoursInput = document.getElementById('hoursQuantity');
+    if (hoursInput && tour.time) {
+      const hrs = parseInt(tour.time, 10) / 60;
+      if (!isNaN(hrs) && hrs > 0) {
+        hoursInput.value = +hrs.toFixed(1);
+      }
+    }
   }
 
   buildTourDetailsCard(tour) {
