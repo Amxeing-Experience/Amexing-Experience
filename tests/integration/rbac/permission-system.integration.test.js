@@ -81,18 +81,21 @@ describe('RBAC Permission System Integration', () => {
     });
 
     describe('Admin Access', () => {
-      it('should allow admin to access user management', async () => {
+      it('should deny admin from listing all users (superadmin-only)', async () => {
         if (!adminToken) {
           console.warn('Admin token not available, skipping test');
           return;
         }
 
+        // Listar TODOS los usuarios (GET /api/users) es función exclusiva de
+        // superadmin: la página vive en /dashboard/superadmin/users
+        // (requireRole('superadmin')). Admin tiene users.read/create/update pero
+        // no el permiso de listar -> 403.
         const response = await request(app)
           .get('/api/users')
           .set('Authorization', `Bearer ${adminToken}`);
 
-        // Should succeed or return valid error (not 401/403)
-        expect([200, 404, 500]).toContain(response.status);
+        expect(response.status).toBe(403);
       });
 
       it('should prevent admin from accessing superadmin-only endpoints', async () => {
@@ -203,7 +206,7 @@ describe('RBAC Permission System Integration', () => {
 
   describe('Permission-Based Access Control', () => {
     describe('User Permissions', () => {
-      it('should validate user.list permission for viewing users', async () => {
+      it('should deny admin the user-list permission (superadmin-only)', async () => {
         if (!adminToken) {
           console.warn('Admin token not available, skipping test');
           return;
@@ -213,8 +216,8 @@ describe('RBAC Permission System Integration', () => {
           .get('/api/users')
           .set('Authorization', `Bearer ${adminToken}`);
 
-        // Admin should have access
-        expect([200, 404, 500]).toContain(response.status);
+        // Listar todos los usuarios es solo de superadmin -> admin recibe 403.
+        expect(response.status).toBe(403);
       });
 
       it('should validate user.create permission for creating users', async () => {
