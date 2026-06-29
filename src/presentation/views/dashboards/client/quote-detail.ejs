@@ -323,15 +323,15 @@ window.currentUser = {
 
 .stepper-item:hover:not(.disabled) {
     background-color: #f8f9fa;
-    color: #f76b1c;
+    color: var(--brand-primary-active);
     text-decoration: none;
 }
 
 .stepper-item.active {
-    background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%);
+    background: var(--brand-gradient);
     color: white;
     font-weight: 600;
-    box-shadow: 0 2px 8px rgba(247, 107, 28, 0.3);
+    box-shadow: 0 2px 8px rgba(var(--brand-primary-rgb), 0.35);
 }
 
 .stepper-item.active .stepper-number {
@@ -340,11 +340,11 @@ window.currentUser = {
 }
 
 .stepper-item.completed {
-    color: #198754;
+    color: var(--brand-success);
 }
 
 .stepper-item.completed .stepper-number {
-    background: #198754;
+    background: var(--brand-success);
     color: white;
 }
 
@@ -386,7 +386,7 @@ window.currentUser = {
 }
 
 .stepper-connector.completed {
-    background: #198754;
+    background: var(--brand-success);
 }
 
 /* Compact status layout for client */
