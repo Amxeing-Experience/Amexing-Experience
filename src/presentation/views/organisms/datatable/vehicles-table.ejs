@@ -41,18 +41,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         </div>
     </div>
 
-    <!-- Filtros -->
+    <!-- Filtro por tarifa (pills) -->
     <div class="card-body border-bottom bg-light">
-        <div class="row g-3">
-            <div class="col-md-3">
-                <label for="filterRate" class="form-label fw-semibold">
-                    Filtrar por Tarifa
-                </label>
-                <select class="form-select" id="filterRate">
-                    <option value="">Todas las tarifas</option>
-                    <!-- Options loaded dynamically -->
-                </select>
-            </div>
+        <label class="form-label fw-semibold d-block mb-2">Filtrar por Tarifa</label>
+        <div class="d-flex flex-wrap gap-2" id="rateFilterPills" role="group" aria-label="Filtro por tarifa">
+            <input type="radio" class="btn-check" name="rateFilter" id="rateFilterAll" value="" checked>
+            <label class="btn btn-sm btn-outline-primary" for="rateFilterAll">Todas</label>
+            <!-- Pills de tarifas cargadas dinámicamente -->
         </div>
     </div>
 
@@ -343,8 +338,8 @@ table.dataTable thead .sorting_desc_disabled {
                 url: apiEndpoint,
                 type: 'GET',
                 data: function(d) {
-                    // Add rate filter parameter
-                    d.rateId = $('#filterRate').val();
+                    // Add rate filter parameter (pill activo)
+                    d.rateId = $('input[name="rateFilter"]:checked').val() || '';
                     return d;
                 },
                 dataSrc: function(json) {
@@ -625,21 +620,25 @@ table.dataTable thead .sorting_desc_disabled {
             }
         });
 
-        // Load rates for filter dropdown
+        // Load rates as filter pills (tabs)
         function loadRatesFilter() {
             $.ajax({
                 url: '/api/rates/active',
                 type: 'GET',
                 success: function(response) {
                     if (response.success && response.data) {
-                        const select = $('#filterRate');
-                        select.find('option:not(:first)').remove();
+                        const container = $('#rateFilterPills');
+                        // Quita pills previas (todas menos "Todas")
+                        container.find('.rate-filter-pill').remove();
                         response.data.forEach(function(rate) {
-                            const option = $('<option></option>')
-                                .attr('value', rate.value)
-                                .text(rate.label)
-                                .attr('data-color', rate.color || '#6366F1');
-                            select.append(option);
+                            const id = 'rateFilter_' + String(rate.value).replace(/[^a-zA-Z0-9_-]/g, '');
+                            const input = $('<input type="radio" class="btn-check rate-filter-pill" name="rateFilter">')
+                                .attr('id', id)
+                                .attr('value', rate.value);
+                            const label = $('<label class="btn btn-sm btn-outline-primary rate-filter-pill"></label>')
+                                .attr('for', id)
+                                .text(rate.label);
+                            container.append(input).append(label);
                         });
                     }
                 },
@@ -649,8 +648,8 @@ table.dataTable thead .sorting_desc_disabled {
             });
         }
 
-        // Reload DataTable when filter changes
-        $('#filterRate').on('change', function() {
+        // Reload DataTable when the active rate pill changes (delegado: pills dinámicas)
+        $('#rateFilterPills').on('change', 'input[name="rateFilter"]', function() {
             dataTable.ajax.reload();
         });
 
