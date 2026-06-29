@@ -770,6 +770,10 @@ class ExperienceServicesBuilder {
   handleServiceTypeChange(type) {
     this.currentServiceType = type;
 
+    // Al cambiar de servicio, limpia segmento/vehículo/precio para no arrastrar
+    // la selección del tipo o ítem anterior. (En edición se restauran después.)
+    this.resetSegmentVehiclePrice();
+
     // Hide all content sections
     document.querySelectorAll('.service-content').forEach((el) => el.classList.add('d-none'));
 
@@ -2256,6 +2260,14 @@ class ExperienceServicesBuilder {
     const prices = this.tourPricesMap.get(`${tourId}_${rateId}`) || [];
     const tp = prices.find((p) => p.vehicleTypeId === vehicleId);
     return tp && tp.price != null ? Number(tp.price) : null;
+  }
+
+  // Limpia segmento + vehículo + precio (al cambiar de servicio).
+  resetSegmentVehiclePrice() {
+    const seg = document.getElementById('transportCategory');
+    if (seg) seg.value = '';
+    this.transportPriceData = null;
+    this.clearVehicleDropdown(); // resetea vehicleSelect y pone el precio en 0.00
   }
 
   async handleTransportRateSelection(rateId, fallbackOrigin = null, fallbackDestination = null) {
