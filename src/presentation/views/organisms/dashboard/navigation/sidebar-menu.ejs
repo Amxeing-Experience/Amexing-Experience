@@ -107,11 +107,12 @@ const navigationItems = {
         ]},
         { section: 'Gestión', icon: 'ti-users', items: [
             { name: 'Facturas', icon: 'receipt', path: '/dashboard/admin/invoices', id: 'invoices', badge: { text: '0', color: 'warning' } },
-            { name: 'Solicitudes de Cancelación', icon: 'x-circle', path: '/dashboard/admin/cancellation-requests', id: 'cancellation-requests' },
+            { name: 'Solicitudes de Cancelación', icon: 'circle-x', path: '/dashboard/admin/cancellation-requests', id: 'cancellation-requests' },
             { name: 'Empleados', icon: 'user-check', path: '/dashboard/admin/employees', id: 'employees' },
             { name: 'Destinos', icon: 'map-pin', path: '/dashboard/admin/pois', id: 'pois' },
-            { name: 'Métodos de Pago', icon: 'credit-card', path: '/dashboard/admin/payment-info', id: 'payment-info' },
-            { name: 'Formularios', icon: 'file-text', path: '/dashboard/admin/forms', id: 'forms' }
+            { name: 'Métodos de Pago', icon: 'credit-card', path: '/dashboard/admin/payment-info', id: 'payment-info' }
+            // Oculto por ahora — descomentar para reactivar Formularios:
+            // , { name: 'Formularios', icon: 'file-text', path: '/dashboard/admin/forms', id: 'forms' }
         ]}
     ],
     client: [

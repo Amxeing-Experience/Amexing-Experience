@@ -14,7 +14,7 @@
         <div class="d-flex justify-content-between align-items-center">
             <div>
                 <h2 class="mb-1 fw-bold">
-                    <i class="ti ti-x-circle me-2 text-primary"></i>
+                    <i class="ti ti-circle-x me-2 text-primary"></i>
                     Solicitudes de Cancelación
                 </h2>
                 <p class="text-muted mb-0">
@@ -30,11 +30,11 @@
     <div class="row">
         <div class="col-12">
             <div class="card border-0 shadow-sm">
-                <div class="card-header text-white" style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); border: none;">
+                <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
                     <div class="row align-items-center">
                         <div class="col">
                             <h5 class="card-title mb-0 text-white">
-                                <i class="ti ti-x-circle me-2"></i>Solicitudes Pendientes de Aprobación
+                                <i class="ti ti-circle-x me-2"></i>Solicitudes Pendientes de Aprobación
                             </h5>
                             <small class="text-white" style="opacity: 0.9;">Solicitudes de cancelación con menos de 24 horas de anticipación</small>
                         </div>
@@ -46,22 +46,22 @@
                     <div class="mb-3">
                         <div class="btn-group" role="group" aria-label="Filtro por estado">
                             <input type="radio" class="btn-check" name="statusFilter" id="filterPending" value="pending" checked>
-                            <label class="btn btn-outline-warning" for="filterPending">
+                            <label class="btn btn-outline-primary" for="filterPending">
                                 <i class="ti ti-clock me-1"></i>Pendientes
                             </label>
                             
                             <input type="radio" class="btn-check" name="statusFilter" id="filterApproved" value="approved">
-                            <label class="btn btn-outline-success" for="filterApproved">
+                            <label class="btn btn-outline-primary" for="filterApproved">
                                 <i class="ti ti-check me-1"></i>Aprobadas
                             </label>
                             
                             <input type="radio" class="btn-check" name="statusFilter" id="filterRejected" value="rejected">
-                            <label class="btn btn-outline-danger" for="filterRejected">
+                            <label class="btn btn-outline-primary" for="filterRejected">
                                 <i class="ti ti-x me-1"></i>Rechazadas
                             </label>
                             
                             <input type="radio" class="btn-check" name="statusFilter" id="filterAll" value="">
-                            <label class="btn btn-outline-secondary" for="filterAll">
+                            <label class="btn btn-outline-primary" for="filterAll">
                                 <i class="ti ti-list me-1"></i>Todas
                             </label>
                         </div>
@@ -70,19 +70,19 @@
                     <!-- Type Filter Pills -->
                     <div class="mb-4">
                         <div class="btn-group" role="group" aria-label="Filtro por tipo">
-                            <input type="radio" class="btn-check" name="typeFilter" id="filterAllTypes" value="" checked>
-                            <label class="btn btn-outline-info" for="filterAllTypes">
-                                <i class="ti ti-list me-1"></i>Todos los tipos
-                            </label>
-                            
                             <input type="radio" class="btn-check" name="typeFilter" id="filterQuotes" value="quote">
                             <label class="btn btn-outline-primary" for="filterQuotes">
                                 <i class="ti ti-file-text me-1"></i>Cotizaciones
                             </label>
-                            
+
                             <input type="radio" class="btn-check" name="typeFilter" id="filterReservations" value="reservation">
-                            <label class="btn btn-outline-success" for="filterReservations">
+                            <label class="btn btn-outline-primary" for="filterReservations">
                                 <i class="ti ti-calendar me-1"></i>Reservaciones
+                            </label>
+
+                            <input type="radio" class="btn-check" name="typeFilter" id="filterAllTypes" value="" checked>
+                            <label class="btn btn-outline-primary" for="filterAllTypes">
+                                <i class="ti ti-list me-1"></i>Todos los tipos
                             </label>
                         </div>
                     </div>
