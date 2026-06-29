@@ -48,6 +48,9 @@ window.__reservationFolio = '<%= typeof reservationFolio !== "undefined" ? reser
 // Reservation id + current status, used by the reservation status segmented control.
 window.__reservationId = '<%= typeof reservationId !== "undefined" ? reservationId : "" %>';
 window.__reservationStatus = '<%= typeof reservationStatus !== "undefined" ? reservationStatus : "" %>';
+// True when a <24h cancellation request is awaiting admin approval: the status
+// control shows "Cancelación solicitada" instead of the reservation's real status.
+window.__hasPendingCancellation = <%= (typeof hasPendingCancellation !== "undefined" && hasPendingCancellation) ? 'true' : 'false' %>;
 // Nota: window.amxDedupFetch (dedup in-flight de /api/quotes/:id) se define en el .js compartido
 // quote-ownership.js, que cargan los 3 roles antes que el resto de módulos.
 </script>
@@ -98,17 +101,23 @@ window.__reservationStatus = '<%= typeof reservationStatus !== "undefined" ? res
                   // (read-only). data-derived marca los no clickables. El estado 'hold'
                   // (Bloqueado) se ocultó a nivel reservación: el bloqueo vive en la
                   // cotización, no en la reservación ya creada.
+                  // A pending <24h cancellation request relabels the cancel segment to
+                  // "Cancelación solicitada" and marks it active, so the control reflects
+                  // the in-progress cancellation (the reservation is still 'confirmed' in
+                  // the DB until an admin approves the request).
+                  const pendingCancel = (typeof hasPendingCancellation !== 'undefined' && hasPendingCancellation && activeResSeg !== 'cancelled');
                   const resSegs = [
                     { key: 'pending', label: 'Asignaciones pendientes', icon: 'ti-user-exclamation', derived: false },
                     { key: 'confirmed', label: 'Confirmada', icon: 'ti-circle-check', derived: false },
                     { key: 'completed', label: 'Finalizada', icon: 'ti-flag-check', derived: true },
-                    { key: 'cancelled', label: 'Cancelada', icon: 'ti-x', derived: false },
+                    { key: 'cancelled', label: pendingCancel ? 'Cancelación solicitada' : 'Cancelada', icon: pendingCancel ? 'ti-clock' : 'ti-x', derived: false },
                   ];
                 %>
                 <div class="quote-status-segments" data-mode="reservation">
                     <% resSegs.forEach(function(seg) { %>
-                    <label class="quote-status-seg <%= seg.derived ? 'derived' : '' %>" data-status="<%= seg.key %>" <%= seg.derived ? 'data-derived="1"' : '' %>>
-                        <input type="radio" name="quoteStatus" value="<%= seg.key %>" <%= activeResSeg === seg.key ? 'checked' : '' %> <%= seg.derived ? 'disabled' : '' %>>
+                    <% const segChecked = pendingCancel ? (seg.key === 'cancelled') : (activeResSeg === seg.key); %>
+                    <label class="quote-status-seg <%= seg.derived ? 'derived' : '' %> <%= (pendingCancel && seg.key === 'cancelled') ? 'pending-cancel' : '' %>" data-status="<%= seg.key %>" <%= seg.derived ? 'data-derived="1"' : '' %>>
+                        <input type="radio" name="quoteStatus" value="<%= seg.key %>" <%= segChecked ? 'checked' : '' %> <%= seg.derived ? 'disabled' : '' %>>
                         <span class="quote-status-seg-label"><i class="ti <%= seg.icon %> me-1"></i><%= seg.label %></span>
                     </label>
                     <% }); %>
@@ -469,6 +478,11 @@ window.__reservationStatus = '<%= typeof reservationStatus !== "undefined" ? res
 .quote-status-seg[data-status="cancelled"]:has(input:checked) .quote-status-seg-label {
     background: var(--brand-danger); color: white; box-shadow: 0 1px 4px rgba(var(--brand-danger-rgb),0.3);
 }
+/* Pending cancellation request (<24h, awaiting approval): amber, not the red of a
+   confirmed cancellation, so the in-progress state reads as distinct. */
+.quote-status-seg[data-status="cancelled"].pending-cancel:has(input:checked) .quote-status-seg-label {
+    background: var(--brand-warning); color: #000; box-shadow: 0 1px 4px rgba(var(--brand-warning-rgb),0.3);
+}
 /* Disabled state (when quote is scheduled/locked) */
 .quote-status-seg.disabled {
     opacity: 0.35;
@@ -609,6 +623,24 @@ document.addEventListener('DOMContentLoaded', function() {
         currentStatus = previousStatus;
         const prevRadio = document.querySelector(`input[name="quoteStatus"][value="${previousStatus}"]`);
         if (prevRadio) prevRadio.checked = true;
+    }
+
+    // Set when a <24h cancellation request is created so the modal's onClose does
+    // not revert the segment — instead it stays on "Cancelación solicitada".
+    let pendingCancelCreated = false;
+
+    // Reflect an in-progress (pending-approval) cancellation in the status control:
+    // relabel the cancel segment to "Cancelación solicitada" and select it. Mirrors
+    // what the server renders on reload when hasPendingCancellation is true.
+    function setCancelRequestedUI() {
+        const seg = document.querySelector('.quote-status-seg[data-status="cancelled"]');
+        if (!seg) return;
+        seg.classList.add('pending-cancel');
+        const label = seg.querySelector('.quote-status-seg-label');
+        if (label) label.innerHTML = '<i class="ti ti-clock me-1"></i>Cancelación solicitada';
+        const radio = seg.querySelector('input[name="quoteStatus"]');
+        if (radio) radio.checked = true;
+        currentStatus = 'cancelled';
     }
 
     function showScheduleLoader(show) {
@@ -811,6 +843,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.reload();
             } else {
                 const requestId = result.data.request?.id || result.data.requestId || 'N/D';
+                // Reservation stays 'confirmed' in the DB until approved; reflect the
+                // pending cancellation in the control and keep it (don't revert onClose).
+                if (window.__isReservation) {
+                    pendingCancelCreated = true;
+                    setCancelRequestedUI();
+                }
                 alert(`Solicitud de cancelación creada exitosamente.\n\nID: ${requestId}\nEstado: Pendiente de aprobación\n\nRecibirá una notificación cuando sea revisada.`);
             }
         } catch (error) {
@@ -829,14 +867,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!resId) { revertStatus(previousStatus); return; }
         if (newStatus === 'cancelled') {
             // Fetch the quote (with serviceItems → event dates) so the modal can apply
-            // the 24h policy, then revert the segment if the user dismisses it.
+            // the 24h policy. On dismiss, revert the segment — UNLESS a cancellation
+            // request was just created, in which case keep "Cancelación solicitada".
+            pendingCancelCreated = false;
             try {
                 const qr = await fetch(`/api/quotes/<%= quoteId %>`, {
                     headers: { 'Authorization': `Bearer ${window.quoteAccessToken}` },
                 });
                 const qj = await qr.json();
                 const quoteData = (qj && qj.data) ? qj.data : { id: '<%= quoteId %>', folio: window.__reservationFolio };
-                showCancelReservationModal(quoteData, () => revertStatus(previousStatus));
+                showCancelReservationModal(quoteData, () => {
+                    if (pendingCancelCreated) { pendingCancelCreated = false; return; }
+                    revertStatus(previousStatus);
+                });
             } catch (e) {
                 revertStatus(previousStatus);
                 alert('No se pudo abrir la cancelación');
