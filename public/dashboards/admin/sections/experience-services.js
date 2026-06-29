@@ -1484,11 +1484,19 @@ class ExperienceServicesBuilder {
     const adultPriceEl = document.getElementById('adultPrice');
     if (adultPriceEl && adultPrice) adultPriceEl.value = adultPrice;
 
+    // Default: si la experiencia no trae precio de niño o de "sin alcohol",
+    // se usa el de adulto.
     const childPriceEl = document.getElementById('childPrice');
-    if (childPriceEl) childPriceEl.value = isProvider ? (exp.price_child || '') : (exp.childPrice || '');
+    if (childPriceEl) {
+      const child = isProvider ? exp.price_child : exp.childPrice;
+      childPriceEl.value = child || adultPrice || '';
+    }
 
     const noAlcPriceEl = document.getElementById('noAlcoholPrice');
-    if (noAlcPriceEl) noAlcPriceEl.value = isProvider ? (exp.price_no_alcohol || '') : (exp.noAlcoholPrice || '');
+    if (noAlcPriceEl) {
+      const noAlc = isProvider ? exp.price_no_alcohol : exp.noAlcoholPrice;
+      noAlcPriceEl.value = noAlc || adultPrice || '';
+    }
 
     // Store experience data for later use
     this.selectedExperienceData = exp;
@@ -3046,8 +3054,12 @@ class ExperienceServicesBuilder {
     const childrenQty = parseInt(document.getElementById('childrenQuantity')?.value) || 0;
     const noAlcQty = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value) || 0;
     const adultPrice = parseFloat(document.getElementById('adultPrice')?.value) || 0;
-    const childPrice = parseFloat(document.getElementById('childPrice')?.value) || 0;
-    const noAlcPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value) || 0;
+    // Default: si el campo de niño o "sin alcohol" está vacío, usa el de adulto
+    // (un 0 explícito sí se respeta).
+    const childRaw = document.getElementById('childPrice')?.value;
+    const noAlcRaw = document.getElementById('noAlcoholPrice')?.value;
+    const childPrice = (childRaw == null || childRaw === '') ? adultPrice : (parseFloat(childRaw) || 0);
+    const noAlcPrice = (noAlcRaw == null || noAlcRaw === '') ? adultPrice : (parseFloat(noAlcRaw) || 0);
 
     const total = (adultsQty * adultPrice) + (childrenQty * childPrice) + (noAlcQty * noAlcPrice);
 
