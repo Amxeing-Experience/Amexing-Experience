@@ -473,7 +473,7 @@ describe('ClientsController', () => {
       mockReq.params = { id: mockClientId };
       mockReq.body = { active: true };
 
-      const toggledClient = { user: { id: mockClientId, active: true } };
+      const toggledClient = { success: true, user: { id: mockClientId, active: true } };
       mockUserService.toggleUserStatus = jest.fn().mockResolvedValue(toggledClient);
 
       await clientsController.toggleClientStatus(mockReq, mockRes);
@@ -500,7 +500,7 @@ describe('ClientsController', () => {
       mockReq.params = { id: mockClientId };
       mockReq.body = { active: false };
 
-      const toggledClient = { user: { id: mockClientId, active: false } };
+      const toggledClient = { success: true, user: { id: mockClientId, active: false } };
       mockUserService.toggleUserStatus = jest.fn().mockResolvedValue(toggledClient);
 
       await clientsController.toggleClientStatus(mockReq, mockRes);
@@ -593,7 +593,7 @@ describe('ClientsController', () => {
       mockReq.params = { id: mockClientId };
       mockReq.body = { active: true };
 
-      const toggledClient = { user: { id: mockClientId, active: true } };
+      const toggledClient = { success: true, user: { id: mockClientId, active: true } };
       mockUserService.toggleUserStatus = jest.fn().mockResolvedValue(toggledClient);
 
       await clientsController.toggleClientStatus(mockReq, mockRes);
