@@ -14,7 +14,7 @@ const quoteTitle = isNewQuote ? 'Nueva Cotización' : entityLabel;
 // 'assigned'/'in_progress' computed states fold into the nearest visible segment.
 const resStatusRaw = typeof reservationStatus !== 'undefined' ? reservationStatus : '';
 const resSegMap = {
-    hold: 'hold',
+    hold: 'pending', // 'Bloqueado' se ocultó del control; una reserva en hold se ve como Asignaciones pendientes
     pending: 'pending',
     assigned: 'confirmed',    // todo asignado = Confirmada (definición del negocio)
     confirmed: 'confirmed',
@@ -87,17 +87,18 @@ window.__reservationStatus = '<%= typeof reservationStatus !== "undefined" ? res
                     <span class="quote-status-title">
                         Estado de la <%= entityLabel %>
                         <% if (isReservationView) { %>
-                        <i class="ti ti-info-circle quote-status-info" title="Bloqueado: congela la reservación manualmente.&#10;Asignaciones pendientes: faltan choferes o guías por asignar (automático). Clic para volver al seguimiento automático.&#10;Confirmada: márcala cuando ya asignaste todo.&#10;Finalizada: automática al completar los servicios.&#10;Cancelada: abre el flujo de cancelación (motivo y política de 24h)."></i>
+                        <i class="ti ti-info-circle quote-status-info" title="Asignaciones pendientes: faltan choferes o guías por asignar (automático). Clic para volver al seguimiento automático.&#10;Confirmada: márcala cuando ya asignaste todo.&#10;Finalizada: automática al completar los servicios.&#10;Cancelada: abre el flujo de cancelación (motivo y política de 24h)."></i>
                         <% } %>
                     </span>
-                    <span class="quote-status-hint"><%= isReservationView ? 'Bloqueado y Confirmada son manuales; Asignaciones pendientes y Finalizada son automáticas' : 'Selecciona el estado actual' %></span>
+                    <span class="quote-status-hint"><%= isReservationView ? 'Confirmada es manual; Asignaciones pendientes y Finalizada son automáticas' : 'Selecciona el estado actual' %></span>
                 </div>
                 <% if (isReservationView) { %>
                 <%
-                  // Mixto: 'hold'/'confirmed'/'cancelled' editables; 'pending'/'completed'
-                  // son derivados (read-only). data-derived marca los no clickables.
+                  // 'confirmed'/'cancelled' editables; 'pending'/'completed' derivados
+                  // (read-only). data-derived marca los no clickables. El estado 'hold'
+                  // (Bloqueado) se ocultó a nivel reservación: el bloqueo vive en la
+                  // cotización, no en la reservación ya creada.
                   const resSegs = [
-                    { key: 'hold', label: 'Bloqueado', icon: 'ti-lock', derived: false },
                     { key: 'pending', label: 'Asignaciones pendientes', icon: 'ti-user-exclamation', derived: false },
                     { key: 'confirmed', label: 'Confirmada', icon: 'ti-circle-check', derived: false },
                     { key: 'completed', label: 'Finalizada', icon: 'ti-flag-check', derived: true },
