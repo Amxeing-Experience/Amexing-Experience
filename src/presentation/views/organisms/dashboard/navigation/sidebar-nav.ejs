@@ -13,18 +13,8 @@ const sidebarUserRole = typeof userRole !== 'undefined' ? userRole : 'guest';
 const sidebarCurrentPath = typeof currentPath !== 'undefined' ? currentPath : '';
 const sidebarUser = typeof user !== 'undefined' ? user : {};
 
-// Role-based branding colors
-const roleColors = {
-    superadmin: { primary: '#ff6b6b', secondary: '#4ecdc4' },
-    admin: { primary: '#5d87ff', secondary: '#49beff' },
-    client: { primary: '#8b5cf6', secondary: '#ec4899' },
-    department_manager: { primary: '#10b981', secondary: '#3b82f6' },
-    employee: { primary: '#06b6d4', secondary: '#8b5cf6' },
-    driver: { primary: '#f59e0b', secondary: '#ef4444' },
-    guest: { primary: '#6b7280', secondary: '#9ca3af' }
-};
-
-const colors = roleColors[sidebarUserRole] || roleColors.guest;
+// Colores del sidebar: se usan las variables de marca del theme (salvia) en el CSS,
+// iguales para todos los roles. Ya no hay paleta hardcodeada por rol.
 
 // Helper function to determine if menu item is active
 function isActiveMenuItem(itemPath, currentPath) {
@@ -54,7 +44,6 @@ function isActiveMenuItem(itemPath, currentPath) {
             <%- include('./sidebar-menu', {
                 userRole: sidebarUserRole,
                 currentPath: sidebarCurrentPath,
-                colors: colors,
                 isActiveMenuItem: isActiveMenuItem,
                 user: sidebarUser
             }) %>
@@ -175,7 +164,7 @@ function isActiveMenuItem(itemPath, currentPath) {
     }
 
     .close-btn:focus {
-        outline: 2px solid #f76b1c;
+        outline: 2px solid var(--brand-primary);
         outline-offset: 2px;
     }
 
@@ -309,7 +298,7 @@ function isActiveMenuItem(itemPath, currentPath) {
         width: 20px;
         height: 20px;
         border: 2px solid transparent;
-        border-top: 2px solid <%= colors.primary %>;
+        border-top: 2px solid var(--brand-primary);
         border-radius: 50%;
         animation: sidebar-loading-spin 1s linear infinite;
         transform: translate(-50%, -50%);

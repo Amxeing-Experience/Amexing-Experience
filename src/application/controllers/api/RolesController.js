@@ -324,7 +324,7 @@ class RolesController {
         trimmedDisplayName = displayName.trim();
 
         // Validate displayName length
-        if (trimmedDisplayName.length > 280) {
+        if (trimmedDisplayName.length > 100) {
           return this.sendError(res, 'Display name cannot exceed 100 characters', 400);
         }
       }

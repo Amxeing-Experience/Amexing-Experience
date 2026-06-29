@@ -72,6 +72,7 @@ describe('Authentication Controller', () => {
         parseAppId: expect.any(String),
         oauthProviders: expect.any(Array),
         oauthLinkingData: null,
+        t: expect.any(Function),
       });
     });
 

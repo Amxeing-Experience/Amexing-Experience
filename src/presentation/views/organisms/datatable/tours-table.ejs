@@ -5829,10 +5829,20 @@ async function saveWalkingTour() {
     $saveBtnText.html('<span class="spinner-border spinner-border-sm me-1" role="status"></span>Guardando...');
 
     try {
-        // Get form data using vanilla JS where possible
+        // Get form data using vanilla JS where possible.
+        // The walking-tour destination uses a custom select widget (.customSelect),
+        // so read from it first, then fall back to TomSelect or the native value.
         const walkingDestElement = document.getElementById('walkingDestinationPOI');
-        const destinationPOI = walkingDestElement && walkingDestElement.tomselect ? 
-                              walkingDestElement.tomselect.getValue() : '';
+        let destinationPOI = '';
+        if (walkingDestElement) {
+            if (walkingDestElement.customSelect && typeof walkingDestElement.customSelect.getValue === 'function') {
+                destinationPOI = walkingDestElement.customSelect.getValue() || '';
+            } else if (walkingDestElement.tomselect) {
+                destinationPOI = walkingDestElement.tomselect.getValue() || '';
+            } else {
+                destinationPOI = walkingDestElement.value || '';
+            }
+        }
         
         // Helper function to safely get value
         const getFieldValue = (id) => {
@@ -5923,6 +5933,13 @@ async function saveWalkingTour() {
             $saveBtnText.html('<i class="ti ti-check me-1"></i>' + originalBtnText);
             return;
         }
+
+        if (!formData.time || formData.time <= 0) {
+            showWalkingTourAlert('Por favor ingrese la duración mínima del tour.', 'danger');
+            $saveBtn.prop('disabled', false);
+            $saveBtnText.html('<i class="ti ti-check me-1"></i>' + originalBtnText);
+            return;
+        }
         
         // Determine if this is create or edit operation
         const tourId = getFieldValue('walkingTourId');
@@ -5937,8 +5954,12 @@ async function saveWalkingTour() {
             return;
         }
         
-        // Prepare API call
-        const apiUrl = isEdit ? `${globalApiEndpoint}/${tourId}` : globalApiEndpoint;
+        // Prepare API call.
+        // globalApiEndpoint may carry a query string (e.g. "?tourType=vehicle");
+        // strip it before appending the id, otherwise the id lands after the query
+        // string and the PUT hits "/api/tours" (404) instead of "/api/tours/:id".
+        const apiBaseUrl = globalApiEndpoint.split('?')[0];
+        const apiUrl = isEdit ? `${apiBaseUrl}/${tourId}` : globalApiEndpoint;
         const method = isEdit ? 'PUT' : 'POST';
         
         
@@ -6253,32 +6274,32 @@ function updateWalkingDaySchedules() {
                     <!-- Precios por Grupo -->
                     <div class="mb-3">
                         <label class="form-label form-label-sm fw-medium text-success mb-3">
-                            <i class="ti ti-walk me-1"></i>Precios por Grupo de Personas
+                            <i class="ti ti-walk me-1"></i>Precios por Grupo de Personas <span class="text-danger">*</span>
                         </label>
                         <div class="row">
                             <div class="col-md-4">
-                                <label class="form-label form-label-sm text-muted">Grupo Pequeño (1-5 personas)</label>
+                                <label class="form-label form-label-sm text-muted">Grupo Pequeño (1-5 personas) <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" id="walkingPriceSmall" min="0" step="0.01" 
+                                    <input type="number" class="form-control" id="walkingPriceSmall" min="0" step="0.01"
                                            placeholder="1050.00" required>
                                     <span class="input-group-text">MXN</span>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label form-label-sm text-muted">Grupo Mediano (6-10 personas)</label>
+                                <label class="form-label form-label-sm text-muted">Grupo Mediano (6-10 personas) <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" id="walkingPriceMedium" min="0" step="0.01" 
+                                    <input type="number" class="form-control" id="walkingPriceMedium" min="0" step="0.01"
                                            placeholder="2100.00" required>
                                     <span class="input-group-text">MXN</span>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label form-label-sm text-muted">Grupo Grande (11-15 personas)</label>
+                                <label class="form-label form-label-sm text-muted">Grupo Grande (11-15 personas) <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" id="walkingPriceLarge" min="0" step="0.01" 
+                                    <input type="number" class="form-control" id="walkingPriceLarge" min="0" step="0.01"
                                            placeholder="3150.00" required>
                                     <span class="input-group-text">MXN</span>
                                 </div>
@@ -6293,9 +6314,9 @@ function updateWalkingDaySchedules() {
                     <!-- Campos de tiempo -->
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Duracion (hrs) minima</label>
-                            <input type="number" class="form-control" id="walkingDuration" min="0" step="0.5"
-                                   placeholder="2" value="2">
+                            <label class="form-label form-label-sm fw-medium text-success">Duracion (hrs) minima <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="walkingDuration" min="0.5" step="0.5"
+                                   placeholder="2" value="2" required>
                             <div class="form-text">
                                 <small>Tiempo total del tour a pie</small>
                             </div>

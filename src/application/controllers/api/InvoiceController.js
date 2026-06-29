@@ -177,7 +177,17 @@ class InvoiceController {
       const query = new Parse.Query('Invoice');
       query.include(['quote', 'requestedBy', 'processedBy', 'quote.client', 'quote.rate']);
 
-      const invoice = await query.get(invoiceId, { useMasterKey: true });
+      let invoice;
+      try {
+        invoice = await query.get(invoiceId, { useMasterKey: true });
+      } catch (err) {
+        // Parse lanza OBJECT_NOT_FOUND si el id no existe; antes caía al catch
+        // general -> 500. Se traduce a 404.
+        if (err && err.code === Parse.Error.OBJECT_NOT_FOUND) {
+          return this.sendError(res, 'Solicitud de factura no encontrada', 404);
+        }
+        throw err;
+      }
       if (!invoice) {
         return this.sendError(res, 'Solicitud de factura no encontrada', 404);
       }
@@ -299,7 +309,17 @@ class InvoiceController {
       const query = new Parse.Query('Invoice');
       query.include(['quote']);
 
-      const invoice = await query.get(invoiceId, { useMasterKey: true });
+      let invoice;
+      try {
+        invoice = await query.get(invoiceId, { useMasterKey: true });
+      } catch (err) {
+        // Parse lanza OBJECT_NOT_FOUND si el id no existe; antes caía al catch
+        // general -> 500. Se traduce a 404.
+        if (err && err.code === Parse.Error.OBJECT_NOT_FOUND) {
+          return this.sendError(res, 'Solicitud de factura no encontrada', 404);
+        }
+        throw err;
+      }
       if (!invoice) {
         return this.sendError(res, 'Solicitud de factura no encontrada', 404);
       }
@@ -380,7 +400,17 @@ class InvoiceController {
       const query = new Parse.Query('Invoice');
       query.include(['quote']);
 
-      const invoice = await query.get(invoiceId, { useMasterKey: true });
+      let invoice;
+      try {
+        invoice = await query.get(invoiceId, { useMasterKey: true });
+      } catch (err) {
+        // Parse lanza OBJECT_NOT_FOUND si el id no existe; antes caía al catch
+        // general -> 500. Se traduce a 404.
+        if (err && err.code === Parse.Error.OBJECT_NOT_FOUND) {
+          return this.sendError(res, 'Solicitud de factura no encontrada', 404);
+        }
+        throw err;
+      }
       if (!invoice) {
         return this.sendError(res, 'Solicitud de factura no encontrada', 404);
       }
@@ -491,7 +521,17 @@ class InvoiceController {
 
       // Find the invoice
       const query = new Parse.Query('Invoice');
-      const invoice = await query.get(invoiceId, { useMasterKey: true });
+      let invoice;
+      try {
+        invoice = await query.get(invoiceId, { useMasterKey: true });
+      } catch (err) {
+        // Parse lanza OBJECT_NOT_FOUND si el id no existe; antes caía al catch
+        // general -> 500. Se traduce a 404.
+        if (err && err.code === Parse.Error.OBJECT_NOT_FOUND) {
+          return this.sendError(res, 'Solicitud de factura no encontrada', 404);
+        }
+        throw err;
+      }
       if (!invoice) {
         return this.sendError(res, 'Solicitud de factura no encontrada', 404);
       }

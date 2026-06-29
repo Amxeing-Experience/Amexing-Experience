@@ -6,11 +6,51 @@
  * @version 1.0.0
  */
 
+const fs = require('fs');
+const path = require('path');
 const logger = require('../../infrastructure/logger');
 
 // Single browser instance reused across requests to avoid the ~500ms cold-start.
 // Lazy-launched on first use; relaunched if it crashes.
 let browserPromise = null;
+
+// Puppeteer's header/footer templates render in an isolated document that can't
+// see the page's @font-face rules or load external font files, so a bare
+// font-family falls back to a system font and looks foreign next to the quote
+// (which uses Myriad Pro). We embed Myriad Pro as base64 @font-face directly in
+// the footer template. Read once and cached — the .otf is ~95KB, encoded once.
+let footerFontFaceCss = null;
+/**
+ * Build (and cache) the base64-embedded @font-face CSS for the PDF footer so it
+ * renders in Myriad Pro like the rest of the quote. Read from disk once.
+ * @returns {string} `@font-face` rules, or '' if the font files can't be read.
+ * @example
+ *   const css = getFooterFontFaceCss(); // "@font-face{font-family:'Myriad Pro';...}"
+ */
+function getFooterFontFaceCss() {
+  if (footerFontFaceCss !== null) return footerFontFaceCss;
+  const fonts = [
+    { file: 'MyriadPro-Regular.otf', weight: 400 },
+    { file: 'MyriadPro-Semibold.otf', weight: 600 },
+  ];
+  try {
+    footerFontFaceCss = fonts.map(({ file, weight }) => {
+      // `file` comes from the hardcoded list above (no user input), so the path
+      // is safe — silence the non-literal-fs-filename security rule.
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      const b64 = fs.readFileSync(
+        path.join(__dirname, '../../../public/fonts', file)
+      ).toString('base64');
+      return `@font-face{font-family:'Myriad Pro';font-style:normal;font-weight:${weight};`
+        + `src:url(data:font/otf;base64,${b64}) format('opentype');}`;
+    }).join('');
+  } catch (e) {
+    // Font files missing → fall back to the system stack (no embedded faces).
+    logger.warn('PdfRenderService: could not embed footer fonts', { message: e.message });
+    footerFontFaceCss = '';
+  }
+  return footerFontFaceCss;
+}
 
 /**
  *
@@ -114,7 +154,8 @@ async function renderUrlToPdf(url, options = {}) {
     // date/title header. Inline font-size is required — the default is 0.
     // Per-page letterhead footer: brand + website + page number. Needs a taller bottom margin.
     const footerTemplate = `
-      <div style="width:100%; box-sizing:border-box; padding:0 ${margin}; font-family:'Segoe UI',Tahoma,Geneva,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+      <style>${getFooterFontFaceCss()}</style>
+      <div style="width:100%; box-sizing:border-box; padding:0 ${margin}; font-family:'Myriad Pro','Segoe UI',Tahoma,Geneva,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
         <div style="border-top:1px solid #d8dac9; padding-top:6px; display:flex; justify-content:space-between; align-items:flex-end;">
           <div style="text-align:left; line-height:1.35;">
             <div style="font-size:11px; font-weight:600; letter-spacing:2.5px; color:#969b81; text-transform:uppercase;">Amexing Experience</div>
@@ -130,6 +171,49 @@ async function renderUrlToPdf(url, options = {}) {
       : {
         top: margin, bottom: footer ? '22mm' : margin, left: margin, right: margin,
       };
+    // ── Height-aware day pagination ──────────────────────────────────────────
+    // Tag each .day-card that fits within a single printed page with
+    // `.pdf-keep-whole` so the CSS `break-inside: avoid` keeps it whole (a short
+    // day jumps to the next page intact instead of splitting mid-day). Days taller
+    // than a page stay untagged so they flow and break BETWEEN services — otherwise
+    // an oversized day forces a blank first page. Done here, after fonts/layout
+    // have settled, comparing against the printable page geometry: the content
+    // aspect ratio is invariant under puppeteer's width-based scale to the paper,
+    // so maxHeightPx = referenceWidthPx * aspect holds in the live layout's units.
+    try {
+      const pageDims = { Letter: [8.5, 11], A4: [8.27, 11.69], Legal: [8.5, 14] };
+      const [pageWIn, pageHIn] = pageDims[format] || pageDims.Letter;
+      /**
+       * Parse a CSS length (mm/cm/in/px or unitless) into inches.
+       * @param {string} v - CSS length, e.g. '8mm', '0.5in', '12'.
+       * @returns {number} The length in inches (0 if unparseable).
+       * @example toIn('8mm') // 0.3149...
+       */
+      const toIn = (v) => {
+        if (typeof v !== 'string') return 0;
+        const m = v.match(/^([\d.]+)\s*(mm|cm|in|px)?$/);
+        if (!m) return 0;
+        const n = parseFloat(m[1]);
+        switch (m[2]) {
+          case 'mm': return n / 25.4;
+          case 'cm': return n / 2.54;
+          case 'px': return n / 96;
+          default: return n; // 'in' or unitless
+        }
+      };
+      const printableWIn = pageWIn - toIn(marginObj.left) - toIn(marginObj.right);
+      const printableHIn = pageHIn - toIn(marginObj.top) - toIn(marginObj.bottom);
+      const aspect = printableHIn / printableWIn;
+      await page.evaluate((aspectRatio) => {
+        /* eslint-disable no-undef */
+        const refWidth = document.documentElement.clientWidth;
+        const maxHeight = refWidth * aspectRatio * 0.96; // small headroom for rounding
+        document.querySelectorAll('.day-card').forEach((el) => {
+          el.classList.toggle('pdf-keep-whole', el.offsetHeight <= maxHeight);
+        });
+        /* eslint-enable no-undef */
+      }, aspect);
+    } catch (e) { /* noop — fall back to plain per-service breaks */ }
     const pdfBuffer = await page.pdf({
       format,
       printBackground: true,

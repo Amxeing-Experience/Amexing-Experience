@@ -88,7 +88,7 @@
             display: flex;
             width: 100%;
             max-width: none;
-            min-height: 100vh;
+            height: 100vh;
             background: #fff;
             border-radius: 0;
             overflow: hidden;
@@ -115,7 +115,7 @@
             color: #fff;
             background-image:
                 linear-gradient(180deg, rgba(20, 20, 19, 0.25) 0%, rgba(20, 20, 19, 0.55) 55%, rgba(18, 18, 17, 0.92) 100%),
-                url('/images/hero-background.jpg');
+                url('/images/SUBS-Privados.jpg');
             background-size: cover;
             background-position: center;
         }
@@ -179,8 +179,14 @@
             padding: 3rem 3.5rem;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             overflow-y: auto;
+        }
+        /* Centra el contenido cuando cabe; permite scroll sin recortar el tope
+           cuando el formulario es largo (p.ej. request-access). Las márgenes auto
+           hacen el centrado en vez de justify-content:center (que recorta arriba). */
+        .auth-body > .auth-content {
+            margin-block: auto;
+            width: 100%;
         }
 
         /* Legacy single-logo block hidden in the split layout */
@@ -289,6 +295,10 @@
         @media (max-width: 860px) {
             .auth-card {
                 flex-direction: column;
+                height: auto;
+            }
+            .auth-body {
+                overflow-y: visible;
             }
 
             .auth-wrapper.with-header .auth-card {
@@ -351,11 +361,19 @@
                 <div class="auth-brand__logo">
                     <img src="/images/logos/light_white_amexing.png" alt="Amexing Experience">
                 </div>
+                <%
+                    const hasAuthT = typeof t === 'function';
+                    const ab = (key, fallback) => {
+                        if (!hasAuthT) return fallback;
+                        const v = t(`pages:auth.brand.${key}`);
+                        return (v && v !== `pages:auth.brand.${key}`) ? v : fallback;
+                    };
+                %>
                 <div class="auth-brand__content">
-                    <span class="auth-brand__eyebrow">Bienvenido de vuelta</span>
+                    <span class="auth-brand__eyebrow"><%= ab('welcome', 'Bienvenido') %></span>
                     <hr class="auth-brand__rule">
-                    <h2 class="auth-brand__title">Elevamos la experiencia de viaje</h2>
-                    <p class="auth-brand__subtitle">Gestión premium de viajes y experiencias a la medida.</p>
+                    <h2 class="auth-brand__title"><%= ab('title', 'La mejor experiencia de viaje empieza aquí') %></h2>
+                    <p class="auth-brand__subtitle"><%= ab('subtitle', 'Plataforma premium de gestión de reservaciones') %></p>
                 </div>
             </aside>
 
@@ -402,8 +420,8 @@
     </div>
 
     <!-- Core JavaScript -->
-    <script src="/flexy-bootstrap-lite-1.0.0/node_modules/jquery/dist/jquery.min.js"></script>
-    <script src="/flexy-bootstrap-lite-1.0.0/node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/dashboard/libs/jquery.min.js"></script>
+    <script src="/dashboard/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Auth Layout Script -->
     <script>

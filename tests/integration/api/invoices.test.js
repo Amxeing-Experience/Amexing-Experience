@@ -38,9 +38,9 @@ describe('Invoice Controller Integration Tests', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('success', true);
-      expect(response.body).toHaveProperty('invoices');
-      expect(Array.isArray(response.body.invoices)).toBe(true);
-      expect(response.body).toHaveProperty('total');
+      expect(response.body).toHaveProperty('data');
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body).toHaveProperty('recordsTotal');
     });
 
     it('should return pending invoices for superadmin', async () => {
@@ -50,7 +50,7 @@ describe('Invoice Controller Integration Tests', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body).toHaveProperty('invoices');
+      expect(response.body).toHaveProperty('data');
     });
 
     it('should support pagination', async () => {
@@ -64,8 +64,8 @@ describe('Invoice Controller Integration Tests', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      if (response.body.invoices.length > 0) {
-        expect(response.body.invoices.length).toBeLessThanOrEqual(5);
+      if (response.body.data.length > 0) {
+        expect(response.body.data.length).toBeLessThanOrEqual(5);
       }
     });
 
@@ -81,8 +81,8 @@ describe('Invoice Controller Integration Tests', () => {
       expect(response.body.success).toBe(true);
       
       // If there are invoices, they should all be pending
-      if (response.body.invoices.length > 0) {
-        response.body.invoices.forEach(invoice => {
+      if (response.body.data.length > 0) {
+        response.body.data.forEach(invoice => {
           expect(invoice.status).toBe('pending');
         });
       }
@@ -111,7 +111,7 @@ describe('Invoice Controller Integration Tests', () => {
 
       expect(response.status).toBe(403);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('No tiene permisos');
+      expect(response.body.error).toContain('Insufficient role level');
     });
 
     it('should deny access to clients', async () => {
@@ -148,8 +148,8 @@ describe('Invoice Controller Integration Tests', () => {
         .get('/api/invoices')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      if (listResponse.body.invoices && listResponse.body.invoices.length > 0) {
-        const invoiceId = listResponse.body.invoices[0].id;
+      if (listResponse.body.data && listResponse.body.data.length > 0) {
+        const invoiceId = listResponse.body.data[0].id;
         
         const response = await request(app)
           .get(`/api/invoices/${invoiceId}`)
@@ -169,8 +169,8 @@ describe('Invoice Controller Integration Tests', () => {
         .get('/api/invoices')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      if (listResponse.body.invoices && listResponse.body.invoices.length > 0) {
-        const invoiceId = listResponse.body.invoices[0].id;
+      if (listResponse.body.data && listResponse.body.data.length > 0) {
+        const invoiceId = listResponse.body.data[0].id;
         
         const response = await request(app)
           .get(`/api/invoices/${invoiceId}`)
@@ -179,7 +179,7 @@ describe('Invoice Controller Integration Tests', () => {
         if (response.status === 200) {
           expect(response.body.invoice).toHaveProperty('quote');
           expect(response.body.invoice.quote).toHaveProperty('folio');
-          expect(response.body.invoice.quote).toHaveProperty('total');
+          expect(response.body.invoice.quote).toHaveProperty('recordsTotal');
         }
       }
     });
@@ -315,9 +315,9 @@ describe('Invoice Controller Integration Tests', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body).toHaveProperty('count');
-      expect(typeof response.body.count).toBe('number');
-      expect(response.body.count).toBeGreaterThanOrEqual(0);
+      expect(response.body.data).toHaveProperty('pendingCount');
+      expect(typeof response.body.data.pendingCount).toBe('number');
+      expect(response.body.data.pendingCount).toBeGreaterThanOrEqual(0);
     });
 
     it('should return count for superadmin', async () => {
@@ -327,7 +327,7 @@ describe('Invoice Controller Integration Tests', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body).toHaveProperty('count');
+      expect(response.body.data).toHaveProperty('pendingCount');
     });
 
     it('should deny access to non-admin users', async () => {
@@ -441,7 +441,7 @@ describe('Invoice Controller Integration Tests', () => {
 
       expect(response.status).toBe(200);
       // Should still work, Parse Server should handle injection prevention
-      expect(response.body).toHaveProperty('invoices');
+      expect(response.body).toHaveProperty('data');
     });
 
     it('should sanitize file uploads', async () => {
