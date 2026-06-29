@@ -22,6 +22,7 @@
     "pm2:logs": "pm2 logs",
     "test": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/.bin/jest tests/integration tests/unit --config .config/jest/jest.config.js || node scripts/check-test-teardown-exit.js",
     "test:all": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/.bin/jest --config .config/jest/jest.config.js",
+    "test:e2e": "playwright test",
     "test:watch": "cross-env NODE_ENV=test jest tests/integration tests/unit --watch --config .config/jest/jest.config.js",
     "test:coverage": "cross-env NODE_ENV=test jest tests/integration tests/unit --coverage --config .config/jest/jest.config.js",
     "test:unit": "cross-env NODE_ENV=test jest tests/unit --config .config/jest/jest.config.js || node scripts/check-test-teardown-exit.js",
@@ -313,6 +314,7 @@
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "20.0.0",
+    "@playwright/test": "^1.61.1",
     "@redocly/cli": "^2.18.2",
     "auto-changelog": "^2.4.0",
     "chokidar": "^5.0.0",
