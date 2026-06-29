@@ -29,17 +29,27 @@ jest.mock('parse/node', () => {
     limit: jest.fn().mockReturnThis(),
     include: jest.fn().mockReturnThis(),
     matches: jest.fn().mockReturnThis(),
+    doesNotExist: jest.fn().mockReturnThis(),
+    exists: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    greaterThan: jest.fn().mockReturnThis(),
+    lessThan: jest.fn().mockReturnThis(),
     get: jest.fn(),
     find: jest.fn(),
     count: jest.fn(),
     first: jest.fn(),
   });
 
-  // Create a fresh mock query instance for each Query() call
+  // Instancia COMPARTIDA por test: cada new Parse.Query() devuelve la misma, para
+  // que el test y el controlador operen sobre el mismo mock (lo que el test
+  // configura con .get/.find es lo que usa el controlador). Se resetea en beforeEach.
+  let sharedInstance = null;
   const defaultQueryImpl = () => {
-    const instance = createMockQueryInstance();
-    mockInstances.push(instance);
-    return instance;
+    if (!sharedInstance) {
+      sharedInstance = createMockQueryInstance();
+      mockInstances.push(sharedInstance);
+    }
+    return sharedInstance;
   };
   const MockQuery = jest.fn(defaultQueryImpl);
 
@@ -64,6 +74,7 @@ jest.mock('parse/node', () => {
   // Reset function to clear all instances between tests
   MockQuery.resetSharedInstance = () => {
     mockInstances.length = 0;
+    sharedInstance = null;
   };
 
   return {
