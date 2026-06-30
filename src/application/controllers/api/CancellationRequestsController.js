@@ -116,7 +116,13 @@ class CancellationRequestsController {
       // PCI DSS Audit: Log individual READ access
       await logReadAccess(req, request, 'CancellationRequest');
 
-      this.sendSuccess(res, { request }, 'Cancellation request retrieved successfully');
+      // Devolver la MISMA forma plana que usa la tabla (id, quoteFolio, clientName,
+      // requestedByName, eventDate, …). El modal de detalles lee esos campos; el
+      // Parse.Object crudo se serializa con objectId/punteros y dejaba todo en
+      // undefined/N/A.
+      const [transformed] = await this.transformRequestsForDataTables([request]);
+
+      this.sendSuccess(res, transformed, 'Cancellation request retrieved successfully');
     } catch (error) {
       logger.error('Error in CancellationRequestsController.getCancellationRequestById', {
         error: error.message,
