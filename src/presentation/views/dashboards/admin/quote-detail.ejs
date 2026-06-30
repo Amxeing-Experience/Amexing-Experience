@@ -146,6 +146,10 @@ window.__hasPendingCancellation = <%= (typeof hasPendingCancellation !== "undefi
                     </label>
                 </div>
                 <% } %>
+                <div class="quote-status-loader" id="cancelStatusLoader" role="status" aria-live="polite">
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    <span>Abriendo cancelación…</span>
+                </div>
             </div>
             <% } %>
         </div>
@@ -393,7 +397,23 @@ window.__hasPendingCancellation = <%= (typeof hasPendingCancellation !== "undefi
     display: flex;
     flex-direction: column;
     align-items: flex-end;
+    position: relative;
 }
+/* Loader shown while the cancel flow fetches the quote before opening the modal. */
+.quote-status-loader {
+    display: none;
+    position: absolute;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 0.5rem;
+    z-index: 5;
+    font-size: 0.85rem;
+    color: var(--brand-primary);
+}
+.quote-status-loader.is-visible { display: flex; }
 .quote-status-header {
     display: flex;
     align-items: baseline;
@@ -650,6 +670,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (confirmBtn) confirmBtn.disabled = show;
     }
 
+    // Loader over the status control while the cancel flow fetches the quote
+    // (event dates / 24h policy) before the cancellation modal opens.
+    function showCancelLoader(show) {
+        const loader = document.getElementById('cancelStatusLoader');
+        if (loader) loader.classList.toggle('is-visible', show);
+    }
+
     async function applyStatusChange(newStatus, previousStatus) {
         if (newStatus === 'scheduled') showScheduleLoader(true);
         try {
@@ -875,6 +902,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // the 24h policy. On dismiss, revert the segment — UNLESS a cancellation
             // request was just created, in which case keep "Cancelación solicitada".
             pendingCancelCreated = false;
+            showCancelLoader(true);
             try {
                 const qr = await fetch(`/api/quotes/<%= quoteId %>`, {
                     headers: { 'Authorization': `Bearer ${window.quoteAccessToken}` },
@@ -888,6 +916,8 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (e) {
                 revertStatus(previousStatus);
                 alert('No se pudo abrir la cancelación');
+            } finally {
+                showCancelLoader(false);
             }
             return;
         }
