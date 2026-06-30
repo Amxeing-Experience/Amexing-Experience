@@ -805,6 +805,22 @@ class ReservationController {
         }
       }
 
+      // Whether a <24h cancellation request is awaiting approval (the reservation
+      // stays in its real status until approved). Surfaced so the detail shows the
+      // "Pendiente de cancelación" label instead of the cancel button.
+      let hasPendingCancellation = false;
+      if (reservation.get('status') !== 'cancelled') {
+        const quotePtr = reservation.get('quotePtr');
+        if (quotePtr) {
+          const pendingQuery = new Parse.Query('CancellationRequest');
+          pendingQuery.equalTo('quote', quotePtr);
+          pendingQuery.equalTo('status', 'pending');
+          pendingQuery.equalTo('exists', true);
+          const pendingCount = await pendingQuery.count({ useMasterKey: true });
+          hasPendingCancellation = pendingCount > 0;
+        }
+      }
+
       return res.json({
         success: true,
         data: {
@@ -814,6 +830,7 @@ class ReservationController {
           quoteId: reservation.get('quotePtr')?.id || '',
           quoteStatus: reservation.get('quotePtr')?.get('status') || '',
           status: reservation.get('status'),
+          hasPendingCancellation,
           startDate: reservation.get('startDate'),
           endDate: reservation.get('endDate'),
           totalAmount: reservation.get('totalAmount'),
