@@ -8,15 +8,16 @@
  * This script consolidates the data onto the new model so `companyClientPtr` is no longer
  * used, which the agency/client table filters now rely on.
  *
- * What it does (idempotent):
- *   1. For every legacy `Client` still referenced by a quote via companyClientPtr:
- *        - reuse an existing end_client with the same email, or create a new one;
- *        - repoint each quote: client = end_client, clientType = 'direct', unset companyClientPtr;
+ * What it does (idempotent) — migrates ALL legacy `Client` records, deleting none without
+ * preserving their data first:
+ *   1. For EVERY legacy `Client` (used by a quote OR orphaned):
+ *        - reuse an existing end_client with the same email, or create a new one (preserving
+ *          name/email; no-email or duplicate-email get a placeholder username);
+ *        - repoint each of its quotes: client = end_client, clientType = 'direct', unset companyClientPtr;
  *        - repoint linked reservations' clientPtr;
- *        - destroy the legacy Client.
+ *        - retire the legacy Client only AFTER its info lives in the end_client.
  *   2. Clean dangling companyClientPtr (points to a deleted Client) when the quote already
  *      has a real `client`.
- *   3. Delete orphaned legacy `Client` records (no quote/reservation/price/ownership refs).
  *
  * Usage:
  *   node scripts/migrate-legacy-clients-to-endclient.js            # dry-run (no writes)
@@ -43,19 +44,6 @@ function splitName(name) {
   if (!parts[0]) return { firstName: 'Cliente', lastName: '' };
   if (parts.length === 1) return { firstName: parts[0], lastName: '' };
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
-}
-
-// Classes/fields that may reference a Client pointer (for orphan safety check).
-const CLIENT_REFS = [
-  ['Quote', 'companyClientPtr'], ['Quote', 'client'], ['Quote', 'clientFinalId'], ['Quote', 'corporateClient'],
-  ['Reservation', 'clientPtr'], ['ClientPrices', 'clientPtr'],
-  ['Client', 'ownedBy'], ['Client', 'ownerUser'], ['Client', 'owner'],
-  ['ClientEmployee', 'client'], ['ClientEmployee', 'clientPtr'], ['QuoteAccess', 'client'],
-];
-
-async function refCount(cls, field, id) {
-  try { return await new Parse.Query(cls).equalTo(field, clientPtr(id)).count({ useMasterKey: true }); }
-  catch (e) { return 0; }
 }
 
 async function resolveOrCreateEndClient(legacyClient) {
@@ -89,43 +77,37 @@ async function resolveOrCreateEndClient(legacyClient) {
     for (const q of quotes) {
       const cc = q.get('companyClientPtr');
       if (!cc || !cc.get('createdAt')) { dangling.push(q); continue; }
-      (byClient[cc.id] = byClient[cc.id] || { client: cc, quotes: [] }).quotes.push(q);
+      (byClient[cc.id] = byClient[cc.id] || []).push(q);
     }
 
-    // 2) Orphan legacy Clients (no references at all).
+    // 2) Migrar TODOS los Client legados (usados + huérfanos) a end_client. Ninguno se
+    //    borra sin preservar: cada uno se convierte en (o reusa) un end_client; el Client
+    //    legado se retira sólo DESPUÉS de preservar su info en el modelo nuevo.
     const allClients = await new Parse.Query('Client').limit(5000).find({ useMasterKey: true });
-    const orphans = [];
-    for (const c of allClients) {
-      let refs = 0;
-      for (const [cls, f] of CLIENT_REFS) { refs += await refCount(cls, f, c.id); if (refs) break; }
-      if (refs === 0) orphans.push(c);
-    }
+    const withQuotes = allClients.filter((c) => byClient[c.id]).length;
 
-    console.log(`Legacy Clients referenced by quotes: ${Object.keys(byClient).length}`);
-    Object.values(byClient).forEach((g) => console.log(`  - ${g.client.get('name')} (${g.client.id}): ${g.quotes.length} quotes`));
+    console.log(`Total legacy Clients: ${allClients.length} (con quotes: ${withQuotes}, huérfanos: ${allClients.length - withQuotes})`);
     console.log(`Dangling companyClientPtr quotes: ${dangling.length}`);
-    console.log(`Orphan legacy Clients (deletable): ${orphans.length}`);
+    allClients.forEach((c) => console.log(`  - ${c.get('name')} (${c.id}) [exists=${c.get('exists')}]: ${(byClient[c.id] || []).length} quotes`));
 
     if (!APPLY) { console.log('\n(dry-run) re-run with --apply to execute.'); process.exit(0); }
 
-    console.log('\n--apply: migrating...');
-    for (const { client: c, quotes: qs } of Object.values(byClient)) {
+    console.log('\n--apply: migrando TODOS los Client legados a end_client...');
+    for (const c of allClients) {
       const { id: uid, reused } = await resolveOrCreateEndClient(c);
+      const qs = byClient[c.id] || [];
       for (const q of qs) {
         q.set('client', userPtr(uid)); q.unset('companyClientPtr'); q.set('clientType', 'direct');
         await q.save(null, { useMasterKey: true });
         const ress = await new Parse.Query('Reservation').equalTo('quotePtr', q).equalTo('exists', true).find({ useMasterKey: true });
         for (const r of ress) { r.set('clientPtr', userPtr(uid)); await r.save(null, { useMasterKey: true }); }
       }
+      // Info preservada como end_client; se retira el Client legado para limpiar la tabla.
       try { await c.destroy({ useMasterKey: true }); } catch (e) { /* already removed */ }
       console.log(`  ${reused ? '↻' : '+'} ${c.get('name')} -> end_client ${uid} (${qs.length} quotes)`);
     }
     for (const q of dangling) { q.unset('companyClientPtr'); await q.save(null, { useMasterKey: true }); }
     if (dangling.length) console.log(`  🧹 cleaned ${dangling.length} dangling companyClientPtr`);
-    if (orphans.length) {
-      await Parse.Object.destroyAll(orphans.map((o) => clientPtr(o.id)), { useMasterKey: true });
-      console.log(`  🗑️  deleted ${orphans.length} orphan legacy Clients`);
-    }
     console.log('\n✅ Migration complete.');
   } catch (e) { console.error('ERROR', e.message, e.stack); }
   process.exit(0);
