@@ -128,6 +128,20 @@ test.describe('Servicios builder — smoke (split de scripts)', () => {
     const cap = await page.evaluate(() => window.itineraryBuilder.capitalizeFirst('hola'));
     expect(cap, "capitalizeFirst('hola') debe devolver 'Hola'").toBe('Hola');
 
+    // 6. Métodos de gestión de días extraídos a quote-services-v2-days.js (prototype).
+    const DAY_METHODS = [
+      'openDayModal', 'saveDay', 'deleteDay', 'renderDaysSidebar', 'renderDayCard',
+      'findOrCreateDayByDate', 'moveServiceToDay', 'sortServicesByTime', 'getCurrentDayContext',
+    ];
+    const missingDay = await page.evaluate(
+      (names) => names.filter((n) => typeof window.itineraryBuilder[n] !== 'function'),
+      DAY_METHODS,
+    );
+    expect(
+      missingDay,
+      `métodos de días faltantes en el prototype: ${missingDay.join(', ')}`,
+    ).toEqual([]);
+
     // 1. Sin errores de consola / pageerror (orden de carga sano)
     expect(pageErrors, `pageerrors: ${pageErrors.join(' | ')}`).toEqual([]);
     expect(consoleErrors, `console.error: ${consoleErrors.join(' | ')}`).toEqual([]);
