@@ -842,7 +842,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('La reserva ha sido cancelada exitosamente.');
                 window.location.reload();
             } else {
-                const requestId = result.data.request?.id || result.data.requestId || 'N/D';
+                const requestId = result.data.requestId || result.data.request?.objectId || result.data.request?.id || 'N/D';
                 // Reservation stays 'confirmed' in the DB until approved; reflect the
                 // pending cancellation in the control and keep it (don't revert onClose).
                 if (window.__isReservation) {

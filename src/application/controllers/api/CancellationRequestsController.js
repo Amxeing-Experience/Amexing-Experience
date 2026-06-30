@@ -748,6 +748,9 @@ class CancellationRequestsController {
 
     return {
       request,
+      // Expose the id explicitly: a serialized Parse.Object uses `objectId`, not `id`,
+      // so the client cannot read `request.id` off the JSON response.
+      requestId: request.id,
       cancellationType: 'request',
       hoursBeforeEvent,
       message: 'Cancellation request created for approval (less than 24 hours before event)',
