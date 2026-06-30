@@ -681,6 +681,9 @@ class ItineraryBuilder {
         this.updateTransferArrivalEstimate();
         // Mostrar/ocultar el total ida y vuelta (×2) según el tipo de viaje.
         this.updateRouteDurationRoundTripHint();
+        // El multiplicador de round-trip (vehículo/espera/guía/greeter ×2) cambia el desglose:
+        // recalcular para que no quede el de one-way. Cascadea a updateDevPaymentBreakdown.
+        this.updateServicePriceBreakdown();
       });
     });
 
@@ -3459,6 +3462,9 @@ class ItineraryBuilder {
       // Fuente única: campo editable → lookup → guardado (ver getRouteDurationMinutes).
       const routeDuration = this.getRouteDurationMinutes();
 
+      // Nota: la lógica de round-trip (×2 a vehículo/espera/guía/greeter) vive en
+      // updateDevPaymentBreakdown, cuyo resultado (_transportBreakdownTotals) es el que se
+      // guarda. Este bloque es solo FALLBACK cuando no hay breakdown del preview.
       if (includeGuide && routeDuration) {
         guideCostEfectivo = this.calculateGuideTransportCost(routeDuration);
       }
@@ -8621,7 +8627,8 @@ class ItineraryBuilder {
       if (waitingHours > 0) {
         // Tarifa editable (si el usuario la modificó) o la de catálogo.
         waitingHourlyRate = this.getEffectiveWaitingHourlyRate();
-        waitingCostEfectivo = waitingHourlyRate * waitingHours;
+        // Round-trip: la espera cuenta ida + vuelta (×2 total); one-way ×1. Confirmado por cliente.
+        waitingCostEfectivo = waitingHourlyRate * waitingHours * legMultiplier;
       }
 
       // Calculate guide costs if applicable
@@ -8631,7 +8638,9 @@ class ItineraryBuilder {
       const routeDuration = this.getRouteDurationMinutes();
 
       if (includeGuide && routeDuration) {
-        guideCostEfectivo = this.calculateGuideTransportCost(routeDuration);
+        // Round-trip: la guía cobra ida + vuelta. Sobre el ×2 base del motor (el guía va y
+        // regresa), round-trip lo duplica → ×4 total; one-way ×2. Confirmado por cliente.
+        guideCostEfectivo = this.calculateGuideTransportCost(routeDuration) * legMultiplier;
       }
 
       // Calculate greeter costs if applicable
@@ -8639,10 +8648,7 @@ class ItineraryBuilder {
       let greeterCostEfectivo = 0;
 
       if (includeGreeter && routeDuration) {
-        // Round-trip: el greeter atiende ida + vuelta (×2), igual que el transporte (legMultiplier).
-        // Antes quedaba en ×1 y se sub-cobraba el greeter en viajes redondos.
-        // TODO(cliente): pendiente de confirmación — ver docs/backlog/TODO-roundtrip-greeter-duracion.md
-        // (greeter ×2, guía en one-way, y regreso con duración distinta). Rama sin mergear hasta validar.
+        // Round-trip: el greeter atiende ida + vuelta (×2 total); one-way ×1. Confirmado por cliente.
         greeterCostEfectivo = this.calculateGreeterPrice(routeDuration) * legMultiplier;
       }
 
@@ -8714,11 +8720,11 @@ class ItineraryBuilder {
       // greeter no) y devuelve los totales por forma de pago + el desglose por nodo.
       const transferRate = this.transferRate;
       const agencyRate = this.agencyRate;
-      // Tiempo de espera de los vehículos adicionales: cada uno su tarifa × sus horas (×1,
-      // no se duplica en round-trip, igual que la espera del principal).
-      const extraWaitingCostEfectivo = (typeof this.getExtraAdditionalVehiclesWaitingCostEfectivo === 'function')
+      // Tiempo de espera de los vehículos adicionales: cada uno su tarifa × sus horas.
+      // Round-trip: cuenta ida + vuelta (×2 total), igual que la espera del principal. Confirmado por cliente.
+      const extraWaitingCostEfectivo = ((typeof this.getExtraAdditionalVehiclesWaitingCostEfectivo === 'function')
         ? this.getExtraAdditionalVehiclesWaitingCostEfectivo()
-        : 0;
+        : 0) * legMultiplier;
       const transportNodes = [
         { key: 'vehicle', efectivo: vehicleTotalEfectivo, surcharge: true },
         { key: 'waiting', efectivo: waitingCostEfectivo, surcharge: true },
@@ -8796,7 +8802,7 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const guideRate = this.guideTransportRateCache?.value || 400;
         const formulaConfig = this.guideFormulaConfigCache || { roundTripMultiplier: 2, minimumCharge: 0 };
-        const multiplier = formulaConfig.roundTripMultiplier || 2;
+        const multiplier = (formulaConfig.roundTripMultiplier || 2) * legMultiplier;
         efectivoBreakdown += `\nGuía + Chofer (${durationHours}h × ${multiplier} × $${guideRate}): $${guideCostEfectivo.toFixed(2)}`;
       }
       if (includeGreeter && greeterCostEfectivo > 0) {
@@ -8806,7 +8812,7 @@ class ItineraryBuilder {
         efectivoBreakdown += `\nGreeter (($${basePrice} + $${hourlyRate}×${durationHours}h)${legMultiplier > 1 ? ` × ${legMultiplier}` : ''} = $${greeterCostEfectivo.toFixed(2)}): $${greeterCostEfectivo.toFixed(2)}`;
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
-        efectivoBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingHourlyRate.toFixed(2)}): $${waitingCostEfectivo.toFixed(2)}`;
+        efectivoBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingHourlyRate.toFixed(2)}${legMultiplier > 1 ? ` × ${legMultiplier}` : ''}): $${waitingCostEfectivo.toFixed(2)}`;
       }
       if (extraWaitingCostEfectivo > 0) {
         efectivoBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.efectivo ?? extraWaitingCostEfectivo).toFixed(2)}`;
@@ -8826,7 +8832,7 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const guideRate = this.guideTransportRateCache?.value || 400;
         const formulaConfig = this.guideFormulaConfigCache || { roundTripMultiplier: 2, minimumCharge: 0 };
-        const multiplier = formulaConfig.roundTripMultiplier || 2;
+        const multiplier = (formulaConfig.roundTripMultiplier || 2) * legMultiplier;
         transferenciaBreakdown += `\nGuía + Chofer (${durationHours}h × ${multiplier} × $${guideRate}): $${guideCostTransferencia.toFixed(2)}`;
       }
       if (includeGreeter && greeterCostTransferencia > 0) {
@@ -8837,7 +8843,7 @@ class ItineraryBuilder {
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.transferRate / 100));
-        transferenciaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTransferencia.toFixed(2)}`;
+        transferenciaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}${legMultiplier > 1 ? ` × ${legMultiplier}` : ''}): $${waitingCostTransferencia.toFixed(2)}`;
       }
       if (extraWaitingCostEfectivo > 0) {
         transferenciaBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.transferencia ?? 0).toFixed(2)}`;
@@ -8857,7 +8863,7 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const guideRate = this.guideTransportRateCache?.value || 400;
         const formulaConfig = this.guideFormulaConfigCache || { roundTripMultiplier: 2, minimumCharge: 0 };
-        const multiplier = formulaConfig.roundTripMultiplier || 2;
+        const multiplier = (formulaConfig.roundTripMultiplier || 2) * legMultiplier;
         tarjetaBreakdown += `\nGuía + Chofer (${durationHours}h × ${multiplier} × $${guideRate}): $${guideCostTarjeta.toFixed(2)}`;
       }
       if (includeGreeter && greeterCostTarjeta > 0) {
@@ -8868,7 +8874,7 @@ class ItineraryBuilder {
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.agencyRate / 100));
-        tarjetaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTarjeta.toFixed(2)}`;
+        tarjetaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}${legMultiplier > 1 ? ` × ${legMultiplier}` : ''}): $${waitingCostTarjeta.toFixed(2)}`;
       }
       if (extraWaitingCostEfectivo > 0) {
         tarjetaBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.tarjeta ?? 0).toFixed(2)}`;
@@ -14880,7 +14886,9 @@ class ItineraryBuilder {
           }
 
           // Combined vehicle + guide line - use surcharged prices
-          const guideCost = this.calculateGuideTransportCost(routeDuration); // Guide cost (no surcharge on guide)
+          // Round-trip: la guía cobra ida + vuelta (× brkLegMultiplier) igual que el vehículo y el
+          // greeter → ×4 total (el ×2 base del motor × ×2 round-trip); one-way ×2. Confirmado por cliente.
+          const guideCost = this.calculateGuideTransportCost(routeDuration) * brkLegMultiplier; // Guide cost (no surcharge on guide)
           const roundTripVehiclePrice = displayUnitPrice * brkLegMultiplier; // Apply round-trip to surcharged vehicle price
           const combinedUnitPrice = roundTripVehiclePrice + guideCost; // Add guide cost to round-trip vehicle price
           const combinedTotal = combinedUnitPrice * quantity; // Multiply by quantity for total
