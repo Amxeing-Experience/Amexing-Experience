@@ -10832,23 +10832,6 @@ class ItineraryBuilder {
     return Math.max(0, basePrice || 0);
   }
 
-  calculatePaymentSurcharge(baseAmount, paymentType) {
-    if (paymentType === 'efectivo') {
-      return 0; // No surcharge for cash
-    }
-
-    let surchargedAmount = baseAmount;
-    if (window.PricingUtils) {
-      surchargedAmount = PricingUtils.applyPaymentRate(baseAmount, paymentType, this.transferRate, this.agencyRate);
-    } else if (paymentType === 'transferencia' && this.transferRate > 0) {
-      surchargedAmount = baseAmount * (1 + this.transferRate / 100);
-    } else if (paymentType === 'tarjeta' && this.agencyRate > 0) {
-      surchargedAmount = baseAmount * (1 + this.agencyRate / 100);
-    }
-
-    return surchargedAmount - baseAmount; // Return only the surcharge amount
-  }
-
   getSurchargePercentage(paymentType) {
     if (paymentType === 'efectivo') {
       return 0;
