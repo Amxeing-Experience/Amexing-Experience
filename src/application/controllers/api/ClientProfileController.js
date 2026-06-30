@@ -16,12 +16,19 @@ const logger = require('../../../infrastructure/logger');
 const ClientAddress = require('../../../domain/models/ClientAddress');
 const TravelPreference = require('../../../domain/models/TravelPreference');
 const ClientPassport = require('../../../domain/models/ClientPassport');
+const ClientDocument = require('../../../domain/models/ClientDocument');
 const FileStorageService = require('../../services/FileStorageService');
 const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
 
-// Accepted document types for a passport copy (image or PDF) and the upload size cap.
+// Accepted document types for a passport copy (image or PDF) and the upload size cap. The (?!svg)
+// excludes image/svg+xml: SVG can carry script that would execute when the presigned URL is opened.
 const PASSPORT_DOC_MAX_BYTES = 5 * 1024 * 1024; // 5MB
-const PASSPORT_DOC_MIME = /^(image\/|application\/pdf$)/;
+const PASSPORT_DOC_MIME = /^(image\/(?!svg)|application\/pdf$)/;
+
+// Client documents (base64-in-JSON upload — WAF returns 426 for multipart binary): image or PDF, ≤10MB.
+const CLIENT_DOC_MAX_BYTES = 10 * 1024 * 1024; // 10MB
+const CLIENT_DOC_MIME = /^(image\/(?!svg)|application\/pdf$)/;
+const CLIENT_DOC_LABEL_MAX = 60;
 
 // Multer (memory storage) for the passport document upload — mirrors ProfileImageController.
 const passportUpload = multer({
@@ -61,6 +68,10 @@ class ClientProfileController {
     this.uploadPassportDocument = this.uploadPassportDocument.bind(this);
     this.deletePassport = this.deletePassport.bind(this);
     this.revealPassportNumber = this.revealPassportNumber.bind(this);
+    this.getDocuments = this.getDocuments.bind(this);
+    this.uploadDocument = this.uploadDocument.bind(this);
+    this.updateDocument = this.updateDocument.bind(this);
+    this.deleteDocument = this.deleteDocument.bind(this);
     this.getTrips = this.getTrips.bind(this);
   }
 
@@ -414,6 +425,24 @@ class ClientProfileController {
     return passportUpload.single('document');
   }
 
+  // Verify the file's real content matches its declared mimetype by magic bytes. The browser-sent
+  // mimetype can lie: a macOS AppleDouble "._" metadata file, or a spoofed/script payload renamed to
+  // look like an image. Returns true only when the bytes are a recognized PDF or raster image
+  // consistent with `mimetype`. Shared by the passport and document upload paths.
+  static contentMatchesMime(buffer, mimetype) {
+    const sig = buffer.slice(0, 16);
+    const isPdf = buffer.slice(0, 1024).includes('%PDF');
+    const isImage = (sig[0] === 0xFF && sig[1] === 0xD8) // JPEG
+      || (sig[0] === 0x89 && sig[1] === 0x50 && sig[2] === 0x4E && sig[3] === 0x47) // PNG
+      || (sig[0] === 0x47 && sig[1] === 0x49 && sig[2] === 0x46) // GIF
+      || (sig.slice(0, 4).toString('latin1') === 'RIFF' && sig.slice(8, 12).toString('latin1') === 'WEBP')
+      || (sig.slice(4, 8).toString('latin1') === 'ftyp') // AVIF/HEIC
+      || (sig[0] === 0x42 && sig[1] === 0x4D); // BMP
+    if (mimetype === 'application/pdf') return isPdf;
+    if (mimetype.startsWith('image/')) return isImage;
+    return false;
+  }
+
   // Serialize a passport, resolving the presigned passportDocument URL from its S3 key when set.
   async serializePassport(passport, ctx = {}) {
     const json = await passport.toSafeJSON(ctx);
@@ -515,20 +544,11 @@ class ClientProfileController {
         return this.sendError(res, 'El archivo supera el límite de 5MB', 400);
       }
 
-      // The mimetype the browser sends can lie: a macOS AppleDouble "._" metadata file (magic
-      // 0x00051607) gets picked instead of the real PDF and uploaded as application/pdf, producing an
-      // unreadable document. Verify the actual content by magic bytes before storing anything.
-      const sig = file.buffer.slice(0, 16);
-      const isPdf = file.buffer.slice(0, 1024).includes('%PDF');
-      const isImage = (sig[0] === 0xFF && sig[1] === 0xD8) // JPEG
-        || (sig[0] === 0x89 && sig[1] === 0x50 && sig[2] === 0x4E && sig[3] === 0x47) // PNG
-        || (sig[0] === 0x47 && sig[1] === 0x49 && sig[2] === 0x46) // GIF
-        || (sig.slice(0, 4).toString('latin1') === 'RIFF' && sig.slice(8, 12).toString('latin1') === 'WEBP')
-        || (sig.slice(4, 8).toString('latin1') === 'ftyp') // AVIF/HEIC
-        || (sig[0] === 0x42 && sig[1] === 0x4D); // BMP
-      if ((file.mimetype === 'application/pdf' && !isPdf) || (file.mimetype.startsWith('image/') && !isImage)) {
+      // Verify the actual content by magic bytes before storing anything (the browser mimetype lies
+      // for a macOS "._" metadata file, etc.). Shared helper — same check the document path uses.
+      if (!ClientProfileController.contentMatchesMime(file.buffer, file.mimetype)) {
         logger.warn('Rejected passport document with mismatched content', {
-          mimetype: file.mimetype, first8Hex: sig.slice(0, 8).toString('hex'), originalname: file.originalname,
+          mimetype: file.mimetype, first8Hex: file.buffer.slice(0, 8).toString('hex'), originalname: file.originalname,
         });
         return this.sendError(
           res,
@@ -621,6 +641,195 @@ class ClientProfileController {
     }
   }
 
+  // ---------- documents (ClientDocument; files in S3, no field-level encryption) ----------
+
+  // Serialize a document, resolving the presigned documentUrl from its S3 key.
+  async serializeDocument(doc) {
+    const json = doc.toSafeJSON();
+    if (json.s3Key) {
+      json.documentUrl = await this.fileStorageService.getPresignedUrl(json.s3Key);
+    }
+    return json;
+  }
+
+  async getDocuments(req, res) {
+    const owner = this.resolveOwner(req);
+    try {
+      await this.validateOwnerExists(owner);
+      const documents = await ClientDocument.getByOwner(owner.ownerType, owner.ownerId);
+      const data = await Promise.all(documents.map((d) => this.serializeDocument(d)));
+      this.sendSuccess(res, { documents: data }, 'Documents retrieved successfully');
+    } catch (error) {
+      logger.error('Error in ClientProfileController.getDocuments', { error: error.message, ownerId: owner.ownerId });
+      this.sendError(res, 'Failed to retrieve documents', error.status || 500);
+    }
+  }
+
+  // Validate a base64 document payload and store it via the same S3 pipeline as the passport copy
+  // (images → optimizer with AVIF/WebP variants, PDFs → direct). Returns { s3Key, size, safeName }.
+  // Throws an Error with `.status` 400 on bad input (the caller's catch turns it into the response).
+  async storeDocumentFile(owner, {
+    fileBase64, fileName, mimeType, label, userId,
+  }) {
+    const fail = (msg) => Object.assign(new Error(msg), { status: 400 });
+
+    if (!fileBase64) throw fail('No se recibió ningún archivo');
+    if (!mimeType || !CLIENT_DOC_MIME.test(mimeType)) throw fail('Tipo de archivo no permitido. Solo imágenes o PDF.');
+    // Reject clearly-oversized payloads before allocating the Buffer (base64 is ~1.37× the bytes).
+    if (typeof fileBase64 !== 'string' || fileBase64.length > Math.ceil(CLIENT_DOC_MAX_BYTES * 1.4)) {
+      throw fail('El archivo supera el límite de 10MB');
+    }
+
+    const buffer = Buffer.from(fileBase64, 'base64');
+    if (!buffer.length) throw fail('Archivo inválido');
+    if (buffer.length > CLIENT_DOC_MAX_BYTES) throw fail('El archivo supera el límite de 10MB');
+    // The declared mimeType can lie; verify the real content by magic bytes.
+    if (!ClientProfileController.contentMatchesMime(buffer, mimeType)) {
+      logger.warn('Rejected client document with mismatched content', {
+        mimeType, first8Hex: buffer.slice(0, 8).toString('hex'), fileName,
+      });
+      throw fail('El archivo no es un PDF o imagen válido.');
+    }
+
+    const entityPath = `documents/${owner.ownerId}`;
+    const safeName = (fileName || 'documento').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const uniqueName = `document-${owner.ownerId}-${Date.now()}-${safeName}`;
+
+    let s3Key;
+    if (mimeType.startsWith('image/')) {
+      const result = await this.serverOptimizationService.uploadOptimizedImage(
+        buffer,
+        uniqueName,
+        mimeType,
+        { entityPath, entityId: owner.ownerId }
+      );
+      s3Key = result && result.originalS3Key;
+    } else {
+      const result = await this.fileStorageService.uploadFile(buffer, uniqueName, mimeType, {
+        entityId: entityPath,
+        metadata: { label, ownerType: owner.ownerType, ownerId: owner.ownerId },
+        userContext: { userId },
+      });
+      s3Key = result && result.s3Key;
+    }
+    if (!s3Key) throw new Error('Error al subir el documento');
+    return { s3Key, size: buffer.length, safeName };
+  }
+
+  // Upload a client document via base64-in-JSON (multipart is blocked by the WAF, HTTP 426).
+  // Body: { fileBase64, fileName, mimeType, label }.
+  async uploadDocument(req, res) {
+    const owner = this.resolveOwner(req);
+    try {
+      await this.validateOwnerExists(owner);
+
+      const { fileBase64, fileName, mimeType } = req.body;
+
+      // The document type is free text (the admin types it; the predefined labels are only datalist
+      // suggestions), so any document the existing tags don't cover is allowed. Trim + clamp length.
+      const label = (req.body.label || '').trim().slice(0, CLIENT_DOC_LABEL_MAX);
+      if (!label) return this.sendError(res, 'Escribe el tipo de documento', 400);
+
+      const stored = await this.storeDocumentFile(owner, {
+        fileBase64, fileName, mimeType, label, userId: req.user?.id,
+      });
+
+      const doc = ClientDocument.create({
+        ownerType: owner.ownerType,
+        ownerId: owner.ownerId,
+        label,
+        customLabel: '',
+        fileName: fileName || stored.safeName,
+        mimeType,
+        size: stored.size,
+        s3Key: stored.s3Key,
+        isSensitive: ClientDocument.isSensitiveLabel(label),
+        uploadedBy: req.user,
+      });
+      await doc.save(null, { useMasterKey: true });
+
+      logger.info('Client document uploaded', {
+        ...owner, documentId: doc.id, s3Key: stored.s3Key, userId: req.user?.id,
+      });
+      this.sendSuccess(res, { document: await this.serializeDocument(doc) }, 'Documento subido exitosamente', 201);
+    } catch (error) {
+      logger.error('Error in ClientProfileController.uploadDocument', { error: error.message, ownerId: owner.ownerId });
+      this.sendError(res, error.message, error.status || 500);
+    }
+  }
+
+  // Update a document's type (label) and optionally replace its file — mirrors the passport edit:
+  // the PUT updates fields, and if a new file is sent it's stored via the same pipeline and the old
+  // S3 object is cleaned up. Body: { label, [fileBase64, fileName, mimeType] }.
+  async updateDocument(req, res) {
+    const owner = this.resolveOwner(req);
+    try {
+      await this.validateOwnerExists(owner);
+      const doc = await this.findOwnedRecord('ClientDocument', req.params.docId, owner);
+
+      const label = (req.body.label || '').trim().slice(0, CLIENT_DOC_LABEL_MAX);
+      if (!label) return this.sendError(res, 'Escribe el tipo de documento', 400);
+      doc.setLabel(label);
+      doc.setSensitive(ClientDocument.isSensitiveLabel(label));
+
+      // File replacement is optional — when no new file is sent the current one is kept.
+      const { fileBase64, fileName, mimeType } = req.body;
+      if (fileBase64) {
+        const oldS3Key = doc.getS3Key();
+        const stored = await this.storeDocumentFile(owner, {
+          fileBase64, fileName, mimeType, label, userId: req.user?.id,
+        });
+        doc.setS3Key(stored.s3Key);
+        doc.setFileName(fileName || stored.safeName);
+        doc.setMimeType(mimeType);
+        doc.setSize(stored.size);
+        // Best-effort cleanup of the replaced file (the row already points at the new one).
+        if (oldS3Key && oldS3Key !== stored.s3Key) {
+          try {
+            await this.fileStorageService.deleteFile(oldS3Key);
+          } catch (e) {
+            logger.warn('Failed to delete replaced document file from S3', { s3Key: oldS3Key, error: e.message });
+          }
+        }
+      }
+
+      await doc.save(null, { useMasterKey: true });
+      this.sendSuccess(res, { document: await this.serializeDocument(doc) }, 'Documento actualizado');
+    } catch (error) {
+      logger.error('Error in ClientProfileController.updateDocument', { error: error.message, ownerId: owner.ownerId });
+      this.sendError(res, error.message, error.status || 500);
+    }
+  }
+
+  /**
+   * Soft-delete a document owned by the request owner (and remove the S3 file).
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async deleteDocument(req, res) {
+    const owner = this.resolveOwner(req);
+    try {
+      await this.validateOwnerExists(owner);
+      const doc = await this.findOwnedRecord('ClientDocument', req.params.docId, owner);
+      const s3Key = doc.getS3Key();
+      await doc.softDelete(req.user);
+      // Best-effort S3 cleanup; the row is already soft-deleted regardless.
+      if (s3Key) {
+        try {
+          await this.fileStorageService.deleteFile(s3Key);
+        } catch (e) {
+          logger.warn('Failed to delete document file from S3', { s3Key, error: e.message });
+        }
+      }
+      this.sendSuccess(res, { id: req.params.docId }, 'Documento eliminado');
+    } catch (error) {
+      logger.error('Error in ClientProfileController.deleteDocument', { error: error.message, ownerId: owner.ownerId });
+      this.sendError(res, error.message, error.status || 500);
+    }
+  }
+
   // ---------- trips (read-only: quotes/reservations linked to this client) ----------
 
   async getTrips(req, res) {
@@ -628,11 +837,28 @@ class ClientProfileController {
     try {
       const ownerObj = await this.validateOwnerExists(owner);
 
-      // A migrated person's trips can be linked by either of two pointers:
-      //   new quotes  → Quote.client (Pointer<AmexingUser>) + clientType 'direct'
-      //   old quotes  → Quote.companyClientPtr (Pointer<Client> == legacyClientId)
+      const userName = (u) => (u
+        ? (`${u.get('firstName') || ''} ${u.get('lastName') || ''}`.trim() || u.get('email') || u.get('username') || '')
+        : '');
+      // A quote belongs to an AGENCY via its `client` pointer (an AmexingUser, role department_manager).
+      // The agency display name is contextualData.companyName (e.g. 'DENMF y Asociados', 'Nuba').
+      const agencyNameOf = (clientPtr) => {
+        if (!clientPtr || clientPtr.get('role') !== 'department_manager') return '';
+        const cd = clientPtr.get('contextualData') || {};
+        return cd.companyName || cd.agencyName || userName(clientPtr);
+      };
+
       let query;
-      if (owner.ownerType === 'amexingUser') {
+      if (owner.ownerType === 'amexingUser' && ownerObj.get('role') === 'department_manager') {
+        // Agency view: every quote of the agency points to this department manager via `client`
+        // (regardless of which agent owns/created it). One simple query covers the whole agency.
+        const AmexingUser = Parse.Object.extend('AmexingUser');
+        query = new Parse.Query('Quote');
+        query.equalTo('client', AmexingUser.createWithoutData(owner.ownerId));
+      } else if (owner.ownerType === 'amexingUser') {
+        // A migrated person's trips can be linked by either of two pointers:
+        //   new quotes  → Quote.client (Pointer<AmexingUser>) + clientType 'direct'
+        //   old quotes  → Quote.companyClientPtr (Pointer<Client> == legacyClientId)
         const AmexingUser = Parse.Object.extend('AmexingUser');
         const userPtr = AmexingUser.createWithoutData(owner.ownerId);
         const byClient = new Parse.Query('Quote');
@@ -657,18 +883,37 @@ class ClientProfileController {
 
       query.equalTo('exists', true);
       query.descending('createdAt');
-      query.limit(100);
+      query.limit(1000); // the trips table paginates client-side (DataTables) — load the full list
+      query.include('client'); // the agency (department manager)
+      query.include('owner'); // responsible person (exposed as a plus)
+      query.include('createdBy');
       const quotes = await query.find({ useMasterKey: true });
 
-      const trips = quotes.map((q) => ({
-        id: q.id,
-        folio: q.get('folio') || '',
-        eventType: q.get('eventType') || '',
-        status: q.get('status') || '',
-        startDate: q.get('startDate') || null,
-        endDate: q.get('endDate') || null,
-        createdAt: q.get('createdAt'),
-      }));
+      const trips = quotes.map((q) => {
+        // Services are denormalized on the quote: serviceItems.days[].subconcepts[]. Count them
+        // (one subconcept = one service, matching what the itinerary shows) — no extra queries.
+        const si = q.get('serviceItems');
+        const serviceCount = si && Array.isArray(si.days)
+          ? si.days.reduce((sum, d) => sum + (Array.isArray(d.subconcepts) ? d.subconcepts.length : 0), 0)
+          : 0;
+        // Responsible person (the "plus"): owner, falling back to creator when owner has no name.
+        const ownerPtr = q.get('owner');
+        const createdByPtr = q.get('createdBy');
+        const agentObj = (ownerPtr && (ownerPtr.get('firstName') || ownerPtr.get('lastName') || ownerPtr.get('email')))
+          ? ownerPtr : createdByPtr;
+        return {
+          id: q.id,
+          folio: q.get('folio') || '',
+          eventType: q.get('eventType') || '',
+          status: q.get('status') || '',
+          startDate: q.get('startDate') || null,
+          endDate: q.get('endDate') || null,
+          createdAt: q.get('createdAt'),
+          serviceCount,
+          agency: agencyNameOf(q.get('client')),
+          agent: userName(agentObj),
+        };
+      });
 
       this.sendSuccess(res, { trips }, 'Trips retrieved successfully');
     } catch (error) {

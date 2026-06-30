@@ -13,6 +13,13 @@ const PREFERENCE_CATALOG = {
   'Vehículo preferido': ['Sedán', 'SUV', 'Suburban', 'Eléctrico'],
   'Idioma preferido': ['Español', 'Inglés', 'Francés', 'Alemán', 'Italiano', 'Portugués'],
 };
+
+// Predefined client-document labels (kept in sync with src/domain/models/ClientDocument.js
+// DOCUMENT_LABELS). Shown as datalist suggestions only — the admin types the document type by hand,
+// so any document not covered by these tags is allowed.
+const DOCUMENT_LABELS = ['Identificación oficial (INE)', 'Pasaporte', 'Visa', 'Comprobante de pago',
+  'Boletos / pase de abordar', 'Voucher / confirmación de reserva', 'Seguro de viaje',
+  'Datos fiscales (RFC)', 'Otro documento'];
 %>
 <style>
     #profileModal .form-control, #profileModal .form-select,
@@ -33,6 +40,7 @@ window.initProfileSection = function (root) {
     // (AmexingUser agent). Falls back to the client base for backward compatibility.
     const base = root.dataset.ownerBase || `/api/clients/${clientId}`;
     const PREFERENCE_CATALOG = <%- JSON.stringify(PREFERENCE_CATALOG) %>;
+    const DOCUMENT_LABELS = <%- JSON.stringify(DOCUMENT_LABELS) %>;
     // Categories where the client can pick several options at once (rendered as checkboxes).
     const PREFERENCE_MULTI = ['Tipo de comida', 'Restricción / Alergia', 'Bebida / Alcohol', 'Interés / Experiencia'];
 
@@ -277,6 +285,101 @@ window.initProfileSection = function (root) {
         const json = await res.json().catch(() => ({}));
         if (!res.ok || json.success === false) throw new Error(json.error || `Error ${res.status}`);
         return true;
+    }
+
+    // ---------- Documents ----------
+    const DOC_LABEL_MAX = 60;
+    const DOC_MAX_BYTES = 10 * 1024 * 1024; // 10MB
+
+    function humanSize(bytes) {
+        const n = Number(bytes) || 0;
+        if (n < 1024) return `${n} B`;
+        if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+        return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    async function loadDocuments() {
+        const box = document.getElementById('documentsContainer');
+        if (!box) return; // agencies don't render the documents card
+        try {
+            const { documents } = await api('/documents');
+            if (!documents.length) { box.innerHTML = '<p class="text-muted mb-0">Sin documentos registrados.</p>'; return; }
+            box.innerHTML = documents.map((d) => {
+                const name = d.label === 'Otro documento' && d.customLabel ? d.customLabel : d.label;
+                return `
+                <div class="d-flex justify-content-between align-items-start border-bottom py-2">
+                    <div>
+                        <div class="fw-semibold">${esc(name) || 'Documento'}${d.isSensitive ? '<span class="badge bg-secondary ms-2"><i class="ti ti-lock me-1"></i>Sensible</span>' : ''}</div>
+                        <div class="text-muted small">${esc(d.fileName)}${d.size ? ` · ${humanSize(d.size)}` : ''}</div>
+                        ${d.documentUrl ? `<a href="${esc(d.documentUrl)}" target="_blank" class="small"><i class="ti ti-file me-1"></i>Ver documento</a>` : ''}
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-light" title="Editar" data-edit-doc="${d.id}"><i class="ti ti-pencil"></i></button>
+                        <button class="btn btn-light text-danger" title="Eliminar" data-del-doc="${d.id}"><i class="ti ti-trash"></i></button>
+                    </div>
+                </div>`;
+            }).join('');
+            box._data = documents;
+        } catch (e) { box.innerHTML = `<p class="text-danger mb-0">${esc(e.message)}</p>`; }
+    }
+
+    function documentForm(fileOptional) {
+        // The type is free text (datalist = suggestions only) so the admin can write a type the
+        // predefined tags don't cover.
+        const opts = DOCUMENT_LABELS.map((l) => `<option value="${esc(l)}"></option>`).join('');
+        const fileHint = fileOptional ? ' <span class="text-muted">(opcional · deja vacío para conservar el actual)</span>' : '';
+        return `
+            <div class="row g-2">
+                <div class="col-12"><label class="form-label small">Tipo de documento</label>
+                    <input class="form-control" data-f="label" list="documentLabelOptions" maxlength="${DOC_LABEL_MAX}" placeholder="Escribe o elige el tipo de documento">
+                    <datalist id="documentLabelOptions">${opts}</datalist></div>
+                <div class="col-12"><label class="form-label small">Archivo (foto o PDF)${fileHint}</label>
+                    <input type="file" class="form-control" data-f-file="document" accept="image/*,application/pdf"></div>
+            </div>`;
+    }
+
+    // Read a File as base64 (strip the "data:...;base64," prefix) for the JSON upload body.
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+            reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Upload a document via base64-in-JSON (multipart is blocked by the WAF, HTTP 426).
+    // Throws on validation failure so openModal keeps the form open and shows the message.
+    async function uploadDocument(values, file) {
+        if (!values.label || !values.label.trim()) throw new Error('Escribe el tipo de documento');
+        if (!file) throw new Error('Selecciona un archivo');
+        if (file.size > DOC_MAX_BYTES) throw new Error('El archivo supera el límite de 10MB');
+        if (!/^image\//.test(file.type) && file.type !== 'application/pdf') {
+            throw new Error('Tipo de archivo no permitido. Solo imágenes o PDF.');
+        }
+        const fileBase64 = await fileToBase64(file);
+        await api('/documents', 'POST', {
+            fileBase64,
+            fileName: file.name,
+            mimeType: file.type,
+            label: values.label.trim(),
+        });
+    }
+
+    // Update a document: label always; file only if a new one is chosen (mirrors the passport edit).
+    async function updateDocument(docId, values, file) {
+        if (!values.label || !values.label.trim()) throw new Error('Escribe el tipo de documento');
+        const body = { label: values.label.trim() };
+        if (file) {
+            if (file.size > DOC_MAX_BYTES) throw new Error('El archivo supera el límite de 10MB');
+            if (!/^image\//.test(file.type) && file.type !== 'application/pdf') {
+                throw new Error('Tipo de archivo no permitido. Solo imágenes o PDF.');
+            }
+            body.fileBase64 = await fileToBase64(file);
+            body.fileName = file.name;
+            body.mimeType = file.type;
+        }
+        await api(`/documents/${docId}`, 'PUT', body);
     }
 
     // ---------- Addresses ----------
@@ -642,6 +745,54 @@ window.initProfileSection = function (root) {
         const rows = box.querySelector('[data-loyalty-rows]');
         if (rows) rows.insertAdjacentHTML('beforeend', loyaltyRow());
     });
+    // Documents: only ~2 fields (tipo + archivo) → render the form inline in the card, not a modal.
+    // openDocumentForm(null) = add; openDocumentForm(doc) = edit (prefilled, file optional). Same edit
+    // capability as the passport, kept inline per the 2-field rule.
+    function openDocumentForm(doc) {
+        const wrap = document.getElementById('documentFormWrap');
+        if (!wrap) return;
+        // Re-clicking "Agregar" while the add form is open toggles it closed.
+        if (!doc && wrap.style.display !== 'none' && wrap.dataset.mode === 'add') {
+            wrap.style.display = 'none'; wrap.innerHTML = ''; wrap.dataset.mode = ''; return;
+        }
+        wrap.dataset.mode = doc ? 'edit' : 'add';
+        wrap.innerHTML = `${documentForm(!!doc)}
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button type="button" class="btn btn-sm btn-secondary" data-doc-cancel><i class="ti ti-x me-1"></i>Cancelar</button>
+                <button type="button" class="btn btn-sm btn-primary" data-doc-submit><i class="ti ti-${doc ? 'check' : 'upload'} me-1"></i>${doc ? 'Guardar' : 'Subir'}</button>
+            </div>`;
+        if (doc) {
+            const labelInput = wrap.querySelector('[data-f="label"]');
+            if (labelInput) labelInput.value = doc.customLabel || doc.label || '';
+        }
+        wrap.style.display = '';
+        wrap.querySelector('[data-doc-cancel]')?.addEventListener('click', () => {
+            wrap.style.display = 'none'; wrap.innerHTML = ''; wrap.dataset.mode = '';
+        });
+        const submitBtn = wrap.querySelector('[data-doc-submit]');
+        submitBtn?.addEventListener('click', async () => {
+            const values = {};
+            wrap.querySelectorAll('[data-f]').forEach((i) => { values[i.dataset.f] = i.value; });
+            const fileInput = wrap.querySelector('[data-f-file]');
+            const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+            const original = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+            try {
+                if (doc) await updateDocument(doc.id, values, file);
+                else await uploadDocument(values, file);
+                notify(doc ? 'Documento actualizado' : 'Documento subido');
+                wrap.style.display = 'none'; wrap.innerHTML = ''; wrap.dataset.mode = '';
+                loadDocuments();
+            } catch (err) {
+                notify(err.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = original;
+            }
+        });
+    }
+    document.getElementById('addDocumentBtn')?.addEventListener('click', () => openDocumentForm(null));
 
     root.addEventListener('click', async (e) => {
         const btn = e.target.closest('button'); if (!btn) return;
@@ -654,12 +805,22 @@ window.initProfileSection = function (root) {
                     span.textContent = span.dataset.masked;
                     icon.className = 'ti ti-eye-off';
                     btn.dataset.revealed = '0';
-                } else {
-                    if (!span.dataset.masked) span.dataset.masked = span.textContent;
-                    const { number } = await api(`/passports/${btn.dataset.revealPp}/reveal`, 'POST');
-                    span.textContent = number;
-                    icon.className = 'ti ti-eye';
-                    btn.dataset.revealed = '1';
+                } else if (btn.dataset.revealing !== '1') {
+                    // Each reveal hits the server (PCI-protected number). Disable the button
+                    // while in flight so spamming the eye can't fire a burst of /reveal requests;
+                    // re-enabled in finally so it stays clickable to re-mask.
+                    btn.dataset.revealing = '1';
+                    btn.disabled = true;
+                    try {
+                        if (!span.dataset.masked) span.dataset.masked = span.textContent;
+                        const { number } = await api(`/passports/${btn.dataset.revealPp}/reveal`, 'POST');
+                        span.textContent = number;
+                        icon.className = 'ti ti-eye';
+                        btn.dataset.revealed = '1';
+                    } finally {
+                        btn.dataset.revealing = '';
+                        btn.disabled = false;
+                    }
                 }
             } else if (btn.dataset.editPp) {
                 const p = (document.getElementById('passportsContainer')._data || []).find((x) => x.id === btn.dataset.editPp);
@@ -670,6 +831,11 @@ window.initProfileSection = function (root) {
                 }, 'id');
             } else if (btn.dataset.delPp) {
                 if (await confirmDanger('¿Eliminar este pasaporte? Esta acción no se puede deshacer.')) { await api(`/passports/${btn.dataset.delPp}`, 'DELETE'); notify('Pasaporte eliminado correctamente'); loadPassports(); }
+            } else if (btn.dataset.editDoc) {
+                const d = (document.getElementById('documentsContainer')._data || []).find((x) => x.id === btn.dataset.editDoc);
+                if (d) openDocumentForm(d);
+            } else if (btn.dataset.delDoc) {
+                if (await confirmDanger('¿Eliminar este documento? Esta acción no se puede deshacer.')) { await api(`/documents/${btn.dataset.delDoc}`, 'DELETE'); notify('Documento eliminado correctamente'); loadDocuments(); }
             } else if (btn.dataset.fav) { await api(`/addresses/${btn.dataset.fav}`, 'PUT', { isFavorite: true }); loadAddresses(); }
             else if (btn.dataset.editAddr) {
                 const a = (document.getElementById('addressesContainer')._data || []).find((x) => x.id === btn.dataset.editAddr);
@@ -696,6 +862,7 @@ window.initProfileSection = function (root) {
     loadAddresses();
     loadPreferences();
     loadLoyalty();
+    loadDocuments();
 };
 
 // Auto-init for the client detail page (the agent modal calls initProfileSection itself).

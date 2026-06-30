@@ -123,6 +123,14 @@ app.post(
   }
 );
 
+// Client/agent document uploads are base64-in-JSON (≤10MB binary ⇒ ~14MB encoded). Cap the body for
+// just these routes BEFORE the 250MB global parser below claims it (express.json skips once the body
+// is parsed), so this path can't be abused to buffer huge payloads into memory.
+app.use(
+  ['/api/clients/:clientId/documents', '/api/agents/:agentId/documents'],
+  express.json({ limit: '15mb' })
+);
+
 // Body parsing middleware
 app.use(express.json({ limit: '250mb' }));
 app.use(express.urlencoded({ extended: true, limit: '250mb' }));

@@ -2315,6 +2315,116 @@ function registerCloudFunctions() {
       }
     });
 
+    /**
+     * Daily background job that sends a birthday greeting to every active Client whose birthDate
+     * (month + day, San Miguel de Allende time) is today. Greeting only — no promo. Deduplicated
+     * via EmailLog so a client is greeted at most once per calendar year. Schedule daily in the
+     * Parse Dashboard (e.g. 8 AM CDMX).
+     * @function sendBirthdayGreetings
+     * @param {Parse.Cloud.JobRequest} request - The Parse Cloud job request object.
+     * @returns {Promise<object>} - Stats { scanned, matched, sent, skipped, failed, errors }.
+     */
+    Parse.Cloud.job('sendBirthdayGreetings', async (request) => {
+      const { message } = request;
+      message('Starting birthday greetings...');
+
+      const results = {
+        scanned: 0, matched: 0, sent: 0, skipped: 0, failed: 0, errors: [],
+      };
+
+      try {
+        // Required dynamically to avoid circular dependencies (same pattern as quote reminders).
+        const emailService = require('../application/services/EmailService');
+
+        // Today's month/day + year in the agency timezone (San Miguel de Allende = CDMX).
+        const tz = 'America/Mexico_City';
+        const parts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+        }).formatToParts(new Date());
+        const todayMonth = parts.find((p) => p.type === 'month').value;
+        const todayDay = parts.find((p) => p.type === 'day').value;
+        const year = parts.find((p) => p.type === 'year').value;
+        const yearStart = new Date(`${year}-01-01T00:00:00.000Z`);
+
+        const query = new Parse.Query('Client');
+        query.exists('birthDate');
+        query.equalTo('active', true);
+        query.equalTo('exists', true);
+
+        // each() auto-paginates with the master key; the callback is awaited before continuing.
+        await query.each(async (client) => {
+          results.scanned += 1;
+          const bd = client.get('birthDate');
+          if (!bd) return;
+          const d = new Date(bd);
+          if (Number.isNaN(d.getTime())) return;
+          const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+          const day = String(d.getUTCDate()).padStart(2, '0');
+          if (m !== todayMonth || day !== todayDay) return;
+          results.matched += 1;
+
+          const email = (client.get('email') || '').trim();
+          if (!email) { results.skipped += 1; return; }
+          const name = `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim() || 'Cliente';
+
+          try {
+            // Dedup: skip if a birthday greeting was already logged for this email this year.
+            const dq = new Parse.Query('EmailLog');
+            dq.equalTo('recipientEmail', email.toLowerCase());
+            dq.equalTo('notificationType', 'BIRTHDAY_GREETING');
+            dq.greaterThanOrEqualTo('sentAt', yearStart);
+            const already = await dq.first({ useMasterKey: true });
+            if (already) { results.skipped += 1; return; }
+
+            await emailService.sendBirthdayGreeting({ to: email, name, clientId: client.id });
+            results.sent += 1;
+          } catch (e) {
+            results.failed += 1;
+            results.errors.push({ clientId: client.id, error: e.message });
+            logger.error('Failed to send birthday greeting', { clientId: client.id, error: e.message });
+          }
+        }, { useMasterKey: true });
+
+        message(`Scanned ${results.scanned}, matched ${results.matched}: ${results.sent} sent, ${results.skipped} skipped, ${results.failed} failed`);
+        logger.info('Birthday greetings job completed', results);
+
+        return { success: true, ...results, timestamp: new Date().toISOString() };
+      } catch (error) {
+        logger.error('Error in birthday greetings job:', error);
+        message(`Job failed: ${error.message}`);
+        throw error;
+      }
+    });
+
+    /**
+     * Manually trigger the birthday greetings job (admin only).
+     * @function triggerBirthdayGreetings
+     * @param {Parse.Cloud.FunctionRequest} request - The cloud function request.
+     * @returns {Promise<object>} - Job trigger result.
+     */
+    Parse.Cloud.define('triggerBirthdayGreetings', async (request) => {
+      try {
+        if (!request.user || !request.user.get('isAdmin')) {
+          throw new Error('Admin access required');
+        }
+        await Parse.Cloud.startJob('sendBirthdayGreetings', {
+          triggeredBy: request.user.get('username') || request.user.get('email'),
+          manual: true,
+        });
+        logger.info('Birthday greetings job triggered manually', {
+          userId: request.user.id, userEmail: request.user.get('email'),
+        });
+        return {
+          success: true,
+          message: 'Birthday greetings job started successfully',
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        logger.error('Error triggering birthday greetings job:', error);
+        throw error;
+      }
+    });
+
     logger.info('Cloud Code loaded successfully');
 
     // Register audit trail hooks INSIDE registerCloudFunctions to ensure Parse.Cloud is available

@@ -391,6 +391,17 @@ const tarifarioTabs = [
 
                 <div class="card border-0 shadow-sm mb-3">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="ti ti-files me-2 text-primary"></i>Documentos</h5>
+                        <button type="button" class="btn btn-sm btn-primary" id="addDocumentBtn"><i class="ti ti-plus me-1"></i>Agregar documento</button>
+                    </div>
+                    <div class="card-body">
+                        <div id="documentFormWrap" class="border rounded p-3 mb-3 bg-light" style="display:none"></div>
+                        <div id="documentsContainer"><p class="text-muted mb-0">Cargando…</p></div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="ti ti-star me-2 text-primary"></i>Programas de Lealtad</h5>
                         <button type="button" class="btn btn-sm btn-primary" id="addLoyaltyBtn"><i class="ti ti-plus me-1"></i>Agregar Programa</button>
                     </div>
@@ -3745,6 +3756,8 @@ function setupExperienceFilters() {
             lastName: document.getElementById('editLastName').value.trim(),
             email: document.getElementById('editEmail').value.trim(),
             phone: document.getElementById('editPhone').value.trim() || undefined,
+            // Date input value is already YYYY-MM-DD; omit when empty so it doesn't clear an existing date.
+            birthDate: document.getElementById('editBirthDate').value || undefined,
             companyName: document.getElementById('editCompanyName').value.trim(),
             taxId: document.getElementById('editTaxId').value.trim() || undefined,
             website: document.getElementById('editWebsite').value.trim() || undefined,
@@ -4250,6 +4263,15 @@ function setupExperienceFilters() {
                                     value: clientData.phone || '',
                                     required: false,
                                     label: 'Teléfono'
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../atoms/form/datepicker', {
+                                    id: 'editBirthDate',
+                                    name: 'birthDate',
+                                    label: 'Fecha de nacimiento',
+                                    value: (clientData.birthDate && !isNaN(new Date(clientData.birthDate))) ? new Date(clientData.birthDate).toISOString().split('T')[0] : '',
+                                    required: false
                                 }) %>
                             </div>
                         </div>
