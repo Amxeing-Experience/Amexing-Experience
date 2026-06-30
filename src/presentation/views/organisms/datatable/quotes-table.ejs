@@ -690,7 +690,15 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     className: 'text-center',
                     render: function(data, type, row) {
                         const userRole = '<%= dtUserRole %>';
-                        
+
+                        // Una cotización cancelada se muestra como badge estático
+                        // "CANCELADA" (rojo), sin dropdown: no debe poder "descancelarse"
+                        // desde aquí (desincronizaría con la reserva). 'cancelled' no está
+                        // en allStatuses, así que sin esto caía a "COTIZADO" (la 1ª opción).
+                        if (data === 'cancelled') {
+                            return `<span class="badge bg-danger px-3 py-2" style="font-size: 0.75rem;">CANCELADA</span>`;
+                        }
+
                         // Define all possible statuses
                         const allStatuses = [
                             { value: 'quoted', text: 'COTIZADO', class: 'bg-info' },
