@@ -129,6 +129,14 @@ ItineraryBuilder.prototype.quickAddDay = async function () {
     if (this._addingDay) return; // guard against rapid double-clicks
     this._addingDay = true;
 
+    // Loader en el botón mientras se guarda (saveToBackend tarda un poco).
+    const addBtn = document.getElementById('addDayConfirmBtn');
+    const addBtnHtml = addBtn ? addBtn.innerHTML : null;
+    if (addBtn) {
+      addBtn.disabled = true;
+      addBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Agregando…';
+    }
+
     const titleInput = document.getElementById('quickDayTitle');
     const dateInput = document.getElementById('quickDayDate');
     const rawTitle = (titleInput?.value || '').trim();
@@ -175,6 +183,10 @@ ItineraryBuilder.prototype.quickAddDay = async function () {
       this.showAlert(`Error al agregar el día: ${error.message}`, 'danger');
     } finally {
       this._addingDay = false;
+      if (addBtn) {
+        addBtn.disabled = false;
+        addBtn.innerHTML = addBtnHtml;
+      }
     }
 };
 
