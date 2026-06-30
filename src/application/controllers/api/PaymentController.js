@@ -125,17 +125,6 @@ class PaymentController {
         reservationServiceId, paymentInfoId, fileBase64, fileName, mimeType,
       } = req.body || {};
 
-      logger.info('[addPayment] DEBUG entry', {
-        reservationId: id,
-        amount,
-        currency,
-        method,
-        hasReceipt: !!fileBase64,
-        receiptBytes: fileBase64 ? fileBase64.length : 0,
-        reservationServiceId: reservationServiceId || null,
-        userId: req.user?.id,
-      });
-
       const validation = PaymentController.validatePaymentInput({
         amount, currency, method, tip,
       });

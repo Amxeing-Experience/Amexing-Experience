@@ -1887,10 +1887,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 },
                 body: JSON.stringify(payload),
             });
-            // DEBUG: read the raw body so a non-JSON 500 (HTML error page) shows the real reason
-            // instead of the generic "Error al guardar el pago".
+            // Read the raw body first so a non-JSON response (e.g. an HTML error page) surfaces a
+            // clear message instead of the generic "Error al guardar el pago".
             const rawBody = await response.text();
-            console.log('[savePayment] HTTP', response.status, response.statusText, '| body:', rawBody.slice(0, 1500));
             let result;
             try {
                 result = JSON.parse(rawBody);
@@ -1912,10 +1911,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (receiptWarn) pmToast(receiptWarn, 'warning');
                 else pmToast('Pago guardado', 'success');
             } else {
-                // Surface the real reason so failures are diagnosable (status + server detail/code).
-                console.warn('[savePayment] rejected', {
-                    status: response.status, error: result.error, detail: result.detail, code: result.code,
-                });
+                // Build a clear message from the real reason (status + server detail/code).
                 let msg = result.error || 'No se pudo guardar el pago';
                 if (result.detail) msg += ` — ${result.detail}`;
                 if (response.status === 401) {
