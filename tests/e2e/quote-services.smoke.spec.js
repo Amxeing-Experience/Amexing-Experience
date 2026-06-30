@@ -142,6 +142,21 @@ test.describe('Servicios builder — smoke (split de scripts)', () => {
       `métodos de días faltantes en el prototype: ${missingDay.join(', ')}`,
     ).toEqual([]);
 
+    // 7. Métodos de transporte extraídos a quote-services-v2-transport.js (prototype).
+    const TRANSPORT_METHODS = [
+      'handleTransportTypeChange', 'clearTransportFormFields', 'renderTransportServiceItem',
+      'populateTransportVehicleDropdown', 'addAdditionalFlightRow', 'collectAdditionalFlights',
+      'getRouteDurationMinutes', 'updateSuggestedDepartureTime',
+    ];
+    const missingTransport = await page.evaluate(
+      (names) => names.filter((n) => typeof window.itineraryBuilder[n] !== 'function'),
+      TRANSPORT_METHODS,
+    );
+    expect(
+      missingTransport,
+      `métodos de transporte faltantes en el prototype: ${missingTransport.join(', ')}`,
+    ).toEqual([]);
+
     // 1. Sin errores de consola / pageerror (orden de carga sano)
     expect(pageErrors, `pageerrors: ${pageErrors.join(' | ')}`).toEqual([]);
     expect(consoleErrors, `console.error: ${consoleErrors.join(' | ')}`).toEqual([]);
