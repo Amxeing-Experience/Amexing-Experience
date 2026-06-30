@@ -12,6 +12,7 @@
 const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
 const FileStorageService = require('../../services/FileStorageService');
+const PaymentService = require('../../services/PaymentService');
 // Models used via Parse.Query string references
 
 // Module-level FileStorageService for presigned S3 URLs (static class needs this)
@@ -552,6 +553,18 @@ class ReservationController {
       servicesQuery.limit(1000);
       const services = await servicesQuery.find({ useMasterKey: true });
 
+      // Payment rollup (fresh, non-persisting) for the financial summary + per-service status.
+      let paymentSummary = null;
+      try {
+        paymentSummary = await PaymentService.summarize(id);
+      } catch (payErr) {
+        logger.warn('ReservationController.getReservationById: payment summary failed', { error: payErr.message });
+      }
+      const paymentByService = {};
+      if (paymentSummary) {
+        for (const s of paymentSummary.services) paymentByService[s.id] = s;
+      }
+
       const client = reservation.get('clientPtr');
 
       // Build a lookup from serviceItemsSnapshot for fallback when subconcept is null
@@ -749,6 +762,21 @@ class ReservationController {
           adjustments: reservation.get('adjustments') || [],
           currency: reservation.get('currency'),
           paymentType: reservation.get('paymentType'),
+          // Payment rollup (con IVA + propina): paymentStatus pending|partial|paid|refunded.
+          payment: paymentSummary ? {
+            paymentStatus: paymentSummary.paymentStatus,
+            paidAmount: paymentSummary.paidAmount,
+            balance: paymentSummary.balance,
+            subtotal: paymentSummary.subtotal,
+            iva: paymentSummary.iva,
+            tip: paymentSummary.tip,
+            total: paymentSummary.total,
+          } : {
+            paymentStatus: reservation.get('paymentStatus') || 'pending',
+            paidAmount: reservation.get('paidAmount') || 0,
+            balance: reservation.get('balance'),
+            tip: reservation.get('tip') || 0,
+          },
           numberOfPeople: reservation.get('numberOfPeople'),
           eventType: reservation.get('eventType'),
           contactPerson: reservation.get('contactPerson'),
@@ -791,6 +819,13 @@ class ReservationController {
               status: svc.get('status'),
               price: svc.get('price'),
               total: svc.get('total'),
+              // Per-service payment rollup (granularidad por servicio).
+              paymentStatus: paymentByService[svc.id]
+                ? paymentByService[svc.id].paymentStatus : (svc.get('paymentStatus') || 'pending'),
+              paidAmount: paymentByService[svc.id]
+                ? paymentByService[svc.id].paidAmount : (svc.get('paidAmount') || 0),
+              paymentBalance: paymentByService[svc.id]
+                ? paymentByService[svc.id].balance : svc.get('balance'),
               originName: svc.get('originName'),
               destinationName: svc.get('destinationName'),
               vehicleTypeName: svc.get('vehicleTypeName'),

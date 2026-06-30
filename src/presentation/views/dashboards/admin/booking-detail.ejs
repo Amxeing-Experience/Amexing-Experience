@@ -154,6 +154,23 @@
         </div>
     </div>
 
+    <!-- Payments Card -->
+    <div class="card border-0 shadow-sm mb-4" id="paymentsCard" style="display:none;">
+        <div class="card-header" style="background: linear-gradient(135deg, #0d9488 0%, #5eead4 100%); border: none;">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-cash me-2"></i>Pagos
+                </h5>
+                <button class="btn btn-sm btn-light d-none" id="addPaymentBtn">
+                    <i class="ti ti-plus me-1"></i>Agregar pago
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0" id="paymentsBody">
+            <!-- Rendered by JS -->
+        </div>
+    </div>
+
     <!-- Services by Day -->
     <div class="card border-0 shadow-sm">
         <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
@@ -509,6 +526,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         return `<span class="badge ${s.cls}" title="Estado de la reservación">${s.label}</span>`;
     }
 
+    // Estado de pago — solid badge + text-white salvo bg-warning (text-dark).
+    const PAYMENT_STATUS_MAP = {
+        pending: { label: 'Pendiente de pago', cls: 'bg-secondary text-white' },
+        partial: { label: 'Pago parcial', cls: 'bg-warning text-dark' },
+        paid: { label: 'Pagado', cls: 'bg-success text-white' },
+        refunded: { label: 'Reembolsado', cls: 'bg-info text-white' },
+    };
+
+    function getPaymentStatusBadge(status) {
+        if (!status) return '';
+        const s = PAYMENT_STATUS_MAP[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}" title="Estado de pago">${s.label}</span>`;
+    }
+
     function formatDate(dateStr) {
         if (!dateStr) return '—';
         return new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
@@ -690,6 +721,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         renderServices(d.services);
         renderFinancialSummary();
+        loadPayments();
 
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('reservationContent').style.display = '';
@@ -1037,6 +1069,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         ${svc.type === 'concepto' && svc.status !== 'cancelled' ? '<span class="badge bg-success text-white">Lista</span>' : getReservationStatusBadge(svc.status)}
+                        ${svc.paymentStatus ? getPaymentStatusBadge(svc.paymentStatus) : ''}
                         <span class="text-end" style="min-width: 80px;">${formatCurrency(getServicePriceByType(svc, reservationData.paymentType), reservationData.currency)}</span>
                         ${canAssign && svc.status !== 'cancelled' && svc.type !== 'concepto' ? `<button class="btn btn-sm ${svc.status === 'completed' ? 'btn-success' : (svc.status === 'assigned' ? 'btn-outline-success' : 'btn-outline-secondary')} status-toggle-btn" data-service-id="${svc.id}" data-current-status="${svc.status}" title="${svc.status === 'completed' ? 'Revertir a asignada' : (svc.status === 'assigned' ? 'Marcar completada' : 'Marcar asignada')}"><i class="ti ${svc.status === 'completed' ? 'ti-circle-check-filled' : (svc.status === 'assigned' ? 'ti-circle-check' : 'ti-circle')}"></i></button>` : ''}
                         ${canAssign ? (() => {
@@ -1526,6 +1559,30 @@ document.addEventListener('DOMContentLoaded', async function() {
             <span class="fw-bold fs-5 text-success">${formatCurrency(finalTotal, curr)}</span>
         </div>`;
 
+        // Payment block — estado de pago + pagado / saldo / total con IVA.
+        const pay = d.payment;
+        if (pay) {
+            const balanceCls = (pay.balance || 0) > 0 ? 'text-danger' : 'text-success';
+            html += `<div class="border-top mt-2 pt-2">
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-muted"><i class="ti ti-cash me-2"></i>Estado de pago</span>
+                    ${getPaymentStatusBadge(pay.paymentStatus)}
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-muted"><i class="ti ti-receipt-2 me-2"></i>Total con IVA</span>
+                    <span class="fw-semibold">${formatCurrency(pay.total, curr)}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-muted"><i class="ti ti-check me-2"></i>Pagado</span>
+                    <span class="fw-semibold text-success">${formatCurrency(pay.paidAmount, curr)}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2">
+                    <span class="text-muted"><i class="ti ti-wallet me-2"></i>Saldo</span>
+                    <span class="fw-semibold ${balanceCls}">${formatCurrency(pay.balance, curr)}</span>
+                </div>
+            </div>`;
+        }
+
         body.innerHTML = html;
 
         // Bind remove buttons
@@ -1550,6 +1607,211 @@ document.addEventListener('DOMContentLoaded', async function() {
         } catch (err) {
             console.error('Remove adjustment error:', err);
             alert('Error al eliminar ajuste');
+        }
+    }
+
+    // ===== PAYMENTS =====
+
+    let paymentsCache = [];
+
+    const PAYMENT_METHOD_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
+
+    // Human label for a service (concept + day) used in the "asignado a" column and the
+    // modal's service select.
+    function getPaymentServiceLabel(serviceId) {
+        const svc = (reservationData?.services || []).find((s) => s.id === serviceId);
+        if (!svc) return 'Servicio';
+        const day = svc.dayNumber ? `Día ${svc.dayNumber}` : '';
+        return [getDisplayConcept(svc), day].filter(Boolean).join(' · ');
+    }
+
+    // Populate the "Asignar a servicio" select from the reservation's services.
+    function buildPaymentServiceOptions(selectedId) {
+        const select = document.getElementById('paymentServiceId');
+        if (!select) return;
+        let html = '<option value="">Toda la reservación</option>';
+        (reservationData?.services || []).forEach((svc) => {
+            const day = svc.dayNumber ? ` · Día ${svc.dayNumber}` : '';
+            html += `<option value="${svc.id}" ${svc.id === selectedId ? 'selected' : ''}>${getDisplayConcept(svc)}${day}</option>`;
+        });
+        select.innerHTML = html;
+    }
+
+    async function loadPayments() {
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/payments`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const result = await response.json();
+            paymentsCache = result?.data?.payments || [];
+        } catch (err) {
+            console.error('Error loading payments:', err);
+            paymentsCache = [];
+        }
+        renderPayments();
+    }
+
+    function renderPayments() {
+        const card = document.getElementById('paymentsCard');
+        const body = document.getElementById('paymentsBody');
+        const addBtn = document.getElementById('addPaymentBtn');
+        if (!card || !body) return;
+
+        const d = reservationData;
+        const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
+        const curr = d.currency || 'MXN';
+
+        card.style.display = '';
+        if (canEdit) addBtn.classList.remove('d-none');
+        else addBtn.classList.add('d-none');
+
+        if (!paymentsCache.length) {
+            body.innerHTML = '<div class="text-center py-4 text-muted">Sin pagos registrados</div>';
+            return;
+        }
+
+        const rows = paymentsCache.map((p) => {
+            const assignedTo = p.reservationServiceId ? getPaymentServiceLabel(p.reservationServiceId) : 'Reservación';
+            const ref = p.reference ? p.reference : '<span class="text-muted">—</span>';
+            const tipHtml = p.tip ? `<small class="text-muted d-block">+ propina ${formatCurrency(p.tip, curr)}</small>` : '';
+            return `<tr>
+                <td>${formatDate(p.paidAt || p.createdAt)}</td>
+                <td><span class="badge bg-secondary-subtle text-secondary">${PAYMENT_METHOD_LABELS[p.method] || p.method || '—'}</span></td>
+                <td>${ref}</td>
+                <td class="text-end">${formatCurrency(p.amount, curr)}${tipHtml}</td>
+                <td>${p.origCurrency || curr}</td>
+                <td><small>${p.registeredByName || '—'}</small></td>
+                <td><small>${assignedTo}</small></td>
+                <td class="text-end">
+                    ${canEdit ? `<button class="btn btn-sm btn-outline-primary py-0 px-1 edit-payment-btn" data-payment-id="${p.id}" title="Editar"><i class="ti ti-edit"></i></button>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1 delete-payment-btn" data-payment-id="${p.id}" title="Eliminar"><i class="ti ti-trash"></i></button>` : ''}
+                </td>
+            </tr>`;
+        }).join('');
+
+        body.innerHTML = `<div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Método</th>
+                        <th>Referencia</th>
+                        <th class="text-end">Monto</th>
+                        <th>Moneda</th>
+                        <th>Registró</th>
+                        <th>Asignado a</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+
+        body.querySelectorAll('.edit-payment-btn').forEach((btn) => {
+            btn.addEventListener('click', () => openPaymentModal(btn.dataset.paymentId));
+        });
+        body.querySelectorAll('.delete-payment-btn').forEach((btn) => {
+            btn.addEventListener('click', () => deletePayment(btn.dataset.paymentId));
+        });
+    }
+
+    function openPaymentModal(paymentId) {
+        const existing = paymentId ? paymentsCache.find((p) => p.id === paymentId) : null;
+        document.getElementById('paymentModalTitle').innerHTML = existing
+            ? '<i class="ti ti-cash me-2"></i>Editar Pago'
+            : '<i class="ti ti-cash me-2"></i>Registrar Pago';
+        document.getElementById('paymentId').value = existing ? existing.id : '';
+        document.getElementById('paymentAmount').value = existing ? (existing.origAmount ?? existing.amount ?? '') : '';
+        document.getElementById('paymentCurrency').value = existing?.origCurrency || 'MXN';
+        document.getElementById('paymentMethod').value = existing?.method || 'efectivo';
+        document.getElementById('paymentTip').value = existing?.tip || '';
+        document.getElementById('paymentReference').value = existing?.reference || '';
+        document.getElementById('paymentNotes').value = existing?.notes || '';
+        // Date inputs need YYYY-MM-DD.
+        const paidAt = existing?.paidAt ? new Date(existing.paidAt).toISOString().slice(0, 10) : '';
+        document.getElementById('paymentPaidAt').value = paidAt;
+        buildPaymentServiceOptions(existing?.reservationServiceId || '');
+        new bootstrap.Modal(document.getElementById('paymentModal')).show();
+    }
+
+    // Refresh the Financial Summary numbers from a POST/PUT/DELETE response summary
+    // (paymentStatus, paidAmount, balance, total) without a full reload.
+    function applyPaymentSummary(summary) {
+        if (!summary || !reservationData.payment) return;
+        Object.assign(reservationData.payment, summary);
+        renderFinancialSummary();
+    }
+
+    document.getElementById('addPaymentBtn')?.addEventListener('click', () => openPaymentModal(null));
+
+    document.getElementById('savePaymentBtn')?.addEventListener('click', async () => {
+        const paymentId = document.getElementById('paymentId').value;
+        const amount = parseFloat(document.getElementById('paymentAmount').value);
+        const tipRaw = parseFloat(document.getElementById('paymentTip').value);
+        const paidAt = document.getElementById('paymentPaidAt').value;
+
+        if (!amount || amount <= 0) { alert('El monto debe ser mayor a 0'); return; }
+
+        const payload = {
+            amount,
+            currency: document.getElementById('paymentCurrency').value,
+            method: document.getElementById('paymentMethod').value,
+            reference: document.getElementById('paymentReference').value.trim(),
+            notes: document.getElementById('paymentNotes').value.trim(),
+        };
+        if (!Number.isNaN(tipRaw) && tipRaw > 0) payload.tip = tipRaw;
+        if (paidAt) payload.paidAt = paidAt;
+        const serviceId = document.getElementById('paymentServiceId').value;
+        if (serviceId) payload.reservationServiceId = serviceId;
+
+        const url = paymentId
+            ? `/api/reservations/${reservationId}/payments/${paymentId}`
+            : `/api/reservations/${reservationId}/payments`;
+        const method = paymentId ? 'PUT' : 'POST';
+
+        const btn = document.getElementById('savePaymentBtn');
+        btn.disabled = true;
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            const result = await response.json();
+            if (result.success) {
+                bootstrap.Modal.getInstance(document.getElementById('paymentModal'))?.hide();
+                applyPaymentSummary(result.data?.summary);
+                await loadPayments();
+            } else {
+                alert(result.error || 'Error al guardar el pago');
+            }
+        } catch (err) {
+            console.error('Save payment error:', err);
+            alert('Error al guardar el pago');
+        }
+        btn.disabled = false;
+    });
+
+    async function deletePayment(paymentId) {
+        if (!confirm('¿Eliminar este pago?')) return;
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/payments/${paymentId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const result = await response.json();
+            if (result.success) {
+                applyPaymentSummary(result.data?.summary);
+                await loadPayments();
+            } else {
+                alert(result.error || 'Error al eliminar el pago');
+            }
+        } catch (err) {
+            console.error('Delete payment error:', err);
+            alert('Error al eliminar el pago');
         }
     }
 
@@ -1715,6 +1977,72 @@ document.addEventListener('click', function(e) {
             <div class="modal-footer border-top">
                 <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button class="btn btn-sm btn-primary px-4" id="saveAdjustmentBtn">
+                    <i class="ti ti-check me-1"></i>Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h6 class="modal-title fw-bold mb-0" id="paymentModalTitle">
+                    <i class="ti ti-cash me-2"></i>Registrar Pago
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="paymentId">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small" for="paymentAmount">Monto</label>
+                        <input type="number" class="form-control form-control-sm" id="paymentAmount" min="0.01" step="0.01" placeholder="0.00" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small" for="paymentCurrency">Moneda</label>
+                        <select class="form-select form-select-sm" id="paymentCurrency">
+                            <option value="MXN">MXN</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small" for="paymentMethod">Método</label>
+                        <select class="form-select form-select-sm" id="paymentMethod">
+                            <option value="efectivo">Efectivo</option>
+                            <option value="transferencia">Transferencia</option>
+                            <option value="tarjeta">Tarjeta</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
+                        <input type="date" class="form-control form-control-sm" id="paymentPaidAt">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small" for="paymentTip">Propina</label>
+                        <input type="number" class="form-control form-control-sm" id="paymentTip" min="0" step="0.01" placeholder="0.00">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small" for="paymentReference">Referencia</label>
+                        <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small" for="paymentServiceId">Asignar a servicio</label>
+                        <select class="form-select form-select-sm" id="paymentServiceId">
+                            <option value="">Toda la reservación</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small" for="paymentNotes">Notas</label>
+                        <textarea class="form-control form-control-sm" id="paymentNotes" rows="2" maxlength="300" placeholder="Notas del pago"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-sm btn-primary px-4" id="savePaymentBtn">
                     <i class="ti ti-check me-1"></i>Guardar
                 </button>
             </div>

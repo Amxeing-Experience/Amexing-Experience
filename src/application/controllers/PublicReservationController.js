@@ -9,6 +9,7 @@
 const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 const FileStorageService = require('../services/FileStorageService');
+const PaymentService = require('../services/PaymentService');
 const { renderUrlToPdf } = require('../services/PdfRenderService');
 const { getArponaEmbedCss, getMyriadEmbedCss } = require('../../infrastructure/utils/fontEmbed');
 
@@ -570,6 +571,28 @@ class PublicReservationController {
     const iva = Math.round(subtotal * 0.16 * 100) / 100;
     const total = Math.round((subtotal + iva) * 100) / 100;
 
+    // Payment rollup (fresh, non-persisting): amount paid, balance and status.
+    // payment.total includes the reservation tip (the full amount due); serviceItems.total does not.
+    let payment = {
+      paymentStatus: reservation.get('paymentStatus') || 'pending',
+      paidAmount: reservation.get('paidAmount') || 0,
+      balance: reservation.get('balance'),
+      tip: reservation.get('tip') || 0,
+      total,
+    };
+    try {
+      const summary = await PaymentService.summarize(reservation.id);
+      payment = {
+        paymentStatus: summary.paymentStatus,
+        paidAmount: summary.paidAmount,
+        balance: summary.balance,
+        tip: summary.tip,
+        total: summary.total,
+      };
+    } catch (payErr) {
+      logger.warn('preparePublicReservationData: payment summary failed', { error: payErr.message });
+    }
+
     const rate = reservation.get('rate') || snapshot.rate || null;
     const reservationServiceCustomer = this.formatPerson(reservation.get('serviceCustomer'));
 
@@ -600,6 +623,7 @@ class PublicReservationController {
         paymentType,
         currency,
       },
+      payment,
       createdAt: reservation.get('createdAt') || null,
       updatedAt: reservation.get('updatedAt') || null,
       startDate: reservation.get('startDate') || null,

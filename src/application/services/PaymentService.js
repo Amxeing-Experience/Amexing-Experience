@@ -150,75 +150,134 @@ class PaymentService {
   }
 
   /**
+   * Load a reservation, its existing services and payments, and compute the
+   * totals + payment rollup (without persisting). Shared by summarize/recalculate.
+   * @param {string} reservationId - Reservation objectId.
+   * @returns {Promise<object>} { reservation, services, totals, paidGlobal, paidByService }.
+   * @example
+   * const data = await PaymentService.loadAndCompute(reservationId);
+   */
+  static async loadAndCompute(reservationId) {
+    const Reservation = require('../../domain/models/Reservation');
+    const Payment = require('../../domain/models/Payment');
+
+    const reservation = await new Parse.Query(Reservation).get(reservationId, { useMasterKey: true });
+
+    const reservationPtr = new Reservation();
+    reservationPtr.id = reservationId;
+    const servicesQuery = BaseModel.queryExisting('ReservationService');
+    servicesQuery.equalTo('reservationPtr', reservationPtr);
+    servicesQuery.limit(1000);
+    const services = await servicesQuery.find({ useMasterKey: true });
+
+    const payments = await Payment.getExistingForReservation(reservationId);
+
+    const paymentType = reservation.get('paymentType') || 'efectivo';
+    const reservationTip = reservation.get('tip') || 0;
+    const totals = this.computeTotals(this.toServiceItems(services), paymentType, reservationTip);
+
+    const paymentRows = payments.map((payment) => {
+      const svcPtr = payment.get('reservationServicePtr');
+      return {
+        amount: payment.get('amount'),
+        reservationServiceId: svcPtr && svcPtr.id ? svcPtr.id : null,
+      };
+    });
+    const { paidGlobal, paidByService } = this.sumPayments(paymentRows);
+
+    return {
+      reservation, services, totals, paidGlobal, paidByService,
+    };
+  }
+
+  /**
+   * Build the payment summary (global + per-service rollups) from computed data.
+   * @param {string} reservationId - Reservation objectId.
+   * @param {object} computed - { totals, paidGlobal, paidByService, services }.
+   * @returns {object} Summary { paymentStatus, paidAmount, balance, total, ..., services[] }.
+   * @example
+   * PaymentService.buildSummary(id, await PaymentService.loadAndCompute(id))
+   */
+  static buildSummary(reservationId, computed) {
+    const {
+      totals, paidGlobal, paidByService, services,
+    } = computed;
+
+    const perService = services.map((svc) => {
+      const total = totals.perService[svc.id] || 0;
+      const paidAmount = round2(paidByService[svc.id] || 0);
+      return {
+        id: svc.id,
+        total,
+        paidAmount,
+        balance: round2(total - paidAmount),
+        paymentStatus: this.deriveStatus(total, paidAmount),
+      };
+    });
+
+    return {
+      reservationId,
+      paymentStatus: this.deriveStatus(totals.total, paidGlobal),
+      paidAmount: paidGlobal,
+      balance: round2(totals.total - paidGlobal),
+      subtotal: totals.subtotal,
+      iva: totals.iva,
+      tip: totals.tip,
+      total: totals.total,
+      services: perService,
+    };
+  }
+
+  /**
+   * Compute the payment summary for a reservation WITHOUT persisting (read path).
+   * @param {string} reservationId - Reservation objectId.
+   * @returns {Promise<object>} Payment summary.
+   * @example
+   * const summary = await PaymentService.summarize(reservationId);
+   */
+  static async summarize(reservationId) {
+    const computed = await this.loadAndCompute(reservationId);
+    return this.buildSummary(reservationId, computed);
+  }
+
+  /**
    * Recalculate and persist the payment rollup for a reservation and its services.
    * Triggered on payment create/edit/delete. Does NOT touch recalculateTotal() or
    * the operational status; paymentStatus is a separate field.
    * @param {string} reservationId - Reservation objectId.
-   * @returns {Promise<object>} Summary { paymentStatus, paidAmount, balance, total, ... }.
+   * @returns {Promise<object>} Payment summary.
    * @example
    * await PaymentService.recalculate(reservationId);
    */
   static async recalculate(reservationId) {
     try {
-      const Reservation = require('../../domain/models/Reservation');
-      const Payment = require('../../domain/models/Payment');
+      const computed = await this.loadAndCompute(reservationId);
+      const { reservation, services } = computed;
+      const summary = this.buildSummary(reservationId, computed);
 
-      const reservation = await new Parse.Query(Reservation).get(reservationId, { useMasterKey: true });
+      reservation.set('paidAmount', summary.paidAmount);
+      reservation.set('balance', summary.balance);
+      reservation.set('paymentStatus', summary.paymentStatus);
 
-      const reservationPtr = new Reservation();
-      reservationPtr.id = reservationId;
-      const servicesQuery = BaseModel.queryExisting('ReservationService');
-      servicesQuery.equalTo('reservationPtr', reservationPtr);
-      servicesQuery.limit(1000);
-      const services = await servicesQuery.find({ useMasterKey: true });
-
-      const payments = await Payment.getExistingForReservation(reservationId);
-
-      const paymentType = reservation.get('paymentType') || 'efectivo';
-      const reservationTip = reservation.get('tip') || 0;
-
-      const totals = this.computeTotals(this.toServiceItems(services), paymentType, reservationTip);
-
-      const paymentRows = payments.map((payment) => {
-        const svcPtr = payment.get('reservationServicePtr');
-        return {
-          amount: payment.get('amount'),
-          reservationServiceId: svcPtr && svcPtr.id ? svcPtr.id : null,
-        };
-      });
-      const { paidGlobal, paidByService } = this.sumPayments(paymentRows);
-
-      reservation.set('paidAmount', paidGlobal);
-      reservation.set('balance', round2(totals.total - paidGlobal));
-      reservation.set('paymentStatus', this.deriveStatus(totals.total, paidGlobal));
-
+      const byId = {};
+      for (const s of summary.services) byId[s.id] = s;
       for (const svc of services) {
-        const svcTotal = totals.perService[svc.id] || 0;
-        const svcPaid = round2(paidByService[svc.id] || 0);
-        svc.set('paidAmount', svcPaid);
-        svc.set('balance', round2(svcTotal - svcPaid));
-        svc.set('paymentStatus', this.deriveStatus(svcTotal, svcPaid));
+        const s = byId[svc.id];
+        svc.set('paidAmount', s.paidAmount);
+        svc.set('balance', s.balance);
+        svc.set('paymentStatus', s.paymentStatus);
       }
 
       await Parse.Object.saveAll([reservation, ...services], { useMasterKey: true });
 
       logger.info('Reservation payment status recalculated', {
         reservationId,
-        paidAmount: paidGlobal,
-        total: totals.total,
-        paymentStatus: reservation.get('paymentStatus'),
+        paidAmount: summary.paidAmount,
+        total: summary.total,
+        paymentStatus: summary.paymentStatus,
       });
 
-      return {
-        reservationId,
-        paymentStatus: reservation.get('paymentStatus'),
-        paidAmount: paidGlobal,
-        balance: reservation.get('balance'),
-        total: totals.total,
-        subtotal: totals.subtotal,
-        iva: totals.iva,
-        tip: totals.tip,
-      };
+      return summary;
     } catch (error) {
       logger.error('Error recalculating reservation payment status', {
         reservationId,
