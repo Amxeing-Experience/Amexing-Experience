@@ -313,6 +313,11 @@ function showRequestDetails(request) {
     const typeBadge = isReservation
         ? '<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="ti ti-calendar me-1"></i>Reservación</span>'
         : '<span class="badge bg-primary-subtle text-primary border border-primary-subtle"><i class="ti ti-file-text me-1"></i>Cotización</span>';
+    // Mostrar solo el folio que corresponde al tipo: el de la reservación cuando es
+    // reservación, el de la cotización cuando es cotización (congruente entre ambos).
+    const primaryFolio = isReservation
+        ? (request.reservationFolio || request.quoteFolio || 'N/A')
+        : (request.quoteFolio || 'N/A');
 
     const hours = request.hoursBeforeEvent ?? 0;
     const urgent = hours < 24;
@@ -336,9 +341,8 @@ function showRequestDetails(request) {
                 <div class="text-muted text-uppercase fw-semibold" style="font-size:.7rem; letter-spacing:.05em;">Solicitud de cancelación</div>
                 <div class="d-flex align-items-center gap-2 mt-1">
                     ${typeBadge}
-                    <span class="fw-bold fs-5">${request.quoteFolio || 'N/A'}</span>
+                    <span class="fw-bold fs-5">${primaryFolio}</span>
                 </div>
-                ${request.reservationFolio ? `<div class="small text-muted mt-1"><i class="ti ti-calendar me-1"></i>Reservación: <span class="font-monospace">${request.reservationFolio}</span></div>` : ''}
             </div>
             <div class="text-end">
                 ${statusBadge}
