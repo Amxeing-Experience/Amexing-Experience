@@ -661,6 +661,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const radio = seg.querySelector('input[name="quoteStatus"]');
         if (radio) radio.checked = true;
         currentStatus = 'cancelled';
+        // Mark as pending so a re-trigger in the same session (sin recargar) no
+        // vuelve a abrir el modal de cancelación.
+        window.__hasPendingCancellation = true;
     }
 
     function showScheduleLoader(show) {
@@ -898,6 +901,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const resId = window.__reservationId;
         if (!resId) { revertStatus(previousStatus); return; }
         if (newStatus === 'cancelled') {
+            // Si ya hay una solicitud de cancelación pendiente, no abrir el modal de
+            // nuevo (evita solicitudes duplicadas): se mantiene "Cancelación solicitada".
+            if (window.__hasPendingCancellation) {
+                setCancelRequestedUI();
+                showReservationToast('Ya existe una solicitud de cancelación pendiente de aprobación');
+                return;
+            }
             // Fetch the quote (with serviceItems → event dates) so the modal can apply
             // the 24h policy. On dismiss, revert the segment — UNLESS a cancellation
             // request was just created, in which case keep "Cancelación solicitada".

@@ -501,7 +501,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-text"></i></a>`;
                         <% } %>
                     }
-                    if (row.status !== 'cancelled' && row.status !== 'completed') {
+                    // No mostrar "Cancelar" si ya hay una solicitud de cancelación
+                    // pendiente (evita solicitudes duplicadas), ni si ya está
+                    // cancelada/completada.
+                    if (row.status !== 'cancelled' && row.status !== 'completed' && !row.hasPendingCancellation) {
                         actions += `<button class="btn btn-sm btn-outline-danger cancel-res-btn" data-id="${row.id}" title="Cancelar"><i class="ti ti-x"></i></button>`;
                     }
                     return actions;
