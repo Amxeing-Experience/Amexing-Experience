@@ -681,6 +681,17 @@ class ItineraryBuilder {
         this.updateTransferArrivalEstimate();
         // Mostrar/ocultar el total ida y vuelta (×2) según el tipo de viaje.
         this.updateRouteDurationRoundTripHint();
+        // Al cambiar one-way ↔ round-trip, handleTripTypeChange limpia parte del form (segmento,
+        // origen/destino), así que el desglose previo deja de ser válido. Si solo recalculáramos,
+        // el cálculo haría early-return (sin segmento → precio 0) dejando los campos devBreakdown*
+        // viejos, y el panel volvería a mostrar el del tipo anterior. Por eso LIMPIAMOS los campos
+        // fuente del dev breakdown y ocultamos el panel; se repuebla solo al completar el form.
+        ['devBreakdownEfectivo', 'devBreakdownTransferencia', 'devBreakdownTarjeta'].forEach((fid) => {
+          const f = document.getElementById(fid);
+          if (f) f.value = '';
+        });
+        const brkPanel = document.getElementById('servicePriceBreakdown');
+        if (brkPanel) brkPanel.classList.add('d-none');
       });
     });
 
@@ -889,11 +900,17 @@ class ItineraryBuilder {
       this.serviceModified = true; // Mark as modified when user changes guide checkbox
       qsDevLog('🚗 A Disposición guide checkbox changed:', e.target.checked);
 
-      // Guía y greeter son mutuamente excluyentes: al marcar guía, se desmarca greeter.
+      // Guía y greeter son mutuamente excluyentes: al marcar guía, se desmarca greeter (y su
+      // sub-opción "viaja en el vehículo").
       if (e.target.checked) {
         const greeterCheckbox = document.getElementById('aDisposicionGreeter');
         if (greeterCheckbox) greeterCheckbox.checked = false;
+        const adGreeterInVehicleContainer = document.getElementById('aDisposicionGreeterInVehicleContainer');
+        const adGreeterInVehicle = document.getElementById('aDisposicionGreeterInVehicle');
+        if (adGreeterInVehicleContainer) adGreeterInVehicleContainer.classList.add('d-none');
+        if (adGreeterInVehicle) adGreeterInVehicle.checked = false;
       }
+      this.updateVehicleCapacityNote();
 
       // Recalculate price with guide rate
       this.calculateADisposicionPrice();
@@ -917,11 +934,32 @@ class ItineraryBuilder {
         if (guideCheckbox) guideCheckbox.checked = false;
       }
 
+      // Sub-opción "Viaja en el vehículo": se muestra y se marca por defecto al activar greeter
+      // (espejo de transporte); se oculta/desmarca al apagarlo.
+      const adGreeterInVehicleContainer = document.getElementById('aDisposicionGreeterInVehicleContainer');
+      const adGreeterInVehicle = document.getElementById('aDisposicionGreeterInVehicle');
+      if (adGreeterInVehicleContainer) {
+        if (e.target.checked) {
+          adGreeterInVehicleContainer.classList.remove('d-none');
+          if (adGreeterInVehicle) adGreeterInVehicle.checked = true;
+        } else {
+          adGreeterInVehicleContainer.classList.add('d-none');
+          if (adGreeterInVehicle) adGreeterInVehicle.checked = false;
+        }
+      }
+      this.updateVehicleCapacityNote();
+
       this.calculateADisposicionPrice();
       this.updateDevPaymentBreakdown();
       setTimeout(() => {
         this.updateServicePriceBreakdown();
       }, 50);
+    });
+
+    // A-disposición: "Viaja en el vehículo" del greeter → actualizar nota de capacidad.
+    document.getElementById('aDisposicionGreeterInVehicle')?.addEventListener('change', () => {
+      this.serviceModified = true;
+      this.updateVehicleCapacityNote();
     });
 
     // Price input listener - update conversion preview when user types a price
@@ -3459,6 +3497,9 @@ class ItineraryBuilder {
       // Fuente única: campo editable → lookup → guardado (ver getRouteDurationMinutes).
       const routeDuration = this.getRouteDurationMinutes();
 
+      // Nota: la lógica de round-trip (×2 a vehículo/espera/guía/greeter) vive en
+      // updateDevPaymentBreakdown, cuyo resultado (_transportBreakdownTotals) es el que se
+      // guarda. Este bloque es solo FALLBACK cuando no hay breakdown del preview.
       if (includeGuide && routeDuration) {
         guideCostEfectivo = this.calculateGuideTransportCost(routeDuration);
       }
@@ -4379,6 +4420,9 @@ class ItineraryBuilder {
         // Collect includeGuide checkbox state for A disposición
         data.includeGuide = document.getElementById('aDisposicionGuide')?.checked || false;
         data.includeGreeter = document.getElementById('aDisposicionGreeter')?.checked || false;
+        // "Viaja en el vehículo" del greeter (ocupa asiento). Reusa el campo greeterInVehicle,
+        // que ya viaja por la pipeline de persistencia (igual que transporte).
+        data.greeterInVehicle = document.getElementById('aDisposicionGreeterInVehicle')?.checked || false;
         data.aDisposicionAdditionalVehicles = this.getADisposicionAdditionalVehicles();
 
         // Store vehicle name for display
@@ -6132,6 +6176,18 @@ class ItineraryBuilder {
         if (aDisposicionGreeterCheckbox) {
           aDisposicionGreeterCheckbox.checked = service.includeGreeter || false;
         }
+
+        // Restore "Viaja en el vehículo" del greeter (a-disposición): valor + visibilidad del
+        // sub-checkbox (visible solo si greeter está activo) + nota de capacidad.
+        const aDisposicionGreeterInVehicleEl = document.getElementById('aDisposicionGreeterInVehicle');
+        if (aDisposicionGreeterInVehicleEl) {
+          aDisposicionGreeterInVehicleEl.checked = service.greeterInVehicle || false;
+        }
+        const aDisposicionGreeterInVehicleCont = document.getElementById('aDisposicionGreeterInVehicleContainer');
+        if (aDisposicionGreeterInVehicleCont) {
+          aDisposicionGreeterInVehicleCont.classList.toggle('d-none', !(service.includeGreeter || false));
+        }
+        this.updateVehicleCapacityNote();
 
         // Restore additional vehicles for A disposición (rebuilds the rows)
         this.restoreADisposicionAdditionalVehicles(service.aDisposicionAdditionalVehicles);
@@ -8621,7 +8677,8 @@ class ItineraryBuilder {
       if (waitingHours > 0) {
         // Tarifa editable (si el usuario la modificó) o la de catálogo.
         waitingHourlyRate = this.getEffectiveWaitingHourlyRate();
-        waitingCostEfectivo = waitingHourlyRate * waitingHours;
+        // Round-trip: la espera cuenta ida + vuelta (×2 total); one-way ×1. Confirmado por cliente.
+        waitingCostEfectivo = waitingHourlyRate * waitingHours * legMultiplier;
       }
 
       // Calculate guide costs if applicable
@@ -8631,7 +8688,9 @@ class ItineraryBuilder {
       const routeDuration = this.getRouteDurationMinutes();
 
       if (includeGuide && routeDuration) {
-        guideCostEfectivo = this.calculateGuideTransportCost(routeDuration);
+        // Round-trip: la guía cobra ida + vuelta. Sobre el ×2 base del motor (el guía va y
+        // regresa), round-trip lo duplica → ×4 total; one-way ×2. Confirmado por cliente.
+        guideCostEfectivo = this.calculateGuideTransportCost(routeDuration) * legMultiplier;
       }
 
       // Calculate greeter costs if applicable
@@ -8639,10 +8698,7 @@ class ItineraryBuilder {
       let greeterCostEfectivo = 0;
 
       if (includeGreeter && routeDuration) {
-        // Round-trip: el greeter atiende ida + vuelta (×2), igual que el transporte (legMultiplier).
-        // Antes quedaba en ×1 y se sub-cobraba el greeter en viajes redondos.
-        // TODO(cliente): pendiente de confirmación — ver docs/backlog/TODO-roundtrip-greeter-duracion.md
-        // (greeter ×2, guía en one-way, y regreso con duración distinta). Rama sin mergear hasta validar.
+        // Round-trip: el greeter atiende ida + vuelta (×2 total); one-way ×1. Confirmado por cliente.
         greeterCostEfectivo = this.calculateGreeterPrice(routeDuration) * legMultiplier;
       }
 
@@ -8714,11 +8770,11 @@ class ItineraryBuilder {
       // greeter no) y devuelve los totales por forma de pago + el desglose por nodo.
       const transferRate = this.transferRate;
       const agencyRate = this.agencyRate;
-      // Tiempo de espera de los vehículos adicionales: cada uno su tarifa × sus horas (×1,
-      // no se duplica en round-trip, igual que la espera del principal).
-      const extraWaitingCostEfectivo = (typeof this.getExtraAdditionalVehiclesWaitingCostEfectivo === 'function')
+      // Tiempo de espera de los vehículos adicionales: cada uno su tarifa × sus horas.
+      // Round-trip: cuenta ida + vuelta (×2 total), igual que la espera del principal. Confirmado por cliente.
+      const extraWaitingCostEfectivo = ((typeof this.getExtraAdditionalVehiclesWaitingCostEfectivo === 'function')
         ? this.getExtraAdditionalVehiclesWaitingCostEfectivo()
-        : 0;
+        : 0) * legMultiplier;
       const transportNodes = [
         { key: 'vehicle', efectivo: vehicleTotalEfectivo, surcharge: true },
         { key: 'waiting', efectivo: waitingCostEfectivo, surcharge: true },
@@ -8796,7 +8852,7 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const guideRate = this.guideTransportRateCache?.value || 400;
         const formulaConfig = this.guideFormulaConfigCache || { roundTripMultiplier: 2, minimumCharge: 0 };
-        const multiplier = formulaConfig.roundTripMultiplier || 2;
+        const multiplier = (formulaConfig.roundTripMultiplier || 2) * legMultiplier;
         efectivoBreakdown += `\nGuía + Chofer (${durationHours}h × ${multiplier} × $${guideRate}): $${guideCostEfectivo.toFixed(2)}`;
       }
       if (includeGreeter && greeterCostEfectivo > 0) {
@@ -8806,7 +8862,7 @@ class ItineraryBuilder {
         efectivoBreakdown += `\nGreeter (($${basePrice} + $${hourlyRate}×${durationHours}h)${legMultiplier > 1 ? ` × ${legMultiplier}` : ''} = $${greeterCostEfectivo.toFixed(2)}): $${greeterCostEfectivo.toFixed(2)}`;
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
-        efectivoBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingHourlyRate.toFixed(2)}): $${waitingCostEfectivo.toFixed(2)}`;
+        efectivoBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingHourlyRate.toFixed(2)}${legMultiplier > 1 ? ` × ${legMultiplier}` : ''}): $${waitingCostEfectivo.toFixed(2)}`;
       }
       if (extraWaitingCostEfectivo > 0) {
         efectivoBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.efectivo ?? extraWaitingCostEfectivo).toFixed(2)}`;
@@ -8826,7 +8882,7 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const guideRate = this.guideTransportRateCache?.value || 400;
         const formulaConfig = this.guideFormulaConfigCache || { roundTripMultiplier: 2, minimumCharge: 0 };
-        const multiplier = formulaConfig.roundTripMultiplier || 2;
+        const multiplier = (formulaConfig.roundTripMultiplier || 2) * legMultiplier;
         transferenciaBreakdown += `\nGuía + Chofer (${durationHours}h × ${multiplier} × $${guideRate}): $${guideCostTransferencia.toFixed(2)}`;
       }
       if (includeGreeter && greeterCostTransferencia > 0) {
@@ -8837,7 +8893,7 @@ class ItineraryBuilder {
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.transferRate / 100));
-        transferenciaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTransferencia.toFixed(2)}`;
+        transferenciaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}${legMultiplier > 1 ? ` × ${legMultiplier}` : ''}): $${waitingCostTransferencia.toFixed(2)}`;
       }
       if (extraWaitingCostEfectivo > 0) {
         transferenciaBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.transferencia ?? 0).toFixed(2)}`;
@@ -8857,7 +8913,7 @@ class ItineraryBuilder {
         const durationHours = (routeDuration / 60).toFixed(1);
         const guideRate = this.guideTransportRateCache?.value || 400;
         const formulaConfig = this.guideFormulaConfigCache || { roundTripMultiplier: 2, minimumCharge: 0 };
-        const multiplier = formulaConfig.roundTripMultiplier || 2;
+        const multiplier = (formulaConfig.roundTripMultiplier || 2) * legMultiplier;
         tarjetaBreakdown += `\nGuía + Chofer (${durationHours}h × ${multiplier} × $${guideRate}): $${guideCostTarjeta.toFixed(2)}`;
       }
       if (includeGreeter && greeterCostTarjeta > 0) {
@@ -8868,7 +8924,7 @@ class ItineraryBuilder {
       }
       if (waitingHours > 0 && waitingHourlyRate > 0) {
         const waitingRateSurcharged = waitingHourlyRate * (1 + (this.agencyRate / 100));
-        tarjetaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}): $${waitingCostTarjeta.toFixed(2)}`;
+        tarjetaBreakdown += `\nTiempo de espera (${waitingHours}h × $${waitingRateSurcharged.toFixed(2)}${legMultiplier > 1 ? ` × ${legMultiplier}` : ''}): $${waitingCostTarjeta.toFixed(2)}`;
       }
       if (extraWaitingCostEfectivo > 0) {
         tarjetaBreakdown += `\nTiempo de espera (vehículos adicionales): $${(transportPricing.nodes.extraWaiting?.tarjeta ?? 0).toFixed(2)}`;
@@ -11337,6 +11393,12 @@ class ItineraryBuilder {
     // de un servicio anterior al abrir uno nuevo.
     const aDispAvList = document.getElementById('aDisposicionAdditionalVehiclesList');
     if (aDispAvList) aDispAvList.innerHTML = '';
+    // Resetea la sub-opción "Viaja en el vehículo" del greeter de a-disposición: form.reset()
+    // no toca classList, así que el container podría quedar visible de un servicio anterior.
+    const aDispGiv = document.getElementById('aDisposicionGreeterInVehicle');
+    if (aDispGiv) aDispGiv.checked = false;
+    const aDispGivCont = document.getElementById('aDisposicionGreeterInVehicleContainer');
+    if (aDispGivCont) aDispGivCont.classList.add('d-none');
   }
 
   /**
@@ -14524,6 +14586,9 @@ class ItineraryBuilder {
 
     // Cuadra los renglones con el total (absorbe el centavo de redondeo).
     this.reconcileBreakdownItemsToTotal(items, totalMXN);
+    // Oculta guía/greeter del desglose para agentes/DM (admin/superadmin sí los ven). El
+    // total no cambia: su monto se pliega en la línea principal. Solo presentación.
+    this.foldHiddenAddonsForRole(items);
 
     // Update Desglose title with payment type
     const desgloseTitle = document.getElementById('desgloseTitle');
@@ -14661,6 +14726,9 @@ class ItineraryBuilder {
 
     // Cuadra los renglones con el total (absorbe el centavo de redondeo).
     this.reconcileBreakdownItemsToTotal(items, totalMXN);
+    // Oculta guía/greeter del desglose para agentes/DM (admin/superadmin sí los ven). El
+    // total no cambia: su monto se pliega en la línea principal. Solo presentación.
+    this.foldHiddenAddonsForRole(items);
 
     // Update Desglose title with payment type
     const desgloseTitle = document.getElementById('desgloseTitle');
@@ -14697,6 +14765,56 @@ class ItineraryBuilder {
    * For walking tours, uses simplified approach. For others, calculates directly.
    * @example
    */
+  /**
+   * Oculta los renglones de GUÍA y GREETER del desglose VISIBLE para roles que NO son
+   * admin/superadmin (agentes/department managers), plegando su monto en la línea principal
+   * (vehículo/servicio). El TOTAL no cambia — es solo presentación; la fórmula sigue
+   * incluyendo guía/greeter (el precio guardado viene de _transportBreakdownTotals, aparte).
+   * Aplica a transporte, tour con vehículo y a-disposición. Admin/superadmin ven todo.
+   * @param {Array<{label: string, amountMXN: number}>} items - Renglones del desglose.
+   * @returns {Array} Items con guía/greeter plegados (o sin cambios para admin/superadmin).
+   * @example
+   */
+  foldHiddenAddonsForRole(items) {
+    // Muta `items` en sitio (como reconcileBreakdownItemsToTotal) para componer con const.
+    if (!Array.isArray(items) || this.canEditPrices) return;
+    let folded = 0;
+    // Recorre al revés para poder hacer splice sin desfasar índices.
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      const raw = String(items[i].label || '');
+      const label = raw.trim();
+      if (/^gu[ií]a\b/i.test(label) || /^greeter\b/i.test(label)) {
+        // Línea independiente de guía / greeter → ocultar y plegar su monto.
+        folded += Number(items[i].amountMXN) || 0;
+        items.splice(i, 1);
+      } else {
+        // Línea combinada "… + Guía …" → quitar la mención a la guía (el monto se queda).
+        items[i].label = raw.replace(/\s*\+\s*Gu[ií]a/gi, '');
+      }
+    }
+    if (items.length === 0) return;
+    // Línea principal SOLO de los tipos en alcance (transporte / tour con vehículo /
+    // a-disposición). Walking tour no tiene estos conceptos → no matchea y se deja intacto.
+    const mainIdx = items.findIndex((it) => /veh[ií]culo|tarifa|transporte|disposici/i.test(it.label || ''));
+    if (mainIdx < 0) {
+      // Sin línea principal reconocida (ej. walking tour): no tocar labels. (folded ≈ 0.)
+      if (folded !== 0) items[0].amountMXN = (Number(items[0].amountMXN) || 0) + folded;
+      return;
+    }
+    if (folded !== 0) items[mainIdx].amountMXN = (Number(items[mainIdx].amountMXN) || 0) + folded;
+    // Quita SIEMPRE los montos $X embebidos del label principal (tarifa y total) para que los 3
+    // casos (sin / con guía / con greeter) se vean consistentes — "Transporte" / "4h × 1
+    // vehículo" + su total — y la fórmula no contradiga el monto (en a-disposición la guía se
+    // pliega en la tarifa, pero el greeter en el monto, así que sin esto el rate no cuadra).
+    items[mainIdx].label = String(items[mainIdx].label || '')
+      .replace(/\$[\d.,]+/g, '') // quita montos $X (tarifa y total)
+      .replace(/×\s*×/g, '×') // colapsa "× ×" donde estaba la tarifa
+      .replace(/\s*[:=]\s*$/, '') // ":" / "=" colgante final
+      .replace(/×\s*$/, '') // "×" colgante final
+      .replace(/\s{2,}/g, ' ') // espacios dobles
+      .trim();
+  }
+
   /**
    * Lee el dev breakdown de la forma de pago activa (la fuente de verdad calculada por
    * updateDevPaymentBreakdown vía el motor) y devuelve sus renglones como items del
@@ -14880,7 +14998,9 @@ class ItineraryBuilder {
           }
 
           // Combined vehicle + guide line - use surcharged prices
-          const guideCost = this.calculateGuideTransportCost(routeDuration); // Guide cost (no surcharge on guide)
+          // Round-trip: la guía cobra ida + vuelta (× brkLegMultiplier) igual que el vehículo y el
+          // greeter → ×4 total (el ×2 base del motor × ×2 round-trip); one-way ×2. Confirmado por cliente.
+          const guideCost = this.calculateGuideTransportCost(routeDuration) * brkLegMultiplier; // Guide cost (no surcharge on guide)
           const roundTripVehiclePrice = displayUnitPrice * brkLegMultiplier; // Apply round-trip to surcharged vehicle price
           const combinedUnitPrice = roundTripVehiclePrice + guideCost; // Add guide cost to round-trip vehicle price
           const combinedTotal = combinedUnitPrice * quantity; // Multiply by quantity for total
@@ -15674,6 +15794,9 @@ class ItineraryBuilder {
 
     // Cuadra los renglones con el total (absorbe el centavo de redondeo).
     this.reconcileBreakdownItemsToTotal(items, totalMXN);
+    // Oculta guía/greeter del desglose para agentes/DM (admin/superadmin sí los ven). El
+    // total no cambia: su monto se pliega en la línea principal. Solo presentación.
+    this.foldHiddenAddonsForRole(items);
 
     // Render all service-specific breakdown items first
     const itemsHTML = items.map((item) => {

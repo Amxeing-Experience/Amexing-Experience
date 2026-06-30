@@ -823,6 +823,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <i class="ti ti-user-check me-1"></i>Incluir Greeter
                                         </label>
                                     </div>
+                                    <!-- Sub-opción: el greeter viaja en el vehículo (ocupa 1 asiento). Espejo de transporte. -->
+                                    <div class="form-check ms-3 d-none" id="aDisposicionGreeterInVehicleContainer">
+                                        <input class="form-check-input" type="checkbox" id="aDisposicionGreeterInVehicle">
+                                        <label class="form-check-label small text-muted" for="aDisposicionGreeterInVehicle">Viaja en el vehículo</label>
+                                    </div>
+                                </div>
+                                <!-- Nota de capacidad (a-disposición): el guía/greeter que viaja ocupa un asiento -->
+                                <div class="col-12">
+                                    <small id="aDisposicionVehicleCapacityNote" class="text-info d-none d-block mt-1"><i class="ti ti-info-circle me-1"></i><span id="aDisposicionVehicleCapacityNoteText"></span></small>
                                 </div>
                             </div>
 
