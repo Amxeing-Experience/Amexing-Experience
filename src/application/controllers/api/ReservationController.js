@@ -524,9 +524,11 @@ class ReservationController {
         const results = await compoundQuery.find({ useMasterKey: true });
 
         // Get service counts for each reservation
+        const pendingCancelQuoteIds = await ReservationController.getPendingCancellationQuoteIds(results);
         const data = await Promise.all(results.map(async (reservation) => {
           const serviceCount = await ReservationController.getServiceCounts(reservation.id);
-          return ReservationController.formatReservationRow(reservation, serviceCount);
+          const hasPendingCancellation = pendingCancelQuoteIds.has(reservation.get('quotePtr')?.id);
+          return ReservationController.formatReservationRow(reservation, serviceCount, hasPendingCancellation);
         }));
 
         return res.json({
@@ -568,9 +570,11 @@ class ReservationController {
       const results = await query.find({ useMasterKey: true });
 
       // Get service counts for each reservation
+      const pendingCancelQuoteIds = await ReservationController.getPendingCancellationQuoteIds(results);
       const data = await Promise.all(results.map(async (reservation) => {
         const serviceCount = await ReservationController.getServiceCounts(reservation.id);
-        return ReservationController.formatReservationRow(reservation, serviceCount);
+        const hasPendingCancellation = pendingCancelQuoteIds.has(reservation.get('quotePtr')?.id);
+        return ReservationController.formatReservationRow(reservation, serviceCount, hasPendingCancellation);
       }));
 
       return res.json({
@@ -1650,7 +1654,27 @@ class ReservationController {
    * @param serviceCount
    * @example
    */
-  static formatReservationRow(reservation, serviceCount) {
+  /**
+   * For a page of reservations, return the Set of quote objectIds that have a
+   * pending CancellationRequest. One batched query instead of N per-row lookups,
+   * so the table can flag reservations awaiting cancellation approval.
+   * @param {Array<Parse.Object>} reservations - Reservation page results.
+   * @returns {Promise<Set<string>>} Set of quoteId strings with a pending request.
+   */
+  static async getPendingCancellationQuoteIds(reservations) {
+    const quotes = reservations.map((r) => r.get('quotePtr')).filter(Boolean);
+    if (quotes.length === 0) return new Set();
+    const query = new Parse.Query('CancellationRequest');
+    query.containedIn('quote', quotes);
+    query.equalTo('status', 'pending');
+    query.equalTo('exists', true);
+    query.select('quote');
+    query.limit(1000);
+    const requests = await query.find({ useMasterKey: true });
+    return new Set(requests.map((req) => req.get('quote')?.id).filter(Boolean));
+  }
+
+  static formatReservationRow(reservation, serviceCount, hasPendingCancellation = false) {
     // Cliente mostrado: se resuelve desde la cotización para reflejar el modelo real.
     // En una cotización 'direct' la persona es el cliente: nuevas llevan un AmexingUser
     // end_client en quotePtr.client; las legadas un Client en quotePtr.companyClientPtr.
@@ -1738,6 +1762,9 @@ class ReservationController {
       totalServices: serviceCount.totalCount,
       assignedServices: serviceCount.assignedCount,
       status,
+      // A <24h cancellation creates a pending request while the reservation stays
+      // in its real status; flag it so the table shows "Pendiente de cancelación".
+      hasPendingCancellation: !!hasPendingCancellation && status !== 'cancelled',
       owner: ownerName,
       ownerIsCreator: !hasUsableOwner, // true cuando se usó el creador como fallback
       createdAt: reservation.createdAt,
